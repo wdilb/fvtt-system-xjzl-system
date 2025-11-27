@@ -88,7 +88,19 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         
         // 银两：只存余额。
         // 交易记录存储在 history 中，通过 type="item" 或 "resource" 区分
-        silver: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Resources.Silver" })  
+        silver: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Resources.Silver" }),
+        
+        satiety: makeResourceField(100, 100, "XJZL.Resources.Satiety"),// 饱食度 (Satiety): 上限100
+        alcohol: makeResourceField(0, 0, "XJZL.Resources.Alcohol"),//酒量 (Alcohol): 当前值可超上限,上限在 prepareDerivedData 中计算 (等于体魄)，这里初始设为0
+        morale: makeResourceField(0, 100, "XJZL.Resources.Morale"),// 士气 (Morale): 0-100
+        // 杀戮 (Shalu): 0-100
+        // 注意：达到100转杀孽的逻辑需要在 Actor._onUpdate 或 Item 逻辑中处理，这里只管存
+        shalu: makeResourceField(0, 100, "XJZL.Resources.Shalu"),
+        // 杀孽 (Shanie): 无上限整数
+        shanie: new fields.NumberField({ min: 0, initial: 0, integer: true, label: "XJZL.Resources.Shanie" }),
+        // 护体真气 (Huti): 无限叠加，优先扣除
+        // 只需要存当前值，不需要 max
+        huti: new fields.NumberField({ min: 0, initial: 0, integer: true, label: "XJZL.Resources.Huti" }) 
       }),
 
       // === E. 战斗属性 (Combat) ===
@@ -441,7 +453,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     resources.hp.max = Math.floor(S.tipo * 4 + S.liliang * 1 + (resources.hp.bonus || 0));
     resources.mp.max = Math.floor(S.neixi * 1 + (resources.mp.bonus || 0));
     resources.rage.max = 10;
-
+    resources.alcohol.max = S.tipo;
     // 战斗属性
     // ------------------------------------
     
@@ -459,13 +471,15 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     
     // 先攻
     combat.initiativeTotal = Math.floor(S.shenfa + combat.initiative);
-
+    
+    // [士气] 计算暴击骰修正
+    const moraleCritMod = Math.floor((resources.morale.value || 0) / 10);
     // 攻防面板
     combat.defWaigongTotal = Math.floor(S.tipo / 5 + combat.def_waigong);
     combat.defNeigongTotal = Math.floor(S.neixi / 3 + combat.def_neigong);
     combat.hitWaigongTotal = Math.floor(S.shenfa / 2 + combat.hit_waigong);
     combat.hitNeigongTotal = Math.floor(S.qigan / 2 + combat.hit_neigong);
-    combat.critWaigongTotal = Math.floor(20 - (S.liliang / 20) + combat.crit_waigong);
-    combat.critNeigongTotal = Math.floor(20 - (S.qigan / 20) + combat.crit_neigong);
+    combat.critWaigongTotal = Math.floor(20 - (S.liliang / 20) + combat.crit_waigong - moraleCritMod);
+    combat.critNeigongTotal = Math.floor(20 - (S.qigan / 20) + combat.crit_neigong - moraleCritMod);
   }
 }
