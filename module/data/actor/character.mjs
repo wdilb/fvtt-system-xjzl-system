@@ -284,6 +284,20 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         
         // --- A. 内功 (Neigong) 计算境界 ---
         if (item.type === "neigong") {
+          // 自动应用属性加成 (仅当内功正在运行 active=true 时)
+          if (item.system.active) {
+            const bonuses = item.system.current.stats; // 直接读取我们在 Item 里算好的 current
+            
+            // 累加到 Actor 的 mod 上
+            // 注意：这里我们修改的是 stats.wuxing.mod (修正值)
+            if (bonuses) {
+              stats.liliang.mod = (stats.liliang.mod || 0) + bonuses.liliang;
+              stats.shenfa.mod  = (stats.shenfa.mod || 0)  + bonuses.shenfa;
+              stats.tipo.mod    = (stats.tipo.mod || 0)    + bonuses.tipo;
+              stats.neixi.mod   = (stats.neixi.mod || 0)   + bonuses.neixi;
+              stats.shencai.mod = (stats.shencai.mod || 0) + bonuses.shencai;
+            }
+          }
           // tier: 1(人), 2(地), 3(天)
           // stage: 1(领), 2(小/掌), 3(圆/精), 4(合)
           const tier = item.system.tier || 1;
@@ -308,7 +322,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           if (realm > maxRealmLevel) maxRealmLevel = realm;
         }
 
-        // --- B. 武学 (Move) 计算悟性和造诣 ---
+        // --- B. 武学 (wuxue) 计算悟性和造诣 ---
         if (item.type === "wuxue") {
           const tier = item.system.tier || 1;
           const stage = item.system.stage || 0;
@@ -471,7 +485,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     
     // 先攻
     combat.initiativeTotal = Math.floor(S.shenfa + combat.initiative);
-    
+
     // [士气] 计算暴击骰修正
     const moraleCritMod = Math.floor((resources.morale.value || 0) / 10);
     // 攻防面板
