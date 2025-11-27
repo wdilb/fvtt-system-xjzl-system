@@ -36,7 +36,6 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     });
 
     return {
-      
       // === A. 基础档案 (Info) ===
       // 记录角色的身份、外貌等 Roleplay 信息
       info: new fields.SchemaField({

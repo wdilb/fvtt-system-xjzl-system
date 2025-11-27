@@ -1,0 +1,89 @@
+<!--暂时的页面，先运行起来-->
+{{!-- 注意：不要写 <form> 标签，系统会自动包裹 --}}
+{{!-- 最外层包裹一个 div，作为唯一的根元素 --}}
+<div class="sheet-content">
+    {{!-- 调试信息：如果这里没东西，说明 JS 上下文还是错的 --}}
+    {{log "Item Render:" item system}}
+
+    <header class="sheet-header">
+        {{!-- 修正图片点击：使用 data-action="editImage" --}}
+        <img src="{{item.img}}" data-action="editImage" title="{{item.name}}" class="profile-img"/>
+        <div style="flex:1">
+            <label>物品名称</label>
+            <input name="name" type="text" value="{{item.name}}" placeholder="输入物品名称" style="font-size: 1.5em; font-weight: bold;"/>
+        </div>
+    </header>
+
+    {{!-- 通用信息 --}}
+    <div style="padding: 5px; background: rgba(0,0,0,0.05); border: 1px solid #aaa; margin-bottom: 10px;">
+        <strong>类型 ID:</strong> {{item.type}}
+    </div>
+
+    <section class="sheet-body">
+        
+        {{!-- === 内功 (neigong) 编辑器 === --}}
+        {{#if (eq item.type "neigong")}}
+        <div class="neigong-editor">
+            <h3>核心设定</h3>
+            <div class="grid grid-2col">
+                <div class="form-group">
+                    <label>品阶 (1人/2地/3天)</label>
+                    <input type="number" name="system.tier" value="{{system.tier}}"/>
+                </div>
+                <div class="form-group">
+                    <label>五行属性</label>
+                    <select name="system.element">
+                        {{!-- 简单的硬编码选项，确保能显示 --}}
+                        <option value="taiji" {{#if (eq system.element "taiji")}}selected{{/if}}>太极</option>
+                        <option value="yin" {{#if (eq system.element "yin")}}selected{{/if}}>阴</option>
+                        <option value="yang" {{#if (eq system.element "yang")}}selected{{/if}}>阳</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>已投入修为 (XP)</label>
+                    <input type="number" name="system.xpInvested" value="{{system.xpInvested}}"/>
+                </div>
+                <div class="form-group">
+                    <label style="display:flex; align-items:center; gap:5px;">
+                        <input type="checkbox" name="system.active" {{checked system.active}} style="width:auto;"/>
+                        是否运功中?
+                    </label>
+                </div>
+            </div>
+
+            <div style="margin-top: 10px; padding: 10px; background: #e0f7fa; border: 1px solid #00acc1; border-radius: 4px;">
+                <p style="margin:0; font-weight:bold;">当前计算状态 (只读)</p>
+                <p style="margin:0;">境界 Stage: {{system.stage}}</p>
+                <p style="margin:0;">进度 Progress: {{system.progress}}%</p>
+            </div>
+
+            <h3>属性加成配置 (测试用)</h3>
+            
+            {{!-- 遍历3个阶段 --}}
+            {{#each system.config as |stageData stageKey|}}
+            <div style="border:1px solid #999; margin-bottom:10px; padding:5px; background: rgba(255,255,255,0.5);">
+                <h4 style="margin:0 0 5px 0; background:#ddd; padding:2px;">{{stageKey}} 设置</h4>
+                
+                <div class="grid grid-3col">
+                    <div><label>力</label><input type="number" name="system.config.{{stageKey}}.stats.liliang" value="{{stageData.stats.liliang}}"/></div>
+                    <div><label>敏</label><input type="number" name="system.config.{{stageKey}}.stats.shenfa" value="{{stageData.stats.shenfa}}"/></div>
+                    <div><label>体</label><input type="number" name="system.config.{{stageKey}}.stats.tipo" value="{{stageData.stats.tipo}}"/></div>
+                    <div><label>息</label><input type="number" name="system.config.{{stageKey}}.stats.neixi" value="{{stageData.stats.neixi}}"/></div>
+                    <div><label>神</label><input type="number" name="system.config.{{stageKey}}.stats.shencai" value="{{stageData.stats.shencai}}"/></div>
+                </div>
+                
+                <div style="margin-top:5px;">
+                    <label>脚本</label>
+                    <input type="text" name="system.config.{{stageKey}}.script" value="{{stageData.script}}" placeholder="S.stats.liliang.mod += 10;"/>
+                </div>
+            </div>
+            {{/each}}
+
+        </div>
+        {{else}}
+        {{!-- 非内功物品显示默认信息 --}}
+        <p>暂无此类型物品的专用编辑器。</p>
+        {{/if}}
+
+    </section>
+</div>
