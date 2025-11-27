@@ -70,11 +70,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       }),
 
       // === C. 修为池 (Cultivation) ===
-      // 仅存储“存量”数据。境界等级和武器造诣由 Item 自动计算，不存数据库。
+      // 仅存储“存量”数据 (当前余额)。
+      // 这里的数值 = 总获得量 - 已投入到内功/武学中的量
       cultivation: new fields.SchemaField({
         general: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.General" }), // 通用修为
         neigong: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Neigong" }), // 专属内功修为
-        wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Martial" }), // 专属武学修为
+        wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Wuxue" }),     // 专属武学修为 (原 martial)
         arts: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Arts" })        // 专属技艺修为
       }),
 
@@ -85,8 +86,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         mp: makeResourceField(0, 0, "XJZL.Resources.MP"),      // 内力 (Mana/Qi)
         rage: makeResourceField(0, 10, "XJZL.Resources.Rage"), // 怒气 (Rage) - 初始0, 上限10
         
-        // 银两/货币
-        silver: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Resources.Silver" }) 
+        // 银两：只存余额。
+        // 交易记录存储在 history 中，通过 type="item" 或 "resource" 区分
+        silver: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Resources.Silver" })  
       }),
 
       // === E. 战斗属性 (Combat) ===
@@ -145,13 +147,54 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         }), { label: "XJZL.Social.Relations" })
       }),
 
-      // === H. 经历日志 (History) ===
-      // 记录修为和银两的收支历史
+      // === 8. 生平经历 (History / Audit Log) ===
+      // 记录角色的所有关键变动。
+      // 设计目标：支持 DM 查账 (审计模式) 和 玩家查看故事 (生平模式)
       history: new fields.ArrayField(new fields.SchemaField({
-        date: new fields.StringField(),   // 发生时间
-        type: new fields.StringField(),   // 类型 (修为/银两)
-        amount: new fields.NumberField(), // 变动值
-        reason: new fields.StringField()  // 原因
+        // 1. 唯一标识符 (ID)
+        // 用于技术上的索引，比如未来可能需要“删除某条错误日志”
+        id: new fields.StringField({ required: true, initial: () => foundry.utils.randomID() }),
+        
+        // 2. 双重时间系统
+        // realTime: 现实时间戳 (毫秒)。必填，用于默认的时间倒序排列。
+        realTime: new fields.NumberField({ required: true, initial: Date.now, label: "XJZL.History.RealTime" }), 
+        // gameDate: 游戏内时间 (字符串)。选填，DM 或系统逻辑可以留空。
+        gameDate: new fields.StringField({ initial: "", label: "XJZL.History.GameDate" }), 
+        
+        // 3. 分类与筛选 (Filter Tags)
+        // 这里的 choices 是存入数据库的值，前端显示时请使用 localize("XJZL.History.Type." + type)
+        type: new fields.StringField({ 
+          required: true, 
+          choices: ["resource", "item", "social", "text"], 
+          initial: "text",
+          label: "XJZL.History.Type.Label"
+        }),
+        
+        // importance: 重要性分级 (用于前端“防乱”过滤)
+        // 0 = 琐事 (如: 买消耗品, 卖杂物, 小额修为变动) -> 默认隐藏，审计模式可见
+        // 1 = 正常 (如: 获得新武学, 突破境界, 大额交易) -> 默认显示
+        // 2 = 关键 (如: 结识关键NPC, DM手动发放奖励, 获得神兵) -> 高亮显示
+        importance: new fields.NumberField({ 
+          initial: 1, 
+          choices: [0, 1, 2], 
+          integer: true, 
+          label: "XJZL.History.Importance.Label" 
+        }),
+        
+        // 4. 内容描述
+        // title: 标题
+        title: new fields.StringField({ required: true, label: "XJZL.History.Title" }), 
+        // delta: 变动量字符串 (如 "+1", "-500", "+20")
+        delta: new fields.StringField({ initial: "", label: "XJZL.History.Delta" }),
+        // balance: (快照) 变动后的余额，仅对资源类有效，方便查账
+        balance: new fields.StringField({ initial: "", label: "XJZL.History.Balance" }),
+        // reason: 原因/备注 (如 "商店购买", "副本掉落", "闭关修炼")
+        reason: new fields.StringField({ initial: "", label: "XJZL.History.Reason" }),
+        
+        // 5. 关联引用 (Reference)
+        // 存储 Item UUID 或 Actor UUID。
+        // 点击日志时，可以尝试获取该对象并显示详情 (如果对象还在身上的话)
+        refId: new fields.StringField({ initial: "" }) 
       }))
     };
   }
@@ -254,7 +297,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         }
 
         // --- B. 武学 (Move) 计算悟性和造诣 ---
-        if (item.type === "move") {
+        if (item.type === "wuxue") {
           const tier = item.system.tier || 1;
           const stage = item.system.stage || 0;
           const wType = item.system.weaponType; // 武器类型
