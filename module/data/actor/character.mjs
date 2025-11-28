@@ -346,6 +346,17 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         total: 0  // 最终值
       };
     }
+
+    // 初始化内功静态加成 (neigongBonus)
+    // 这样我们就有了三个明确的数据来源：
+    // 1. value (基础)
+    // 2. mod (装备/Buff/脚本)
+    // 3. neigongBonus (内功静态加成)
+    for (const [key, stat] of Object.entries(this.stats)) {
+      if (key === 'freePoints') continue;
+      // 初始化 neigongBonus，防止后续计算 NaN
+      stat.neigongBonus = 0;
+    }
     
     // 初始化衍生容器，防止访问 undefined
     if (!this.cultivation) this.cultivation = {};
@@ -425,14 +436,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           if (item.system.active) {
             const bonuses = item.system.current.stats; // 直接读取我们在 Item 里算好的 current
             
-            // 累加到 Actor 的 mod 上
-            // 注意：这里我们修改的是 stats.wuxing.mod (修正值)
+            // 累加到 Actor 的 neigongBonus 上 (分离 mod 字段)
+            // 注意：这里我们修改的是 stats.xxx.neigongBonus
             if (bonuses) {
-              stats.liliang.mod = (stats.liliang.mod || 0) + bonuses.liliang;
-              stats.shenfa.mod  = (stats.shenfa.mod || 0)  + bonuses.shenfa;
-              stats.tipo.mod    = (stats.tipo.mod || 0)    + bonuses.tipo;
-              stats.neixi.mod   = (stats.neixi.mod || 0)   + bonuses.neixi;
-              stats.shencai.mod = (stats.shencai.mod || 0) + bonuses.shencai;
+              stats.liliang.neigongBonus = (stats.liliang.neigongBonus || 0) + bonuses.liliang;
+              stats.shenfa.neigongBonus  = (stats.shenfa.neigongBonus || 0)  + bonuses.shenfa;
+              stats.tipo.neigongBonus    = (stats.tipo.neigongBonus || 0)    + bonuses.tipo;
+              stats.neixi.neigongBonus   = (stats.neixi.neigongBonus || 0)   + bonuses.neixi;
+              stats.shencai.neigongBonus = (stats.shencai.neigongBonus || 0) + bonuses.shencai;
             }
           }
           // tier: 1(人), 2(地), 3(天)
@@ -610,9 +621,10 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     for (const [key, stat] of Object.entries(stats)) {
       if (key === 'wuxing' || key === 'freePoints') continue; 
       
-      // Total = Base + Assigned + Mod
-      // mod 此时包含：AE修正 + 内功静态修正 + (如果有)脚本动态修正
-      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0);
+      // Total = Base + Assigned + Mod + NeigongBonus
+      // mod: AE修正 + (如果有)脚本动态修正
+      // neigongBonus: 内功静态修正
+      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0) + (stat.neigongBonus || 0);
       
       // TODO 属性小于0 死亡
     }

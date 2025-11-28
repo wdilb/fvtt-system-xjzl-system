@@ -16,7 +16,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     const makeStageSchema = (label) => new fields.SchemaField({
       // 属性加成 (填写该阶段生效的总数值)
       stats: new fields.SchemaField({
-        liliang: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusLilinag" }),
+        liliang: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusLiliang" }),
         shenfa: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusShenfa" }),
         tipo: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusTipo" }),
         neixi: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusNeixi" }),
