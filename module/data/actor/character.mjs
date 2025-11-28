@@ -22,9 +22,11 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     const fields = foundry.data.fields;
 
-    // [Helper] 七维属性模板：包含 基础值(value) 和 修正值(mod)
+    // [Helper] 七维属性模板：包含 基础值(value)、分配值(assigned) 和 修正值(mod)
+    // assigned: 自由属性点分配的数值
     const makeStatField = (labelKey) => new fields.SchemaField({
       value: new fields.NumberField({ required: true, integer: true, initial: 1, label: "XJZL.Stats.Base" }),
+      assigned: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.Assigned" }), 
       mod: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.Mod" })
     }, { label: labelKey });
 
@@ -35,58 +37,75 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       bonus: new fields.NumberField({ required: true, integer: true, initial: 0 }) 
     });
 
+    // [Helper] 通用数值模板 (用于抗性、伤害修正、武器等级等)
+    // 结构: { value: 基础值, mod: 修正值(AE), total: 最终值 }
+    const makeModField = (initial = 0) => new fields.SchemaField({
+        value: new fields.NumberField({ initial: initial, integer: true }), 
+        mod: new fields.NumberField({ initial: 0, integer: true }),         
+        total: new fields.NumberField({ initial: initial, integer: true })  
+    },{ label: label });
+
     return {
-      // ==========================================
-      // A. 基础档案 (Info) - 角色扮演信息
-      // ==========================================
+      // === A. 基础档案 (Info) ===
+      // 记录角色的身份、外貌等 Roleplay 信息
       info: new fields.SchemaField({
         gender: new fields.StringField({ initial: "", label: "XJZL.Info.Gender" }),   // 性别
-        zi: new fields.StringField({ initial: "", label: "XJZL.Info.Zi" }),           // 表字
-        title: new fields.StringField({ initial: "", label: "XJZL.Info.Title" }),     // 江湖称号
+        zi: new fields.StringField({ initial: "", label: "XJZL.Info.Zi" }),           // 字
+        title: new fields.StringField({ initial: "", label: "XJZL.Info.Title" }),     // 称号
+        
         age: new fields.NumberField({ min: 0, initial: 18, integer: true, label: "XJZL.Info.Age" }), // 年龄
-        height: new fields.StringField({ initial: "", label: "XJZL.Info.Height" }),   // 身高
+        height: new fields.StringField({ initial: "", label: "XJZL.Info.Height" }),   // 身高 
         weight: new fields.StringField({ initial: "", label: "XJZL.Info.Weight" }),   // 体重
         
-        sect: new fields.StringField({ initial: "", label: "XJZL.Info.Sect" }),       // 门派 (存储门派ID或名称)
-        background: new fields.StringField({ initial: "", label: "XJZL.Info.Background" }), // 身世背景 (Item引用或文本)
+        sect: new fields.StringField({ initial: "", label: "XJZL.Info.Sect" }),       // 门派 (ID或Key)
+        background: new fields.StringField({ initial: "", label: "XJZL.Info.Background" }), // 身世背景
         personality: new fields.StringField({ initial: "", label: "XJZL.Info.Personality" }), // 性格特质
         
-        bio: new fields.HTMLField({ label: "XJZL.Info.Bio" }),                        // 详细传记 (HTML富文本)
+        bio: new fields.HTMLField({ label: "XJZL.Info.Bio" }),                        // 详细传记 (富文本)
         appearance: new fields.StringField({ label: "XJZL.Info.Appearance" })         // 外貌简述
       }),
 
-      // ==========================================
-      // B. 七维属性 (Stats) - 核心骨架
-      // ==========================================
+      // === B. 七维属性 (Stats) ===
+      // 核心骨架，全拼音命名。初始为1，变为负数触发死亡逻辑。
       stats: new fields.SchemaField({
-        wuxing: makeStatField("XJZL.Stats.Wuxing"),   // 悟性: 决定武学修炼速度、境界突破概率
-        liliang: makeStatField("XJZL.Stats.Liliang"), // 力量: 决定负重、外功伤害、暴击率
-        shenfa: makeStatField("XJZL.Stats.Shenfa"),   // 身法: 决定速度、闪避、轻功、先攻
-        neixi: makeStatField("XJZL.Stats.Neixi"),     // 内息: 决定内力上限、内功伤害、回气速度
-        tipo: makeStatField("XJZL.Stats.Tipo"),       // 体魄: 决定气血上限、防御力、酒量
-        qigan: makeStatField("XJZL.Stats.Qigan"),     // 气感: 决定感知范围、特殊技能判定
-        shencai: makeStatField("XJZL.Stats.Shencai")  // 神采: 决定社交、定力、精神抗性
+        // 自由属性点 (可自由分配到除悟性外的属性上)
+        freePoints: new fields.SchemaField({
+            value: new fields.NumberField({ min: 0, initial: 0, integer: true }), // 初始赠送
+            mod: new fields.NumberField({ initial: 0, integer: true }),           // AE/升级获得
+            total: new fields.NumberField({ initial: 0, integer: true })          // 剩余可用
+        }, { label: "XJZL.Stats.FreePoints" }),
+
+        // 悟性特殊处理：包含玄关打通状态
+        wuxing: new fields.SchemaField({
+            value: new fields.NumberField({ required: true, integer: true, initial: 1, label: "XJZL.Stats.Base" }),
+            mod: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.Mod" }),
+            xuanguan: new fields.BooleanField({ initial: false, label: "XJZL.Stats.Xuanguan" }) // 是否打通玄关 (影响上限)
+        }, { label: "XJZL.Stats.Wuxing" }),
+
+        liliang: makeStatField("XJZL.Stats.Liliang"), // 力量
+        shenfa: makeStatField("XJZL.Stats.Shenfa"),   // 身法
+        neixi: makeStatField("XJZL.Stats.Neixi"),     // 内息
+        tipo: makeStatField("XJZL.Stats.Tipo"),       // 体魄
+        qigan: makeStatField("XJZL.Stats.Qigan"),     // 气感
+        shencai: makeStatField("XJZL.Stats.Shencai")  // 神采
       }),
 
-      // ==========================================
-      // C. 修为池 (Cultivation) - 经验值系统
-      // ==========================================
+      // === C. 修为池 (Cultivation) ===
       // 仅存储“存量”数据 (当前余额)。
       // 这里的数值 = 总获得量 - 已投入到内功/武学中的量
       cultivation: new fields.SchemaField({
         general: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.General" }), // 通用修为
         neigong: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Neigong" }), // 专属内功修为
-        wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Wuxue" }),     // 专属武学修为 (原 martial)
+        wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Wuxue" }),     // 专属武学修为
         arts: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Arts" })        // 专属技艺修为
       }),
 
-      // ==========================================
-      // D. 核心资源 (Resources) - 动态条
-      // ==========================================
+      // === D. 核心资源 (Resources) ===
+      // 战斗中高频变动的数据
       resources: new fields.SchemaField({
-        hp: makeResourceField(10, 10, "XJZL.Resources.HP"),    // 气血: 归零昏迷/死亡
-        mp: makeResourceField(0, 0, "XJZL.Resources.MP"),      // 内力: 施放招式消耗
-        rage: makeResourceField(0, 10, "XJZL.Resources.Rage"), // 怒气: 战斗积累，释放绝技 (上限固定10)
+        hp: makeResourceField(10, 10, "XJZL.Resources.HP"),    // 气血 (Health)
+        mp: makeResourceField(0, 0, "XJZL.Resources.MP"),      // 内力 (Mana/Qi)
+        rage: makeResourceField(0, 10, "XJZL.Resources.Rage"), // 怒气 (Rage) - 初始0, 上限10
         
         // 银两：只存余额。
         // 交易记录存储在 history 中，通过 type="item" 或 "resource" 区分
@@ -105,41 +124,73 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         huti: new fields.NumberField({ min: 0, initial: 0, integer: true, label: "XJZL.Resources.Huti" }) 
       }),
 
-      // ==========================================
-      // E. 战斗属性 (Combat) - 面板数据
-      // ==========================================
-      // 这里的字段主要用于接收 Active Effects 的修正值 (Mod)。
-      // 最终值 (Total) 并不存在数据库里，而是每次计算出来的。
+      // === E. 战斗属性 (Combat) ===
+      // 这里的字段主要用于接收 Active Effects (如装备、Buff) 的修正值。
+      // 最终面板值 (Total) 由 prepareDerivedData 计算。
       combat: new fields.SchemaField({
-        // 1. 基础修正
-        block: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Block" }),       // 格挡值
-        kanpo: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Kanpo" }),       // 看破值
-        speed: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Speed" }),       // 移动速度
-        dodge: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Dodge" }),       // 闪避值
-        initiative: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Initiative" }), // 先攻值
+        // 1. 基础战斗属性 
+        block: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Block" }),       // 格挡修正
+        kanpo: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Kanpo" }),       // 看破修正
+        speed: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Speed" }),       // 速度修正
+        dodge: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Dodge" }),       // 闪避修正
+        initiative: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Initiative" }), // 先攻修正
         
-        // 2. 攻防修正
-        def_waigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.DefWaigong" }), // 外功防御
-        def_neigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.DefNeigong" }), // 内功防御
-        hit_waigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.HitWaigong" }), // 外功命中
-        hit_neigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.HitNeigong" }), // 内功命中
-        crit_waigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.CritWaigong" }), // 外功暴击
-        crit_neigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.CritNeigong" }), // 内功暴击
+        // 2. 攻防复合属性 (前缀_拼音)
+        def_waigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.DefWaigong" }), // 外防修正
+        def_neigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.DefNeigong" }), // 内防修正
+        hit_waigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.HitWaigong" }), // 外功命中修正
+        hit_neigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.HitNeigong" }), // 内功命中修正
+        crit_waigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.CritWaigong" }), // 外功暴击修正
+        crit_neigong: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.CritNeigong" }), // 内功暴击修正
 
-        // 3. 全局伤害修正 (用于Buff，如"大力丸: 造成伤害+5")
-        weapon_dmg_bonus: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.GlobalDmgMod" })
+        // 3. 武器等级 (Weapon Ranks) - 移至 combat 下以支持 mod (AE)
+        // 结构: { value: 基础(武学), mod: 修正(装备), total: 最终 }
+         weaponRanks: new fields.SchemaField({
+            sword: makeModField(0, "XJZL.Combat.Rank.Sword"),           // 剑
+            blade: makeModField(0, "XJZL.Combat.Rank.Blade"),           // 刀
+            staff: makeModField(0, "XJZL.Combat.Rank.Staff"),           // 棍 (长棍/长枪)
+            dagger: makeModField(0, "XJZL.Combat.Rank.Dagger"),         // 匕首 (双刺/扇)
+            hidden: makeModField(0, "XJZL.Combat.Rank.Hidden"),         // 暗器
+            unarmed: makeModField(0, "XJZL.Combat.Rank.Unarmed"),       // 徒手 (拳/掌/腿)
+            instrument: makeModField(0, "XJZL.Combat.Rank.Instrument"), // 乐器
+            special: makeModField(0, "XJZL.Combat.Rank.Special")        // 奇门
+        }, { label: "XJZL.Combat.WeaponRanks" }),
+
+        // 4. 详细伤害修正 (Damage Bonuses)
+        // 用于接收各类 Buff/装备 的 mod，替代旧的 weapon_dmg_bonus
+        damages: new fields.SchemaField({
+            global: makeModField(0, "XJZL.Combat.Dmg.Global"), // 全局伤害加成
+            weapon: makeModField(0, "XJZL.Combat.Dmg.Weapon"), // 武器伤害加成
+            normal: makeModField(0, "XJZL.Combat.Dmg.Normal"), // 普通攻击伤害加成
+            skill: makeModField(0, "XJZL.Combat.Dmg.Skill"),  // 招式伤害加成
+            yang: makeModField(0, "XJZL.Combat.Dmg.Yang"),  // 阳属性伤害加成
+            yin: makeModField(0, "XJZL.Combat.Dmg.Yin"),    // 阴属性伤害加成
+            gang: makeModField(0, "XJZL.Combat.Dmg.Gang"),   // 刚属性伤害加成
+            rou: makeModField(0, "XJZL.Combat.Dmg.Rou"),    // 柔属性伤害加成
+            taiji: makeModField(0, "XJZL.Combat.Dmg.Taiji")   // 太极伤害加成
+        }, { label: "XJZL.Combat.Damages" }),
+
+        // 5. 抗性 (Resistances)
+        resistances: new fields.SchemaField({
+            global: makeModField(0, "XJZL.Combat.Res.Global"),     // 全局抗性 (预留)
+            bleed: makeModField(0, "XJZL.Combat.Res.Bleed"),      // 流血抗性 (基础=凝血)
+            poison: makeModField(0, "XJZL.Combat.Res.Poison"),     // 毒素抗性 (基础=韧性)
+            fire: makeModField(0, "XJZL.Combat.Res.Fire"),       // 火焰抗性
+            mental: makeModField(0, "XJZL.Combat.Res.Mental"),      // 精神抗性
+            liushi: makeModField(0, "XJZL.Combat.Res.Liushi")      // 流失抗性
+        }, { label: "XJZL.Combat.Resistances" })
       }),
 
-      // ==========================================
-      // F. 武学状态 (Martial)
-      // ==========================================
+      // === F. 武学状态 (Martial Status) ===
       martial: new fields.SchemaField({
-        active_neigong: new fields.StringField({ label: "XJZL.Resources.ActiveNeigong" }), // 当前激活的内功 Item UUID
+        active_neigong: new fields.StringField({ label: "XJZL.Resources.ActiveNeigong" }), // 当前运行内功的 UUID
+        
+        // 当前架招 (Stance)
+        stance: new fields.StringField({ label: "XJZL.Martial.Stance" }), // 架招 Item UUID
+        stanceActive: new fields.BooleanField({ initial: false }),        // 架招是否激活
       }),
 
-      // ==========================================
-      // G. 社交与声望 (Social)
-      // ==========================================
+      // === G. 社交与声望 (Social) ===
       social: new fields.SchemaField({
         // 势力声望
         rep_chaoting: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Social.RepChaoting" }), // 朝廷
@@ -166,9 +217,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         }), { label: "XJZL.Social.Relations" })
       }),
 
-      // ==========================================
-      // H. 生平经历 (History) - 审计日志
-      // ==========================================
+      // === 8. 生平经历 (History / Audit Log) ===
       // 记录角色的所有关键变动。
       // 设计目标：支持 DM 查账 (审计模式) 和 玩家查看故事 (生平模式)
       history: new fields.ArrayField(new fields.SchemaField({
@@ -258,9 +307,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     
     // 初始化衍生容器，防止访问 undefined
     if (!this.cultivation) this.cultivation = {};
-    this.cultivation.weaponRanks = {}; // 存储计算后的武器等级
     this.cultivation.wuxingBonus = 0;  // 存储计算后的悟性加成
-    this.cultivation.maxGenericDmgBonus = 0; // 存储计算后的武器伤害加成
+    // 武器等级现在移到了 combat.weaponRanks，这里不需要初始化了
   }
 
   /**
@@ -273,24 +321,24 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    * 为了支持“脚本依赖最终属性，且脚本能修正最终属性”的双重需求，
    * 我们将原来的大函数拆分为四个子步骤：
    * 1. _prepareStatsAndCultivation: 遍历物品，叠加静态加成 (只运行一次！)
-   * 2. _calculateStatsTotals: 计算 Total = Value + Mod (可重复运行)
+   * 2. _calculateStatsTotals: 计算 Total = Value + Assigned + Mod (可重复运行)
    * 3. _prepareSkills: 计算技能 (可重复运行)
-   * 4. _prepareCombatAndResources: 计算 HP/战斗 (可重复运行)
+   * 4. _prepareCombatAndResources: 计算 HP/战斗/抗性/伤害 (可重复运行)
    * 
    * Actor 可以在运行脚本后，手动调用 recalculate() 来刷新数据。
    */
   prepareDerivedData() {
-    this._prepareStatsAndCultivation();        // 步骤A: 静态累加 (Pass 1 独有)
-    this._calculateStatsTotals();      // 步骤B: 计算总值
-    this._prepareSkills();             // 步骤C: 技能
-    this._prepareCombatAndResources(); // 步骤D: 资源与战斗
+    this._prepareStatsAndCultivation(); // 步骤A: 静态累加 (Pass 1 独有)
+    this._calculateStatsTotals();       // 步骤B: 计算总值
+    this._prepareSkills();              // 步骤C: 技能
+    this._prepareCombatAndResources();  // 步骤D: 资源与战斗
   }
 
   /**
    * [公开接口] 重新计算衍生数据
    * 供 Actor 在执行完内功动态脚本 (修改了 mod) 后调用。
    * 
-   * 注意：这里【不】调用 _prepareCultivation，
+   * 注意：这里【不】调用 _prepareStatsAndCultivation，
    * 从而保证内功的静态加成不会被重复叠加。
    */
   recalculate() {
@@ -300,13 +348,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
   }
 
   /**
-   * [内部步骤 A] 计算境界、武器等级、叠加内功静态属性
+   * [内部步骤 A] 计算境界、武器等级(Base)、叠加内功静态属性
    * 【只执行一次】
    * 累加型操作 (+=)
    */
   _prepareStatsAndCultivation() {
     const stats = this.stats;
     const actor = this.parent; // 获取 Actor 实例以访问 Items
+    const combat = this.combat;
 
     // =======================================================
     // 逻辑一：遍历 Items 计算 [境界]、[悟性加成]、[武器等级]
@@ -315,6 +364,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     let maxRealmLevel = 0; // 最高境界 (0-7)
     let wuxingBonus = 0;   // 悟性额外加成点数
     
+    // 武器等级的“基础值”暂存 (不直接写 Total，因为 Total 还需要加 Mod)
+    const rankBases = {}; 
+
     // 武器积分计数器 { "blade": { t1: 0, t2: 0, t3: 0 } }
     const weaponCounts = {}; 
 
@@ -406,56 +458,31 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     wuxingBonus += maxRealmLevel; // 境界加成 (1级+1)
     wuxingBonus += Math.min(wuxingHumanCount, 10); // 人级上限 10
     wuxingBonus += Math.min(wuxingEarthCount, 10); // 地级上限 10
+    this.cultivation.wuxingBonus = wuxingBonus;
 
     // =======================================================
-    // 逻辑二：结算武器等级 (Weapon Ranks)
+    // 逻辑二：结算武器等级基础值 (Weapon Ranks Base)
     // =======================================================
     
-    // 用于 Combat 面板显示的通用最大加成
-    let maxGenericDmgBonus = 0;
-
     for (const [wType, counts] of Object.entries(weaponCounts)) {
       let rank = 0;
-      
       // 梯度1 (1-4级): 只要掌握就算，上限 4
       const r1 = Math.min(counts.t1, 4);
-      
       // 梯度2 (5-8级): 地/天级精通，上限 4
       const r2 = Math.min(counts.t2, 4);
-      
       // 梯度3 (9+级): 天级合一，无上限
       const r3 = counts.t3;
 
-      // 总等级等级 = 各梯度之和
+      // 总等级 = 各梯度之和
       rank = r1 + r2 + r3;
-
-      // 保存等级等级 (如: 刀法=6)
-      this.cultivation.weaponRanks[wType] = rank;
-
-      // 2. 计算伤害加成 (分段函数累加)
-      // 规则：
-      // 等级 1-4: 每级 +1
-      // 等级 5-8: 每级 +2
-      // 等级 9+ : 每级 +3
-      // 指的是每一点的加成，不需要分段累加
-      let dmg = 0;
-      
-      if (rank <= 4) {
-        dmg = rank * 1;
-      } else if (rank <= 8) {
-        dmg = rank * 2;
-      } else {
-        dmg = rank * 3;
-      }
-
-      // 存入 weaponRanks 供 Roll 调用
-      this.cultivation.weaponRanks[`${wType}_dmg`] = dmg;
-      
-      if (dmg > maxGenericDmgBonus) maxGenericDmgBonus = dmg;
+      rankBases[wType] = rank;
     }
 
-    // 将计算出的最大通用伤害加成暂存到 cultivation 中，供后续 combat 计算使用
-    this.cultivation.maxGenericDmgBonus = maxGenericDmgBonus;
+    // 将计算出的 Base 填入 combat.weaponRanks.value
+    // 这样在后续步骤中就能计算 Total = Value(Base) + Mod(AE)
+    for (const key of Object.keys(combat.weaponRanks)) {
+        combat.weaponRanks[key].value = rankBases[key] || 0;
+    }
   }
 
   /**
@@ -467,15 +494,34 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     const stats = this.stats;
     const wuxingBonus = this.cultivation.wuxingBonus || 0; // 读取 A 步骤存的值
 
-    // 1. 特殊处理悟性
-    stats.wuxing.total = (stats.wuxing.value || 0) + (stats.wuxing.mod || 0) + wuxingBonus;
+    // 1. 特殊处理悟性 (含玄关上限逻辑)
+    const wuxingBase = stats.wuxing.value || 0;
+    const wuxingMod = stats.wuxing.mod || 0;
+    // 悟性不接受自由分配点数
+    let wuxingTotal = wuxingBase + wuxingMod + wuxingBonus;
+    
+    // 上限逻辑: 打通玄关为40，否则为30
+    const wuxingLimit = stats.wuxing.xuanguan ? 40 : 30;
+    stats.wuxing.total = Math.min(wuxingTotal, wuxingLimit);
 
-    // 2. 处理其他属性
+    // 2. 计算自由属性点 (Total = 剩余可用点数)
+    // 逻辑：(初始值 + AE/道具增加的Mod) - (所有属性已分配点数之和)
+    let totalAssigned = 0;
     for (const [key, stat] of Object.entries(stats)) {
-      if (key === 'wuxing') continue; 
+        if (key === 'wuxing' || key === 'freePoints') continue;
+        totalAssigned += (stat.assigned || 0);
+    }
+    // 计算剩余点数
+    const freePool = (stats.freePoints.value || 0) + (stats.freePoints.mod || 0);
+    stats.freePoints.total = Math.max(0, freePool - totalAssigned);
+
+    // 2. 处理其他属性 (含 assigned 自由分配值)
+    for (const [key, stat] of Object.entries(stats)) {
+      if (key === 'wuxing' || key === 'freePoints') continue; 
       
+      // Total = Base + Assigned + Mod
       // mod 此时包含：AE修正 + 内功静态修正 + (如果有)脚本动态修正
-      stat.total = (stat.value || 0) + (stat.mod || 0);
+      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0);
       
       // 死亡标记
       if (stat.total < 0) this.parent.system.isDead = true; 
@@ -544,7 +590,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       neixi: stats.neixi.total,
       tipo: stats.tipo.total,
       qigan: stats.qigan.total,
-      shencai: stats.shencai.total
+      shencai: stats.shencai.total,
+      renxing: this.skills.renxing.total, // 韧性
+      ningxue: this.skills.ningxue.total  // 凝血
     };
 
     // =======================================================
@@ -567,14 +615,58 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       resources.hp.value = resources.hp.max;
     }
 
-    // 2. 战斗属性计算 (Combat Stats)
+    // 2. 抗性计算 (Resistances)
     // ------------------------------------
-    
-    // 武器伤害修正 = 等级加成(取最高)
-    const maxGenericDmgBonus = this.cultivation.maxGenericDmgBonus || 0;
-    combat.weaponDmgTotal = maxGenericDmgBonus + (combat.weapon_dmg_bonus || 0);
+    const res = combat.resistances;
+    // 毒素抗性: 基础(韧性) + Mod
+    res.poison.total = S.renxing + (res.poison.mod || 0);
+    // 流血抗性: 基础(凝血) + Mod
+    res.bleed.total = S.ningxue + (res.bleed.mod || 0);
+    // 其他抗性: 基础0 + Mod
+    res.fire.total = 0 + (res.fire.mod || 0);
+    res.mental.total = 0 + (res.mental.mod || 0);
+    res.global.total = 0 + (res.global.mod || 0);
 
-     // 基础
+    // 3. 武器等级修正与伤害计算 (Weapon Ranks & Dmg)
+    // ------------------------------------
+    let maxGenericDmgBonus = 0;
+
+    for (const [key, rankData] of Object.entries(combat.weaponRanks)) {
+        // Total = Base(武学计算) + Mod(AE)
+        rankData.total = (rankData.value || 0) + (rankData.mod || 0);
+        const rank = rankData.total;
+
+        // 伤害加成逻辑 (断层式暴涨: 4级=4, 5级=10, 9级=27)
+        let dmg = 0;
+        if (rank <= 4) {
+          dmg = rank * 1;
+        } else if (rank <= 8) {
+          dmg = rank * 2;
+        } else {
+          dmg = rank * 3;
+        }
+
+        // 如果这个武器伤害加成比通用的高，记录下来 (通用战斗面板显示用)
+        if (dmg > maxGenericDmgBonus) maxGenericDmgBonus = dmg;
+    }
+
+    // 4. 伤害修正汇总 (Damage Bonuses)
+    // ------------------------------------
+    const dmg = combat.damages;
+    // Total = Value(基础) + Mod(AE)
+    dmg.global.total = (dmg.global.value || 0) + (dmg.global.mod || 0);
+    
+    // Weapon Damage Total 在这里主要作为面板参考值 (取最大值 + 修正)
+    dmg.weapon.total = maxGenericDmgBonus + (dmg.weapon.mod || 0);
+
+    // 其他类型 (Yang, Yin, Normal, Skill 等)
+    for (const k of ["yang", "yin", "gang", "rou", "taiji", "normal", "skill"]) {
+        dmg[k].total = (dmg[k].value || 0) + (dmg[k].mod || 0);
+    }
+
+    // 5. 战斗属性计算 (Combat Stats)
+    // ------------------------------------
+    // 基础
     combat.blockTotal = combat.block || 0;
     combat.kanpoTotal = combat.kanpo || 0;
 
@@ -598,7 +690,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.hitNeigongTotal = Math.floor(S.qigan / 2 + combat.hit_neigong);
     
     // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
-    combat.critWaigongTotal = Math.floor(20 - (S.liliang / 20) + combat.crit_waigong - moraleCritMod);
-    combat.critNeigongTotal = Math.floor(20 - (S.qigan / 20) + combat.crit_neigong - moraleCritMod);
+    // 最小值限制为 0
+    combat.critWaigongTotal = Math.max(0, Math.floor(20 - (S.liliang / 20) + combat.crit_waigong - moraleCritMod));
+    combat.critNeigongTotal = Math.max(0, Math.floor(20 - (S.qigan / 20) + combat.crit_neigong - moraleCritMod));
   }
 }
