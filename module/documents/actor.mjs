@@ -11,10 +11,27 @@ export class XJZLActor extends Actor {
    *    -> prepareDerivedData() (DataModel + Document)
    */
   prepareDerivedData() {
+    // ----------------------------------------------------
+    // PHASE 1: 基础计算 (Pass 1)
+    // ----------------------------------------------------
+    // 执行 DataModel.prepareDerivedData()
+    // 此时：
+    // - 内功的固定属性加成已生效
     super.prepareDerivedData();
     
-    // 执行完 DataModel 的基础计算后，我们来处理复杂的“脚本特效”
+    // ----------------------------------------------------
+    // PHASE 2: 脚本干预 (Script Execution)
+    // ----------------------------------------------------
+    // 运行内功脚本。
+    // 因为 Pass 1 已经执行，脚本可以安全地读取计算后的属性：
     this._applyNeigongEffects();
+
+    // ----------------------------------------------------
+    // PHASE 3: 重算 (Pass 2)
+    // ----------------------------------------------------
+    // 因为脚本可能修改了 stats.mod，我们需要重新跑一遍公式。
+    // 调用我们在 DataModel 里新写的 recalculate()。
+    this.system.recalculate();
   }
 
   /**
