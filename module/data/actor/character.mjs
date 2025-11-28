@@ -614,8 +614,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       // mod 此时包含：AE修正 + 内功静态修正 + (如果有)脚本动态修正
       stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0);
       
-      // 死亡标记
-      if (stat.total < 0) this.parent.system.isDead = true; 
+      // TODO 属性小于0 死亡
     }
   }
 
@@ -846,7 +845,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 基础
     // 公式: 属性衍生 + 基础加值(DB/AE) + 经脉加成(Temp)
     combat.blockTotal = (combat.block || 0) + bonuses.block;
-    combat.kanpoTotal = combat.kanpo || 0 + bonuses.kanpo;
+    combat.kanpoTotal = (combat.kanpo || 0) + bonuses.kanpo;
     combat.xuzhaoTotal = (combat.xuzhao || 0) + bonuses.xuzhao;
 
     // 速度 (基础5 + 轻功/2 + 修正)

@@ -119,6 +119,11 @@ function registerHandlebarsHelpers() {
   Handlebars.registerHelper("checked", function (value) {
     return value ? "checked" : "";
   });
+  //计算百分比
+  Handlebars.registerHelper("calculatePercentage", function (value, max) {
+    if (!max || max === 0) return 0;
+    return Math.min(100, Math.floor((value / max) * 100));
+  });
 }
 /**
  * 预加载模板片段
