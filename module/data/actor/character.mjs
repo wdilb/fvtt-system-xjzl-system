@@ -39,7 +39,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // [Helper] 通用数值模板 (用于抗性、伤害修正、武器等级等)
     // 结构: { value: 基础值, mod: 修正值(AE), total: 最终值 }
-    const makeModField = (initial = 0) => new fields.SchemaField({
+    const makeModField = (initial = 0, label = "") => new fields.SchemaField({
         value: new fields.NumberField({ initial: initial, integer: true }), 
         mod: new fields.NumberField({ initial: 0, integer: true }),         
         total: new fields.NumberField({ initial: initial, integer: true })  
@@ -78,8 +78,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         // 悟性特殊处理：包含玄关打通状态
         wuxing: new fields.SchemaField({
             value: new fields.NumberField({ required: true, integer: true, initial: 1, label: "XJZL.Stats.Base" }),
-            mod: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.Mod" }),
-            xuanguan: new fields.BooleanField({ initial: false, label: "XJZL.Stats.Xuanguan" }) // 是否打通玄关 (影响上限)
+            mod: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.Mod" })
         }, { label: "XJZL.Stats.Wuxing" }),
 
         liliang: makeStatField("XJZL.Stats.Liliang"), // 力量
@@ -131,6 +130,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         // 1. 基础战斗属性 
         block: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Block" }),       // 格挡修正
         kanpo: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Kanpo" }),       // 看破修正
+        xuzhao: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.XuZhao" }),     //虚招加值
         speed: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Speed" }),       // 速度修正
         dodge: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Dodge" }),       // 闪避修正
         initiative: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.Initiative" }), // 先攻修正
@@ -217,7 +217,49 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         }), { label: "XJZL.Social.Relations" })
       }),
 
-      // === 8. 生平经历 (History / Audit Log) ===
+      // === 经脉系统 (jingmai) ===
+      jingmai: new fields.SchemaField({
+        // 1. 十二正经 (Standard 12)
+        standard: new fields.SchemaField({
+          // 第一关
+          hand_shaoyin: new fields.BooleanField(),  // 手少阴心经（少冲）
+          foot_shaoyin: new fields.BooleanField(),  // 足少阴肾经（涌泉）
+          hand_shaoyang: new fields.BooleanField(), // 手少阳三焦经（关冲）
+          foot_shaoyang: new fields.BooleanField(), // 足少阳胆经（足窍）
+          // 第二关
+          hand_jueyin: new fields.BooleanField(),   // 手厥阴心包经（中冲）
+          foot_jueyin: new fields.BooleanField(),   // 足厥阴肝经（大敦）
+          hand_yangming: new fields.BooleanField(), // 手阳明大肠经（商阳）
+          foot_yangming: new fields.BooleanField(), // 足阳明胃经（厉兑）
+          // 第三关
+          hand_taiyin: new fields.BooleanField(),   // 手太阴肺经（少商）
+          foot_taiyin: new fields.BooleanField(),   // 足太阴脾经（隐白）
+          hand_taiyang: new fields.BooleanField(),  // 手太阳小肠经（少泽）
+          foot_taiyang: new fields.BooleanField()   // 足太阳膀胱经（足通）
+        }),
+
+        // 2. 奇经八脉 (Extra 8)
+        extra: new fields.SchemaField({
+          du: new fields.BooleanField(),      // 督脉
+          ren: new fields.BooleanField(),     // 任脉
+          chong: new fields.BooleanField(),   // 冲脉
+          dai: new fields.BooleanField(),     // 带脉
+          yangwei: new fields.BooleanField(), // 阳维脉
+          yinwei: new fields.BooleanField(),  // 阴维脉
+          yangqiao: new fields.BooleanField(),// 阳跷脉
+          yinqiao: new fields.BooleanField()  // 阴跷脉
+        }),
+
+        // 3. 生死玄关与突破记录
+        xuanguan: new fields.SchemaField({
+            // 是否打通生死玄关 (影响悟性上限、属性奖励)
+            broken: new fields.BooleanField({ initial: false }), 
+            // 突破时选择加强的武学 UUID
+            buffedItem: new fields.StringField() 
+        })
+      }),
+    
+      // === 生平经历 (History / Audit Log) ===
       // 记录角色的所有关键变动。
       // 设计目标：支持 DM 查账 (审计模式) 和 玩家查看故事 (生平模式)
       history: new fields.ArrayField(new fields.SchemaField({
@@ -492,30 +534,79 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    */
   _calculateStatsTotals() {
     const stats = this.stats;
+    const jingmai = this.jingmai;
     const wuxingBonus = this.cultivation.wuxingBonus || 0; // 读取 A 步骤存的值
 
-    // 1. 特殊处理悟性 (含玄关上限逻辑)
+    // ===========================================
+    // 1. 计算经脉提供的自由属性点
+    // ===========================================
+    let jingmaiFreePoints = 0;
+    const s = jingmai.standard;
+    const x = jingmai.xuanguan;
+
+    // 第一关 (每个 +5)
+    if (s.hand_shaoyin) jingmaiFreePoints += 5;
+    if (s.foot_shaoyin) jingmaiFreePoints += 5;
+    if (s.hand_shaoyang) jingmaiFreePoints += 5;
+    if (s.foot_shaoyang) jingmaiFreePoints += 5;
+
+    // 第二关 (每个 +10)
+    if (s.hand_jueyin) jingmaiFreePoints += 10;
+    if (s.foot_jueyin) jingmaiFreePoints += 10;
+    if (s.hand_yangming) jingmaiFreePoints += 10;
+    if (s.foot_yangming) jingmaiFreePoints += 10;
+
+    // 第三关 (每个 +20)
+    if (s.hand_taiyin) jingmaiFreePoints += 20;
+    if (s.foot_taiyin) jingmaiFreePoints += 20;
+    if (s.hand_taiyang) jingmaiFreePoints += 20;
+    if (s.foot_taiyang) jingmaiFreePoints += 20;
+
+    // 生死玄关突破 (自由属性 +100)
+    if (x.broken) jingmaiFreePoints += 100;
+
+    // ===========================================
+    // 2. 处理任督二脉的全属性加成 (这里只处理 Mod，不处理 Value)
+    // ===========================================
+    const e = jingmai.extra;
+    let allStatBonus = 0;
+    // 督脉/任脉 基础全属性+10
+    if (e.du) allStatBonus += 10;
+    if (e.ren) allStatBonus += 10;
+
+    if (allStatBonus > 0) {
+      for (const [key, stat] of Object.entries(stats)) {
+        if (key === 'wuxing' || key === 'freePoints') continue;
+        stat.mod = (stat.mod || 0) + allStatBonus;
+      }
+    }
+
+    // ===========================================
+    // 3. 计算悟性 (含玄关上限逻辑)
+    // ===========================================
     const wuxingBase = stats.wuxing.value || 0;
     const wuxingMod = stats.wuxing.mod || 0;
-    // 悟性不接受自由分配点数
-    let wuxingTotal = wuxingBase + wuxingMod + wuxingBonus;
+    const wuxingTotal = wuxingBase + wuxingMod + wuxingBonus;
     
-    // 上限逻辑: 打通玄关为40，否则为30
-    const wuxingLimit = stats.wuxing.xuanguan ? 40 : 30;
+    // 上限逻辑: 读取 jingmai.xuanguan.broken
+    const wuxingLimit = x.broken ? 40 : 30;
     stats.wuxing.total = Math.min(wuxingTotal, wuxingLimit);
 
-    // 2. 计算自由属性点 (Total = 剩余可用点数)
-    // 逻辑：(初始值 + AE/道具增加的Mod) - (所有属性已分配点数之和)
+    // ===========================================
+    // 4. 计算剩余自由属性点
+    // ===========================================
     let totalAssigned = 0;
     for (const [key, stat] of Object.entries(stats)) {
         if (key === 'wuxing' || key === 'freePoints') continue;
         totalAssigned += (stat.assigned || 0);
     }
-    // 计算剩余点数
-    const freePool = (stats.freePoints.value || 0) + (stats.freePoints.mod || 0);
+    // 剩余点数 = (初始 + AE + 经脉赠送) - 已分配
+    const freePool = (stats.freePoints.value || 0) + (stats.freePoints.mod || 0) + jingmaiFreePoints;
     stats.freePoints.total = Math.max(0, freePool - totalAssigned);
 
-    // 2. 处理其他属性 (含 assigned 自由分配值)
+    // ===========================================
+    // 5. 处理其他六维属性 Total
+    // ===========================================
     for (const [key, stat] of Object.entries(stats)) {
       if (key === 'wuxing' || key === 'freePoints') continue; 
       
@@ -579,6 +670,10 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    * 依赖：stats.total, skills.total
    */
   _prepareCombatAndResources() {
+    const jingmai = this.jingmai;
+    const s = jingmai.standard;
+    const e = jingmai.extra;
+    const x = jingmai.xuanguan;
     const stats = this.stats;
     const combat = this.combat;
     const resources = this.resources;
@@ -595,16 +690,90 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       ningxue: this.skills.ningxue.total  // 凝血
     };
 
+    // 1. 经脉资源加成 (HP/MP)
+    // ==========================
+
+    // =======================================================
+    // 初始化临时变量 (Bonuses)
+    // 每次函数运行时，这些变量都会归零，确保不会重复叠加
+    // =======================================================
+    // 资源类
+    let hpAdd = 0;
+    let mpAdd = 0;
+
+    // 战斗属性类 (用于暂存经脉带来的数值变化)
+    const bonuses = {
+        // 基础
+        block: 0, kanpo: 0, xuzhao: 0, speed: 0, dodge: 0, initiative: 0,
+        // 攻防
+        defWaigong: 0, defNeigong: 0, hitWaigong: 0, hitNeigong: 0,
+        critWaigong: 0, critNeigong: 0,
+        // 伤害
+        skillDmg: 0, yang: 0, yin: 0, gang: 0, rou: 0
+    };
+
+    // =======================================================
+    // 2. 累加经脉效果 (只修改临时变量)
+    // =======================================================
+
+    // --- 第一关 ---
+    if (s.hand_shaoyin) { hpAdd += 10; bonuses.critWaigong -= 1; }              // 手少阴心经: 气血+10, 外功暴击骰-1
+    if (s.foot_shaoyin) { mpAdd += 5;  bonuses.block += 5; }                    // 足少阴肾经: 内力+5, 格挡值+5
+    if (s.hand_shaoyang){ hpAdd += 10; bonuses.hitWaigong += 5; }               // 手少阳三焦经: 气血+10, 命中+5
+    if (s.foot_shaoyang){ mpAdd += 5;  bonuses.speed += 1; bonuses.initiative += 1; } // 足少阳胆经: 内力+5, 速度+1, 先攻+1
+
+    // --- 第二关 ---
+    if (s.hand_jueyin)  { hpAdd += 30; bonuses.dodge += 5; }                    // 手厥阴心包经: 气血+30, 闪避+5
+    if (s.foot_jueyin)  { mpAdd += 15; bonuses.skillDmg += 5; }                 // 足厥阴肝经: 内力+15, 招式伤害+5
+    if (s.hand_yangming){ hpAdd += 30; bonuses.defWaigong += 5; bonuses.defNeigong += 5; } // 手阳明大肠经: 气血+30, 内外防御+5
+    if (s.foot_yangming){ mpAdd += 15; bonuses.critNeigong -= 2; }              // 足阳明胃经: 内力+15, 内功暴击骰-2
+
+    // --- 第三关 ---
+    if (s.hand_taiyin) { // 手太阴肺经: 气血+60, 外暴-1, 内暴-2, 命中+10
+        hpAdd += 60; bonuses.critWaigong -= 1; bonuses.critNeigong -= 2; bonuses.hitWaigong += 10;
+    }
+    if (s.foot_taiyin) { // 足太阴脾经: 内力+30, 先攻+5, 闪避+10, 虚招+1
+        mpAdd += 30; bonuses.initiative += 5; bonuses.dodge += 10; bonuses.xuzhao += 1;
+    }
+    if (s.hand_taiyang) { // 手太阳小肠经: 气血+60, 外暴-1, 内暴-2, 招式伤害+10
+        hpAdd += 60; bonuses.critWaigong -= 1; bonuses.critNeigong -= 2; bonuses.skillDmg += 10;
+    }
+    if (s.foot_taiyang) { // 足太阳膀胱经: 内力+30, 速度+2, 格挡+10, 看破+1
+        mpAdd += 30; bonuses.speed += 2; bonuses.block += 10; bonuses.kanpo += 1;
+    }
+
+    // --- 奇经八脉 ---
+    if (e.chong)   hpAdd += 200; // 冲脉: 气血上限+200
+    if (e.dai)     bonuses.block += 40; // 带脉: 格挡值+40
+    
+    // 阳维: 阳/刚 +20
+    if (e.yangwei) { bonuses.yang += 20; bonuses.gang += 20; }
+    // 阴维: 阴/柔 +20
+    if (e.yinwei)  { bonuses.yin += 20; bonuses.rou += 20; }
+    
+    // 阳跷: 速度+1, 先攻+5, 暴击-1
+    if (e.yangqiao){ bonuses.speed += 1; bonuses.initiative += 5; bonuses.critWaigong -= 1; }
+    // 阴跷: 速度+1, 闪避+5, 暴击-1
+    if (e.yinqiao) { bonuses.speed += 1; bonuses.dodge += 5; bonuses.critWaigong -= 1; }
+
+    // --- 生死玄关 ---
+    if (x.broken) {
+        hpAdd += 100; mpAdd += 100; 
+        bonuses.block += 100; 
+        bonuses.kanpo += 3; //看破+3
+        bonuses.xuzhao += 3; //虚招+3
+    }
+
     // =======================================================
     // 计算资源与战斗面板 (Combat & Resources)
     // =======================================================
 
     // 1. 资源上限计算 (Resource Max)
     // ------------------------------------
-    // HP = 体魄*4 + 力量*1 + 额外
-    resources.hp.max = Math.floor(S.tipo * 4 + S.liliang * 1 + (resources.hp.bonus || 0));
+    // HP = 体魄*4 + 力量*1 + 额外 + 经脉加成(Temp)
+    resources.hp.max = Math.floor(S.tipo * 4 + S.liliang * 1 + (resources.hp.bonus || 0) + hpAdd);
     // MP = 内息*1 + 额外
-    resources.mp.max = Math.floor(S.neixi * 1 + (resources.mp.bonus || 0));
+    resources.mp.max = Math.floor(S.neixi * 1 + (resources.mp.bonus || 0) + mpAdd);
     // 怒气上限固定
     resources.rage.max = 10;
     // 酒量 = 体魄
@@ -659,39 +828,49 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // Weapon Damage Total 在这里主要作为面板参考值 (取最大值 + 修正)
     dmg.weapon.total = maxGenericDmgBonus + (dmg.weapon.mod || 0);
 
-    // 其他类型 (Yang, Yin, Normal, Skill 等)
-    for (const k of ["yang", "yin", "gang", "rou", "taiji", "normal", "skill"]) {
+     // 公式: Value + Mod(AE) + Bonus(Jingmai)
+
+    dmg.skill.total = (dmg.skill.value || 0) + (dmg.skill.mod || 0) + bonuses.skillDmg;
+    dmg.yang.total = (dmg.yang.value || 0) + (dmg.yang.mod || 0) + bonuses.yang;
+    dmg.gang.total = (dmg.gang.value || 0) + (dmg.gang.mod || 0) + bonuses.gang;
+    dmg.yin.total = (dmg.yin.value || 0) + (dmg.yin.mod || 0) + bonuses.yin;
+    dmg.rou.total = (dmg.rou.value || 0) + (dmg.rou.mod || 0) + bonuses.rou;
+
+    // 其他类型 (太极和平A伤害，目前没有经脉加成)
+    for (const k of ["taiji", "normal"]) {
         dmg[k].total = (dmg[k].value || 0) + (dmg[k].mod || 0);
     }
 
     // 5. 战斗属性计算 (Combat Stats)
     // ------------------------------------
     // 基础
-    combat.blockTotal = combat.block || 0;
-    combat.kanpoTotal = combat.kanpo || 0;
+    // 公式: 属性衍生 + 基础加值(DB/AE) + 经脉加成(Temp)
+    combat.blockTotal = (combat.block || 0) + bonuses.block;
+    combat.kanpoTotal = combat.kanpo || 0 + bonuses.kanpo;
+    combat.xuzhaoTotal = (combat.xuzhao || 0) + bonuses.xuzhao;
 
     // 速度 (基础5 + 轻功/2 + 修正)
     // 注意：this.skills.qinggong.total 必须在步骤C已计算
-    combat.speedTotal = Math.floor(5 + (this.skills.qinggong.total / 2) + combat.speed);
+    combat.speedTotal = Math.floor(5 + (this.skills.qinggong.total / 2) + (combat.speed || 0) + bonuses.speed);
     
     // 闪避 (基础10 + 身法/4 + 修正)
-    combat.dodgeTotal = Math.floor(10 + (S.shenfa / 4) + combat.dodge);
+    combat.dodgeTotal = Math.floor(10 + (S.shenfa / 4) + (combat.dodge || 0) + bonuses.dodge);
     
     // 先攻 (身法 + 修正)
-    combat.initiativeTotal = Math.floor(S.shenfa + combat.initiative);
+    combat.initiativeTotal = Math.floor(S.shenfa + (combat.initiative || 0) + bonuses.initiative);
 
     // 士气影响暴击
     const moraleCritMod = Math.floor((resources.morale.value || 0) / 10);
     
     // 攻防面板
-    combat.defWaigongTotal = Math.floor(S.tipo / 5 + combat.def_waigong);
-    combat.defNeigongTotal = Math.floor(S.neixi / 3 + combat.def_neigong);
-    combat.hitWaigongTotal = Math.floor(S.shenfa / 2 + combat.hit_waigong);
-    combat.hitNeigongTotal = Math.floor(S.qigan / 2 + combat.hit_neigong);
+    combat.defWaigongTotal = Math.floor(S.tipo / 5 + (combat.def_waigong || 0) + bonuses.defWaigong);
+    combat.defNeigongTotal = Math.floor(S.neixi / 3 + (combat.def_neigong || 0) + bonuses.defNeigong);
+    combat.hitWaigongTotal = Math.floor(S.shenfa / 2 + (combat.hit_waigong || 0) + bonuses.hitWaigong);
+    combat.hitNeigongTotal = Math.floor(S.qigan / 2 + (combat.hit_neigong || 0));
     
     // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
     // 最小值限制为 0
-    combat.critWaigongTotal = Math.max(0, Math.floor(20 - (S.liliang / 20) + combat.crit_waigong - moraleCritMod));
-    combat.critNeigongTotal = Math.max(0, Math.floor(20 - (S.qigan / 20) + combat.crit_neigong - moraleCritMod));
+    combat.critWaigongTotal = Math.max(0, Math.floor(20 - (S.liliang / 20) + combat.crit_waigong + bonuses.critWaigong - moraleCritMod));
+    combat.critNeigongTotal = Math.max(0, Math.floor(20 - (S.qigan / 20) + combat.crit_neigong  + bonuses.critNeigong - moraleCritMod));
   }
 }
