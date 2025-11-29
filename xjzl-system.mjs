@@ -81,8 +81,8 @@ Hooks.once("init", async function () {
   
   registerHandlebarsHelpers();
 
-  // 预加载 Handlebars 模板
-  preloadHandlebarsTemplates();
+  // 预加载 Handlebars 模板,必须等待预加载完成
+  await preloadHandlebarsTemplates();
 });
 
 /* -------------------------------------------- */
@@ -124,15 +124,27 @@ function registerHandlebarsHelpers() {
     if (!max || max === 0) return 0;
     return Math.min(100, Math.floor((value / max) * 100));
   });
+
+  Handlebars.registerHelper("ne", function (a, b) {
+    return a !== b;
+  });
+  
+  Handlebars.registerHelper("log", function (context) {
+    console.log("HBS Context:", context);
+  });
 }
 /**
  * 预加载模板片段
  * 使用 foundry.applications.handlebars.loadTemplates
  */
 async function preloadHandlebarsTemplates() {
+  const SYSTEM_ID = "xjzl-system";
   const templatePaths = [
-    // 目前只有一个主模板，还没拆分 partials，暂时留空
-    // "systems/xjzl-system/templates/parts/actor-stats.hbs",
+    // 把所有拆分出来的子模板路径都写在这里
+    `systems/${SYSTEM_ID}/templates/actor/parts/actor-header.hbs`,
+    `systems/${SYSTEM_ID}/templates/actor/parts/actor-stats.hbs`,
+    `systems/${SYSTEM_ID}/templates/actor/parts/actor-combat.hbs`,
+    `systems/${SYSTEM_ID}/templates/actor/parts/actor-inventory.hbs`
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);
