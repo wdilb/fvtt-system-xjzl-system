@@ -427,79 +427,78 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     let wuxingHumanCount = 0; // 人级精通数
     let wuxingEarthCount = 0; // 地级精通数
 
-    if (actor && actor.items) {
-      for (const item of actor.items) {
-        
-        // --- A. 内功 (Neigong) 计算境界 ---
-        if (item.type === "neigong") {
-          // 自动应用属性加成 (仅当内功正在运行 active=true 时)
-          if (item.system.active) {
-            const bonuses = item.system.current.stats; // 直接读取我们在 Item 里算好的 current
-            
-            // 累加到 Actor 的 neigongBonus 上 (分离 mod 字段)
-            // 注意：这里我们修改的是 stats.xxx.neigongBonus
-            if (bonuses) {
-              stats.liliang.neigongBonus = (stats.liliang.neigongBonus || 0) + bonuses.liliang;
-              stats.shenfa.neigongBonus  = (stats.shenfa.neigongBonus || 0)  + bonuses.shenfa;
-              stats.tipo.neigongBonus    = (stats.tipo.neigongBonus || 0)    + bonuses.tipo;
-              stats.neixi.neigongBonus   = (stats.neixi.neigongBonus || 0)   + bonuses.neixi;
-              stats.shencai.neigongBonus = (stats.shencai.neigongBonus || 0) + bonuses.shencai;
-            }
+    if (actor) {
+      // 优化了写法，fvtt会自动将物品按类型索引到 actor.itemTypes，性能更好
+      const neigongs = actor.itemTypes.neigong || [];
+      for (const item of neigongs) {
+        // 自动应用属性加成 (仅当内功正在运行 active=true 时)
+        if (item.system.active) {
+          const bonuses = item.system.current.stats; // 直接读取我们在 Item 里算好的 current
+          
+          // 累加到 Actor 的 neigongBonus 上 (分离 mod 字段)
+          // 注意：这里我们修改的是 stats.xxx.neigongBonus
+          if (bonuses) {
+            stats.liliang.neigongBonus = (stats.liliang.neigongBonus || 0) + bonuses.liliang;
+            stats.shenfa.neigongBonus  = (stats.shenfa.neigongBonus || 0)  + bonuses.shenfa;
+            stats.tipo.neigongBonus    = (stats.tipo.neigongBonus || 0)    + bonuses.tipo;
+            stats.neixi.neigongBonus   = (stats.neixi.neigongBonus || 0)   + bonuses.neixi;
+            stats.shencai.neigongBonus = (stats.shencai.neigongBonus || 0) + bonuses.shencai;
           }
-          // tier: 1(人), 2(地), 3(天)
-          // stage: 1(领), 2(小/掌), 3(圆/精), 4(合)
-          const tier = item.system.tier || 1;
-          const stage = item.system.stage || 1;
-          let realm = 0;
-
-          // 境界判定规则
-          if (tier === 1) { // 人级
-            if (stage === 1) realm = 1;
-            if (stage === 2) realm = 2;
-            if (stage >= 3) realm = 3;
-          } else if (tier === 2) { // 地级
-            if (stage === 1) realm = 3;
-            if (stage === 2) realm = 4;
-            if (stage >= 3) realm = 5;
-          } else if (tier === 3) { // 天级
-            if (stage === 1) realm = 5;
-            if (stage === 2) realm = 6;
-            if (stage >= 3) realm = 7;
-          }
-          // 取最高境界
-          if (realm > maxRealmLevel) maxRealmLevel = realm;
         }
+        // tier: 1(人), 2(地), 3(天)
+        // stage: 1(领), 2(小/掌), 3(圆/精), 4(合)
+        const tier = item.system.tier || 1;
+        const stage = item.system.stage || 1;
+        let realm = 0;
 
-        // --- B. 武学 (wuxue) 计算悟性和等级 ---
-        if (item.type === "wuxue") {
-          const tier = item.system.tier || 1;
-          const stage = item.system.stage || 0;
-          const wType = item.system.weaponType; // 武器类型
+        // 境界判定规则
+        if (tier === 1) { // 人级
+          if (stage === 1) realm = 1;
+          if (stage === 2) realm = 2;
+          if (stage >= 3) realm = 3;
+        } else if (tier === 2) { // 地级
+          if (stage === 1) realm = 3;
+          if (stage === 2) realm = 4;
+          if (stage >= 3) realm = 5;
+        } else if (tier === 3) { // 天级
+          if (stage === 1) realm = 5;
+          if (stage === 2) realm = 6;
+          if (stage >= 3) realm = 7;
+        }
+        // 取最高境界
+        if (realm > maxRealmLevel) maxRealmLevel = realm;
+      }
 
-          if (wType) {
-            // 初始化计数器
-            if (!weaponCounts[wType]) weaponCounts[wType] = { t1: 0, t2: 0, t3: 0 };
+      const wuxues = actor.itemTypes.wuxue || [];
+      for (const item of wuxues) {
+                  const tier = item.system.tier || 1;
+        const stage = item.system.stage || 0;
+        const wType = item.system.weaponType; // 武器类型
 
-            // 1. 统计悟性加成 (需达到 精通/Stage>=3)
-            if (stage >= 3) {
-              if (tier === 1) wuxingHumanCount++;
-              if (tier === 2) wuxingEarthCount++;
-              if (tier === 3) wuxingBonus += 1; // 天级精通 +1
-            }
-            if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
+        if (wType) {
+          // 初始化计数器
+          if (!weaponCounts[wType]) weaponCounts[wType] = { t1: 0, t2: 0, t3: 0 };
 
-            // 2. 统计武器积分 (Tier 1/2/3 分组计数)
-            // 梯度1: 掌握(Stage>=2)
-            if (stage >= 2) weaponCounts[wType].t1++;
-            
-            // 梯度2: 精通(Stage>=3) 且 地级以上
-            if (stage >= 3 && tier >= 2) weaponCounts[wType].t2++;
-
-            // 梯度3: 合一(Stage>=4) 且 天级
-            if (stage >= 4 && tier >= 3) weaponCounts[wType].t3++;
+          // 1. 统计悟性加成 (需达到 精通/Stage>=3)
+          if (stage >= 3) {
+            if (tier === 1) wuxingHumanCount++;
+            if (tier === 2) wuxingEarthCount++;
+            if (tier === 3) wuxingBonus += 1; // 天级精通 +1
           }
+          if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
+
+          // 2. 统计武器积分 (Tier 1/2/3 分组计数)
+          // 梯度1: 掌握(Stage>=2)
+          if (stage >= 2) weaponCounts[wType].t1++;
+          
+          // 梯度2: 精通(Stage>=3) 且 地级以上
+          if (stage >= 3 && tier >= 2) weaponCounts[wType].t2++;
+
+          // 梯度3: 合一(Stage>=4) 且 天级
+          if (stage >= 4 && tier >= 3) weaponCounts[wType].t3++;
         }
       }
+      
     }
 
     // --- 结算：境界与悟性 ---
