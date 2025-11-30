@@ -880,7 +880,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     
     // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
     // 最小值限制为 0
-    combat.critWaigongTotal = Math.max(0, Math.floor(20 - (S.liliang / 20) + combat.crit_waigong + bonuses.critWaigong - moraleCritMod));
-    combat.critNeigongTotal = Math.max(0, Math.floor(20 - (S.qigan / 20) + combat.crit_neigong  + bonuses.critNeigong - moraleCritMod));
+    combat.critWaigongTotal = Math.max(0, 20 - Math.floor(S.liliang / 20) + (combat.crit_waigong || 0) + bonuses.critWaigong - moraleCritMod);
+    combat.critNeigongTotal = Math.max(0, 20 - Math.floor(S.qigan / 20) + (combat.crit_neigong || 0) + bonuses.critNeigong - moraleCritMod);
   }
 }
