@@ -51,4 +51,15 @@ export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     
     return context;
   }
+
+  _onRender(context, options) {
+    super._onRender(context, options);
+    // 绑定所有输入框的 change 事件以自动保存
+    this.element.querySelectorAll("input, select, textarea").forEach(input => {
+        input.addEventListener("change", (event) => {
+            event.preventDefault();
+            this.submit(); // 触发 AppV2 的提交逻辑
+        });
+    });
+  }
 }

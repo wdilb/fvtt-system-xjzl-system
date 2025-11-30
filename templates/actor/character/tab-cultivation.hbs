@@ -2,35 +2,82 @@
          data-tab="cultivation" 
          data-group="primary">
 
-    <div class="xjzl-card xjzl-flex-row" style="justify-content: space-between; margin-bottom: 10px;">
-        <label style="font-size: 1.2em; font-weight: bold;">{{localize "XJZL.Cultivation.General"}}</label>
-        <input type="number" name="system.cultivation.general" value="{{system.cultivation.general}}" class="xjzl-input" style="width: 100px; font-size: 1.2em;"/>
+    {{!-- 通用修为栏 --}}
+    <div class="xjzl-card xjzl-flex-row" style="justify-content: space-between; margin-bottom: 15px; background: rgba(255, 255, 255, 0.6);">
+        <label style="font-size: 1.2em; font-weight: bold; color: var(--xjzl-ink-800);">
+            <i class="fas fa-database"></i> {{localize "XJZL.Cultivation.General"}}
+        </label>
+        <div class="xjzl-flex-row">
+            <input type="number" name="system.cultivation.general" value="{{system.cultivation.general}}" class="xjzl-input" style="width: 100px; font-size: 1.4em; border-bottom: 2px solid var(--xjzl-gold);"/>
+        </div>
     </div>
 
-    <h3>{{localize "XJZL.TYPES.Item.neigong"}}</h3>
-    <div class="xjzl-flex-col">
+    {{!-- 标题 --}}
+    <h3 style="border-bottom: 2px solid var(--xjzl-ink-500); padding-bottom: 5px; margin-bottom: 10px;">
+        {{!-- 修复：如果 TYPES 在根目录，直接调用 TYPES --}}
+        {{localize "TYPES.Item.neigong"}}
+    </h3>
+
+    {{!-- 
+        【美化核心】：使用 Grid-2 布局，让卡片变小，一行两个
+    --}}
+    <div class="xjzl-grid-2">
         {{#each neigongs as |item|}}
-        <div class="xjzl-card neigong-item xjzl-flex-row {{#if item.isRunning}}active{{/if}}">
-            <img src="{{item.img}}" width="48" height="48" style="border-radius: 4px;"/>
-            <div class="xjzl-grow xjzl-flex-col" style="gap: 2px;">
-                <div class="xjzl-flex-row">
-                    <span style="font-weight: bold;">{{item.name}}</span>
-                    <span style="font-size: 0.8em; background: #333; color: white; padding: 0 4px; border-radius: 4px;">{{localize (concat "XJZL.Neigong.Stage" item.system.stage)}}</span>
-                </div>
-                <div style="font-size: 0.8em;">
-                    已投入: {{item.system.xpInvested}} / {{item.system.progressData.max}} ({{item.system.progressData.pct}}%)
+        <div class="xjzl-card neigong-item {{#if item.isRunning}}active{{/if}}">
+            
+            {{!-- 上半部分：图标 + 信息 --}}
+            <div style="display: flex; gap: 10px;">
+                {{!-- 图标 --}}
+                <a data-action="editItem" data-item-id="{{item.id}}" style="flex: 0 0 52px; position: relative;">
+                    <img src="{{item.img}}" width="52" height="52" style="border-radius: 4px;"/>
+                    {{#if item.isRunning}}
+                        <i class="fas fa-certificate" style="position: absolute; bottom: -4px; right: -4px; color: var(--xjzl-gold); text-shadow: 0 0 3px black; font-size: 1.2em;"></i>
+                    {{/if}}
+                </a>
+                
+                {{!-- 信息 --}}
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; overflow: hidden;">
+                    {{!-- 名字与删除 --}}
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="item-name" style="font-weight: bold;">{{item.name}}</span>
+                        <a data-action="deleteItem" data-item-id="{{item.id}}" title="删除" style="color: #888; padding: 2px;"><i class="fas fa-times"></i></a>
+                    </div>
+                    
+                    {{!-- 阶段 --}}
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="stage-tag">
+                            {{localize (concat "XJZL.Neigong.Stage" item.system.stage)}}
+                        </span>
+                        <span style="font-size: 0.7em; color: #aaa;">{{item.system.xpInvested}}/{{item.system.progressData.max}}</span>
+                    </div>
+
+                    {{!-- 进度条 --}}
+                    <div class="progress-bg" style="height: 4px; border-radius: 2px; width: 100%; overflow: hidden;">
+                        <div style="background: var(--xjzl-jade); height: 100%; width: {{item.system.progressData.pct}}%;"></div>
+                    </div>
                 </div>
             </div>
-            <div class="xjzl-flex-col">
-                <button type="button" data-action="toggleNeigong" data-item-id="{{item.id}}" style="font-size: 0.8em; {{#if item.isRunning}}color:#c5a059; font-weight:bold;{{/if}}">
-                    <i class="fas fa-power-off"></i> {{#if item.isRunning}}停止{{else}}运功{{/if}}
+
+            {{!-- 下半部分：按钮组 --}}
+            <div class="button-group">
+                <button type="button" data-action="toggleNeigong" data-item-id="{{item.id}}" 
+                        class="{{#if item.isRunning}}active-btn{{/if}}">
+                    <i class="fas fa-power-off"></i> {{#if item.isRunning}}运行中{{else}}运功{{/if}}
                 </button>
-                <button type="button" data-action="investXP" data-item-id="{{item.id}}" style="font-size: 0.8em;">修炼</button>
+                <button type="button" data-action="investXP" data-item-id="{{item.id}}">
+                    <i class="fas fa-arrow-up"></i> 修炼
+                </button>
             </div>
-            <a data-action="edit" data-document-id="{{item.id}}" style="margin-left: 5px; color: var(--xjzl-ink-500); cursor:pointer;"><i class="fas fa-edit"></i></a>
         </div>
         {{else}}
-        <p style="text-align: center; color: #777;">暂无内功，请从物品栏拖入。</p>
+        <div style="grid-column: 1 / -1; text-align: center; color: #999; padding: 20px;">
+            暂无内功
+        </div>
         {{/each}}
     </div>
+    
+    {{!-- 
+       修正：为了让按钮好点，我建议把按钮代码重新插回上面的卡片里。
+       请使用下面的这段替换上面的 {{#each}} 块
+    --}}
 </section>
