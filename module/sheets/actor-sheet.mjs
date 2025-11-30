@@ -1,119 +1,175 @@
 /**
  * 先简单写一个让系统运行起来
  */
+/* module/sheets/actor-sheet.mjs */
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-/**
- * 玩家角色卡片 (V13 ApplicationV2 + Handlebars)
- */
 export class XJZLActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
-  
-  /**
-   * 定义界面组成部分 (Parts)
-   * 必须定义，HandlebarsMixin 会根据这里配置的路径去加载模板
-   */
-  static PARTS = {
-    form: {
-      template: "systems/xjzl-system/templates/actor/character-sheet.hbs",
-      scrollable: [".sheet-body"] // 指定哪个区域可以滚动
-    }
-  };
-
-  /**
-   * V2 核心配置
-   */
   static DEFAULT_OPTIONS = {
-    tag: "form", // 告诉系统外层包裹 <form> 标签
-    classes: ["xjzl", "sheet", "actor"],
-    position: { width: 800, height: 800 },
-    form: {
-      submitOnChange: true,  // 修改数据即自动保存
-      closeOnSubmit: false
-    },
-    window: {
-      resizable: true,
-      minimizable: true,
-      controls: [] // 窗口标题栏按钮
-    },
-    // 定义按钮动作映射 (data-action="xxx")
+    tag: "form",
+    classes: ["xjzl-window", "actor", "character", "xjzl-system"],
+    position: { width: 900, height: 800 },
+    window: { resizable: true },
     actions: {
-      editItem: this._onEditItem,
-      deleteItem: this._onDeleteItem,
-      createItem: this._onCreateItem
+        toggleNeigong: XJZLActorSheet.prototype._onToggleNeigong,
+        investXP: XJZLActorSheet.prototype._onInvestXP
     }
   };
 
-  /**
-   * 准备渲染数据 (Context)
-   * 替代了旧版的 getData
-   * @returns {Promise<object>} 传递给 Handlebars 的数据对象
-   */
-  async _prepareContext(options) {
-    // 获取父类准备的基础数据
-    const context = await super._prepareContext(options);
-    
-    // V2 中，this.document 指向当前 Actor 实例
-    const actor = this.document;
-    
-    // 将数据挂载到 context 上
-    context.actor = actor;
-    context.system = actor.system;
-    context.flags = actor.flags;
-    
-    // 添加一些辅助标记
-    context.isGM = game.user.isGM;
+  static PARTS = {
+    header:      { template: "systems/xjzl-system/templates/actor/character/header.hbs" },
+    tabs:        { template: "systems/xjzl-system/templates/actor/character/tabs.hbs" },
+    // 内容 Parts
+    stats:       { template: "systems/xjzl-system/templates/actor/character/tab-stats.hbs", scrollable: [""] },
+    cultivation: { template: "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs", scrollable: [""] },
+    jingmai:     { template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs", scrollable: [""] },
+    combat:      { template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs", scrollable: [""] }
+  };
 
-    // 调试日志 (确认数据结构)
-    console.log("Sheet Context:", context);
+  tabGroups = { primary: "stats" };
+
+  /* -------------------------------------------- */
+  /*  生命周期与数据准备                           */
+  /* -------------------------------------------- */
+
+  async _prepareContext(options) {
+    const context = await super._prepareContext(options);
+    const actor = this.document;
+
+    context.system = actor.system;
+    context.tabs = this.tabGroups; 
+
+    // 资源百分比
+    context.percents = {
+        hp: actor.system.resources.hp.max ? Math.min(100, (actor.system.resources.hp.value / actor.system.resources.hp.max) * 100) : 0,
+        mp: actor.system.resources.mp.max ? Math.min(100, (actor.system.resources.mp.value / actor.system.resources.mp.max) * 100) : 0
+    };
+    
+    // 内功
+    context.neigongs = actor.itemTypes.neigong || [];
+    context.neigongs.forEach(item => item.isRunning = item.system.active);
 
     return context;
   }
 
   /* -------------------------------------------- */
-  /*  事件处理 (Event Handlers)                   */
+  /*  核心：自动保存与验证逻辑                     */
   /* -------------------------------------------- */
 
   /**
-   * 处理创建物品
-   * 触发: <a data-action="createItem" data-type="...">
+   * 渲染后挂载事件监听器
+   * AppV2 中，我们需要手动监听 input 的 change 事件来实现“即时保存”
    */
-  static async _onCreateItem(event, target) {
-    const type = target.dataset.type || "item";
-    const name = `新${type}`; // 例如: 新neigong
-    const itemData = {
-      name: name,
-      type: type,
-      img: "icons/svg/item-bag.svg" // 默认图标
-    };
-    await this.document.createEmbeddedDocuments("Item", [itemData]);
+  _onRender(context, options) {
+    super._onRender(context, options);
+
+    // 查找所有输入框，绑定 change 事件
+    this.element.querySelectorAll("input, select, textarea").forEach(input => {
+        // 防止重复绑定 (AppV2可能会多次调用_onRender)
+        if (input.dataset.hasChangeListener) return;
+        
+        input.addEventListener("change", this._onChangeInput.bind(this));
+        input.dataset.hasChangeListener = "true";
+    });
   }
 
   /**
-   * 处理编辑物品
-   * 触发: <a data-action="editItem" data-item-id="...">
+   * 处理输入框变化
    */
-  static async _onEditItem(event, target) {
-    const itemId = target.dataset.itemId;
-    const item = this.document.items.get(itemId);
-    if (item) item.sheet.render(true);
-  }
+  async _onChangeInput(event) {
+    event.preventDefault();
+    const input = event.target;
+    const name = input.name;
+    const value = input.type === "number" ? Number(input.value) : input.value;
 
-  /**
-   * 处理删除物品
-   * 触发: <a data-action="deleteItem" data-item-id="...">
-   */
-  static async _onDeleteItem(event, target) {
-    const itemId = target.dataset.itemId;
-    const item = this.document.items.get(itemId);
-    if (item) {
-        // 使用 V2 风格的确认弹窗
-        const confirm = await foundry.applications.api.DialogV2.confirm({
-            content: `确定要删除 <strong>${item.name}</strong> 吗？`,
-            modal: true,
-            rejectClose: false
-        });
-        if (confirm) item.delete();
+    // 1. 验证：自由属性点分配逻辑
+    // 检查字段名是否包含 .assigned (例如 system.stats.liliang.assigned)
+    if (name.includes(".assigned")) {
+        if (!this._validateStatAssignment(name, value, input)) {
+            return; // 验证失败，终止保存
+        }
     }
+
+    // 2. 提交保存
+    // AppV2 的 submit 方法会自动收集表单数据并更新 Document
+    await this.submit();
+  }
+
+  /**
+   * 验证属性分配是否合法
+   * @param {string} fieldName - 修改的字段名
+   * @param {number} newValue - 玩家输入的新值
+   * @param {HTMLElement} inputElement - 输入框 DOM 对象 (用于重置)
+   * @returns {boolean} - true 通过, false 失败
+   */
+  _validateStatAssignment(fieldName, newValue, inputElement) {
+    const actor = this.document;
+    const stats = actor.system.stats;
+
+    // 1. 获取当前的剩余点数 (Total Free Points)
+    // 注意：这里的 total 是基于 document 中已保存的数据计算的
+    const currentFree = stats.freePoints.total;
+
+    // 2. 获取该属性 *旧的* 分配值
+    // foundry.utils.getProperty 是获取深层属性的好帮手
+    // fieldName 类似 "system.stats.liliang.assigned"，我们需要去掉 "system." 前缀来从 actor.system 中取值吗？
+    // DataModel 中的数据是 actor.system.stats... 
+    // input 的 name 是 system.stats...
+    // 我们用 foundry.utils.getProperty(this.document, fieldName) 直接取
+    const oldValue = foundry.utils.getProperty(this.document, fieldName) || 0;
+
+    // 3. 计算差值 (Delta)
+    // 如果新值 5，旧值 2，差值是 3 (需要消耗3点)
+    // 如果新值 1，旧值 5，差值是 -4 (返还4点)
+    const delta = newValue - oldValue;
+
+    // 4. 判断余额是否充足
+    if (currentFree - delta < 0) {
+        ui.notifications.warn(`自由属性点不足！剩余: ${currentFree}, 需要: ${delta}`);
+        
+        // 重置输入框为旧值
+        inputElement.value = oldValue;
+        return false;
+    }
+
+    // 5. 防止负数输入
+    if (newValue < 0) {
+        ui.notifications.warn("分配值不能为负数。");
+        inputElement.value = oldValue;
+        return false;
+    }
+
+    return true;
+  }
+
+  /* -------------------------------------------- */
+  /*  Actions                                     */
+  /* -------------------------------------------- */
+
+  async _onToggleNeigong(event, target) {
+      const itemId = target.dataset.itemId;
+      const item = this.document.items.get(itemId);
+      if (item) await item.update({ "system.active": !item.system.active });
+  }
+
+  async _onInvestXP(event, target) {
+      const itemId = target.dataset.itemId;
+      const item = this.document.items.get(itemId);
+      if (!item) return;
+      const input = await foundry.applications.api.DialogV2.prompt({
+          window: { title: "修炼内功" },
+          content: "<p>投入多少通用修为?</p><input type='number' name='xp' value='100' autofocus>",
+          ok: { label: "投入", callback: (event, button, form) => form.xp.value }
+      });
+      if (input) {
+          const amount = parseInt(input);
+          if (this.document.system.cultivation.general >= amount) {
+              await this.document.update({"system.cultivation.general": this.document.system.cultivation.general - amount});
+              await item.update({"system.xpInvested": item.system.xpInvested + amount});
+          } else {
+              ui.notifications.warn("通用修为不足！");
+          }
+      }
   }
 }

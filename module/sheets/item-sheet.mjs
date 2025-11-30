@@ -1,70 +1,42 @@
 /**
  * 先简单写一个让系统运行起来
  */
+/**
+ * 侠界之旅 - 物品卡 V2
+ * 采用 ActorSheet 验证成功的架构
+ */
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
-  
   static DEFAULT_OPTIONS = {
     tag: "form",
-    classes: ["xjzl", "sheet", "item"],
-    position: { width: 600, height: 550 }, // 稍微调高一点
-    form: {
-      submitOnChange: true,
-      closeOnSubmit: false
-    },
-    window: {
-      resizable: true,
-      controls: []
-    },
-    actions: {
-      editImage: this._onEditImage // 绑定图片编辑动作
-    }
+    // 关键：添加 neigong 类 (暂且假设所有物品都是内功，未来可以用JS动态判断添加class)
+    classes: ["xjzl-window", "item", "neigong", "xjzl-system"],
+    position: { width: 600, height: 700 },
+    window: { resizable: true },
+    actions: {}
   };
 
   static PARTS = {
-    form: {
-      template: "systems/xjzl-system/templates/item/item-sheet.hbs",
-      scrollable: [".sheet-body"]
-    }
+    // 暂时所有物品都用这个模板，未来在此根据 type 判断
+    main: { template: "systems/xjzl-system/templates/item/neigong/sheet.hbs", scrollable: [".scroll-area"] }
   };
 
-  /**
-   * 准备数据给模板
-   */
+  tabGroups = { primary: "config" };
+
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
-    
-    // === 关键修正 ===
-    // 必须显式把 document 挂载为 'item'，模板才能用 {{item.name}}
-    context.item = this.document;
     context.system = this.document.system;
     
-    // 挂载权限信息
-    context.isGM = game.user.isGM;
-    context.editable = this.isEditable;
-    
-    console.log("Item Sheet Data:", context); // 调试看这里
-    
+    // 准备内功阶段数据
+    if (this.document.type === "neigong") {
+        context.stages = [
+            { id: 1, label: "XJZL.Neigong.Stage1", key: "stage1" },
+            { id: 2, label: "XJZL.Neigong.Stage2", key: "stage2" },
+            { id: 3, label: "XJZL.Neigong.Stage3", key: "stage3" }
+        ];
+    }
     return context;
-  }
-
-  /**
-   * 图片点击编辑逻辑 (V13 需要手动实现)
-   */
-  static async _onEditImage(event, target) {
-    const item = this.document;
-    if (!this.isEditable) return;
-
-    const current = item.img;
-    const fp = new FilePicker({
-      type: "image",
-      current: current,
-      callback: path => {
-        item.update({img: path});
-      }
-    });
-    return fp.browse();
   }
 }

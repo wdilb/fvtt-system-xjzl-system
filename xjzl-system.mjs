@@ -132,6 +132,29 @@ function registerHandlebarsHelpers() {
   Handlebars.registerHelper("log", function (context) {
     console.log("HBS Context:", context);
   });
+
+  Handlebars.registerHelper("array", (...args) => { 
+    args.pop(); // 移除最后一个 Handlebars 传入的 options 对象
+    return args; 
+  });
+  
+  // 增加 selectOptions (Item Sheet 用到了)
+  Handlebars.registerHelper("selectOptions", (choices, options) => {
+    let selected = options.hash.selected;
+    let html = "";
+    for (let choice of choices) {
+      let label = choice;
+      let value = choice;
+      // 简单处理：如果传入的是对象 {value, label}
+      if (typeof choice === 'object') {
+          value = choice.value;
+          label = choice.label;
+      }
+      let isSelected = (String(value) === String(selected)) ? " selected" : "";
+      html += `<option value="${value}"${isSelected}>${label}</option>`;
+    }
+    return new Handlebars.SafeString(html);
+  });
 }
 /**
  * 预加载模板片段
@@ -140,11 +163,18 @@ function registerHandlebarsHelpers() {
 async function preloadHandlebarsTemplates() {
   const SYSTEM_ID = "xjzl-system";
   const templatePaths = [
-    // 把所有拆分出来的子模板路径都写在这里
-    `systems/${SYSTEM_ID}/templates/actor/parts/actor-header.hbs`,
-    `systems/${SYSTEM_ID}/templates/actor/parts/actor-stats.hbs`,
-    `systems/${SYSTEM_ID}/templates/actor/parts/actor-combat.hbs`,
-    `systems/${SYSTEM_ID}/templates/actor/parts/actor-inventory.hbs`
+    // Character Sheets
+    "systems/xjzl-system/templates/actor/character/header.hbs",
+    "systems/xjzl-system/templates/actor/character/tabs.hbs",
+    "systems/xjzl-system/templates/actor/character/tab-stats.hbs",
+    "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs",
+    "systems/xjzl-system/templates/actor/character/tab-combat.hbs",
+    "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
+    // NPC Sheets (未来添加)
+    // "systems/xjzl-system/templates/actor/npc/header.hbs",
+    
+    // Item Sheets
+    "systems/xjzl-system/templates/item/neigong/sheet.hbs"
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);
