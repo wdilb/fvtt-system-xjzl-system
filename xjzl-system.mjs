@@ -140,20 +140,35 @@ function registerHandlebarsHelpers() {
   
   // 增加 selectOptions (Item Sheet 用到了)
   Handlebars.registerHelper("selectOptions", (choices, options) => {
-    let selected = options.hash.selected;
+    // 获取当前选中的值，转为字符串以便比较
+    const selected = String(options.hash.selected ?? ""); 
     let html = "";
-    for (let choice of choices) {
-      let label = choice;
-      let value = choice;
-      // 简单处理：如果传入的是对象 {value, label}
-      if (typeof choice === 'object') {
-          value = choice.value;
-          label = choice.label;
-      }
-      let isSelected = (String(value) === String(selected)) ? " selected" : "";
-      html += `<option value="${value}"${isSelected}>${label}</option>`;
+
+    // 情况 A: 传入的是对象 { key: "Label", yin: "阴" }
+    if (choices && typeof choices === 'object' && !Array.isArray(choices)) {
+        for (const [key, label] of Object.entries(choices)) {
+            const isSelected = String(key) === selected ? " selected" : "";
+            html += `<option value="${key}"${isSelected}>${label}</option>`;
+        }
+    } 
+    // 情况 B: 传入的是数组 [1, 2, 3] 或 [{value:1, label:"一"}]
+    else if (Array.isArray(choices)) {
+        for (const choice of choices) {
+            let value, label;
+            // 如果数组里是对象 {value, label}
+            if (typeof choice === 'object' && choice !== null) {
+                value = choice.value;
+                label = choice.label || value;
+            } else {
+                // 简单数组 [1, 2, 3]
+                value = choice;
+                label = choice;
+            }
+            const isSelected = String(value) === selected ? " selected" : "";
+            html += `<option value="${value}"${isSelected}>${label}</option>`;
+        }
     }
-    return new Handlebars.SafeString(html);
+        return new Handlebars.SafeString(html);
   });
 }
 /**

@@ -1,35 +1,46 @@
 /**
  * 先简单写一个让系统运行起来
  */
-/**
- * 侠界之旅 - 物品卡 V2
- * 采用 ActorSheet 验证成功的架构
- */
+/* module/sheets/item-sheet.mjs */
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
-    // 关键：添加 neigong 类 (暂且假设所有物品都是内功，未来可以用JS动态判断添加class)
     classes: ["xjzl-window", "item", "neigong", "xjzl-system"],
-    position: { width: 600, height: 700 },
+    position: { width: 550, height: 700 }, // 稍微调宽一点
     window: { resizable: true },
     actions: {}
   };
 
   static PARTS = {
-    // 暂时所有物品都用这个模板，未来在此根据 type 判断
-    main: { template: "systems/xjzl-system/templates/item/neigong/sheet.hbs", scrollable: [".scroll-area"] }
+    // 只有一个 main 部分，但我们要指定它是可滚动的
+    main: { 
+      template: "systems/xjzl-system/templates/item/neigong/sheet.hbs", 
+      scrollable: [".scroll-area"] // 告诉 Foundry 哪个类名是滚动容器
+    }
   };
-
-  tabGroups = { primary: "config" };
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.system = this.document.system;
     
-    // 准备内功阶段数据
+    // === 1. 准备本地化下拉菜单数据 ===
+    // 我们需要把 key:value 传给 selectOptions
+    context.elementChoices = {
+        "yin": game.i18n.localize("XJZL.Neigong.ElementYin"), // "阴"
+        "yang": game.i18n.localize("XJZL.Neigong.ElementYang"), // "阳"
+        "taiji": game.i18n.localize("XJZL.Neigong.ElementTaiji") // "太极"
+    };
+
+    context.tierChoices = {
+        1: game.i18n.localize("XJZL.Tiers.1"), // 人级
+        2: game.i18n.localize("XJZL.Tiers.2"), // 地级
+        3: game.i18n.localize("XJZL.Tiers.3")  // 天级
+    };
+
+    // === 2. 准备阶段数据 ===
     if (this.document.type === "neigong") {
         context.stages = [
             { id: 1, label: "XJZL.Neigong.Stage1", key: "stage1" },
@@ -37,6 +48,7 @@ export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             { id: 3, label: "XJZL.Neigong.Stage3", key: "stage3" }
         ];
     }
+    
     return context;
   }
 }
