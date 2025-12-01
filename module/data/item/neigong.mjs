@@ -82,6 +82,9 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     else if (this.tier === 2) thresholds = [1000, 4000, 10000];
     else if (this.tier === 3) thresholds = [2000, 12000, 30000];
 
+    // 定义该内功的绝对上限 (圆满所需的值)
+    const absoluteMax = thresholds[2];
+
     // 2. 计算当前阶段 (Stage)
     // 0: 未入门
     // 1: 领悟
@@ -125,32 +128,36 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     // 4. 计算进度条 (UI用)
     this.progressData = {
       pct: 0,
-      current: this.xpInvested,
-      max: null,
-      label: ""
+      current: 0,     // 用于显示：当前这级修了多少
+      max: 0,         // 用于显示：这级修满要多少
+      absoluteMax: absoluteMax, // 绝对上限，用于 prevent overflow
+      isMastered: stage >= 3
     };
 
-    // 显示逻辑：显示距离下一级的进度
-    if (stage < 3) {
-      const nextThreshold = thresholds[stage]; // 下一级的门槛 (注意 stage 从 0 或 1 开始对应)
-      // 特殊情况：如果是未入门(0)，下一级是 thresholds[0]
-      // 如果是领悟(1)，下一级是 thresholds[1]
-      // 修正逻辑：
-      // 阶段 0 (未入门) -> 目标 thresholds[0]
-      // 阶段 1 (领悟)   -> 目标 thresholds[1]
-      // 阶段 2 (小成)   -> 目标 thresholds[2]
+    if (stage < 3 && stage > 0) {
+      // 处于 Stage 1 或 Stage 2
+      // 目标是下一级的门槛
+      const nextThreshold = thresholds[stage]; // stage=1 -> thresholds[1] (1000)
+      const prevThreshold = thresholds[stage - 1] || 0; 
+
+      // 相对数值
+      this.progressData.max = nextThreshold - prevThreshold;
+      this.progressData.current = this.xpInvested - prevThreshold;
       
-      const target = thresholds[stage];
-      const prev = stage > 0 ? thresholds[stage-1] : 0;
-      
-      this.progressData.max = target;
-      // 计算百分比
-      const den = target - prev;
-      const num = this.xpInvested - prev;
-      this.progressData.pct = den > 0 ? Math.min(100, Math.floor((num / den) * 100)) : 0;
-    } else {
+      // 百分比
+      if (this.progressData.max > 0) {
+        this.progressData.pct = Math.min(100, Math.floor((this.progressData.current / this.progressData.max) * 100));
+      }
+    } else if (stage === 3) {
+      // 已圆满
       this.progressData.pct = 100;
-      this.progressData.label = "已圆满";
+      this.progressData.current = this.xpInvested;
+      this.progressData.max = absoluteMax;
+    } else {
+      // 未入门 (针对高阶内功)
+      this.progressData.pct = 0;
+      this.progressData.max = thresholds[0];
+      this.progressData.current = this.xpInvested;
     }
   }
 }

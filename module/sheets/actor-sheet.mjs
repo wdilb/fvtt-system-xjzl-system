@@ -12,10 +12,16 @@ export class XJZLActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     position: { width: 900, height: 800 },
     window: { resizable: true },
     actions: {
+        //切换内功
         toggleNeigong: XJZLActorSheet.prototype._onToggleNeigong,
+        //投入修为
         investXP: XJZLActorSheet.prototype._onInvestXP,
+        //编辑物品
         editItem: XJZLActorSheet.prototype._onEditItem,
-        deleteItem: XJZLActorSheet.prototype._onDeleteItem
+        //删除物品
+        deleteItem: XJZLActorSheet.prototype._onDeleteItem,
+        //返回投入的修为
+        refundXP: XJZLActorSheet.prototype._onRefundXP
     }
   };
 
@@ -149,108 +155,167 @@ export class XJZLActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   /*  Action Handlers                             */
   /* -------------------------------------------- */
 
-  async _onEditItem(event, target) {
-      const itemId = target.dataset.itemId;
-      const item = this.document.items.get(itemId);
-      if (item) item.sheet.render(true);
-  }
+    async _onEditItem(event, target) {
+        const itemId = target.dataset.itemId;
+        const item = this.document.items.get(itemId);
+        if (item) item.sheet.render(true);
+    }
 
   // 新增：删除物品逻辑
-  async _onDeleteItem(event, target) {
-      const itemId = target.dataset.itemId;
-      const item = this.document.items.get(itemId);
-      if (!item) return;
-      
-      // 弹窗确认
-      const confirm = await foundry.applications.api.DialogV2.confirm({
-          window: { title: "删除物品" },
-          content: `<p>确定要删除 <b>${item.name}</b> 吗？</p>`,
-          rejectClose: false
-      });
+    async _onDeleteItem(event, target) {
+        const itemId = target.dataset.itemId;
+        const item = this.document.items.get(itemId);
+        if (!item) return;
+        
+        // 弹窗确认
+        const confirm = await foundry.applications.api.DialogV2.confirm({
+            window: { title: "删除物品" },
+            content: `<p>确定要删除 <b>${item.name}</b> 吗？</p>`,
+            rejectClose: false
+        });
 
-      if (confirm) {
-          await item.delete();
-      }
-  }
+        if (confirm) {
+            await item.delete();
+        }
+    }
 
-  async _onToggleNeigong(event, target) {
-      // ... (保持之前的逻辑不变) ...
-      const itemId = target.dataset.itemId;
-      const item = this.document.items.get(itemId);
-      if (!item) return;
-      const wasActive = item.system.active;
-      if (!wasActive) {
-          const updates = [];
-          for (const i of this.document.itemTypes.neigong) {
-              if (i.id !== itemId && i.system.active) {
-                  updates.push({ _id: i.id, "system.active": false });
-              }
-          }
-          if (updates.length) await this.document.updateEmbeddedDocuments("Item", updates);
-          await this.document.update({"system.martial.active_neigong": itemId});
-      } else {
-          await this.document.update({"system.martial.active_neigong": ""});
-      }
-      await item.update({ "system.active": !wasActive });
-  }
+    async _onToggleNeigong(event, target) {
+        // ... (保持之前的逻辑不变) ...
+        const itemId = target.dataset.itemId;
+        const item = this.document.items.get(itemId);
+        if (!item) return;
+        const wasActive = item.system.active;
+        if (!wasActive) {
+            const updates = [];
+            for (const i of this.document.itemTypes.neigong) {
+                if (i.id !== itemId && i.system.active) {
+                    updates.push({ _id: i.id, "system.active": false });
+                }
+            }
+            if (updates.length) await this.document.updateEmbeddedDocuments("Item", updates);
+            await this.document.update({"system.martial.active_neigong": itemId});
+        } else {
+            await this.document.update({"system.martial.active_neigong": ""});
+        }
+        await item.update({ "system.active": !wasActive });
+    }
 
-  async _onInvestXP(event, target) {
-      const itemId = target.dataset.itemId;
-      const item = this.document.items.get(itemId);
-      if (!item) return;
+    /**
+     * 投入修为
+     */
+    async _onInvestXP(event, target) {
+        const itemId = target.dataset.itemId;
+        const item = this.document.items.get(itemId);
+        if (!item) return;
 
-      const input = await foundry.applications.api.DialogV2.prompt({
-          window: { 
-              title: `修炼: ${item.name}`,
-              icon: "fas fa-arrow-up"
-          },
-          content: `
+        // 获取上限数据 (DataModel 中已计算)
+        const currentInvested = item.system.xpInvested;
+        const maxXP = item.system.progressData.absoluteMax;
+        
+        // 如果已圆满，直接禁止
+        if (currentInvested >= maxXP) {
+            return ui.notifications.warn(`${item.name} 已达圆满境界，无需再投入修为。`);
+        }
+
+        const input = await foundry.applications.api.DialogV2.prompt({
+            window: { title: `修炼: ${item.name}`, icon: "fas fa-arrow-up" },
+            content: `
             <div style="text-align:center; padding: 10px;">
+                <p>距离圆满还需: <b>${maxXP - currentInvested}</b></p>
                 <p style="margin-bottom:10px;">当前通用修为: <b>${this.document.system.cultivation.general}</b></p>
                 <div style="display:flex; flex-direction:column; gap:5px;">
                     <label>请输入投入数量:</label>
                     <input type="number" name="xp" value="100" autofocus 
-                           style="text-align:center; font-size:1.5em; width:100%; 
-                                  background:rgba(255,255,255,0.8); color:black; border:1px solid #333;"/>
+                            style="text-align:center; font-size:1.5em; width:100%; background:rgba(255,255,255,0.8); color:black;"/>
                 </div>
             </div>
-          `,
-          ok: { 
-              label: "投入", 
-              icon: "fas fa-check",
-              // 【核心修复】使用原生 FormData，无需依赖 Foundry 特定 API
-              callback: (event, button) => {
-                  const formData = new FormData(button.form);
-                  return formData.get("xp"); // 直接获取 name="xp" 的值
-              } 
-          },
-          rejectClose: false
-      });
+            `,
+            ok: { 
+                label: "投入", icon: "fas fa-check",
+                callback: (event, button) => new FormData(button.form).get("xp")
+            },
+            rejectClose: false
+        });
 
-      if (input) {
-          const amount = parseInt(input);
-          const currentGeneral = this.document.system.cultivation.general;
+        if (input) {
+            let amount = parseInt(input);
+            const currentGeneral = this.document.system.cultivation.general;
 
-          if (isNaN(amount) || amount <= 0) {
-              return ui.notifications.warn("请输入有效的正整数。");
-          }
-          
-          if (currentGeneral < amount) {
-              return ui.notifications.warn(`通用修为不足！你只有 ${currentGeneral} 点。`);
-          }
+            if (isNaN(amount) || amount <= 0) return ui.notifications.warn("请输入有效的正整数。");
 
-          // 1. 扣除 Actor 修为
-          await this.document.update({
-              "system.cultivation.general": currentGeneral - amount
-          });
-          
-          // 2. 增加 Item 修为
-          const newInvested = (item.system.xpInvested || 0) + amount;
-          await item.update({
-              "system.xpInvested": newInvested
-          });
+            // 1. 溢出计算
+            const needed = maxXP - currentInvested;
+            if (amount > needed) {
+                ui.notifications.info(`投入过多，已自动调整为所需的 ${needed} 点。`);
+                amount = needed;
+            }
 
-          ui.notifications.info(`${item.name} 修为增加 ${amount}，当前进度: ${newInvested}`);
-      }
-  }
+            // 2. 余额检查
+            if (currentGeneral < amount) {
+                return ui.notifications.warn(`通用修为不足！你只有 ${currentGeneral} 点。`);
+            }
+
+            // 3. 执行更新
+            await this.document.update({
+                "system.cultivation.general": currentGeneral - amount
+            });
+            
+            await item.update({
+                "system.xpInvested": currentInvested + amount
+            });
+
+            ui.notifications.info(`${item.name} 修为增加 ${amount}。`);
+        }
+    }
+
+    /**
+     * 回退修为
+     */
+    async _onRefundXP(event, target) {
+        const itemId = target.dataset.itemId;
+        const item = this.document.items.get(itemId);
+        if (!item) return;
+
+        const currentInvested = item.system.xpInvested;
+        if (currentInvested <= 0) return ui.notifications.warn("该内功尚未投入修为，无法回退。");
+
+        const input = await foundry.applications.api.DialogV2.prompt({
+            window: { title: `回退: ${item.name}`, icon: "fas fa-undo" },
+            content: `
+            <div style="text-align:center; padding: 10px;">
+                <p style="color:var(--xjzl-accent);">回退将减少内功境界，并返还通用修为。</p>
+                <p style="margin-bottom:10px;">当前已投入: <b>${currentInvested}</b></p>
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <label>请输入取出数量:</label>
+                    <input type="number" name="xp" value="${currentInvested}" autofocus 
+                            style="text-align:center; font-size:1.5em; width:100%; background:rgba(255,255,255,0.8); color:black;"/>
+                </div>
+            </div>
+            `,
+            ok: { 
+                label: "回退", icon: "fas fa-undo",
+                callback: (event, button) => new FormData(button.form).get("xp")
+            },
+            rejectClose: false
+        });
+
+        if (input) {
+            let amount = parseInt(input);
+            
+            if (isNaN(amount) || amount <= 0) return ui.notifications.warn("请输入有效数字。");
+            if (amount > currentInvested) amount = currentInvested; // 既然是取出，最多全取
+
+            // 1. 返还通用修为
+            await this.document.update({
+                "system.cultivation.general": this.document.system.cultivation.general + amount
+            });
+
+            // 2. 扣除物品修为
+            await item.update({
+                "system.xpInvested": currentInvested - amount
+            });
+
+            ui.notifications.info(`${item.name} 回退成功，返还 ${amount} 点修为。`);
+        }
+    }
 }
