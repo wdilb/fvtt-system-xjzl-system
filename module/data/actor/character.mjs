@@ -442,6 +442,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
             stats.shenfa.neigongBonus  = (stats.shenfa.neigongBonus || 0)  + bonuses.shenfa;
             stats.tipo.neigongBonus    = (stats.tipo.neigongBonus || 0)    + bonuses.tipo;
             stats.neixi.neigongBonus   = (stats.neixi.neigongBonus || 0)   + bonuses.neixi;
+            stats.qigan.neigongBonus   = (stats.qigan.neigongBonus || 0)   + bonuses.qigan;
             stats.shencai.neigongBonus = (stats.shencai.neigongBonus || 0) + bonuses.shencai;
           }
         }
@@ -754,7 +755,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // --- 第一关 ---
     if (s.hand_shaoyin) { hpAdd += 10; bonuses.critWaigong -= 1; }              // 手少阴心经: 气血+10, 外功暴击骰-1
     if (s.foot_shaoyin) { mpAdd += 5;  bonuses.block += 5; }                    // 足少阴肾经: 内力+5, 格挡值+5
-    if (s.hand_shaoyang){ hpAdd += 10; bonuses.hitWaigong += 5; }               // 手少阳三焦经: 气血+10, 命中+5
+    if (s.hand_shaoyang){ hpAdd += 10; bonuses.hitWaigong += 5; bonuses.hitNeigong += 5; }               // 手少阳三焦经: 气血+10, 命中+5
     if (s.foot_shaoyang){ mpAdd += 5;  bonuses.speed += 1; bonuses.initiative += 1; } // 足少阳胆经: 内力+5, 速度+1, 先攻+1
 
     // --- 第二关 ---
@@ -765,7 +766,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // --- 第三关 ---
     if (s.hand_taiyin) { // 手太阴肺经: 气血+60, 外暴-1, 内暴-2, 命中+10
-        hpAdd += 60; bonuses.critWaigong -= 1; bonuses.critNeigong -= 2; bonuses.hitWaigong += 10;
+        hpAdd += 60; bonuses.critWaigong -= 1; bonuses.critNeigong -= 2; bonuses.hitWaigong += 10; bonuses.hitNeigong += 10;
     }
     if (s.foot_taiyin) { // 足太阴脾经: 内力+30, 先攻+5, 闪避+10, 虚招+1
         mpAdd += 30; bonuses.initiative += 5; bonuses.dodge += 10; bonuses.xuzhao += 1;
@@ -901,7 +902,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.defWaigongTotal = Math.floor(S.tipo / 5 + (combat.def_waigong || 0) + bonuses.defWaigong);
     combat.defNeigongTotal = Math.floor(S.neixi / 3 + (combat.def_neigong || 0) + bonuses.defNeigong);
     combat.hitWaigongTotal = Math.floor(S.shenfa / 2 + (combat.hit_waigong || 0) + bonuses.hitWaigong);
-    combat.hitNeigongTotal = Math.floor(S.qigan / 2 + (combat.hit_neigong || 0));
+    combat.hitNeigongTotal = Math.floor(S.qigan / 2 + (combat.hit_neigong || 0) + bonuses.hitNeigong);
     
     // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
     // 最小值限制为 0

@@ -40,6 +40,7 @@ export class XJZLActor extends Actor {
   _applyNeigongEffects() {
     // 1. 获取当前运行的内功
     const activeNeigongId = this.system.martial.active_neigong;
+    console.log(">>> [Actor] 开始执行内功脚本检测, ActiveID:", activeNeigongId);
     if (!activeNeigongId) return;
 
     const item = this.items.get(activeNeigongId);
@@ -47,6 +48,7 @@ export class XJZLActor extends Actor {
 
     // 2. 获取当前阶段的脚本 (由 Item DataModel 算出来的 current.script)
     const script = item.system.current?.script;
+    console.log(`>>> [Actor] 运行内功: ${item.name}, 脚本内容:`, script);
     if (!script || !script.trim()) return;
 
     // 3. 沙盒执行脚本
@@ -64,6 +66,7 @@ export class XJZLActor extends Actor {
       
       // 执行函数
       fn.call(this, sandbox.actor, sandbox.item, sandbox.system, sandbox.S);
+      console.log(`>>> [Actor] ${item.name} 脚本执行成功。S.combat.crit_neigong 现在是:`, this.system.combat.crit_neigong);
       
     } catch (err) {
       console.error(`内功 [${item.name}] 脚本执行错误:`, err);

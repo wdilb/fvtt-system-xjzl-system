@@ -20,6 +20,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
         shenfa: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusShenfa" }),
         tipo: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusTipo" }),
         neixi: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusNeixi" }),
+        qigan: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusQigan" }),
         shencai: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusShencai" })
       }),
       // 该阶段的特效描述 (HTML富文本)
@@ -125,6 +126,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       if (stageConfig) {
         this.current.stats = { ...stageConfig.stats };
         this.current.effect = stageConfig.effect;
+        this.current.script = stageConfig.script || ""; 
       }
       
       // 如果圆满，激活圆满特效
