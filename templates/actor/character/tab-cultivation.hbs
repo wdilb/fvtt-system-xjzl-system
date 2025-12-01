@@ -3,43 +3,50 @@
          data-group="primary">
 
     {{!-- 通用修为栏 --}}
-    <div class="xjzl-card xjzl-flex-row" style="justify-content: space-between; margin-bottom: 15px; background: rgba(255, 255, 255, 0.6);">
+    <div class="xjzl-card xjzl-flex-row" style="justify-content: space-between; margin-bottom: 15px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--xjzl-gold);">
         <label style="font-size: 1.2em; font-weight: bold; color: var(--xjzl-ink-800);">
             <i class="fas fa-database"></i> {{localize "XJZL.Cultivation.General"}}
         </label>
         <div class="xjzl-flex-row">
-            <input type="number" name="system.cultivation.general" value="{{system.cultivation.general}}" class="xjzl-input" style="width: 100px; font-size: 1.4em; border-bottom: 2px solid var(--xjzl-gold);"/>
+            <input type="number" name="system.cultivation.general" value="{{system.cultivation.general}}" class="xjzl-input" style="width: 100px; font-size: 1.4em; font-weight: 900; color: var(--xjzl-accent) !important; background: transparent;"/>
         </div>
     </div>
 
     {{!-- 标题 --}}
     <h3 style="border-bottom: 2px solid var(--xjzl-ink-500); padding-bottom: 5px; margin-bottom: 10px;">
-        {{!-- 修复：如果 TYPES 在根目录，直接调用 TYPES --}}
         {{localize "TYPES.Item.neigong"}}
     </h3>
 
-    {{!-- 
-        【美化核心】：使用 Grid-2 布局，让卡片变小，一行两个
-    --}}
+    {{!-- 内功卡片网格 (两列) --}}
     <div class="xjzl-grid-2">
         {{#each neigongs as |item|}}
         <div class="xjzl-card neigong-item {{#if item.isRunning}}active{{/if}}">
             
-            {{!-- 上半部分：图标 + 信息 --}}
-            <div style="flex: 1; display: flex; flex-direction: column; gap: 3px; overflow: hidden;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span class="item-name" style="font-weight: bold;">{{item.name}}</span>
-                        <a data-action="deleteItem" data-item-id="{{item.id}}" title="删除" style="color: #888; padding: 2px;"><i class="fas fa-times"></i></a>
+            {{!-- 上半部分：图标与信息 --}}
+            <div class="neigong-main">
+                
+                {{!-- 1. 图标 (固定大小) --}}
+                <a class="item-icon" data-action="editItem" data-item-id="{{item.id}}" title="点击编辑">
+                    <img src="{{item.img}}"/>
+                    {{#if item.isRunning}}
+                        <i class="fas fa-cog fa-spin status-icon"></i>
+                    {{/if}}
+                </a>
+                
+                {{!-- 2. 信息列 --}}
+                <div class="item-info">
+                    {{!-- 第一行：名字 + 删除 --}}
+                    <div class="info-row header">
+                        <span class="name">{{item.name}}</span>
+                        <a class="delete-btn" data-action="deleteItem" data-item-id="{{item.id}}" title="删除"><i class="fas fa-times"></i></a>
                     </div>
                     
-                    {{!-- 阶段与数值 --}}
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                    {{!-- 第二行：阶段标签 + 进度数值 --}}
+                    <div class="info-row meta">
                         <span class="stage-tag">
                             {{localize (concat "XJZL.Neigong.Stage" item.system.stage)}}
                         </span>
-                        
-                        {{!-- 显示：当前层级已修 / 当前层级上限 --}}
-                        <span style="font-size: 0.7em; color: #aaa;">
+                        <span class="xp-text">
                             {{#if item.system.progressData.isMastered}}
                                 MAX
                             {{else}}
@@ -48,45 +55,44 @@
                         </span>
                     </div>
 
-                    {{!-- 进度条 --}}
-                    <div class="progress-bg" style="height: 4px; border-radius: 2px; width: 100%; overflow: hidden;">
-                        <div style="background: var(--xjzl-jade); height: 100%; width: {{item.system.progressData.pct}}%;"></div>
+                    {{!-- 第三行：进度条 --}}
+                    <div class="progress-bar">
+                        <div class="fill" style="width: {{item.system.progressData.pct}}%;"></div>
                     </div>
                 </div>
             </div>
 
             {{!-- 下半部分：按钮组 --}}
             <div class="button-group">
+                {{!-- 运功 --}}
                 <button type="button" data-action="toggleNeigong" data-item-id="{{item.id}}" 
-                        class="{{#if item.isRunning}}active-btn{{/if}}">
+                        class="btn-toggle {{#if item.isRunning}}running{{/if}}">
                     <i class="fas fa-power-off"></i> {{#if item.isRunning}}运行中{{else}}运功{{/if}}
                 </button>
                 
-                <button type="button" data-action="refundXP" data-item-id="{{item.id}}" title="散功" style="flex: 0 0 30px;">
+                {{!-- 散功 --}}
+                <button type="button" class="btn-refund" data-action="refundXP" data-item-id="{{item.id}}" title="散功">
                     <i class="fas fa-undo"></i>
                 </button>
 
-                {{!-- 如果已圆满，禁用修炼按钮 --}}
+                {{!-- 修炼 --}}
                 {{#if item.system.progressData.isMastered}}
-                    <button type="button" disabled style="opacity: 0.5; cursor: default; background: #333; color: gold;">
+                    <button type="button" class="btn-invest mastered" disabled>
                         <i class="fas fa-crown"></i> 圆满
                     </button>
                 {{else}}
-                    <button type="button" data-action="investXP" data-item-id="{{item.id}}">
+                    <button type="button" class="btn-invest" data-action="investXP" data-item-id="{{item.id}}">
                         <i class="fas fa-arrow-up"></i> 修炼
                     </button>
                 {{/if}}
             </div>
+
         </div>
         {{else}}
-        <div style="grid-column: 1 / -1; text-align: center; color: #999; padding: 20px;">
-            暂无内功
+        <div style="grid-column: 1 / -1; text-align: center; color: #999; padding: 30px; border: 2px dashed #ccc; border-radius: 8px;">
+            暂无内功，请从物品栏拖入
         </div>
         {{/each}}
     </div>
-    
-    {{!-- 
-       修正：为了让按钮好点，我建议把按钮代码重新插回上面的卡片里。
-       请使用下面的这段替换上面的 {{#each}} 块
-    --}}
+
 </section>

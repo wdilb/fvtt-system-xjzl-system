@@ -9,43 +9,43 @@ export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
     classes: ["xjzl-window", "item", "neigong", "xjzl-system"],
-    position: { width: 550, height: 700 }, // 稍微调宽一点
+    position: { width: 550, height: 700 },
     window: { resizable: true },
     actions: {
-      //增加圆满特效
-      addMasteryChange: XJZLItemSheet.prototype._onAddMasteryChange,
-      //删除圆满特效
-      deleteMasteryChange: XJZLItemSheet.prototype._onDeleteMasteryChange
+        addMasteryChange: XJZLItemSheet.prototype._onAddMasteryChange,
+        deleteMasteryChange: XJZLItemSheet.prototype._onDeleteMasteryChange
     }
   };
 
   static PARTS = {
-    // 只有一个 main 部分，但我们要指定它是可滚动的
     main: { 
       template: "systems/xjzl-system/templates/item/neigong/sheet.hbs", 
-      scrollable: [".scroll-area"] // 告诉 Foundry 哪个类名是滚动容器
+      scrollable: [".scroll-area"] 
     }
   };
+
+  /* -------------------------------------------- */
+  /*  数据准备                                    */
+  /* -------------------------------------------- */
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     context.system = this.document.system;
     
-    // === 1. 准备本地化下拉菜单数据 ===
-    // 我们需要把 key:value 传给 selectOptions
+    // 1. 本地化下拉菜单
     context.elementChoices = {
-        "yin": game.i18n.localize("XJZL.Neigong.ElementYin"), // "阴"
-        "yang": game.i18n.localize("XJZL.Neigong.ElementYang"), // "阳"
-        "taiji": game.i18n.localize("XJZL.Neigong.ElementTaiji") // "太极"
+        "yin": game.i18n.localize("XJZL.Neigong.ElementYin"),
+        "yang": game.i18n.localize("XJZL.Neigong.ElementYang"),
+        "taiji": game.i18n.localize("XJZL.Neigong.ElementTaiji")
     };
 
     context.tierChoices = {
-        1: game.i18n.localize("XJZL.Tiers.1"), // 人级
-        2: game.i18n.localize("XJZL.Tiers.2"), // 地级
-        3: game.i18n.localize("XJZL.Tiers.3")  // 天级
+        1: game.i18n.localize("XJZL.Tiers.1"),
+        2: game.i18n.localize("XJZL.Tiers.2"),
+        3: game.i18n.localize("XJZL.Tiers.3")
     };
 
-    // === 2. 准备阶段数据 ===
+    // 2. 内功阶段配置
     if (this.document.type === "neigong") {
         context.stages = [
             { id: 1, label: "XJZL.Neigong.Stage1", key: "stage1" },
@@ -57,32 +57,61 @@ export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     return context;
   }
 
+  /* -------------------------------------------- */
+  /*  生命周期与事件监听                          */
+  /* -------------------------------------------- */
+
+  /**
+   * 自动保存逻辑
+   * AppV2 默认不监听 input change，我们需要手动触发 submit
+   */
   _onRender(context, options) {
     super._onRender(context, options);
-    // 绑定所有输入框的 change 事件以自动保存
+    
+    // 查找所有输入框
     this.element.querySelectorAll("input, select, textarea").forEach(input => {
+        // 避免重复绑定
+        if (input.dataset.hasChangeListener) return;
+        
         input.addEventListener("change", (event) => {
             event.preventDefault();
-            this.submit(); // 触发 AppV2 的提交逻辑
+            this.submit(); // 触发保存
         });
+        input.dataset.hasChangeListener = "true";
     });
   }
 
+  /* -------------------------------------------- */
+  /*  Action Handlers (动作处理)                  */
+  /* -------------------------------------------- */
+
+  /**
+   * 动作: 添加一行圆满修正
+   */
   async _onAddMasteryChange(event, target) {
-      // 获取当前数组
+      // 获取当前数组，如果是 undefined 则初始化为空数组
       const changes = this.document.system.masteryChanges || [];
-      // 写入新数组 (追加一个空对象)
+      
+      // 更新数据：追加一个新的空对象
       await this.document.update({
-          "system.masteryChanges": [...changes, { key: "", value: 0, label: "" }]
+          "system.masteryChanges": [
+              ...changes, 
+              { key: "", value: 0, label: "" }
+          ]
       });
+      // AppV2 会自动重新渲染界面
   }
 
+  /**
+   * 动作: 删除一行圆满修正
+   */
   async _onDeleteMasteryChange(event, target) {
       const index = Number(target.dataset.index);
       const changes = this.document.system.masteryChanges || [];
       
-      // 移除指定索引的项
+      // 过滤掉指定索引的项
       const newChanges = changes.filter((_, i) => i !== index);
+      
       await this.document.update({
           "system.masteryChanges": newChanges
       });
