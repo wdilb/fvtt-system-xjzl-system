@@ -178,7 +178,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
             fire: makeModField(0, "XJZL.Combat.Res.Fire"),       // 火焰抗性
             mental: makeModField(0, "XJZL.Combat.Res.Mental"),      // 精神抗性
             liushi: makeModField(0, "XJZL.Combat.Res.Liushi")      // 流失抗性
-        }, { label: "XJZL.Combat.Resistances" })
+        }, { label: "XJZL.Combat.Resistances" }),
+
+        //6.消耗减少
+        costs: new fields.SchemaField({
+            neili: makeModField(0, "XJZL.Combat.Cost.Neili"),   // 内力消耗减少
+            rage: makeModField(0, "XJZL.Combat.Cost.Rage") // 怒气消耗减少
+        }, { label: "XJZL.Combat.ReduceCost" })
+
       }),
 
       // === F. 武学状态 (Martial Status) ===
@@ -335,7 +342,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       "renxing", "biqi", "rennai", "ningxue",      // 体魄系
       "liaoshang", "chongxue", "lianxi", "duqi",   // 内息系
       "dianxue", "zhuizong", "tancha", "dongcha",  // 气感系
-      "jiaoyi", "qiman", "shuofu", "dingli"        // 神采系
+      "jiaoyi", "qiman", "shuofu", "dingli",       // 神采系
+      // 悟性系技能
+      "wuxue",    // 武学内功
+      "jianding", // 物品鉴定
+      "bagua",    // 江湖八卦
+      "shili"     // 角色实力
     ];
 
     // 构建结构: { base: 0, mod: 0, total: 0 }
@@ -677,11 +689,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 计算属性技能 (Skills)
     // 此时 mod 字段已被 AE 填充
     // =======================================================
-    const calcSkill = (key, statVal) => {
+    const calcSkill = (key, statVal, isFlat = false) => {
       const skill = this.skills[key];
       // 防止重算时没有初始化
       if (!skill) return; 
-      skill.base = Math.floor(statVal / 10);
+      // 悟性系直接等于属性值，其他系除以 10
+      skill.base = isFlat ? statVal : Math.floor(statVal / 10);
       skill.total = skill.base + (skill.mod || 0); // mod 来自 AE
     };
 
@@ -698,6 +711,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     calcSkill("dianxue", S.qigan); calcSkill("zhuizong", S.qigan); calcSkill("tancha", S.qigan); calcSkill("dongcha", S.qigan);
     // 神采系
     calcSkill("jiaoyi", S.shencai); calcSkill("qiman", S.shencai); calcSkill("shuofu", S.shencai); calcSkill("dingli", S.shencai);
+    // 悟性系
+    calcSkill("wuxue", S.wuxing, true); calcSkill("jianding", S.wuxing, true); calcSkill("bagua", S.wuxing, true); calcSkill("shili", S.wuxing, true);
   }
 
   /**
@@ -882,7 +897,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 基础
     // 公式: 属性衍生 + 基础加值(DB/AE) + 经脉加成(Temp)
     combat.blockTotal = (combat.block || 0) + bonuses.block;
-    combat.kanpoTotal = (combat.kanpo || 0) + bonuses.kanpo;
+    // 看破的基础值=武学内功
+    const kanpoBase = this.skills.wuxue?.total || 0; 
+    combat.kanpoTotal = kanpoBase + (combat.kanpo || 0) + bonuses.kanpo;
     combat.xuzhaoTotal = (combat.xuzhao || 0) + bonuses.xuzhao;
 
     // 速度 (基础5 + 轻功/2 + 修正)
@@ -903,6 +920,10 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.defNeigongTotal = Math.floor(S.neixi / 3 + (combat.def_neigong || 0) + bonuses.defNeigong);
     combat.hitWaigongTotal = Math.floor(S.shenfa / 2 + (combat.hit_waigong || 0) + bonuses.hitWaigong);
     combat.hitNeigongTotal = Math.floor(S.qigan / 2 + (combat.hit_neigong || 0) + bonuses.hitNeigong);
+
+    //消耗减少
+    combat.costs.neili.total = (combat.costs.neili.value || 0) + (combat.costs.neili.mod || 0);
+    combat.costs.rage.total = (combat.costs.rage.value || 0) + (combat.costs.rage.mod || 0);
     
     // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
     // 最小值限制为 0

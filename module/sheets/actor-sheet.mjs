@@ -32,6 +32,7 @@ export class XJZLActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     stats:       { template: "systems/xjzl-system/templates/actor/character/tab-stats.hbs", scrollable: [""] },
     cultivation: { template: "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs", scrollable: [""] },
     jingmai:     { template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs", scrollable: [""] },
+    skills:      { template: "systems/xjzl-system/templates/actor/character/tab-skills.hbs", scrollable: [""] },
     combat:      { template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs", scrollable: [""] }
   };
 
@@ -57,6 +58,16 @@ export class XJZLActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     // 内功
     context.neigongs = actor.itemTypes.neigong || [];
     context.neigongs.forEach(item => item.isRunning = item.system.active);
+
+    context.skillGroups = [
+        { label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
+        { label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
+        { label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] },
+        { label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
+        { label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
+        { label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] },
+        { label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }
+    ];
 
     return context;
   }
