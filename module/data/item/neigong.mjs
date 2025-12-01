@@ -55,6 +55,14 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       
       // 圆满特效 (额外独立字段，仅圆满生效)
       masteryEffect: new fields.HTMLField({ label: "XJZL.Neigong.MasteryEffect" }),
+      //圆满特效（实际生效部分）
+      masteryStats: new fields.ArrayField(
+        new fields.SchemaField({
+          key: new fields.StringField({ required: true, label: "属性路径" }),
+          value: new fields.NumberField({ required: true, label: "数值" }),
+          label: new fields.StringField({ label: "备注" }) // 方便GM看是啥
+        })
+      ,  { label: "XJZL.Neigong.MasteryEffect" }),
 
       // === 2. 动态数据 (玩家存档) ===
       

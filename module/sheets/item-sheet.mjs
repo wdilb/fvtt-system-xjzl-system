@@ -11,7 +11,12 @@ export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     classes: ["xjzl-window", "item", "neigong", "xjzl-system"],
     position: { width: 550, height: 700 }, // 稍微调宽一点
     window: { resizable: true },
-    actions: {}
+    actions: {
+      //增加圆满特效
+      addMasteryChange: XJZLItemSheet.prototype._onAddMasteryChange,
+      //删除圆满特效
+      deleteMasteryChange: XJZLItemSheet.prototype._onDeleteMasteryChange
+    }
   };
 
   static PARTS = {
@@ -61,5 +66,25 @@ export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             this.submit(); // 触发 AppV2 的提交逻辑
         });
     });
+  }
+
+  async _onAddMasteryChange(event, target) {
+      // 获取当前数组
+      const changes = this.document.system.masteryChanges || [];
+      // 写入新数组 (追加一个空对象)
+      await this.document.update({
+          "system.masteryChanges": [...changes, { key: "", value: 0, label: "" }]
+      });
+  }
+
+  async _onDeleteMasteryChange(event, target) {
+      const index = Number(target.dataset.index);
+      const changes = this.document.system.masteryChanges || [];
+      
+      // 移除指定索引的项
+      const newChanges = changes.filter((_, i) => i !== index);
+      await this.document.update({
+          "system.masteryChanges": newChanges
+      });
   }
 }

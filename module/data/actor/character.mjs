@@ -445,6 +445,31 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
             stats.shencai.neigongBonus = (stats.shencai.neigongBonus || 0) + bonuses.shencai;
           }
         }
+
+        // ---  圆满加成 (Mastery Bonus) ---
+        // 只要达到 Stage 3 (圆满)，无论是否运功，都永久生效
+        // 我们直接读取 item.system.masteryStats
+        if (item.system.stage >= 3 && item.system.masteryChanges) {
+            for (const change of item.system.masteryChanges) {
+                if (!change.key || !change.value) continue;
+
+                // 1. 读取 Actor 当前属性值 (可能是 0)
+                // 例如 key = "system.stats.liliang.mod"
+                // 注意：Foundry 的 DataModel 中，this 就是 system，所以我们去掉 "system." 前缀
+                let propPath = change.key;
+                if (propPath.startsWith("system.")) {
+                    propPath = propPath.substring(7); // 去掉 "system."
+                }
+
+                // 2. 获取当前值
+                const currentVal = foundry.utils.getProperty(this, propPath) || 0;
+
+                // 3. 累加数值
+                // 注意：这里修改的是 this (即 system)，
+                // 因为 mod 属性在 prepareBaseData 里已经被重置为 0，所以这里累加是安全的
+                foundry.utils.setProperty(this, propPath, currentVal + change.value);
+            }
+        }
         // tier: 1(人), 2(地), 3(天)
         // stage: 1(领), 2(小/掌), 3(圆/精), 4(合)
         const tier = item.system.tier || 1;
