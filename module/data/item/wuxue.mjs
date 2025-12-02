@@ -138,6 +138,9 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         }
     }
 
+    // 获取绝对上限
+    const absoluteMax = thresholds[thresholds.length - 1];
+
     // 2. 遍历每个招式，计算状态
     for (const move of this.moves) {
         // A. 计算等级 (Level)
@@ -158,7 +161,7 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
         // B. 计算进度条数据 (Progress)
         // 结构: { current, max, pct, isMax }
-        move.progress = { current: 0, max: 0, pct: 0, isMax: false };
+        move.progress = { current: 0, max: 0, pct: 0, isMax: false, absoluteMax: absoluteMax };
         
         if (lvl === move.maxLevel) {
             move.progress.isMax = true;
@@ -187,9 +190,6 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
             rage: move.costs.rage?.[costIndex] || 0,
             hp: move.costs.hp?.[costIndex] || 0
         };
-        
-        // D. 绝对上限 (防止修为溢出)
-        move.progress.absoluteMax = thresholds[thresholds.length - 1];
     }
   }
 }

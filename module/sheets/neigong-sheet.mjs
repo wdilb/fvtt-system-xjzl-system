@@ -5,15 +5,15 @@
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-export class XJZLItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
+export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
     classes: ["xjzl-window", "item", "neigong", "xjzl-system"],
     position: { width: 550, height: 700 },
     window: { resizable: true },
     actions: {
-        addMasteryChange: XJZLItemSheet.prototype._onAddMasteryChange,
-        deleteMasteryChange: XJZLItemSheet.prototype._onDeleteMasteryChange
+        addMasteryChange: XJZLNeigongSheet.prototype._onAddMasteryChange,
+        deleteMasteryChange: XJZLNeigongSheet.prototype._onDeleteMasteryChange
     }
   };
 

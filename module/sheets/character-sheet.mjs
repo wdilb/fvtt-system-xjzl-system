@@ -5,7 +5,7 @@
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-export class XJZLActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
+export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
     classes: ["xjzl-window", "actor", "character", "xjzl-system"],
@@ -13,15 +13,15 @@ export class XJZLActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     window: { resizable: true },
     actions: {
         //切换内功
-        toggleNeigong: XJZLActorSheet.prototype._onToggleNeigong,
+        toggleNeigong: XJZLCharacterSheet.prototype._onToggleNeigong,
         //投入修为
-        investXP: XJZLActorSheet.prototype._onInvestXP,
+        investXP: XJZLCharacterSheet.prototype._onInvestXP,
         //编辑物品
-        editItem: XJZLActorSheet.prototype._onEditItem,
+        editItem: XJZLCharacterSheet.prototype._onEditItem,
         //删除物品
-        deleteItem: XJZLActorSheet.prototype._onDeleteItem,
+        deleteItem: XJZLCharacterSheet.prototype._onDeleteItem,
         //返回投入的修为
-        refundXP: XJZLActorSheet.prototype._onRefundXP
+        refundXP: XJZLCharacterSheet.prototype._onRefundXP
     }
   };
 

@@ -12,11 +12,13 @@ import { XJZLItem } from "./module/documents/item.mjs";
 import { XJZLCharacterData } from "./module/data/actor/character.mjs";
 // import { XJZLNPCData } from "./module/data/actor/npc.mjs"; // 暂时注释，写了再开
 import { XJZLNeigongData } from "./module/data/item/neigong.mjs";
+import { XJZLWuxueData } from "./module/data/item/wuxue.mjs"
 // (后续会导入更多 Item 模型)
 
 // 导入 Sheets (UI)
-import { XJZLActorSheet } from "./module/sheets/actor-sheet.mjs";
-import { XJZLItemSheet } from "./module/sheets/item-sheet.mjs";
+import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
+import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
+import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -46,6 +48,7 @@ Hooks.once("init", async function () {
 
   CONFIG.Item.dataModels = {
     neigong: XJZLNeigongData,
+    wuxue: XJZLWuxueData, // 注册武学数据
     // weapon: XJZLWeaponData (未来添加)
   };
 
@@ -58,10 +61,10 @@ Hooks.once("init", async function () {
   Actors.unregisterSheet("core", ActorSheet);
   
   // 注意：V13 中虽然推荐 AppV2，但注册方式仍需兼容 DocumentSheetConfig
-  Actors.registerSheet("xjzl-system", XJZLActorSheet, {
+  Actors.registerSheet("xjzl-system", XJZLCharacterSheet, {
     types: ["character"], // 暂时只绑定 character 类型
     makeDefault: true,
-    label: "XJZL.Sheet.ActorDefault"
+    label: "XJZL.Sheet.Character"
   });
 
   // ---注册 Item Sheet ---
@@ -70,9 +73,18 @@ Hooks.once("init", async function () {
   // 使用命名空间访问 V1 ItemSheet (用于注销)
   const ItemSheet = foundry.applications.sheets.ItemSheet;
   Items.unregisterSheet("core", ItemSheet);
-  Items.registerSheet("xjzl-system", XJZLItemSheet, {
+  // 注册内功表单
+  Items.registerSheet("xjzl-system", XJZLNeigongSheet, {
+    types: ["neigong"],
     makeDefault: true,
-    label: "XJZL.Sheet.ItemDefault"
+    label: "XJZL.Sheet.Neigong"
+  });
+
+  // 注册武学表单
+  Items.registerSheet("xjzl-system", XJZLWuxueSheet, {
+    types: ["wuxue"],
+    makeDefault: true,
+    label: "XJZL.Sheet.Wuxue"
   });
 
   // ==========================================
@@ -178,7 +190,7 @@ function registerHandlebarsHelpers() {
 async function preloadHandlebarsTemplates() {
   const SYSTEM_ID = "xjzl-system";
   const templatePaths = [
-    // Character Sheets
+    // 角色卡
     "systems/xjzl-system/templates/actor/character/header.hbs",
     "systems/xjzl-system/templates/actor/character/tabs.hbs",
     "systems/xjzl-system/templates/actor/character/tab-stats.hbs",
@@ -188,8 +200,13 @@ async function preloadHandlebarsTemplates() {
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
     
-    // Item Sheets
-    "systems/xjzl-system/templates/item/neigong/sheet.hbs"
+    // 内功
+    "systems/xjzl-system/templates/item/neigong/sheet.hbs",
+    //武学
+    "systems/xjzl-system/templates/item/wuxue/header.hbs",
+    "systems/xjzl-system/templates/item/wuxue/tabs.hbs",
+    "systems/xjzl-system/templates/item/wuxue/tab-details.hbs",
+    "systems/xjzl-system/templates/item/wuxue/tab-effects.hbs"
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);
