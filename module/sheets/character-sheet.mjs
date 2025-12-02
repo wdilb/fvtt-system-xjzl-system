@@ -14,6 +14,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     actions: {
         //切换内功
         toggleNeigong: XJZLCharacterSheet.prototype._onToggleNeigong,
+        // 切换子标签页 (内功/武学)
+        toggleSubTab: XJZLCharacterSheet.prototype._onToggleSubTab,
         //投入修为
         investXP: XJZLCharacterSheet.prototype._onInvestXP,
         //编辑物品
@@ -21,7 +23,12 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         //删除物品
         deleteItem: XJZLCharacterSheet.prototype._onDeleteItem,
         //返回投入的修为
-        refundXP: XJZLCharacterSheet.prototype._onRefundXP
+        refundXP: XJZLCharacterSheet.prototype._onRefundXP,
+        //武学投入修为
+        investMoveXP: XJZLCharacterSheet.prototype._onInvestMoveXP,
+        //武学回退修为
+        refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
+        rollMove: XJZLCharacterSheet.prototype._onRollMove // 先占位
     }
   };
 
@@ -58,6 +65,51 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     // 内功
     context.neigongs = actor.itemTypes.neigong || [];
     context.neigongs.forEach(item => item.isRunning = item.system.active);
+    // 我们不仅要列出武学，还要预计算招式伤害
+    context.wuxues = actor.itemTypes.wuxue || [];
+    
+    // 遍历所有武学
+    for (const wuxue of context.wuxues) {
+        // 遍历该武学下的所有招式
+        wuxue.system.moves.forEach(move => {
+            // A. 获取基础伤害
+            // (base + growth * (level - 1))
+            // 注意：这里取的是 move.computedLevel (当前实际等级)
+            const lvl = Math.max(1, move.computedLevel || 1);
+            const baseDmg = (move.calculation.base || 0) + (move.calculation.growth || 0) * (lvl - 1);
+
+            // B. 计算属性加成
+            let attrBonus = 0;
+            if (move.calculation.scalings) {
+                for (const scale of move.calculation.scalings) {
+                    // 读取 Actor 属性总值 (如 system.stats.liliang.total)
+                    const propVal = foundry.utils.getProperty(actor.system.stats, `${scale.prop}.total`) || 0;
+                    attrBonus += propVal * (scale.ratio || 0);
+                }
+            }
+
+            // C. 计算内功加成 (系数)
+            // 调用我们刚才写在 DataModel 里的方法
+            const neigongBonusRatio = actor.system.getNeigongDamageBonus(move.element);
+            
+            // D. 汇总
+            // 公式: (基础 + 属性) * (1 + 内功加成 + 其他加成)
+            // 假设内功加成是乘区 (系数)，如果不适乘区，请改为加法
+            const totalDmg = Math.floor((baseDmg + attrBonus) * (1 + neigongBonusRatio));
+
+            // 将计算结果挂载到临时对象上，供模板显示
+            move.derived = {
+                damage: totalDmg,
+                neigongBonus: neigongBonusRatio > 0 ? `+${(neigongBonusRatio*100).toFixed(0)}%` : "",
+                cost: move.currentCost // 之前在 DataModel 里算的当前消耗
+            };
+        });
+    }
+
+    // UI 状态控制
+    // 如果没有初始化，默认显示 'neigong'
+    if (!this._cultivationSubTab) this._cultivationSubTab = "neigong";
+    context.cultivationSubTab = this._cultivationSubTab;
 
     context.skillGroups = [
         { label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
@@ -335,5 +387,141 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
             ui.notifications.info(`${item.name} 回退成功，返还 ${amount} 点修为。`);
         }
+    }
+
+    /**
+     * 切换修为页面的子标签 (内功/武学)
+     */
+    async _onToggleSubTab(event, target) {
+        const tab = target.dataset.target;
+        this._cultivationSubTab = tab;
+        this.render(); // 重新渲染界面以更新显示
+    }
+
+    // 武学投入修为
+    async _onInvestMoveXP(event, target) {
+        const itemId = target.dataset.itemId;
+        const moveId = target.dataset.moveId;
+        const item = this.document.items.get(itemId);
+        if (!item) return;
+
+        const moveIndex = item.system.moves.findIndex(m => m.id === moveId);
+        if (moveIndex === -1) return;
+        const move = item.system.moves[moveIndex];
+
+        // 【核心修复】计算还需要多少修为才能升级
+        // move.progress.max 是当前级别所需的总投入 (相对值)
+        // move.progress.current 是当前级别已投入 (相对值)
+        const needed = move.progress.max - move.progress.current;
+
+        const uniqueId = `invest-${foundry.utils.randomID()}`;
+
+        const input = await foundry.applications.api.DialogV2.prompt({
+            window: { title: `修炼: ${move.name}`, icon: "fas fa-arrow-up" },
+            content: `
+                <div style="text-align:center; padding: 10px;">
+                    <p>当前进度: <span style="color:var(--xjzl-gold)">${move.progress.current}</span> / ${move.progress.max}</p>
+                    <p style="font-size:0.9em; color:#666;">(总投入: ${move.xpInvested})</p>
+                    <p style="margin-bottom:10px;">可用修为: <b>${this.document.system.cultivation.general}</b></p>
+                    <div style="display:flex; flex-direction:column; gap:5px;">
+                        <label>投入数量</label>
+                        {{!-- 默认填入升级所需的值 --}}
+                        <input id="${uniqueId}" type="number" name="xp" value="${needed}" autofocus 
+                            style="text-align:center; font-size:1.5em; width:100%; color:black; background:rgba(255,255,255,0.9); border:1px solid #333;"/>
+                    </div>
+                </div>
+            `,
+            ok: { 
+                label: "投入", icon: "fas fa-check",
+                callback: () => document.getElementById(uniqueId).value
+            },
+            rejectClose: false
+        });
+
+        if (input) {
+            let amount = parseInt(input);
+            const currentGeneral = this.document.system.cultivation.general;
+
+            if (isNaN(amount) || amount <= 0) return ui.notifications.warn("无效数字");
+            
+            // 溢出检查：不能超过当前级的上限
+            // 如果你想支持一次升多级，这里逻辑要改，但目前为了稳定，我们限制一次只升一级
+            if (amount > needed) {
+                ui.notifications.info(`投入过多，已调整为升级所需的 ${needed} 点。`);
+                amount = needed;
+            }
+
+            if (currentGeneral < amount) return ui.notifications.warn("修为不足");
+
+            // 1. 扣除通用修为
+            await this.document.update({
+                "system.cultivation.general": currentGeneral - amount
+            });
+
+            // 2. 更新招式数据
+            const itemData = item.system.toObject();
+            const idx = itemData.moves.findIndex(m => m.id === moveId);
+            if (idx !== -1) {
+                itemData.moves[idx].xpInvested += amount;
+                await item.update({ "system.moves": itemData.moves });
+                ui.notifications.info(`${move.name} 获得 ${amount} 点修为！`);
+            }
+        }
+    }
+    //回退武学修为
+    async _onRefundMoveXP(event, target) {
+        console.log(">>> 点击了 [招式散功]");
+        const itemId = target.dataset.itemId;
+        const moveId = target.dataset.moveId;
+        const item = this.document.items.get(itemId);
+        if (!item) return;
+
+        const moveIndex = item.system.moves.findIndex(m => m.id === moveId);
+        if (moveIndex === -1) return;
+        const move = item.system.moves[moveIndex];
+
+        if (move.xpInvested <= 0) return ui.notifications.warn("尚未投入修为");
+
+        const uniqueId = `refund-${foundry.utils.randomID()}`;
+
+        const input = await foundry.applications.api.DialogV2.prompt({
+            window: { title: `散功: ${move.name}`, icon: "fas fa-undo" },
+            content: `
+                <div style="text-align:center; padding: 10px;">
+                    <p style="color:#ff4444; font-size:0.9em; margin-bottom:5px;">⚠️ 将返还修为并降低等级</p>
+                    <p>可退还: <b>${move.xpInvested}</b></p>
+                    <input id="${uniqueId}" type="number" value="${move.xpInvested}" autofocus 
+                        style="text-align:center; font-size:1.5em; width:100%; color:black; background:rgba(255,255,255,0.9); border:1px solid #333;"/>
+                </div>
+            `,
+            ok: { 
+                label: "散功", icon: "fas fa-undo",
+                callback: () => document.getElementById(uniqueId).value
+            },
+            rejectClose: false
+        });
+
+        if (input) {
+            let amount = parseInt(input);
+            if (isNaN(amount) || amount <= 0) return;
+            if (amount > move.xpInvested) amount = move.xpInvested;
+
+            await this.document.update({
+                "system.cultivation.general": this.document.system.cultivation.general + amount
+            });
+
+            const itemData = item.system.toObject();
+            const idx = itemData.moves.findIndex(m => m.id === moveId);
+            if (idx !== -1) {
+                itemData.moves[idx].xpInvested -= amount;
+                await item.update({ "system.moves": itemData.moves });
+                ui.notifications.info(`${move.name} 散功成功，返还 ${amount} 点修为。`);
+            }
+        }
+    }
+
+    // 占位
+    async _onRollMove(event, target) {
+        ui.notifications.info("招式施放功能即将实装！");
     }
 }

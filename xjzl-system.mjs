@@ -107,6 +107,48 @@ Hooks.once("ready", async function () {
 });
 
 /* -------------------------------------------- */
+/*  Hooks: Active Effect Config                 */
+/* -------------------------------------------- */
+
+// 在打开特效编辑窗口时，注入“可堆叠”选项
+Hooks.on("renderActiveEffectConfig", (app, html, data) => {
+  // V13 兼容性处理：确保 html 是原生 DOM 元素
+  const el = html instanceof HTMLElement ? html : html[0];
+
+  const disabledInput = el.querySelector('input[name="disabled"]');
+  if (!disabledInput) return; 
+
+  const disabledField = disabledInput.closest(".form-group");
+  
+  // 使用 app.document 而不是 app.object
+  // 读取 Flag
+  const isStackable = app.document.getFlag("xjzl-system", "stackable") || false;
+  const maxStacks = app.document.getFlag("xjzl-system", "maxStacks") || 0;
+
+  // 构建 HTML (包含堆叠开关 和 最大层数)
+  const stackableHtml = `
+    <div class="form-group">
+        <label>可堆叠 (Stackable)</label>
+        <div class="form-fields">
+            <input type="checkbox" name="flags.xjzl-system.stackable" ${isStackable ? "checked" : ""}>
+        </div>
+        <p class="notes">勾选后，重复应用将增加层数而非覆盖。</p>
+    </div>
+    
+    <div class="form-group">
+        <label>最大层数 (Max Stacks)</label>
+        <div class="form-fields">
+            <input type="number" name="flags.xjzl-system.maxStacks" value="${maxStacks}" placeholder="0 为无限制">
+        </div>
+        <p class="notes">设为 0 表示无上限。</p>
+    </div>
+  `;
+  
+  disabledField.insertAdjacentHTML('afterend', stackableHtml);
+  app.setPosition({ height: "auto" });
+});
+
+/* -------------------------------------------- */
 /*  辅助函数                                    */
 /* -------------------------------------------- */
 /**

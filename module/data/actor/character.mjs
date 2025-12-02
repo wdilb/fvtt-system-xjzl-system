@@ -509,31 +509,35 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
       const wuxues = actor.itemTypes.wuxue || [];
       for (const item of wuxues) {
-                  const tier = item.system.tier || 1;
-        const stage = item.system.stage || 0;
-        const wType = item.system.weaponType; // 武器类型
+        const tier = item.system.tier || 1;
+        const moves = item.system.moves || [];
+        // 遍历每一招
+        for (const move of moves) {
+          const stage = move.computedLevel || 0;
+          const wType = move.weaponType; // 武器类型
 
-        if (wType) {
-          // 初始化计数器
-          if (!weaponCounts[wType]) weaponCounts[wType] = { t1: 0, t2: 0, t3: 0 };
+          if (wType) {
+            // 初始化计数器
+            if (!weaponCounts[wType]) weaponCounts[wType] = { t1: 0, t2: 0, t3: 0 };
 
-          // 1. 统计悟性加成 (需达到 精通/Stage>=3)
-          if (stage >= 3) {
-            if (tier === 1) wuxingHumanCount++;
-            if (tier === 2) wuxingEarthCount++;
-            if (tier === 3) wuxingBonus += 1; // 天级精通 +1
+            // 1. 统计悟性加成 (需达到 精通/Stage>=3)
+            if (stage >= 3) {
+              if (tier === 1) wuxingHumanCount++;
+              if (tier === 2) wuxingEarthCount++;
+              if (tier === 3) wuxingBonus += 1; // 天级精通 +1
+            }
+            if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
+
+            // 2. 统计武器积分 (Tier 1/2/3 分组计数)
+            // 梯度1: 掌握(Stage>=2)
+            if (stage >= 2) weaponCounts[wType].t1++;
+            
+            // 梯度2: 精通(Stage>=3) 且 地级以上
+            if (stage >= 3 && tier >= 2) weaponCounts[wType].t2++;
+
+            // 梯度3: 合一(Stage>=4) 且 天级
+            if (stage >= 4 && tier >= 3) weaponCounts[wType].t3++;
           }
-          if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
-
-          // 2. 统计武器积分 (Tier 1/2/3 分组计数)
-          // 梯度1: 掌握(Stage>=2)
-          if (stage >= 2) weaponCounts[wType].t1++;
-          
-          // 梯度2: 精通(Stage>=3) 且 地级以上
-          if (stage >= 3 && tier >= 2) weaponCounts[wType].t2++;
-
-          // 梯度3: 合一(Stage>=4) 且 天级
-          if (stage >= 4 && tier >= 3) weaponCounts[wType].t3++;
         }
       }
       
@@ -929,5 +933,56 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 最小值限制为 0
     combat.critWaigongTotal = Math.max(0, 20 - Math.floor(S.liliang / 20) + (combat.crit_waigong || 0) + bonuses.critWaigong - moraleCritMod);
     combat.critNeigongTotal = Math.max(0, 20 - Math.floor(S.qigan / 20) + (combat.crit_neigong || 0) + bonuses.critNeigong - moraleCritMod);
+  }
+
+  /**
+   * 计算内功对招式的伤害系数加成
+   * @param {String} moveElement - 招式的五行属性 (yin, yang, gang, rou, taiji, none)
+   * @returns {Number} 加成系数 (例如 0.2 或 0.1)
+   */
+  getNeigongDamageBonus(moveElement) {
+    if (!moveElement || moveElement === "none") return 0;
+
+    // 1. 获取当前运行内功的属性
+    // 我们需要从 parent (Actor) 获取 Item，因为 DataModel 本身不存 Item 数据
+    const actor = this.parent;
+    if (!actor) return 0;
+
+    const activeNeigongId = this.martial.active_neigong;
+    if (!activeNeigongId) return 0;
+
+    const neigong = actor.items.get(activeNeigongId);
+    if (!neigong) return 0;
+
+    const neigongElement = neigong.system.element; // yin, yang, taiji
+
+    // 2. 根据规则判定加成
+    let bonus = 0;
+
+    // 规则 A: 阴柔内功 (yin)
+    // 施展 阴(yin)、柔(rou) -> +0.2
+    // 施展 太极(taiji) -> +0.1
+    if (neigongElement === "yin") {
+        if (["yin", "rou"].includes(moveElement)) bonus = 0.2;
+        else if (moveElement === "taiji") bonus = 0.1;
+    }
+
+    // 规则 B: 阳刚内功 (yang)
+    // 施展 阳(yang)、刚(gang) -> +0.2
+    // 施展 太极(taiji) -> +0.1
+    else if (neigongElement === "yang") {
+        if (["yang", "gang"].includes(moveElement)) bonus = 0.2;
+        else if (moveElement === "taiji") bonus = 0.1;
+    }
+
+    // 规则 C: 太极内功 (taiji)
+    // 施展 太极(taiji) -> +0.2
+    // 施展 阴/柔/阳/刚 -> +0.1
+    else if (neigongElement === "taiji") {
+        if (moveElement === "taiji") bonus = 0.2;
+        else if (["yin", "yang", "gang", "rou"].includes(moveElement)) bonus = 0.1;
+    }
+
+    return bonus;
   }
 }

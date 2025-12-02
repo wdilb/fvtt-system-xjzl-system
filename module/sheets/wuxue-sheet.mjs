@@ -82,7 +82,11 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     context.levelLabels = (context.system.tier === 3) 
         ? ["领悟", "掌握", "精通", "合一"] 
         : ["领悟", "掌握", "精通"];
-
+    context.costConfig = [
+        { key: "mp", label: "XJZL.Wuxue.Cost.MP" },
+        { key: "rage", label: "XJZL.Wuxue.Cost.Rage" },
+        { key: "hp", label: "XJZL.Wuxue.Cost.HP" }
+    ];
     return context;
   }
 
