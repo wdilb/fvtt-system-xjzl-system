@@ -83,14 +83,21 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
   _onRender(context, options) {
     super._onRender(context, options);
 
-    // 查找所有输入框，绑定 change 事件
-    this.element.querySelectorAll("input, select, textarea").forEach(input => {
-        // 防止重复绑定 (AppV2可能会多次调用_onRender)
-        if (input.dataset.hasChangeListener) return;
-        
-        input.addEventListener("change", this._onChangeInput.bind(this));
-        input.dataset.hasChangeListener = "true";
-    });
+    // 性能优化：使用事件委托监听所有输入框
+    // 避免给每个 input 单独绑定 listener
+    if (!this.element.dataset.delegated) {
+        this.element.addEventListener("change", (event) => {
+            const target = event.target;
+            // 过滤：只响应输入控件的 change
+            if (target.matches("input, select, textarea")) {
+                // 排除一些不需要自动保存的特殊输入框（如果有的话）
+                // 目前没有，直接提交
+                this.submit();
+            }
+        });
+        // 标记该元素已绑定，防止重绘时重复绑定
+        this.element.dataset.delegated = "true";
+    }
   }
 
   /**

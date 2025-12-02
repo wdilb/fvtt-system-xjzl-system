@@ -1,7 +1,8 @@
 /**
  * 武学物品表单
  */
-import { XJZL } from "../../config.mjs";
+import { XJZL } from "../config.mjs";
+import { localizeConfig } from "../utils/utils.mjs"; // 引入工具函数
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -17,7 +18,15 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         addMove: XJZLWuxueSheet.prototype._onAddMove,
         deleteMove: XJZLWuxueSheet.prototype._onDeleteMove,
         
-        // 特效操作 (Active Effects)
+        // 嵌套数组操作 (属性加成)
+        addScaling: XJZLWuxueSheet.prototype._onAddScaling,
+        deleteScaling: XJZLWuxueSheet.prototype._onDeleteScaling,
+
+        // 嵌套数组操作 (特效引用)
+        addEffectRef: XJZLWuxueSheet.prototype._onAddEffectRef,
+        deleteEffectRef: XJZLWuxueSheet.prototype._onDeleteEffectRef,
+
+        // 特效Tab操作
         createEffect: XJZLWuxueSheet.prototype._onCreateEffect,
         editEffect: XJZLWuxueSheet.prototype._onEditEffect,
         deleteEffect: XJZLWuxueSheet.prototype._onDeleteEffect,
@@ -41,22 +50,16 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     context.system = this.document.system;
     context.tabs = this.tabGroups;
 
-    // 1. 准备下拉菜单选项
-    // Helper: 将 Config 对象转换为本地化后的对象
-    // 输入: { key: "Loc.Key" } -> 输出: { key: "中文" }
-    const localizeConfig = (config) => {
-        const localized = {};
-        for (const [key, labelKey] of Object.entries(config)) {
-            localized[key] = game.i18n.localize(labelKey);
-        }
-        return localized;
-    };
+    // 1. 准备下拉菜单选项(使用工具函数)
     context.choices = {
         tiers: localizeConfig(XJZL.tiers),
         categories: localizeConfig(XJZL.wuxueCategories),
         moveTypes: localizeConfig(XJZL.moveTypes),
         elements: localizeConfig(XJZL.elements),
-        attributes: localizeConfig(XJZL.attributes)
+        attributes: localizeConfig(XJZL.attributes),
+        weaponTypes: localizeConfig(XJZL.weaponTypes),
+        triggers: localizeConfig(XJZL.effectTriggers),
+        targets: localizeConfig(XJZL.effectTargets)
     };
 
     // 2. 准备特效列表 (用于 Effects Tab)
@@ -73,6 +76,13 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         };
     });
 
+    // 3. 计算当前最大层级 (用于渲染消耗表的列数)
+    // 逻辑：天级=4，其他人级/地级=3 (简单判定)
+    context.maxMoveLevels = (context.system.tier === 3) ? [0, 1, 2, 3] : [0, 1, 2];
+    context.levelLabels = (context.system.tier === 3) 
+        ? ["领悟", "掌握", "精通", "合一"] 
+        : ["领悟", "掌握", "精通"];
+
     return context;
   }
 
@@ -81,11 +91,48 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   /* -------------------------------------------- */
   _onRender(context, options) {
     super._onRender(context, options);
-    this.element.querySelectorAll("input, select, textarea").forEach(input => {
-        if (input.dataset.hasChangeListener) return;
-        input.addEventListener("change", (e) => { e.preventDefault(); this.submit(); });
-        input.dataset.hasChangeListener = "true";
-    });
+    // 【优化】只给 form 根元素绑定一次监听器
+    // 利用事件冒泡机制，捕获所有子元素的 change 事件
+    if (!this.element.dataset.delegated) {
+        this.element.addEventListener("change", (event) => {
+            const target = event.target;
+            // 只处理输入控件
+            if (target.matches("input, select, textarea")) {
+                // event.preventDefault(); // change 事件通常不需要 preventDefault
+                this.submit();
+            }
+        });
+        // 标记已绑定，防止重复
+        this.element.dataset.delegated = "true";
+    }
+  }
+
+  /* -------------------------------------------- */
+  /*  嵌套数组操作                  */
+  /* -------------------------------------------- */
+
+  // 通用辅助：获取招式和索引
+  _getMove(target) {
+      const index = Number(target.closest("[data-move-index]").dataset.moveIndex);
+      const source = this.document.system.toObject();
+      const moves = source.moves || [];
+      return { index, moves, move: moves[index] };
+  }
+
+  // --- 属性加成 (Scalings) ---
+  async _onAddScaling(event, target) {
+      const { index, moves, move } = this._getMove(target);
+      // 向该招式的 scalings 数组追加
+      move.calculation.scalings.push({ prop: "liliang", ratio: 0.5 });
+      await this.document.update({ "system.moves": moves });
+  }
+
+  async _onDeleteScaling(event, target) {
+      const { index, moves, move } = this._getMove(target);
+      const scalingIndex = Number(target.dataset.idx);
+      // 删除指定索引
+      move.calculation.scalings.splice(scalingIndex, 1);
+      await this.document.update({ "system.moves": moves });
   }
 
   /* -------------------------------------------- */
@@ -163,5 +210,20 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
       const effectId = target.dataset.id;
       const effect = this.document.effects.get(effectId);
       if (effect) await effect.update({ disabled: !effect.disabled });
+  }
+
+    // --- 特效引用 (Effect Refs) ---
+  async _onAddEffectRef(event, target) {
+      const { index, moves, move } = this._getMove(target);
+      // 向该招式的 applyEffects 数组追加对象
+      move.applyEffects.push({ key: "", trigger: "hit", target: "target" });
+      await this.document.update({ "system.moves": moves });
+  }
+
+  async _onDeleteEffectRef(event, target) {
+      const { index, moves, move } = this._getMove(target);
+      const effectIndex = Number(target.dataset.idx);
+      move.applyEffects.splice(effectIndex, 1);
+      await this.document.update({ "system.moves": moves });
   }
 }

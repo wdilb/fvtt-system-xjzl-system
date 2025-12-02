@@ -1,29 +1,37 @@
 <section class="tab scroll-area {{#if (eq tabs.primary 'details')}}active{{/if}}" 
          data-tab="details" data-group="primary">
 
-    {{!-- 招式列表 --}}
     <div class="xjzl-flex-col">
         {{#each system.moves as |move i|}}
-        <div class="xjzl-card" style="position: relative;">
+        {{!-- 加上 data-move-index 方便 JS 查找父级 --}}
+        <div class="xjzl-card" style="position: relative; margin-bottom: 15px;" data-move-index="{{i}}">
             
-            {{!-- 卡片标题栏：图标 + 名字 + 删除 --}}
-            <div class="xjzl-flex-row" style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 5px;">
-                <img src="{{move.img}}" width="24" height="24" style="border:1px solid #000; background:#333;"/>
-                <input type="text" name="system.moves.{{i}}.name" value="{{move.name}}" class="xjzl-input" style="font-weight:bold; text-align:left; flex:1;"/>
+            {{!-- 1. 标题栏 --}}
+            <div class="xjzl-flex-row" style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px;">
+                <img src="{{move.img}}" width="32" height="32" style="border:1px solid #000; background:#333;"/>
+                <input type="text" name="system.moves.{{i}}.name" value="{{move.name}}" class="xjzl-input" style="font-weight:bold; font-size:1.2em; text-align:left; flex:1;"/>
                 
-                {{!-- 类型选择 --}}
-                <select name="system.moves.{{i}}.type" class="xjzl-input" style="width: 60px;">
+                <select name="system.moves.{{i}}.type" class="xjzl-input" style="width: 80px;">
                     {{selectOptions ../choices.moveTypes selected=move.type}}
                 </select>
                 
-                {{!-- 删除按钮 --}}
-                <a data-action="deleteMove" data-id="{{move.id}}" style="color:#999;"><i class="fas fa-trash"></i></a>
+                <a data-action="deleteMove" data-id="{{move.id}}" style="color:#999; margin-left:5px;"><i class="fas fa-trash"></i></a>
             </div>
 
-            {{!-- 招式详情 (Grid) --}}
+            {{!-- 2. 基础配置 (Grid) --}}
             <div class="xjzl-grid-2">
-                {{!-- 左列：属性 --}}
+                {{!-- 左侧：标签 --}}
                 <div class="xjzl-flex-col">
+                    <div class="xjzl-flex-row">
+                        <label>兵器类型</label>
+                        <select name="system.moves.{{i}}.weaponType" class="xjzl-input">
+                            {{selectOptions ../choices.weaponTypes selected=move.weaponType}}
+                        </select>
+                    </div>
+                    <div class="xjzl-flex-row">
+                        <label>子类型</label>
+                        <input type="text" name="system.moves.{{i}}.weaponSubtype" value="{{move.weaponSubtype}}" class="xjzl-input" placeholder="如: 重剑"/>
+                    </div>
                     <div class="xjzl-flex-row">
                         <label>五行</label>
                         <select name="system.moves.{{i}}.element" class="xjzl-input">
@@ -36,22 +44,104 @@
                     </div>
                 </div>
 
-                {{!-- 右列：伤害公式 --}}
-                <div class="xjzl-flex-col" style="border-left:1px dashed #ccc; padding-left:5px;">
-                    <label style="font-size:0.8em; font-weight:bold;">伤害/数值配置</label>
+                {{!-- 右侧：数值公式 (动态列表) --}}
+                <div class="xjzl-flex-col" style="background: rgba(0,0,0,0.03); padding: 5px; border-radius: 4px;">
+                    <div class="xjzl-flex-row" style="border-bottom:1px dashed #ccc;">
+                        <label style="font-weight:bold;">伤害/数值公式</label>
+                        <a data-action="addScaling" title="添加加成属性"><i class="fas fa-plus"></i></a>
+                    </div>
+                    
                     <div class="xjzl-flex-row">
                         <label>基础</label>
                         <input type="number" name="system.moves.{{i}}.calculation.base" value="{{move.calculation.base}}" class="xjzl-input"/>
+                        <label>成长</label>
+                        <input type="number" name="system.moves.{{i}}.calculation.growth" value="{{move.calculation.growth}}" class="xjzl-input"/>
                     </div>
-                    {{!-- 这里先简化，未来可以展开更多配置 --}}
+                    
+                    {{!-- 动态加成列表 --}}
+                    {{#each move.calculation.scalings as |scale idx|}}
+                    <div class="xjzl-flex-row">
+                        <select name="system.moves.{{i}}.calculation.scalings.{{idx}}.prop" class="xjzl-input">
+                            {{selectOptions ../../choices.attributes selected=scale.prop}}
+                        </select>
+                        <span>×</span>
+                        <input type="number" name="system.moves.{{i}}.calculation.scalings.{{idx}}.ratio" value="{{scale.ratio}}" class="xjzl-input" step="0.1"/>
+                        <a data-action="deleteScaling" data-idx="{{idx}}" style="color:#999;"><i class="fas fa-times"></i></a>
+                    </div>
+                    {{/each}}
                 </div>
             </div>
-            
-            {{!-- 描述 --}}
-            <div style="margin-top: 5px;">
-                {{!-- 注意：AppV2 的 prose-mirror 需要特定写法，这里先用 textarea 代替 --}}
-                <textarea name="system.moves.{{i}}.description" rows="2" class="xjzl-input" style="text-align:left; width:100%; height:auto;" placeholder="招式描述...">{{move.description}}</textarea>
+
+            <hr style="border-color: #ddd; margin: 10px 0;">
+
+            {{!-- 3. 消耗配置 (动态列数) --}}
+            <div class="xjzl-flex-col">
+                <label style="font-weight:bold;">分级消耗</label>
+                <div class="xjzl-flex-row" style="font-size:0.8em; text-align:center;">
+                    <div style="width:40px;"></div>
+                    {{!-- 遍历列头 --}}
+                    {{#each ../levelLabels as |label|}}
+                        <div style="flex:1;">{{label}}</div>
+                    {{/each}}
+                </div>
+                
+                {{!-- 资源行 --}}
+                {{#each (array "mp" "rage" "hp") as |res|}}
+                <div class="xjzl-flex-row">
+                    <label style="width:40px; font-size:0.8em;">
+                        {{localize (concat "XJZL.Wuxue.Cost." res)}}
+                    </label>
+                    
+                    {{!-- 遍历列输入框 (保持不变) --}}
+                    {{#each ../../maxMoveLevels as |lvlIdx|}}
+                    <input type="number" 
+                           name="system.moves.{{i}}.costs.{{res}}.{{lvlIdx}}" 
+                           value="{{lookup (lookup (lookup move.costs res) lvlIdx) ''}}" 
+                           class="xjzl-input"/>
+                    {{/each}}
+                </div>
+                {{/each}}
             </div>
+
+            <hr style="border-color: #ddd; margin: 10px 0;">
+
+            {{!-- 4. 高级特效逻辑 (动态列表) --}}
+            <div class="xjzl-flex-col">
+                <div class="xjzl-flex-row" style="border-bottom:1px dashed #ccc;">
+                    <label style="font-weight:bold;">触发特效配置</label>
+                    <a data-action="addEffectRef" title="添加触发特效"><i class="fas fa-plus"></i></a>
+                </div>
+                
+                {{!-- 表头 --}}
+                {{#if move.applyEffects.length}}
+                <div class="xjzl-flex-row" style="font-size:0.8em; color:#666;">
+                    <div style="flex:1;">触发时机</div>
+                    <div style="flex:1;">作用目标</div>
+                    <div style="flex:2;">特效名称 (需对应 Effects Tab)</div>
+                    <div style="width:20px;"></div>
+                </div>
+                {{/if}}
+
+                {{!-- 列表 --}}
+                {{#each move.applyEffects as |eff idx|}}
+                <div class="xjzl-flex-row">
+                    <select name="system.moves.{{i}}.applyEffects.{{idx}}.trigger" class="xjzl-input" style="flex:1;">
+                        {{selectOptions ../../choices.triggers selected=eff.trigger}}
+                    </select>
+                    
+                    <select name="system.moves.{{i}}.applyEffects.{{idx}}.target" class="xjzl-input" style="flex:1;">
+                        {{selectOptions ../../choices.targets selected=eff.target}}
+                    </select>
+                    
+                    <input type="text" name="system.moves.{{i}}.applyEffects.{{idx}}.key" value="{{eff.key}}" class="xjzl-input" style="flex:2;" placeholder="填入特效名"/>
+                    
+                    <a data-action="deleteEffectRef" data-idx="{{idx}}" style="color:#999;"><i class="fas fa-times"></i></a>
+                </div>
+                {{/each}}
+            </div>
+
+            {{!-- 5. 描述 --}}
+            <textarea name="system.moves.{{i}}.description" rows="2" class="xjzl-input" style="margin-top:10px; height:auto; text-align:left;" placeholder="招式描述...">{{move.description}}</textarea>
 
         </div>
         {{/each}}

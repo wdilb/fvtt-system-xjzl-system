@@ -68,17 +68,16 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
   _onRender(context, options) {
     super._onRender(context, options);
     
-    // 查找所有输入框
-    this.element.querySelectorAll("input, select, textarea").forEach(input => {
-        // 避免重复绑定
-        if (input.dataset.hasChangeListener) return;
-        
-        input.addEventListener("change", (event) => {
-            event.preventDefault();
-            this.submit(); // 触发保存
+    // 性能优化：事件委托
+    if (!this.element.dataset.delegated) {
+        this.element.addEventListener("change", (event) => {
+            const target = event.target;
+            if (target.matches("input, select, textarea")) {
+                this.submit();
+            }
         });
-        input.dataset.hasChangeListener = "true";
-    });
+        this.element.dataset.delegated = "true";
+    }
   }
 
   /* -------------------------------------------- */

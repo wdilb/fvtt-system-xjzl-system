@@ -79,7 +79,11 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       
       // 附加特效列表: 存储要应用到目标身上的 ActiveEffect 的名称/ID
       // 逻辑: 攻击命中后，代码会在 Item.effects 里找同名特效，复制给目标
-      applyEffects: new fields.ArrayField(new fields.StringField(), { label: "XJZL.Wuxue.Moves.ApplyEffects" }),
+      applyEffects: new fields.ArrayField(new fields.SchemaField({
+        key: new fields.StringField({ required: true }), // 特效名称
+        trigger: new fields.StringField({ initial: "hit", choices: ["hit", "use", "crit", "parry", "kill"] }),
+        target: new fields.StringField({ initial: "target", choices: ["self", "target"] })
+      })),
 
       // 招式脚本: 用于处理极其复杂的逻辑 (如: 自身血量<50%时伤害翻倍)
       // 这是一个 JS 代码块，在 Roll 的时候执行

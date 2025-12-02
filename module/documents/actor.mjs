@@ -38,6 +38,7 @@ export class XJZLActor extends Actor {
    * 处理内功的被动特效脚本
    */
   _applyNeigongEffects() {
+    //到时候记得去掉日志
     // 1. 获取当前运行的内功
     const activeNeigongId = this.system.martial.active_neigong;
     console.log(">>> [Actor] 开始执行内功脚本检测, ActiveID:", activeNeigongId);
