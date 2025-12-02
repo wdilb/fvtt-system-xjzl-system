@@ -72,36 +72,92 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     for (const wuxue of context.wuxues) {
         // 遍历该武学下的所有招式
         wuxue.system.moves.forEach(move => {
-            // A. 获取基础伤害
-            // (base + growth * (level - 1))
-            // 注意：这里取的是 move.computedLevel (当前实际等级)
+             // --- A. 基础伤害 ---
             const lvl = Math.max(1, move.computedLevel || 1);
             const baseDmg = (move.calculation.base || 0) + (move.calculation.growth || 0) * (lvl - 1);
 
-            // B. 计算属性加成
+            // --- B. 内功系数加成 ---
+            // 获取当前内功对该招式的加成系数 (如 0.2)
+            const neigongBonusRatio = actor.system.getNeigongDamageBonus(move.element);
+
+            // --- C. 属性加成 (Scalings) ---
             let attrBonus = 0;
             if (move.calculation.scalings) {
                 for (const scale of move.calculation.scalings) {
-                    // 读取 Actor 属性总值 (如 system.stats.liliang.total)
                     const propVal = foundry.utils.getProperty(actor.system.stats, `${scale.prop}.total`) || 0;
-                    attrBonus += propVal * (scale.ratio || 0);
+                    
+                    // 【规则修正】：内功加成是直接加在系数上的
+                    // 原系数 0.5 + 内功 0.2 = 新系数 0.7
+                    const finalRatio = (scale.ratio || 0) + neigongBonusRatio;
+                    
+                    attrBonus += propVal * finalRatio;
                 }
             }
 
-            // C. 计算内功加成 (系数)
-            // 调用我们刚才写在 DataModel 里的方法
-            const neigongBonusRatio = actor.system.getNeigongDamageBonus(move.element);
+            // --- D. 固定增伤 (Flat Bonuses) ---
+            let flatBonus = 0;
+            // 全局 + 招式 + 属性伤害
+            flatBonus += (actor.system.combat.damages.global.total || 0);
+            flatBonus += (actor.system.combat.damages.skill.total || 0);
+            if (move.element && move.element !== "none") {
+                flatBonus += (actor.system.combat.damages[move.element]?.total || 0);
+            }
             
-            // D. 汇总
-            // 公式: (基础 + 属性) * (1 + 内功加成 + 其他加成)
-            // 假设内功加成是乘区 (系数)，如果不适乘区，请改为加法
-            const totalDmg = Math.floor((baseDmg + attrBonus) * (1 + neigongBonusRatio));
+            // 兵器造诣增伤
+            if (move.weaponType) {
+                const rankObj = actor.system.combat.weaponRanks[move.weaponType];
+                if (rankObj) {
+                    const rank = rankObj.total || 0;
+                    let rankDmg = 0;
+                    if (rank <= 4) rankDmg = rank * 1;
+                    else if (rank <= 8) rankDmg = rank * 2;
+                    else rankDmg = rank * 3;
+                    flatBonus += rankDmg;
+                }
+            }
 
-            // 将计算结果挂载到临时对象上，供模板显示
+            // 武器基础伤害 (Weapon Item)
+            // TODO: 等 Weapon Item 开发完成后，在这里读取 actor.equippedWeapon.system.damage
+            // 暂时模拟：如果手里有装备，且类型匹配，加上武器伤害
+            // 目前设为 0，但逻辑位置留在这里
+            let weaponBaseDmg = 0;
+            
+            // 伪代码示例：
+            // const weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === move.weaponType);
+            // if (weapon) weaponBaseDmg = weapon.system.damage;
+            
+            flatBonus += weaponBaseDmg;
+
+            // --- E. 初步汇总 ---
+            let totalDmg = Math.floor(baseDmg + attrBonus + flatBonus);
+
+            // --- F. 执行招式脚本 (Script Preview) ---
+            // 允许用户通过脚本修改最终伤害
+            // 我们把 totalDmg 包装在对象里传进去，脚本修改 out.damage
+            if (move.script && move.script.trim()) {
+                const out = { damage: totalDmg };
+                try {
+                    // 暴露给脚本的变量：
+                    // actor: 角色实例
+                    // S: 系统数据简写
+                    // out: 输出对象 (修改 out.damage)
+                    const fn = new Function("actor", "S", "out", move.script);
+                    fn(actor, actor.system, out);
+                    
+                    // 更新伤害
+                    totalDmg = Math.floor(out.damage);
+                } catch (err) {
+                    console.warn(`招式 [${move.name}] 预览脚本错误:`, err);
+                }
+            }
+
+            // --- G. 挂载显示 ---
             move.derived = {
                 damage: totalDmg,
-                neigongBonus: neigongBonusRatio > 0 ? `+${(neigongBonusRatio*100).toFixed(0)}%` : "",
-                cost: move.currentCost // 之前在 DataModel 里算的当前消耗
+                // 提示文本
+                breakdown: `基${baseDmg} + 属${Math.floor(attrBonus)} (系数+${neigongBonusRatio}) + 固${flatBonus}`,
+                neigongBonus: neigongBonusRatio > 0 ? `+${(neigongBonusRatio).toFixed(1)}系数` : "",
+                cost: move.currentCost
             };
         });
     }
