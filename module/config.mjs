@@ -71,3 +71,15 @@ XJZL.effectTargets = {
   self: "XJZL.Wuxue.Target.Self",      // 自己
   target: "XJZL.Wuxue.Target.Target"   // 敌方/目标
 };
+
+// 9. 防具部位/类型
+XJZL.armorTypes = {
+  head: "XJZL.Armor.Type.Head",       // 头饰
+  top: "XJZL.Armor.Type.Top",         // 上衣
+  bottom: "XJZL.Armor.Type.Bottom",   // 下衣
+  shoes: "XJZL.Armor.Type.Shoes",     // 鞋子
+  ring: "XJZL.Armor.Type.Ring",       // 戒指
+  earring: "XJZL.Armor.Type.Earring", // 耳环
+  necklace: "XJZL.Armor.Type.Necklace",// 项链
+  accessory: "XJZL.Armor.Type.Accessory" // 饰品
+};

@@ -4,6 +4,42 @@
 export class XJZLActor extends Actor {
 
   /**
+   * 应用 Active Effects
+   * 我们在这里拦截装备的特效。如果装备没穿上，就在内存里把特效“屏蔽”掉。
+   */
+  applyActiveEffects() {
+     // ---------------------------------------------------------------
+    // 阶段 1: 预处理 - 抑制未装备物品的特效 (Optimization Mode)
+    // ---------------------------------------------------------------
+    // 我们遍历 Items 而不是 Effects，因为 Item 数量通常更少且结构更清晰。
+    // 这样避免了使用了耗时的 fromUuidSync。
+    
+    for (const item of this.items) {
+        // 1. 检查是否是“可装备”的物品，且状态为“未装备”
+        // 注意：不仅是 weapon/armor，奇珍也有 equipped 字段
+        if ( "equipped" in item.system && item.system.equipped === false ) {
+            
+            // 2. 遍历该物品拥有的所有特效
+            for (const effect of item.effects) {
+                // 3. 只抑制 "Transfer" (被动) 特效
+                // 触发类特效 (Transfer=false) 本来就不会自动挂在 Actor 身上，不用管
+                if (effect.transfer) {
+                    effect.isSuppressed = true;
+                }
+            }
+        }
+    }
+
+    // ---------------------------------------------------------------
+    // 阶段 2: 执行核心应用逻辑
+    // ---------------------------------------------------------------
+    // 调用父类方法。Foundry 核心在遍历 effects 时，
+    // 会自动跳过所有 isSuppressed === true 的特效。
+    return super.applyActiveEffects();
+  }
+
+
+  /**
    * 数据准备流程的生命周期：
    * 1. prepareData()
    *    -> prepareBaseData()  (DataModel)

@@ -67,11 +67,33 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     context.neigongs.forEach(item => item.isRunning = item.system.active);
     // 我们不仅要列出武学，还要预计算招式伤害
     context.wuxues = actor.itemTypes.wuxue || [];
+    // 虚拟一个target用作预计算
+    // 使用 Proxy 拦截所有读取，返回 0 或空结构，防止脚本报错
+    const dummyTarget = new Proxy({
+        name: "预设木桩",
+        system: {
+            resources: { hp: { value: 100, max: 100 }, mp: { value: 100, max: 100 }, rage: { value: 0, max: 10 } },
+            stats: {}, combat: {}
+        }
+    }, {
+        get: (target, prop) => {
+            if (prop in target) return target[prop];
+            // 递归容错：访问不存在的属性时，返回一个能参与计算的“0”函数
+            return new Proxy(() => 0, {
+                get: () => 0,
+                apply: () => 0,
+                toPrimitive: () => 0
+            });
+        }
+    });
+
+    const dummyTargetsArray = [dummyTarget];
     
     // 遍历所有武学
     for (const wuxue of context.wuxues) {
+        const moves = wuxue.system.moves || [];
         // 遍历该武学下的所有招式
-        wuxue.system.moves.forEach(move => {
+        moves.forEach(move => {
              // --- A. 基础伤害 ---
             const lvl = Math.max(1, move.computedLevel || 1);
             const baseDmg = (move.calculation.base || 0) + (move.calculation.growth || 0) * (lvl - 1);
@@ -126,38 +148,49 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // const weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === move.weaponType);
             // if (weapon) weaponBaseDmg = weapon.system.damage;
             
-            flatBonus += weaponBaseDmg;
+            baseDmg += weaponBaseDmg;
 
             // --- E. 初步汇总 ---
-            let totalDmg = Math.floor(baseDmg + attrBonus + flatBonus);
+            let preScriptDmg = Math.floor(baseDmg + attrBonus + flatBonus);
+            let totalDmg = preScriptDmg;
+            let scriptBonus = 0;
 
             // --- F. 执行招式脚本 (Script Preview) ---
             // 允许用户通过脚本修改最终伤害
             // 我们把 totalDmg 包装在对象里传进去，脚本修改 out.damage
             if (move.script && move.script.trim()) {
-                const out = { damage: totalDmg };
-                try {
-                    // 暴露给脚本的变量：
-                    // actor: 角色实例
-                    // S: 系统数据简写
-                    // out: 输出对象 (修改 out.damage)
-                    const fn = new Function("actor", "S", "out", move.script);
-                    fn(actor, actor.system, out);
-                    
-                    // 更新伤害
-                    totalDmg = Math.floor(out.damage);
-                } catch (err) {
-                    console.warn(`招式 [${move.name}] 预览脚本错误:`, err);
+                // 只有当系统数据完备时才运行
+                if (actor.system.resources && actor.system.stats) {
+                    const out = { damage: totalDmg };
+                    try {
+                        // 参数对齐：actor, S, out, t, targets, item, rollData
+                        // 这里 item 传 wuxue，rollData 暂时传空 {}
+                        const fn = new Function("actor", "S", "out", "t", "targets", "item", "rollData", move.script);
+                        
+                        fn(actor, actor.system, out, dummyTarget, dummyTargetsArray, wuxue, {});
+                        
+                        totalDmg = Math.floor(out.damage);
+                        scriptBonus = totalDmg - preScriptDmg;
+                    } catch (err) {
+                        // 保持静默，只在调试模式或严重错误时输出
+                        // console.warn(`[XJZL] 预览脚本忽略: ${err.message}`);
+                    }
                 }
             }
 
             // --- G. 挂载显示 ---
+            let breakdownText = `招式本身伤害${baseDmg} + 属性加伤${Math.floor(attrBonus)} (内功系数+${neigongBonusRatio.toFixed(1)}) + 其他加伤${flatBonus}`;
+            if (scriptBonus !== 0) {
+                const sign = scriptBonus > 0 ? "+" : "";
+                breakdownText += ` ${sign} 特效加伤${scriptBonus}`;
+            }
+            breakdownText += `\n(注: 预估基于木桩目标)`;
+
             move.derived = {
                 damage: totalDmg,
-                // 提示文本
-                breakdown: `基${baseDmg} + 属${Math.floor(attrBonus)} (系数+${neigongBonusRatio}) + 固${flatBonus}`,
+                breakdown: breakdownText,
                 neigongBonus: neigongBonusRatio > 0 ? `+${(neigongBonusRatio).toFixed(1)}系数` : "",
-                cost: move.currentCost
+                cost: move.currentCost || { mp:0, rage:0, hp:0 }
             };
         });
     }
@@ -526,7 +559,6 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
     //回退武学修为
     async _onRefundMoveXP(event, target) {
-        console.log(">>> 点击了 [招式散功]");
         const itemId = target.dataset.itemId;
         const moveId = target.dataset.moveId;
         const item = this.document.items.get(itemId);
@@ -541,7 +573,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const uniqueId = `refund-${foundry.utils.randomID()}`;
 
         const input = await foundry.applications.api.DialogV2.prompt({
-            window: { title: `散功: ${move.name}`, icon: "fas fa-undo" },
+            window: { title: `回退: ${move.name}`, icon: "fas fa-undo" },
             content: `
                 <div style="text-align:center; padding: 10px;">
                     <p style="color:#ff4444; font-size:0.9em; margin-bottom:5px;">⚠️ 将返还修为并降低等级</p>

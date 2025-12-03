@@ -13,7 +13,9 @@ import { XJZLCharacterData } from "./module/data/actor/character.mjs";
 // import { XJZLNPCData } from "./module/data/actor/npc.mjs"; // 暂时注释，写了再开
 import { XJZLNeigongData } from "./module/data/item/neigong.mjs";
 import { XJZLWuxueData } from "./module/data/item/wuxue.mjs"
-// (后续会导入更多 Item 模型)
+import { XJZLWeaponData } from "./module/data/item/weapon.mjs";
+import { XJZLArmorData } from "./module/data/item/armor.mjs";
+import { XJZLQizhenData } from "./module/data/item/qizhen.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
@@ -49,7 +51,9 @@ Hooks.once("init", async function () {
   CONFIG.Item.dataModels = {
     neigong: XJZLNeigongData,
     wuxue: XJZLWuxueData, // 注册武学数据
-    // weapon: XJZLWeaponData (未来添加)
+    weapon: XJZLWeaponData,
+    armor: XJZLArmorData,
+    qizhen: XJZLQizhenData
   };
 
   // 4. 注册 Sheets (表现层)
