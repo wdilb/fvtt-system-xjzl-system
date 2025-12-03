@@ -63,7 +63,7 @@ Hooks.once("init", async function () {
   const ActorSheet = foundry.applications.sheets.ActorSheet;
   // 注销默认 Sheet，注册我们需要用来渲染的 AppV2 Sheet
   Actors.unregisterSheet("core", ActorSheet);
-  
+
   // 注意：V13 中虽然推荐 AppV2，但注册方式仍需兼容 DocumentSheetConfig
   Actors.registerSheet("xjzl-system", XJZLCharacterSheet, {
     types: ["character"], // 暂时只绑定 character 类型
@@ -91,10 +91,17 @@ Hooks.once("init", async function () {
     label: "XJZL.Sheet.Wuxue"
   });
 
+  // 注册装备表单 (复用同一个类)
+  Items.registerSheet("xjzl-system", XJZLEquipmentSheet, {
+    types: ["weapon", "armor", "qizhen"], // 同时绑定三种类型
+    makeDefault: true,
+    label: "XJZL.Sheet.Equipment" // 记得在 zh-cn.json 里加这个 label
+  });
+
   // ==========================================
   //  5.注册 常用Handlebars 辅助函数
   // ==========================================
-  
+
   registerHandlebarsHelpers();
 
   // 预加载 Handlebars 模板,必须等待预加载完成
@@ -120,10 +127,10 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
   const el = html instanceof HTMLElement ? html : html[0];
 
   const disabledInput = el.querySelector('input[name="disabled"]');
-  if (!disabledInput) return; 
+  if (!disabledInput) return;
 
   const disabledField = disabledInput.closest(".form-group");
-  
+
   // 使用 app.document 而不是 app.object
   // 读取 Flag
   const isStackable = app.document.getFlag("xjzl-system", "stackable") || false;
@@ -147,7 +154,7 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
         <p class="notes">设为 0 表示无上限。</p>
     </div>
   `;
-  
+
   disabledField.insertAdjacentHTML('afterend', stackableHtml);
   app.setPosition({ height: "auto" });
 });
@@ -172,7 +179,7 @@ function registerHandlebarsHelpers() {
     args.pop();
     return args.join("");
   });
-  
+
   // 用于 checkbox 的选中状态
   Handlebars.registerHelper("checked", function (value) {
     return value ? "checked" : "";
@@ -186,47 +193,47 @@ function registerHandlebarsHelpers() {
   Handlebars.registerHelper("ne", function (a, b) {
     return a !== b;
   });
-  
+
   Handlebars.registerHelper("log", function (context) {
     console.log("HBS Context:", context);
   });
 
-  Handlebars.registerHelper("array", (...args) => { 
+  Handlebars.registerHelper("array", (...args) => {
     args.pop(); // 移除最后一个 Handlebars 传入的 options 对象
-    return args; 
+    return args;
   });
-  
+
   // 增加 selectOptions (Item Sheet 用到了)
   Handlebars.registerHelper("selectOptions", (choices, options) => {
     // 获取当前选中的值，转为字符串以便比较
-    const selected = String(options.hash.selected ?? ""); 
+    const selected = String(options.hash.selected ?? "");
     let html = "";
 
     // 情况 A: 传入的是对象 { key: "Label", yin: "阴" }
     if (choices && typeof choices === 'object' && !Array.isArray(choices)) {
-        for (const [key, label] of Object.entries(choices)) {
-            const isSelected = String(key) === selected ? " selected" : "";
-            html += `<option value="${key}"${isSelected}>${label}</option>`;
-        }
-    } 
+      for (const [key, label] of Object.entries(choices)) {
+        const isSelected = String(key) === selected ? " selected" : "";
+        html += `<option value="${key}"${isSelected}>${label}</option>`;
+      }
+    }
     // 情况 B: 传入的是数组 [1, 2, 3] 或 [{value:1, label:"一"}]
     else if (Array.isArray(choices)) {
-        for (const choice of choices) {
-            let value, label;
-            // 如果数组里是对象 {value, label}
-            if (typeof choice === 'object' && choice !== null) {
-                value = choice.value;
-                label = choice.label || value;
-            } else {
-                // 简单数组 [1, 2, 3]
-                value = choice;
-                label = choice;
-            }
-            const isSelected = String(value) === selected ? " selected" : "";
-            html += `<option value="${value}"${isSelected}>${label}</option>`;
+      for (const choice of choices) {
+        let value, label;
+        // 如果数组里是对象 {value, label}
+        if (typeof choice === 'object' && choice !== null) {
+          value = choice.value;
+          label = choice.label || value;
+        } else {
+          // 简单数组 [1, 2, 3]
+          value = choice;
+          label = choice;
         }
+        const isSelected = String(value) === selected ? " selected" : "";
+        html += `<option value="${value}"${isSelected}>${label}</option>`;
+      }
     }
-        return new Handlebars.SafeString(html);
+    return new Handlebars.SafeString(html);
   });
 }
 /**
@@ -245,14 +252,19 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
-    
+
     // 内功
     "systems/xjzl-system/templates/item/neigong/sheet.hbs",
     //武学
     "systems/xjzl-system/templates/item/wuxue/header.hbs",
     "systems/xjzl-system/templates/item/wuxue/tabs.hbs",
     "systems/xjzl-system/templates/item/wuxue/tab-details.hbs",
-    "systems/xjzl-system/templates/item/wuxue/tab-effects.hbs"
+    "systems/xjzl-system/templates/item/wuxue/tab-effects.hbs",
+    //装备
+    "systems/xjzl-system/templates/item/equipment/header.hbs",
+    "systems/xjzl-system/templates/item/equipment/tabs.hbs",
+    "systems/xjzl-system/templates/item/equipment/tab-details.hbs",
+    "systems/xjzl-system/templates/item/equipment/tab-effects.hbs"
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);
