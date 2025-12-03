@@ -1,5 +1,5 @@
 import { XJZL } from "../config.mjs";
-import { localizeConfig } from "../utils.mjs";
+import { localizeConfig } from "../utils/utils.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;

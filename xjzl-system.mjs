@@ -7,6 +7,7 @@
 // 导入 Document 类
 import { XJZLActor } from "./module/documents/actor.mjs";
 import { XJZLItem } from "./module/documents/item.mjs";
+import { XJZLActiveEffect } from "./module/documents/active-effect.mjs";
 
 // 导入 DataModels (数据结构)
 import { XJZLCharacterData } from "./module/data/actor/character.mjs";
@@ -21,6 +22,7 @@ import { XJZLQizhenData } from "./module/data/item/qizhen.mjs";
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
+import { XJZLEquipmentSheet  } from "./module/sheets/equipment-sheet.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -39,6 +41,8 @@ Hooks.once("init", async function () {
   // 告诉 Foundry 使用我们需要扩展的类，而不是默认的 Actor/Item
   CONFIG.Actor.documentClass = XJZLActor;
   CONFIG.Item.documentClass = XJZLItem;
+  // 注册 ActiveEffect 类，用来处理装备的自动抑制
+  CONFIG.ActiveEffect.documentClass = XJZLActiveEffect;
 
   // 3. 注册 DataModels (数据层) - V13 核心
   // 将 system.json 中定义的类型与 JS 类绑定
@@ -250,6 +254,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs",
     "systems/xjzl-system/templates/actor/character/tab-combat.hbs",
     "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
+    "systems/xjzl-system/templates/actor/character/tab-inventory.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
 
