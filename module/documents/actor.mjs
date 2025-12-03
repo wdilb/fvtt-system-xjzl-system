@@ -2,32 +2,30 @@
  * 扩展核心 Actor 类
  */
 export class XJZLActor extends Actor {
-
   /**
    * 应用 Active Effects
    * 我们在这里拦截装备的特效。如果装备没穿上，就在内存里把特效“屏蔽”掉。
    */
   applyActiveEffects() {
-     // ---------------------------------------------------------------
+    // ---------------------------------------------------------------
     // 阶段 1: 预处理 - 抑制未装备物品的特效 (Optimization Mode)
     // ---------------------------------------------------------------
     // 我们遍历 Items 而不是 Effects，因为 Item 数量通常更少且结构更清晰。
     // 这样避免了使用了耗时的 fromUuidSync。
-    
+
     for (const item of this.items) {
-        // 1. 检查是否是“可装备”的物品，且状态为“未装备”
-        // 注意：不仅是 weapon/armor，奇珍也有 equipped 字段
-        if ( "equipped" in item.system && item.system.equipped === false ) {
-            
-            // 2. 遍历该物品拥有的所有特效
-            for (const effect of item.effects) {
-                // 3. 只抑制 "Transfer" (被动) 特效
-                // 触发类特效 (Transfer=false) 本来就不会自动挂在 Actor 身上，不用管
-                if (effect.transfer) {
-                    effect.isSuppressed = true;
-                }
-            }
+      // 1. 检查是否是“可装备”的物品，且状态为“未装备”
+      // 注意：不仅是 weapon/armor，奇珍也有 equipped 字段
+      if ("equipped" in item.system && item.system.equipped === false) {
+        // 2. 遍历该物品拥有的所有特效
+        for (const effect of item.effects) {
+          // 3. 只抑制 "Transfer" (被动) 特效
+          // 触发类特效 (Transfer=false) 本来就不会自动挂在 Actor 身上，不用管
+          if (effect.transfer) {
+            effect.isSuppressed = true;
+          }
         }
+      }
     }
 
     // ---------------------------------------------------------------
@@ -37,7 +35,6 @@ export class XJZLActor extends Actor {
     // 会自动跳过所有 isSuppressed === true 的特效。
     return super.applyActiveEffects();
   }
-
 
   /**
    * 数据准备流程的生命周期：
@@ -54,7 +51,7 @@ export class XJZLActor extends Actor {
     // 此时：
     // - 内功的固定属性加成已生效
     super.prepareDerivedData();
-    
+
     // ----------------------------------------------------
     // PHASE 2: 脚本干预 (Script Execution)
     // ----------------------------------------------------
@@ -94,17 +91,19 @@ export class XJZLActor extends Actor {
       actor: this,
       item: item,
       system: this.system, // 允许脚本直接修改 system 下的属性
-      S: this.system // 快捷别名
+      S: this.system, // 快捷别名
     };
 
     try {
       // 创建函数：Function("变量名1", "变量名2", ..., "代码体")
       const fn = new Function("actor", "item", "system", "S", script);
-      
+
       // 执行函数
       fn.call(this, sandbox.actor, sandbox.item, sandbox.system, sandbox.S);
-      console.log(`>>> [Actor] ${item.name} 脚本执行成功。S.combat.crit_neigong 现在是:`, this.system.combat.crit_neigong);
-      
+      console.log(
+        `>>> [Actor] ${item.name} 脚本执行成功。S.combat.crit_neigong 现在是:`,
+        this.system.combat.crit_neigong
+      );
     } catch (err) {
       console.error(`内功 [${item.name}] 脚本执行错误:`, err);
       // 可以在界面上提示，但为了防止刷屏，建议只在控制台报错
@@ -116,69 +115,84 @@ export class XJZLActor extends Actor {
    * @param {Object} effectData  从物品里拿出来的特效数据 (toObject后的)
    */
   async applyStackableEffect(effectData) {
-    const isStackable = foundry.utils.getProperty(effectData, "flags.xjzl-system.stackable");
+    const isStackable = foundry.utils.getProperty(
+      effectData,
+      "flags.xjzl-system.stackable"
+    );
     // 获取配置的最大层数 (默认为0，即无限)
-    const maxStacksLimit = foundry.utils.getProperty(effectData, "flags.xjzl-system.maxStacks") || 0;
+    const maxStacksLimit =
+      foundry.utils.getProperty(effectData, "flags.xjzl-system.maxStacks") || 0;
     const originalName = effectData.name; // 记录原始名字，如 "中毒"
 
     // 查找逻辑升级：
     // 1. 匹配名字完全一样的 (未堆叠时)
     // 2. 或者匹配 flag 中记录的原始名字 (堆叠后)
-    const existingEffect = this.effects.find(e => 
-        e.name === originalName || 
+    const existingEffect = this.effects.find(
+      (e) =>
+        e.name === originalName ||
         e.getFlag("xjzl-system", "sourceName") === originalName
     );
 
     // --- 情况 A: 不可堆叠 或 找不到现有特效 ---
     if (!isStackable || !existingEffect) {
-        // 如果不可堆叠且已存在，先删除旧的覆盖
-        if (existingEffect && !isStackable) await existingEffect.delete();
+      // 如果不可堆叠且已存在，先删除旧的覆盖
+      if (existingEffect && !isStackable) await existingEffect.delete();
 
-        // 准备新数据
-        if (isStackable) {
-            // 如果是可堆叠的，初始化层数和原始名字标记
-            foundry.utils.setProperty(effectData, "flags.xjzl-system.stacks", 1);
-            foundry.utils.setProperty(effectData, "flags.xjzl-system.sourceName", originalName);
-            effectData.name = `${originalName} (1)`;
-        }
-        
-        return this.createEmbeddedDocuments("ActiveEffect", [effectData]);
-    } 
-    
+      // 准备新数据
+      if (isStackable) {
+        // 如果是可堆叠的，初始化层数和原始名字标记
+        foundry.utils.setProperty(effectData, "flags.xjzl-system.stacks", 1);
+        foundry.utils.setProperty(
+          effectData,
+          "flags.xjzl-system.sourceName",
+          originalName
+        );
+        effectData.name = `${originalName} (1)`;
+      }
+
+      return this.createEmbeddedDocuments("ActiveEffect", [effectData]);
+    }
+
     // --- 情况 B: 可堆叠且已存在 ---
     else {
-        const currentStacks = existingEffect.getFlag("xjzl-system", "stacks") || 1;
-        // 上限检查
-        if (maxStacksLimit > 0 && currentStacks >= maxStacksLimit) {
-            ui.notifications.warn(`${this.name} 身上的 [${originalName}] 已达最大层数 (${maxStacksLimit})。`);
-            return; // 终止堆叠
+      const currentStacks =
+        existingEffect.getFlag("xjzl-system", "stacks") || 1;
+      // 上限检查
+      if (maxStacksLimit > 0 && currentStacks >= maxStacksLimit) {
+        ui.notifications.warn(
+          `${this.name} 身上的 [${originalName}] 已达最大层数 (${maxStacksLimit})。`
+        );
+        return; // 终止堆叠
+      }
+
+      const newStacks = currentStacks + 1;
+
+      // 计算数值 (假设 effectData.changes 里存的是单层基础值)
+      const newChanges = existingEffect.changes.map((change) => {
+        const baseChange = effectData.changes.find((c) => c.key === change.key);
+        if (!baseChange) return change;
+
+        const baseValue = Number(baseChange.value);
+        if (!isNaN(baseValue)) {
+          return { ...change, value: String(baseValue * newStacks) };
         }
+        return change;
+      });
 
-        const newStacks = currentStacks + 1;
-        
-        // 计算数值 (假设 effectData.changes 里存的是单层基础值)
-        const newChanges = existingEffect.changes.map(change => {
-            const baseChange = effectData.changes.find(c => c.key === change.key);
-            if (!baseChange) return change;
+      // 获取原始名字 (从 flag 取，或者从参数取)
+      const sourceName =
+        existingEffect.getFlag("xjzl-system", "sourceName") || originalName;
 
-            const baseValue = Number(baseChange.value);
-            if (!isNaN(baseValue)) {
-                return { ...change, value: String(baseValue * newStacks) };
-            }
-            return change;
-        });
+      await existingEffect.update({
+        name: `${sourceName} (${newStacks})`,
+        changes: newChanges,
+        "flags.xjzl-system.stacks": newStacks,
+        "duration.startTime": game.time.worldTime,
+      });
 
-        // 获取原始名字 (从 flag 取，或者从参数取)
-        const sourceName = existingEffect.getFlag("xjzl-system", "sourceName") || originalName;
-
-        await existingEffect.update({
-            "name": `${sourceName} (${newStacks})`,
-            "changes": newChanges,
-            "flags.xjzl-system.stacks": newStacks,
-            "duration.startTime": game.time.worldTime 
-        });
-        
-        ui.notifications.info(`${this.name} 的 [${sourceName}] 叠加到了 ${newStacks} 层！`);
+      ui.notifications.info(
+        `${this.name} 的 [${sourceName}] 叠加到了 ${newStacks} 层！`
+      );
     }
   }
 }
