@@ -43,8 +43,10 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
             // 武器类型
             weaponTypes: localizeConfig(XJZL.weaponTypes),
             // 防具部位
-            armorTypes: localizeConfig(XJZL.armorTypes)
+            armorTypes: localizeConfig(XJZL.armorTypes),
             // 奇珍的穴位比较特殊，通常不需要下拉选择，而是拖拽进去时自动填，或者我们给一个简单的文本框即可
+            //品阶
+            qualities: localizeConfig(XJZL.qualities)
         };
         // 准备特效列表
         context.effects = this.document.effects.map(e => ({
@@ -76,7 +78,7 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
 
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
-            name: "新属性",
+            name: "装备属性",
             icon: "icons/svg/aura.svg",
             origin: this.document.uuid,
             transfer: true // 【关键】装备的属性默认是被动生效的

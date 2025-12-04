@@ -288,6 +288,51 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         await this.submit();
     }
 
+    /* -------------------------------------------- */
+    /*  Drag & Drop (拖拽处理)                      */
+    /* -------------------------------------------- */
+
+    /**
+     * 重写原生的物品拖拽处理
+     * 目的：实现特定类型的自动堆叠
+     */
+    async _onDropItem(event, data) {
+        if (!this.actor.isOwner) return false;
+
+        // 获取被拖拽的物品数据 (从侧边栏或其他角色)
+        const item = await Item.implementation.fromDropData(data);
+        if (!item) return false;
+
+        // 1. 定义哪些类型允许堆叠
+        // 装备(weapon/armor/qizhen) 和 功法(neigong/wuxue) 不在此列 -> 它们会走默认逻辑，创建新实例
+        const stackableTypes = ["consumable", "misc", "manual"];
+
+        if (stackableTypes.includes(item.type)) {
+            // 2. 查找背包里是否已有同名、同类型的物品
+            const existingItem = this.actor.items.find(i =>
+                i.type === item.type &&
+                i.name === item.name
+            );
+
+            // 3. 如果找到了 -> 堆叠数量
+            if (existingItem) {
+                // 获取拖进来的数量 (默认为1)
+                const addQty = item.system.quantity || 1;
+                const newQty = existingItem.system.quantity + addQty;
+
+                await existingItem.update({ "system.quantity": newQty });
+
+                ui.notifications.info(`已合并 ${item.name}，数量 +${addQty} (当前: ${newQty})`);
+
+                // 返回 false 阻止父类继续执行创建新物品的操作
+                return false;
+            }
+        }
+
+        // 4. 如果类型不可堆叠，或者没找到同名物品 -> 走默认逻辑 (创建新物品)
+        return super._onDropItem(event, data);
+    }
+
     /**
      * 验证属性分配是否合法
      * @param {string} fieldName - 修改的字段名

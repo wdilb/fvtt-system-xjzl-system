@@ -17,12 +17,16 @@ import { XJZLWuxueData } from "./module/data/item/wuxue.mjs"
 import { XJZLWeaponData } from "./module/data/item/weapon.mjs";
 import { XJZLArmorData } from "./module/data/item/armor.mjs";
 import { XJZLQizhenData } from "./module/data/item/qizhen.mjs";
+import { XJZLConsumableData } from "./module/data/item/consumable.mjs";
+import { XJZLManualData } from "./module/data/item/manual.mjs";
+import { XJZLMiscData } from "./module/data/item/misc.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet  } from "./module/sheets/equipment-sheet.mjs";
+import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -57,7 +61,10 @@ Hooks.once("init", async function () {
     wuxue: XJZLWuxueData, // 注册武学数据
     weapon: XJZLWeaponData,
     armor: XJZLArmorData,
-    qizhen: XJZLQizhenData
+    qizhen: XJZLQizhenData,
+    consumable: XJZLConsumableData,
+    manual: XJZLManualData,
+    misc: XJZLMiscData
   };
 
   // 4. 注册 Sheets (表现层)
@@ -100,6 +107,13 @@ Hooks.once("init", async function () {
     types: ["weapon", "armor", "qizhen"], // 同时绑定三种类型
     makeDefault: true,
     label: "XJZL.Sheet.Equipment" // 记得在 zh-cn.json 里加这个 label
+  });
+
+  // 注册物品表单
+  Items.registerSheet("xjzl-system", XJZLGeneralItemSheet, {
+    types: ["consumable", "manual", "misc"],
+    makeDefault: true,
+    label: "XJZL.Sheet.GeneralItem"
   });
 
   // ==========================================
@@ -269,7 +283,12 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/item/equipment/header.hbs",
     "systems/xjzl-system/templates/item/equipment/tabs.hbs",
     "systems/xjzl-system/templates/item/equipment/tab-details.hbs",
-    "systems/xjzl-system/templates/item/equipment/tab-effects.hbs"
+    "systems/xjzl-system/templates/item/equipment/tab-effects.hbs",
+    //物品
+    "systems/xjzl-system/templates/item/general/header.hbs",
+    "systems/xjzl-system/templates/item/general/tabs.hbs",
+    "systems/xjzl-system/templates/item/general/tab-details.hbs",
+    "systems/xjzl-system/templates/item/general/tab-effects.hbs"
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);

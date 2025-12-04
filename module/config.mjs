@@ -100,3 +100,22 @@ XJZL.acupoints = {
   hand_taiyang: "XJZL.Jingmai.Hand_taiyang",
   foot_taiyang: "XJZL.Jingmai.Foot_taiyang"
 };
+
+// 11. 消耗品类型
+XJZL.consumableTypes = {
+  medicine: "XJZL.Consumable.Type.Medicine", // 药品
+  poison: "XJZL.Consumable.Type.Poison",     // 毒药
+  tea: "XJZL.Consumable.Type.Tea",           // 茶叶
+  food: "XJZL.Consumable.Type.Food",         // 佳肴
+  wine: "XJZL.Consumable.Type.Wine",         // 美酒
+  other: "XJZL.Consumable.Type.Other"        // 其他
+};
+
+// 12. 物品品质
+XJZL.qualities = {
+  0: "XJZL.Qualities.0", // 凡
+  1: "XJZL.Qualities.1", // 铜
+  2: "XJZL.Qualities.2", // 银
+  3: "XJZL.Qualities.3", // 金
+  4: "XJZL.Qualities.4"  // 玉
+};
