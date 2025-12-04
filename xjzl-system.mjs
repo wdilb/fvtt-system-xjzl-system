@@ -25,7 +25,7 @@ import { XJZLMiscData } from "./module/data/item/misc.mjs";
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
-import { XJZLEquipmentSheet  } from "./module/sheets/equipment-sheet.mjs";
+import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
 import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 
 // 导入配置
@@ -184,6 +184,11 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
  * 注册 Handlebars 辅助函数
  */
 function registerHandlebarsHelpers() {
+  Handlebars.registerHelper("or", function (...args) {
+    args.pop();
+    return args.some(Boolean);
+  });
+  Handlebars.registerHelper("gt", (a, b) => a > b);
   Handlebars.registerHelper("capitalize", function (value) {
     if (typeof value !== "string") return "";
     return value.charAt(0).toUpperCase() + value.slice(1);
@@ -288,7 +293,9 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/item/general/header.hbs",
     "systems/xjzl-system/templates/item/general/tabs.hbs",
     "systems/xjzl-system/templates/item/general/tab-details.hbs",
-    "systems/xjzl-system/templates/item/general/tab-effects.hbs"
+    "systems/xjzl-system/templates/item/general/tab-effects.hbs",
+    //聊天卡片
+    "systems/xjzl-system/templates/chat/item-card.hbs"
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);

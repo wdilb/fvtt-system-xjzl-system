@@ -1,59 +1,79 @@
-<section class="tab scroll-area {{#if (eq tabs.primary 'inventory')}}active{{/if}}" 
-         data-tab="inventory" data-group="primary">
+<section class="tab scroll-area {{#if (eq tabs.primary 'inventory')}}active{{/if}}" data-tab="inventory"
+    data-group="primary">
 
     {{!-- 遍历我们在 JS 里分好的组 (weapon, armor, qizhen...) --}}
     {{#each inventory as |section|}}
     <div class="xjzl-flex-col" style="margin-bottom: 15px;">
-        
+
         {{!-- 分类标题 + 添加按钮 --}}
-        <div class="xjzl-flex-row" style="border-bottom: 2px solid var(--xjzl-ink-500); padding-bottom: 5px; align-items: center;">
+        <div class="xjzl-flex-row"
+            style="border-bottom: 2px solid var(--xjzl-ink-500); padding-bottom: 5px; align-items: center;">
             <h3 class="inventory-header" style="margin:0; border:none; flex:1;">{{localize section.label}}</h3>
-            <a data-action="createItem" data-type="{{section.type}}" title="{{localize 'UI.CreateNew'}}"><i class="fas fa-plus"></i></a>
+            <a data-action="createItem" data-type="{{section.type}}" title="{{localize 'UI.CreateNew'}}"><i
+                    class="fas fa-plus"></i></a>
         </div>
 
         {{!-- 物品列表 --}}
         <div class="xjzl-flex-col" style="gap: 5px;">
             {{#each section.items as |item|}}
-            <div class="xjzl-card neigong-item" style="flex-direction: row; align-items: center; padding: 5px; min-height: auto;">
-                
+            <div class="xjzl-card neigong-item"
+                style="flex-direction: row; align-items: center; padding: 5px; min-height: auto;">
+
                 {{!-- 图标 --}}
-                <a class="item-icon" data-action="editItem" data-item-id="{{item.id}}" style="flex: 0 0 40px; height: 40px;">
-                    <img src="{{item.img}}"/>
+                <a class="item-icon" data-action="editItem" data-item-id="{{item.id}}"
+                    style="flex: 0 0 40px; height: 40px;">
+                    <img src="{{item.img}}" />
                 </a>
 
                 {{!-- 信息 --}}
                 <div class="xjzl-flex-col xjzl-grow" style="gap: 2px; margin-left: 10px;">
                     <div class="item-name" style="font-size: 1em;">
                         {{item.name}}
-                        {{#if (gt item.system.quantity 1)}} 
-                            <span style="font-weight:bold; color:var(--xjzl-gold);">x{{item.system.quantity}}</span> 
+                        {{#if (gt item.system.quantity 1)}}
+                        <span style="font-weight:bold; color:var(--xjzl-gold);">x{{item.system.quantity}}</span>
                         {{/if}}
                     </div>
                     <div style="font-size: 0.8em; color: #aaa;">
-                        {{!-- 根据类型显示不同信息 --}}
-                        {{#if (eq item.type "weapon")}}
-                           伤:{{item.system.damage}}
-                        {{/if}}
-                        {{#if (eq item.type "qizhen")}}
-                           穴:{{item.system.acupoint}}
-                        {{/if}}
+                        {{!-- 根据类型显示不同简略信息 --}}
+                        {{#if (eq item.type "weapon")}} 伤:{{item.system.damage}} {{/if}}
+                        {{#if (eq item.type "armor")}} {{item.system.type}} {{/if}}
+                        {{#if (eq item.type "qizhen")}} {{item.system.acupoint}} {{/if}}
+                        {{#if (eq item.type "consumable")}} {{item.system.type}} {{/if}}
+                        {{#if (eq item.type "manual")}} {{item.system.tier}}阶 {{/if}}
                     </div>
                 </div>
 
                 {{!-- 操作区 --}}
                 <div style="display: flex; align-items: center; gap: 10px;">
-                    
-                    {{!-- 装备开关 (消耗品除外) --}}
-                    {{#if (ne item.type "consumable")}}
-                    <a data-action="toggleEquip" data-item-id="{{item.id}}" 
-                       title="{{#if item.system.equipped}}卸下{{else}}装备{{/if}}"
-                       style="font-size: 1.5em; color: {{#if item.system.equipped}}var(--xjzl-jade){{else}}#444{{/if}};">
+
+                    {{!-- 1. 装备开关 (仅限装备类) --}}
+                    {{#if (or (eq item.type "weapon") (eq item.type "armor") (eq item.type "qizhen"))}}
+                    <a data-action="toggleEquip" data-item-id="{{item.id}}"
+                        title="{{#if item.system.equipped}}卸下{{else}}装备{{/if}}"
+                        style="font-size: 1.5em; color: {{#if item.system.equipped}}var(--xjzl-jade){{else}}#444{{/if}};">
                         <i class="fas {{#if item.system.equipped}}fa-toggle-on{{else}}fa-toggle-off{{/if}}"></i>
                     </a>
                     {{/if}}
 
+                    {{!-- 2. 使用按钮 (仅限消耗品) --}}
+                    {{#if (eq item.type "consumable")}}
+                    <a data-action="useConsumable" data-item-id="{{item.id}}" title="使用"
+                        style="font-size: 1.2em; color: var(--xjzl-accent);">
+                        <i class="fas fa-flask"></i>
+                    </a>
+                    {{/if}}
+
+                    {{!-- 3. 阅读按钮 (仅限秘籍) --}}
+                    {{#if (eq item.type "manual")}}
+                    <a data-action="readManual" data-item-id="{{item.id}}" title="阅读/学习"
+                        style="font-size: 1.2em; color: var(--xjzl-gold);">
+                        <i class="fas fa-book-open"></i>
+                    </a>
+                    {{/if}}
+
                     {{!-- 删除 --}}
-                    <a data-action="deleteItem" data-item-id="{{item.id}}" style="color: #666;"><i class="fas fa-trash"></i></a>
+                    <a data-action="deleteItem" data-item-id="{{item.id}}" style="color: #666;"><i
+                            class="fas fa-trash"></i></a>
                 </div>
 
             </div>
