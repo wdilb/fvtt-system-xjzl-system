@@ -83,3 +83,20 @@ XJZL.armorTypes = {
   necklace: "XJZL.Armor.Type.Necklace",// 项链
   accessory: "XJZL.Armor.Type.Accessory" // 饰品
 };
+
+// 10. 穴位列表 (用于遍历和UI显示)
+XJZL.acupoints = {
+  // 十二正经
+  hand_shaoyin: "XJZL.Jingmai.Hand_shaoyin",
+  foot_shaoyin: "XJZL.Jingmai.Foot_shaoyin",
+  hand_shaoyang: "XJZL.Jingmai.Hand_shaoyang",
+  foot_shaoyang: "XJZL.Jingmai.Foot_shaoyang",
+  hand_jueyin: "XJZL.Jingmai.Hand_jueyin",
+  foot_jueyin: "XJZL.Jingmai.Foot_jueyin",
+  hand_yangming: "XJZL.Jingmai.Hand_yangming",
+  foot_yangming: "XJZL.Jingmai.Foot_yangming",
+  hand_taiyin: "XJZL.Jingmai.Hand_taiyin",
+  foot_taiyin: "XJZL.Jingmai.Foot_taiyin",
+  hand_taiyang: "XJZL.Jingmai.Hand_taiyang",
+  foot_taiyang: "XJZL.Jingmai.Foot_taiyang"
+};
