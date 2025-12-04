@@ -57,6 +57,12 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
             }));
         }
 
+        // 秘籍: 解析 UUID 对应的物品名字 (为了显示好看)
+        if (context.isManual && context.system.learnItemUuid) {
+            const targetItem = await fromUuid(context.system.learnItemUuid);
+            context.targetItemName = targetItem ? targetItem.name : "未知物品 (可能已删除)";
+        }
+
         return context;
     }
 
@@ -72,7 +78,49 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
             });
             this.element.dataset.delegated = "true";
         }
+
+        // 秘籍拖拽监听
+        if (context.isManual) {
+            const dropZone = this.element.querySelector(".manual-drop-zone");
+            if (dropZone) {
+                dropZone.addEventListener("drop", this._onDropManualTarget.bind(this));
+                // 必须阻止 dragover 默认行为，否则 drop 不会触发
+                dropZone.addEventListener("dragover", (e) => e.preventDefault());
+            }
+        }
     }
+
+    /**
+   * 处理秘籍目标拖拽
+   */
+  async _onDropManualTarget(event) {
+      event.preventDefault();
+      // 获取拖拽数据
+      const data = TextEditor.getDragEventData(event);
+      if (data.type !== "Item") return;
+
+      const item = await Item.implementation.fromDropData(data);
+      if (!item) return;
+
+      // 逻辑判断：只允许内功和武学
+      if (!["neigong", "wuxue"].includes(item.type)) {
+          return ui.notifications.warn("秘籍只能记载【内功】或【武学】。");
+      }
+
+      // 逻辑判断：目前只支持单本 (覆盖旧的)
+      
+      // 自动更新品阶
+      // 如果是高阶武学，秘籍自然也是高阶
+      // item.system.tier 对应 1, 2, 3
+      const newTier = item.system.tier || 1;
+
+      await this.document.update({
+          "system.learnItemUuid": item.uuid,
+          "system.tier": newTier,
+          "img": item.img, // 可选：把秘籍图标变成武学图标，或者保持书本图标
+          "name": `${item.name} 秘籍` // 可选：自动改名
+      });
+  }
 
     /* 特效逻辑 (消耗品专用) */
     async _onCreateEffect(event, target) {

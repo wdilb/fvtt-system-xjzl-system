@@ -53,6 +53,18 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
             id: e.id, name: e.name, img: e.img, disabled: e.disabled,
             transfer: e.transfer // 显示是否是被动
         }));
+
+        // 奇珍状态显示逻辑
+        if (context.isQizhen) {
+            const key = context.system.acupoint;
+            if (key && XJZL.acupoints[key]) {
+                // 如果有值，去配置里找对应的中文 Key，再翻译
+                context.acupointLabel = game.i18n.localize(XJZL.acupoints[key]);
+            } else {
+                // 如果为空，显示为空
+                context.acupointLabel = "";
+            }
+        }
         return context;
     }
 

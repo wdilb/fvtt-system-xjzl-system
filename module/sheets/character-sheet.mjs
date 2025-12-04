@@ -2,6 +2,8 @@
  * 先简单写一个让系统运行起来
  */
 /* module/sheets/actor-sheet.mjs */
+import { XJZL } from "../config.mjs";
+
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -321,8 +323,6 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 const newQty = existingItem.system.quantity + addQty;
 
                 await existingItem.update({ "system.quantity": newQty });
-
-                ui.notifications.info(`已合并 ${item.name}，数量 +${addQty} (当前: ${newQty})`);
 
                 // 返回 false 阻止父类继续执行创建新物品的操作
                 return false;
@@ -745,13 +745,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 2. 弹窗让玩家选择
             const content = `
             <div class="form-group">
-                <label>选择储存穴位:</label>
+                <label>选择镶嵌穴位:</label>
                 <div class="form-fields">
-                    <select name="acupoint" style="width: 100%;">
+                    <!-- 【修复】增加 style="width: 100%; min-width: 250px;" -->
+                    <select name="acupoint" style="width: 100%; min-width: 250px; height: 30px; font-size: 1.1em;">
                         ${availableSlots.map(slot => `<option value="${slot.key}">${slot.label}</option>`).join("")}
                     </select>
                 </div>
-                <p class="notes">只能储存在已打通且为空的经脉穴位中。</p>
+                <p class="notes">只能镶嵌在已打通且为空的经脉穴位中。</p>
             </div>
           `;
 
