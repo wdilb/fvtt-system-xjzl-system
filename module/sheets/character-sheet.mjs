@@ -6,6 +6,7 @@ import { XJZL } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
+const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
@@ -35,7 +36,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             createItem: XJZLCharacterSheet.prototype._onCreateItem,
             toggleEquip: XJZLCharacterSheet.prototype._onToggleEquip,
             useConsumable: XJZLCharacterSheet.prototype._onUseConsumable, //使用消耗品
-            readManual: XJZLCharacterSheet.prototype._onReadManual  //阅读秘籍
+            readManual: XJZLCharacterSheet.prototype._onReadManual,  //阅读秘籍
+            deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect  //删除buff/debuff
         }
     };
 
@@ -48,7 +50,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         jingmai: { template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs", scrollable: [""] },
         skills: { template: "systems/xjzl-system/templates/actor/character/tab-skills.hbs", scrollable: [""] },
         combat: { template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs", scrollable: [""] },
-        inventory: { template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs", scrollable: [".scroll-area"] }
+        inventory: { template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs", scrollable: [".scroll-area"] },
+        effects: { template: "systems/xjzl-system/templates/actor/character/tab-effects.hbs", scrollable: [""] }
     };
 
     tabGroups = { primary: "stats" };
@@ -286,6 +289,23 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             { label: "TYPES.Item.manual", type: "manual", items: actor.itemTypes.manual },
             { label: "TYPES.Item.misc", type: "misc", items: actor.itemTypes.misc }
         ];
+
+        // 3. 准备特效列表 (分为两类：临时状态 和 装备被动)
+        const allEffects = actor.effects.map(e => {
+            const source = fromUuidSync(e.origin); // 尝试获取来源
+            return {
+                id: e.id,
+                name: e.name,
+                img: e.img,
+                disabled: e.disabled,
+                isTemporary: !e.transfer, // transfer=false 的通常是临时状态
+                sourceName: source ? source.name : "未知来源",
+                description: e.description
+            };
+        });
+
+        context.temporaryEffects = allEffects.filter(e => e.isTemporary);
+        context.passiveEffects = allEffects.filter(e => !e.isTemporary);
 
         return context;
     }
@@ -1041,6 +1061,18 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             } else {
                 await manual.delete();
             }
+        }
+    }
+
+    /**
+     * 删除角色身上的特效
+     */
+    async _onDeleteEffect(event, target) {
+        const effectId = target.dataset.id;
+        const effect = this.document.effects.get(effectId);
+        if (effect) {
+            await effect.delete();
+            ui.notifications.info(`已移除状态: ${effect.name}`);
         }
     }
 }

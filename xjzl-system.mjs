@@ -274,6 +274,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/tab-combat.hbs",
     "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
     "systems/xjzl-system/templates/actor/character/tab-inventory.hbs",
+    "systems/xjzl-system/templates/actor/character/tab-effects.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
 

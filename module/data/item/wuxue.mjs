@@ -87,7 +87,9 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
       // 招式脚本: 用于处理极其复杂的逻辑 (如: 自身血量<50%时伤害翻倍)
       // 这是一个 JS 代码块，在 Roll 的时候执行
-      script: new fields.StringField({ label: "XJZL.Wuxue.Moves.Script" })
+      script: new fields.StringField({ label: "XJZL.Wuxue.Moves.Script" }),
+      // 2. 招式执行脚本 (异步，用于演出和特殊逻辑)
+      executionScript: new fields.StringField({ label: "XJZL.Wuxue.Moves.ExecutionScript" })
 
     });
 
