@@ -93,34 +93,45 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
     /**
    * 处理秘籍目标拖拽
    */
-  async _onDropManualTarget(event) {
-      event.preventDefault();
-      // 获取拖拽数据
-      const data = TextEditor.getDragEventData(event);
-      if (data.type !== "Item") return;
+    async _onDropManualTarget(event) {
+        event.preventDefault();
+        // 1. 解析拖拽数据 (V13 标准写法)
+        let data;
+        try {
+            data = JSON.parse(event.dataTransfer.getData("text/plain"));
+        } catch (err) {
+            return;
+        }
 
-      const item = await Item.implementation.fromDropData(data);
-      if (!item) return;
+        if (data.type !== "Item" || !data.uuid) return;
 
-      // 逻辑判断：只允许内功和武学
-      if (!["neigong", "wuxue"].includes(item.type)) {
-          return ui.notifications.warn("秘籍只能记载【内功】或【武学】。");
-      }
+        // 2. 查找源物品 (使用 fromUuid，最轻量)
+        const item = await fromUuid(data.uuid);
+        if (!item) return;
 
-      // 逻辑判断：目前只支持单本 (覆盖旧的)
-      
-      // 自动更新品阶
-      // 如果是高阶武学，秘籍自然也是高阶
-      // item.system.tier 对应 1, 2, 3
-      const newTier = item.system.tier || 1;
+        // 3. 类型检查
+        if (!["neigong", "wuxue"].includes(item.type)) {
+            return ui.notifications.warn("秘籍只能记载【内功】或【武学】。");
+        }
 
-      await this.document.update({
-          "system.learnItemUuid": item.uuid,
-          "system.tier": newTier,
-          "img": item.img, // 可选：把秘籍图标变成武学图标，或者保持书本图标
-          "name": `${item.name} 秘籍` // 可选：自动改名
-      });
-  }
+        // 4. 数据清洗
+        // 必须把要存的数据转为 字符串(String) 或 数字(Number)
+        // 绝对不要直接把 item 对象传进 update，那样会引发 Semaphore 错误
+        const updatePayload = {
+            "system.learnItemUuid": String(item.uuid), // 强制转字符串
+            "system.tier": Number(item.system.tier) || 1, // 强制转数字
+            "img": String(item.img),
+            "name": `${item.name} 秘籍`
+        };
+
+        // 5. 提交数据库
+        try {
+            await this.document.update(updatePayload);
+            ui.notifications.info(`秘籍内容已更新: ${item.name}`);
+        } catch (err) {
+            console.error("秘籍更新失败:", err);
+        }
+    }
 
     /* 特效逻辑 (消耗品专用) */
     async _onCreateEffect(event, target) {

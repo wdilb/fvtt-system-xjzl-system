@@ -61,8 +61,8 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
                 // 如果有值，去配置里找对应的中文 Key，再翻译
                 context.acupointLabel = game.i18n.localize(XJZL.acupoints[key]);
             } else {
-                // 如果为空，显示为空
-                context.acupointLabel = "";
+                // 如果为空，显示未装备
+                context.acupointLabel = game.i18n.localize("XJZL.Equipment.NotInlaid");
             }
         }
         return context;
