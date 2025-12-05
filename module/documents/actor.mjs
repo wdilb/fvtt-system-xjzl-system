@@ -80,10 +80,47 @@ export class XJZLActor extends Actor {
   }
 
   /**
+   * 准备用于骰子检定的数据 (Roll Data)
+   * 这决定了你在公式里可以用 @ 什么属性
+   */
+  getRollData() {
+    const data = super.getRollData();
+    const sys = this.system;
+
+    // 1. 将七维属性添加到顶层，方便引用
+    // 例如: @liliang 代替 @stats.liliang.total
+    if (sys.stats) {
+      for (const [key, stat] of Object.entries(sys.stats)) {
+        if (stat && typeof stat === 'object') {
+          data[key] = stat.total || 0;
+        }
+      }
+    }
+
+    // 2. 将资源添加到顶层
+    // 例如: @hp, @mp, @rage
+    if (sys.resources) {
+      data.hp = sys.resources.hp.value;
+      data.mp = sys.resources.mp.value;
+      data.rage = sys.resources.rage.value;
+    }
+
+    // 3. 将战斗属性添加到顶层
+    // 例如: @wuxue (武学技能), @speed
+    if (sys.skills) {
+      for (const [key, skill] of Object.entries(sys.skills)) {
+        data[key] = skill.total || 0;
+      }
+    }
+
+    return data;
+  }
+
+
+  /**
    * 处理内功的被动特效脚本
    */
   _applyNeigongEffects() {
-    //到时候记得去掉日志
     // 1. 获取当前运行的内功
     const activeNeigongId = this.system.martial.active_neigong;
     // console.log(">>> [Actor] 开始执行内功脚本检测, ActiveID:", activeNeigongId);
@@ -230,5 +267,36 @@ export class XJZLActor extends Actor {
       }
     }
     return available;
+  }
+
+
+  /**
+   * 验证属性点更新是否合法
+   * @param {string} fieldName - 字段名 (如 "system.stats.liliang.assigned")
+   * @param {number} newValue - 新的值
+   * @returns {Object} { valid: boolean, message: string, oldValue: number }
+   */
+  canUpdateStat(fieldName, newValue) {
+    // 1. 获取旧值
+    const oldValue = foundry.utils.getProperty(this, fieldName) || 0;
+
+    // 2. 负数检查
+    if (newValue < 0) {
+      return { valid: false, message: "分配值不能为负数。", oldValue };
+    }
+
+    // 3. 余额检查
+    const currentFree = this.system.stats.freePoints.total; // 基于 DataModel 自动计算的
+    const delta = newValue - oldValue;
+
+    if (currentFree - delta < 0) {
+      return {
+        valid: false,
+        message: `自由属性点不足！剩余: ${currentFree}, 需要: ${delta}`,
+        oldValue
+      };
+    }
+
+    return { valid: true };
   }
 }

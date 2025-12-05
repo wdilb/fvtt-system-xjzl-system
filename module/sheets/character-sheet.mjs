@@ -1,12 +1,10 @@
 /**
- * 先简单写一个让系统运行起来
+ * 角色卡片逻辑
  */
-/* module/sheets/actor-sheet.mjs */
 import { XJZL } from "../config.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
-const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
@@ -15,36 +13,35 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         position: { width: 900, height: 800 },
         window: { resizable: true },
         actions: {
-            //切换内功
+            // --- 核心切换 ---
             toggleNeigong: XJZLCharacterSheet.prototype._onToggleNeigong,
-            // 切换子标签页 (内功/武学)
             toggleSubTab: XJZLCharacterSheet.prototype._onToggleSubTab,
-            //投入修为
-            investXP: XJZLCharacterSheet.prototype._onInvestXP,
-            //编辑物品
+
+            // --- 物品基础操作 ---
             editItem: XJZLCharacterSheet.prototype._onEditItem,
-            //删除物品
             deleteItem: XJZLCharacterSheet.prototype._onDeleteItem,
-            //返回投入的修为
-            refundXP: XJZLCharacterSheet.prototype._onRefundXP,
-            //武学投入修为
-            investMoveXP: XJZLCharacterSheet.prototype._onInvestMoveXP,
-            //武学回退修为
-            refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
-            rollMove: XJZLCharacterSheet.prototype._onRollMove, // 先占位
-            // 物品操作
             createItem: XJZLCharacterSheet.prototype._onCreateItem,
+
+            // --- 物品功能交互 (逻辑在 Item 中) ---
             toggleEquip: XJZLCharacterSheet.prototype._onToggleEquip,
-            useConsumable: XJZLCharacterSheet.prototype._onUseConsumable, //使用消耗品
-            readManual: XJZLCharacterSheet.prototype._onReadManual,  //阅读秘籍
-            deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect  //删除buff/debuff
+            useConsumable: XJZLCharacterSheet.prototype._onUseConsumable,
+            readManual: XJZLCharacterSheet.prototype._onReadManual,
+
+            // --- 修炼系统 (统一使用辅助方法) ---
+            investXP: XJZLCharacterSheet.prototype._onInvestXP,
+            refundXP: XJZLCharacterSheet.prototype._onRefundXP,
+            investMoveXP: XJZLCharacterSheet.prototype._onInvestMoveXP,
+            refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
+
+            // --- 其他 ---
+            deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect,
+            rollMove: XJZLCharacterSheet.prototype._onRollMove
         }
     };
 
     static PARTS = {
         header: { template: "systems/xjzl-system/templates/actor/character/header.hbs" },
         tabs: { template: "systems/xjzl-system/templates/actor/character/tabs.hbs" },
-        // 内容 Parts
         stats: { template: "systems/xjzl-system/templates/actor/character/tab-stats.hbs", scrollable: [""] },
         cultivation: { template: "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs", scrollable: [""] },
         jingmai: { template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs", scrollable: [""] },
@@ -57,7 +54,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     tabGroups = { primary: "stats" };
 
     /* -------------------------------------------- */
-    /*  生命周期与数据准备                           */
+    /*  数据准备 (Data Preparation)                  */
     /* -------------------------------------------- */
 
     async _prepareContext(options) {
@@ -78,195 +75,26 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.neigongs.forEach(item => item.isRunning = item.system.active);
 
         // =====================================================
-        //  准备武学 (全要素伤害预估)
+        //  准备武学 (调用 Item 方法计算)
         // =====================================================
         context.wuxues = actor.itemTypes.wuxue || [];
 
-        // 模拟目标 (Mock Target) - 性能优化版 (循环外创建)
-        const dummyTarget = new Proxy({
-            name: "预设木桩",
-            system: {
-                resources: { hp: { value: 100, max: 100 }, mp: { value: 100, max: 100 }, rage: { value: 0, max: 10 } },
-                stats: {}, combat: {}
-            }
-        }, {
-            get: (target, prop) => {
-                if (prop in target) return target[prop];
-                return new Proxy(() => 0, { get: () => 0, apply: () => 0, toPrimitive: () => 0 });
-            }
-        });
-        const dummyTargetsArray = [dummyTarget];
-
-        // 开始遍历计算
         for (const wuxue of context.wuxues) {
             const moves = wuxue.system.moves || [];
-
             moves.forEach(move => {
-                // --- A. 招式自带基础 (Base + Growth) ---
-                const lvl = Math.max(1, move.computedLevel || 1);
-                const moveBaseDmg = (move.calculation.base || 0) + (move.calculation.growth || 0) * (lvl - 1);
+                // 委托 Item 计算数值 (瘦 Sheet)
+                const result = wuxue.calculateMoveDamage(move.id);
 
-                // --- B. 武器基础伤害 (Weapon Item) & 装备判定 ---
-                let weaponDmg = 0;
-                let isWeaponMatch = false; // 【新增】标记：是否满足武器条件
-
-                // 判定逻辑：
-                // 1. 如果招式是徒手，默认满足
-                if (move.weaponType === 'unarmed') {
-                    isWeaponMatch = true;
+                if (result) {
+                    result.breakdown += `\n\n------------------\n注: 预估基于100气血/100内力/0怒气\n无内功和招式抗性的标准木桩`;
+                    move.derived = result;
+                } else {
+                    move.derived = { damage: 0, feint: 0, breakdown: "计算错误", cost: { mp: 0, rage: 0, hp: 0 } };
                 }
-                // 2. 否则查找已装备且类型匹配的武器
-                else if (actor.itemTypes.weapon && move.weaponType && move.weaponType !== 'none') {
-                    const weapon = actor.itemTypes.weapon.find(w =>
-                        w.system.equipped === true &&
-                        w.system.type === move.weaponType
-                    );
-
-                    if (weapon) {
-                        weaponDmg = weapon.system.damage || 0;
-                        isWeaponMatch = true; // 找到了匹配武器
-                    }
-                }
-
-                // --- C. 内功系数加成 ---
-                const neigongBonusRatio = actor.system.getNeigongDamageBonus ? actor.system.getNeigongDamageBonus(move.element) : 0;
-
-                // --- D. 属性加成 (Scalings) ---
-                let attrBonus = 0;
-                if (move.calculation.scalings) {
-                    for (const scale of move.calculation.scalings) {
-                        const propVal = foundry.utils.getProperty(actor.system.stats, `${scale.prop}.total`) || 0;
-                        // 内功加成直接加在系数上
-                        const finalRatio = (scale.ratio || 0) + neigongBonusRatio;
-                        attrBonus += propVal * finalRatio;
-                    }
-                }
-
-                // --- E. 固定增伤 (Flat Bonuses from Actor) ---
-                let flatBonus = 0;
-                if (actor.system.combat?.damages) {
-                    flatBonus += (actor.system.combat.damages.global?.total || 0);
-                    flatBonus += (actor.system.combat.damages.skill?.total || 0);
-                    if (move.element && move.element !== "none") {
-                        flatBonus += (actor.system.combat.damages[move.element]?.total || 0);
-                    }
-                }
-
-                // 武器等级增伤
-                let weaponDmgBonus = 0;
-                // 【修改】只有在 isWeaponMatch 为真时，才计算造诣加成
-                if (isWeaponMatch && move.weaponType && actor.system.combat?.weaponRanks) {
-                    const rankObj = actor.system.combat.weaponRanks[move.weaponType];
-                    if (rankObj) {
-                        const rank = rankObj.total || 0;
-                        let rankDmg = 0;
-                        // 断层公式
-                        if (rank <= 4) rankDmg = rank * 1;
-                        else if (rank <= 8) rankDmg = rank * 2;
-                        else rankDmg = rank * 3;
-                        weaponDmgBonus += rankDmg;
-                    }
-                }
-
-                // --- F. 初步汇总 ---
-                // 公式：(招式基 + 武器基 + 属性加成 + 其他固定增伤 + 武器等级增伤)
-                // 这里假设内功系数只影响属性加成(D步骤已处理)，如果内功也影响武器伤害，需要重新调整公式位置
-                // 按照之前的逻辑：Attr = Prop * (Ratio + Bonus)
-                // 所以这里直接相加即可
-                let preScriptDmg = Math.floor(moveBaseDmg + weaponDmg + attrBonus + flatBonus + weaponDmgBonus);
-                let totalDmg = preScriptDmg;
-                let scriptDmgBonus = 0;
-                let scriptFeintBonus = 0;
-
-                //在执行脚本前添加虚招值的计算
-                let feintVal = 0;
-                let feintBreakdown = ""; // 新增：构成详解
-
-                if (move.type === 'feint') {
-                    // 1. 基础虚招值 (来自 DataModel)
-                    const base = move.baseFeint || 0;
-
-                    // 2. 武器等级
-                    let weaponRank = 0;
-                    if (isWeaponMatch && move.weaponType && actor.system.combat?.weaponRanks) {
-                        const rankObj = actor.system.combat.weaponRanks[move.weaponType];
-                        if (rankObj) weaponRank = rankObj.total || 0;
-                    }
-
-                    // 3. 角色加成
-                    const actorBonus = actor.system.combat.xuzhaoTotal || 0;
-
-                    feintVal = base + weaponRank + actorBonus;
-
-                    // 生成提示文本
-                    feintBreakdown = `${game.i18n.localize("XJZL.Wuxue.Moves.BaseFeint")} ${base} + ${game.i18n.localize("XJZL.Combat.WeaponRanks")} ${weaponRank} + ${game.i18n.localize("XJZL.Combat.XuZhao")} ${actorBonus}`;
-                }
-
-                // --- G. 执行招式脚本 (Script Preview) ---
-                if (move.script && move.script.trim()) {
-                    if (actor.system.resources && actor.system.stats) {
-                        const out = {
-                            damage: totalDmg,
-                            feint: feintVal
-                        };
-                        try {
-                            const fn = new Function("actor", "S", "out", "t", "targets", "item", "rollData", move.script);
-                            fn(actor, actor.system, out, dummyTarget, dummyTargetsArray, wuxue, {});
-                            // 1. 更新伤害
-                            totalDmg = Math.floor(out.damage);
-                            scriptDmgBonus = totalDmg - preScriptDmg;
-
-                            // 2. 更新虚招值
-                            const newFeint = Math.floor(out.feint);
-                            scriptFeintBonus = newFeint - feintVal;
-                            feintVal = newFeint;
-                        } catch (err) { /* Ignore in preview */ }
-                    }
-                }
-
-                // --- H. 挂载显示 (详细拆解) ---
-                let breakdownText = `招式本身伤害: ${moveBaseDmg}\n`;
-                breakdownText += `+ 武器伤害: ${weaponDmg}\n`;
-                breakdownText += `+ 武器等级增伤: ${weaponDmgBonus}\n`;
-                breakdownText += `+ 属性增伤: ${Math.floor(attrBonus)}\n`;
-                breakdownText += `+ 其他增伤: ${flatBonus}`;
-
-                if (scriptDmgBonus !== 0) {
-                    const sign = scriptDmgBonus > 0 ? "+" : "";
-                    breakdownText += `\n${sign} 特效增伤: ${scriptDmgBonus}`;
-                }
-
-                if (scriptFeintBonus !== 0) {
-                    const sign = scriptFeintBonus > 0 ? "+" : "";
-                    // 如果原本没有 Breakdown (非虚招变成了有数值)，给个初始头
-                    if (!feintBreakdown) feintBreakdown = "基础 0";
-                    feintBreakdown += ` ${sign} 特效加值 ${scriptFeintBonus}`;
-                }
-
-                // 如果有武器但没装备，给个醒目提示
-                if (!isWeaponMatch && move.weaponType && move.weaponType !== 'none' && move.weaponType !== 'unarmed') {
-                    breakdownText += `\n(⚠️ 未装备匹配武器)`;
-                    feintBreakdown += `\n(⚠️ 未装备匹配武器)`;
-                }
-
-                // 木桩说明
-                breakdownText += `\n\n------------------\n注: 预估基于100气血/100内力/0怒气\n无内功和招式抗性的标准木桩`;
-
-
-
-                move.derived = {
-                    damage: totalDmg,
-                    feint: feintVal,
-                    feintBreakdown: feintBreakdown,
-                    breakdown: breakdownText,
-                    neigongBonus: neigongBonusRatio > 0 ? `+${(neigongBonusRatio).toFixed(1)}系数` : "",
-                    cost: move.currentCost || { mp: 0, rage: 0, hp: 0 }
-                };
             });
         }
 
-        // UI 状态控制
-        // 如果没有初始化，默认显示 'neigong'
+        // 技能组与 UI 状态
         if (!this._cultivationSubTab) this._cultivationSubTab = "neigong";
         context.cultivationSubTab = this._cultivationSubTab;
 
@@ -280,7 +108,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             { label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }
         ];
 
-        // 将物品分类，方便前端渲染
+        // 物品分类
         context.inventory = [
             { label: "TYPES.Item.weapon", type: "weapon", items: actor.itemTypes.weapon },
             { label: "TYPES.Item.armor", type: "armor", items: actor.itemTypes.armor },
@@ -290,20 +118,19 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             { label: "TYPES.Item.misc", type: "misc", items: actor.itemTypes.misc }
         ];
 
-        // 3. 准备特效列表 (分为两类：临时状态 和 装备被动)
+        // 特效列表
         const allEffects = actor.effects.map(e => {
-            const source = fromUuidSync(e.origin); // 尝试获取来源
+            const source = fromUuidSync(e.origin);
             return {
                 id: e.id,
                 name: e.name,
                 img: e.img,
                 disabled: e.disabled,
-                isTemporary: !e.transfer, // transfer=false 的通常是临时状态
+                isTemporary: !e.transfer,
                 sourceName: source ? source.name : "未知来源",
                 description: e.description
             };
         });
-
         context.temporaryEffects = allEffects.filter(e => e.isTemporary);
         context.passiveEffects = allEffects.filter(e => !e.isTemporary);
 
@@ -311,35 +138,25 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /* -------------------------------------------- */
-    /*  核心：自动保存与验证逻辑                     */
+    /*  事件监听与自动保存                           */
     /* -------------------------------------------- */
 
-    /**
-     * 渲染后挂载事件监听器
-     * AppV2 中，我们需要手动监听 input 的 change 事件来实现“即时保存”
-     */
     _onRender(context, options) {
         super._onRender(context, options);
 
-        // 性能优化：使用事件委托监听所有输入框
-        // 避免给每个 input 单独绑定 listener
         if (!this.element.dataset.delegated) {
             this.element.addEventListener("change", (event) => {
                 const target = event.target;
-                // 过滤：只响应输入控件的 change
                 if (target.matches("input, select, textarea")) {
-                    // 排除一些不需要自动保存的特殊输入框（如果有的话）
-                    // 目前没有，直接提交
                     this.submit();
                 }
             });
-            // 标记该元素已绑定，防止重绘时重复绑定
             this.element.dataset.delegated = "true";
         }
     }
 
     /**
-     * 处理输入框变化
+     * 处理输入框变化 (增加属性验证)
      */
     async _onChangeInput(event) {
         event.preventDefault();
@@ -347,103 +164,35 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const name = input.name;
         const value = input.type === "number" ? Number(input.value) : input.value;
 
-        // 1. 验证：自由属性点分配逻辑
-        // 检查字段名是否包含 .assigned (例如 system.stats.liliang.assigned)
+        // 1. 验证：自由属性点分配
+        // 优化：将验证逻辑委托给 Actor，Sheet 只负责处理 UI (回滚值/提示)
         if (name.includes(".assigned")) {
             if (!this._validateStatAssignment(name, value, input)) {
-                return; // 验证失败，终止保存
+                return; // 验证失败，阻止提交
             }
         }
 
         // 2. 提交保存
-        // AppV2 的 submit 方法会自动收集表单数据并更新 Document
         await this.submit();
     }
 
-    /* -------------------------------------------- */
-    /*  Drag & Drop (拖拽处理)                      */
-    /* -------------------------------------------- */
-
     /**
-     * 重写原生的物品拖拽处理
-     * 目的：实现特定类型的自动堆叠
-     */
-    async _onDropItem(event, data) {
-        if (!this.actor.isOwner) return false;
-
-        // 获取被拖拽的物品数据 (从侧边栏或其他角色)
-        const item = await Item.implementation.fromDropData(data);
-        if (!item) return false;
-
-        // 1. 定义哪些类型允许堆叠
-        // 装备(weapon/armor/qizhen) 和 功法(neigong/wuxue) 不在此列 -> 它们会走默认逻辑，创建新实例
-        const stackableTypes = ["consumable", "misc", "manual"];
-
-        if (stackableTypes.includes(item.type)) {
-            // 2. 查找背包里是否已有同名、同类型的物品
-            const existingItem = this.actor.items.find(i =>
-                i.type === item.type &&
-                i.name === item.name
-            );
-
-            // 3. 如果找到了 -> 堆叠数量
-            if (existingItem) {
-                // 获取拖进来的数量 (默认为1)
-                const addQty = item.system.quantity || 1;
-                const newQty = existingItem.system.quantity + addQty;
-
-                await existingItem.update({ "system.quantity": newQty });
-
-                // 返回 false 阻止父类继续执行创建新物品的操作
-                return false;
-            }
-        }
-
-        // 4. 如果类型不可堆叠，或者没找到同名物品 -> 走默认逻辑 (创建新物品)
-        return super._onDropItem(event, data);
-    }
-
-    /**
-     * 验证属性分配是否合法
-     * @param {string} fieldName - 修改的字段名
-     * @param {number} newValue - 玩家输入的新值
-     * @param {HTMLElement} inputElement - 输入框 DOM 对象 (用于重置)
-     * @returns {boolean} - true 通过, false 失败
+     * 调用 Actor 的方法来判断是否合法
      */
     _validateStatAssignment(fieldName, newValue, inputElement) {
-        const actor = this.document;
-        const stats = actor.system.stats;
-
-        // 1. 获取当前的剩余点数 (Total Free Points)
-        // 注意：这里的 total 是基于 document 中已保存的数据计算的
-        const currentFree = stats.freePoints.total;
-
-        // 2. 获取该属性 *旧的* 分配值
-        // foundry.utils.getProperty 是获取深层属性的好帮手
-        // fieldName 类似 "system.stats.liliang.assigned"，我们需要去掉 "system." 前缀来从 actor.system 中取值吗？
-        // DataModel 中的数据是 actor.system.stats... 
-        // input 的 name 是 system.stats...
-        // 我们用 foundry.utils.getProperty(this.document, fieldName) 直接取
-        const oldValue = foundry.utils.getProperty(this.document, fieldName) || 0;
-
-        // 3. 计算差值 (Delta)
-        // 如果新值 5，旧值 2，差值是 3 (需要消耗3点)
-        // 如果新值 1，旧值 5，差值是 -4 (返还4点)
-        const delta = newValue - oldValue;
-
-        // 4. 判断余额是否充足
-        if (currentFree - delta < 0) {
-            ui.notifications.warn(`自由属性点不足！剩余: ${currentFree}, 需要: ${delta}`);
-
-            // 重置输入框为旧值
-            inputElement.value = oldValue;
-            return false;
+        // 安全检查：防止 Actor 还没写这个方法时报错
+        if (typeof this.actor.canUpdateStat !== "function") {
+            console.warn("XJZLActor 尚未实现 canUpdateStat 方法，跳过验证。");
+            return true;
         }
 
-        // 5. 防止负数输入
-        if (newValue < 0) {
-            ui.notifications.warn("分配值不能为负数。");
-            inputElement.value = oldValue;
+        // 调用 Actor 业务逻辑
+        const validation = this.actor.canUpdateStat(fieldName, newValue);
+
+        if (!validation.valid) {
+            ui.notifications.warn(validation.message || "无法分配属性点。");
+            // 重置 UI 为旧值
+            inputElement.value = validation.oldValue;
             return false;
         }
 
@@ -451,291 +200,83 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /* -------------------------------------------- */
-    /*  Action Handlers                             */
+    /*  Drag & Drop (堆叠逻辑)                      */
     /* -------------------------------------------- */
 
+    async _onDropItem(event, data) {
+        if (!this.actor.isOwner) return false;
+        const item = await Item.implementation.fromDropData(data);
+        if (!item) return false;
+
+        const stackableTypes = ["consumable", "misc", "manual"];
+        if (stackableTypes.includes(item.type)) {
+            const existingItem = this.actor.items.find(i => i.type === item.type && i.name === item.name);
+            if (existingItem) {
+                const addQty = item.system.quantity || 1;
+                const newQty = existingItem.system.quantity + addQty;
+                await existingItem.update({ "system.quantity": newQty });
+                return false;
+            }
+        }
+        return super._onDropItem(event, data);
+    }
+
+    /* -------------------------------------------- */
+    /*  辅助方法 (Helpers)                          */
+    /* -------------------------------------------- */
+
+    /**
+     * 通用数值输入弹窗
+     * @param {Object} options
+     * @returns {Promise<number|null>} 返回输入的数字，取消返回 null
+     */
+    async _promptForValue({ title, icon = "fas fa-edit", label = "数量", value = 0, hint = "" } = {}) {
+        const content = `
+        <div style="text-align:center; padding: 10px;">
+            ${hint ? `<p style="margin-bottom:10px; font-size:1.1em;">${hint}</p>` : ""}
+            <div style="display:flex; flex-direction:column; gap:5px;">
+                <label style="font-weight:bold;">${label}</label>
+                <input name="amount" type="number" value="${value}" autofocus 
+                       style="text-align:center; font-size:1.5em; width:100%; color:black; background:rgba(255,255,255,0.9); border:1px solid #333;"/>
+            </div>
+        </div>`;
+
+        const result = await foundry.applications.api.DialogV2.prompt({
+            window: { title, icon },
+            content: content,
+            ok: {
+                label: "确定",
+                icon: "fas fa-check",
+                // 直接通过 Form Data 获取，不再依赖 ID
+                callback: (event, button) => new FormData(button.form).get("amount")
+            },
+            rejectClose: false
+        });
+
+        if (!result) return null;
+        return parseInt(result);
+    }
+
+    /* -------------------------------------------- */
+    /*  交互 Actions                                */
+    /* -------------------------------------------- */
+
+    // --- 物品管理 ---
+
     async _onEditItem(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
+        const item = this.document.items.get(target.dataset.itemId);
         if (item) item.sheet.render(true);
     }
 
-    // 删除物品逻辑
     async _onDeleteItem(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
+        const item = this.document.items.get(target.dataset.itemId);
         if (!item) return;
-
-        // 弹窗确认
         const confirm = await foundry.applications.api.DialogV2.confirm({
             window: { title: "删除物品" },
             content: `<p>确定要删除 <b>${item.name}</b> 吗？</p>`,
             rejectClose: false
         });
-
-        if (confirm) {
-            await item.delete();
-        }
-    }
-    //激活内功
-    async _onToggleNeigong(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
-        if (item) item.toggleNeigong();
-    }
-
-    /**
-     * 投入修为
-     */
-    async _onInvestXP(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
-        if (!item) return;
-
-        // 获取上限数据 (DataModel 中已计算)
-        const currentInvested = item.system.xpInvested;
-        const maxXP = item.system.progressData.absoluteMax;
-
-        // 如果已圆满，直接禁止
-        if (currentInvested >= maxXP) {
-            return ui.notifications.warn(`${item.name} 已达圆满境界，无需再投入修为。`);
-        }
-
-        const input = await foundry.applications.api.DialogV2.prompt({
-            window: { title: `修炼: ${item.name}`, icon: "fas fa-arrow-up" },
-            content: `
-            <div style="text-align:center; padding: 10px;">
-                <p>距离圆满还需: <b>${maxXP - currentInvested}</b></p>
-                <p style="margin-bottom:10px;">当前通用修为: <b>${this.document.system.cultivation.general}</b></p>
-                <div style="display:flex; flex-direction:column; gap:5px;">
-                    <label>请输入投入数量:</label>
-                    <input type="number" name="xp" value="100" autofocus 
-                            style="text-align:center; font-size:1.5em; width:100%; background:rgba(255,255,255,0.8); color:black;"/>
-                </div>
-            </div>
-            `,
-            ok: {
-                label: "投入", icon: "fas fa-check",
-                callback: (event, button) => new FormData(button.form).get("xp")
-            },
-            rejectClose: false
-        });
-
-        if (input) {
-            let amount = parseInt(input);
-            const currentGeneral = this.document.system.cultivation.general;
-
-            if (isNaN(amount) || amount <= 0) return ui.notifications.warn("请输入有效的正整数。");
-
-            // 1. 溢出计算
-            const needed = maxXP - currentInvested;
-            if (amount > needed) {
-                ui.notifications.info(`投入过多，已自动调整为所需的 ${needed} 点。`);
-                amount = needed;
-            }
-
-            // 2. 余额检查
-            if (currentGeneral < amount) {
-                return ui.notifications.warn(`通用修为不足！你只有 ${currentGeneral} 点。`);
-            }
-
-            // 3. 执行更新
-            await this.document.update({
-                "system.cultivation.general": currentGeneral - amount
-            });
-
-            await item.update({
-                "system.xpInvested": currentInvested + amount
-            });
-
-            ui.notifications.info(`${item.name} 修为增加 ${amount}。`);
-        }
-    }
-
-    /**
-     * 回退修为
-     */
-    async _onRefundXP(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
-        if (!item) return;
-
-        const currentInvested = item.system.xpInvested;
-        if (currentInvested <= 0) return ui.notifications.warn("该内功尚未投入修为，无法回退。");
-
-        const input = await foundry.applications.api.DialogV2.prompt({
-            window: { title: `回退: ${item.name}`, icon: "fas fa-undo" },
-            content: `
-            <div style="text-align:center; padding: 10px;">
-                <p style="color:var(--xjzl-accent);">回退将减少内功境界，并返还通用修为。</p>
-                <p style="margin-bottom:10px;">当前已投入: <b>${currentInvested}</b></p>
-                <div style="display:flex; flex-direction:column; gap:5px;">
-                    <label>请输入取出数量:</label>
-                    <input type="number" name="xp" value="${currentInvested}" autofocus 
-                            style="text-align:center; font-size:1.5em; width:100%; background:rgba(255,255,255,0.8); color:black;"/>
-                </div>
-            </div>
-            `,
-            ok: {
-                label: "回退", icon: "fas fa-undo",
-                callback: (event, button) => new FormData(button.form).get("xp")
-            },
-            rejectClose: false
-        });
-
-        if (input) {
-            let amount = parseInt(input);
-
-            if (isNaN(amount) || amount <= 0) return ui.notifications.warn("请输入有效数字。");
-            if (amount > currentInvested) amount = currentInvested; // 既然是取出，最多全取
-
-            // 1. 返还通用修为
-            await this.document.update({
-                "system.cultivation.general": this.document.system.cultivation.general + amount
-            });
-
-            // 2. 扣除物品修为
-            await item.update({
-                "system.xpInvested": currentInvested - amount
-            });
-
-            ui.notifications.info(`${item.name} 回退成功，返还 ${amount} 点修为。`);
-        }
-    }
-
-    /**
-     * 切换修为页面的子标签 (内功/武学)
-     */
-    async _onToggleSubTab(event, target) {
-        const tab = target.dataset.target;
-        this._cultivationSubTab = tab;
-        this.render(); // 重新渲染界面以更新显示
-    }
-
-    // 武学投入修为
-    async _onInvestMoveXP(event, target) {
-        const itemId = target.dataset.itemId;
-        const moveId = target.dataset.moveId;
-        const item = this.document.items.get(itemId);
-        if (!item) return;
-
-        const moveIndex = item.system.moves.findIndex(m => m.id === moveId);
-        if (moveIndex === -1) return;
-        const move = item.system.moves[moveIndex];
-
-        // 【核心修复】计算还需要多少修为才能升级
-        // move.progress.max 是当前级别所需的总投入 (相对值)
-        // move.progress.current 是当前级别已投入 (相对值)
-        const needed = move.progress.max - move.progress.current;
-
-        const uniqueId = `invest-${foundry.utils.randomID()}`;
-
-        const input = await foundry.applications.api.DialogV2.prompt({
-            window: { title: `修炼: ${move.name}`, icon: "fas fa-arrow-up" },
-            content: `
-                <div style="text-align:center; padding: 10px;">
-                    <p>当前进度: <span style="color:var(--xjzl-gold)">${move.progress.current}</span> / ${move.progress.max}</p>
-                    <p style="font-size:0.9em; color:#666;">(总投入: ${move.xpInvested})</p>
-                    <p style="margin-bottom:10px;">可用修为: <b>${this.document.system.cultivation.general}</b></p>
-                    <div style="display:flex; flex-direction:column; gap:5px;">
-                        <label>投入数量</label>
-                        {{!-- 默认填入升级所需的值 --}}
-                        <input id="${uniqueId}" type="number" name="xp" value="${needed}" autofocus 
-                            style="text-align:center; font-size:1.5em; width:100%; color:black; background:rgba(255,255,255,0.9); border:1px solid #333;"/>
-                    </div>
-                </div>
-            `,
-            ok: {
-                label: "投入", icon: "fas fa-check",
-                callback: () => document.getElementById(uniqueId).value
-            },
-            rejectClose: false
-        });
-
-        if (input) {
-            let amount = parseInt(input);
-            const currentGeneral = this.document.system.cultivation.general;
-
-            if (isNaN(amount) || amount <= 0) return ui.notifications.warn("无效数字");
-
-            // 溢出检查：不能超过当前级的上限
-            // 如果你想支持一次升多级，这里逻辑要改，但目前为了稳定，我们限制一次只升一级
-            if (amount > needed) {
-                ui.notifications.info(`投入过多，已调整为升级所需的 ${needed} 点。`);
-                amount = needed;
-            }
-
-            if (currentGeneral < amount) return ui.notifications.warn("修为不足");
-
-            // 1. 扣除通用修为
-            await this.document.update({
-                "system.cultivation.general": currentGeneral - amount
-            });
-
-            // 2. 更新招式数据
-            const itemData = item.system.toObject();
-            const idx = itemData.moves.findIndex(m => m.id === moveId);
-            if (idx !== -1) {
-                itemData.moves[idx].xpInvested += amount;
-                await item.update({ "system.moves": itemData.moves });
-                ui.notifications.info(`${move.name} 获得 ${amount} 点修为！`);
-            }
-        }
-    }
-    //回退武学修为
-    async _onRefundMoveXP(event, target) {
-        const itemId = target.dataset.itemId;
-        const moveId = target.dataset.moveId;
-        const item = this.document.items.get(itemId);
-        if (!item) return;
-
-        const moveIndex = item.system.moves.findIndex(m => m.id === moveId);
-        if (moveIndex === -1) return;
-        const move = item.system.moves[moveIndex];
-
-        if (move.xpInvested <= 0) return ui.notifications.warn("尚未投入修为");
-
-        const uniqueId = `refund-${foundry.utils.randomID()}`;
-
-        const input = await foundry.applications.api.DialogV2.prompt({
-            window: { title: `回退: ${move.name}`, icon: "fas fa-undo" },
-            content: `
-                <div style="text-align:center; padding: 10px;">
-                    <p style="color:#ff4444; font-size:0.9em; margin-bottom:5px;">⚠️ 将返还修为并降低等级</p>
-                    <p>可退还: <b>${move.xpInvested}</b></p>
-                    <input id="${uniqueId}" type="number" value="${move.xpInvested}" autofocus 
-                        style="text-align:center; font-size:1.5em; width:100%; color:black; background:rgba(255,255,255,0.9); border:1px solid #333;"/>
-                </div>
-            `,
-            ok: {
-                label: "散功", icon: "fas fa-undo",
-                callback: () => document.getElementById(uniqueId).value
-            },
-            rejectClose: false
-        });
-
-        if (input) {
-            let amount = parseInt(input);
-            if (isNaN(amount) || amount <= 0) return;
-            if (amount > move.xpInvested) amount = move.xpInvested;
-
-            await this.document.update({
-                "system.cultivation.general": this.document.system.cultivation.general + amount
-            });
-
-            const itemData = item.system.toObject();
-            const idx = itemData.moves.findIndex(m => m.id === moveId);
-            if (idx !== -1) {
-                itemData.moves[idx].xpInvested -= amount;
-                await item.update({ "system.moves": itemData.moves });
-                ui.notifications.info(`${move.name} 散功成功，返还 ${amount} 点修为。`);
-            }
-        }
-    }
-
-    // 占位
-    async _onRollMove(event, target) {
-        ui.notifications.info("招式施放功能即将实装！");
+        if (confirm) await item.delete();
     }
 
     async _onCreateItem(event, target) {
@@ -743,27 +284,24 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         await Item.create({ name: `新${type}`, type: type }, { parent: this.document });
     }
 
-    /**
-     * 切换装备状态 (装备/卸下)
-     */
+    // --- 物品功能 (委托给 Item) ---
+
+    async _onToggleNeigong(event, target) {
+        const item = this.document.items.get(target.dataset.itemId);
+        if (item) item.toggleNeigong();
+    }
+
     async _onToggleEquip(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
+        const item = this.document.items.get(target.dataset.itemId);
         if (!item) return;
 
-        // 如果是卸下，不需要弹窗，直接调用
-        if (item.system.equipped) {
-            return item.toggleEquip();
-        }
+        // 卸下直接执行
+        if (item.system.equipped) return item.toggleEquip();
 
-        // 如果是装备奇珍，需要弹窗选择穴位
+        // 装备奇珍需要选穴位
         if (item.type === "qizhen") {
-            // 获取可用穴位
-            const availableSlots = this.actor.getAvailableAcupoints();
-
-            if (availableSlots.length === 0) {
-                return ui.notifications.warn("没有可用的已打通穴位，或穴位已满。");
-            }
+            const availableSlots = this.actor.getAvailableAcupoints(); // 逻辑在 Actor
+            if (availableSlots.length === 0) return ui.notifications.warn("没有可用的已打通穴位。");
 
             const content = `
             <div class="form-group">
@@ -773,53 +311,116 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         ${availableSlots.map(slot => `<option value="${slot.key}">${slot.label}</option>`).join("")}
                     </select>
                 </div>
-                <p class="notes">只能放入到已打通且为空的经脉穴位中。</p>
-            </div>
-          `;
+            </div>`;
 
             const acupoint = await foundry.applications.api.DialogV2.prompt({
                 window: { title: `装备: ${item.name}`, icon: "fas fa-gem" },
                 content: content,
-                ok: {
-                    label: "放入",
-                    // 使用原生 FormData 获取
-                    callback: (event, button) => new FormData(button.form).get("acupoint")
-                }
+                ok: { label: "放入", callback: (event, button) => new FormData(button.form).get("acupoint") }
             });
 
-            if (acupoint) {
-                // 将选中的穴位传给 Item 方法
-                item.toggleEquip(acupoint);
-            }
+            if (acupoint) item.toggleEquip(acupoint);
         } else {
-            // 普通装备，直接调用
+            // 普通装备
             item.toggleEquip();
         }
     }
 
-
-    /**
-     * 统一的物品使用入口
-     * Sheet 只负责 UI 绑定，逻辑全交给 Item
-     */
     async _onUseConsumable(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
+        const item = this.document.items.get(target.dataset.itemId);
         if (item) item.use();
     }
 
     async _onReadManual(event, target) {
-        const itemId = target.dataset.itemId;
-        const item = this.document.items.get(itemId);
+        const item = this.document.items.get(target.dataset.itemId);
         if (item) item.use();
     }
 
-    /**
-     * 删除角色身上的特效
-     */
+    // --- 修炼系统 (使用 _promptForValue 简化) ---
+
+    async _onInvestXP(event, target) {
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return;
+        const needed = item.system.progressData.absoluteMax - item.system.xpInvested;
+
+        if (needed <= 0) return ui.notifications.warn("已圆满。");
+
+        const amount = await this._promptForValue({
+            title: `修炼: ${item.name}`,
+            icon: "fas fa-arrow-up",
+            value: 100,
+            hint: `距离圆满还需: <b>${needed}</b>`
+        });
+
+        if (amount) await item.investNeigong(amount);
+    }
+
+    async _onRefundXP(event, target) {
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return;
+
+        const amount = await this._promptForValue({
+            title: `回退: ${item.name}`,
+            icon: "fas fa-undo",
+            value: item.system.xpInvested,
+            hint: `<span style="color:#ff4444;">⚠️ 返还修为并降低境界</span><br>当前投入: <b>${item.system.xpInvested}</b>`,
+            label: "回退数量"
+        });
+
+        if (amount) await item.refundNeigong(amount);
+    }
+
+    async _onInvestMoveXP(event, target) {
+        const item = this.document.items.get(target.dataset.itemId);
+        const moveId = target.dataset.moveId;
+        if (!item) return;
+        const move = item.system.moves.find(m => m.id === moveId);
+        if (!move) return;
+
+        const needed = move.progress.max - move.progress.current;
+
+        const amount = await this._promptForValue({
+            title: `修炼招式: ${move.name}`,
+            icon: "fas fa-arrow-up",
+            value: needed,
+            hint: `本级还需: <b>${needed}</b>`
+        });
+
+        if (amount) await item.investMove(moveId, amount);
+    }
+
+    async _onRefundMoveXP(event, target) {
+        const item = this.document.items.get(target.dataset.itemId);
+        const moveId = target.dataset.moveId;
+        if (!item) return;
+        const move = item.system.moves.find(m => m.id === moveId);
+        if (!move) return;
+
+        const amount = await this._promptForValue({
+            title: `回退: ${move.name}`,
+            icon: "fas fa-undo",
+            value: move.xpInvested,
+            hint: `可退还: <b>${move.xpInvested}</b>`,
+            label: "回退数量"
+        });
+
+        if (amount) await item.refundMove(moveId, amount);
+    }
+
+    // --- 其他 ---
+
+    async _onToggleSubTab(event, target) {
+        this._cultivationSubTab = target.dataset.target;
+        this.render();
+    }
+
+    async _onRollMove(event, target) {
+        // 后续将在 Item 中实现 rollMove
+        ui.notifications.info("招式施放功能即将实装！");
+    }
+
     async _onDeleteEffect(event, target) {
-        const effectId = target.dataset.id;
-        const effect = this.document.effects.get(effectId);
+        const effect = this.document.effects.get(target.dataset.id);
         if (effect) {
             await effect.delete();
             ui.notifications.info(`已移除状态: ${effect.name}`);
