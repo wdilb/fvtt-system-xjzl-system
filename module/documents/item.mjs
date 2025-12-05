@@ -11,18 +11,18 @@ const DUMMY_TARGET = new Proxy({
     stats: {}, combat: {}
   }
 }, {
-    get: (t, prop) => {
-        if (prop in t) return t[prop];
-        // 返回一个新的递归 Proxy
-        return new Proxy(() => 0, { 
-            get: () => 0, 
-            apply: () => 0, 
-            toPrimitive: () => 0,
-            set: () => true // 允许设置操作但不生效 (静默吞掉)
-        });
-    },
-    // 【新增】拦截对根对象的修改
-    set: () => true // 告诉脚本"设置成功"，但实际上什么都不改
+  get: (t, prop) => {
+    if (prop in t) return t[prop];
+    // 返回一个新的递归 Proxy
+    return new Proxy(() => 0, {
+      get: () => 0,
+      apply: () => 0,
+      toPrimitive: () => 0,
+      set: () => true // 允许设置操作但不生效 (静默吞掉)
+    });
+  },
+  // 【新增】拦截对根对象的修改
+  set: () => true // 告诉脚本"设置成功"，但实际上什么都不改
 });
 export class XJZLItem extends Item {
   /* -------------------------------------------- */
@@ -379,157 +379,370 @@ export class XJZLItem extends Item {
   /* -------------------------------------------- */
 
   /**
-   * 内功修炼：投入修为
-   * @param {Number} amount - 尝试投入的数量
+   * 获取当前物品对应的 Actor 专属修为池的 Key
+   * @returns {string|null} "neigong" | "wuxue" | null
    */
-  async investNeigong(amount) {
+  _getSpecificPoolKey() {
+    if (this.type === "neigong") return "neigong";
+    if (this.type === "wuxue") return "wuxue";
+    // 如果以后有技艺
+    // if (this.type === "art") return "arts";
+    return null;
+  }
+
+  /**
+   * 内功修炼：投入修为
+   * @param {Number|Object} amountOrAllocation - 可以是数字(自动分配)，也可以是对象(手动分配)
+   */
+  async investNeigong(amountOrAllocation) {
     if (this.type !== "neigong") return ui.notifications.warn("只能投入于内功。");;
     if (!this.actor) return ui.notifications.warn("物品不在角色身上。");
 
-    amount = parseInt(amount);
-    if (isNaN(amount) || amount <= 0) return ui.notifications.warn("请输入有效的正整数。");
+    // === 1. 参数归一化 (Normalization) ===
+    let general = 0;
+    let specific = 0;
+    let totalTarget = 0;
 
-    // 1. 获取数据与校验
+    // A. 自动模式：传入的是数字
+    if (typeof amountOrAllocation === "number" || typeof amountOrAllocation === "string") {
+      totalTarget = parseInt(amountOrAllocation);
+      if (isNaN(totalTarget) || totalTarget <= 0) return ui.notifications.warn("无效数字");
+
+      // --- 核心逻辑：计算自动分配 (优先扣专属) ---
+      const specificKey = this._getSpecificPoolKey(); // "neigong"
+      // 获取 Actor 身上现有的专属修为余额
+      const actorSpecificBalance = this.actor.system.cultivation[specificKey] || 0;
+
+      // 既然优先扣专属，那就看专属够不够
+      // 如果 需求 100，专属有 30，那就 specific=30, general=70
+      specific = Math.min(totalTarget, actorSpecificBalance);
+      general = totalTarget - specific;
+    }
+    // B. 手动模式：传入的是对象
+    else {
+      general = parseInt(amountOrAllocation.general) || 0;
+      specific = parseInt(amountOrAllocation.specific) || 0;
+      totalTarget = general + specific;
+    }
+    if (totalTarget <= 0) return ui.notifications.warn("请输入有效的投入数量。");
+
+    // === 2. 上限检查与溢出钳制 (Clamping) ===
     const currentInvested = this.system.xpInvested;
     const maxXP = this.system.progressData.absoluteMax; // 来源于 DataModel prepareDerivedData
-    const currentGeneral = this.actor.system.cultivation.general;
 
     // 检查是否已满
     if (currentInvested >= maxXP) {
       return ui.notifications.warn(`${this.name} 已达圆满境界，无需再投入。`);
     }
 
-    // 2. 溢出钳制 (Clamping)
-    // 计算实际需要的量，如果输入过多，自动截断
+    // 如果投入总和超过了需求，我们需要“削减”投入量。
+    // 策略：优先保留“专属修为”(specific)，削减“通用修为”(general)。
     const needed = maxXP - currentInvested;
-    let actualAmount = amount;
+    if (totalTarget > needed) {
+      const overflow = totalTarget - needed;
 
-    if (amount > needed) {
-      actualAmount = needed;
-      ui.notifications.info(`投入溢出，已自动调整为所需的 ${actualAmount} 点。`);
+      // 尝试从通用里扣除溢出部分
+      if (general >= overflow) {
+        general -= overflow;
+      } else {
+        // 如果通用不够扣，才扣专属
+        const remainder = overflow - general;
+        general = 0;
+        specific -= remainder;
+      }
+      ui.notifications.info(`投入溢出，已自动调整为：通用 ${general} / 专属 ${specific}。`);
     }
 
-    // 3. 检查余额
-    if (currentGeneral < actualAmount) {
-      return ui.notifications.warn(`通用修为不足！你只有 ${currentGeneral} 点，需要 ${actualAmount} 点。`);
+    // 重新计算实际投入总额
+    const finalTotal = general + specific;
+
+    // === 3. 余额检查 (Balance Check) ===
+    const specificKey = this._getSpecificPoolKey();
+    const actorGeneral = this.actor.system.cultivation.general;
+    const actorSpecific = this.actor.system.cultivation[specificKey] || 0;
+
+    if (actorGeneral < general) {
+      return ui.notifications.warn(`通用修为不足！需要 ${general}，拥有 ${actorGeneral}。`);
+    }
+    if (actorSpecific < specific) {
+      return ui.notifications.warn(`专属修为不足！需要 ${specific}，拥有 ${actorSpecific}。`);
     }
 
-    // 4. 执行事务 (Transaction-like)
-    // 使用 Promise.all 同时发送请求，性能更好
+    // === 4. 执行更新 ===
+    // 更新成分池 (Breakdown)
+    const currentBreakdown = this.system.sourceBreakdown || { general: 0, specific: 0 };
+    const newBreakdown = {
+      general: currentBreakdown.general + general,
+      specific: currentBreakdown.specific + specific
+    };
+
+    const actorUpdates = {
+      "system.cultivation.general": actorGeneral - general
+    };
+    // 只有当有专属消耗时才更新专属字段
+    if (specific > 0) {
+      actorUpdates[`system.cultivation.${specificKey}`] = actorSpecific - specific;
+    }
+
     await Promise.all([
-      this.actor.update({ "system.cultivation.general": currentGeneral - actualAmount }),
-      this.update({ "system.xpInvested": currentInvested + actualAmount })
+      this.actor.update(actorUpdates),
+      this.update({
+        "system.xpInvested": currentInvested + finalTotal,
+        "system.sourceBreakdown": newBreakdown
+      })
     ]);
 
-    ui.notifications.info(`${this.name} 修为增加 ${actualAmount}。`);
+    ui.notifications.info(`${this.name} 修为增加 ${finalTotal} (通用:${general}, 专属:${specific})。`);
   }
 
   /**
    * 内功回退：回收修为
-   * @param {Number} amount - 尝试回收的数量
+   * 策略：优先退还通用修为 (LIFO)
    */
-  async refundNeigong(amount) {
+  async refundNeigong(amountOrAllocation) {
     if (this.type !== "neigong") return;
     if (!this.actor) return;
 
-    amount = parseInt(amount);
-    const currentInvested = this.system.xpInvested;
+    // === 1. 参数归一化 ===
+    let refundGeneral = 0;
+    let refundSpecific = 0;
+    let totalRefund = 0;
 
-    if (isNaN(amount) || amount <= 0) return ui.notifications.warn("请输入有效数字。");
-    if (currentInvested <= 0) return ui.notifications.warn("尚未投入修为，无法散功。");
+    // 获取 Item 内部当前的构成
+    const breakdown = this.system.sourceBreakdown || { general: 0, specific: 0 };
+    // A. 自动模式
+    if (typeof amountOrAllocation === "number" || typeof amountOrAllocation === "string") {
+      totalRefund = parseInt(amountOrAllocation);
+      if (isNaN(totalRefund) || totalRefund <= 0) return ui.notifications.warn("请输入有效数字。");
 
-    // 钳制：不能取出超过已投入的量
-    let actualAmount = Math.min(amount, currentInvested);
+      // --- 核心逻辑：优先退通用 ---
+      // 假设要退 100。Item 里有 通用80，专属50。
+      // general = min(100, 80) = 80
+      // specific = 100 - 80 = 20
+      refundGeneral = Math.min(totalRefund, breakdown.general);
+      refundSpecific = totalRefund - refundGeneral;
+
+      // 安全检查：如果 item 里没那么多专属
+      if (refundSpecific > breakdown.specific) {
+        refundSpecific = breakdown.specific;
+        totalRefund = refundGeneral + refundSpecific; // 调整总数
+      }
+    }
+    // B. 手动模式
+    else {
+      refundGeneral = parseInt(amountOrAllocation.general) || 0;
+      refundSpecific = parseInt(amountOrAllocation.specific) || 0;
+      totalRefund = refundGeneral + refundSpecific;
+
+      // 存量检查
+      if (refundGeneral > breakdown.general) return ui.notifications.warn("通用存量不足");
+      if (refundSpecific > breakdown.specific) return ui.notifications.warn("专属存量不足");
+    }
+
+    // === 2. 执行更新 ===
+    const specificKey = this._getSpecificPoolKey();
+    const actorUpdates = {
+      "system.cultivation.general": this.actor.system.cultivation.general + refundGeneral
+    };
+    if (refundSpecific > 0) {
+      // 退回到对应的专属池
+      const currentActorSpecific = this.actor.system.cultivation[specificKey] || 0;
+      actorUpdates[`system.cultivation.${specificKey}`] = currentActorSpecific + refundSpecific;
+    }
+
+    const newBreakdown = {
+      general: breakdown.general - refundGeneral,
+      specific: breakdown.specific - refundSpecific
+    };
 
     // 使用 Promise.all 同时发送请求，性能更好
     await Promise.all([
-      this.actor.update({ "system.cultivation.general": this.actor.system.cultivation.general + actualAmount }),
-      this.update({ "system.xpInvested": currentInvested - actualAmount })
+      this.actor.update(actorUpdates),
+      this.update({
+        "system.xpInvested": this.system.xpInvested - totalRefund,
+        "system.sourceBreakdown": newBreakdown
+      })
     ]);
 
-    ui.notifications.info(`${this.name} 回退成功，返还 ${actualAmount} 点修为。`);
+    ui.notifications.info(`${this.name} 回退成功，返还 ${totalRefund} 点修为。(通:${refundGeneral}/专:${refundSpecific})`);
   }
 
   /**
    * 招式修炼
-   * @param {String} moveId - 招式的唯一 ID
-   * @param {Number} amount - 投入数量
+   * @param {String} moveId - 招式 ID
+   * @param {Number|Object} amountOrAllocation - 数字(自动) 或 对象(手动 {general, specific})
    */
-  async investMove(moveId, amount) {
+  async investMove(moveId, amountOrAllocation) {
     if (this.type !== "wuxue") return;
-    if (!this.actor) return;
+    if (!this.actor) return ui.notifications.warn("物品不在角色身上。");
 
-    amount = parseInt(amount);
-    if (isNaN(amount) || amount <= 0) return ui.notifications.warn("请输入有效数字。");
-
-    // 1. 查找招式
+    // === 1. 准备数据 ===
     // 必须使用 toObject 获取纯数据副本，因为我们要修改数组内部
     const itemData = this.system.toObject();
     const moveIndex = itemData.moves.findIndex(m => m.id === moveId);
 
     if (moveIndex === -1) return ui.notifications.error("未找到指定招式。");
 
-    const move = this.system.moves[moveIndex]; // 注意：这里读取的是 Derived Data (为了获取 progress.max)
-    const maxXP = move.progress.absoluteMax;   // 绝对上限
-    const currentInvested = move.xpInvested;
+    // moveDerived: 用于读取计算后的数据 (如 absoluteMax)
+    // targetMove: 用于写入数据 (Source Data)
+    const moveDerived = this.system.moves[moveIndex];
+    const targetMove = itemData.moves[moveIndex];
 
-    // 2. 溢出钳制
+    // === 2. 参数归一化 ===
+    let general = 0;
+    let specific = 0;
+    let totalTarget = 0;
+
+    // A. 自动模式
+    if (typeof amountOrAllocation === "number" || typeof amountOrAllocation === "string") {
+      totalTarget = parseInt(amountOrAllocation);
+      if (isNaN(totalTarget) || totalTarget <= 0) return ui.notifications.warn("无效数字");
+
+      // --- 核心逻辑：自动分配 (优先扣专属) ---
+      const specificKey = this._getSpecificPoolKey(); // "wuxue"
+      const actorSpecificBalance = this.actor.system.cultivation[specificKey] || 0;
+
+      specific = Math.min(totalTarget, actorSpecificBalance);
+      general = totalTarget - specific;
+    }
+    // B. 手动模式
+    else {
+      general = parseInt(amountOrAllocation.general) || 0;
+      specific = parseInt(amountOrAllocation.specific) || 0;
+      totalTarget = general + specific;
+    }
+    if (totalTarget <= 0) return ui.notifications.warn("请输入有效的投入数量。");
+
+
+    // === 3. 上限检查与溢出钳制 (Clamping) ===
+    const maxXP = moveDerived.progress.absoluteMax;
+    const currentInvested = targetMove.xpInvested || 0;
+
     if (currentInvested >= maxXP) return ui.notifications.warn("该招式已修至化境。");
 
     const needed = maxXP - currentInvested;
-    let actualAmount = amount;
-    if (amount > needed) {
-      actualAmount = needed;
-      ui.notifications.info(`投入调整为 ${actualAmount} 点。`);
+
+    // 溢出策略：优先保留专属，削减通用
+    if (totalTarget > needed) {
+      const overflow = totalTarget - needed;
+
+      if (general >= overflow) {
+        general -= overflow;
+      } else {
+        const remainder = overflow - general;
+        general = 0;
+        specific -= remainder;
+      }
+      ui.notifications.info(`投入溢出，已自动调整为：通用 ${general} / 专属 ${specific}。`);
     }
 
-    // 3. 余额检查
-    const currentGeneral = this.actor.system.cultivation.general;
-    if (currentGeneral < actualAmount) {
-      return ui.notifications.warn(`通用修为不足！需要 ${actualAmount}。`);
+    const finalTotal = general + specific;
+
+    // === 4. 余额检查 ===
+    const specificKey = this._getSpecificPoolKey();
+    const actorGeneral = this.actor.system.cultivation.general;
+    const actorSpecific = this.actor.system.cultivation[specificKey] || 0;
+
+    if (actorGeneral < general) return ui.notifications.warn(`通用修为不足！需要 ${general}`);
+    if (actorSpecific < specific) return ui.notifications.warn(`专属修为不足！需要 ${specific}`);
+
+    // === 5. 执行更新 ===
+    // 更新目标招式的数据
+    targetMove.xpInvested = currentInvested + finalTotal;
+
+    // 初始化/更新成分池
+    if (!targetMove.sourceBreakdown) targetMove.sourceBreakdown = { general: 0, specific: 0 };
+    targetMove.sourceBreakdown.general += general;
+    targetMove.sourceBreakdown.specific += specific;
+
+    // 准备 Actor 更新数据
+    const actorUpdates = {
+      "system.cultivation.general": actorGeneral - general
+    };
+    if (specific > 0) {
+      actorUpdates[`system.cultivation.${specificKey}`] = actorSpecific - specific;
     }
 
-    // 4. 执行更新
-    // 修改数组副本中的数据
-    itemData.moves[moveIndex].xpInvested += actualAmount;
-
-    // 使用 Promise.all 同时发送请求，性能更好
+    // 并发提交
     await Promise.all([
-      this.actor.update({ "system.cultivation.general": currentGeneral - actualAmount }),
-      this.update({ "system.moves": itemData.moves })
+      this.actor.update(actorUpdates),
+      this.update({ "system.moves": itemData.moves }) // 全量更新 moves 数组
     ]);
 
-    ui.notifications.info(`${move.name} 获得 ${actualAmount} 点修为！`);
+    ui.notifications.info(`${moveDerived.name} 获得 ${finalTotal} 点修为 (通:${general}/专:${specific})。`);
   }
 
   /**
    * 招式回退
    * @param {String} moveId - 招式 ID
-   * @param {Number} amount - 回收数量
+   * @param {Number|Object} amountOrAllocation - 回收数量或分配对象
    */
-  async refundMove(moveId, amount) {
+  async refundMove(moveId, amountOrAllocation) {
     if (this.type !== "wuxue") return;
+    if (!this.actor) return;
 
-    amount = parseInt(amount);
-    if (isNaN(amount) || amount <= 0) return;
-
+    // === 1. 获取数据 ===
     const itemData = this.system.toObject();
     const moveIndex = itemData.moves.findIndex(m => m.id === moveId);
     if (moveIndex === -1) return;
 
-    const currentInvested = itemData.moves[moveIndex].xpInvested; // 读取保存的数据即可
-    if (currentInvested <= 0) return ui.notifications.warn("无修为可退。");
+    const targetMove = itemData.moves[moveIndex];
+    // 读取当前存量 (Component Check)
+    const breakdown = targetMove.sourceBreakdown || { general: 0, specific: 0 };
 
-    let actualAmount = Math.min(amount, currentInvested);
+    // === 2. 参数归一化 ===
+    let refundGeneral = 0;
+    let refundSpecific = 0;
+    let totalRefund = 0;
 
-    itemData.moves[moveIndex].xpInvested -= actualAmount;
-    // 使用 Promise.all 同时发送请求，性能更好
+    // A. 自动模式
+    if (typeof amountOrAllocation === "number" || typeof amountOrAllocation === "string") {
+        totalRefund = parseInt(amountOrAllocation);
+        if (isNaN(totalRefund) || totalRefund <= 0) return ui.notifications.warn("请输入有效数字。");
+
+        // --- 核心逻辑：优先退通用 (LIFO) ---
+        refundGeneral = Math.min(totalRefund, breakdown.general);
+        refundSpecific = totalRefund - refundGeneral;
+
+        if (refundSpecific > breakdown.specific) {
+            refundSpecific = breakdown.specific;
+            totalRefund = refundGeneral + refundSpecific;
+        }
+    }
+    // B. 手动模式
+    else {
+        refundGeneral = parseInt(amountOrAllocation.general) || 0;
+        refundSpecific = parseInt(amountOrAllocation.specific) || 0;
+        totalRefund = refundGeneral + refundSpecific;
+
+        if (refundGeneral > breakdown.general) return ui.notifications.warn("通用修为存量不足");
+        if (refundSpecific > breakdown.specific) return ui.notifications.warn("专属修为存量不足");
+    }
+
+    if (totalRefund <= 0) return;
+
+    // === 3. 执行更新 ===
+    // 扣除招式内数据
+    targetMove.xpInvested -= totalRefund;
+    targetMove.sourceBreakdown.general = breakdown.general - refundGeneral;
+    targetMove.sourceBreakdown.specific = breakdown.specific - refundSpecific;
+
+    // 准备 Actor 返还数据
+    const specificKey = this._getSpecificPoolKey();
+    const actorUpdates = {
+        "system.cultivation.general": this.actor.system.cultivation.general + refundGeneral
+    };
+    if (refundSpecific > 0) {
+        const currentActorSpecific = this.actor.system.cultivation[specificKey] || 0;
+        actorUpdates[`system.cultivation.${specificKey}`] = currentActorSpecific + refundSpecific;
+    }
+
     await Promise.all([
-      this.actor.update({ "system.cultivation.general": this.actor.system.cultivation.general + actualAmount }),
-      this.update({ "system.moves": itemData.moves })
+        this.actor.update(actorUpdates),
+        this.update({ "system.moves": itemData.moves })
     ]);
 
-    ui.notifications.info(`招式回退成功，返还 ${actualAmount} 点。`);
+    ui.notifications.info(`招式回退成功，返还 ${totalRefund} 点 (通:${refundGeneral}/专:${refundSpecific})。`);
   }
 
   /* -------------------------------------------- */
@@ -664,7 +877,7 @@ export class XJZLItem extends Item {
         try {
           // 构造沙盒
           // 获取该 Item 的 rollData (通常包含 actor.system 的简化版)
-          const rollData = this.getRollData(); 
+          const rollData = this.getRollData();
           const fn = new Function("actor", "S", "out", "t", "targets", "item", "rollData", move.script);
           fn(actor, actor.system, out, primaryTarget, targetsArray, this, rollData);
 

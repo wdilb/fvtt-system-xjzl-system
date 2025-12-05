@@ -226,35 +226,143 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     /* -------------------------------------------- */
 
     /**
-     * 通用数值输入弹窗
-     * @param {Object} options
-     * @returns {Promise<number|null>} 返回输入的数字，取消返回 null
+     * 核心交互：通用修炼/散功弹窗构建器
+     * @param {Object} params - 配置参数
      */
-    async _promptForValue({ title, icon = "fas fa-edit", label = "数量", value = 0, hint = "" } = {}) {
-        const content = `
-        <div style="text-align:center; padding: 10px;">
-            ${hint ? `<p style="margin-bottom:10px; font-size:1.1em;">${hint}</p>` : ""}
-            <div style="display:flex; flex-direction:column; gap:5px;">
-                <label style="font-weight:bold;">${label}</label>
-                <input name="amount" type="number" value="${value}" autofocus 
-                       style="text-align:center; font-size:1.5em; width:100%; color:black; background:rgba(255,255,255,0.9); border:1px solid #333;"/>
-            </div>
-        </div>`;
+    async _promptInvest({
+        title,
+        mode = "invest",
+        currentInvested,
+        maxXP,
+        poolGeneral = 0,
+        poolSpecific = 0,
+        breakdown = { general: 0, specific: 0 }
+    }) {
+        const isInvest = mode === "invest";
+        const targetLabel = isInvest ? "距离圆满还需" : "可取回总额";
+        const targetValue = isInvest ? (maxXP - currentInvested) : currentInvested;
+        const confirmIcon = isInvest ? "fas fa-arrow-up" : "fas fa-undo";
+        const confirmLabel = isInvest ? "投入" : "取回";
 
-        const result = await foundry.applications.api.DialogV2.prompt({
-            window: { title, icon },
+        const inputStyle = "width:100%; font-size:1.5em; color:white; background:rgba(0,0,0,0.5); border:1px solid var(--xjzl-gold); text-align:center; border-radius:4px;";
+        const labelStyle = "font-weight:bold; color:#ccc; margin-bottom:5px; display:block;";
+        const infoStyle = "font-size:0.9em; color:#aaa; display:flex; justify-content:space-around; background:rgba(255,255,255,0.05); padding:8px; border-radius:4px; border:1px solid #444;";
+
+        const content = `
+        <div class="xjzl-invest-dialog" style="padding: 5px;">
+            <div style="text-align:center; margin-bottom:15px; border-bottom: 1px solid #444; padding-bottom: 10px;">
+                <p style="font-size:1.2em; margin-bottom:8px; color:#fff;">${targetLabel}: <b style="color:#ff4444; font-size:1.4em;">${targetValue}</b></p>
+                
+                <div style="${infoStyle}">
+                    ${isInvest ? `
+                        <span>通用池: <b style="color:white;">${poolGeneral}</b></span>
+                        <span>专属池: <b style="color:var(--xjzl-gold);">${poolSpecific}</b></span>
+                    ` : `
+                        <span>含通用: <b style="color:white;">${breakdown.general}</b></span>
+                        <span>含专属: <b style="color:var(--xjzl-gold);">${breakdown.specific}</b></span>
+                    `}
+                </div>
+            </div>
+
+            <form>
+                <div class="form-group" style="margin-bottom:15px; justify-content:center; gap:20px; color:#ddd;">
+                    <label style="font-weight:bold; color:#fff;">分配模式:</label>
+                    <div class="radio-group" style="display:flex; gap:15px;">
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                            <input type="radio" name="mode" value="auto" checked> 自动
+                        </label>
+                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
+                            <input type="radio" name="mode" value="manual"> 手动
+                        </label>
+                    </div>
+                </div>
+
+                <div class="auto-mode-container">
+                    <label style="${labelStyle}">
+                        ${isInvest ? "投入总数 (优先扣除专属)" : "取回总数 (优先取回通用)"}
+                    </label>
+                    <input type="number" name="totalAmount" value="100" autofocus class="xjzl-input" style="${inputStyle}"/>
+                </div>
+
+                <div class="manual-mode-container" style="display:none;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <div>
+                            <label style="${labelStyle}">通用部分</label>
+                            <input type="number" name="manualGeneral" value="0" class="xjzl-input" style="${inputStyle} font-size:1.2em;"/>
+                        </div>
+                        <div>
+                            <label style="${labelStyle} color:var(--xjzl-gold);">专属部分</label>
+                            <input type="number" name="manualSpecific" value="0" class="xjzl-input" style="${inputStyle} font-size:1.2em; border-color:var(--xjzl-gold);"/>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+      `;
+
+        return foundry.applications.api.DialogV2.prompt({
+            window: { title: title, icon: confirmIcon },
             content: content,
+
+            // 参数只有一个 event，DOM 元素是 event.target
+            render: (event) => {
+                const html = event.target.element; // 获取弹窗的根 DOM 元素
+
+                const autoDiv = html.querySelector(".auto-mode-container");
+                const manualDiv = html.querySelector(".manual-mode-container");
+                const radios = html.querySelectorAll('input[name="mode"]');
+
+                // 定义切换逻辑
+                const toggleMode = () => {
+                    // 注意：这里需要再次在 html 里查找选中的元素
+                    const selectedInput = html.querySelector('input[name="mode"]:checked');
+                    if (!selectedInput) return;
+
+                    const selected = selectedInput.value;
+
+                    if (selected === "auto") {
+                        autoDiv.style.display = "block";
+                        manualDiv.style.display = "none";
+                        autoDiv.querySelector("input")?.focus();
+                    } else {
+                        autoDiv.style.display = "none";
+                        manualDiv.style.display = "block"; // 或 grid
+                        manualDiv.querySelector("input")?.focus();
+                    }
+                };
+
+                // 绑定监听
+                radios.forEach(radio => {
+                    radio.addEventListener("change", toggleMode);
+                });
+
+                // 初始化
+                toggleMode();
+            },
+
             ok: {
-                label: "确定",
-                icon: "fas fa-check",
-                // 直接通过 Form Data 获取，不再依赖 ID
-                callback: (event, button) => new FormData(button.form).get("amount")
+                label: confirmLabel,
+                icon: confirmIcon,
+                callback: (event, button) => {
+                    const form = button.closest(".window-content")?.querySelector("form") || button.form;
+                    if (!form) return null;
+
+                    const formData = new FormData(form);
+                    const inputMode = formData.get("mode");
+
+                    if (inputMode === "auto") {
+                        const val = parseInt(formData.get("totalAmount"));
+                        return isNaN(val) ? null : val;
+                    } else {
+                        const g = parseInt(formData.get("manualGeneral")) || 0;
+                        const s = parseInt(formData.get("manualSpecific")) || 0;
+                        if (g === 0 && s === 0) return null;
+                        return { general: g, specific: s };
+                    }
+                }
             },
             rejectClose: false
         });
-
-        if (!result) return null;
-        return parseInt(result);
     }
 
     /* -------------------------------------------- */
@@ -336,40 +444,51 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         if (item) item.use();
     }
 
-    // --- 修炼系统 (使用 _promptForValue 简化) ---
+    // --- 修炼系统 (使用 _promptInvest 简化) ---
 
+    /**
+   * 内功修炼
+   */
     async _onInvestXP(event, target) {
         const item = this.document.items.get(target.dataset.itemId);
         if (!item) return;
-        const needed = item.system.progressData.absoluteMax - item.system.xpInvested;
 
-        if (needed <= 0) return ui.notifications.warn("已圆满。");
+        // 准备参数
+        const maxXP = item.system.progressData.absoluteMax;
 
-        const amount = await this._promptForValue({
+        const result = await this._promptInvest({
             title: `修炼: ${item.name}`,
-            icon: "fas fa-arrow-up",
-            value: 100,
-            hint: `距离圆满还需: <b>${needed}</b>`
+            mode: "invest",
+            currentInvested: item.system.xpInvested,
+            maxXP: maxXP,
+            poolGeneral: this.document.system.cultivation.general,
+            poolSpecific: this.document.system.cultivation.neigong || 0
         });
 
-        if (amount) await item.investNeigong(amount);
+        if (result !== null) await item.investNeigong(result);
     }
 
+    /**
+     * 内功散功
+     */
     async _onRefundXP(event, target) {
         const item = this.document.items.get(target.dataset.itemId);
         if (!item) return;
 
-        const amount = await this._promptForValue({
-            title: `回退: ${item.name}`,
-            icon: "fas fa-undo",
-            value: item.system.xpInvested,
-            hint: `<span style="color:#ff4444;">⚠️ 返还修为并降低境界</span><br>当前投入: <b>${item.system.xpInvested}</b>`,
-            label: "回退数量"
+        const result = await this._promptInvest({
+            title: `散功: ${item.name}`,
+            mode: "refund",
+            currentInvested: item.system.xpInvested,
+            // 散功不需要 maxXP，但需要 breakdown
+            breakdown: item.system.sourceBreakdown || { general: 0, specific: 0 }
         });
 
-        if (amount) await item.refundNeigong(amount);
+        if (result !== null) await item.refundNeigong(result);
     }
 
+    /**
+     * 招式修炼
+     */
     async _onInvestMoveXP(event, target) {
         const item = this.document.items.get(target.dataset.itemId);
         const moveId = target.dataset.moveId;
@@ -377,18 +496,22 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const move = item.system.moves.find(m => m.id === moveId);
         if (!move) return;
 
-        const needed = move.progress.max - move.progress.current;
-
-        const amount = await this._promptForValue({
+        // 注意：move.progress.absoluteMax 是我们在 DataModel 里算好的
+        const result = await this._promptInvest({
             title: `修炼招式: ${move.name}`,
-            icon: "fas fa-arrow-up",
-            value: needed,
-            hint: `本级还需: <b>${needed}</b>`
+            mode: "invest",
+            currentInvested: move.xpInvested,
+            maxXP: move.progress.absoluteMax,
+            poolGeneral: this.document.system.cultivation.general,
+            poolSpecific: this.document.system.cultivation.wuxue || 0
         });
 
-        if (amount) await item.investMove(moveId, amount);
+        if (result !== null) await item.investMove(move.id, result);
     }
 
+    /**
+     * 招式散功
+     */
     async _onRefundMoveXP(event, target) {
         const item = this.document.items.get(target.dataset.itemId);
         const moveId = target.dataset.moveId;
@@ -396,15 +519,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const move = item.system.moves.find(m => m.id === moveId);
         if (!move) return;
 
-        const amount = await this._promptForValue({
-            title: `回退: ${move.name}`,
-            icon: "fas fa-undo",
-            value: move.xpInvested,
-            hint: `可退还: <b>${move.xpInvested}</b>`,
-            label: "回退数量"
+        const result = await this._promptInvest({
+            title: `散功: ${move.name}`,
+            mode: "refund",
+            currentInvested: move.xpInvested,
+            breakdown: move.sourceBreakdown || { general: 0, specific: 0 }
         });
 
-        if (amount) await item.refundMove(moveId, amount);
+        if (result !== null) await item.refundMove(move.id, result);
     }
 
     // --- 其他 ---

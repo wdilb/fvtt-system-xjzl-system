@@ -2,6 +2,32 @@
  * 扩展核心 Actor 类
  */
 export class XJZLActor extends Actor {
+
+  /* -------------------------------------------- */
+  /*  生命周期钩子 (Lifecycle Hooks)              */
+  /* -------------------------------------------- */
+
+  /**
+   * 监控内嵌文档更新 (装备/内功/Buff 变动)
+   */
+  _onUpdateEmbeddedDocuments(embeddedName, documents, result, options, userId) {
+    super._onUpdateEmbeddedDocuments(embeddedName, documents, result, options, userId);
+    // 只由当前操作的用户执行，防止多客户端重复写入
+    if (userId !== game.user.id) return;
+
+    this._enforceResourceIntegrity();
+  }
+
+  /**
+   * 监控自身数据更新 (基础属性变动/升级)
+   */
+  _onUpdate(changed, options, userId) {
+    super._onUpdate(changed, options, userId);
+    if (userId !== game.user.id) return;
+
+    this._enforceResourceIntegrity();
+  }
+
   /**
    * 应用 Active Effects
    * 我们在这里拦截装备的特效。如果装备没穿上，就在内存里把特效“屏蔽”掉。
@@ -298,5 +324,38 @@ export class XJZLActor extends Actor {
     }
 
     return { valid: true };
+  }
+
+  /**
+   * 强制资源完整性检查 (HP & MP)
+   * 如果 数据库原值 > 当前计算出的上限，则执行截断写入
+   */
+  _enforceResourceIntegrity() {
+    // 1. 获取计算后的衍生数据 (包含最新的 max)
+    const res = this.system.resources;
+
+    // 2. 获取数据库里的原始数据 (Source Data)
+    // 使用 getProperty 安全读取，防止数据结构缺失报错
+    const sourceHP = foundry.utils.getProperty(this._source, "system.resources.hp.value") || 0;
+    const sourceMP = foundry.utils.getProperty(this._source, "system.resources.mp.value") || 0;
+
+    // 3. 准备更新对象
+    const updates = {};
+
+    // --- 检查 HP ---
+    if (sourceHP > res.hp.max) {
+      updates["system.resources.hp.value"] = res.hp.max;
+    }
+
+    // --- 检查 MP ---
+    if (sourceMP > res.mp.max) {
+      updates["system.resources.mp.value"] = res.mp.max;
+    }
+
+    // 4. 如果有需要更新的内容，一次性提交
+    if (!foundry.utils.isEmpty(updates)) {
+      this.update(updates);
+      // 可选：在这里加个 ui.notifications.info("境界跌落，气血/内力已流失...") 更有修仙味
+    }
   }
 }

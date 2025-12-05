@@ -29,20 +29,20 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       // 被动脚本 (Passive Script)
       // 这是一段 JS 代码，会在 Actor 计算数据时执行
       // 上下文变量: actor, item, system (actor.system)
-      script: new fields.StringField({ 
+      script: new fields.StringField({
         required: false,
         initial: "", // 默认值为空，确保不自动生效
-        label: "XJZL.Neigong.ScriptLabel", 
+        label: "XJZL.Neigong.ScriptLabel",
         hint: "XJZL.Neigong.ScriptHint"
       })
     }, { label: label });
 
     return {
       // === 1. 静态配置 (GM设定) ===
-      
+
       // 品阶: 1=人, 2=地, 3=天
       tier: new fields.NumberField({ required: true, initial: 1, choices: [1, 2, 3], label: "XJZL.Neigong.Tier" }),
-      
+
       // 内功属性: yin, yang, taiji
       element: new fields.StringField({ required: true, initial: "taiji", choices: ["yin", "yang", "taiji"], label: "XJZL.Neigong.Element" }),
 
@@ -53,7 +53,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
         stage2: makeStageSchema("XJZL.Neigong.Stage2"), // 小成
         stage3: makeStageSchema("XJZL.Neigong.Stage3"), // 圆满
       }),
-      
+
       // 圆满特效 (额外独立字段，仅圆满生效)
       masteryEffect: new fields.HTMLField({ label: "XJZL.Neigong.MasteryEffect" }),
       //圆满特效（实际生效部分）
@@ -63,13 +63,20 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
           value: new fields.NumberField({ required: true, initial: 0 }),
           label: new fields.StringField({ initial: "" })
         })
-      , { initial: [] }),
+        , { initial: [] }),
 
       // === 2. 动态数据 (玩家存档) ===
-      
+
       // 核心：已投入修为 (银行账户)
       xpInvested: new fields.NumberField({ required: true, min: 0, initial: 0, label: "XJZL.Neigong.XPInvested" }),
-      
+
+      // 修为来源成分记录
+      // 记录当前投入的总修为中，有多少来自通用，多少来自专属
+      sourceBreakdown: new fields.SchemaField({
+        general: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        specific: new fields.NumberField({ initial: 0, min: 0, integer: true })
+      }),
+
       // 状态：是否正在运行
       active: new fields.BooleanField({ initial: false, label: "XJZL.Neigong.Active" })
     };
@@ -85,7 +92,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     // 人级: 0(领) -> 1000(小) -> 3000(圆)
     // 地级: 1000(领) -> 4000(小) -> 10000(圆)
     // 天级: 2000(领) -> 12000(小) -> 30000(圆)
-    
+
     let thresholds = [0, 0, 0];
     if (this.tier === 1) thresholds = [0, 1000, 3000];
     else if (this.tier === 2) thresholds = [1000, 4000, 10000];
@@ -103,13 +110,13 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     if (this.xpInvested >= thresholds[0]) stage = 1;
     if (this.xpInvested >= thresholds[1]) stage = 2;
     if (this.xpInvested >= thresholds[2]) stage = 3;
-    
+
     this.stage = stage; // 存入内存
 
     // 3. 生成“当前生效数据” (Snapshot)
     // Actor 在计算属性时，直接读取 item.system.current.stats 即可，
     // 不需要 Actor 再写一遍判断逻辑。
-    
+
     this.current = {
       stats: { liliang: 0, shenfa: 0, tipo: 0, neixi: 0, shencai: 0 },
       effect: "",         // 常驻特效文本
@@ -126,9 +133,9 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       if (stageConfig) {
         this.current.stats = { ...stageConfig.stats };
         this.current.effect = stageConfig.effect;
-        this.current.script = stageConfig.script || ""; 
+        this.current.script = stageConfig.script || "";
       }
-      
+
       // 如果圆满，激活圆满特效
       if (stage === 3) {
         this.current.masteryEffect = this.masteryEffect;
@@ -148,12 +155,12 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       // 处于 Stage 1 或 Stage 2
       // 目标是下一级的门槛
       const nextThreshold = thresholds[stage]; // stage=1 -> thresholds[1] (1000)
-      const prevThreshold = thresholds[stage - 1] || 0; 
+      const prevThreshold = thresholds[stage - 1] || 0;
 
       // 相对数值
       this.progressData.max = nextThreshold - prevThreshold;
       this.progressData.current = this.xpInvested - prevThreshold;
-      
+
       // 百分比
       if (this.progressData.max > 0) {
         this.progressData.pct = Math.min(100, Math.floor((this.progressData.current / this.progressData.max) * 100));

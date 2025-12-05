@@ -62,6 +62,12 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       level: new fields.NumberField({ min: 1, initial: 1, label: "XJZL.Wuxue.Moves.Level" }),
       xpInvested: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Neigong.XPInvested" }),
 
+      // 招式修为成分
+      sourceBreakdown: new fields.SchemaField({
+        general: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+        specific: new fields.NumberField({ initial: 0, min: 0, integer: true })
+      }),
+
       // --- 5. 数值配置 ---
       calculation: makeCalculationSchema(),
 
