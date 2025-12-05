@@ -1,3 +1,5 @@
+import { XJZL } from "../config.mjs";
+const renderTemplate = foundry.applications.handlebars.renderTemplate;
 export class XJZLItem extends Item {
   /* -------------------------------------------- */
   /*  核心交互逻辑                                */
@@ -8,7 +10,7 @@ export class XJZLItem extends Item {
    * 外部调用 item.use() 即可，无需关心具体类型
    */
   async use() {
-    if (!this.actor) return ui.notifications.warn("...");
+    if (!this.actor) return ui.notifications.warn("该物品不在角色身上，无法使用。");
 
     // 1. 触发使用前钩子 (允许外部取消使用)
     if (Hooks.call("xjzl.preUseItem", this, this.actor) === false) return;
@@ -127,7 +129,7 @@ export class XJZLItem extends Item {
       scriptOutput: scriptOutput
     };
 
-    const content = await foundry.applications.handlebars.renderTemplate(
+    const content = await renderTemplate(
       "systems/xjzl-system/templates/chat/item-card.hbs",
       templateData
     );
@@ -184,7 +186,7 @@ export class XJZLItem extends Item {
     await this.actor.createEmbeddedDocuments("Item", [itemData]);
 
     // 4. 发送聊天卡片
-    const content = await foundry.applications.handlebars.renderTemplate(
+    const content = await renderTemplate(
       "systems/xjzl-system/templates/chat/item-card.hbs", {
       item: this,
       tags: ["秘籍", targetItem.type === "neigong" ? "内功" : "武学"],
@@ -206,6 +208,146 @@ export class XJZLItem extends Item {
         await this.delete();
       }
     }
+  }
+
+  /**
+   * 切换内功运行状态
+   */
+  async toggleNeigong() {
+    if (this.type !== "neigong") return ui.notifications.warn("只能运行内功。");
+    const actor = this.actor;
+    if (!actor) return ui.notifications.warn("该内功不在角色身上，无法运行。");
+
+    const isActive = this.system.active; // 当前状态
+    const targetState = !isActive;       // 目标状态 (取反)
+
+    // === 1. 准备 Item 的更新数据 (Batch Updates) ===
+    const itemUpdates = [];
+
+    // 如果是要开启新内功，需要先找到所有其他正在运行的内功，把它们关掉
+    if (targetState) {
+      // 遍历角色身上所有内功
+      for (const i of actor.itemTypes.neigong) {
+        // 排除自己，且只处理当前是 active 的
+        if (i.id !== this.id && i.system.active) {
+          itemUpdates.push({ 
+            _id: i.id, 
+            "system.active": false 
+          });
+        }
+      }
+    }
+
+    // 把自己状态的更新也放进这个数组，一起提交！
+    itemUpdates.push({
+      _id: this.id,
+      "system.active": targetState
+    });
+
+    // === 2. 执行数据库更新 ===
+    
+    // 2.1 批量更新所有涉及变动的 Item (关闭旧的 + 开启新的) -> 触发一次界面刷新
+    if (itemUpdates.length > 0) {
+      await actor.updateEmbeddedDocuments("Item", itemUpdates);
+    }
+
+    // 2.2 更新 Actor 自身的记录字段 -> 触发一次界面刷新
+    // 如果开启，记录 ID；如果关闭，清空记录
+    const newActiveId = targetState ? this.id : "";
+    
+    // 只有当 Actor 记录的数据和我们预期的不一致时才更新 (节省性能)
+    if (actor.system.martial.active_neigong !== newActiveId) {
+        await actor.update({ "system.martial.active_neigong": newActiveId });
+    }
+
+    // === 3. 提示信息 ===
+    if (targetState) {
+      ui.notifications.info(`${this.name} 开始运行。`);
+    } else {
+      ui.notifications.info(`${this.name} 停止运行。`);
+    }
+  }
+
+  /**
+   * 切换装备状态
+   * @param {String} [acupoint] - (仅奇珍) 指定镶嵌的穴位 Key
+   */
+  async toggleEquip(acupoint = null) {
+    const actor = this.actor;
+    if (!actor) return ui.notifications.warn("该物品不在角色身上，无法装备。");;
+
+    const isEquipping = !this.system.equipped; // 目标状态
+
+    // === 卸下逻辑 (简单) ===
+    if (!isEquipping) {
+      // 如果是奇珍，卸下时清空穴位记录
+      if (this.type === "qizhen") {
+        await this.update({ "system.equipped": false, "system.acupoint": "" });
+      } else {
+        await this.update({ "system.equipped": false });
+      }
+      return;
+    }
+
+    // === 装备逻辑 (复杂，含互斥) ===
+    const updates = [];
+
+    // 1. 武器 (互斥)
+    if (this.type === "weapon") {
+      // 找到所有已装备的武器
+      const equippedWeapons = actor.itemTypes.weapon.filter(i => i.system.equipped);
+      // 将它们全部加入卸下队列
+      equippedWeapons.forEach(w => updates.push({ _id: w.id, "system.equipped": false }));
+    }
+
+    // 2. 防具 (同部位互斥，戒指限2，饰品限6)
+    else if (this.type === "armor") {
+      const type = this.system.type;
+      const limit = (type === "ring") ? 2 : 1;
+      // 找到同部位已装备的
+      const equippedArmor = actor.itemTypes.armor.filter(i => i.system.equipped && i.system.type === type);
+
+      // 如果满了，卸下最早的一个 (FIFO)
+      if (equippedArmor.length >= limit) {
+        // 按 sort 排序或直接取第一个
+        // 如果戒指有2个，这里会卸下第1个，保留第2个，腾出位置给新戒指
+        // 如果想做得更细(比如弹窗让用户选卸下哪个)，逻辑会复杂很多，这里采用自动替换
+        updates.push({ _id: equippedArmor[0].id, "system.equipped": false });
+      }
+    }
+
+    // 3. 奇珍 (穴位校验)
+    else if (this.type === "qizhen") {
+      // 必须传入穴位
+      if (!acupoint) {
+        return ui.notifications.error("装备奇珍必须指定穴位。");
+      }
+      // 增加校验逻辑：防止宏强行插入已占用的穴位
+      const available = this.actor.getAvailableAcupoints();
+      if (!available.find(a => a.key === acupoint)) {
+            return ui.notifications.error("该穴位未打通或已被占用！");
+      }
+      // 这里进行最终的逻辑校验 (Sheet层可能已经校验过 UI，这里做数据兜底)
+      // 比如检查穴位是否打通、是否被占用等，逻辑同 Sheet，建议封装 helper
+      // 为简化，这里假设传入的 acupoint 是合法的，直接写入
+      await this.update({
+        "system.equipped": true,
+        "system.acupoint": acupoint
+      });
+      ui.notifications.info(`已将 ${this.name} 储存至 ${game.i18n.localize(XJZL.acupoints[acupoint] || acupoint)}`);
+      return; // 奇珍已独立处理，直接返回
+    }
+    // 把“自己”的更新也加入到 updates 数组中！
+    // 这样 卸下旧的 + 装备新的 = 1 次数据库操作 = 1 次界面刷新
+    // 注意：奇珍已经在前面 return 了，所以走到这里的一定是 weapon 或 armor
+    updates.push({
+      _id: this.id,
+      "system.equipped": true
+    });
+
+    // 统一提交
+    await actor.updateEmbeddedDocuments("Item", updates);
+    ui.notifications.info(`已装备 ${this.name}`);
   }
 
   // 将来 roll() 也会写在这里

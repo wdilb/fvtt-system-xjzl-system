@@ -203,4 +203,32 @@ export class XJZLActor extends Actor {
       );
     }
   }
+
+  /**
+   * 辅助方法：获取当前角色可用的穴位列表
+   */
+  getAvailableAcupoints() {
+    const occupiedPoints = new Set();
+    this.itemTypes.qizhen.forEach(i => {
+      if (i.system.equipped && i.system.acupoint) {
+        occupiedPoints.add(i.system.acupoint);
+      }
+    });
+
+    const available = [];
+    const standardJingmai = this.system.jingmai.standard;
+
+    for (const [key, isOpen] of Object.entries(standardJingmai)) {
+      // 这里记得要把 XJZL 配置对象引进来，或者通过 CONFIG.XJZL 访问
+      const labelKey = CONFIG.XJZL.acupoints[key] || key;
+
+      if (isOpen && !occupiedPoints.has(key)) {
+        available.push({
+          key: key,
+          label: game.i18n.localize(labelKey)
+        });
+      }
+    }
+    return available;
+  }
 }

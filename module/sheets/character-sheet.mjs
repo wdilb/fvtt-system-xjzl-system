@@ -477,25 +477,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             await item.delete();
         }
     }
-
+    //激活内功
     async _onToggleNeigong(event, target) {
         const itemId = target.dataset.itemId;
         const item = this.document.items.get(itemId);
-        if (!item) return;
-        const wasActive = item.system.active;
-        if (!wasActive) {
-            const updates = [];
-            for (const i of this.document.itemTypes.neigong) {
-                if (i.id !== itemId && i.system.active) {
-                    updates.push({ _id: i.id, "system.active": false });
-                }
-            }
-            if (updates.length) await this.document.updateEmbeddedDocuments("Item", updates);
-            await this.document.update({ "system.martial.active_neigong": itemId });
-        } else {
-            await this.document.update({ "system.martial.active_neigong": "" });
-        }
-        await item.update({ "system.active": !wasActive });
+        if (item) item.toggleNeigong();
     }
 
     /**
@@ -765,134 +751,52 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const item = this.document.items.get(itemId);
         if (!item) return;
 
-        // A. 如果当前是“已装备”，则直接卸下
+        // 如果是卸下，不需要弹窗，直接调用
         if (item.system.equipped) {
-            await item.update({ "system.equipped": false });
-            return;
+            return item.toggleEquip();
         }
 
-        // B. 如果当前是“未装备”，则尝试装备 (执行互斥检查)
-        const actor = this.document;
-        const updates = []; // 待执行的批量更新操作 (用于卸下冲突装备)
-
-        // --- 逻辑 1: 武器 (只能装一把) ---
-        if (item.type === "weapon") {
-            // 找到所有已装备的武器
-            const equippedWeapons = actor.itemTypes.weapon.filter(i => i.system.equipped);
-            // 将它们全部加入卸下队列
-            equippedWeapons.forEach(w => {
-                updates.push({ _id: w.id, "system.equipped": false });
-            });
-        }
-
-        // --- 逻辑 2: 防具 (同部位互斥，戒指限2) ---
-        else if (item.type === "armor") {
-            const type = item.system.type;
-            const limit = (type === "ring") ? 2 : 1; // 戒指上限2，其他1
-
-            // 找到同部位已装备的
-            const equippedArmor = actor.itemTypes.armor.filter(i => i.system.equipped && i.system.type === type);
-
-            // 如果已满
-            if (equippedArmor.length >= limit) {
-                // 策略：卸下最早的一个 (数组第一个)
-                // 如果戒指有2个，这里会卸下第1个，保留第2个，腾出位置给新戒指
-                // 如果想做得更细(比如弹窗让用户选卸下哪个)，逻辑会复杂很多，这里采用自动替换
-                updates.push({ _id: equippedArmor[0].id, "system.equipped": false });
-            }
-        }
-
-        // --- 逻辑 3: 奇珍 (穴位选择与判定) ---
-        else if (item.type === "qizhen") {
-            // 1. 获取所有可用的穴位
-            // 条件：(1) 经脉已打通 (2) 没有被其他已装备的奇珍占用
-            const availableSlots = this._getAvailableAcupoints(actor);
+        // 如果是装备奇珍，需要弹窗选择穴位
+        if (item.type === "qizhen") {
+            // 获取可用穴位
+            const availableSlots = this.actor.getAvailableAcupoints();
 
             if (availableSlots.length === 0) {
                 return ui.notifications.warn("没有可用的已打通穴位，或穴位已满。");
             }
 
-            // 2. 弹窗让玩家选择
             const content = `
             <div class="form-group">
-                <label>选择镶嵌穴位:</label>
+                <label>选择放入穴位:</label>
                 <div class="form-fields">
-                    <!-- 【修复】增加 style="width: 100%; min-width: 250px;" -->
                     <select name="acupoint" style="width: 100%; min-width: 250px; height: 30px; font-size: 1.1em;">
                         ${availableSlots.map(slot => `<option value="${slot.key}">${slot.label}</option>`).join("")}
                     </select>
                 </div>
-                <p class="notes">只能镶嵌在已打通且为空的经脉穴位中。</p>
+                <p class="notes">只能放入到已打通且为空的经脉穴位中。</p>
             </div>
           `;
 
-            const result = await foundry.applications.api.DialogV2.prompt({
+            const acupoint = await foundry.applications.api.DialogV2.prompt({
                 window: { title: `装备: ${item.name}`, icon: "fas fa-gem" },
                 content: content,
                 ok: {
-                    label: "储存",
+                    label: "放入",
+                    // 使用原生 FormData 获取
                     callback: (event, button) => new FormData(button.form).get("acupoint")
                 }
             });
 
-            if (!result) return; // 用户取消
-
-            // 奇珍特殊处理：装备时需要写入选定的 acupoint
-            // 这里我们直接执行 update，不走下面的通用流程了
-            await item.update({
-                "system.equipped": true,
-                "system.acupoint": result
-            });
-            ui.notifications.info(`已将 ${item.name} 储存至 ${game.i18n.localize(XJZL.acupoints[result])}`);
-            return;
+            if (acupoint) {
+                // 将选中的穴位传给 Item 方法
+                item.toggleEquip(acupoint);
+            }
+        } else {
+            // 普通装备，直接调用
+            item.toggleEquip();
         }
-
-        // --- 执行通用更新 (武器/防具) ---
-        // 1. 先执行卸下旧装备 (如果有)
-        if (updates.length > 0) {
-            await actor.updateEmbeddedDocuments("Item", updates);
-        }
-
-        // 2. 再装备新物品
-        await item.update({ "system.equipped": true });
-
-        ui.notifications.info(`已装备 ${item.name}`);
     }
 
-    /**
-     * 辅助方法：获取当前角色可用的穴位列表
-     */
-    _getAvailableAcupoints(actor) {
-        // 1. 统计已被占用的穴位
-        const occupiedPoints = new Set();
-        actor.itemTypes.qizhen.forEach(i => {
-            if (i.system.equipped && i.system.acupoint) {
-                occupiedPoints.add(i.system.acupoint);
-            }
-        });
-
-        const available = [];
-        const standardJingmai = actor.system.jingmai.standard;
-
-        // 2. 遍历角色的十二正经数据
-        for (const [key, isOpen] of Object.entries(standardJingmai)) {
-
-            // 条件 A: 穴位已打通 (isOpen === true)
-            // 条件 B: 穴位未被占用 (!has)
-            if (isOpen && !occupiedPoints.has(key)) {
-
-                // 从配置中获取中文 Label (如果配置里没有，这就显示 key)
-                const labelKey = XJZL.acupoints[key] || key;
-
-                available.push({
-                    key: key,
-                    label: game.i18n.localize(labelKey)
-                });
-            }
-        }
-
-        return available;
-    }
 
     /**
      * 统一的物品使用入口
