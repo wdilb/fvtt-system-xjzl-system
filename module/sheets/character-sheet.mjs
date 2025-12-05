@@ -895,173 +895,19 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-    * 使用消耗品
-    * 逻辑：扣除数量 -> 恢复资源 -> 应用互斥特效 -> 执行脚本
-    */
+     * 统一的物品使用入口
+     * Sheet 只负责 UI 绑定，逻辑全交给 Item
+     */
     async _onUseConsumable(event, target) {
         const itemId = target.dataset.itemId;
         const item = this.document.items.get(itemId);
-        if (!item || item.system.quantity <= 0) return;
-
-        const actor = this.document;
-        const config = item.system;
-        const tags = []; // 用于聊天卡片显示的标签
-        const resultLines = []; // 结果文本
-
-        // 0. 预判是否会销毁
-        const willDestroy = item.system.quantity <= 1;
-
-        // 1. 恢复资源 (HP/MP/Rage)
-        const updates = {};
-        if (config.recovery) {
-            for (const [key, val] of Object.entries(config.recovery)) {
-                if (val && val !== 0) {
-                    // 安全读取，防止 null
-                    const current = actor.system.resources?.[key]?.value || 0;
-                    const max = actor.system.resources?.[key]?.max || 999;
-                    const newVal = Math.min(max, current + val);
-
-                    if (newVal !== current) {
-                        updates[`system.resources.${key}.value`] = newVal;
-                        // 本地化 Label 查找 (简单的映射)
-                        const labelMap = { hp: "气血", mp: "内力", rage: "怒气" };
-                        resultLines.push(`${labelMap[key] || key} +${val}`);
-                        tags.push("恢复");
-                    }
-                }
-            }
-        }
-        if (!foundry.utils.isEmpty(updates)) await actor.update(updates);
-
-        // 2. 应用特效 (互斥逻辑 + Origin 修正)
-        const consumableType = config.type || "other";
-        // 移除互斥旧特效
-        const effectsToDelete = actor.effects
-            .filter(e => e.getFlag("xjzl-system", "consumableType") === consumableType)
-            .map(e => e.id);
-        if (effectsToDelete.length > 0) await actor.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
-
-        // 创建新特效
-        const effectsToCreate = item.effects.map(e => {
-            const data = e.toObject();
-            foundry.utils.setProperty(data, "flags.xjzl-system.consumableType", consumableType);
-            data.transfer = false;
-
-            // 如果物品将销毁，Origin 指向 Actor，否则指向 Item
-            data.origin = willDestroy ? actor.uuid : item.uuid;
-
-            return data;
-        });
-
-        if (effectsToCreate.length > 0) {
-            await actor.createEmbeddedDocuments("ActiveEffect", effectsToCreate);
-            resultLines.push(`应用状态: [${effectsToCreate.map(e => e.name).join(", ")}]`);
-            tags.push("状态");
-        }
-
-        // 3. 执行脚本 (异步支持)
-        let scriptOutput = "";
-        if (config.usageScript && config.usageScript.trim()) {
-            try {
-                // 使用 AsyncFunction 构造器(异步支持)
-                const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
-                const fn = new AsyncFunction("actor", "item", config.usageScript);
-
-                // 执行并等待
-                const result = await fn(actor, item);
-                if (typeof result === "string") scriptOutput = result; // 允许脚本返回文本用于显示
-                tags.push("特殊效果");
-            } catch (err) {
-                console.error(err);
-                ui.notifications.error(`脚本错误: ${err.message}`);
-            }
-        }
-
-        // 4. 发送聊天卡片 (代替 ui.notifications)
-        const templateData = {
-            item: item,
-            tags: tags,
-            resultText: resultLines.join("，"),
-            scriptOutput: scriptOutput
-        };
-        const content = await renderTemplate("systems/xjzl-system/templates/chat/item-card.hbs", templateData);
-
-        ChatMessage.create({
-            user: game.user.id,
-            speaker: ChatMessage.getSpeaker({ actor: actor }),
-            flavor: `${actor.name} 使用了 ${item.name}`,
-            content: content
-        });
-
-        // 5. 扣除数量
-        if (willDestroy) {
-            await item.delete();
-        } else {
-            await item.update({ "system.quantity": item.system.quantity - 1 });
-        }
+        if (item) item.use();
     }
 
-    /**
-     * 阅读秘籍
-     * 逻辑：检查目标 -> 复制创建 -> 消耗秘籍
-     */
     async _onReadManual(event, target) {
         const itemId = target.dataset.itemId;
-        const manual = this.document.items.get(itemId);
-        if (!manual) return;
-
-        const targetUuid = manual.system.learnItemUuid;
-        if (!targetUuid) return ui.notifications.warn("这本秘籍是无字天书。");
-
-        // 1. 获取目标物品
-        let targetItem;
-        try {
-            targetItem = await fromUuid(targetUuid);
-        } catch (err) {
-            return ui.notifications.error("无法找到记载的武学。");
-        }
-        if (!targetItem) return ui.notifications.error("目标物品不存在。");
-
-        // 2. 检查是否已学会 (【核心修复 C】使用 sourceId 判定)
-        // 逻辑：检查背包里是否有物品的 sourceId 等于目标物品的 uuid
-        const alreadyLearned = this.document.items.find(i => i.flags.core?.sourceId === targetUuid);
-
-        if (alreadyLearned) {
-            return ui.notifications.warn(`你已经学会了 ${targetItem.name}，无需重复阅读。`);
-        }
-
-        // 3. 学习
-        const itemData = targetItem.toObject();
-        delete itemData._id;
-        delete itemData.folder;
-        delete itemData.ownership;
-        // 记录来源，以便下次查重
-        foundry.utils.setProperty(itemData, "flags.core.sourceId", targetUuid);
-
-        await this.document.createEmbeddedDocuments("Item", [itemData]);
-
-        // 4. 发送聊天卡片
-        const content = await renderTemplate("systems/xjzl-system/templates/chat/item-card.hbs", {
-            item: manual, // 显示秘籍的信息
-            tags: ["秘籍", targetItem.type === "neigong" ? "内功" : "武学"],
-            resultText: `领悟了 <b>[${targetItem.name}]</b>`
-        });
-
-        ChatMessage.create({
-            user: game.user.id,
-            speaker: ChatMessage.getSpeaker({ actor: this.document }),
-            flavor: `${this.document.name} 阅读了 ${manual.name}`,
-            content: content
-        });
-
-        // 5. 消耗
-        if (manual.system.destroyOnUse) {
-            if (manual.system.quantity > 1) {
-                await manual.update({ "system.quantity": manual.system.quantity - 1 });
-            } else {
-                await manual.delete();
-            }
-        }
+        const item = this.document.items.get(itemId);
+        if (item) item.use();
     }
 
     /**
