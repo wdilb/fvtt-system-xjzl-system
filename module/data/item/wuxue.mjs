@@ -95,7 +95,15 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // 这是一个 JS 代码块，在 Roll 的时候执行
       script: new fields.StringField({ label: "XJZL.Wuxue.Moves.Script" }),
       // 2. 招式执行脚本 (异步，用于演出和特殊逻辑)
-      executionScript: new fields.StringField({ label: "XJZL.Wuxue.Moves.ExecutionScript" })
+      executionScript: new fields.StringField({ label: "XJZL.Wuxue.Moves.ExecutionScript" }),
+
+      // --- 7. 伤害类型 ---
+      // 决定了是否需要进行命中检定，以及应用伤害时对抗哪种抗性
+      damageType: new fields.StringField({
+        initial: "waigong",
+        label: "XJZL.Wuxue.Moves.DamageType",
+        choices: Object.keys(CONFIG.XJZL.damageTypes) // 校验
+      }),
 
     });
 

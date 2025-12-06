@@ -119,3 +119,55 @@ XJZL.qualities = {
   3: "XJZL.Qualities.3", // 金
   4: "XJZL.Qualities.4"  // 玉
 };
+
+// 13. 伤害类型
+XJZL.damageTypes = {
+  waigong: "XJZL.Damage.Waigong", // 外功 (需命中)
+  neigong: "XJZL.Damage.Neigong", // 内功 (需命中)
+  bleed: "XJZL.Damage.Bleed",     // 流血 (必中)
+  poison: "XJZL.Damage.Poison",   // 毒素 (必中)
+  mental: "XJZL.Damage.Mental",   // 精神 (必中)
+  fire: "XJZL.Damage.Fire",       // 火焰 (必中)
+  liushi: "XJZL.Damage.Liushi"    // 流失 (真实伤害)
+};
+
+// 14. 系统状态标志 (逻辑开关)
+// 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
+// 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
+XJZL.statusFlags = {
+  // --- A. 检定与对抗类  ---
+  attackAdvantage: "XJZL.Status.AttackAdvantage",                 // 攻击优势 (自身攻击检定取高)
+  attackDisadvantage: "XJZL.Status.AttackDisadvantage",           // 攻击劣势 (自身攻击检定取低)
+
+  grantAttackAdvantage: "XJZL.Status.GrantAttackAdvantage",       // 被攻击优势 (给予攻击者优势)
+  grantAttackDisadvantage: "XJZL.Status.GrantAttackDisadvantage", // 被攻击劣势 (给予攻击者劣势)
+
+  feintAdvantage: "XJZL.Status.FeintAdvantage",                   // 虚招对抗优势 (使用虚招时检定取高)
+  feintDisadvantage: "XJZL.Status.FeintDisadvantage",             // 虚招对抗劣势 (使用虚招时检定取低)
+
+  defendFeintAdvantage: "XJZL.Status.DefendFeintAdvantage",       // 被虚招优势 (抵抗虚招时检定取高)
+  defendFeintDisadvantage: "XJZL.Status.DefendFeintDisadvantage", // 被虚招劣势 (抵抗虚招时检定取低)
+
+  // --- B. 资源封锁类  ---
+  noRecoverRage: "XJZL.Status.NoRecoverRage",     // 无法获得怒气 (怒气锁定)
+  noRecoverNeili: "XJZL.Status.NoRecoverNeili",   // 无法获得内力 (内力锁定)
+  noRecoverHP: "XJZL.Status.NoRecoverHP",         // 无法获得气血 (禁疗)
+
+  // --- C. 行为限制类  ---
+  // 在 Item.roll() 开头检测这些 Flag
+  blockShiZhao: "XJZL.Status.BlockShiZhao",       // 无法施展实招
+  blockXuZhao: "XJZL.Status.BlockXuZhao",         // 无法施展虚招
+  blockQiZhao: "XJZL.Status.BlockQiZhao",         // 无法施展气招
+  blockCounter: "XJZL.Status.BlockCounter",       // 无法施展反击
+  blockUltimate: "XJZL.Status.BlockUltimate",     // 无法施展绝招
+  blockStance: "XJZL.Status.BlockStance",         // 无法开启架招/防御姿态
+
+  forceUnarmed: "XJZL.Status.ForceUnarmed",       // 只能施展徒手招式 (缴械)
+  silence: "XJZL.Status.Silence",                 // 无法施展任何招式
+  stun: "XJZL.Status.Stun",                       // 无法行动 (晕眩/定身)
+
+  // --- D. 受击触发类 (Triggers - On Hit) ---
+  // 在 Apply Damage 逻辑中检测
+  bleedOnHit: "XJZL.Status.BleedOnHit",           // 受伤时流失气血 (通用易伤/撕裂)
+  wuxueBleedOnHit: "XJZL.Status.WuxueBleedOnHit"  // 仅受到内外功伤害时流失气血 (内伤/旧疾)
+};

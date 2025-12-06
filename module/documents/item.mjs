@@ -952,7 +952,7 @@ export class XJZLItem extends Item {
     this._rolling = true;
 
     try {
-      // 1. 基础校验
+      //  基础校验
       if (this.type !== "wuxue") return;
       const actor = this.actor;
       if (!actor) {
@@ -966,14 +966,40 @@ export class XJZLItem extends Item {
         return;
       }
 
-      // 2. 获取上下文与目标
-      // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
-      const targets = options.targets || Array.from(game.user.targets);
-      const primaryTarget = targets[0] || null;
+      // =====================================================
+      // 1. 状态阻断检查 (Status Check)
+      // =====================================================
+      const s = actor.xjzlStatuses || {};
+
+      // 硬控：晕眩
+      if (s.stun) return ui.notifications.warn(`${actor.name} 处于晕眩状态，无法行动！`);
+
+      // 沉默：无法施展气招/绝招 (假设设定)
+      if (s.silence && (move.type === "qi" || move.type === "ultimate")) {
+        return ui.notifications.warn(`${actor.name} 处于沉默状态，无法施展气招或绝招！`);
+      }
+
+      // 缴械：只能用徒手
+      if (s.forceUnarmed && move.weaponType !== "unarmed") {
+        return ui.notifications.warn(`${actor.name} 被缴械，只能使用徒手招式！`);
+      }
+
+      // 类型封锁
+      if (s.blockShiZhao && move.type === "real") return ui.notifications.warn("无法施展实招！");
+      if (s.blockXuZhao && move.type === "feint") return ui.notifications.warn("无法施展虚招！");
+      if (s.blockQiZhao && move.type === "qi") return ui.notifications.warn("无法施展气招！");
+      if (s.blockStance && move.type === "stance") return ui.notifications.warn("无法开启架招！");
 
       // 插入 Hook：允许模组在招式执行前进行干预 (例如：定身状态下无法攻击)
       // 如果 Hook 返回 false，则流程中止
       if (Hooks.call("xjzl.preRollMove", this, move, options, actor) === false) return;
+
+      // =====================================================
+      // 2. 目标与资源
+      // =====================================================
+      // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
+      const targets = options.targets || Array.from(game.user.targets);
+      const primaryTarget = targets[0] || null;
 
       // TODO: 【预留】如果是 Creature (野兽/怪物) 发起的攻击
       // 它们的伤害逻辑可能很简单，不需要走复杂的武学计算
@@ -981,7 +1007,7 @@ export class XJZLItem extends Item {
         // return this._rollCreatureAttack(move, targets);
       }
 
-      // 3. 资源检查 (Pre-Check)
+      // 资源检查 (Pre-Check)
       // 计算实际消耗 (原消耗 - 减耗属性)
       // 注意：减耗不能把消耗减成负数
       const costs = move.currentCost; // { mp: 10, rage: 0, hp: 0 }
@@ -1007,7 +1033,10 @@ export class XJZLItem extends Item {
         return;
       }
 
-      // 4. 执行招式脚本 (Phase 1: Async Execution)
+      // =====================================================
+      // 3. 执行脚本 (Async Decision)
+      // =====================================================
+
       // 这是“决策阶段”，用于弹窗、播放动画、修改临时变量
       // 脚本可以通过 return false 来取消攻击
       if (move.executionScript && move.executionScript.trim()) {
@@ -1026,7 +1055,9 @@ export class XJZLItem extends Item {
         }
       }
 
-      // 5. 计算伤害数值 (Phase 2: Sync Calculation)
+      // =====================================================
+      // 4. 伤害计算 (Sync Calculation)
+      // =====================================================
       // 直接调用我们之前封装好的方法，保证和角色卡预览一致
       const calcResult = this.calculateMoveDamage(moveId, primaryTarget);
 
@@ -1035,7 +1066,43 @@ export class XJZLItem extends Item {
         return;
       }
 
-      // 6. 扣除资源 (Deduct)
+      // =====================================================
+      // 5. 命中检定 (Hit Roll)
+      // =====================================================
+      let attackRoll = null;
+      const damageType = move.damageType || "waigong";
+      const needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
+
+      if (needsHitCheck) {
+        // A. 确定检定加值
+        let hitMod = 0;
+        if (damageType === "waigong") hitMod = actor.system.combat.hitWaigongTotal;
+        else hitMod = actor.system.combat.hitNeigongTotal;
+
+        // B. 确定优势/劣势 (Advantage/Disadvantage)
+        // 读取我们定义的 Flags
+        let formula = "1d20";
+        const hasAdvantage = s.attackAdvantage; // 自身有优势
+        const hasDisadvantage = s.attackDisadvantage; // 自身有劣势
+
+        // 这里只处理自身的优劣势。
+        // "目标给予的优势 (grantAttackAdvantage)" 需要在 applyDamage 阶段或这里通过 primaryTarget 判断
+        // 为了简单，这里先只看自身
+        // TODO 还需要看目标身上的状态，甚至还需要考虑优/劣相互抵消
+
+        if (hasAdvantage && !hasDisadvantage) formula = "2d20kh";
+        if (!hasAdvantage && hasDisadvantage) formula = "2d20kl";
+
+        // C. 投掷
+        attackRoll = await new Roll(`${formula} + @mod`, { mod: hitMod }).evaluate();
+
+        // 播放 3D 骰子 (如果装了 Dice So Nice)
+        if (game.dice3d) game.dice3d.showForRoll(attackRoll, game.user, true);
+      }
+
+      // =====================================================
+      // 6. 扣除资源 & 发送消息
+      // =====================================================
       // 只有走到这一步才真正扣血蓝
       const resourceUpdates = {};
       if (finalCost.mp > 0) resourceUpdates["system.resources.mp.value"] = actor.system.resources.mp.value - finalCost.mp;
@@ -1046,7 +1113,7 @@ export class XJZLItem extends Item {
         await actor.update(resourceUpdates);
       }
 
-      // 7. 生成聊天卡片 (Chat Card)
+      // 生成聊天卡片 (Chat Card)
       const templateData = {
         actor: actor,
         item: this,
@@ -1056,7 +1123,9 @@ export class XJZLItem extends Item {
         isFeint: move.type === "feint",
         isStance: move.type === "stance",
         // 传入 system 数据方便 handlebars 直接访问更多层级
-        system: this.system
+        system: this.system,
+        attackRoll: attackRoll, // 传给模板显示骰子结果
+        damageTypeLabel: game.i18n.localize(XJZL.damageTypes[damageType])
       };
 
       const content = await renderTemplate(
@@ -1064,7 +1133,7 @@ export class XJZLItem extends Item {
         templateData
       );
 
-      // 8. 发送消息
+      // 发送消息
       const chatData = {
         user: game.user.id,
         speaker: ChatMessage.getSpeaker({ actor: actor }),
@@ -1078,6 +1147,8 @@ export class XJZLItem extends Item {
             damage: calcResult.damage, // 存下最终伤害，方便后续按钮调用
             feint: calcResult.feint,
             calc: calcResult,          // 存入完整计算结果，包含 breakdown
+            damageType: damageType,// 如果有命中检定，存下检定结果 (total)
+            attackTotal: attackRoll ? attackRoll.total : null,
             targets: targets.map(t => t.document.uuid) // 记录目标 UUID，方便后续自动化应用伤害
           }
         }

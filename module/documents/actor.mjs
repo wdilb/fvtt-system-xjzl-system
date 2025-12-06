@@ -90,6 +90,16 @@ export class XJZLActor extends Actor {
     // - 内功的固定属性加成已生效
     super.prepareDerivedData();
 
+    // 初始化状态字典
+    // 现在可以在其他地方直接写 if (this.xjzlStatuses.exposed) { ... } 
+    // 而不需要写难看的 if (this.getFlag("xjzl-system", "exposed")) { ... }
+    this.xjzlStatuses = {};
+    const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
+    for (const key of Object.keys(statusFlags)) {
+      // 检查当前是否有这个 Flag
+      this.xjzlStatuses[key] = this.getFlag("xjzl-system", key) || false;
+    }
+
     // ----------------------------------------------------
     // PHASE 2: 脚本干预 (Script Execution)
     // ----------------------------------------------------

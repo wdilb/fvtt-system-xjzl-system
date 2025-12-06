@@ -175,6 +175,40 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
 
   disabledField.insertAdjacentHTML('afterend', stackableHtml);
   app.setPosition({ height: "auto" });
+
+  // --- 新增：给 Attribute Key 添加自动补全 ---
+
+  // 1. 找到 Key 的输入框
+  // 注意：V13 DOM 结构可能稍有不同，建议用 name 属性查找
+  const keyInput = $(html).find('select[name="changes.0.key"], input[name="changes.0.key"]');
+
+  // 如果当前是 select (FVTT 默认给了一些)，我们可能不管它
+  // 如果是 input (通常是手输)，我们给它加个 datalist
+  if (keyInput.length && keyInput.prop("tagName") === "INPUT") {
+
+    // 创建 datalist ID
+    const listId = "xjzl-status-list";
+    keyInput.attr("list", listId);
+
+    // 构建选项 HTML
+    let options = "";
+
+    // A. 加入你的状态开关
+    for (const [key, label] of Object.entries(CONFIG.XJZL.statusFlags)) {
+      // 显示为: "flags.xjzl-system.stun (晕眩)"
+      // 这里的 value 必须是真正要写入数据库的完整路径
+      options += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
+    }
+
+    // B. 加入你的基础属性 (可选)
+    // 比如 system.resources.mp.value
+    options += `<option value="system.resources.mp.value">内力值</option>`;
+    options += `<option value="system.resources.hp.value">气血值</option>`;
+
+    // 插入 datalist 到 DOM
+    const dataListHtml = `<datalist id="${listId}">${options}</datalist>`;
+    keyInput.after(dataListHtml);
+  }
 });
 
 /* -------------------------------------------- */
