@@ -58,6 +58,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         elements: localizeConfig(XJZL.elements),
         attributes: localizeConfig(XJZL.attributes),
         weaponTypes: localizeConfig(XJZL.weaponTypes),
+        damageTypes: localizeConfig(XJZL.damageTypes),
         triggers: localizeConfig(XJZL.effectTriggers),
         targets: localizeConfig(XJZL.effectTargets)
     };
