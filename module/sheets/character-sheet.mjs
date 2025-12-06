@@ -34,8 +34,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
 
             // --- 其他 ---
-            deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect,
-            rollMove: XJZLCharacterSheet.prototype._onRollMove
+            deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect, //删除状态
+            rollMove: XJZLCharacterSheet.prototype._onRollMove   //使用招式
         }
     };
 
@@ -537,8 +537,18 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     async _onRollMove(event, target) {
-        // 后续将在 Item 中实现 rollMove
-        ui.notifications.info("招式施放功能即将实装！");
+        event.preventDefault();
+
+        const itemId = target.dataset.itemId;
+        const moveId = target.dataset.moveId;
+
+        // 1. 获取物品
+        const item = this.document.items.get(itemId);
+        if (!item) return;
+
+        // 2. 调用 Item 的核心 Roll 方法
+        // Item 会负责：资源检查 -> 脚本执行 -> 伤害计算 -> 发送聊天卡片
+        await item.roll(moveId);
     }
 
     async _onDeleteEffect(event, target) {

@@ -24,6 +24,10 @@ const DUMMY_TARGET = new Proxy({
   // 【新增】拦截对根对象的修改
   set: () => true // 告诉脚本"设置成功"，但实际上什么都不改
 });
+
+// 缓存 AsyncFunction 构造器，避免重复创建
+const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
+
 export class XJZLItem extends Item {
   /* -------------------------------------------- */
   /*  核心交互逻辑                                */
@@ -697,26 +701,26 @@ export class XJZLItem extends Item {
 
     // A. 自动模式
     if (typeof amountOrAllocation === "number" || typeof amountOrAllocation === "string") {
-        totalRefund = parseInt(amountOrAllocation);
-        if (isNaN(totalRefund) || totalRefund <= 0) return ui.notifications.warn("请输入有效数字。");
+      totalRefund = parseInt(amountOrAllocation);
+      if (isNaN(totalRefund) || totalRefund <= 0) return ui.notifications.warn("请输入有效数字。");
 
-        // --- 核心逻辑：优先退通用 (LIFO) ---
-        refundGeneral = Math.min(totalRefund, breakdown.general);
-        refundSpecific = totalRefund - refundGeneral;
+      // --- 核心逻辑：优先退通用 (LIFO) ---
+      refundGeneral = Math.min(totalRefund, breakdown.general);
+      refundSpecific = totalRefund - refundGeneral;
 
-        if (refundSpecific > breakdown.specific) {
-            refundSpecific = breakdown.specific;
-            totalRefund = refundGeneral + refundSpecific;
-        }
+      if (refundSpecific > breakdown.specific) {
+        refundSpecific = breakdown.specific;
+        totalRefund = refundGeneral + refundSpecific;
+      }
     }
     // B. 手动模式
     else {
-        refundGeneral = parseInt(amountOrAllocation.general) || 0;
-        refundSpecific = parseInt(amountOrAllocation.specific) || 0;
-        totalRefund = refundGeneral + refundSpecific;
+      refundGeneral = parseInt(amountOrAllocation.general) || 0;
+      refundSpecific = parseInt(amountOrAllocation.specific) || 0;
+      totalRefund = refundGeneral + refundSpecific;
 
-        if (refundGeneral > breakdown.general) return ui.notifications.warn("通用修为存量不足");
-        if (refundSpecific > breakdown.specific) return ui.notifications.warn("专属修为存量不足");
+      if (refundGeneral > breakdown.general) return ui.notifications.warn("通用修为存量不足");
+      if (refundSpecific > breakdown.specific) return ui.notifications.warn("专属修为存量不足");
     }
 
     if (totalRefund <= 0) return;
@@ -730,16 +734,16 @@ export class XJZLItem extends Item {
     // 准备 Actor 返还数据
     const specificKey = this._getSpecificPoolKey();
     const actorUpdates = {
-        "system.cultivation.general": this.actor.system.cultivation.general + refundGeneral
+      "system.cultivation.general": this.actor.system.cultivation.general + refundGeneral
     };
     if (refundSpecific > 0) {
-        const currentActorSpecific = this.actor.system.cultivation[specificKey] || 0;
-        actorUpdates[`system.cultivation.${specificKey}`] = currentActorSpecific + refundSpecific;
+      const currentActorSpecific = this.actor.system.cultivation[specificKey] || 0;
+      actorUpdates[`system.cultivation.${specificKey}`] = currentActorSpecific + refundSpecific;
     }
 
     await Promise.all([
-        this.actor.update(actorUpdates),
-        this.update({ "system.moves": itemData.moves })
+      this.actor.update(actorUpdates),
+      this.update({ "system.moves": itemData.moves })
     ]);
 
     ui.notifications.info(`招式回退成功，返还 ${totalRefund} 点 (通:${refundGeneral}/专:${refundSpecific})。`);
@@ -932,8 +936,167 @@ export class XJZLItem extends Item {
     };
   }
 
-  // 将来 roll() 也会写在这里
-  async roll() {
-    // ...
+  /* -------------------------------------------- */
+  /*  Roll: 核心招式执行                          */
+  /* -------------------------------------------- */
+
+  /**
+   * 执行招式 (Roll)
+   * @param {String} moveId - 招式 ID
+   * @param {Object} options - 额外配置 (如 targets, skipDialog 等)
+   */
+  async roll(moveId, options = {}) {
+    // 0. 防连点/重入锁 (UI 层面防止重复点击导致资源连扣)
+    // 这里的 _rolling 只是一个临时标记，不需要存入数据库
+    if (this._rolling) return;
+    this._rolling = true;
+
+    try {
+      // 1. 基础校验
+      if (this.type !== "wuxue") return;
+      const actor = this.actor;
+      if (!actor) {
+        ui.notifications.warn("该武学不在角色身上。");
+        return;
+      }
+
+      const move = this.system.moves.find(m => m.id === moveId);
+      if (!move) {
+        ui.notifications.error("未找到招式数据。");
+        return;
+      }
+
+      // 2. 获取上下文与目标
+      // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
+      const targets = options.targets || Array.from(game.user.targets);
+      const primaryTarget = targets[0] || null;
+
+      // 插入 Hook：允许模组在招式执行前进行干预 (例如：定身状态下无法攻击)
+      // 如果 Hook 返回 false，则流程中止
+      if (Hooks.call("xjzl.preRollMove", this, move, options, actor) === false) return;
+
+      // TODO: 【预留】如果是 Creature (野兽/怪物) 发起的攻击
+      // 它们的伤害逻辑可能很简单，不需要走复杂的武学计算
+      if (actor.type === "creature") {
+        // return this._rollCreatureAttack(move, targets);
+      }
+
+      // 3. 资源检查 (Pre-Check)
+      // 计算实际消耗 (原消耗 - 减耗属性)
+      // 注意：减耗不能把消耗减成负数
+      const costs = move.currentCost; // { mp: 10, rage: 0, hp: 0 }
+      const costReductions = actor.system.combat.costs; // { mp: {total: 5}, rage: ... }
+
+      const finalCost = {
+        mp: Math.max(0, costs.mp - (costReductions?.mp?.total || 0)),
+        rage: Math.max(0, costs.rage - (costReductions?.rage?.total || 0)),
+        hp: costs.hp // 气血通常不享受减耗
+      };
+
+      // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
+      if (actor.system.resources.mp.value < finalCost.mp) {
+        ui.notifications.warn("内力不足！");
+        return;
+      }
+      if (actor.system.resources.rage.value < finalCost.rage) {
+        ui.notifications.warn("怒气不足！");
+        return;
+      }
+      if (actor.system.resources.hp.value <= finalCost.hp) {
+        ui.notifications.warn("气血不足，无法施展！");
+        return;
+      }
+
+      // 4. 执行招式脚本 (Phase 1: Async Execution)
+      // 这是“决策阶段”，用于弹窗、播放动画、修改临时变量
+      // 脚本可以通过 return false 来取消攻击
+      if (move.executionScript && move.executionScript.trim()) {
+        try {
+          // 参数: actor, item, move, targets, game, ui
+          const fn = new AsyncFunction("actor", "item", "move", "targets", "game", "ui", move.executionScript);
+
+          // 优化：传递 this 为 item
+          const result = await fn(actor, this, move, targets, game, ui);
+          if (result === false) return; // 脚本返回 false 则中止
+
+        } catch (err) {
+          console.error(`[XJZL] 招式 [${move.name}] 执行脚本错误:`, err);
+          ui.notifications.error("招式脚本运行失败，请检查控制台。");
+          return;
+        }
+      }
+
+      // 5. 计算伤害数值 (Phase 2: Sync Calculation)
+      // 直接调用我们之前封装好的方法，保证和角色卡预览一致
+      const calcResult = this.calculateMoveDamage(moveId, primaryTarget);
+
+      if (!calcResult) {
+        ui.notifications.error("伤害计算失败。");
+        return;
+      }
+
+      // 6. 扣除资源 (Deduct)
+      // 只有走到这一步才真正扣血蓝
+      const resourceUpdates = {};
+      if (finalCost.mp > 0) resourceUpdates["system.resources.mp.value"] = actor.system.resources.mp.value - finalCost.mp;
+      if (finalCost.rage > 0) resourceUpdates["system.resources.rage.value"] = actor.system.resources.rage.value - finalCost.rage;
+      if (finalCost.hp > 0) resourceUpdates["system.resources.hp.value"] = actor.system.resources.hp.value - finalCost.hp;
+
+      if (!foundry.utils.isEmpty(resourceUpdates)) {
+        await actor.update(resourceUpdates);
+      }
+
+      // 7. 生成聊天卡片 (Chat Card)
+      const templateData = {
+        actor: actor,
+        item: this,
+        move: move,
+        calc: calcResult, // 包含 damage, feint, breakdown
+        cost: finalCost,
+        isFeint: move.type === "feint",
+        isStance: move.type === "stance",
+        // 传入 system 数据方便 handlebars 直接访问更多层级
+        system: this.system
+      };
+
+      const content = await renderTemplate(
+        "systems/xjzl-system/templates/chat/move-card.hbs",
+        templateData
+      );
+
+      // 8. 发送消息
+      const chatData = {
+        user: game.user.id,
+        speaker: ChatMessage.getSpeaker({ actor: actor }),
+        flavor: `施展了招式: ${move.name}`,
+        content: content,
+        flags: {
+          "xjzl-system": {
+            actionType: "move-attack", // 标记类型，方便识别
+            itemId: this.id,
+            moveId: move.id,
+            damage: calcResult.damage, // 存下最终伤害，方便后续按钮调用
+            feint: calcResult.feint,
+            calc: calcResult,          // 存入完整计算结果，包含 breakdown
+            targets: targets.map(t => t.document.uuid) // 记录目标 UUID，方便后续自动化应用伤害
+          }
+        }
+      };
+
+      // 如果配置了骰子声音
+      ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+      const message = await ChatMessage.create(chatData);
+
+      // 插入 Hook：允许后续逻辑（如自动播放特效、自动化模组监听）
+      Hooks.callAll("xjzl.rollMove", this, move, message, calcResult);
+
+    } catch (err) {
+      // 统一的错误捕获，防止报错后锁没有解开
+      console.error(err);
+      ui.notifications.error("招式执行过程中发生未知错误，请检查控制台。");
+    } finally {
+      // 无论成功还是失败，最后都解锁，允许下一次点击
+      this._rolling = false;
+    }
   }
 }
