@@ -209,7 +209,7 @@ export class XJZLActor extends Actor {
     }
 
     // 3. 上下文对象 (Context Item/Move)
-    // 这是你在 roll() 时传进来的，比如当前正在施展的招式
+    // 这是在 roll()或者其他调用的时候传进来的，比如当前正在施展的招式
     if (contextItem && contextItem.scripts && Array.isArray(contextItem.scripts)) {
       contextItem.scripts.forEach(s => {
         if (s.trigger === trigger && s.active) {

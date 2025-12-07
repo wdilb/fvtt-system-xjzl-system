@@ -11,6 +11,7 @@ export const SCRIPT_TRIGGERS = {
   CALC: "calc",             // [同步] 伤害计算修正 (calculateMoveDamage)
   ATTACK: "attack",         // [异步] 出招/掷骰前 (决定优势、资源、是否允许出招)
   HIT: "hit",               // [异步] 命中/结算后 (应用BUFF、扣血、副作用)
+  DAMAGED: "damaged",   // 【新增】防御者触发：受伤时
   TURN_START: "turnStart",  // [异步] 回合开始
   TURN_END: "turnEnd",      // [异步] 回合结束
   // EQUIP: "equip",           // [异步] 装备/卸下时 (特殊逻辑)
@@ -22,6 +23,7 @@ export const TRIGGER_CHOICES = {
   [SCRIPT_TRIGGERS.CALC]: "XJZL.Triggers.Calc",
   [SCRIPT_TRIGGERS.ATTACK]: "XJZL.Triggers.Attack",
   [SCRIPT_TRIGGERS.HIT]: "XJZL.Triggers.Hit",
+  [SCRIPT_TRIGGERS.DAMAGED]: "XJZL.Triggers.Damaged",
   [SCRIPT_TRIGGERS.TURN_START]: "XJZL.Triggers.TurnStart",
   [SCRIPT_TRIGGERS.TURN_END]: "XJZL.Triggers.TurnEnd",
   // [SCRIPT_TRIGGERS.EQUIP]: "XJZL.Triggers.Equip"
