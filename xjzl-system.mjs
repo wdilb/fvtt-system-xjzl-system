@@ -313,7 +313,10 @@ async function preloadHandlebarsTemplates() {
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
 
     // 内功
-    "systems/xjzl-system/templates/item/neigong/sheet.hbs",
+    "systems/xjzl-system/templates/item/neigong/header.hbs",
+    "systems/xjzl-system/templates/item/neigong/tabs.hbs",
+    "systems/xjzl-system/templates/item/neigong/tab-config.hbs",
+    "systems/xjzl-system/templates/item/neigong/tab-effects.hbs",
     //武学
     "systems/xjzl-system/templates/item/wuxue/header.hbs",
     "systems/xjzl-system/templates/item/wuxue/tabs.hbs",

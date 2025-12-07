@@ -1,6 +1,10 @@
 /**
  * 扩展核心 Actor 类
  */
+import { SCRIPT_TRIGGERS } from "../data/common.mjs";
+
+// 【优化】将构造器缓存在模块作用域，避免每次 runScripts 重复创建
+const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 export class XJZLActor extends Actor {
 
   /* -------------------------------------------- */
@@ -103,9 +107,11 @@ export class XJZLActor extends Actor {
     // ----------------------------------------------------
     // PHASE 2: 脚本干预 (Script Execution)
     // ----------------------------------------------------
-    // 运行内功脚本。
+    // 运行 [被动常驻] 类型的脚本 (内功、装备等)
     // 因为 Pass 1 已经执行，脚本可以安全地读取计算后的属性：
-    this._applyNeigongEffects();
+    // 此时不需要上下文 Item，传入空对象即可
+    // 脚本可以修改 this.system 下的属性，也可以修改 this.xjzlStatuses
+    this.runScripts(SCRIPT_TRIGGERS.PASSIVE, {});
 
     // ----------------------------------------------------
     // PHASE 3: 重算 (Pass 2)
@@ -152,47 +158,153 @@ export class XJZLActor extends Actor {
     return data;
   }
 
+  /* -------------------------------------------- */
+  /*  核心脚本引擎 (Script Engine)                 */
+  /* -------------------------------------------- */
 
   /**
-   * 处理内功的被动特效脚本
+   * [核心] 收集当前 Actor 身上所有符合触发条件的脚本
+   * @param {String} trigger - 触发时机 (来自 SCRIPT_TRIGGERS, 如 'attack')
+   * @param {Object|Item} [contextItem] - (可选) 当前正在交互的具体对象 (如招式数据 move，或物品 item)
+   * @returns {Array} 脚本对象数组 [{ script, label, source }]
    */
-  _applyNeigongEffects() {
-    // 1. 获取当前运行的内功
-    const activeNeigongId = this.system.martial.active_neigong;
-    // console.log(">>> [Actor] 开始执行内功脚本检测, ActiveID:", activeNeigongId);
-    if (!activeNeigongId) return;
+  collectScripts(trigger, contextItem = null) {
+    const scripts = [];
 
-    const item = this.items.get(activeNeigongId);
-    if (!item || item.type !== "neigong") return;
+    // 1. 内功 (Neigong) - 从 active_neigong 指向的 Item 中读取
+    const neigongId = this.system.martial?.active_neigong;
+    if (neigongId) {
+      const neigong = this.items.get(neigongId);
+      // 注意：读取的是 system.current.scripts (这是我们在 DataModel 里算好的当前阶段数据)
+      if (neigong?.system?.current?.scripts) {
+        neigong.system.current.scripts.forEach(s => {
+          if (s.trigger === trigger && s.active) {
+            scripts.push({
+              script: s.script,
+              label: s.label || neigong.name,
+              source: neigong
+            });
+          }
+        });
+      }
+    }
 
-    // 2. 获取当前阶段的脚本 (由 Item DataModel 算出来的 current.script)
-    const script = item.system.current?.script;
-    // console.log(`>>> [Actor] 运行内功: ${item.name}, 脚本内容:`, script);
-    if (!script || !script.trim()) return;
+    // 2. 装备 (Weapon, Armor, Qizhen) - 筛选已装备的
+    const equipments = this.items.filter(i =>
+      ["weapon", "armor", "qizhen"].includes(i.type) &&
+      i.system.equipped &&
+      i.system.scripts // 确保有脚本字段
+    );
 
-    // 3. 沙盒执行脚本
-    // 我们把 actor.system 暴露为 'S' 以便简写
+    for (const item of equipments) {
+      item.system.scripts.forEach(s => {
+        if (s.trigger === trigger && s.active) {
+          scripts.push({
+            script: s.script,
+            label: s.label || item.name,
+            source: item
+          });
+        }
+      });
+    }
+
+    // 3. 上下文对象 (Context Item/Move)
+    // 这是你在 roll() 时传进来的，比如当前正在施展的招式
+    if (contextItem && contextItem.scripts && Array.isArray(contextItem.scripts)) {
+      contextItem.scripts.forEach(s => {
+        if (s.trigger === trigger && s.active) {
+          scripts.push({
+            script: s.script,
+            label: s.label || "招式特效",
+            source: contextItem
+          });
+        }
+      });
+    }
+
+    return scripts;
+  }
+
+  /**
+   * [核心] 执行指定时机的脚本
+   * @param {String} trigger - 触发时机
+   * @param {Object} context - 传递给脚本的上下文变量 (如 { actor, target, flags ... })
+   * @param {Object|Item} [contextItem] - 用于 collectScripts 的上下文对象
+   */
+  async runScripts(trigger, context = {}, contextItem = null) {
+    // 1. 收集脚本
+    const scriptsToRun = this.collectScripts(trigger, contextItem);
+    if (!scriptsToRun.length) return;
+
+    // 2. 准备基础沙盒变量
     const sandbox = {
-      actor: this,
-      item: item,
-      system: this.system, // 允许脚本直接修改 system 下的属性
-      S: this.system, // 快捷别名
+      ...context,           // 展开传入的上下文
+      actor: this,          // 始终提供 actor
+      system: this.system,  // 始终提供 system
+      S: this.system,       // 简写别名
+      console: console,     // 允许打印日志
+      game: game,           // 允许访问 game
+      ui: ui,               // 允许访问 ui
+      trigger: trigger      // 告诉脚本当前是什么时机
     };
 
-    try {
-      // 创建函数：Function("变量名1", "变量名2", ..., "代码体")
-      const fn = new Function("actor", "item", "system", "S", script);
+    // 3. 决定执行模式 (同步/异步)
+    // Passive 和 Calc 必须同步运行，不能 await，否则会阻塞数据计算
+    const isSync = [SCRIPT_TRIGGERS.PASSIVE, SCRIPT_TRIGGERS.CALC].includes(trigger);
 
-      // 执行函数
-      fn.call(this, sandbox.actor, sandbox.item, sandbox.system, sandbox.S);
-    } catch (err) {
-      console.error(`内功 [${item.name}] 脚本执行错误:`, err);
-      // 可以在界面上提示，但为了防止刷屏，建议只在控制台报错
+    if (isSync) {
+      this._runScriptsSync(scriptsToRun, sandbox);
+    } else {
+      await this._runScriptsAsync(scriptsToRun, sandbox);
     }
   }
 
   /**
-   * 【核心功能】应用可堆叠的特效
+   * [内部] 同步执行 (用于 Passive, Calc)
+   */
+  _runScriptsSync(scripts, sandbox) {
+    for (const entry of scripts) {
+      try {
+        // 构建函数: new Function("变量名1", ..., "脚本内容")
+        const paramNames = Object.keys(sandbox);
+        const paramValues = Object.values(sandbox);
+        // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);
+        // 这里的 entry.script 就是用户填写的 JS 代码字符串
+        const fn = new Function(...paramNames, entry.script);
+        fn(...paramValues);
+      } catch (err) {
+        console.error(`[XJZL] 同步脚本错误 [${entry.label}]:`, err);
+        // 可选：开发模式下弹出提示
+        // ui.notifications.error(`脚本错误: ${entry.label}`);
+      }
+    }
+  }
+
+  /**
+   * [内部] 异步执行 (用于 Attack, Hit, TurnStart...)
+   */
+  async _runScriptsAsync(scripts, sandbox) {
+
+    for (const entry of scripts) {
+      try {
+        const paramNames = Object.keys(sandbox);
+        const paramValues = Object.values(sandbox);
+        // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);
+        const fn = new AsyncFunction(...paramNames, entry.script);
+        await fn(...paramValues);
+      } catch (err) {
+        console.error(`[XJZL] 异步脚本错误 [${entry.label}]:`, err);
+        ui.notifications.error(`特效脚本执行失败: ${entry.label}`);
+      }
+    }
+  }
+
+  /* -------------------------------------------- */
+  /*  其他辅助方法 (Helpers)                       */
+  /* -------------------------------------------- */
+
+  /**
+   * 应用可堆叠的特效
    * @param {Object} effectData  从物品里拿出来的特效数据 (toObject后的)
    */
   async applyStackableEffect(effectData) {

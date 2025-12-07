@@ -1,32 +1,7 @@
 import { XJZL } from "../config.mjs";
+import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
-/**
- * 预设一个木桩目标用于伤害预览的计算，为了防止用户在脚本里修改全局木桩对象，加一个set 陷阱来禁止修改
- */
-const DUMMY_TARGET = new Proxy({
-  name: "预设木桩",
-  system: {
-    resources: { hp: { value: 100, max: 100 }, mp: { value: 100, max: 100 }, rage: { value: 0, max: 10 } },
-    stats: {}, combat: {}
-  }
-}, {
-  get: (t, prop) => {
-    if (prop in t) return t[prop];
-    // 返回一个新的递归 Proxy
-    return new Proxy(() => 0, {
-      get: () => 0,
-      apply: () => 0,
-      toPrimitive: () => 0,
-      set: () => true // 允许设置操作但不生效 (静默吞掉)
-    });
-  },
-  // 【新增】拦截对根对象的修改
-  set: () => true // 告诉脚本"设置成功"，但实际上什么都不改
-});
-
-// 缓存 AsyncFunction 构造器，避免重复创建
-const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 
 export class XJZLItem extends Item {
   /* -------------------------------------------- */
@@ -132,7 +107,7 @@ export class XJZLItem extends Item {
       tags.push("状态");
     }
 
-    // 3. 执行脚本
+    // 3. 执行脚本(消耗品仍保留旧的 usageScript 逻辑，或者可以以后统一)
     let scriptOutput = "";
     if (config.usageScript && config.usageScript.trim()) {
       try {
@@ -756,10 +731,9 @@ export class XJZLItem extends Item {
   /**
    * 计算招式的详细数值 (预览/结算通用)
    * @param {String} moveId - 招式 ID
-   * @param {Actor|Object} [target=null] - 目标 Actor。如果不传，自动创建一个满状态木桩。
    * @returns {Object|null} 计算结果 { damage, feint, breakdown, cost, ... }
    */
-  calculateMoveDamage(moveId, target = null) {
+  calculateMoveDamage(moveId) {
     // 1. 基础校验
     if (this.type !== "wuxue") return null;
     const actor = this.actor;
@@ -770,11 +744,7 @@ export class XJZLItem extends Item {
     if (!move) return null;
 
     // 2. 准备目标 (Target / Mock)
-    // 如果没有传入目标，创建一个 Proxy 假人 (木桩)
-    const actualTarget = target || DUMMY_TARGET;
-    // 包装成数组以适配脚本中的 targets 参数
-    const targetsArray = Array.isArray(actualTarget) ? actualTarget : [actualTarget];
-    const primaryTarget = targetsArray[0];
+    // 已经不需要构建虚拟目标了，我们不再在这里使用目标
 
     // =====================================================
     //  核心计算流程
@@ -869,36 +839,44 @@ export class XJZLItem extends Item {
       feintBreakdown = `${game.i18n.localize("XJZL.Wuxue.Moves.BaseFeint")} ${base} + ${game.i18n.localize("XJZL.Combat.WeaponRanks")} ${wRankVal} + ${game.i18n.localize("XJZL.Combat.XuZhao")} ${actorBonus}`;
     }
 
-    // --- G. 执行招式脚本 (Script Execution) ---
-    // 注意：这是同步执行，用于计算数值
-    if (move.script && move.script.trim()) {
-      if (actor.system.resources && actor.system.stats) {
-        const out = {
-          damage: totalDmg,
-          feint: feintVal
-        };
+    // ==========================================================
+    // G. 执行 CALC 阶段脚本 (Script Execution)
+    // ==========================================================
+    // 替换了旧的 move.script 逻辑，现在统一调用 actor.runScripts
+    // 1. 准备可变输出对象 (Output)
+    // 脚本通过修改这个对象来影响最终结果
+    const calcOutput = {
+      damage: preScriptDmg, // 初始伤害
+      feint: feintVal,      // 初始虚招
+      bonusDesc: []         // 允许脚本添加额外的描述文本
+    };
 
-        try {
-          // 构造沙盒
-          // 获取该 Item 的 rollData (通常包含 actor.system 的简化版)
-          const rollData = this.getRollData();
-          const fn = new Function("actor", "S", "out", "t", "targets", "item", "rollData", move.script);
-          fn(actor, actor.system, out, primaryTarget, targetsArray, this, rollData);
+    // 2. 准备上下文 (Context)
+    const context = {
+      move: move,
+      // 传入基础数值供参考 (只读)
+      baseData: {
+        base: moveBaseDmg,
+        weapon: weaponDmg,
+        level: lvl,
+        isWeaponMatch: isWeaponMatch
+      },
+      // 传入输出对象 (可写)
+      output: calcOutput
+    };
 
-          // 1. 更新伤害
-          totalDmg = Math.floor(out.damage);
-          scriptDmgBonus = totalDmg - preScriptDmg;
+    // 3. 运行脚本 (同步)
+    // 注意：这里把 move 作为 contextItem 传入而不是this，以便 collectScripts 能找到招式自身的脚本
+    // 因为对于武学来说，脚本是挂在招式(move)上的，不是挂在物品(this)上的
+    actor.runScripts(SCRIPT_TRIGGERS.CALC, context, move);
 
-          // 2. 更新虚招值
-          const newFeint = Math.floor(out.feint);
-          scriptFeintBonus = newFeint - feintVal;
-          feintVal = newFeint;
+    // 4. 读取结果
+    const finalDamage = Math.floor(calcOutput.damage);
+    const finalFeint = Math.floor(calcOutput.feint);
 
-        } catch (err) {
-          console.warn(`[XJZL] 招式 [${move.name}] 计算脚本错误:`, err);
-        }
-      }
-    }
+    // 计算脚本带来的差值 (用于显示 Breakdown)
+    scriptDmgBonus = finalDamage - preScriptDmg;
+    scriptFeintBonus = finalFeint - feintVal;
 
     // --- H. 生成显示数据 (Breakdown) ---
     let breakdownText = `招式本身伤害: ${moveBaseDmg}\n`;
@@ -909,13 +887,13 @@ export class XJZLItem extends Item {
 
     if (scriptDmgBonus !== 0) {
       const sign = scriptDmgBonus > 0 ? "+" : "";
-      breakdownText += `\n${sign} 特效增伤: ${scriptDmgBonus}`;
+      breakdownText += `\n${sign} 特效增伤: ${scriptDmgBonus}(仅生效计算阶段特效与被动特效，不代表最终结果)`;
     }
 
     if (scriptFeintBonus !== 0) {
       const sign = scriptFeintBonus > 0 ? "+" : "";
       if (!feintBreakdown) feintBreakdown = "基础 0";
-      feintBreakdown += ` ${sign} 特效加值 ${scriptFeintBonus}`;
+      feintBreakdown += ` ${sign} 特效加值 ${scriptFeintBonus}(仅生效计算阶段特效与被动特效，不代表最终结果)`;
     }
 
     if (!isWeaponMatch && move.weaponType && move.weaponType !== 'none' && move.weaponType !== 'unarmed') {
@@ -995,11 +973,40 @@ export class XJZLItem extends Item {
       if (Hooks.call("xjzl.preRollMove", this, move, options, actor) === false) return;
 
       // =====================================================
-      // 2. 目标与资源
+      // 2. 准备上下文与目标
       // =====================================================
       // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
+      // 保留 targets 仅用于记录 Chat Message 的 flags，不传给脚本
       const targets = options.targets || Array.from(game.user.targets);
-      const primaryTarget = targets[0] || null;
+
+      // =====================================================
+      // 3. 执行 ATTACK (Pre-Roll) 脚本
+      // =====================================================
+      // 这是“决策阶段”，用于决定是否优势、是否允许出招、消耗资源
+      // 替代了旧的 executionScript
+
+      const attackContext = {
+        move: move,
+        // 核心 Flags (供脚本修改)
+        flags: {
+          // 代表“本次招式是否提供优势/劣势”，不包含角色被动。
+          // 脚本里写: flags.advantage = true;
+          advantage: false,
+          disadvantage: false,
+          abort: false,       // 脚本设为 true 可阻断攻击
+          abortReason: ""     // 阻断原因
+        }
+      };
+
+      // 执行异步脚本 (ATTACK)
+      await actor.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, move);
+
+      // 检查阻断
+      if (attackContext.flags.abort) {
+        // 如果脚本没有提供原因，则使用默认提示
+        if (attackContext.flags.abortReason) ui.notifications.warn(attackContext.flags.abortReason);
+        return;
+      }
 
       // TODO: 【预留】如果是 Creature (野兽/怪物) 发起的攻击
       // 它们的伤害逻辑可能很简单，不需要走复杂的武学计算
@@ -1007,7 +1014,9 @@ export class XJZLItem extends Item {
         // return this._rollCreatureAttack(move, targets);
       }
 
-      // 资源检查 (Pre-Check)
+      // =====================================================
+      // 4. 资源消耗检查 (Resource Check)
+      // =====================================================
       // 计算实际消耗 (原消耗 - 减耗属性)
       // 注意：减耗不能把消耗减成负数
       const costs = move.currentCost; // { mp: 10, rage: 0, hp: 0 }
@@ -1034,32 +1043,10 @@ export class XJZLItem extends Item {
       }
 
       // =====================================================
-      // 3. 执行脚本 (Async Decision)
-      // =====================================================
-
-      // 这是“决策阶段”，用于弹窗、播放动画、修改临时变量
-      // 脚本可以通过 return false 来取消攻击
-      if (move.executionScript && move.executionScript.trim()) {
-        try {
-          // 参数: actor, item, move, targets, game, ui
-          const fn = new AsyncFunction("actor", "item", "move", "targets", "game", "ui", move.executionScript);
-
-          // 优化：传递 this 为 item
-          const result = await fn(actor, this, move, targets, game, ui);
-          if (result === false) return; // 脚本返回 false 则中止
-
-        } catch (err) {
-          console.error(`[XJZL] 招式 [${move.name}] 执行脚本错误:`, err);
-          ui.notifications.error("招式脚本运行失败，请检查控制台。");
-          return;
-        }
-      }
-
-      // =====================================================
-      // 4. 伤害计算 (Sync Calculation)
+      // 5. 伤害计算 (Sync Calculation)
       // =====================================================
       // 直接调用我们之前封装好的方法，保证和角色卡预览一致
-      const calcResult = this.calculateMoveDamage(moveId, primaryTarget);
+      const calcResult = this.calculateMoveDamage(moveId);
 
       if (!calcResult) {
         ui.notifications.error("伤害计算失败。");
@@ -1067,11 +1054,15 @@ export class XJZLItem extends Item {
       }
 
       // =====================================================
-      // 5. 命中检定 (Hit Roll)
+      // 6. 命中检定 (Hit Roll)
       // =====================================================
       let attackRoll = null;
       const damageType = move.damageType || "waigong";
       const needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
+      let rollFormula = "";
+      let rollTooltip = ""; // 用于存储 HTML 详情
+      // 将 flavorText 提到外层作用域，防止 needsHitCheck=false 时报错
+      let flavorText = "";
 
       if (needsHitCheck) {
         // A. 确定检定加值
@@ -1080,28 +1071,49 @@ export class XJZLItem extends Item {
         else hitMod = actor.system.combat.hitNeigongTotal;
 
         // B. 确定优势/劣势 (Advantage/Disadvantage)
-        // 读取我们定义的 Flags
-        let formula = "1d20";
-        const hasAdvantage = s.attackAdvantage; // 自身有优势
-        const hasDisadvantage = s.attackDisadvantage; // 自身有劣势
+        //4 Flag 抵消逻辑
 
-        // 这里只处理自身的优劣势。
-        // "目标给予的优势 (grantAttackAdvantage)" 需要在 applyDamage 阶段或这里通过 primaryTarget 判断
-        // 为了简单，这里先只看自身
-        // TODO 还需要看目标身上的状态，甚至还需要考虑优/劣相互抵消
+        // 1. 获取 角色被动状态 (Boolean)
+        const actorAdv = s.attackAdvantage || false;
+        const actorDis = s.attackDisadvantage || false;
 
-        if (hasAdvantage && !hasDisadvantage) formula = "2d20kh";
-        if (!hasAdvantage && hasDisadvantage) formula = "2d20kl";
+        // 2. 获取 招式脚本状态 (Boolean)
+        const moveAdv = attackContext.flags.advantage || false;
+        const moveDis = attackContext.flags.disadvantage || false;
+
+        // console.log(`优势:${actorAdv},劣势:${actorDis},招式优势:${moveAdv},招式劣势:${moveDis}`);
+
+        // 3. 计算优劣势源的数量 (True=1, False=0)
+        // 逻辑：只要有一个来源给优势，优势数就+1
+        const advCount = (actorAdv ? 1 : 0) + (moveAdv ? 1 : 0);
+        const disCount = (actorDis ? 1 : 0) + (moveDis ? 1 : 0);
+
+        // 基础公式
+        let dicePart = "1d20";
+        flavorText = "普通命中";
+
+        if (advCount > disCount) {
+          dicePart = "2d20kh";
+          flavorText = "优势命中";
+        } else if (disCount > advCount) {
+          dicePart = "2d20kl";
+          flavorText = "劣势命中";
+        }
+
+        rollFormula = `${dicePart} + ${hitMod}`;
 
         // C. 投掷
-        attackRoll = await new Roll(`${formula} + @mod`, { mod: hitMod }).evaluate();
+        attackRoll = await new Roll(rollFormula).evaluate();
+
+        // D. 获取骰子详情 HTML (这是玩家想看到的)
+        rollTooltip = await attackRoll.getTooltip();
 
         // 播放 3D 骰子 (如果装了 Dice So Nice)
         if (game.dice3d) game.dice3d.showForRoll(attackRoll, game.user, true);
       }
 
       // =====================================================
-      // 6. 扣除资源 & 发送消息
+      // 7. 扣除资源 & 发送消息
       // =====================================================
       // 只有走到这一步才真正扣血蓝
       const resourceUpdates = {};
@@ -1115,16 +1127,16 @@ export class XJZLItem extends Item {
 
       // 生成聊天卡片 (Chat Card)
       const templateData = {
-        actor: actor,
-        item: this,
-        move: move,
-        calc: calcResult, // 包含 damage, feint, breakdown
-        cost: finalCost,
+        actor: actor,       // 施法者
+        item: this,         // 武学物品
+        move: move,         // 招式数据
+        calc: calcResult,   // 伤害计算结果 (包含 breakdown, damage, feint)
+        cost: finalCost,    // 实际消耗
         isFeint: move.type === "feint",
         isStance: move.type === "stance",
-        // 传入 system 数据方便 handlebars 直接访问更多层级
-        system: this.system,
-        attackRoll: attackRoll, // 传给模板显示骰子结果
+        system: this.system,// 方便在模板里直接用 system.tier 等
+        attackRoll: attackRoll, // 骰子实例
+        rollTooltip: rollTooltip, // 骰子详情 HTML
         damageTypeLabel: game.i18n.localize(XJZL.damageTypes[damageType])
       };
 
@@ -1134,22 +1146,43 @@ export class XJZLItem extends Item {
       );
 
       // 发送消息
+      let flavor = `施展了招式: ${move.name}`;
+      if (flavorText) flavor += `, ${flavorText}`;
       const chatData = {
         user: game.user.id,
         speaker: ChatMessage.getSpeaker({ actor: actor }),
-        flavor: `施展了招式: ${move.name}`,
+        flavor: flavor,
         content: content,
+
+        // 这里的 flags 存储了所有“生成伤害”所需的信息
+        // 后续的“应用伤害”按钮将读取这些 info 来运行 On-Hit 脚本和扣血
         flags: {
           "xjzl-system": {
-            actionType: "move-attack", // 标记类型，方便识别
-            itemId: this.id,
-            moveId: move.id,
-            damage: calcResult.damage, // 存下最终伤害，方便后续按钮调用
-            feint: calcResult.feint,
-            calc: calcResult,          // 存入完整计算结果，包含 breakdown
-            damageType: damageType,// 如果有命中检定，存下检定结果 (total)
-            attackTotal: attackRoll ? attackRoll.total : null,
-            targets: targets.map(t => t.document.uuid) // 记录目标 UUID，方便后续自动化应用伤害
+            // 1. 基础标识
+            actionType: "move-attack", // 消息类型，用于监听器识别
+            itemId: this.id,           // 武学 Item ID
+            moveId: move.id,           // 招式 ID
+
+            // 2. 数值结果
+            damage: calcResult.damage, // 最终伤害值 (整数)
+            feint: calcResult.feint,   // 最终虚招值 (整数)
+            calc: calcResult,          // 完整计算详情 (含 breakdown 文本)
+            damageType: damageType,    // 伤害类型 (waigong/neigong/...)
+
+            // 3. 掷骰结果
+            // 我们存入 JSON，以便后续可以重新构建 Roll 对象 (roll = Roll.fromJSON(...))
+            // 供后续脚本判断 roll.total 或 roll.isCritical
+            rollJSON: attackRoll ? attackRoll.toJSON() : null,
+
+            // 4. 上下文快照
+            // 记录出招时的 Flags 状态 (如是否有优势)
+            // 这对调试很有用，也方便后续逻辑判断 "是否处于优势下命中"
+            contextFlags: attackContext.flags,
+
+            // 5. 目标快照
+            // 记录 UUID 列表，方便 GM 点击“一键应用”时自动寻找目标
+            // 并不代表 ATTACK 脚本处理了这些目标，仅仅是 UI 层的记录
+            targets: targets.map(t => t.document.uuid)
           }
         }
       };

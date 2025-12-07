@@ -133,66 +133,59 @@
 
             <hr style="border-color: #ddd; margin: 10px 0;">
 
-            {{!-- 4. 高级特效引用 --}}
-            <div class="xjzl-flex-col">
-                <div class="xjzl-flex-row" style="border-bottom:1px dashed #ccc;">
-                    <label style="font-weight:bold;">{{localize "XJZL.Wuxue.Moves.ApplyEffects"}}</label>
-                    <a data-action="addEffectRef" title="添加触发特效"><i class="fas fa-plus"></i></a>
-                </div>
+            {{!-- 4. 描述与脚本列表 (Grid) --}}
+            <div class="xjzl-grid-2" style="align-items: start; gap: 15px;">
 
-                {{#if move.applyEffects.length}}
-                <div class="xjzl-flex-row" style="font-size:0.8em; color:#666;">
-                    <div style="flex:1;">{{localize "XJZL.Wuxue.Trigger.Use"}}</div> {{!-- 临时借用做表头 --}}
-                    <div style="flex:1;">{{localize "XJZL.Wuxue.Target.Target"}}</div>
-                    <div style="flex:2;">特效名称</div>
-                    <div style="width:20px;"></div>
-                </div>
-                {{/if}}
-
-                {{#each move.applyEffects as |eff idx|}}
-                <div class="xjzl-flex-row">
-                    <select name="system.moves.{{i}}.applyEffects.{{idx}}.trigger" class="xjzl-input" style="flex:1;">
-                        {{selectOptions ../../choices.triggers selected=eff.trigger}}
-                    </select>
-                    <select name="system.moves.{{i}}.applyEffects.{{idx}}.target" class="xjzl-input" style="flex:1;">
-                        {{selectOptions ../../choices.targets selected=eff.target}}
-                    </select>
-                    <input type="text" name="system.moves.{{i}}.applyEffects.{{idx}}.key" value="{{eff.key}}"
-                        class="xjzl-input" style="flex:2;" placeholder="填入 Effects Tab 中的名称" />
-                    <a data-action="deleteEffectRef" data-idx="{{idx}}" style="color:#999;"><i
-                            class="fas fa-times"></i></a>
-                </div>
-                {{/each}}
-            </div>
-
-            {{!-- 5. 描述与脚本 (恢复脚本输入框) --}}
-            <div class="xjzl-grid-2" style="margin-top: 10px; align-items: start;">
+                {{!-- 左侧：描述 --}}
                 <div class="xjzl-flex-col">
                     <label style="font-weight:bold; font-size:0.9em;">描述文本</label>
                     <textarea name="system.moves.{{i}}.description" rows="8" class="xjzl-input"
                         style="text-align:left; height:auto; background: rgba(255,255,255,0.5);">{{move.description}}</textarea>
                 </div>
 
+                {{!-- 右侧：脚本列表 (【新增】核心改动) --}}
                 <div class="xjzl-flex-col">
-                    {{!-- 伤害脚本 --}}
-                    <div class="xjzl-flex-col">
-                        <label style="font-weight:bold; font-size:0.9em; color:var(--xjzl-accent);">
-                            {{localize "XJZL.Wuxue.Moves.Script"}}
-                            <i class="fas fa-info-circle" title="仅限数值计算。禁止使用 await/弹窗。会影响角色卡面板预览。"></i>
-                        </label>
-                        <textarea name="system.moves.{{i}}.script" rows="3" class="xjzl-input script-editor"
-                            placeholder="// 修改 out.damage, out.feint&#10;if(S.hp.value < 10) out.damage *= 2;">{{move.script}}</textarea>
+                    <div class="xjzl-flex-row"
+                        style="align-items: center; justify-content: space-between; margin-bottom: 5px;">
+                        <label style="font-weight:bold; font-size:0.9em;">{{localize "XJZL.Script.ScriptList"}}</label>
+                        <a class="item-control" data-action="addMoveScript" title="添加新特效">
+                            <i class="fas fa-plus"></i> 添加
+                        </a>
                     </div>
 
-                    {{!-- 执行脚本 (新增) --}}
-                    <div class="xjzl-flex-col" style="margin-top:5px;">
-                        <label style="font-weight:bold; font-size:0.9em; color:var(--xjzl-ink-800);">
-                            {{localize "XJZL.Wuxue.Moves.ExecutionScript"}}
-                            <i class="fas fa-info-circle" title="支持 await。可播放音效、弹窗、修改Token。仅在点击招式攻击时运行。"></i>
-                        </label>
-                        <textarea name="system.moves.{{i}}.executionScript" rows="3" class="xjzl-input script-editor"
-                            placeholder="// await AudioHelper.play(...)&#10;// await Dialog.confirm(...)">{{move.executionScript}}</textarea>
+                    {{!-- 遍历该招式的脚本 --}}
+                    {{#each move.scripts as |script sIdx|}}
+                    <div class="xjzl-script-item"
+                        style="border: 1px solid #ccc; padding: 5px; margin-bottom: 5px; border-radius: 4px; background: rgba(0,0,0,0.02);">
+                        <div class="xjzl-flex-row" style="gap: 5px; margin-bottom: 5px;">
+                            <input type="text" name="system.moves.{{i}}.scripts.{{sIdx}}.label" value="{{script.label}}"
+                                placeholder="特效名称" class="xjzl-input" style="flex: 2;" />
+
+                            <select name="system.moves.{{i}}.scripts.{{sIdx}}.trigger" style="flex: 2;">
+                                {{selectOptions ../../scriptTriggerChoices selected=script.trigger localize=false}}
+                            </select>
+
+                            <div style="display: flex; align-items: center;" title="是否启用">
+                                <input type="checkbox" name="system.moves.{{i}}.scripts.{{sIdx}}.active" {{checked
+                                    script.active}} />
+                            </div>
+
+                            <a data-action="deleteMoveScript" data-idx="{{sIdx}}" style="color: #999;">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                        </div>
+
+                        <textarea name="system.moves.{{i}}.scripts.{{sIdx}}.script" rows="2"
+                            class="xjzl-input script-editor"
+                            style="font-family: monospace; font-size: 0.9em; background: #fff;"
+                            placeholder="// JS 代码...">{{script.script}}</textarea>
                     </div>
+                    {{else}}
+                    <div
+                        style="text-align: center; color: #999; font-size: 0.9em; padding: 10px; border: 1px dashed #ddd;">
+                        无特效脚本
+                    </div>
+                    {{/each}}
                 </div>
             </div>
 

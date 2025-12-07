@@ -1,6 +1,7 @@
 /**
  * 奇珍数据模型 (镶嵌在经脉穴位中)
  */
+import { makeScriptEffectSchema } from "../common.mjs";
 export class XJZLQizhenData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     const fields = foundry.data.fields;
@@ -23,7 +24,9 @@ export class XJZLQizhenData extends foundry.abstract.TypeDataModel {
       // 【删除】 equipChanges (交给 AE 处理)
 
       // === 高级逻辑 ===
-      equipScript: new fields.StringField({ label: "XJZL.Equipment.EquipScript" }),
+      scripts: new fields.ArrayField(makeScriptEffectSchema(), {
+        label: "XJZL.Item.ScriptList"
+      }),
 
       description: new fields.HTMLField({ label: "XJZL.Info.Bio" }) // 描述
     };

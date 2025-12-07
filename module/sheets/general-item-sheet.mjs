@@ -11,6 +11,11 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
         classes: ["xjzl-window", "item", "general", "xjzl-system"],
         position: { width: 550, height: 600 },
         window: { resizable: true },
+        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        form: {
+            submitOnChange: true,
+            closeOnSubmit: false
+        },
         actions: {
             // 特效操作 (仅消耗品需要)
             createEffect: XJZLGeneralItemSheet.prototype._onCreateEffect,
@@ -23,8 +28,8 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
     static PARTS = {
         header: { template: "systems/xjzl-system/templates/item/general/header.hbs" },
         tabs: { template: "systems/xjzl-system/templates/item/general/tabs.hbs" },
-        details: { template: "systems/xjzl-system/templates/item/general/tab-details.hbs", scrollable: [".scroll-area"] },
-        effects: { template: "systems/xjzl-system/templates/item/general/tab-effects.hbs", scrollable: [".scroll-area"] }
+        details: { template: "systems/xjzl-system/templates/item/general/tab-details.hbs", scrollable: [""] },
+        effects: { template: "systems/xjzl-system/templates/item/general/tab-effects.hbs", scrollable: [""] }
     };
 
     tabGroups = { primary: "details" };
@@ -69,15 +74,15 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
     /* 自动保存 */
     _onRender(context, options) {
         super._onRender(context, options);
-        if (!this.element.dataset.delegated) {
-            this.element.addEventListener("change", (e) => {
-                if (e.target.matches("input, select, textarea")) {
-                    e.preventDefault();
-                    this.submit();
-                }
-            });
-            this.element.dataset.delegated = "true";
-        }
+        // if (!this.element.dataset.delegated) {
+        //     this.element.addEventListener("change", (e) => {
+        //         if (e.target.matches("input, select, textarea")) {
+        //             e.preventDefault();
+        //             this.submit();
+        //         }
+        //     });
+        //     this.element.dataset.delegated = "true";
+        // }
 
         // 秘籍拖拽监听
         if (context.isManual) {

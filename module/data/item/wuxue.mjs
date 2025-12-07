@@ -7,6 +7,7 @@
  * 3. 计算招式的等级、消耗和伤害面板。
  * ==========================================
  */
+import { makeScriptEffectSchema } from "../common.mjs";
 export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
   static defineSchema() {
@@ -85,17 +86,14 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
       // 附加特效列表: 存储要应用到目标身上的 ActiveEffect 的名称/ID
       // 逻辑: 攻击命中后，代码会在 Item.effects 里找同名特效，复制给目标
-      applyEffects: new fields.ArrayField(new fields.SchemaField({
-        key: new fields.StringField({ required: true }), // 特效名称
-        trigger: new fields.StringField({ initial: "hit", choices: ["hit", "use", "crit", "parry", "kill"] }),
-        target: new fields.StringField({ initial: "target", choices: ["self", "target"] })
-      })),
+      // 不需要了，附加逻辑在scripts里完成，普通的交给AE处理
 
-      // 招式脚本: 用于处理极其复杂的逻辑 (如: 自身血量<50%时伤害翻倍)
-      // 这是一个 JS 代码块，在 Roll 的时候执行
-      script: new fields.StringField({ label: "XJZL.Wuxue.Moves.Script" }),
-      // 2. 招式执行脚本 (异步，用于演出和特殊逻辑)
-      executionScript: new fields.StringField({ label: "XJZL.Wuxue.Moves.ExecutionScript" }),
+      // 以前: script (计算用), executionScript (执行用)
+      // 现在: 统一放在 effects 数组里，通过 trigger 区分
+      scripts: new fields.ArrayField(makeScriptEffectSchema(), {
+        label: "XJZL.Item.ScriptList",
+        initial: []
+      }),
 
       // --- 7. 伤害类型 ---
       // 决定了是否需要进行命中检定，以及应用伤害时对抗哪种抗性

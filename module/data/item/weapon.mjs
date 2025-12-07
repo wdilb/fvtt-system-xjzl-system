@@ -1,6 +1,7 @@
 /**
  * 武器数据模型
  */
+import { makeScriptEffectSchema } from "../common.mjs";
 export class XJZLWeaponData extends foundry.abstract.TypeDataModel {
   static defineSchema() {
     const fields = foundry.data.fields;
@@ -27,8 +28,10 @@ export class XJZLWeaponData extends foundry.abstract.TypeDataModel {
       // 【删除】 equipChanges (交给 AE 处理)
 
       // === 高级逻辑 ===
-      // 装备时生效的脚本
-      equipScript: new fields.StringField({ label: "XJZL.Equipment.EquipScript" }),
+      // 以前: equipScript
+      scripts: new fields.ArrayField(makeScriptEffectSchema(), {
+        label: "XJZL.Item.ScriptList"
+      }),
 
       description: new fields.HTMLField({ label: "XJZL.Info.Bio" }) //描述
     };

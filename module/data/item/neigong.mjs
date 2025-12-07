@@ -6,6 +6,7 @@
  * 2. 根据投入的修为自动计算当前重数 (Derived Data)
  * 3. 汇总当前生效的属性加成，供 Actor 调用
  */
+import { makeScriptEffectSchema } from "../common.mjs";
 export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
 
   static defineSchema() {
@@ -26,14 +27,12 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       // 该阶段的特效描述 (HTML富文本)
       effect: new fields.HTMLField({ label: "XJZL.Neigong.EffectConfig" }),
 
-      // 被动脚本 (Passive Script)
-      // 这是一段 JS 代码，会在 Actor 计算数据时执行
-      // 上下文变量: actor, item, system (actor.system)
-      script: new fields.StringField({
-        required: false,
-        initial: "", // 默认值为空，确保不自动生效
-        label: "XJZL.Neigong.ScriptLabel",
-        hint: "XJZL.Neigong.ScriptHint"
+      // === 脚本列表 ===
+      // 以前是 script: new fields.StringField(...)
+      // 现在改为 ArrayField
+      scripts: new fields.ArrayField(makeScriptEffectSchema(), {
+        label: "XJZL.Item.ScriptList",
+        initial: []
       })
     }, { label: label });
 
@@ -121,7 +120,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       stats: { liliang: 0, shenfa: 0, tipo: 0, neixi: 0, shencai: 0 },
       effect: "",         // 常驻特效文本
       masteryEffect: "",   // 圆满特效文本
-      script: ""        //脚本
+      effects: [] // 初始化为空数组
     };
 
     if (stage > 0) {
@@ -133,7 +132,8 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       if (stageConfig) {
         this.current.stats = { ...stageConfig.stats };
         this.current.effect = stageConfig.effect;
-        this.current.script = stageConfig.script || "";
+        // 复制数组 (浅拷贝即可，因为里面的对象通常只读)
+        this.current.effects = stageConfig.effects || [];
       }
 
       // 如果圆满，激活圆满特效

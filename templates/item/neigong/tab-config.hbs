@@ -1,0 +1,163 @@
+<section class="tab scroll-area {{#if (eq tabs.primary 'config')}}active{{/if}}" data-tab="config" data-group="primary">
+    <div class="xjzl-flex-col">
+      
+      {{!-- 循环渲染三个阶段 --}}
+      {{#each stages as |stage|}}
+      <fieldset class="xjzl-card" style="margin-bottom: 10px;">
+        <legend class="xjzl-card-header">{{localize stage.label}} (Stage {{stage.id}})</legend>
+        
+        {{!-- 1. 属性加成 (保持不变) --}}
+        <div class="xjzl-grid-3">
+            <div class="xjzl-flex-col xjzl-center">
+                <label>{{localize "XJZL.Stats.Liliang"}}</label>
+                {{!-- 使用 lookup 动态查找: system.config.stage1.stats.liliang --}}
+                <input type="number" name="system.config.{{stage.key}}.stats.liliang" 
+                       value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'liliang'}}" 
+                       class="xjzl-input" style="width: 50px;"/>
+            </div>
+            <div class="xjzl-flex-col xjzl-center">
+                <label>{{localize "XJZL.Stats.Shenfa"}}</label>
+                <input type="number" name="system.config.{{stage.key}}.stats.shenfa" 
+                       value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'shenfa'}}" 
+                       class="xjzl-input" style="width: 50px;"/>
+            </div>
+             <div class="xjzl-flex-col xjzl-center">
+                <label>{{localize "XJZL.Stats.Tipo"}}</label>
+                <input type="number" name="system.config.{{stage.key}}.stats.tipo" 
+                       value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'tipo'}}" 
+                       class="xjzl-input" style="width: 50px;"/>
+            </div>
+            <div class="xjzl-flex-col xjzl-center">
+                <label>{{localize "XJZL.Stats.Neixi"}}</label>
+                <input type="number" name="system.config.{{stage.key}}.stats.neixi" 
+                       value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'neixi'}}" 
+                       class="xjzl-input" style="width: 50px;"/>
+            </div>
+            <div class="xjzl-flex-col xjzl-center">
+                <label>{{localize "XJZL.Stats.Qigan"}}</label>
+                <input type="number" name="system.config.{{stage.key}}.stats.qigan" 
+                       value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'qigan'}}" 
+                       class="xjzl-input" style="width: 50px;"/>
+            </div>
+             <div class="xjzl-flex-col xjzl-center">
+                <label>{{localize "XJZL.Stats.Shencai"}}</label>
+                <input type="number" name="system.config.{{stage.key}}.stats.shencai" 
+                       value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'shencai'}}" 
+                       class="xjzl-input" style="width: 50px;"/>
+            </div>
+        </div>
+
+        <hr style="border-color: #aaa; opacity: 0.3; margin: 10px 0;">
+        
+        {{!-- 2. 特效描述 --}}
+        <div class="xjzl-flex-col">
+            <label style="font-weight: bold;">{{localize "XJZL.Neigong.EffectConfig"}}</label>
+            <textarea name="system.config.{{stage.key}}.effect" rows="2" 
+                      class="xjzl-input script-editor" 
+                      style="font-family: inherit; font-size: 14px; color: #000 !important; background: rgba(255,255,255,0.5);"
+                      placeholder="在此输入特效描述...">{{lookup (lookup ../system.config stage.key) 'effect'}}</textarea>
+        </div>
+
+        <div style="height: 5px;"></div>
+
+        {{!-- 3. 脚本列表 (【新增】核心改动) --}}
+        <div class="xjzl-flex-col">
+            <div class="xjzl-flex-row" style="align-items: center; justify-content: space-between; margin-bottom:5px;">
+                <label style="font-weight: bold;">{{localize "XJZL.Script.ScriptList"}}</label>
+                {{!-- 添加按钮：需要传递 stage.key --}}
+                <a class="item-control" data-action="addStageScript" data-stage="{{stage.key}}" title="添加新特效">
+                    <i class="fas fa-plus"></i> 添加
+                </a>
+            </div>
+            
+            {{!-- 遍历该阶段的 scripts 数组 --}}
+            {{#each (lookup (lookup ../system.config stage.key) 'scripts') as |script i|}}
+            <div class="xjzl-script-item" style="border: 1px solid #ccc; padding: 5px; margin-bottom: 5px; border-radius: 4px; background: rgba(0,0,0,0.02);">
+                <div class="xjzl-flex-row" style="gap: 5px; margin-bottom: 5px;">
+                    {{!-- 名称 --}}
+                    <input type="text" name="system.config.{{stage.key}}.scripts.{{i}}.label" 
+                           value="{{script.label}}" placeholder="特效名称"
+                           class="xjzl-input" style="flex: 2;"/>
+                    
+                    {{!-- 触发器 --}}
+                    <select name="system.config.{{stage.key}}.scripts.{{i}}.trigger" style="flex: 2;">
+                        {{selectOptions ../../scriptTriggerChoices selected=script.trigger localize=false}}
+                    </select>
+
+                    {{!-- 开关 --}}
+                    <div style="display: flex; align-items: center;" title="是否启用">
+                        <input type="checkbox" name="system.config.{{stage.key}}.scripts.{{i}}.active" {{checked script.active}}/>
+                    </div>
+
+                    {{!-- 删除 --}}
+                    <a data-action="deleteStageScript" data-stage="{{stage.key}}" data-index="{{i}}" style="color: #999;">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </div>
+                
+                {{!-- 代码框 --}}
+                <textarea name="system.config.{{stage.key}}.scripts.{{i}}.script" rows="2" 
+                          class="xjzl-input script-editor" 
+                          style="font-family: monospace; font-size: 0.9em; background: #fff;"
+                          placeholder="// JS 代码...">{{script.script}}</textarea>
+            </div>
+            {{else}}
+            <div style="text-align: center; color: #999; padding: 5px; border: 1px dashed #ccc; font-size: 0.9em;">
+                暂无脚本
+            </div>
+            {{/each}}
+        </div>
+
+      </fieldset>
+      {{/each}}
+
+      {{!-- 圆满配置区域 (保持不变) --}}
+      <fieldset class="xjzl-card" style="border-color: var(--xjzl-gold); background: rgba(255, 215, 0, 0.05);">
+        <legend class="xjzl-card-header" style="color: var(--xjzl-gold) !important; border-bottom-color: var(--xjzl-gold);">
+            <i class="fas fa-crown"></i> 圆满境界 (永久加成)
+        </legend>
+        
+        <p style="font-size: 0.8em; color: #666; text-align: center; margin: 0 0 10px 0;">
+            此处属性在内功达到圆满后<b>永久生效</b>，无需运功。
+        </p>
+
+        <div class="xjzl-flex-col">
+            <div class="xjzl-flex-row" style="font-weight:bold; font-size:0.8em; color:#555; border-bottom:1px solid #ccc; padding-bottom:4px;">
+                <div style="flex: 2;">属性 Key</div>
+                <div style="flex: 1; text-align:center;">数值</div>
+                <div style="flex: 1;">备注</div>
+                <div style="width: 30px;"></div>
+            </div>
+
+            {{#each system.masteryChanges as |change i|}}
+            <div class="xjzl-flex-row">
+                <input type="text" name="system.masteryChanges.{{i}}.key" value="{{change.key}}" 
+                       class="xjzl-input" style="flex: 2; text-align: left;" placeholder="system.stats..."/>
+                <input type="number" name="system.masteryChanges.{{i}}.value" value="{{change.value}}" 
+                       class="xjzl-input" style="flex: 1;"/>
+                <input type="text" name="system.masteryChanges.{{i}}.label" value="{{change.label}}" 
+                       class="xjzl-input" style="flex: 1;" placeholder="例如: 力量"/>
+                <a data-action="deleteMasteryChange" data-index="{{i}}" style="color: #999; width: 30px; text-align: center;">
+                    <i class="fas fa-trash"></i>
+                </a>
+            </div>
+            {{/each}}
+
+            <button type="button" data-action="addMasteryChange" style="margin-top: 5px; border: 1px dashed #999; background: transparent; color: #555;">
+                <i class="fas fa-plus"></i> 添加一条修正
+            </button>
+        </div>
+
+        <hr style="border-color: var(--xjzl-gold); opacity: 0.3; margin: 10px 0;">
+
+        <div class="xjzl-flex-col">
+            <label style="font-weight: bold;">{{localize "XJZL.Neigong.MasteryEffect"}}</label>
+            <textarea name="system.masteryEffect" rows="2" 
+                      class="xjzl-input script-editor" 
+                      style="font-family: inherit; font-size: 14px; color: #000 !important; background: rgba(255,255,255,0.5);"
+                      placeholder="描述圆满后的特殊效果...">{{system.masteryEffect}}</textarea>
+        </div>
+      </fieldset>
+      
+    </div>
+</section>

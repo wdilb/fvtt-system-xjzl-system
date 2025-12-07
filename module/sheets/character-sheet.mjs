@@ -12,6 +12,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         classes: ["xjzl-window", "actor", "character", "xjzl-system"],
         position: { width: 900, height: 800 },
         window: { resizable: true },
+        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        form: {
+            submitOnChange: true,
+            closeOnSubmit: false
+        },
         actions: {
             // --- 核心切换 ---
             toggleNeigong: XJZLCharacterSheet.prototype._onToggleNeigong,
@@ -47,7 +52,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         jingmai: { template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs", scrollable: [""] },
         skills: { template: "systems/xjzl-system/templates/actor/character/tab-skills.hbs", scrollable: [""] },
         combat: { template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs", scrollable: [""] },
-        inventory: { template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs", scrollable: [".scroll-area"] },
+        inventory: { template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs", scrollable: [""] },
         effects: { template: "systems/xjzl-system/templates/actor/character/tab-effects.hbs", scrollable: [""] }
     };
 
@@ -141,19 +146,19 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     /*  事件监听与自动保存                           */
     /* -------------------------------------------- */
 
-    _onRender(context, options) {
-        super._onRender(context, options);
+    // _onRender(context, options) {
+    //     super._onRender(context, options);
 
-        if (!this.element.dataset.delegated) {
-            this.element.addEventListener("change", (event) => {
-                const target = event.target;
-                if (target.matches("input, select, textarea")) {
-                    this.submit();
-                }
-            });
-            this.element.dataset.delegated = "true";
-        }
-    }
+    //     if (!this.element.dataset.delegated) {
+    //         this.element.addEventListener("change", (event) => {
+    //             const target = event.target;
+    //             if (target.matches("input, select, textarea")) {
+    //                 this.submit();
+    //             }
+    //         });
+    //         this.element.dataset.delegated = "true";
+    //     }
+    // }
 
     /**
      * 处理输入框变化 (增加属性验证)

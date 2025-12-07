@@ -1,5 +1,6 @@
 import { XJZL } from "../config.mjs";
 import { localizeConfig } from "../utils/utils.mjs";
+import { TRIGGER_CHOICES } from "../data/common.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -11,19 +12,26 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         classes: ["xjzl-window", "item", "equipment", "xjzl-system"],
         position: { width: 550, height: 650 },
         window: { resizable: true },
+        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        form: {
+            submitOnChange: true,
+            closeOnSubmit: false
+        },
         actions: {
             createEffect: XJZLEquipmentSheet.prototype._onCreateEffect,
             editEffect: XJZLEquipmentSheet.prototype._onEditEffect,
             deleteEffect: XJZLEquipmentSheet.prototype._onDeleteEffect,
-            toggleEffect: XJZLEquipmentSheet.prototype._onToggleEffect
+            toggleEffect: XJZLEquipmentSheet.prototype._onToggleEffect,
+            addScript: XJZLEquipmentSheet.prototype._onAddScript,
+            deleteScript: XJZLEquipmentSheet.prototype._onDeleteScript
         }
     };
 
     static PARTS = {
         header: { template: "systems/xjzl-system/templates/item/equipment/header.hbs" },
         tabs: { template: "systems/xjzl-system/templates/item/equipment/tabs.hbs" },
-        details: { template: "systems/xjzl-system/templates/item/equipment/tab-details.hbs", scrollable: [".scroll-area"] },
-        effects: { template: "systems/xjzl-system/templates/item/equipment/tab-effects.hbs", scrollable: [".scroll-area"] }
+        details: { template: "systems/xjzl-system/templates/item/equipment/tab-details.hbs", scrollable: [""] },
+        effects: { template: "systems/xjzl-system/templates/item/equipment/tab-effects.hbs", scrollable: [""] }
     };
 
     tabGroups = { primary: "details" };
@@ -37,6 +45,12 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         context.isWeapon = this.document.type === "weapon";
         context.isArmor = this.document.type === "armor";
         context.isQizhen = this.document.type === "qizhen";
+
+        // 准备触发器下拉菜单 (本地化)
+        context.scriptTriggerChoices = {};
+        for (const [key, labelKey] of Object.entries(TRIGGER_CHOICES)) {
+            context.scriptTriggerChoices[key] = game.i18n.localize(labelKey);
+        }
 
         // 准备下拉菜单
         context.choices = {
@@ -71,17 +85,45 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
     /* -------------------------------------------- */
     /*  自动保存 (事件委托)                         */
     /* -------------------------------------------- */
-    _onRender(context, options) {
-        super._onRender(context, options);
-        if (!this.element.dataset.delegated) {
-            this.element.addEventListener("change", (e) => {
-                if (e.target.matches("input, select, textarea")) {
-                    e.preventDefault();
-                    this.submit();
-                }
-            });
-            this.element.dataset.delegated = "true";
-        }
+    // _onRender(context, options) {
+    //     super._onRender(context, options);
+    //     if (!this.element.dataset.delegated) {
+    //         this.element.addEventListener("change", (e) => {
+    //             if (e.target.matches("input, select, textarea")) {
+    //                 e.preventDefault();
+    //                 this.submit();
+    //             }
+    //         });
+    //         this.element.dataset.delegated = "true";
+    //     }
+    // }
+
+    /* -------------------------------------------- */
+    /*  Script Logic (脚本管理)                      */
+    /* -------------------------------------------- */
+
+    async _onAddScript(event, target) {
+        const scripts = this.document.system.scripts || [];
+        const newScript = {
+            label: "新特效",
+            trigger: "passive", // 默认被动
+            script: "",
+            active: true
+        };
+
+        await this.document.update({
+            "system.scripts": [...scripts, newScript]
+        });
+    }
+
+    async _onDeleteScript(event, target) {
+        const index = Number(target.dataset.index);
+        const scripts = this.document.system.scripts || [];
+        const newScripts = scripts.filter((_, i) => i !== index);
+
+        await this.document.update({
+            "system.scripts": newScripts
+        });
     }
 
     /* -------------------------------------------- */
