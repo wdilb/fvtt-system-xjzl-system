@@ -28,6 +28,9 @@ import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
 import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 
+//导入管理器
+import {ChatCardManager} from "./module/managers/chat-manager.mjs";
+
 // 导入配置
 import { XJZL } from "./module/config.mjs";
 
@@ -132,6 +135,8 @@ Hooks.once("init", async function () {
 
 Hooks.once("ready", async function () {
   // 等待系统完全加载后的操作，比如处理设置、欢迎弹窗等
+  // 监听聊天消息渲染，绑定按钮事件
+  Hooks.on("renderChatMessageHTML", ChatCardManager.onRenderChatMessage);
   console.log("侠界之旅系统 - 准备就绪");
 });
 

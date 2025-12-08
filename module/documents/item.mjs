@@ -965,7 +965,7 @@ export class XJZLItem extends Item {
       content += `
           <div class="form-group">
               <label>允许暴击?（仅指造成暴击伤害）</label>
-              <input type="checkbox" name="canCrit" checked}/>
+              <input type="checkbox" name="canCrit" checked/>
           </div>`;
     }
 
@@ -1169,10 +1169,7 @@ export class XJZLItem extends Item {
       // 直接调用我们之前封装好的方法，保证和角色卡预览一致
       const calcResult = this.calculateMoveDamage(moveId);
 
-      if (!calcResult) {
-        ui.notifications.error("伤害计算失败。");
-        return;
-      }
+      if (!calcResult) return ui.notifications.error("伤害计算失败。");
 
       // 应用手动修正
       calcResult.damage += config.bonusDamage;
@@ -1183,6 +1180,10 @@ export class XJZLItem extends Item {
       // =====================================================
       let attackRoll = null;
       let rollJSON = null;
+      let rollTooltip = null;
+      let displayTotal = 0; // 卡片上显示的数字，用来处理复杂的优势劣势情况下该显示什么数字
+      // 初始化 targetsResults，防止 ReferenceError
+      const targetsResults = {};
       const damageType = move.damageType || "waigong";
       const needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
       if (move.type === "counter") needsHitCheck = false; //反击必中，其他的架招和虚招在上面已经返回了
@@ -1205,8 +1206,6 @@ export class XJZLItem extends Item {
         const scriptAdv = attackContext.flags.advantage || false;
         const scriptDis = attackContext.flags.disadvantage || false;
 
-        // console.log(`优势:${actorAdv},劣势:${actorDis},招式优势:${moveAdv},招式劣势:${moveDis}`);
-
         // 3. 计算优劣势源的数量 (True=1, False=0)
         // 逻辑：只要有一个来源给优势，优势数就+1
         const selfAdvCount = (actorAdv ? 1 : 0) + (scriptAdv ? 1 : 0);
@@ -1216,7 +1215,9 @@ export class XJZLItem extends Item {
         if (selfAdvCount > selfDisCount) selfState = 1;
         else if (selfDisCount > selfAdvCount) selfState = -1;
 
-        //  C.目标预判 (决定投掷数量，如果传入了目标的话)
+        // C. 目标预判 (Target Pre-Check)
+        // 核心逻辑：如果 targets 里有任何人导致我需要扔双骰，那就扔双骰 (needsTwoDice=true)
+        // 这样可以避免后续补骰，实现“一次投掷，多种解释”
         let needsTwoDice = (selfState !== 0);
         const targetStates = new Map(); // 存储每个目标的优劣状态
 
@@ -1227,8 +1228,8 @@ export class XJZLItem extends Item {
 
             // 运行 CHECK 脚本
             const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
-
-            actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
+            // runScripts 是 async 方法，即使 trigger 是同步的，外部调用最好也 await 保证顺序
+            await actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
             //再次结合目标来判断优劣
             const tStatus = targetActor.xjzlStatuses || {};
@@ -1250,6 +1251,8 @@ export class XJZLItem extends Item {
         // 如果需要补骰，公式显示 2d20，方便玩家知道“哦，我有优势/劣势处理”
         const diceFormula = needsTwoDice ? "2d20" : "1d20";
         attackRoll = await new Roll(`${diceFormula} + @mod`, { mod: hitMod }).evaluate();
+        // 生成 Tooltip HTML
+        rollTooltip = await attackRoll.getTooltip();
         rollJSON = attackRoll.toJSON();
 
         // E. 分配结果
@@ -1257,28 +1260,49 @@ export class XJZLItem extends Item {
         const d1 = diceResults[0];
         const d2 = diceResults[1] || d1;
 
-        flavorText = selfState === 1 ? "攻击 (自身优势)" : (selfState === -1 ? "攻击 (自身劣势)" : "攻击");
+        // 逻辑：如果有目标，取第一个目标的优劣势状态；如果没有，取自身状态。
+        let primaryState = selfState;
+
+        if (targets.length > 0) {
+          const firstId = targets[0].id;
+          // targetStates 在 C 步骤中已经计算好了
+          primaryState = targetStates.get(firstId) ?? 0;
+        }
+
+        // 根据主要状态计算大数字
+        if (primaryState === 1) {
+          displayTotal = Math.max(d1, d2) + hitMod;
+          flavorText = "攻击 (优势)";
+        } else if (primaryState === -1) {
+          displayTotal = Math.min(d1, d2) + hitMod;
+          flavorText = "攻击 (劣势)";
+        } else {
+          displayTotal = d1 + hitMod;
+          flavorText = "攻击";
+        }
 
         // 填充预判结果
         targets.forEach(t => {
           const state = targetStates.get(t.id) ?? 0;
           let finalDie = d1;
           let outcomeLabel = "平";
-
+          // 根据每个目标的最终状态，从 d1/d2 中选一个
           if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
           else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
 
           const total = finalDie + hitMod;
-          // 假设防御属性 (暂定为外防，未来根据 damageType 变)
+
+          // 获取目标闪避
           // 这里只是预览命中，不做逻辑判定
-          const defVal = t.actor.system.combat.dodgeTotal || 10;
+          const dodge = t.actor.system.combat.dodgeTotal || 10;
 
           targetsResults[t.id] = {
             name: t.name,
             total: total,
-            isHit: total >= defVal,
+            isHit: total >= dodge,
             stateLabel: outcomeLabel,
-            defVal: defVal
+            dodge: dodge,
+            die: finalDie // 调试用：显示用的哪个骰子
           };
         });
       }
@@ -1286,6 +1310,21 @@ export class XJZLItem extends Item {
       // =====================================================
       // 7. 发送消息
       // =====================================================
+
+      // --- 计算是否显示虚招对抗按钮 ---
+      let showFeintBtn = false;
+
+      // 只有虚招才需要判断
+      if (move.type === "feint") {
+        if (targets.length === 0) {
+          // 情况 1: 没选目标 -> 默认显示 (允许玩家发卡后手动选人点按钮)
+          showFeintBtn = true;
+        } else {
+          // 情况 2: 选了目标 -> 检查是否有任意一个目标开启了架招
+          // 使用 .some() 方法，找到一个满足条件的就停止
+          showFeintBtn = targets.some(t => t.actor?.system.martial?.stanceActive === true);
+        }
+      }
 
       // 生成聊天卡片 (Chat Card)
       const templateData = {
@@ -1299,8 +1338,10 @@ export class XJZLItem extends Item {
         attackRoll: attackRoll, // 骰子实例
         rollTooltip: rollTooltip, // 骰子详情 HTML
         damageTypeLabel: game.i18n.localize(XJZL.damageTypes[damageType]),
+        displayTotal: displayTotal,
         targetsResults: targetsResults,
-        hasTargets: Object.keys(targetsResults).length > 0
+        hasTargets: Object.keys(targetsResults).length > 0,
+        showFeintBtn: showFeintBtn
       };
 
       const content = await renderTemplate(
@@ -1338,7 +1379,20 @@ export class XJZLItem extends Item {
             // 4. 目标快照
             // 记录 UUID 列表，方便 GM 点击“一键应用”时自动寻找目标
             // 并不代表 ATTACK 脚本处理了这些目标，仅仅是 UI 层的记录
-            targets: (options.targets || Array.from(game.user.targets)).map(t => t.document.uuid)
+            targets: targets.map(t => t.document.uuid),
+            // 存储预判结果 Map
+            // 这里的 Key 是 Token ID，Value 是预判的状态
+            // 这样在 Apply Damage 时，直接通过 Token ID 查表即可
+            targetsResultMap: Object.keys(targetsResults).reduce((acc, tokenId) => {
+              const res = targetsResults[tokenId];
+              acc[tokenId] = {
+                stateLabel: res.stateLabel, // "优", "劣", "平"
+                isHit: res.isHit,           // 是否命中
+                total: res.total,           // 最终数值
+                dieUsed: res.die            // 用的哪个骰子
+              };
+              return acc;
+            }, {})
           }
         }
       };

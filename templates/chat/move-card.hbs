@@ -1,59 +1,76 @@
 <div class="xjzl-chat-card move-card" data-item-id="{{item.id}}" data-move-id="{{move.id}}">
 
-    {{!-- 1. 头部：招式信息 --}}
+    {{!-- 1. 头部 --}}
     <header class="card-header"
         style="border-bottom: 2px solid var(--xjzl-gold); padding-bottom: 5px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
         <img src="{{move.img}}" width="40" height="40"
             style="border:1px solid #333; background:#000; border-radius: 4px;" />
         <div style="flex: 1;">
             <h3 style="margin: 0; font-weight: 900; border: none; color: #8b0000; font-size: 1.2em;">{{move.name}}</h3>
-            <div style="font-size: 0.8em; color: #555; display: flex; justify-content: space-between;">
-                <span>{{item.name}}</span>
+            <div style="font-size: 0.8em; color: #555;">
                 <span style="background: #333; color: #fff; padding: 0 4px; border-radius: 2px;">
-                    {{#if isStance}}架{{else if isFeint}}虚{{else}}实{{/if}}
+                    {{localize (concat "XJZL.Wuxue.Type." move.type)}}
                 </span>
+                - {{item.name}}
             </div>
         </div>
     </header>
 
-    {{!-- 2. 描述 (可选，太长可以不显示，或者只显示简述) --}}
+    {{!-- 2. 描述 (可选) --}}
     {{#if move.description}}
     <div class="card-description"
-        style="font-style: italic; font-size: 0.9em; color: #444; margin-bottom: 10px; padding: 5px; background: rgba(0,0,0,0.05); border-radius: 4px;">
+        style="font-style: italic; font-size: 0.9em; color: #444; margin-bottom: 10px; padding: 5px; background: rgba(0,0,0,0.03); border-radius: 4px;">
         {{{move.description}}}
     </div>
     {{/if}}
 
-    {{!-- 命中检定结果 --}}
+    {{!-- 3. 命中检定 --}}
     {{#if attackRoll}}
     <div class="card-roll" style="margin-bottom: 10px;">
-        <div style="background: #eee; padding: 5px; border-radius: 4px; text-align: center; cursor: pointer;"
-            onclick="$(this).next('.dice-tooltip').toggleClass('expanded')">
-            <div style="font-size: 0.8em; color: #666;">{{damageTypeLabel}} - 命中检定</div>
+        {{!-- 加上类名 roll-header 方便 JS 监听点击 --}}
+        <div class="roll-header"
+            style="background: #eee; padding: 5px; border-radius: 4px; text-align: center; cursor: pointer; border: 1px solid #ccc;">
+            <div style="font-size: 0.8em; color: #666;">{{damageTypeLabel}} 检定</div>
             <div style="font-size: 1.4em; font-weight: bold; color: #333;">
-                {{attackRoll.total}}
+                {{displayTotal}}
             </div>
             <div style="font-size: 0.7em; color: #888;">
                 {{attackRoll.formula}} (点击查看详情)
             </div>
         </div>
 
-        {{!-- 骰子详情 (默认折叠) --}}
-        {{!-- 注意：expanded 类需要在 CSS 里处理，或者默认显示 --}}
-        <div class="dice-tooltip" style="display: none;">
+        <div class="dice-tooltip" style="display: none; margin-top: 5px;">
             {{{rollTooltip}}}
         </div>
+
+        {{!-- 目标预判列表 --}}
+        {{#if hasTargets}}
+        <div style="margin-top: 5px; border-top: 1px dashed #ccc; padding-top: 5px; font-size: 0.85em;">
+            {{#each targetsResults as |res id|}}
+            <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                <span style="font-weight:bold; color:#444;">{{res.name}}</span>
+                <span>
+                    <b style="color: {{#if res.isHit}}green{{else}}red{{/if}};">
+                        {{res.total}}
+                    </b>
+                    vs {{res.dodge}}
+                    <span style="font-size:0.8em; color:#999;">({{res.stateLabel}})</span>
+                </span>
+            </div>
+            {{/each}}
+        </div>
+        {{/if}}
     </div>
     {{/if}}
 
-    {{!-- 3. 核心数值展示 --}}
+    {{!-- 4. 核心数值展示 (汉化 + 清晰化) --}}
     <div class="card-stats"
         style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 15px; background: #fff; border: 1px dashed #ccc; padding: 5px; border-radius: 4px;">
 
         {{!-- 伤害 --}}
         {{#if (gt calc.damage 0)}}
         <div style="text-align: center;">
-            <div style="font-size: 0.8em; color: #666; text-transform: uppercase;">Damage</div>
+            <div style="font-size: 0.8em; color: #666;">伤害</div>
             <div style="font-size: 1.8em; font-weight: 900; color: var(--xjzl-accent); line-height: 1;"
                 title="{{calc.breakdown}}">
                 {{calc.damage}}
@@ -64,7 +81,7 @@
         {{!-- 虚招 --}}
         {{#if (gt calc.feint 0)}}
         <div style="text-align: center;">
-            <div style="font-size: 0.8em; color: #666; text-transform: uppercase;">Feint</div>
+            <div style="font-size: 0.8em; color: #666;">虚招值</div>
             <div style="font-size: 1.8em; font-weight: 900; color: #9370db; line-height: 1;"
                 title="{{calc.feintBreakdown}}">
                 {{calc.feint}}
@@ -72,43 +89,38 @@
         </div>
         {{/if}}
 
-        {{!-- 消耗 --}}
-        {{#if (or calc.cost.mp calc.cost.rage calc.cost.hp)}}
-        <div
-            style="text-align: center; font-size: 0.9em; color: #333; border-left: 1px solid #eee; padding-left: 10px;">
-            {{#if calc.cost.mp}}<div><i class="fas fa-bolt" style="color:#88caff"></i> {{calc.cost.mp}}</div>{{/if}}
-            {{#if calc.cost.rage}}<div><i class="fas fa-fire" style="color:#ffca88"></i> {{calc.cost.rage}}</div>{{/if}}
-            {{#if calc.cost.hp}}<div><i class="fas fa-heart" style="color:#ff8888"></i> {{calc.cost.hp}}</div>{{/if}}
+        {{!-- 消耗 (文字版) --}}
+        {{#if (or cost.mp cost.rage cost.hp)}}
+        <div style="text-align: left; font-size: 0.85em; color: #555; border-left: 1px solid #eee; padding-left: 10px;">
+            {{#if cost.mp}}<div><b style="color:#2b4c7e">内力:</b> {{cost.mp}}</div>{{/if}}
+            {{#if cost.rage}}<div><b style="color:#c5a059">怒气:</b> {{cost.rage}}</div>{{/if}}
+            {{#if cost.hp}}<div><b style="color:#8b0000">气血:</b> {{cost.hp}}</div>{{/if}}
         </div>
         {{/if}}
     </div>
 
-    {{!-- 4. 交互按钮组 --}}
+    {{!-- 5. 交互按钮组 (调整顺序) --}}
     <div class="card-buttons" style="display: flex; flex-direction: column; gap: 5px;">
 
-        {{!-- 架招 --}}
-        {{#if isStance}}
-        <button data-action="applyStance" style="background: #444; color: white;">
-            <i class="fas fa-shield-alt"></i> 开启架招姿态
-        </button>
-        {{/if}}
-
-        {{!-- 伤害类 --}}
-        {{#if (gt calc.damage 0)}}
-        <div style="display: flex; gap: 5px;">
-            <button data-action="applyDamage" style="flex: 2; background: var(--xjzl-accent); color: white;">
-                <i class="fas fa-tint"></i> 应用伤害
-            </button>
-            <button data-action="applyEffects" style="flex: 1; background: #333; color: white;" title="给目标附加招式特效">
-                <i class="fas fa-bolt"></i> 特效
-            </button>
-        </div>
-        {{/if}}
-
-        {{!-- 虚招 --}}
+        {{!-- 虚招对抗 (放在上面) --}}
         {{#if isFeint}}
+        {{#if showFeintBtn}}
         <button data-action="rollFeintContest" style="background: #483d8b; color: white;">
             <i class="fas fa-dice-d20"></i> 虚招对抗检定
+        </button>
+        {{else}}
+        {{!-- 如果目标无架招，显示提示信息，或者完全隐藏 --}}
+        <div style="text-align:center; font-size:0.8em; color:#666; background:#eee; padding:4px; border-radius:4px;">
+            目标未开启架招，直接生效
+        </div>
+        {{/if}}
+        {{/if}}
+
+        {{!-- 伤害应用 (放在下面) --}}
+        {{#if (gt calc.damage 0)}}
+        {{!-- 删除了特效按钮 --}}
+        <button data-action="applyDamage" style="background: var(--xjzl-accent); color: white;">
+            <i class="fas fa-tint"></i> 应用伤害
         </button>
         {{/if}}
 
