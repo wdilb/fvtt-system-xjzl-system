@@ -249,8 +249,8 @@ export class XJZLActor extends Actor {
     };
 
     // 3. 决定执行模式 (同步/异步)
-    // Passive 和 Calc 必须同步运行，不能 await，否则会阻塞数据计算
-    const isSync = [SCRIPT_TRIGGERS.PASSIVE, SCRIPT_TRIGGERS.CALC].includes(trigger);
+    // Passive 和 Calc 和 CHECK 必须同步运行，不能 await，否则会阻塞数据计算
+    const isSync = [SCRIPT_TRIGGERS.PASSIVE, SCRIPT_TRIGGERS.CALC, SCRIPT_TRIGGERS.CHECK].includes(trigger);
 
     if (isSync) {
       this._runScriptsSync(scriptsToRun, sandbox);

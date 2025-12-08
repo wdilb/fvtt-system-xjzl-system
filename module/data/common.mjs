@@ -10,8 +10,9 @@ export const SCRIPT_TRIGGERS = {
   PASSIVE: "passive",       // [同步] 被动常驻 (prepareDerivedData)
   CALC: "calc",             // [同步] 伤害计算修正 (calculateMoveDamage)
   ATTACK: "attack",         // [异步] 出招/掷骰前 (决定优势、资源、是否允许出招)
+  CHECK: "check",           // [同步] 检定修正（仅用于那些需要目标又在命中前生效的特效）
   HIT: "hit",               // [异步] 命中/结算后 (应用BUFF、扣血、副作用)
-  DAMAGED: "damaged",   // 【新增】防御者触发：受伤时
+  DAMAGED: "damaged",       // [异步] 防御者触发：受伤时
   TURN_START: "turnStart",  // [异步] 回合开始
   TURN_END: "turnEnd",      // [异步] 回合结束
   // EQUIP: "equip",           // [异步] 装备/卸下时 (特殊逻辑)
@@ -22,6 +23,7 @@ export const TRIGGER_CHOICES = {
   [SCRIPT_TRIGGERS.PASSIVE]: "XJZL.Triggers.Passive",
   [SCRIPT_TRIGGERS.CALC]: "XJZL.Triggers.Calc",
   [SCRIPT_TRIGGERS.ATTACK]: "XJZL.Triggers.Attack",
+  [SCRIPT_TRIGGERS.CHECK]: "XJZL.Triggers.Check",
   [SCRIPT_TRIGGERS.HIT]: "XJZL.Triggers.Hit",
   [SCRIPT_TRIGGERS.DAMAGED]: "XJZL.Triggers.Damaged",
   [SCRIPT_TRIGGERS.TURN_START]: "XJZL.Triggers.TurnStart",
