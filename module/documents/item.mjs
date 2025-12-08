@@ -915,8 +915,81 @@ export class XJZLItem extends Item {
   }
 
   /* -------------------------------------------- */
-  /*  Roll: 核心招式执行                          */
+  /*  Roll: 核心招式执行                           */
   /* -------------------------------------------- */
+
+  /**
+   * 步骤 0: 动态配置弹窗
+   * 根据招式类型显示不同的输入框
+   */
+  async _promptRollConfiguration(move) {
+    const isFeint = move.type === "feint";
+    const isCounter = move.type === "counter";
+
+    // 架招和气招不需要弹窗，直接瞬发
+    if (move.type === "stance") return {};
+
+    //需要询问命中的
+    const needsAttack = ["real", "feint", "ultimate"].includes(move.type) && ["waigong", "neigong"].includes(move.damageType);
+
+    //需要询问伤害加值的
+    const needsDamage = ["real", "feint", "counter", "ultimate"].includes(move.type);
+
+    let content = `<form style="margin-bottom:10px;">`;
+
+    if (needsAttack) {
+      content += `
+          <div class="form-group">
+              <label>额外命中加值</label>
+              <input type="number" name="bonusAttack" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
+          </div>`;
+    }
+
+    if (isFeint) {
+      content += `
+          <div class="form-group">
+              <label>额外虚招值</label>
+              <input type="number" name="bonusFeint" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
+          </div>`;
+    }
+
+    if (needsDamage) {
+      content += `
+          <div class="form-group">
+              <label>额外伤害加值</label>
+              <input type="number" name="bonusDamage" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
+          </div>`;
+    }
+
+    if (!isCounter) {
+      content += `
+          <div class="form-group">
+              <label>允许暴击?（仅指造成暴击伤害）</label>
+              <input type="checkbox" name="canCrit" checked}/>
+          </div>`;
+    }
+
+    content += `</form>`;
+
+    return foundry.applications.api.DialogV2.prompt({
+      window: { title: `施展: ${move.name}`, icon: "fas fa-dice" },
+      content: content,
+      ok: {
+        label: "执行",
+        icon: "fas fa-check",
+        callback: (event, button) => {
+          const formData = new FormData(button.form);
+          return {
+            bonusAttack: parseInt(formData.get("bonusAttack")) || 0,
+            bonusFeint: parseInt(formData.get("bonusFeint")) || 0,
+            bonusDamage: parseInt(formData.get("bonusDamage")) || 0,
+            canCrit: formData.get("canCrit") === "on"
+          };
+        }
+      },
+      rejectClose: true
+    });
+  }
 
   /**
    * 执行招式 (Roll)
@@ -944,17 +1017,18 @@ export class XJZLItem extends Item {
         return;
       }
 
+
       // =====================================================
       // 1. 状态阻断检查 (Status Check)
       // =====================================================
       const s = actor.xjzlStatuses || {};
 
       // 硬控：晕眩
-      if (s.stun) return ui.notifications.warn(`${actor.name} 处于晕眩状态，无法行动！`);
+      if (s.stun) return ui.notifications.warn(`${actor.name} 无法行动！`);
 
-      // 沉默：无法施展气招/绝招 (假设设定)
-      if (s.silence && (move.type === "qi" || move.type === "ultimate")) {
-        return ui.notifications.warn(`${actor.name} 处于沉默状态，无法施展气招或绝招！`);
+      // 沉默：无法施展任何招式
+      if (s.silence) {
+        return ui.notifications.warn(`${actor.name} 无法施展任何招式！`);
       }
 
       // 缴械：只能用徒手
@@ -966,7 +1040,9 @@ export class XJZLItem extends Item {
       if (s.blockShiZhao && move.type === "real") return ui.notifications.warn("无法施展实招！");
       if (s.blockXuZhao && move.type === "feint") return ui.notifications.warn("无法施展虚招！");
       if (s.blockQiZhao && move.type === "qi") return ui.notifications.warn("无法施展气招！");
+      if (s.blockCounter && move.type === "counter") return ui.notifications.warn("无法施展反击！");
       if (s.blockStance && move.type === "stance") return ui.notifications.warn("无法开启架招！");
+      if (s.blockUltimate && move.type === "ultimate") return ui.notifications.warn("无法施展绝招！");
 
       // 插入 Hook：允许模组在招式执行前进行干预 (例如：定身状态下无法攻击)
       // 如果 Hook 返回 false，则流程中止
@@ -979,8 +1055,56 @@ export class XJZLItem extends Item {
       // 保留 targets 仅用于记录 Chat Message 的 flags，不传给脚本
       const targets = options.targets || Array.from(game.user.targets);
 
+      // === 玩家配置弹窗 (Dialog) ===
+      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true };
+
+      if (!options.skipDialog) {
+        const dialogResult = await this._promptRollConfiguration(move);
+        if (!dialogResult) return;
+        config = dialogResult;
+      }
+
       // =====================================================
-      // 3. 执行 ATTACK (Pre-Roll) 脚本
+      // 3. 资源消耗检查 (Resource Check)
+      // =====================================================
+      // 计算实际消耗 (原消耗 - 减耗属性)
+      // 注意：减耗不能把消耗减成负数
+      // 应该放在执行出招脚本前面，资源不足直接出招失败了
+      const costs = move.currentCost; // { mp: 10, rage: 0, hp: 0 }
+      const costReductions = actor.system.combat.costs; // { mp: {total: 5}, rage: ... }
+
+      const finalCost = {
+        mp: Math.max(0, costs.mp - (costReductions?.mp?.total || 0)),
+        rage: Math.max(0, costs.rage - (costReductions?.rage?.total || 0)),
+        hp: costs.hp // 气血通常不享受减耗
+      };
+
+      // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
+      if (actor.system.resources.mp.value < finalCost.mp) {
+        ui.notifications.warn("内力不足！");
+        return;
+      }
+      if (actor.system.resources.rage.value < finalCost.rage) {
+        ui.notifications.warn("怒气不足！");
+        return;
+      }
+      if (actor.system.resources.hp.value <= finalCost.hp) {
+        ui.notifications.warn("气血不足，无法施展！");
+        return;
+      }
+
+      //扣除资源
+      const resourceUpdates = {};
+      if (finalCost.mp > 0) resourceUpdates["system.resources.mp.value"] = actor.system.resources.mp.value - finalCost.mp;
+      if (finalCost.rage > 0) resourceUpdates["system.resources.rage.value"] = actor.system.resources.rage.value - finalCost.rage;
+      if (finalCost.hp > 0) resourceUpdates["system.resources.hp.value"] = actor.system.resources.hp.value - finalCost.hp;
+
+      if (!foundry.utils.isEmpty(resourceUpdates)) {
+        await actor.update(resourceUpdates);
+      }
+
+      // =====================================================
+      // 4. 执行 ATTACK (Pre-Roll) 脚本
       // =====================================================
       // 这是“决策阶段”，用于决定是否优势、是否允许出招、消耗资源
       // 替代了旧的 executionScript
@@ -1008,38 +1132,35 @@ export class XJZLItem extends Item {
         return;
       }
 
-      // TODO: 【预留】如果是 Creature (野兽/怪物) 发起的攻击
-      // 它们的伤害逻辑可能很简单，不需要走复杂的武学计算
-      if (actor.type === "creature") {
-        // return this._rollCreatureAttack(move, targets);
+      // === 特殊分支：架招 和 气招 ===
+      // 架招不消耗普通资源(通常)，不弹窗，直接生效
+      // 在伤害计算之前我们把架招和气招处理了，他们根本不造成伤害
+      if (move.type === "stance") {
+        // 1. 切换状态
+        await actor.update({
+          "system.martial.stanceActive": true,
+          "system.martial.stance": this.id // 记录是哪个武学的架招
+        });
+
+        // 2. 发送简单卡片
+        ChatMessage.create({
+          user: game.user.id,
+          speaker: ChatMessage.getSpeaker({ actor: actor }),
+          flavor: `开启了架招: ${move.name}`,
+          content: `<div class="xjzl-chat-card"><div class="card-result">已开启架招</div></div>`
+        });
+        return; // 架招流程结束
       }
 
-      // =====================================================
-      // 4. 资源消耗检查 (Resource Check)
-      // =====================================================
-      // 计算实际消耗 (原消耗 - 减耗属性)
-      // 注意：减耗不能把消耗减成负数
-      const costs = move.currentCost; // { mp: 10, rage: 0, hp: 0 }
-      const costReductions = actor.system.combat.costs; // { mp: {total: 5}, rage: ... }
-
-      const finalCost = {
-        mp: Math.max(0, costs.mp - (costReductions?.mp?.total || 0)),
-        rage: Math.max(0, costs.rage - (costReductions?.rage?.total || 0)),
-        hp: costs.hp // 气血通常不享受减耗
-      };
-
-      // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
-      if (actor.system.resources.mp.value < finalCost.mp) {
-        ui.notifications.warn("内力不足！");
-        return;
-      }
-      if (actor.system.resources.rage.value < finalCost.rage) {
-        ui.notifications.warn("怒气不足！");
-        return;
-      }
-      if (actor.system.resources.hp.value <= finalCost.hp) {
-        ui.notifications.warn("气血不足，无法施展！");
-        return;
+      if (move.type === "qi") {
+        // 1. 发送简单卡片
+        ChatMessage.create({
+          user: game.user.id,
+          speaker: ChatMessage.getSpeaker({ actor: actor }),
+          flavor: `开启了架招: ${move.name}`,
+          content: `<div class="xjzl-chat-card"><div class="card-result">已使用气招</div></div>`
+        });
+        return; // 气招流程结束
       }
 
       // =====================================================
@@ -1053,22 +1174,25 @@ export class XJZLItem extends Item {
         return;
       }
 
+      // 应用手动修正
+      calcResult.damage += config.bonusDamage;
+      calcResult.feint += config.bonusFeint;
+
       // =====================================================
       // 6. 命中检定 (Hit Roll)
       // =====================================================
       let attackRoll = null;
+      let rollJSON = null;
       const damageType = move.damageType || "waigong";
       const needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
-      let rollFormula = "";
-      let rollTooltip = ""; // 用于存储 HTML 详情
+      if (move.type === "counter") needsHitCheck = false; //反击必中，其他的架招和虚招在上面已经返回了
       // 将 flavorText 提到外层作用域，防止 needsHitCheck=false 时报错
       let flavorText = "";
 
       if (needsHitCheck) {
         // A. 确定检定加值
-        let hitMod = 0;
-        if (damageType === "waigong") hitMod = actor.system.combat.hitWaigongTotal;
-        else hitMod = actor.system.combat.hitNeigongTotal;
+        let hitMod = (damageType === "waigong" ? actor.system.combat.hitWaigongTotal : actor.system.combat.hitNeigongTotal);
+        hitMod += config.bonusAttack; //玩家手动加值
 
         // B. 确定优势/劣势 (Advantage/Disadvantage)
         //4 Flag 抵消逻辑
@@ -1078,52 +1202,90 @@ export class XJZLItem extends Item {
         const actorDis = s.attackDisadvantage || false;
 
         // 2. 获取 招式脚本状态 (Boolean)
-        const moveAdv = attackContext.flags.advantage || false;
-        const moveDis = attackContext.flags.disadvantage || false;
+        const scriptAdv = attackContext.flags.advantage || false;
+        const scriptDis = attackContext.flags.disadvantage || false;
 
         // console.log(`优势:${actorAdv},劣势:${actorDis},招式优势:${moveAdv},招式劣势:${moveDis}`);
 
         // 3. 计算优劣势源的数量 (True=1, False=0)
         // 逻辑：只要有一个来源给优势，优势数就+1
-        const advCount = (actorAdv ? 1 : 0) + (moveAdv ? 1 : 0);
-        const disCount = (actorDis ? 1 : 0) + (moveDis ? 1 : 0);
+        const selfAdvCount = (actorAdv ? 1 : 0) + (scriptAdv ? 1 : 0);
+        const selfDisCount = (actorDis ? 1 : 0) + (scriptDis ? 1 : 0);
 
-        // 基础公式
-        let dicePart = "1d20";
-        flavorText = "普通命中";
+        let selfState = 0; // 0=平, 1=优, -1=劣
+        if (selfAdvCount > selfDisCount) selfState = 1;
+        else if (selfDisCount > selfAdvCount) selfState = -1;
 
-        if (advCount > disCount) {
-          dicePart = "2d20kh";
-          flavorText = "优势命中";
-        } else if (disCount > advCount) {
-          dicePart = "2d20kl";
-          flavorText = "劣势命中";
+        //  C.目标预判 (决定投掷数量，如果传入了目标的话)
+        let needsTwoDice = (selfState !== 0);
+        const targetStates = new Map(); // 存储每个目标的优劣状态
+
+        if (targets.length > 0) {
+          for (const targetToken of targets) {
+            const targetActor = targetToken.actor;
+            if (!targetActor) continue;
+
+            // 运行 CHECK 脚本
+            const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
+
+            actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
+
+            //再次结合目标来判断优劣
+            const tStatus = targetActor.xjzlStatuses || {};
+            const grantAdv = tStatus.grantAttackAdvantage || checkContext.flags.grantAdvantage;
+            const grantDis = tStatus.grantAttackDisadvantage || checkContext.flags.grantDisadvantage;
+
+            const totalAdv = selfAdvCount + (grantAdv ? 1 : 0);
+            const totalDis = selfDisCount + (grantDis ? 1 : 0);
+
+            let finalState = 0;
+            if (totalAdv > totalDis) finalState = 1;
+            else if (totalDis > totalAdv) finalState = -1;
+
+            targetStates.set(targetToken.id, finalState);
+            if (finalState !== 0) needsTwoDice = true; // 只要有一个目标不平，就得投2个
+          }
         }
+        // D. 执行投掷
+        // 如果需要补骰，公式显示 2d20，方便玩家知道“哦，我有优势/劣势处理”
+        const diceFormula = needsTwoDice ? "2d20" : "1d20";
+        attackRoll = await new Roll(`${diceFormula} + @mod`, { mod: hitMod }).evaluate();
+        rollJSON = attackRoll.toJSON();
 
-        rollFormula = `${dicePart} + ${hitMod}`;
+        // E. 分配结果
+        const diceResults = attackRoll.terms[0].results.map(r => r.result);
+        const d1 = diceResults[0];
+        const d2 = diceResults[1] || d1;
 
-        // C. 投掷
-        attackRoll = await new Roll(rollFormula).evaluate();
+        flavorText = selfState === 1 ? "攻击 (自身优势)" : (selfState === -1 ? "攻击 (自身劣势)" : "攻击");
 
-        // D. 获取骰子详情 HTML (这是玩家想看到的)
-        rollTooltip = await attackRoll.getTooltip();
+        // 填充预判结果
+        targets.forEach(t => {
+          const state = targetStates.get(t.id) ?? 0;
+          let finalDie = d1;
+          let outcomeLabel = "平";
 
-        // 播放 3D 骰子 (如果装了 Dice So Nice)
-        if (game.dice3d) game.dice3d.showForRoll(attackRoll, game.user, true);
+          if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
+          else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
+
+          const total = finalDie + hitMod;
+          // 假设防御属性 (暂定为外防，未来根据 damageType 变)
+          // 这里只是预览命中，不做逻辑判定
+          const defVal = t.actor.system.combat.dodgeTotal || 10;
+
+          targetsResults[t.id] = {
+            name: t.name,
+            total: total,
+            isHit: total >= defVal,
+            stateLabel: outcomeLabel,
+            defVal: defVal
+          };
+        });
       }
 
       // =====================================================
-      // 7. 扣除资源 & 发送消息
+      // 7. 发送消息
       // =====================================================
-      // 只有走到这一步才真正扣血蓝
-      const resourceUpdates = {};
-      if (finalCost.mp > 0) resourceUpdates["system.resources.mp.value"] = actor.system.resources.mp.value - finalCost.mp;
-      if (finalCost.rage > 0) resourceUpdates["system.resources.rage.value"] = actor.system.resources.rage.value - finalCost.rage;
-      if (finalCost.hp > 0) resourceUpdates["system.resources.hp.value"] = actor.system.resources.hp.value - finalCost.hp;
-
-      if (!foundry.utils.isEmpty(resourceUpdates)) {
-        await actor.update(resourceUpdates);
-      }
 
       // 生成聊天卡片 (Chat Card)
       const templateData = {
@@ -1133,11 +1295,12 @@ export class XJZLItem extends Item {
         calc: calcResult,   // 伤害计算结果 (包含 breakdown, damage, feint)
         cost: finalCost,    // 实际消耗
         isFeint: move.type === "feint",
-        isStance: move.type === "stance",
         system: this.system,// 方便在模板里直接用 system.tier 等
         attackRoll: attackRoll, // 骰子实例
         rollTooltip: rollTooltip, // 骰子详情 HTML
-        damageTypeLabel: game.i18n.localize(XJZL.damageTypes[damageType])
+        damageTypeLabel: game.i18n.localize(XJZL.damageTypes[damageType]),
+        targetsResults: targetsResults,
+        hasTargets: Object.keys(targetsResults).length > 0
       };
 
       const content = await renderTemplate(
@@ -1146,12 +1309,10 @@ export class XJZLItem extends Item {
       );
 
       // 发送消息
-      let flavor = `施展了招式: ${move.name}`;
-      if (flavorText) flavor += `, ${flavorText}`;
       const chatData = {
         user: game.user.id,
         speaker: ChatMessage.getSpeaker({ actor: actor }),
-        flavor: flavor,
+        flavor: flavorText || `施展了招式: ${move.name}`,
         content: content,
 
         // 这里的 flags 存储了所有“生成伤害”所需的信息
@@ -1168,28 +1329,30 @@ export class XJZLItem extends Item {
             feint: calcResult.feint,   // 最终虚招值 (整数)
             calc: calcResult,          // 完整计算详情 (含 breakdown 文本)
             damageType: damageType,    // 伤害类型 (waigong/neigong/...)
-
+            canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
             // 3. 掷骰结果
             // 我们存入 JSON，以便后续可以重新构建 Roll 对象 (roll = Roll.fromJSON(...))
             // 供后续脚本判断 roll.total 或 roll.isCritical
-            rollJSON: attackRoll ? attackRoll.toJSON() : null,
+            rollJSON: rollJSON,
 
-            // 4. 上下文快照
-            // 记录出招时的 Flags 状态 (如是否有优势)
-            // 这对调试很有用，也方便后续逻辑判断 "是否处于优势下命中"
-            contextFlags: attackContext.flags,
-
-            // 5. 目标快照
+            // 4. 目标快照
             // 记录 UUID 列表，方便 GM 点击“一键应用”时自动寻找目标
             // 并不代表 ATTACK 脚本处理了这些目标，仅仅是 UI 层的记录
-            targets: targets.map(t => t.document.uuid)
+            targets: (options.targets || Array.from(game.user.targets)).map(t => t.document.uuid)
           }
         }
       };
 
       // 如果配置了骰子声音
-      ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+      if (attackRoll) {
+        ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+      }
       const message = await ChatMessage.create(chatData);
+
+      // 播放 3D 骰子 (如果装了 Dice So Nice)
+      if (attackRoll && game.dice3d) {
+        game.dice3d.showForRoll(attackRoll, game.user, true);
+      }
 
       // 插入 Hook：允许后续逻辑（如自动播放特效、自动化模组监听）
       Hooks.callAll("xjzl.rollMove", this, move, message, calcResult);
