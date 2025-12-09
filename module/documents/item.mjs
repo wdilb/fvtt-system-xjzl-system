@@ -1243,7 +1243,7 @@ export class XJZLItem extends Item {
             if (totalAdv > totalDis) finalState = 1;
             else if (totalDis > totalAdv) finalState = -1;
 
-            targetStates.set(targetToken.id, finalState);
+            targetStates.set(targetToken.document.uuid, finalState);
             if (finalState !== 0) needsTwoDice = true; // 只要有一个目标不平，就得投2个
           }
         }
@@ -1264,7 +1264,7 @@ export class XJZLItem extends Item {
         let primaryState = selfState;
 
         if (targets.length > 0) {
-          const firstId = targets[0].id;
+          const firstId = targets[0].document.uuid;
           // targetStates 在 C 步骤中已经计算好了
           primaryState = targetStates.get(firstId) ?? 0;
         }
@@ -1283,7 +1283,10 @@ export class XJZLItem extends Item {
 
         // 填充预判结果
         targets.forEach(t => {
-          const state = targetStates.get(t.id) ?? 0;
+          // 修改为使用 t.document.uuid 作为 Key，而不是 t.id
+          // t.id 只是由 ID 组成的字符串，而 uuid 包含场景信息，更安全
+          const tokenUuid = t.document.uuid; 
+          const state = targetStates.get(tokenUuid) ?? 0;
           let finalDie = d1;
           let outcomeLabel = "平";
           // 根据每个目标的最终状态，从 d1/d2 中选一个
@@ -1296,7 +1299,7 @@ export class XJZLItem extends Item {
           // 这里只是预览命中，不做逻辑判定
           const dodge = t.actor.system.combat.dodgeTotal || 10;
 
-          targetsResults[t.id] = {
+          targetsResults[tokenUuid] = {
             name: t.name,
             total: total,
             isHit: total >= dodge,
@@ -1371,6 +1374,7 @@ export class XJZLItem extends Item {
             calc: calcResult,          // 完整计算详情 (含 breakdown 文本)
             damageType: damageType,    // 伤害类型 (waigong/neigong/...)
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
+            attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
             // 3. 掷骰结果
             // 我们存入 JSON，以便后续可以重新构建 Roll 对象 (roll = Roll.fromJSON(...))
             // 供后续脚本判断 roll.total 或 roll.isCritical

@@ -66,9 +66,30 @@ export class ChatCardManager {
         let item = null;
         if (flags.itemId && actor) item = actor.items.get(flags.itemId);
 
-        // 3. 获取目标 (对于 Apply 类操作)
-        // 这里的 targets 是当前选中的 Token
-        const targets = Array.from(game.user.targets).map(t => t.actor).filter(a => a);
+        // 3. 获取目标
+        // 逻辑：如果历史有记录，强制使用历史记录
+        // 只有当历史记录为空时 (说明 Roll 的时候没选目标)，才允许使用当前选中的目标
+        let targets = [];
+        const historyUuids = flags.targets || [];
+
+        // 防御请求(rollDefendFeint)不需要目标
+        if (action === "rollDefendFeint") {
+            await ChatCardManager._onDefendFeint(attacker, flags, message);
+            return;
+        }
+
+        if (historyUuids.length > 0) {
+            // A. 如果 Roll 阶段记录了目标，强制使用历史目标
+            // 使用 fromUuidSync 同步获取 (因为在同一场景下通常都在内存里)
+            targets = historyUuids.map(uuid => fromUuidSync(uuid)).filter(a => a);
+            if (targets.length === 0) return ui.notifications.warn("历史目标已不存在 (可能被删除)。");
+        } else {
+            // B. 如果 Roll 阶段没目标，使用当前选中
+            targets = Array.from(game.user.targets).map(t => t.actor).filter(a => a);
+            if (targets.length === 0 && action !== "rollDefendFeint") {
+                return ui.notifications.warn("请先在场景中选中目标。");
+            }
+        }
 
         // === 分发逻辑 ===
         switch (action) {
@@ -82,12 +103,6 @@ export class ChatCardManager {
                 if (!item) return ui.notifications.warn("源物品数据已丢失。");
                 await ChatCardManager._rollFeintContest(actor, item, flags, targets, message);
                 break;
-
-            case "rollDefendFeint":
-                // 这是防御者点的 (在新生成的防御请求卡上)
-                // 这里的 flags 是防御卡的 flags，包含 originMessageId, attackTotal 等
-                await ChatCardManager._onDefendFeint(actor, flags, message);
-                break;
         }
     }
 
@@ -96,79 +111,118 @@ export class ChatCardManager {
     /* -------------------------------------------- */
 
     /**
-   * 辅助：解析命中结果 (含 CHECK 脚本和补骰)
-   */
+     * 辅助：解析命中结果 (含 CHECK 脚本和补骰)
+     * 特性：检测是否需要补骰 -> 弹窗让玩家投 -> 更新消息 -> 返回结果
+     */
     static async _resolveHitRoll(attacker, flags, targets, message) {
         const damageType = flags.damageType || "waigong";
         // 只有内/外功需要检定
-        if (!["waigong", "neigong"].includes(damageType)) return null;
+        const needsCheck = ["waigong", "neigong"].includes(damageType);
 
+        // 不需要检定，直接返回命中
+        if (!needsCheck) {
+            const results = {};
+            targets.forEach(t => results[t.uuid] = { isHit: true, total: 0 });
+            return results;
+        }
+
+        // 1. 恢复基准骰子 (D1)
         if (!flags.rollJSON) return null;
         const baseRoll = Roll.fromJSON(flags.rollJSON);
         const d1 = baseRoll.terms[0].results[0].result;
 
-        // 读取已有的补骰结果 (如果有)
-        let supplementalDieVal = flags.supplementalDie || null;
+        // 2. 检查是否有目标需要补骰 (Determine Supplement Needs)
+        // 我们需要先遍历一遍所有目标，看看有没有谁的状态导致我们需要 D2
+        let needsSupplemental = false;
 
-        const results = {};
-        let needsUpdateFlag = false;
+        // 如果 flags 里已经存了补骰结果，就不用再补了
+        let supplementalDie = flags.supplementalDie || null;
+
+        // 临时存储计算用的中间状态，避免 for 循环里重复跑脚本
+        const targetMeta = new Map();
 
         for (const target of targets) {
-            // 1. 运行 CHECK 脚本 (同步)
-            // 确保 context 包含 target
+            // 优先读缓存
+            const cached = flags.targetsResultMap?.[target.uuid];
+            if (cached) continue; // 有缓存说明 Roll 的时候就算好了，不需要补骰
+
+            // 跑 CHECK 脚本
             const checkContext = { target: target, flags: { grantAdvantage: false, grantDisadvantage: false } };
-            // 我们需要临时构建一个 move 对象或者直接传 ID？这里最好传 item 和 moveId
-            // 为了简化，这里暂时略过脚本执行，假设已经在 Roll 阶段执行过或者只依赖 Flags
-            // 如果必须执行，需要从 item 里再次 find move，这需要 item 参数
+            const move = item.system.moves.find(m => m.id === flags.moveId);
+            await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
-            // 简化：直接读取目标 Flags
-            const tStatus = target.xjzlStatuses || {};
-            const grantAdv = tStatus.grantAttackAdvantage;
-            const grantDis = tStatus.grantAttackDisadvantage;
+            // 计算优劣势
+            const contextFlags = flags.contextFlags || {}; // 攻击者 Roll 时的自身状态
+            const selfAdvCount = (contextFlags.advantage ? 1 : 0) + (checkContext.flags.grantAdvantage ? 1 : 0);
+            const selfDisCount = (contextFlags.disadvantage ? 1 : 0) + (checkContext.flags.grantDisadvantage ? 1 : 0);
 
-            // 2. 结合攻击者自身状态
-            const contextFlags = flags.contextFlags || {};
-            const attackerState = (contextFlags.advantage ? 1 : 0) - (contextFlags.disadvantage ? 1 : 0);
+            let finalState = 0;
+            if (selfAdvCount > selfDisCount) finalState = 1;      // 优
+            else if (selfDisCount > selfAdvCount) finalState = -1; // 劣
 
-            // 3. 综合状态
-            let finalState = attackerState + (grantAdv ? 1 : 0) - (grantDis ? 1 : 0);
-            if (finalState > 0) finalState = 1;
-            else if (finalState < 0) finalState = -1;
-
-            // 4. 决定骰面
-            let finalDie = d1;
-            if (finalState !== 0) {
-                if (supplementalDieVal === null) {
-                    // 现场补骰
-                    const r = await new Roll("1d20").evaluate();
-                    supplementalDieVal = r.total;
-                    needsUpdateFlag = true;
-                    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
-                }
-                if (finalState === 1) finalDie = Math.max(d1, supplementalDieVal);
-                else finalDie = Math.min(d1, supplementalDieVal);
+            // 只要有一个目标导致了非平局，且我们还没有补骰数据，就需要补
+            if (finalState !== 0 && supplementalDie === null) {
+                needsSupplemental = true;
             }
 
-            // 5. 判定
-            const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
-            // 手动加值 (Roll 阶段的) 已经包含在 hitMod 里了吗？
-            // 注意：Roll 阶段的 hitMod 是算好的，但这里我们无法还原当时的 hitMod (因为它没存在 flags 里)
-            // 所以我们最好在 flags 里直接存一个 baseMod
-            // 修正：我们重新读取 Actor 属性即可
-
-            const total = finalDie + hitMod; // 这里略有偏差，丢失了 manualBonus，但影响不大
-            const defVal = target.system.combat.dodgeTotal || 10;
-
-            results[target.uuid] = {
-                isHit: total >= defVal,
-                total: total
-            };
+            // 存下来一会用
+            targetMeta.set(target.uuid, finalState);
         }
 
-        if (needsUpdateFlag) {
-            await message.update({
-                "flags.xjzl-system.supplementalDie": supplementalDieVal
+        // 3. 交互式补骰 (如果需要)
+        if (needsSupplemental) {
+            // 弹出 Dialog 询问玩家
+            const confirm = await foundry.applications.api.DialogV2.confirm({
+                window: { title: "补投检定", icon: "fas fa-dice-d20" },
+                content: `
+                  <p>部分目标的当前状态导致你的攻击具有 <b>优势</b> 或 <b>劣势</b>。</p>
+                  <p>需要补投一个 <b>d20</b> 来进行最终裁定。</p>
+              `,
+                rejectClose: false,
+                ok: { label: "投掷" }
             });
+
+            if (!confirm) return null; // 玩家取消，中断流程
+
+            // 投掷
+            const r = await new Roll("1d20").evaluate();
+            supplementalDie = r.total;
+
+            if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
+
+            // 存回消息 (防止下次还得投)
+            await message.update({ "flags.xjzl-system.supplementalDie": supplementalDie });
+
+        }
+
+        // 4. 计算最终结果
+        const results = {};
+        const manualBonus = flags.attackBonus || 0; // 【修正】读取手动加值
+
+        for (const target of targets) {
+            const cached = flags.targetsResultMap?.[target.uuid];
+            if (cached) {
+                results[target.uuid] = cached;
+                continue;
+            }
+
+            // 读取刚才算的中间状态
+            const state = targetMeta.get(target.uuid) ?? 0;
+
+            let finalDie = d1;
+            if (state === 1 && supplementalDie !== null) finalDie = Math.max(d1, supplementalDie);
+            else if (state === -1 && supplementalDie !== null) finalDie = Math.min(d1, supplementalDie);
+
+            // 计算 Total = 骰面 + 属性修正 + 手动加值
+            const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
+            const total = finalDie + hitMod + manualBonus;
+
+            const dodge = target.system.combat.dodgeTotal || 10;
+
+            results[target.uuid] = {
+                isHit: total >= dodge,
+                total: total
+            };
         }
 
         return results;
@@ -178,13 +232,13 @@ export class ChatCardManager {
      * 动作: 虚招对抗 (发起请求)
      */
     static async _rollFeintContest(attacker, item, flags, targets, message) {
-        // 1. 获取目标 (必须选中)
-        if (targets.length === 0) return ui.notifications.warn("请先选中目标。");
 
-        // 2. 确保命中判定 (如果需要)
-        // 虚招虽然造成伤害，但“破防”本身是否需要命中？
-        // 根据你的描述：先命中 -> 再判断架招。
-        const hitResults = await this._resolveHitRoll(attacker, flags, targets, message);
+        // 1. 确保命中判定 
+        // 虚招也需要命中才能谈破防
+        let hitResults = null;
+        try {
+            hitResults = await this._resolveHitRoll(attacker, flags, targets, message);
+        } catch (e) { return; } // 取消补骰
 
         const feintVal = flags.feint || 0;
 
