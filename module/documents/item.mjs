@@ -1184,6 +1184,9 @@ export class XJZLItem extends Item {
       let displayTotal = 0; // 卡片上显示的数字，用来处理复杂的优势劣势情况下该显示什么数字
       // 初始化 targetsResults，防止 ReferenceError
       const targetsResults = {};
+      // 提前初始化自身优劣势计数，确保 flags 能读到
+      let selfAdvCount = 0;
+      let selfDisCount = 0;
       const damageType = move.damageType || "waigong";
       const needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
       if (move.type === "counter") needsHitCheck = false; //反击必中，其他的架招和虚招在上面已经返回了
@@ -1208,8 +1211,8 @@ export class XJZLItem extends Item {
 
         // 3. 计算优劣势源的数量 (True=1, False=0)
         // 逻辑：只要有一个来源给优势，优势数就+1
-        const selfAdvCount = (actorAdv ? 1 : 0) + (scriptAdv ? 1 : 0);
-        const selfDisCount = (actorDis ? 1 : 0) + (scriptDis ? 1 : 0);
+        selfAdvCount = (actorAdv ? 1 : 0) + (scriptAdv ? 1 : 0);
+        selfDisCount = (actorDis ? 1 : 0) + (scriptDis ? 1 : 0);
 
         let selfState = 0; // 0=平, 1=优, -1=劣
         if (selfAdvCount > selfDisCount) selfState = 1;
@@ -1375,6 +1378,10 @@ export class XJZLItem extends Item {
             damageType: damageType,    // 伤害类型 (waigong/neigong/...)
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
+            contextFlags: {
+                selfAdvCount: selfAdvCount,
+                selfDisCount: selfDisCount
+            },//传递自身的优势、劣势结算，用于后面进行补骰
             // 3. 掷骰结果
             // 我们存入 JSON，以便后续可以重新构建 Roll 对象 (roll = Roll.fromJSON(...))
             // 供后续脚本判断 roll.total 或 roll.isCritical
