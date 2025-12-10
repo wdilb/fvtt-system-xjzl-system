@@ -1189,7 +1189,7 @@ export class XJZLItem extends Item {
       let selfAdvCount = 0;
       let selfDisCount = 0;
       const damageType = move.damageType || "waigong";
-      const needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
+      let needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
       if (move.type === "counter") needsHitCheck = false; //反击必中，其他的架招和虚招在上面已经返回了
       // 将 flavorText 提到外层作用域，防止 needsHitCheck=false 时报错
       let flavorText = "";
@@ -1383,6 +1383,7 @@ export class XJZLItem extends Item {
             actionType: "move-attack", // 消息类型，用于监听器识别
             itemId: this.id,           // 武学 Item ID
             moveId: move.id,           // 招式 ID
+            moveType: move.type,       // 招式类型
 
             // 2. 数值结果
             damage: calcResult.damage, // 最终伤害值 (整数)

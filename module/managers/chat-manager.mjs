@@ -128,7 +128,11 @@ export class ChatCardManager {
         // 1. 基础数据准备 (Common Data)
         // =====================================================
         const damageType = flags.damageType || "waigong";
-        const needsCheck = ["waigong", "neigong"].includes(damageType);
+        // 如果 flags.moveType 是 counter，或者 damageType 不属于内外功，则不需要检定
+        const isCounter = flags.moveType === "counter"; // 读取你新加的 flag
+        const isValidDamage = ["waigong", "neigong"].includes(damageType);
+
+        const needsCheck = isValidDamage && !isCounter;
 
         // 如果不需要检定 (如气招/反击)，直接返回全命中
         if (!needsCheck) {
