@@ -193,8 +193,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         active_neigong: new fields.StringField({ label: "XJZL.Resources.ActiveNeigong" }), // 当前运行内功的 UUID
 
         // 当前架招 (Stance)
-        stance: new fields.StringField({ label: "XJZL.Martial.Stance" }), // 架招 Item UUID
-        stanceActive: new fields.BooleanField({ initial: false }),        // 架招是否激活
+        stance: new fields.StringField({ label: "XJZL.Martial.Stance" }),     // 存 Move ID (具体哪一招)
+        stanceItemId: new fields.StringField({ label: "XJZL.Martial.StanceItemId" }), // 存 Item ID (所属武学)
+        stanceActive: new fields.BooleanField({ initial: false }),                    // 架招是否激活
       }),
 
       // === G. 社交与声望 (Social) ===
@@ -903,8 +904,61 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 5. 战斗属性计算 (Combat Stats)
     // ------------------------------------
     // 基础
-    // 公式: 属性衍生 + 基础加值(DB/AE) + 经脉加成(Temp)
-    combat.blockTotal = (combat.block || 0) + bonuses.block;
+
+    // 架招逻辑处理 (Stance Logic)
+    let stanceBlockValue = 0; // 架招【额外】提供的格挡值
+
+    // 1. 获取数据
+    const stanceMoveId = this.martial.stance;      // Move ID
+    const stanceItemId = this.martial.stanceItemId;// Item ID
+    const isStanceActive = this.martial.stanceActive;
+
+    // 2. 获取 Flag: 是否允许被动格挡
+    // 假设你的 Actor 逻辑已经处理好 Flags 并挂在 actor.xjzlStatuses 上
+    const actor = this.parent;
+    const hasPassiveBlock = actor?.xjzlStatuses?.passiveBlock || false;
+
+    // 3. 计算架招本身的强度 (仅当架招开启且ID有效时)
+    if (isStanceActive && stanceItemId && stanceMoveId && actor) {
+      // 直接通过 ID 获取物品，不再遍历整个背包
+      const stanceItem = actor.items.get(stanceItemId);
+
+      // 只有物品存在且装备中(可选)才生效
+      if (stanceItem) {
+        // 在物品里找招式 (find 是必须的，但只在一个物品的moves里找，极快)
+        const move = stanceItem.system.moves.find(m => m.id === stanceMoveId);
+
+        if (move) {
+          // 公式: Base + Growth * (Level - 1)
+          const lvl = Math.max(1, move.computedLevel || 1);
+          const base = move.calculation.base || 0;
+          const growth = move.calculation.growth || 0;
+
+          stanceBlockValue = base + growth * (lvl - 1);
+        }
+      }
+    }
+
+    // 计算最终格挡总值 (Total Block)
+    // ------------------------------------
+    // 基础格挡 = 属性衍生(通常为0) + 装备/Buff修正 + 经脉修正
+    // 注意：bonuses.block 包含了经脉和AE的加值
+    const baseBlock = (combat.block || 0) + bonuses.block;
+
+    if (isStanceActive) {
+      // 情况 1: 架招开启
+      // Total = 基础(含装备/经脉) + 架招本体强度
+      combat.blockTotal = baseBlock + stanceBlockValue;
+    } else if (hasPassiveBlock) {
+      // 情况 2: 架招关闭，但有“被动格挡”特效 (如密宗瑜伽内功)
+      // Total = 基础(含装备/经脉)
+      combat.blockTotal = baseBlock;
+    } else {
+      // 情况 3: 架招关闭，且无特殊特效
+      // Total = 0 (所有格挡失效)
+      combat.blockTotal = 0;
+    }
+
     // 看破的基础值=武学内功
     const kanpoBase = this.skills.wuxue?.total || 0;
     combat.kanpoTotal = kanpoBase + (combat.kanpo || 0) + bonuses.kanpo;

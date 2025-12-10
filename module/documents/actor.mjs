@@ -32,6 +32,51 @@ export class XJZLActor extends Actor {
     this._enforceResourceIntegrity();
   }
 
+
+  /** 
+   * @override 
+   * @description
+   *  1. 根据角色类型设置默认token状态
+   *  2. 统一设置（例如显示名字）
+  */
+  async _preCreate(data, options, user) {
+    // 调用父类逻辑
+    await super._preCreate(data, options, user);
+
+    // 获取原型 Token 的初始数据
+    const prototypeToken = {};
+
+    // === 1. 根据角色类型设置默认关联状态 ===
+    if (data.type === "character") {
+      // 玩家角色：默认【关联】
+      prototypeToken.actorLink = true;
+
+      // 玩家角色：默认【友方】 (1 = Friendly, 0 = Neutral, -1 = Hostile)
+      prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.FRIENDLY;
+
+      // 可选：玩家默认开启视野
+      // prototypeToken.sight = { enabled: true };
+    }
+    else if (data.type === "npc") {
+      // NPC：默认【不关联】
+      prototypeToken.actorLink = false;
+
+      // NPC：默认【敌对】
+      prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.HOSTILE;
+    }
+
+    // === 2. 统一设置 ===
+    // 鼠标悬停时显示名字 (20 = Hover, 40 = Always, 0 = None)
+    prototypeToken.displayName = CONST.TOKEN_DISPLAY_MODES.HOVER;
+
+    // 默认显示血条 (50 = Always, 40 = Hover Owner, etc.)
+    // prototypeToken.displayBars = CONST.TOKEN_DISPLAY_MODES.ALWAYS;
+
+    // 将修改应用到当前正在创建的 Actor 上
+    this.updateSource({ prototypeToken });
+  }
+
+
   /**
    * 应用 Active Effects
    * 我们在这里拦截装备的特效。如果装备没穿上，就在内存里把特效“屏蔽”掉。
@@ -480,4 +525,5 @@ export class XJZLActor extends Actor {
       // 可选：在这里加个 ui.notifications.info("境界跌落，气血/内力已流失...") 更有修仙味
     }
   }
+
 }

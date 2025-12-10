@@ -1139,7 +1139,8 @@ export class XJZLItem extends Item {
         // 1. 切换状态
         await actor.update({
           "system.martial.stanceActive": true,
-          "system.martial.stance": this.id // 记录是哪个武学的架招
+          "system.martial.stance": move.id,      // 存招式 ID (用于读取数值)
+          "system.martial.stanceItemId": this.id // 存物品 ID (用于快速查找)
         });
 
         // 2. 发送简单卡片

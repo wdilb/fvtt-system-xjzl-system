@@ -169,5 +169,8 @@ XJZL.statusFlags = {
   // --- D. 受击触发类 (Triggers - On Hit) ---
   // 在 Apply Damage 逻辑中检测
   bleedOnHit: "XJZL.Status.BleedOnHit",           // 受伤时流失气血 (通用易伤/撕裂)
-  wuxueBleedOnHit: "XJZL.Status.WuxueBleedOnHit"  // 仅受到内外功伤害时流失气血 (内伤/旧疾)
+  wuxueBleedOnHit: "XJZL.Status.WuxueBleedOnHit",  // 仅受到内外功伤害时流失气血 (内伤/旧疾)
+
+  // --- E. 其他类  ---
+  passiveBlock: "XJZL.Status.PassiveBlock" // 被动格挡：即使未开启架招，基础格挡值依然生效
 };

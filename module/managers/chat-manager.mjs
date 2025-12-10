@@ -469,7 +469,7 @@ export class ChatCardManager {
                 <div>1d20(${roll.total - kanpoBase - bonus}) + 看破(${kanpoBase}) + 修正(${bonus}) = <b>${defTotal}</b></div>
                 <hr>
                 <div style="font-size:1.2em; font-weight:bold; color:${!isBroken ? 'green' : 'red'};">
-                    ${!isBroken ? "识破！(架招维持)" : "被破防！(状态将在伤害阶段移除)"}
+                    ${!isBroken ? "看破！(架招维持)" : "被破防！(架招将在伤害阶段移除)"}
                 </div>
             </div>
           `
