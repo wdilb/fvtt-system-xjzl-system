@@ -136,11 +136,24 @@ XJZL.damageTypes = {
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
   // --- A. 检定与对抗类  ---
-  attackAdvantage: "XJZL.Status.AttackAdvantage",                 // 攻击优势 (自身攻击检定取高)
-  attackDisadvantage: "XJZL.Status.AttackDisadvantage",           // 攻击劣势 (自身攻击检定取低)
+  // attackAdvantage: "XJZL.Status.AttackAdvantage",                 // 攻击优势 (自身攻击检定取高)
+  // attackDisadvantage: "XJZL.Status.AttackDisadvantage",           // 攻击劣势 (自身攻击检定取低)
 
-  grantAttackAdvantage: "XJZL.Status.GrantAttackAdvantage",       // 被攻击优势 (给予攻击者优势)
-  grantAttackDisadvantage: "XJZL.Status.GrantAttackDisadvantage", // 被攻击劣势 (给予攻击者劣势)
+  // grantAttackAdvantage: "XJZL.Status.GrantAttackAdvantage",       // 被攻击优势 (给予攻击者优势)
+  // grantAttackDisadvantage: "XJZL.Status.GrantAttackDisadvantage", // 被攻击劣势 (给予攻击者劣势)
+
+  // === 数值型优劣势计数器 ===
+  // 逻辑：正数(+)代表优势，负数(-)代表劣势，0代表正常
+  // 在 AE 中请使用 Mode 2 (ADD) 进行加减
+  
+  // 1. 自身攻击修正 (Self)
+  // 含义：我攻击别人时，我的状态让我 [更容易(+)/更难(-)] 命中
+  attackLevel: "XJZL.Status.AttackLevel", 
+
+  // 2. 被击修正 (Grant/Target)
+  // 含义：别人攻击我时，我的状态让他 [更容易(+)/更难(-)] 命中
+  // 例如：在这里写 +1，代表"空门大开"，任何打我的人获得 +1 优势
+  grantAttackLevel: "XJZL.Status.GrantAttackLevel",
 
   feintAdvantage: "XJZL.Status.FeintAdvantage",                   // 虚招对抗优势 (使用虚招时检定取高)
   feintDisadvantage: "XJZL.Status.FeintDisadvantage",             // 虚招对抗劣势 (使用虚招时检定取低)

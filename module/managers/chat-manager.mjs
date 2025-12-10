@@ -125,6 +125,25 @@ export class ChatCardManager {
      */
     static async _resolveHitRoll(attacker, item, flags, targets, message) {
         // =====================================================
+        // 0. 【拦截】读取已锁定的结果
+        // =====================================================
+        // 检查这张卡片是否已经有了“最终裁定结果”
+        // 注意：这里读取的是 message 自身的 flag，而不是传入的 flags 参数
+        // 我们存的是 Array，取出来转回 Object Map 以供后续代码使用
+        const lockedArray = message.getFlag("xjzl-system", "finalResolvedHit");
+
+        if (lockedArray && Array.isArray(lockedArray)) {
+            // 如果存在，直接返回，不再执行任何脚本、弹窗或后续逻辑
+            // 哪怕 targets 变了，也只返回第一次计算时的那批结果
+            const restoredResults = {};
+            lockedArray.forEach(entry => {
+                // 解构取出 uuid，剩下的作为结果数据
+                const { uuid, ...data } = entry;
+                restoredResults[uuid] = data;
+            });
+            return restoredResults;
+        }
+        // =====================================================
         // 1. 基础数据准备 (Common Data)
         // =====================================================
         const damageType = flags.damageType || "waigong";
@@ -154,9 +173,11 @@ export class ChatCardManager {
 
         // D2: 获取第二个骰子 (可能来自 2d20，也可能来自之前的补骰)
         let d2 = null;
+        let isNativeDouble = false; // 标记：是否本来就是双骰
         if (baseRoll.terms[0].results.length > 1) {
             // 情况 A: 初始 Roll 就是 2d20
             d2 = baseRoll.terms[0].results[1].result;
+            isNativeDouble = true;
         } else if (flags.supplementalDie !== undefined && flags.supplementalDie !== null) {
             // 情况 B: 初始 Roll 是 1d20，但 flag 里有补骰记录
             d2 = flags.supplementalDie;
@@ -168,11 +189,10 @@ export class ChatCardManager {
         // 我们需要知道到底有没有人导致“优/劣势”，从而决定是否需要补骰
         const targetStates = new Map();
         let needsSupplemental = false;
+        let hasNewTargets = false; // 标记是否有新目标参与计算
 
-        // 恢复攻击者自身的优劣势计数
-        const ctx = flags.contextFlags || {};
-        const selfAdvCount = ctx.selfAdvCount || 0;
-        const selfDisCount = ctx.selfDisCount || 0;
+        const ctx = flags.contextLevel || {};
+        const selfLevel = ctx.selfLevel || 0; // 读取数值等级
 
         for (const target of targets) {
             const uuid = target.uuid;
@@ -182,22 +202,31 @@ export class ChatCardManager {
             // A. 如果有缓存结果，直接跳过计算 (但在最终结算时直接用)
             if (flags.targetsResultMap?.[uuid]) continue;
 
+            // 只要进入这里，说明有新目标
+            hasNewTargets = true;
             // B. 现场计算优劣势 (跑 CHECK 脚本)
-            const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
+            // const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
+            const checkContext = {
+                target: targetActor,
+                flags: {
+                    grantLevel: 0
+                }
+            }; //换成优劣势计数
             const move = item.system.moves.find(m => m.id === flags.moveId);
             await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
-            // 读取目标被动状态
-            const tStatus = targetActor.xjzlStatuses || {};
-            const grantAdv = tStatus.grantAttackAdvantage || checkContext.flags.grantAdvantage;
-            const grantDis = tStatus.grantAttackDisadvantage || checkContext.flags.grantDisadvantage;
 
-            // 汇总计算状态 (1=优, -1=劣, 0=平)
-            const totalAdv = selfAdvCount + (grantAdv ? 1 : 0);
-            const totalDis = selfDisCount + (grantDis ? 1 : 0);
+            // 1. 目标给予 (当前时刻)
+            const targetStatusGrant = targetActor.xjzlStatuses?.grantAttackLevel || 0;
+
+            // 2. 脚本临时修正
+            const scriptGrant = checkContext.flags.grantLevel || 0;
+
+            // 汇总
+            const totalLevel = selfLevel + targetStatusGrant + scriptGrant;
             let finalState = 0;
-            if (totalAdv > totalDis) finalState = 1;
-            else if (totalDis > totalAdv) finalState = -1;
+            if (totalLevel > 0) finalState = 1;
+            else if (totalLevel < 0) finalState = -1;
 
             targetStates.set(uuid, finalState);
 
@@ -228,12 +257,24 @@ export class ChatCardManager {
 
             // 异步更新消息 (持久化 D2)
             await message.update({ "flags.xjzl-system.supplementalDie": d2 });
+        }
 
+        // =====================================================
+        // 4. 发送结果汇总卡片 (New Targets Summary)
+        // =====================================================
+
+        // 只要有新目标参与计算，或者进行了补骰，就发送汇总卡片
+        // 这样玩家就能看到新选中的这些人到底中没中
+        if (needsSupplemental || hasNewTargets) {
             // --- 生成补骰结果卡片 (预览) ---
             let resultListHtml = "";
 
             for (const target of targets) {
                 const uuid = target.uuid;
+                // 如果是旧缓存，跳过显示（因为已经在之前的卡片里显示过了）
+                // 这里我们只显示本次新计算的目标
+                if (flags.targetsResultMap?.[uuid]) continue;
+
                 const tActor = target.actor || target;
                 if (!tActor) continue;
 
@@ -258,32 +299,45 @@ export class ChatCardManager {
                 const label = isHit ? "命中" : "未中";
 
                 resultListHtml += `
-                <li style="display:flex; justify-content:space-between; font-size:0.9em; border-bottom:1px dashed #eee;">
-                    <span>${tActor.name}</span>
-                    <span>
-                        <span style="color:#666;">[${stateLabel}]</span> 
-                        ${total} vs ${dodge} 
-                        <b style="color:${color};">(${label})</b>
-                    </span>
-                </li>`;
+                    <li style="display:flex; justify-content:space-between; font-size:0.9em; border-bottom:1px dashed #eee;">
+                        <span>${tActor.name}</span>
+                        <span>
+                            <span style="color:#666;">[${stateLabel}]</span> 
+                            ${total} vs ${dodge} 
+                            <b style="color:${color};">(${label})</b>
+                        </span>
+                    </li>`;
             }
-
+            // --- 优化标题显示 ---
+            let headerHtml = "";
             // 发送卡片
-            ChatMessage.create({
-                user: game.user.id,
-                speaker: ChatMessage.getSpeaker({ actor: attacker }),
-                flavor: "补投检定结果",
-                content: `
-                <div class="xjzl-chat-card">
-                    <div style="font-size:1.1em; text-align:center; padding:5px; border-bottom:1px solid #ccc;">
-                        补骰: <span style="font-weight:bold; color:var(--xjzl-gold); font-size:1.4em;">${d2}</span> 
-                        <span style="font-size:0.8em; color:#666;">(原始: ${d1})</span>
-                    </div>
-                    <ul style="list-style:none; padding:5px; margin:0;">
-                        ${resultListHtml}
-                    </ul>
-                </div>`
-            });
+            if (needsSupplemental) {
+                // 场景：刚刚现投了一个补骰
+                headerHtml = `补骰: <span style="font-weight:bold; color:var(--xjzl-gold); font-size:1.4em;">${d2}</span> <span style="font-size:0.8em; color:#666;">(原始: ${d1})</span>`;
+            } else if (d2 !== null) {
+                // 场景：不需要现投，但使用了 D2 (可能是原生双骰，也可能是历史补骰)
+                const sourceText = isNativeDouble ? "双骰取值" : "历史补骰";
+                headerHtml = `${sourceText} <span style="font-size:0.8em; color:#666;">(D1:${d1} / D2:${d2})</span>`;
+            } else {
+                // 场景：普通单骰
+                headerHtml = `结算结果 <span style="font-size:0.8em; color:#666;">(D20: ${d1})</span>`;
+            }
+            if (resultListHtml) {
+                ChatMessage.create({
+                    user: game.user.id,
+                    speaker: ChatMessage.getSpeaker({ actor: attacker }),
+                    flavor: "命中结算详情",
+                    content: `
+                    <div class="xjzl-chat-card">
+                        <div style="font-size:1.1em; text-align:center; padding:5px; border-bottom:1px solid #ccc;">
+                            ${headerHtml}
+                        </div>
+                        <ul style="list-style:none; padding:5px; margin:0;">
+                            ${resultListHtml}
+                        </ul>
+                    </div>`
+                });
+            }
         }
 
         // =====================================================
@@ -334,6 +388,17 @@ export class ChatCardManager {
                 dieUsed: finalDie // 这里的 Key 改为 dieUsed 比较明确，之前的代码混用了 die 和 dieUsed
             };
         }
+        
+        // 将计算出的 results 写入 Message Flag
+        // 将 Results 对象转换为 Array，避免 Key 中包含 '.' 导致数据库存储为嵌套对象
+        // 格式转换: { "Scene.x.Token.y": { isHit: true } } -> [ { uuid: "Scene.x.Token.y", isHit: true } ]
+        const resultsArray = Object.entries(results).map(([uuid, res]) => ({
+            uuid: uuid,
+            ...res
+        }));
+        // 使用 setFlag 是原子操作，它会自动触发 update
+        // 这一步之后，下次再调用这个函数，就会在第 0 步直接返回这个 results
+        await message.setFlag("xjzl-system", "finalResolvedHit", resultsArray);
 
         return results;
     }
@@ -347,6 +412,11 @@ export class ChatCardManager {
      * 1. 复核命中 -> 2. 攻方投掷(仅一次) -> 3. 发送防御请求
      */
     static async _rollFeintContest(attacker, item, flags, targets, message) {
+        // 如果标记显示已经处理过，直接提示并退出
+        if (flags.feintProcessed) {
+            ui.notifications.warn("该虚招对抗请求已处理完毕，请勿重复点击。");
+            return;
+        }
         // 1. 命中复核 (包含潜在的补骰交互)
         // 这会返回一个 Map: { uuid: { isHit: true/false, ... } }
         const hitResults = await this._resolveHitRoll(attacker, item, flags, targets, message);
@@ -355,32 +425,13 @@ export class ChatCardManager {
         if (!hitResults) return;
 
         const feintVal = flags.feint || 0;
-
-        // 2. 准备攻方虚招结果 (Check Attacker Roll)
-        // 逻辑：一次出招，对所有人的虚招值是一样的
-        let attackerFeintRoll = flags.feintRollTotal;
-
-        if (attackerFeintRoll === undefined) { // 第一次点，还没投过
-            const r = await new Roll("1d20").evaluate();
-            attackerFeintRoll = r.total;
-
-            if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
-
-            // 存入数据库，下次点就能读到了
-            await message.update({ "flags.xjzl-system.feintRollTotal": attackerFeintRoll });
-        }
-        const attackTotal = attackerFeintRoll + feintVal;
-
-        // 3. 读取“已发送请求名单” (防刷逻辑)
-        // 如果 flags 里没有这个数组，初始化为空数组
         const alreadyRequested = flags.feintRequestSent || [];
-        const newlyRequested = []; // 本次新发送的目标
+        // 临时存储预筛选出来的有效目标，避免直接循环时无法判断是否需要投骰子
+        const validTargetsToRequest = [];
         const skippedLog = []; // 用于记录无需对抗的目标及其原因
 
-        // 4. 遍历目标
         for (const target of targets) {
             const uuid = target.uuid;
-
             // 获取 Actor (TokenDocument 不包含 system 数据，必须取 actor)
             const targetActor = target.actor || target;
             if (!targetActor) continue;
@@ -407,55 +458,80 @@ export class ChatCardManager {
                 skippedLog.push({ name: targetActor.name, reason: "未开启架招。" });
                 continue;
             }
-            // 获取头像
-            const imgPath = target.texture?.src || targetActor.img;
 
-            // D. 渲染并发送防御请求卡
-            const templateData = {
-                attackerName: attacker.name,
-                targetName: targetActor.name,
-                targetImg: imgPath,
-                rollTotal: attackerFeintRoll,
-                feintVal: feintVal,
-                attackTotal: attackTotal,
-                targetUuid: uuid,
-                originMessageId: message.id
-            };
-
-            const content = await renderTemplate(
-                "systems/xjzl-system/templates/chat/request-defense.hbs",
-                templateData
-            );
-
-            ChatMessage.create({
-                user: game.user.id,
-                speaker: ChatMessage.getSpeaker({ actor: targetActor }), // 使用 Actor
-                content: content,
-                flags: {
-                    "xjzl-system": {
-                        type: "defense-request",
-                        targetUuid: uuid,
-                        attackTotal: attackTotal,
-                        originMessageId: message.id
-                    }
-                }
+            // 存入待处理列表
+            validTargetsToRequest.push({
+                uuid: uuid,
+                actor: targetActor,
+                target: target // 保留原始target对象以获取纹理
             });
-
-            // ui.notifications.info(`已向 ${target.name} 发送对抗请求。`);
-
-            // 记录到本次新增名单里
-            newlyRequested.push(uuid);
         }
 
-        // 5. 更新“已发送名单”到数据库
-        if (newlyRequested.length > 0) {
-            // 合并旧名单和新名单
-            const updatedList = [...alreadyRequested, ...newlyRequested];
-            await message.update({ "flags.xjzl-system.feintRequestSent": updatedList });
+        // 准备更新到 message 的数据对象
+        const updateData = {};
+        let newlyRequested = [];
+
+        if (validTargetsToRequest.length > 0) {
+
+            // 2. 准备攻方虚招结果 (Check Attacker Roll)
+            // 逻辑：一次出招，对所有人的虚招值是一样的
+            let attackerFeintRoll = flags.feintRollTotal;
+
+            if (attackerFeintRoll === undefined) { // 第一次点，还没投过
+                const r = await new Roll("1d20").evaluate();
+                attackerFeintRoll = r.total;
+
+                if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
+
+                // 记录需要更新的骰子结果
+                updateData["flags.xjzl-system.feintRollTotal"] = attackerFeintRoll;
+            }
+            const attackTotal = attackerFeintRoll + feintVal;
+
+            // 3. 遍历有效目标发送请求
+            for (const tData of validTargetsToRequest) {
+                const { uuid, actor: targetActor, target } = tData;
+
+                // 获取头像
+                const imgPath = target.texture?.src || targetActor.img;
+
+                // D. 渲染并发送防御请求卡
+                const templateData = {
+                    attackerName: attacker.name,
+                    targetName: targetActor.name,
+                    targetImg: imgPath,
+                    rollTotal: attackerFeintRoll,
+                    feintVal: feintVal,
+                    attackTotal: attackTotal,
+                    targetUuid: uuid,
+                    originMessageId: message.id
+                };
+
+                const content = await renderTemplate(
+                    "systems/xjzl-system/templates/chat/request-defense.hbs",
+                    templateData
+                );
+
+                ChatMessage.create({
+                    user: game.user.id,
+                    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                    content: content,
+                    flags: {
+                        "xjzl-system": {
+                            type: "defense-request",
+                            targetUuid: uuid,
+                            attackTotal: attackTotal,
+                            originMessageId: message.id
+                        }
+                    }
+                });
+
+                newlyRequested.push(uuid);
+            }
         }
-        // 发送“忽略名单”汇总卡片 (公开消息)
+        // 4. 发送“忽略名单”汇总卡片 (公开消息)
+        // 无论有没有有效目标，只要有被忽略的（比如闪避了），都显示出来
         if (skippedLog.length > 0) {
-            // 这里我们也做一个简单的 HBS 风格的 HTML，保持一致性
             let summaryHtml = `
             <div class="xjzl-chat-card">
                 <header class="card-header" style="border-bottom: 2px solid #aaa; padding-bottom: 5px; margin-bottom: 5px; display: flex; align-items: center; gap: 5px;">
@@ -471,13 +547,30 @@ export class ChatCardManager {
 
             ChatMessage.create({
                 user: game.user.id,
-                speaker: { alias: "战斗提示" }, // 使用别名，而不是具体的 Token
+                speaker: { alias: "战斗提示" },
                 content: summaryHtml
-                // 删除了 whisper 属性，现在所有人可见
             });
         }
-        if (newlyRequested.length === 0 && skippedLog.length === 0) {
+
+        // 提示无目标
+        if (validTargetsToRequest.length === 0 && skippedLog.length === 0) {
             ui.notifications.warn("没有有效的目标进行对抗。");
+        }
+
+        // --- 5. 批量更新数据库 (包含防刷名单、骰子结果、以及最重要的“已处理”锁) ---
+
+        // 更新已发送名单
+        if (newlyRequested.length > 0) {
+            const updatedList = [...alreadyRequested, ...newlyRequested];
+            updateData["flags.xjzl-system.feintRequestSent"] = updatedList;
+        }
+
+        // 只要代码跑到了这里，无论是发了卡还是因为全部闪避而结束，都视为本次交互已完成
+        updateData["flags.xjzl-system.feintProcessed"] = true;
+
+        // 执行一次性更新
+        if (!foundry.utils.isEmpty(updateData)) {
+            await message.update(updateData);
         }
     }
 
@@ -506,7 +599,7 @@ export class ChatCardManager {
         if (originMsg) {
             const currentResults = originMsg.flags["xjzl-system"]?.feintResults || {};
             // 如果该目标的 UUID 已经在结果列表中，说明已经点过了
-            if (currentResults[targetActor.uuid]) {
+            if (currentResults[flags.targetUuid]) {
                 // 为了视觉同步，顺便把按钮废掉
                 await message.update({
                     content: message.content.replace(
@@ -612,7 +705,7 @@ export class ChatCardManager {
         // 5. 回写状态到原始攻击卡片
         // 让应用伤害的时候可以知道这次是否击破架招，是否要触发击破架招的特效
         const feintResults = originMsg.flags["xjzl-system"]?.feintResults || {};
-        feintResults[targetActor.uuid] = isBroken ? "broken" : "resisted";
+        feintResults[flags.targetUuid] = isBroken ? "broken" : "resisted";
 
         await originMsg.update({
             "flags.xjzl-system.feintResults": feintResults
@@ -636,7 +729,6 @@ export class ChatCardManager {
         const hitResults = await this._resolveHitRoll(attacker, item, flags, targets, message);
         // 如果点取消，hitResults 为 null，中断流程
         if (!hitResults) return;
-
         // 2. 虚招“漏网之鱼”检查
         // 检查是否有：目标开了架招 && 是虚招攻击 && 还没有对抗结果 && 被命中
         const move = item.system.moves.find(m => m.id === flags.moveId);
@@ -657,6 +749,7 @@ export class ChatCardManager {
                 // 如果开了架招，且没有对抗结果，视为“漏网”
                 if (stanceActive && !hasResult) {
                     missingDefense = true;
+                    console.log(`[XJZL] 漏网：${targetActor.name},hasResult:${hasResult},stanceActive:${stanceActive}`);
                     break;
                 }
             }

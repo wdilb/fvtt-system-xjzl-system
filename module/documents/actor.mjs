@@ -146,8 +146,15 @@ export class XJZLActor extends Actor {
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
+      // 如果是那两个数值型的 Key，单独处理，否则按布尔处理
+      if (["attackLevel", "grantAttackLevel"].includes(key)) continue;
       this.xjzlStatuses[key] = this.getFlag("xjzl-system", key) || false;
     }
+
+    // 初始化数值计数器 (支持 AE 的 ADD 模式)
+    // 注意：getFlag 读取出来的可能是 undefined，必须保底为 0
+    this.xjzlStatuses.attackLevel = parseInt(this.getFlag("xjzl-system", "attackLevel")) || 0;
+    this.xjzlStatuses.grantAttackLevel = parseInt(this.getFlag("xjzl-system", "grantAttackLevel")) || 0;
 
     // ----------------------------------------------------
     // PHASE 2: 脚本干预 (Script Execution)

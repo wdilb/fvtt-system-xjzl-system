@@ -1111,17 +1111,18 @@ export class XJZLItem extends Item {
 
       const attackContext = {
         move: move,
+        // 使用数值计数器，不再使用布尔值的flags
         // 核心 Flags (供脚本修改)
         flags: {
-          // 代表“本次招式是否提供优势/劣势”，不包含角色被动。
-          // 脚本里写: flags.advantage = true;
-          advantage: false,
-          disadvantage: false,
+          level: s.attackLevel || 0, // 使用数值计数器，不再使用布尔值的flags,初始值继承自 Actor
           abort: false,       // 脚本设为 true 可阻断攻击
           abortReason: ""     // 阻断原因
         }
       };
-
+      // 现在脚本里：
+      // 增加优势: flags.level += 1
+      // 增加劣势: flags.level -= 1
+      // 强制普通: flags.level = 0
       // 执行异步脚本 (ATTACK)
       await actor.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, move);
 
@@ -1186,8 +1187,8 @@ export class XJZLItem extends Item {
       // 初始化 targetsResults，防止 ReferenceError
       const targetsResults = {};
       // 提前初始化自身优劣势计数，确保 flags 能读到
-      let selfAdvCount = 0;
-      let selfDisCount = 0;
+      // 直接读取 context 里的数字 (包含了 Actor 被动 + 脚本修改)
+      let selfLevel = attackContext.flags.level;
       const damageType = move.damageType || "waigong";
       let needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
       if (move.type === "counter") needsHitCheck = false; //反击必中，其他的架招和虚招在上面已经返回了
@@ -1200,24 +1201,11 @@ export class XJZLItem extends Item {
         hitMod += config.bonusAttack; //玩家手动加值
 
         // B. 确定优势/劣势 (Advantage/Disadvantage)
-        //4 Flag 抵消逻辑
 
-        // 1. 获取 角色被动状态 (Boolean)
-        const actorAdv = s.attackAdvantage || false;
-        const actorDis = s.attackDisadvantage || false;
-
-        // 2. 获取 招式脚本状态 (Boolean)
-        const scriptAdv = attackContext.flags.advantage || false;
-        const scriptDis = attackContext.flags.disadvantage || false;
-
-        // 3. 计算优劣势源的数量 (True=1, False=0)
-        // 逻辑：只要有一个来源给优势，优势数就+1
-        selfAdvCount = (actorAdv ? 1 : 0) + (scriptAdv ? 1 : 0);
-        selfDisCount = (actorDis ? 1 : 0) + (scriptDis ? 1 : 0);
-
-        let selfState = 0; // 0=平, 1=优, -1=劣
-        if (selfAdvCount > selfDisCount) selfState = 1;
-        else if (selfDisCount > selfAdvCount) selfState = -1;
+        // 现在很简单了，只需要看level是否大于0
+        let selfState = 0;
+        if (selfLevel > 0) selfState = 1;
+        else if (selfLevel < 0) selfState = -1;
 
         // C. 目标预判 (Target Pre-Check)
         // 核心逻辑：如果 targets 里有任何人导致我需要扔双骰，那就扔双骰 (needsTwoDice=true)
@@ -1231,21 +1219,26 @@ export class XJZLItem extends Item {
             if (!targetActor) continue;
 
             // 运行 CHECK 脚本
-            const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
+            // const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
+            const checkContext = {
+              target: targetActor,
+              flags: {
+                grantLevel: 0
+              }
+            };
             // runScripts 是 async 方法，即使 trigger 是同步的，外部调用最好也 await 保证顺序
             await actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
             //再次结合目标来判断优劣
-            const tStatus = targetActor.xjzlStatuses || {};
-            const grantAdv = tStatus.grantAttackAdvantage || checkContext.flags.grantAdvantage;
-            const grantDis = tStatus.grantAttackDisadvantage || checkContext.flags.grantDisadvantage;
+            //简单地只需要看计数了
+            const targetGrant = targetActor.xjzlStatuses.grantAttackLevel || 0;
+            const scriptGrant = checkContext.flags.grantLevel || 0;
 
-            const totalAdv = selfAdvCount + (grantAdv ? 1 : 0);
-            const totalDis = selfDisCount + (grantDis ? 1 : 0);
+            const totalLevel = selfLevel + targetGrant + scriptGrant;
 
             let finalState = 0;
-            if (totalAdv > totalDis) finalState = 1;
-            else if (totalDis > totalAdv) finalState = -1;
+            if (totalLevel > 0) finalState = 1;
+            else if (totalLevel < 0) finalState = -1;
 
             targetStates.set(targetToken.document.uuid, finalState);
             if (finalState !== 0) needsTwoDice = true; // 只要有一个目标不平，就得投2个
@@ -1392,10 +1385,9 @@ export class XJZLItem extends Item {
             damageType: damageType,    // 伤害类型 (waigong/neigong/...)
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
-            contextFlags: {
-              selfAdvCount: selfAdvCount,
-              selfDisCount: selfDisCount
-            },//传递自身的优势、劣势结算，用于后面进行补骰
+            contextLevel: {
+              selfLevel: selfLevel  // 存下 Roll 时的自身等级
+            },//只需要存数字了
             // 3. 掷骰结果
             // 我们存入 JSON，以便后续可以重新构建 Roll 对象 (roll = Roll.fromJSON(...))
             // 供后续脚本判断 roll.total 或 roll.isCritical
