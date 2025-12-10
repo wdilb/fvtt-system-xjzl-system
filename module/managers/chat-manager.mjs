@@ -278,6 +278,8 @@ export class ChatCardManager {
                 const tActor = target.actor || target;
                 if (!tActor) continue;
 
+                const displayName = target.name || tActor.name;
+
                 // 复用计算逻辑 (局部)
                 const state = targetStates.get(uuid) ?? 0;
                 let finalDie = d1;
@@ -300,7 +302,7 @@ export class ChatCardManager {
 
                 resultListHtml += `
                     <li style="display:flex; justify-content:space-between; font-size:0.9em; border-bottom:1px dashed #eee;">
-                        <span>${tActor.name}</span>
+                        <span>${displayName}</span>
                         <span>
                             <span style="color:#666;">[${stateLabel}]</span> 
                             ${total} vs ${dodge} 
@@ -436,6 +438,9 @@ export class ChatCardManager {
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
+            // 获取显示名称：优先用 Token 名字
+            const displayName = target.name || targetActor.name;
+
             // A. 防刷检查：如果已经给这个人发过卡了，直接跳过
             if (alreadyRequested.includes(uuid)) {
                 // 可选：提示一下用户
@@ -448,14 +453,14 @@ export class ChatCardManager {
             const res = hitResults[uuid];
             if (res && !res.isHit) {
                 // ui.notifications.warn(`${target.name} 闪避了攻击，无需对抗。`);
-                skippedLog.push({ name: targetActor.name, reason: "已闪避" });  //改为在卡片里提醒
+                skippedLog.push({ name: displayName , reason: "已闪避" });  //改为在卡片里提醒
                 continue;
             }
 
             // C. 架招检查
             if (!targetActor.system.martial.stanceActive) {
                 // ui.notifications.info(`${target.name} 未开启架招。`);
-                skippedLog.push({ name: targetActor.name, reason: "未开启架招。" });
+                skippedLog.push({ name: displayName , reason: "未开启架招。" });
                 continue;
             }
 
@@ -463,7 +468,8 @@ export class ChatCardManager {
             validTargetsToRequest.push({
                 uuid: uuid,
                 actor: targetActor,
-                target: target // 保留原始target对象以获取纹理
+                target: target, // 保留原始target对象以获取纹理
+                displayName: displayName 
             });
         }
 
@@ -490,7 +496,7 @@ export class ChatCardManager {
 
             // 3. 遍历有效目标发送请求
             for (const tData of validTargetsToRequest) {
-                const { uuid, actor: targetActor, target } = tData;
+                const { uuid, actor: targetActor, target, displayName } = tData;
 
                 // 获取头像
                 const imgPath = target.texture?.src || targetActor.img;
@@ -498,7 +504,7 @@ export class ChatCardManager {
                 // D. 渲染并发送防御请求卡
                 const templateData = {
                     attackerName: attacker.name,
-                    targetName: targetActor.name,
+                    targetName: displayName,
                     targetImg: imgPath,
                     rollTotal: attackerFeintRoll,
                     feintVal: feintVal,
@@ -594,6 +600,8 @@ export class ChatCardManager {
             return;
         }
 
+        const displayName = targetDoc.name || targetActor.name;
+
         // --- 防重复检查 ---
         const originMsg = game.messages.get(flags.originMessageId);
         if (originMsg) {
@@ -607,7 +615,7 @@ export class ChatCardManager {
                         'disabled style="background:#555; color:#999; cursor:not-allowed;"'
                     ).replace('进行看破检定', '已检定')
                 });
-                return ui.notifications.warn(`${targetActor.name} 已经进行过对抗了。`);
+                return ui.notifications.warn(`${displayName} 已经进行过对抗了。`);
             }
         } else {
             return ui.notifications.warn("原始攻击消息已丢失，无法记录对抗结果。");
@@ -617,7 +625,7 @@ export class ChatCardManager {
         const kanpoBase = targetActor.system.combat.kanpoTotal || 0;
 
         const input = await foundry.applications.api.DialogV2.prompt({
-            window: { title: `看破检定: ${targetActor.name}`, icon: "fas fa-eye" },
+            window: { title: `看破检定: ${displayName}`, icon: "fas fa-eye" },
             content: `
             <div style="text-align:center; padding:10px;">
                 <p>敌方虚招强度: <b style="color:red;">${flags.attackTotal}</b></p>
@@ -749,7 +757,7 @@ export class ChatCardManager {
                 // 如果开了架招，且没有对抗结果，视为“漏网”
                 if (stanceActive && !hasResult) {
                     missingDefense = true;
-                    console.log(`[XJZL] 漏网：${targetActor.name},hasResult:${hasResult},stanceActive:${stanceActive}`);
+                    console.log(`漏网：${target.name}`);
                     break;
                 }
             }
@@ -776,6 +784,9 @@ export class ChatCardManager {
             const uuid = target.uuid;
             const targetActor = target.actor || target;
             if (!targetActor) continue;
+
+            const displayName = target.name || targetActor.name;
+
 
             // A. 准备基础参数
             const res = hitResults[uuid];
@@ -821,7 +832,7 @@ export class ChatCardManager {
             if (isHit) {
                 hitCount++;
                 const templateData = {
-                    name: targetActor.name,
+                    name: displayName,
                     img: target.texture?.src || targetActor.img, // 优先取 Token 图
                     finalDamage: damageResult.finalDamage,
                     hutiLost: damageResult.hutiLost,
@@ -954,6 +965,9 @@ export class ChatCardManager {
 
         const actor = doc.actor || doc;
 
+        const displayName = doc.name || actor.name;
+
+
         // 安全检查：确保 actor 存在且有 system 数据
         if (!actor || !actor.system) {
             return ui.notifications.error("无法获取目标角色的详细数据。");
@@ -961,8 +975,8 @@ export class ChatCardManager {
 
         // 2. 确认对话框
         const confirm = await foundry.applications.api.DialogV2.confirm({
-            window: { title: `撤销结算: ${actor.name}`, icon: "fas fa-undo" },
-            content: `<p>确定要回退 <b>${actor.name}</b> 的本次伤害结算吗？</p>
+            window: { title: `撤销结算: ${displayName}`, icon: "fas fa-undo" },
+            content: `<p>确定要回退 <b>${displayName}</b> 的本次伤害结算吗？</p>
                       <ul style="font-size:0.9em; color:#555;">
                         <li>恢复损失的 HP/内力/护体</li>
                         ${undoData.gainedRage ? "<li>扣除获得的怒气 (1点)</li>" : ""}
