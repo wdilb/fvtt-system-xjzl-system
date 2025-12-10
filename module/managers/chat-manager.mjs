@@ -251,9 +251,22 @@ export class ChatCardManager {
             // 使用 targetActor 获取属性
             const dodge = targetActor.system.combat.dodgeTotal || 10;
 
+            let isHit = false;
+
+            // 规则：20必中，1必失
+            if (finalDie === 20) {
+                isHit = true;
+            } else if (finalDie === 1) {
+                isHit = false;
+            } else {
+                // 常规检定
+                isHit = total >= dodge;
+            }
+
             results[uuid] = {
-                isHit: total >= dodge,
-                total: total
+                isHit: isHit,
+                total: total,
+                die: finalDie // 返回最终使用的骰子面值
             };
         }
 
@@ -454,10 +467,47 @@ export class ChatCardManager {
         const atkTotal = flags.attackTotal;
 
         // 3. 判定胜负
-        const success = defTotal > atkTotal; // 守方胜 (看破 > 虚招)
-        // 注意规则：攻击方 >= 防御方 则破防。反之防御方 > 攻击方 则守住。
+        // 攻击方 >= 防御方 则破防。反之防御方 > 攻击方 则守住。
         // 所以 broken = atkTotal >= defTotal
         const isBroken = atkTotal >= defTotal;
+
+        // === 执行状态变更 ===
+        if (isBroken) {
+            // A. 关闭架招状态
+            // 只要这里改为 false，你的 Actor 数据类里的格挡计算逻辑就会自动把 stanceBlockValue 去掉
+            await targetActor.update({ "system.martial.stanceActive": false });
+
+            // B. (TODO) 先手动创建一个ae，到时候我们创建通用的破防ae
+            // 添加“破防” Debuff
+            // 这里我们动态创建一个 ActiveEffect
+            // 破防效果通常是：无法再次开启架招、或者受到的伤害增加
+            const breakEffectData = {
+                name: "破防",
+                icon: "icons/svg/downgrade.svg", // 或者找一个破盾的图标
+                origin: message.uuid, // 记录来源
+                duration: { rounds: 1 }, // 持续 1 回合
+                statuses: ["brokenDefense"], // 方便系统识别
+                description: "架招被虚招击破，处于破防状态。",
+                // 如果你想让破防禁止被动格挡，可以加上这个 change:
+                // changes: [{ key: "system.combat.block", mode: 2, value: 0 }] 
+            };
+
+            await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
+
+            // 飘字提示
+            if (targetActor.token?.object) {
+                canvas.interface.createScrollingText(targetActor.token.object.center, "被击破架招！", {
+                    fill: "#ff0000", stroke: "#000000", strokeThickness: 4, jitter: 0.25
+                });
+            }
+        } else {
+            // 守住了
+            if (targetActor.token?.object) {
+                canvas.interface.createScrollingText(targetActor.token.object.center, "看破！", {
+                    fill: "#00ff00", stroke: "#000000", strokeThickness: 4, jitter: 0.25
+                });
+            }
+        }
 
         // 4. 显示结果
         ChatMessage.create({
@@ -476,7 +526,7 @@ export class ChatCardManager {
         });
 
         // 5. 回写状态到原始攻击卡片
-        // 我们不在这里修改 Actor 状态，而是记在攻击卡上
+        // 让应用伤害的时候可以知道这次是否击破架招，是否要触发击破架招的特效
         const originMsg = game.messages.get(flags.originMessageId);
         if (originMsg) {
             const feintResults = originMsg.flags["xjzl-system"]?.feintResults || {};
@@ -491,103 +541,142 @@ export class ChatCardManager {
     }
 
     /**
-     * 动作 A: 应用伤害
-     * 流程：命中检查 -> 格挡(Parry) -> 受伤脚本(Damaged) -> 扣血
+     * 应用伤害
      */
     static async _applyDamage(attacker, item, flags, targets, message) {
         // 1. 命中复核
-        const hitResults = await this._resolveHitRoll(attacker, flags, targets, message);
-        const damageAmount = flags.damage;
-        const damageType = flags.damageType;
+        const hitResults = await this._resolveHitRoll(attacker, item, flags, targets, message);
+        // 如果点取消，hitResults 为 null，中断流程
+        if (!hitResults) return;
 
-        for (const target of targets) {
-            // A. 命中判定
-            if (hitResults) {
+        // 2. 虚招“漏网之鱼”检查
+        // 检查是否有：目标开了架招 && 是虚招攻击 && 还没有对抗结果 && 被命中
+        const move = item.system.moves.find(m => m.id === flags.moveId);
+        const feintResults = message.flags["xjzl-system"]?.feintResults || {};
+        const isFeintMove = move?.type === "feint";
+        let missingDefense = false;
+
+        if (isFeintMove) {
+            for (const target of targets) {
+                const targetActor = target.actor || target; // 兼容 Token/Actor
+                // 必须用 target.uuid (Token UUID) 来查表
+                const hasResult = feintResults[target.uuid];
+                const stanceActive = targetActor.system?.martial?.stanceActive;
                 const res = hitResults[target.uuid];
-                if (res && !res.isHit) {
-                    ui.notifications.info(`${target.name} 闪避了攻击！`);
-                    continue; // 跳过此目标
-                }
-            }
+                // 如果没命中，不需要对抗，自然也不算漏网
+                if (!res || !res.isHit) continue;
 
-            let finalDamage = damageAmount;
-
-            // B. 护甲减免 (Armor) - 仅对外功生效?
-            // if (damageType === "waigong") finalDamage -= target.system.combat.armorValue || 0;
-
-            // C. 格挡判定 (Parry)
-            if (target.system.martial.stanceActive) {
-                // 触发 PARRY 脚本 (防御者)
-                const parryContext = { attacker, damage: finalDamage, type: damageType };
-                await target.runScripts(SCRIPT_TRIGGERS.PARRY, parryContext);
-
-                // 硬减免
-                const blockVal = target.system.combat.blockTotal || 0;
-                finalDamage -= blockVal;
-                ui.notifications.info(`${target.name} 格挡了攻击 (减免 ${blockVal})`);
-            }
-
-            // 保底 0
-            finalDamage = Math.max(0, finalDamage);
-
-            // D. 受伤脚本 (DAMAGED) - 最终修正
-            const damageContext = {
-                attacker: attacker,
-                type: damageType,
-                output: {
-                    damage: finalDamage,
-                    abort: false
-                },
-                // 传递快照
-                hp: target.system.resources.hp.value,
-                huti: target.system.resources.huti.value || 0
-            };
-
-            await target.runScripts(SCRIPT_TRIGGERS.DAMAGED, damageContext);
-
-            if (damageContext.output.abort) {
-                ui.notifications.info(`${target.name} 免疫了此次伤害。`);
-                continue;
-            }
-
-            finalDamage = Math.max(0, Math.floor(damageContext.output.damage));
-
-            // E. 结算扣血
-            if (finalDamage > 0) {
-                const currentHP = target.system.resources.hp.value;
-                await target.update({ "system.resources.hp.value": Math.max(0, currentHP - finalDamage) });
-
-                // 飘字
-                canvas.interface.createScrollingText(target.token?.object?.center || { x: 0, y: 0 }, `-${finalDamage}`, {
-                    fill: "#ff0000", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                });
-            } else {
-                ui.notifications.info(`${target.name} 未受到伤害。`);
-            }
-
-            // F. 应用特效 (On-Hit Effects)
-            // 只有命中了才应用特效
-            if (item) {
-                const move = item.system.moves.find(m => m.id === flags.moveId);
-                if (move && move.applyEffects.length > 0) {
-                    // 复用之前的逻辑，或者直接在这里处理
-                    // 为了代码简洁，这里简单实现：
-                    for (const ref of move.applyEffects) {
-                        if (ref.target !== "target") continue;
-                        // 检查触发条件
-                        // 比如 trigger="crit" 但没暴击，就跳过。这里暂略，默认 hit 都触发。
-
-                        const template = item.effects.find(e => e.name === ref.key);
-                        if (template) {
-                            const effectData = template.toObject();
-                            effectData.origin = item.uuid;
-                            effectData.transfer = false;
-                            await target.applyStackableEffect(effectData);
-                        }
-                    }
+                // 如果开了架招，且没有对抗结果，视为“漏网”
+                if (stanceActive && !hasResult) {
+                    missingDefense = true;
+                    break;
                 }
             }
         }
+
+        if (missingDefense) {
+            const confirm = await foundry.applications.api.DialogV2.confirm({
+                window: { title: "未对抗警告", icon: "fas fa-exclamation-triangle" },
+                content: `<p>检测到<b>已命中</b>且<b>开启架招</b>的目标尚未进行虚招对抗。</p>
+                          <p>直接应用伤害将导致<b>无法触发破防效果</b>（架招格挡值将正常生效）。</p>
+                          <p>是否继续？</p>`,
+                ok: { label: "强行应用", icon: "fas fa-skull" },
+                reject: { label: "我再去点一下", icon: "fas fa-arrow-left" }
+            });
+            if (!confirm) return;
+        }
+
+        // 3. 准备全局统计 (用于 HIT_ONCE)
+        const summary = [];
+        let hitCount = 0;
+
+        // 4. 遍历目标
+        for (const target of targets) {
+            const uuid = target.uuid;
+            const targetActor = target.actor || target;
+            if (!targetActor) continue;
+
+            // A. 准备基础参数
+            const res = hitResults[uuid];
+            const isHit = res ? res.isHit : false;
+            const die = res ? res.die : 0;
+
+            // B. 判定暴击 (Critical)
+            // 逻辑：只要命中且骰子点数 >= 阈值，就算暴击 (触发暴击特效)
+            // 至于是否造成双倍伤害，由 flags.canCrit 控制，传给 Actor 处理
+            let isCrit = false;
+            const damageType = flags.damageType;
+
+            if (["waigong", "neigong"].includes(damageType)) {
+                // 阈值 (例如 18，代表 18,19,20 都是暴击)
+                const critThreshold = (damageType === "neigong")
+                    ? attacker.system.combat.critNeigongTotal
+                    : attacker.system.combat.critWaigongTotal;
+
+                // 命中 且 骰子 >= 阈值
+                if (isHit && die >= critThreshold) {
+                    isCrit = true;
+                }
+            }
+
+            // 获取对抗结果 (broken / resisted / undefined)
+            const feintStatus = feintResults[uuid];
+            const isBroken = (feintStatus === "broken");
+
+            // C. 调用 Actor 伤害处理
+            const damageResult = await targetActor.applyDamage({
+                amount: flags.damage,      // 面板伤害
+                type: flags.damageType,    // 伤害类型
+                attacker: attacker,        // 攻击者
+                isHit: isHit,              // 命中状态
+                isCrit: isCrit,            // 暴击状态 (用于触发特效)
+                applyCritDamage: flags.canCrit, // 配置: 是否应用暴击伤害倍率 (用于计算数值)
+                isBroken: isBroken,        // 破防状态
+                ignoreBlock: false,        //无视格挡，先预留
+                ignoreDefense: false        //无视内外功防御，先预留
+            });
+
+            if (isHit) hitCount++;
+
+            // D. 收集结果
+            // damageResult 应该包含: { finalDamage: 10, hpLost: 10, isDead: false ... }
+            const resultEntry = {
+                target: targetActor,
+                isHit: isHit,
+                isCrit: isCrit,
+                isBroken: isBroken,
+                baseDamage: flags.damage,
+                finalDamage: damageResult.finalDamage, // 获取实际造成的伤害
+                damageResult: damageResult // 保留完整对象备用
+            };
+            summary.push(resultEntry);
+
+            // E. 执行攻击者脚本 (Trigger: HIT)
+            // 现在我们可以把“实际伤害”传给攻击者了 (比如：吸血逻辑，当然我们侠界的吸血是高贵的吸收没有减免的伤害)
+            const hitContext = {
+                ...resultEntry, // 展开上面的结果
+                attacker: attacker,
+                item: item,
+                move: move
+            };
+
+            // 无论命中与否都执行，脚本内自己判断 if (args.isHit)
+            await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
+        }
+
+        // 5. 执行全局结算脚本 (Trigger: HIT_ONCE)
+        // 无论是否有目标、无论是否命中，只要流程走完就触发
+        const globalContext = {
+            targets: summary,         // 包含所有目标的详细结果数组
+            hitCount: hitCount,       // 命中数量
+            baseDamage: flags.damage, // 面板伤害
+            totalDamageDealt: summary.reduce((a, b) => a + b.finalDamage, 0),
+            attacker: attacker,
+            item: item,
+            move: move
+        };
+
+        await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
     }
 
 }

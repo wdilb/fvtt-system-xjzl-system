@@ -12,6 +12,7 @@ export const SCRIPT_TRIGGERS = {
   ATTACK: "attack",         // [异步] 出招/掷骰前 (决定优势、资源、是否允许出招)
   CHECK: "check",           // [同步] 检定修正（仅用于那些需要目标又在命中前生效的特效）
   HIT: "hit",               // [异步] 命中/结算后 (应用BUFF、扣血、副作用)
+  HIT_ONCE: "hit_once",     // [异步] 命中/结算后 和上面的唯一区别是这个只执行一次，不管几个目标
   DAMAGED: "damaged",       // [异步] 防御者触发：受伤时
   TURN_START: "turnStart",  // [异步] 回合开始
   TURN_END: "turnEnd",      // [异步] 回合结束
@@ -25,6 +26,7 @@ export const TRIGGER_CHOICES = {
   [SCRIPT_TRIGGERS.ATTACK]: "XJZL.Triggers.Attack",
   [SCRIPT_TRIGGERS.CHECK]: "XJZL.Triggers.Check",
   [SCRIPT_TRIGGERS.HIT]: "XJZL.Triggers.Hit",
+  [SCRIPT_TRIGGERS.HIT_ONCE]: "XJZL.Triggers.HitOnce",
   [SCRIPT_TRIGGERS.DAMAGED]: "XJZL.Triggers.Damaged",
   [SCRIPT_TRIGGERS.TURN_START]: "XJZL.Triggers.TurnStart",
   [SCRIPT_TRIGGERS.TURN_END]: "XJZL.Triggers.TurnEnd",

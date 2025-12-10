@@ -1289,7 +1289,7 @@ export class XJZLItem extends Item {
         targets.forEach(t => {
           // 修改为使用 t.document.uuid 作为 Key，而不是 t.id
           // t.id 只是由 ID 组成的字符串，而 uuid 包含场景信息，更安全
-          const tokenUuid = t.document.uuid; 
+          const tokenUuid = t.document.uuid;
           const state = targetStates.get(tokenUuid) ?? 0;
           let finalDie = d1;
           let outcomeLabel = "平";
@@ -1303,10 +1303,22 @@ export class XJZLItem extends Item {
           // 这里只是预览命中，不做逻辑判定
           const dodge = t.actor.system.combat.dodgeTotal || 10;
 
+          let isHit = false;
+
+          // 规则：20必中，1必失
+          if (finalDie === 20) {
+            isHit = true;
+          } else if (finalDie === 1) {
+            isHit = false;
+          } else {
+            // 常规检定
+            isHit = total >= dodge;
+          }
+
           targetsResults[tokenUuid] = {
             name: t.name,
             total: total,
-            isHit: total >= dodge,
+            isHit: isHit,
             stateLabel: outcomeLabel,
             dodge: dodge,
             die: finalDie // 调试用：显示用的哪个骰子
@@ -1380,8 +1392,8 @@ export class XJZLItem extends Item {
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
             contextFlags: {
-                selfAdvCount: selfAdvCount,
-                selfDisCount: selfDisCount
+              selfAdvCount: selfAdvCount,
+              selfDisCount: selfDisCount
             },//传递自身的优势、劣势结算，用于后面进行补骰
             // 3. 掷骰结果
             // 我们存入 JSON，以便后续可以重新构建 Roll 对象 (roll = Roll.fromJSON(...))
