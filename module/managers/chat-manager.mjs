@@ -51,6 +51,12 @@ export class ChatCardManager {
         const action = button.dataset.action;
         const flags = message.flags["xjzl-system"] || {};
 
+        // 0. 特殊处理：撤销伤害不需要选中任何目标，也不需要攻击者（只需要数据回滚）
+        if (action === "undoDamage") {
+            await ChatCardManager._undoDamage(message);
+            return;
+        }
+
         // 1. 获取攻击者 (Speaker)
         // 对于防御请求卡，Speaker 可能是防御者自己，也可能是 GM
         const speaker = message.speaker;
@@ -118,88 +124,89 @@ export class ChatCardManager {
      * 特性：检测是否需要补骰 -> 弹窗让玩家投 -> 更新消息 -> 返回结果
      */
     static async _resolveHitRoll(attacker, item, flags, targets, message) {
+        // =====================================================
+        // 1. 基础数据准备 (Common Data)
+        // =====================================================
         const damageType = flags.damageType || "waigong";
-        // 只有内/外功需要检定
         const needsCheck = ["waigong", "neigong"].includes(damageType);
 
-        // 不需要检定，直接返回命中
+        // 如果不需要检定 (如气招/反击)，直接返回全命中
         if (!needsCheck) {
             const results = {};
             targets.forEach(t => results[t.uuid] = { isHit: true, total: 0 });
             return results;
         }
 
-        // 1. 恢复基准骰子 (D1)
+        // 提前计算公共加值 (修复 ReferenceError 的关键)
+        const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
+        const manualBonus = flags.attackBonus || 0;
+
+        // 恢复骰子数据
         if (!flags.rollJSON) return null;
         const baseRoll = Roll.fromData(flags.rollJSON);
+
         // D1: 第一个骰子 (永远存在)
         const d1 = baseRoll.terms[0].results[0].result;
 
-        // D2: 第二个骰子 (可能来自 2d20，也可能来自之前的补骰)
+        // D2: 获取第二个骰子 (可能来自 2d20，也可能来自之前的补骰)
         let d2 = null;
-        // 情况 A: 初始 Roll 就是 2d20 (自身有优劣势)
         if (baseRoll.terms[0].results.length > 1) {
+            // 情况 A: 初始 Roll 就是 2d20
             d2 = baseRoll.terms[0].results[1].result;
-        }
-        // 情况 B: 初始 Roll 是 1d20，检查是否有补骰记录
-        else if (flags.supplementalDie !== undefined && flags.supplementalDie !== null) {
+        } else if (flags.supplementalDie !== undefined && flags.supplementalDie !== null) {
+            // 情况 B: 初始 Roll 是 1d20，但 flag 里有补骰记录
             d2 = flags.supplementalDie;
         }
 
-        // 2. 预计算所有新目标的状态 (Pre-Calculate States)
-        // 我们需要知道到底有没有人需要 D2，才能决定是否弹窗
+        // =====================================================
+        // 2. 预计算目标优劣势状态 (Pre-Calculate States)
+        // =====================================================
+        // 我们需要知道到底有没有人导致“优/劣势”，从而决定是否需要补骰
         const targetStates = new Map();
         let needsSupplemental = false;
 
-        // 读取攻击者自身计数 (从 Flags 恢复)
+        // 恢复攻击者自身的优劣势计数
         const ctx = flags.contextFlags || {};
         const selfAdvCount = ctx.selfAdvCount || 0;
         const selfDisCount = ctx.selfDisCount || 0;
 
         for (const target of targets) {
-            // 改为了TokenDocument 直接取 uuid
             const uuid = target.uuid;
-
-            // 获取 Actor 对象，用于下面获取闪避属性
-            // TokenDocument 包含 actor 属性。如果是直接传的 Actor，这行也能兼容 (Actor.actor 是 undefined，回退到 target 自身)
             const targetActor = target.actor || target;
+            if (!targetActor) continue;
 
-            if (!targetActor) continue; // 安全检查
-            // A. 缓存命中 (Cache Hit) -> 跳过计算
+            // A. 如果有缓存结果，直接跳过计算 (但在最终结算时直接用)
             if (flags.targetsResultMap?.[uuid]) continue;
 
-            // B. 缓存未命中 -> 现场计算优劣势
-            // 跑 CHECK 脚本
-            //避免脚本里用 target.system会报错，所以这里也修改为将targetActor传递给脚本
+            // B. 现场计算优劣势 (跑 CHECK 脚本)
             const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
             const move = item.system.moves.find(m => m.id === flags.moveId);
             await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
-            // 读取目标被动
-            // 状态在 Actor 上，必须用 targetActor 读取
+            // 读取目标被动状态
             const tStatus = targetActor.xjzlStatuses || {};
             const grantAdv = tStatus.grantAttackAdvantage || checkContext.flags.grantAdvantage;
             const grantDis = tStatus.grantAttackDisadvantage || checkContext.flags.grantDisadvantage;
 
-            // 汇总计算
+            // 汇总计算状态 (1=优, -1=劣, 0=平)
             const totalAdv = selfAdvCount + (grantAdv ? 1 : 0);
             const totalDis = selfDisCount + (grantDis ? 1 : 0);
-
             let finalState = 0;
-            if (totalAdv > totalDis) finalState = 1;//优势
-            else if (totalDis > totalAdv) finalState = -1;//劣势
+            if (totalAdv > totalDis) finalState = 1;
+            else if (totalDis > totalAdv) finalState = -1;
 
-            targetStates.set(uuid, finalState); // 记录对这个目标的优势、劣势的状态
+            targetStates.set(uuid, finalState);
 
-            // 判断是否缺骰子
+            // 关键判断：如果状态不平，且没有 D2，则需要补骰
             if (finalState !== 0 && d2 === null) {
                 needsSupplemental = true;
             }
         }
 
-        // 3. 交互式补骰 (如果需要)
+        // =====================================================
+        // 3. 交互式补骰 (Interactive Supplemental Roll)
+        // =====================================================
         if (needsSupplemental) {
-            // 弹出 Dialog 询问玩家
             const confirm = await foundry.applications.api.DialogV2.confirm({
                 window: { title: "补投检定", icon: "fas fa-dice-d20" },
                 content: `<p>部分目标的当前状态导致攻击具有 <b>优势</b> 或 <b>劣势</b>。</p>
@@ -210,36 +217,91 @@ export class ChatCardManager {
 
             if (!confirm) return null; // 玩家取消，中断流程
 
-            // 投掷
+            // 投掷 D2
             const r = await new Roll("1d20").evaluate();
             d2 = r.total;
-            //3D骰子
             if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
 
-            // 异步更新消息 (不阻塞后续流程)
-            // 这样下次再点的时候，d2 就已经存在于 flags 里了
+            // 异步更新消息 (持久化 D2)
             await message.update({ "flags.xjzl-system.supplementalDie": d2 });
 
+            // --- 生成补骰结果卡片 (预览) ---
+            let resultListHtml = "";
+
+            for (const target of targets) {
+                const uuid = target.uuid;
+                const tActor = target.actor || target;
+                if (!tActor) continue;
+
+                // 复用计算逻辑 (局部)
+                const state = targetStates.get(uuid) ?? 0;
+                let finalDie = d1;
+                let stateLabel = "平";
+
+                if (state === 1) { finalDie = Math.max(d1, d2); stateLabel = "优"; }
+                else if (state === -1) { finalDie = Math.min(d1, d2); stateLabel = "劣"; }
+
+                const total = finalDie + hitMod + manualBonus;
+                const dodge = tActor.system.combat.dodgeTotal || 10;
+
+                // 判定命中 (含20必中/1必失)
+                let isHit = false;
+                if (finalDie === 20) isHit = true;
+                else if (finalDie === 1) isHit = false;
+                else isHit = total >= dodge;
+
+                const color = isHit ? "green" : "red";
+                const label = isHit ? "命中" : "未中";
+
+                resultListHtml += `
+                <li style="display:flex; justify-content:space-between; font-size:0.9em; border-bottom:1px dashed #eee;">
+                    <span>${tActor.name}</span>
+                    <span>
+                        <span style="color:#666;">[${stateLabel}]</span> 
+                        ${total} vs ${dodge} 
+                        <b style="color:${color};">(${label})</b>
+                    </span>
+                </li>`;
+            }
+
+            // 发送卡片
+            ChatMessage.create({
+                user: game.user.id,
+                speaker: ChatMessage.getSpeaker({ actor: attacker }),
+                flavor: "补投检定结果",
+                content: `
+                <div class="xjzl-chat-card">
+                    <div style="font-size:1.1em; text-align:center; padding:5px; border-bottom:1px solid #ccc;">
+                        补骰: <span style="font-weight:bold; color:var(--xjzl-gold); font-size:1.4em;">${d2}</span> 
+                        <span style="font-size:0.8em; color:#666;">(原始: ${d1})</span>
+                    </div>
+                    <ul style="list-style:none; padding:5px; margin:0;">
+                        ${resultListHtml}
+                    </ul>
+                </div>`
+            });
         }
 
-        // 4. 计算最终结果
+        // =====================================================
+        // 4. 计算最终结果 (Final Resolution)
+        // =====================================================
         const results = {};
-        const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
-        const manualBonus = flags.attackBonus || 0; // 手动加值
 
         for (const target of targets) {
             const uuid = target.uuid;
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
-            // A. 缓存优先
+            // A. 缓存优先 (如果是 ApplyDamage 二次调用，且不需要补骰，可能走缓存)
+            // 但如果刚补了骰子，这里的缓存可能还是旧的，所以要注意 flags 更新时机
+            // 通常建议如果 d2 存在，总是重新计算最稳妥
             const cached = flags.targetsResultMap?.[uuid];
-            if (cached) {
+            if (cached && !needsSupplemental) {
                 results[uuid] = cached;
                 continue;
             }
 
-            // B. 使用刚才算好的状态
+            // B. 确定最终使用的骰子 (Final Die)
             const state = targetStates.get(uuid) ?? 0;
             let finalDie = d1;
 
@@ -247,26 +309,25 @@ export class ChatCardManager {
             if (state === 1 && d2 !== null) finalDie = Math.max(d1, d2);
             else if (state === -1 && d2 !== null) finalDie = Math.min(d1, d2);
 
+            // C. 计算数值
             const total = finalDie + hitMod + manualBonus;
-            // 使用 targetActor 获取属性
             const dodge = targetActor.system.combat.dodgeTotal || 10;
 
+            // D. 判定命中
             let isHit = false;
-
             // 规则：20必中，1必失
             if (finalDie === 20) {
                 isHit = true;
             } else if (finalDie === 1) {
                 isHit = false;
             } else {
-                // 常规检定
                 isHit = total >= dodge;
             }
 
             results[uuid] = {
                 isHit: isHit,
                 total: total,
-                die: finalDie // 返回最终使用的骰子面值
+                dieUsed: finalDie // 这里的 Key 改为 dieUsed 比较明确，之前的代码混用了 die 和 dieUsed
             };
         }
 
@@ -436,6 +497,25 @@ export class ChatCardManager {
             return;
         }
 
+        // --- 防重复检查 ---
+        const originMsg = game.messages.get(flags.originMessageId);
+        if (originMsg) {
+            const currentResults = originMsg.flags["xjzl-system"]?.feintResults || {};
+            // 如果该目标的 UUID 已经在结果列表中，说明已经点过了
+            if (currentResults[targetActor.uuid]) {
+                // 为了视觉同步，顺便把按钮废掉
+                await message.update({
+                    content: message.content.replace(
+                        /data-action="rollDefendFeint"/,
+                        'disabled style="background:#555; color:#999; cursor:not-allowed;"'
+                    ).replace('进行看破检定', '已检定')
+                });
+                return ui.notifications.warn(`${targetActor.name} 已经进行过对抗了。`);
+            }
+        } else {
+            return ui.notifications.warn("原始攻击消息已丢失，无法记录对抗结果。");
+        }
+
         // 2. 弹窗询问加值
         const kanpoBase = targetActor.system.combat.kanpoTotal || 0;
 
@@ -453,7 +533,7 @@ export class ChatCardManager {
                 label: "投掷",
                 callback: (event, button) => button.closest(".window-content").querySelector("input").value
             },
-            rejectClose: true
+            rejectClose: false // 设为 false，这样关闭窗口时返回 null 而不是报错
         });
 
         if (input === null) return; // 取消
@@ -527,17 +607,21 @@ export class ChatCardManager {
 
         // 5. 回写状态到原始攻击卡片
         // 让应用伤害的时候可以知道这次是否击破架招，是否要触发击破架招的特效
-        const originMsg = game.messages.get(flags.originMessageId);
-        if (originMsg) {
-            const feintResults = originMsg.flags["xjzl-system"]?.feintResults || {};
-            // 更新该目标的对抗结果
-            feintResults[targetActor.uuid] = isBroken ? "broken" : "resisted";
+        const feintResults = originMsg.flags["xjzl-system"]?.feintResults || {};
+        feintResults[targetActor.uuid] = isBroken ? "broken" : "resisted";
 
-            await originMsg.update({
-                "flags.xjzl-system.feintResults": feintResults
-            });
-            // ui.notifications.info("对抗结果已记录。请攻击者点击 [应用伤害] 结算。");
-        }
+        await originMsg.update({
+            "flags.xjzl-system.feintResults": feintResults
+        });
+
+        // 更新当前的请求卡片，禁用按钮
+        // 这样玩家就知道自己已经点过了，无需再点
+        await message.update({
+            content: message.content.replace(
+                /data-action="rollDefendFeint"/,
+                'disabled style="background:#555; color:#999; cursor:not-allowed;"'
+            ).replace('进行看破检定', '已检定')
+        });
     }
 
     /**
@@ -633,10 +717,57 @@ export class ChatCardManager {
                 applyCritDamage: flags.canCrit, // 配置: 是否应用暴击伤害倍率 (用于计算数值)
                 isBroken: isBroken,        // 破防状态
                 ignoreBlock: false,        //无视格挡，先预留
-                ignoreDefense: false        //无视内外功防御，先预留
+                ignoreDefense: false       //无视内外功防御，先预留
             });
 
-            if (isHit) hitCount++;
+            // 统计数据更新为该目标发送独立伤害卡片 (仅命中时)
+            if (isHit) {
+                hitCount++;
+                const templateData = {
+                    name: targetActor.name,
+                    img: target.texture?.src || targetActor.img, // 优先取 Token 图
+                    finalDamage: damageResult.finalDamage,
+                    hutiLost: damageResult.hutiLost,
+                    hpLost: damageResult.hpLost,
+                    mpLost: damageResult.mpLost,
+                    isDead: damageResult.isDead,
+                    isDying: damageResult.isDying,
+                    rageGained: damageResult.rageGained, // 防御者是否回怒
+                    isUndone: false
+                };
+
+                const content = await renderTemplate(
+                    "systems/xjzl-system/templates/chat/damage-card.hbs",
+                    templateData
+                );
+
+                // 准备单人份的 Undo 数据
+                const undoData = {
+                    attackerUuid: attacker.uuid, // 仅用于提示
+                    targetUuid: uuid,
+                    hpLost: damageResult.hpLost,
+                    hutiLost: damageResult.hutiLost,
+                    mpLost: damageResult.mpLost,
+                    gainedDead: damageResult.isDead,
+                    gainedDying: damageResult.isDying,
+                    gainedRage: damageResult.rageGained // 防御者回怒状态
+                };
+
+                // 发送消息
+                ChatMessage.create({
+                    user: game.user.id,
+                    speaker: ChatMessage.getSpeaker({ actor: targetActor }), // Speaker 设为受害者
+                    content: content,
+                    flags: {
+                        "xjzl-system": {
+                            type: "damage-card", // 标记类型
+                            undoData: undoData   // 存入数据
+                        }
+                    }
+                });
+            }
+
+
 
             // D. 收集结果
             // damageResult 应该包含: { finalDamage: 10, hpLost: 10, isDead: false ... }
@@ -645,9 +776,18 @@ export class ChatCardManager {
                 isHit: isHit,
                 isCrit: isCrit,
                 isBroken: isBroken,
-                baseDamage: flags.damage,
-                finalDamage: damageResult.finalDamage, // 获取实际造成的伤害
-                damageResult: damageResult // 保留完整对象备用
+                baseDamage: flags.damage, // 面板伤害 (吸血逻辑可能需要这个)
+
+                // 展开 Actor 返回的结算数据
+                finalDamage: damageResult.finalDamage,  //实际伤害
+                hpLost: damageResult.hpLost,
+                hutiLost: damageResult.hutiLost,
+                mpLost: damageResult.mpLost,
+                isDying: damageResult.isDying,
+                isDead: damageResult.isDead,
+
+                // 保留完整对象备查
+                damageResult: damageResult
             };
             summary.push(resultEntry);
 
@@ -664,19 +804,125 @@ export class ChatCardManager {
             await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
         }
 
-        // 5. 执行全局结算脚本 (Trigger: HIT_ONCE)
-        // 无论是否有目标、无论是否命中，只要流程走完就触发
+        // =====================================================
+        // 5. 攻击者后续处理 (Global Post-Process)
+        // =====================================================
+
+        // A. 攻击者回怒 (Attacker Rage)
+        // 规则：只要本次出招命中了至少一个敌人，攻击者回复 1 点怒气
+        // 放在这里执行满足 "AOE只回1点" 的需求
+        // A. 攻击者回怒 (Attacker Rage)
+        // 规则：只要本次出招命中了至少一个敌人，且是内外功伤害，攻击者回复 1 点怒气
+        if (hitCount > 0) {
+            const attRage = attacker.system.resources.rage;
+            // 检查封穴状态
+            const attNoRecover = attacker.xjzlStatuses?.noRecoverRage;
+            // 检查伤害类型
+            const isValidType = ["waigong", "neigong"].includes(flags.damageType);
+
+            if (isValidType && attRage.value < attRage.max && !attNoRecover) {
+                // 执行更新
+                await attacker.update({ "system.resources.rage.value": attRage.value + 1 });
+            }
+        }
+
+        // B. 执行全局结算脚本 (Trigger: HIT_ONCE)
         const globalContext = {
-            targets: summary,         // 包含所有目标的详细结果数组
-            hitCount: hitCount,       // 命中数量
+            targets: summary,         // 包含所有目标的详细结果
+            hitCount: hitCount,       // 总命中数
             baseDamage: flags.damage, // 面板伤害
-            totalDamageDealt: summary.reduce((a, b) => a + b.finalDamage, 0),
+            // totalDamageDealt: summary.reduce((a, b) => a + (b.finalDamage || 0), 0), // 总造成伤害，感觉用不到，先注释掉
             attacker: attacker,
             item: item,
             move: move
         };
 
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
+    }
+
+    /**
+     * 动作: 撤销伤害 (Undo Damage)
+     */
+    static async _undoDamage(message) {
+        const undoData = message.flags["xjzl-system"]?.undoData;
+        if (!undoData) return ui.notifications.warn("无法读取撤销数据。");
+
+        if (message.flags["xjzl-system"]?.isUndone) {
+            return ui.notifications.warn("该次结算已撤销。");
+        }
+
+        // 1. 获取目标文档对象
+        const doc = await fromUuid(undoData.targetUuid);
+        if (!doc) return ui.notifications.warn("目标已不存在。");
+
+        const actor = doc.actor || doc;
+
+        // 安全检查：确保 actor 存在且有 system 数据
+        if (!actor || !actor.system) {
+            return ui.notifications.error("无法获取目标角色的详细数据。");
+        }
+
+        // 2. 确认对话框
+        const confirm = await foundry.applications.api.DialogV2.confirm({
+            window: { title: `撤销结算: ${actor.name}`, icon: "fas fa-undo" },
+            content: `<p>确定要回退 <b>${actor.name}</b> 的本次伤害结算吗？</p>
+                      <ul style="font-size:0.9em; color:#555;">
+                        <li>恢复损失的 HP/内力/护体</li>
+                        ${undoData.gainedRage ? "<li>扣除获得的怒气 (1点)</li>" : ""}
+                        ${undoData.gainedDead ? "<li>移除死亡状态</li>" : ""}
+                      </ul>
+                      <hr>
+                      <p style="color:#e67e22; font-size:0.85em;">* 攻击者怒气需手动调整。</p>`,
+            ok: { label: "撤销" }
+        });
+        if (!confirm) return;
+
+        // 3. 执行回退
+        const updates = {};
+        const sys = actor.system;
+
+        // A. 恢复数值 (注意兼容 NumberField 和 SchemaField)
+        if (undoData.hpLost > 0) updates["system.resources.hp.value"] = sys.resources.hp.value + undoData.hpLost;
+
+        // Huti 兼容
+        const currentHuti = typeof sys.resources.huti === 'object' ? sys.resources.huti.value : sys.resources.huti;
+        if (undoData.hutiLost > 0) {
+            if (typeof sys.resources.huti === 'object') updates["system.resources.huti.value"] = (currentHuti || 0) + undoData.hutiLost;
+            else updates["system.resources.huti"] = (currentHuti || 0) + undoData.hutiLost;
+        }
+
+        if (undoData.mpLost > 0) updates["system.resources.mp.value"] = sys.resources.mp.value + undoData.mpLost;
+
+        // B. 恢复怒气 (防御者)
+        if (undoData.gainedRage) {
+            if (sys.resources.rage.value > 0) {
+                updates["system.resources.rage.value"] = sys.resources.rage.value - 1;
+            }
+        }
+
+        // 应用数值更新
+        if (!foundry.utils.isEmpty(updates)) {
+            await actor.update(updates);
+        }
+
+        // C. 移除状态
+        if (undoData.gainedDead) {
+            await actor.toggleStatusEffect("dead", { active: false });
+        }
+        // 濒死状态回退暂留空
+
+        // 4. 更新卡片状态
+        const content = message.content.replace(
+            /<button data-action="undoDamage".*?<\/button>/,
+            `<div style="text-align:center; color:#888; border:1px solid #ccc; padding:5px; background:#eee;">已撤销</div>`
+        );
+
+        await message.update({
+            content: content,
+            "flags.xjzl-system.isUndone": true
+        });
+
+        ui.notifications.info("目标状态已回滚。但攻击者获得的怒气与触发的特效需要手动调整。");
     }
 
 }

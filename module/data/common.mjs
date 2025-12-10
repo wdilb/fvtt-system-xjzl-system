@@ -14,6 +14,8 @@ export const SCRIPT_TRIGGERS = {
   HIT: "hit",               // [异步] 命中/结算后 (应用BUFF、扣血、副作用)
   HIT_ONCE: "hit_once",     // [异步] 命中/结算后 和上面的唯一区别是这个只执行一次，不管几个目标
   DAMAGED: "damaged",       // [异步] 防御者触发：受伤时
+  DYING: "dying",           // [异步] 气血归零，进入濒死状态时触发
+  DEATH: "death",           // [异步] 内力归零，角色彻底死亡时触发
   TURN_START: "turnStart",  // [异步] 回合开始
   TURN_END: "turnEnd",      // [异步] 回合结束
   // EQUIP: "equip",           // [异步] 装备/卸下时 (特殊逻辑)
@@ -28,6 +30,8 @@ export const TRIGGER_CHOICES = {
   [SCRIPT_TRIGGERS.HIT]: "XJZL.Triggers.Hit",
   [SCRIPT_TRIGGERS.HIT_ONCE]: "XJZL.Triggers.HitOnce",
   [SCRIPT_TRIGGERS.DAMAGED]: "XJZL.Triggers.Damaged",
+  [SCRIPT_TRIGGERS.DYING]: "XJZL.Triggers.Dying",
+  [SCRIPT_TRIGGERS.DEATH]: "XJZL.Triggers.Death",
   [SCRIPT_TRIGGERS.TURN_START]: "XJZL.Triggers.TurnStart",
   [SCRIPT_TRIGGERS.TURN_END]: "XJZL.Triggers.TurnEnd",
   // [SCRIPT_TRIGGERS.EQUIP]: "XJZL.Triggers.Equip"
