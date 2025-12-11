@@ -601,13 +601,15 @@ export class ChatCardManager {
         }
 
         const displayName = targetDoc.name || targetActor.name;
+        // 把 UUID 中的点替换为下划线，防止被解析成嵌套对象，在FVTT自带的机制中调用update会把点视为 层级路径 而不是一个扁平的键名
+        const safeKey = flags.targetUuid.replaceAll(".", "_"); 
 
         // --- 防重复检查 ---
         const originMsg = game.messages.get(flags.originMessageId);
         if (originMsg) {
             const currentResults = originMsg.flags["xjzl-system"]?.feintResults || {};
             // 如果该目标的 UUID 已经在结果列表中，说明已经点过了
-            if (currentResults[flags.targetUuid]) {
+            if (currentResults[safeKey]) {
                 // 为了视觉同步，顺便把按钮废掉
                 await message.update({
                     content: message.content.replace(
@@ -712,11 +714,10 @@ export class ChatCardManager {
 
         // 5. 回写状态到原始攻击卡片
         // 让应用伤害的时候可以知道这次是否击破架招，是否要触发击破架招的特效
-        const feintResults = originMsg.flags["xjzl-system"]?.feintResults || {};
-        feintResults[flags.targetUuid] = isBroken ? "broken" : "resisted";
-
+        // 直接更新具体的 Key，让 Foundry 服务器去合并，避免覆盖别人的结果
+        const resultValue = isBroken ? "broken" : "resisted";
         await originMsg.update({
-            "flags.xjzl-system.feintResults": feintResults
+            [`flags.xjzl-system.feintResults.${safeKey}`]: resultValue
         });
 
         // 更新当前的请求卡片，禁用按钮
@@ -740,7 +741,7 @@ export class ChatCardManager {
         // 2. 虚招“漏网之鱼”检查
         // 检查是否有：目标开了架招 && 是虚招攻击 && 还没有对抗结果 && 被命中
         const move = item.system.moves.find(m => m.id === flags.moveId);
-        const feintResults = message.flags["xjzl-system"]?.feintResults || {};
+        const feintResults = flags.feintResults || {};
         const isFeintMove = move?.type === "feint";
         let missingDefense = false;
 
@@ -748,7 +749,9 @@ export class ChatCardManager {
             for (const target of targets) {
                 const targetActor = target.actor || target; // 兼容 Token/Actor
                 // 必须用 target.uuid (Token UUID) 来查表
-                const hasResult = feintResults[target.uuid];
+                // 我们储存的时候把uuid的.替换成下划线来避免被视为嵌套对象，读取的时候也必须这样读取
+                const safeKey = target.uuid.replaceAll(".", "_");
+                const hasResult = feintResults[safeKey];
                 const stanceActive = targetActor.system?.martial?.stanceActive;
                 const res = hitResults[target.uuid];
                 // 如果没命中，不需要对抗，自然也不算漏网
@@ -757,7 +760,6 @@ export class ChatCardManager {
                 // 如果开了架招，且没有对抗结果，视为“漏网”
                 if (stanceActive && !hasResult) {
                     missingDefense = true;
-                    console.log(`漏网：${target.name}`);
                     break;
                 }
             }
@@ -812,7 +814,9 @@ export class ChatCardManager {
             }
 
             // 获取对抗结果 (broken / resisted / undefined)
-            const feintStatus = feintResults[uuid];
+            // 我们储存的时候把uuid的.替换成下划线来避免被视为嵌套对象，读取的时候也必须这样读取
+            const safeKey = uuid.replaceAll(".", "_");
+            const feintStatus = feintResults[safeKey];
             const isBroken = (feintStatus === "broken");
 
             // C. 调用 Actor 伤害处理
