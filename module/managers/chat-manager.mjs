@@ -85,6 +85,16 @@ export class ChatCardManager {
             return;
         }
 
+        if (action === "applyDamage") {
+            // 安全检查：因为绕过了后面的 switch，这里必须手动检查 item
+            if (!item) return ui.notifications.warn("源物品数据已丢失。");
+            if (event.shiftKey) {
+                // A. Shift模式：走手动强制流程
+                await ChatCardManager._handleManualDamage(attacker, item, flags, message);
+                return;
+            }
+        }
+
         if (historyUuids.length > 0) {
             // A. 如果 Roll 阶段记录了目标，强制使用历史目标
             // 使用 fromUuidSync 同步获取 (因为在同一场景下通常都在内存里)
