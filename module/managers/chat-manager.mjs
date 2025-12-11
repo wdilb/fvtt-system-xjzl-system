@@ -685,7 +685,40 @@ export class ChatCardManager {
             return ui.notifications.warn("原始攻击消息已丢失，无法记录对抗结果。");
         }
 
+        // =====================================================
+        // 1.5 获取攻击者 & 计算优劣势 (New Logic)
+        // =====================================================
+        let attackerActor = null;
+        const speaker = originMsg.speaker;
+        if (speaker.token) attackerActor = game.actors.tokens[speaker.token];
+        if (!attackerActor) attackerActor = game.actors.get(speaker.actor);
+
+        // A. 防御者自身看破能力 (Self)
+        const selfLevel = targetActor.xjzlStatuses?.feintLevel || 0;
+
+        // B. 攻击者赋予的修正 (Grant) - 例如攻击者动作迟缓容易被看破
+        let grantLevel = 0;
+        if (attackerActor) {
+            grantLevel = attackerActor.xjzlStatuses?.defendFeintLevel || 0;
+        }
+
+        // C. 汇总状态
+        const totalLevel = selfLevel + grantLevel;
+
+        let diceFormula = "1d20";
+        let flavorStatus = ""; // 用于弹窗提示
+
+        if (totalLevel > 0) {
+            diceFormula = "2d20kh";
+            flavorStatus = "(优势)";
+        } else if (totalLevel < 0) {
+            diceFormula = "2d20kl";
+            flavorStatus = "(劣势)";
+        }
+
+        // =====================================================
         // 2. 弹窗询问加值
+        // =====================================================
         const kanpoBase = targetActor.system.combat.kanpoTotal || 0;
 
         const input = await foundry.applications.api.DialogV2.prompt({
@@ -694,6 +727,7 @@ export class ChatCardManager {
             <div style="text-align:center; padding:10px;">
                 <p>敌方虚招强度: <b style="color:red;">${flags.attackTotal}</b></p>
                 <p>你的看破值: <b>${kanpoBase}</b></p>
+                <p style="font-size:0.9em; color:#666;">当前判定: <b>${diceFormula}</b> <span style="color:var(--xjzl-gold)">${flavorStatus}</span></p>
                 <label>额外加值</label>
                 <input type="number" name="bonus" value="0" style="text-align:center; width:100%;"/>
             </div>
@@ -708,14 +742,14 @@ export class ChatCardManager {
         if (input === null) return; // 取消
         const bonus = parseInt(input) || 0;
 
-        // 2. 投掷
-        const roll = await new Roll("1d20 + @kanpo + @bonus", { kanpo: kanpoBase, bonus: bonus }).evaluate();
+        // 3. 投掷
+        const roll = await new Roll(`${diceFormula} + @kanpo + @bonus`, { kanpo: kanpoBase, bonus: bonus }).evaluate();
         if (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);
 
         const defTotal = roll.total;
         const atkTotal = flags.attackTotal;
 
-        // 3. 判定胜负
+        // 4. 判定胜负
         // 攻击方 >= 防御方 则破防。反之防御方 > 攻击方 则守住。
         // 所以 broken = atkTotal >= defTotal
         const isBroken = atkTotal >= defTotal;
@@ -758,23 +792,50 @@ export class ChatCardManager {
             }
         }
 
-        // 4. 显示结果
+        // =====================================================
+        // 5. 构建显示字符串 (JS 处理逻辑)-渲染模板
+        // =====================================================
+        const diceTerm = roll.terms[0]; // 获取第一个 DiceTerm (1d20 或 2d20kh)
+        const diceTotal = diceTerm.total; // 骰子本身的结果 (不含加值)
+        
+        // 获取原始点数数组 [5, 18]
+        const rawResults = diceTerm.results.map(r => {
+            // 如果该骰子被丢弃(dropped)，通常加个样式标记（可选），这里简单只显示数字
+            return r.result;
+        }).join(", ");
+
+        let rollDisplay = "";
+        
+        // 格式化显示： 2d20kh (5, 18) ➔ 18
+        if (diceTerm.results.length > 1) {
+            rollDisplay = `${diceFormula} <span style="color:#666; font-size:0.9em;">(${rawResults})</span> <i class="fas fa-arrow-right" style="font-size:0.8em"></i> <b>${diceTotal}</b>`;
+        } else {
+            // 格式化显示： 1d20 ➔ 15
+            rollDisplay = `${diceFormula} <i class="fas fa-arrow-right" style="font-size:0.8em"></i> <b>${diceTotal}</b>`;
+        }
+
+        const templateData = {
+            rollDisplay: rollDisplay, // 包含 HTML 的字符串
+            kanpoBase: kanpoBase,
+            bonus: bonus,
+            defTotal: defTotal,
+            isBroken: isBroken
+        };
+
+        const content = await renderTemplate(
+            "systems/xjzl-system/templates/chat/defend-result.hbs",
+            templateData
+        );
+
+        // 发送结果卡片
         ChatMessage.create({
             user: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-            flavor: "看破检定结果",
-            content: `
-            <div class="xjzl-chat-card">
-                <div>1d20(${roll.total - kanpoBase - bonus}) + 看破(${kanpoBase}) + 修正(${bonus}) = <b>${defTotal}</b></div>
-                <hr>
-                <div style="font-size:1.2em; font-weight:bold; color:${!isBroken ? 'green' : 'red'};">
-                    ${!isBroken ? "看破！(架招维持)" : "被破防！(架招将在伤害阶段移除)"}
-                </div>
-            </div>
-          `
+            flavor: `看破检定结果 ${flavorStatus}`,
+            content: content
         });
 
-        // 5. 回写状态到原始攻击卡片
+        // 6. 回写状态到原始攻击卡片
         // 让应用伤害的时候可以知道这次是否击破架招，是否要触发击破架招的特效
         // 直接更新具体的 Key，让 Foundry 服务器去合并，避免覆盖别人的结果
         const resultValue = isBroken ? "broken" : "resisted";

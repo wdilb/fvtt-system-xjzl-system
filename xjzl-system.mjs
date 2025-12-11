@@ -341,7 +341,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/chat/item-card.hbs", //物品使用
     "systems/xjzl-system/templates/chat/move-card.hbs", //招式使用
     "systems/xjzl-system/templates/chat/request-defense.hbs", //虚招对抗
-    "systems/xjzl-system/templates/chat/damage-card.hbs" //伤害卡片
+    "systems/xjzl-system/templates/chat/damage-card.hbs", //伤害卡片
+    "systems/xjzl-system/templates/chat/defend-result.hbs" //看破结果
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);
