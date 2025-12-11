@@ -262,7 +262,36 @@ export class XJZLActor extends Actor {
       });
     }
 
-    // 3. 上下文对象 (Context Item/Move)
+    // =====================================================
+    // 3. 当前激活的架招 (Active Stance)
+    // =====================================================
+    // 架招开启后，应当视为常驻被动效果，直到关闭
+    const martial = this.system.martial;
+    // 检查：架招激活 + 有记录的 Move ID + 有记录的 Item ID
+    if (martial?.stanceActive && martial?.stance && martial?.stanceItemId) {
+
+      const wuxueItem = this.items.get(martial.stanceItemId);
+
+      if (wuxueItem) {
+        // 在该武学中找到对应的招式
+        const stanceMove = wuxueItem.system.moves.find(m => m.id === martial.stance);
+
+        if (stanceMove && stanceMove.scripts) {
+          stanceMove.scripts.forEach(s => {
+            // 同样检查触发器和开关
+            if (s.trigger === trigger && s.active) {
+              scripts.push({
+                script: s.script,
+                label: s.label || stanceMove.name,
+                source: wuxueItem // 源头依然归属于该武学物品
+              });
+            }
+          });
+        }
+      }
+    }
+
+    // 4. 上下文对象 (Context Item/Move)
     // 这是在 roll()或者其他调用的时候传进来的，比如当前正在施展的招式
     if (contextItem && contextItem.scripts && Array.isArray(contextItem.scripts)) {
       contextItem.scripts.forEach(s => {
@@ -774,7 +803,7 @@ export class XJZLActor extends Actor {
         isDead = false; // 取消死亡标记
         // 同样，脚本里需要负责把内力/血量拉回来
       }
-      else{
+      else {
         // TODO: 触发死亡逻辑 (Overlay图标、发送聊天信息等)
         // 使用 Actor 的方法切换状态
         // "dead" 是 Foundry 核心默认的死亡状态 ID，通常会自动挂载骷髅图标
