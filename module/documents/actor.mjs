@@ -146,8 +146,8 @@ export class XJZLActor extends Actor {
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
-      // 如果是那两个数值型的 Key，单独处理，否则按布尔处理
-      if (["attackLevel", "grantAttackLevel"].includes(key)) continue;
+      // 如果是那数值型的 Key，单独处理，否则按布尔处理
+      if (["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel"].includes(key)) continue;
       this.xjzlStatuses[key] = this.getFlag("xjzl-system", key) || false;
     }
 
@@ -155,6 +155,8 @@ export class XJZLActor extends Actor {
     // 注意：getFlag 读取出来的可能是 undefined，必须保底为 0
     this.xjzlStatuses.attackLevel = parseInt(this.getFlag("xjzl-system", "attackLevel")) || 0;
     this.xjzlStatuses.grantAttackLevel = parseInt(this.getFlag("xjzl-system", "grantAttackLevel")) || 0;
+    this.xjzlStatuses.feintLevel = parseInt(this.getFlag("xjzl-system", "feintLevel")) || 0;
+    this.xjzlStatuses.defendFeintLevel = parseInt(this.getFlag("xjzl-system", "defendFeintLevel")) || 0;
 
     // ----------------------------------------------------
     // PHASE 2: 脚本干预 (Script Execution)

@@ -150,15 +150,15 @@ export class ChatCardManager {
         // 如果 flags.moveType 是 counter，或者 damageType 不属于内外功，则不需要检定
         const isCounter = flags.moveType === "counter"; // 读取你新加的 flag
         const isValidDamage = ["waigong", "neigong"].includes(damageType);
-
+        // 反击(Counter) 或 非内外功招式 不需要投骰子比对闪避
         const needsCheck = isValidDamage && !isCounter;
 
         // 如果不需要检定 (如气招/反击)，直接返回全命中
-        if (!needsCheck) {
-            const results = {};
-            targets.forEach(t => results[t.uuid] = { isHit: true, total: 0 });
-            return results;
-        }
+        // if (!needsCheck) {
+        //     const results = {};
+        //     targets.forEach(t => results[t.uuid] = { isHit: true, total: 0 });
+        //     return results;
+        // }
 
         // 提前计算公共加值 (修复 ReferenceError 的关键)
         const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
@@ -193,6 +193,7 @@ export class ChatCardManager {
 
         const ctx = flags.contextLevel || {};
         const selfLevel = ctx.selfLevel || 0; // 读取数值等级
+        const selfFeintLevel = ctx.selfFeintLevel || 0; // 虚招等级
 
         for (const target of targets) {
             const uuid = target.uuid;
@@ -209,29 +210,45 @@ export class ChatCardManager {
             const checkContext = {
                 target: targetActor,
                 flags: {
-                    grantLevel: 0
+                    grantLevel: 0,
+                    grantFeintLevel: 0  // 虚招修正
                 }
             }; //换成优劣势计数
             const move = item.system.moves.find(m => m.id === flags.moveId);
             await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
+            // --- 1. 计算命中优劣势 (Attack State) ---
+            let attackState = 0;
+            // 只有需要检定的招式才计算命中优劣
+            if (needsCheck) {
+                // 1. 目标给予 (当前时刻)
+                const targetGrant = targetActor.xjzlStatuses?.grantAttackLevel || 0;
+                // 2. 脚本临时修正
+                const scriptGrant = checkContext.flags.grantLevel || 0;
+                // 汇总
+                const totalLevel = selfLevel + targetGrant + scriptGrant;
 
-            // 1. 目标给予 (当前时刻)
-            const targetStatusGrant = targetActor.xjzlStatuses?.grantAttackLevel || 0;
+                if (totalLevel > 0) attackState = 1;
+                else if (totalLevel < 0) attackState = -1;
+            }
 
-            // 2. 脚本临时修正
-            const scriptGrant = checkContext.flags.grantLevel || 0;
+            // --- 2. 计算虚招优劣势 (Feint State) ---
+            // 即使是必中招式，如果它是虚招，也需要这个状态
+            const targetFeintGrant = targetActor.xjzlStatuses?.defendFeintLevel || 0;
+            const scriptFeintGrant = checkContext.flags.grantFeintLevel || 0;
+            const totalFeintLevel = selfFeintLevel + targetFeintGrant + scriptFeintGrant;
 
-            // 汇总
-            const totalLevel = selfLevel + targetStatusGrant + scriptGrant;
-            let finalState = 0;
-            if (totalLevel > 0) finalState = 1;
-            else if (totalLevel < 0) finalState = -1;
+            let feintState = 0;
+            if (totalFeintLevel > 0) feintState = 1;
+            else if (totalFeintLevel < 0) feintState = -1;
 
-            targetStates.set(uuid, finalState);
+            targetStates.set(uuid, {
+                attackState: attackState,
+                feintState: feintState
+            });
 
             // 关键判断：如果状态不平，且没有 D2，则需要补骰
-            if (finalState !== 0 && d2 === null) {
+            if (needsCheck && attackState !== 0 && d2 === null) {
                 needsSupplemental = true;
             }
         }
@@ -281,31 +298,43 @@ export class ChatCardManager {
                 const displayName = target.name || tActor.name;
 
                 // 复用计算逻辑 (局部)
-                const state = targetStates.get(uuid) ?? 0;
-                let finalDie = d1;
-                let stateLabel = "平";
+                const states = targetStates.get(uuid) || { attackState: 0, feintState: 0 }; // 读取刚才算的状态
+                const state = states.attackState;
 
-                if (state === 1) { finalDie = Math.max(d1, d2); stateLabel = "优"; }
-                else if (state === -1) { finalDie = Math.min(d1, d2); stateLabel = "劣"; }
+                // --- 命中判定逻辑 ---
+                let stateLabel = "-";
+                let displayTotal = "-";
+                let dodge = "-";
+                let isHit = true; // 默认为中 (针对反击等)
+                let color = "green";
+                let label = "必中";
 
-                const total = finalDie + hitMod + manualBonus;
-                const dodge = tActor.system.combat.dodgeTotal || 10;
+                if (needsCheck) {
+                    let finalDie = d1;
+                    stateLabel = "平";
 
-                // 判定命中 (含20必中/1必失)
-                let isHit = false;
-                if (finalDie === 20) isHit = true;
-                else if (finalDie === 1) isHit = false;
-                else isHit = total >= dodge;
+                    if (state === 1) { finalDie = Math.max(d1, d2); stateLabel = "优"; }
+                    else if (state === -1) { finalDie = Math.min(d1, d2); stateLabel = "劣"; }
 
-                const color = isHit ? "green" : "red";
-                const label = isHit ? "命中" : "未中";
+                    const total = finalDie + hitMod + manualBonus;
+                    dodge = tActor.system.combat.dodgeTotal || 10;
+                    displayTotal = total
+
+                    // 判定命中 (含20必中/1必失)
+                    if (finalDie === 20) isHit = true;
+                    else if (finalDie === 1) isHit = false;
+                    else isHit = total >= dodge;
+
+                    color = isHit ? "green" : "red";
+                    label = isHit ? "命中" : "未中";
+                }
 
                 resultListHtml += `
                     <li style="display:flex; justify-content:space-between; font-size:0.9em; border-bottom:1px dashed #eee;">
                         <span>${displayName}</span>
                         <span>
                             <span style="color:#666;">[${stateLabel}]</span> 
-                            ${total} vs ${dodge} 
+                            ${displayTotal} vs ${dodge} 
                             <b style="color:${color};">(${label})</b>
                         </span>
                     </li>`;
@@ -320,6 +349,8 @@ export class ChatCardManager {
                 // 场景：不需要现投，但使用了 D2 (可能是原生双骰，也可能是历史补骰)
                 const sourceText = isNativeDouble ? "双骰取值" : "历史补骰";
                 headerHtml = `${sourceText} <span style="font-size:0.8em; color:#666;">(D1:${d1} / D2:${d2})</span>`;
+            } else if (!needsCheck) {
+                headerHtml = `无需检定 <span style="font-size:0.8em; color:#666;">(必中)</span>`;
             } else {
                 // 场景：普通单骰
                 headerHtml = `结算结果 <span style="font-size:0.8em; color:#666;">(D20: ${d1})</span>`;
@@ -343,7 +374,7 @@ export class ChatCardManager {
         }
 
         // =====================================================
-        // 4. 计算最终结果 (Final Resolution)
+        // 5. 计算最终结果 (Final Resolution)
         // =====================================================
         const results = {};
 
@@ -362,35 +393,40 @@ export class ChatCardManager {
             }
 
             // B. 确定最终使用的骰子 (Final Die)
-            const state = targetStates.get(uuid) ?? 0;
+            const states = targetStates.get(uuid) || { attackState: 0, feintState: 0 };
+            const state = states.attackState;
             let finalDie = d1;
+            let isHit = true;
+            let total = 0;
+            if (needsCheck) {
+                // 此时 d2 一定就位 (除非 state=0 或者用户取消了)
+                if (state === 1 && d2 !== null) finalDie = Math.max(d1, d2);
+                else if (state === -1 && d2 !== null) finalDie = Math.min(d1, d2);
 
-            // 此时 d2 一定就位 (除非 state=0 或者用户取消了)
-            if (state === 1 && d2 !== null) finalDie = Math.max(d1, d2);
-            else if (state === -1 && d2 !== null) finalDie = Math.min(d1, d2);
+                // C. 计算数值
+                total = finalDie + hitMod + manualBonus;
+                const dodge = targetActor.system.combat.dodgeTotal || 10;
 
-            // C. 计算数值
-            const total = finalDie + hitMod + manualBonus;
-            const dodge = targetActor.system.combat.dodgeTotal || 10;
-
-            // D. 判定命中
-            let isHit = false;
-            // 规则：20必中，1必失
-            if (finalDie === 20) {
-                isHit = true;
-            } else if (finalDie === 1) {
-                isHit = false;
-            } else {
-                isHit = total >= dodge;
+                // D. 判定命中
+                // 规则：20必中，1必失
+                if (finalDie === 20) {
+                    isHit = true;
+                } else if (finalDie === 1) {
+                    isHit = false;
+                } else {
+                    isHit = total >= dodge;
+                }
             }
 
             results[uuid] = {
                 isHit: isHit,
-                total: total,
-                dieUsed: finalDie // 这里的 Key 改为 dieUsed 比较明确，之前的代码混用了 die 和 dieUsed
+                total: total, //total为0且isHit为true说明是不需要判断的必中攻击
+                dieUsed: needsCheck ? finalDie : "-", // 这里的 Key 改为 dieUsed 比较明确，之前的代码混用了 die 和 dieUsed
+                stateLabel: state === 1 ? "优" : (state === -1 ? "劣" : "平"),
+                feintState: states.feintState
             };
         }
-        
+
         // 将计算出的 results 写入 Message Flag
         // 将 Results 对象转换为 Array，避免 Key 中包含 '.' 导致数据库存储为嵌套对象
         // 格式转换: { "Scene.x.Token.y": { isHit: true } } -> [ { uuid: "Scene.x.Token.y", isHit: true } ]
@@ -432,6 +468,8 @@ export class ChatCardManager {
         const validTargetsToRequest = [];
         const skippedLog = []; // 用于记录无需对抗的目标及其原因
 
+        let needsTwoDice = false; // 是否需要投掷 2 个骰子
+
         for (const target of targets) {
             const uuid = target.uuid;
             // 获取 Actor (TokenDocument 不包含 system 数据，必须取 actor)
@@ -453,15 +491,21 @@ export class ChatCardManager {
             const res = hitResults[uuid];
             if (res && !res.isHit) {
                 // ui.notifications.warn(`${target.name} 闪避了攻击，无需对抗。`);
-                skippedLog.push({ name: displayName , reason: "已闪避" });  //改为在卡片里提醒
+                skippedLog.push({ name: displayName, reason: "已闪避" });  //改为在卡片里提醒
                 continue;
             }
 
             // C. 架招检查
             if (!targetActor.system.martial.stanceActive) {
                 // ui.notifications.info(`${target.name} 未开启架招。`);
-                skippedLog.push({ name: displayName , reason: "未开启架招。" });
+                skippedLog.push({ name: displayName, reason: "未开启架招。" });
                 continue;
+            }
+
+            // D. 检查该目标的虚招优劣势 (从结果中直接读取)
+            // res.feintState 在 Item.roll 阶段已计算并存入 targetsResultMap
+            if (res.feintState !== 0) {
+                needsTwoDice = true;
             }
 
             // 存入待处理列表
@@ -469,7 +513,8 @@ export class ChatCardManager {
                 uuid: uuid,
                 actor: targetActor,
                 target: target, // 保留原始target对象以获取纹理
-                displayName: displayName 
+                displayName: displayName,
+                feintState: res.feintState || 0
             });
         }
 
@@ -478,25 +523,42 @@ export class ChatCardManager {
         let newlyRequested = [];
 
         if (validTargetsToRequest.length > 0) {
-
-            // 2. 准备攻方虚招结果 (Check Attacker Roll)
-            // 逻辑：一次出招，对所有人的虚招值是一样的
-            let attackerFeintRoll = flags.feintRollTotal;
-
-            if (attackerFeintRoll === undefined) { // 第一次点，还没投过
-                const r = await new Roll("1d20").evaluate();
-                attackerFeintRoll = r.total;
-
+            let d1 = 0;
+            let d2 = null;
+            if (needsTwoDice) {
+                // 优势或劣势：一次性投 2d20，生成合并动画
+                const r = await new Roll("2d20").evaluate();
                 if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
 
-                // 记录需要更新的骰子结果
-                updateData["flags.xjzl-system.feintRollTotal"] = attackerFeintRoll;
+                // 提取结果
+                d1 = r.terms[0].results[0].result;
+                d2 = r.terms[0].results[1].result;
+            } else {
+                // 普通：投 1d20
+                const r = await new Roll("1d20").evaluate();
+                if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
+
+                d1 = r.total;
+                d2 = null;
             }
-            const attackTotal = attackerFeintRoll + feintVal;
 
             // 3. 遍历有效目标发送请求
             for (const tData of validTargetsToRequest) {
-                const { uuid, actor: targetActor, target, displayName } = tData;
+                const { uuid, actor: targetActor, target, displayName, feintState } = tData;
+
+                // 计算针对该目标的最终点数
+                let finalDie = d1;
+                let rollDisplay = `${d1}`;
+
+                if (feintState === 1 && d2 !== null) {
+                    finalDie = Math.max(d1, d2);
+                    rollDisplay = `优势(${d1}, ${d2}) ➔ <b>${finalDie}</b>`;
+                } else if (feintState === -1 && d2 !== null) {
+                    finalDie = Math.min(d1, d2);
+                    rollDisplay = `劣势(${d1}, ${d2}) ➔ <b>${finalDie}</b>`;
+                }
+
+                const attackTotal = finalDie + feintVal;
 
                 // 获取头像
                 const imgPath = target.texture?.src || targetActor.img;
@@ -506,7 +568,7 @@ export class ChatCardManager {
                     attackerName: attacker.name,
                     targetName: displayName,
                     targetImg: imgPath,
-                    rollTotal: attackerFeintRoll,
+                    rollTotal: rollDisplay,
                     feintVal: feintVal,
                     attackTotal: attackTotal,
                     targetUuid: uuid,
@@ -602,7 +664,7 @@ export class ChatCardManager {
 
         const displayName = targetDoc.name || targetActor.name;
         // 把 UUID 中的点替换为下划线，防止被解析成嵌套对象，在FVTT自带的机制中调用update会把点视为 层级路径 而不是一个扁平的键名
-        const safeKey = flags.targetUuid.replaceAll(".", "_"); 
+        const safeKey = flags.targetUuid.replaceAll(".", "_");
 
         // --- 防重复检查 ---
         const originMsg = game.messages.get(flags.originMessageId);

@@ -1115,6 +1115,7 @@ export class XJZLItem extends Item {
         // 核心 Flags (供脚本修改)
         flags: {
           level: s.attackLevel || 0, // 使用数值计数器，不再使用布尔值的flags,初始值继承自 Actor
+          feintLevel: s.feintLevel || 0, // 虚招自身等级
           abort: false,       // 脚本设为 true 可阻断攻击
           abortReason: ""     // 阻断原因
         }
@@ -1178,7 +1179,67 @@ export class XJZLItem extends Item {
       calcResult.feint += config.bonusFeint;
 
       // =====================================================
-      // 6. 命中检定 (Hit Roll)
+      // 6. 目标状态预计算 (Target Pre-Calculation)
+      // =====================================================
+      // 【核心修改】将这部分逻辑移出 needsHitCheck，对所有目标执行
+
+      const targetContexts = new Map(); // 存储每个目标的计算结果 (UUID -> Context)
+
+      // 读取自身状态
+      // 提前初始化自身优劣势计数，确保 flags 能读到
+      // 直接读取 context 里的数字 (包含了 Actor 被动 + 脚本修改)
+      const selfLevel = attackContext.flags.level;
+      const selfFeintLevel = attackContext.flags.feintLevel;
+
+      // 遍历目标进行脚本运算
+      if (targets.length > 0) {
+        for (const targetToken of targets) {
+          const targetActor = targetToken.actor;
+          if (!targetActor) continue;
+
+          // 运行 CHECK 脚本
+          const checkContext = {
+            target: targetActor,
+            flags: {
+              grantLevel: 0,      // 攻击修正
+              grantFeintLevel: 0  // 虚招修正
+            }
+          };
+
+          await actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
+
+          // 读取目标被动状态
+          const tStatus = targetActor.xjzlStatuses || {};
+
+          // --- A. 计算命中优劣势 ---
+          const targetGrant = tStatus.grantAttackLevel || 0;
+          const scriptGrant = checkContext.flags.grantLevel || 0;
+          const totalAttackLevel = selfLevel + targetGrant + scriptGrant;
+
+          let attackState = 0;
+          if (totalAttackLevel > 0) attackState = 1;
+          else if (totalAttackLevel < 0) attackState = -1;
+
+          // --- B. 计算虚招优劣势 ---
+          const targetFeintGrant = tStatus.defendFeintLevel || 0;
+          const scriptFeintGrant = checkContext.flags.grantFeintLevel || 0;
+          const totalFeintLevel = selfFeintLevel + targetFeintGrant + scriptFeintGrant;
+
+          let feintState = 0;
+          if (totalFeintLevel > 0) feintState = 1;
+          else if (totalFeintLevel < 0) feintState = -1;
+
+          // 存入 Map
+          targetContexts.set(targetToken.document.uuid, {
+            attackState: attackState,
+            feintState: feintState,
+            // 这里还可以存一些中间值备查
+          });
+        }
+      }
+
+      // =====================================================
+      // 7. 命中检定 (Hit Roll)
       // =====================================================
       let attackRoll = null;
       let rollJSON = null;
@@ -1186,9 +1247,6 @@ export class XJZLItem extends Item {
       let displayTotal = 0; // 卡片上显示的数字，用来处理复杂的优势劣势情况下该显示什么数字
       // 初始化 targetsResults，防止 ReferenceError
       const targetsResults = {};
-      // 提前初始化自身优劣势计数，确保 flags 能读到
-      // 直接读取 context 里的数字 (包含了 Actor 被动 + 脚本修改)
-      let selfLevel = attackContext.flags.level;
       const damageType = move.damageType || "waigong";
       let needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
       if (move.type === "counter") needsHitCheck = false; //反击必中，其他的架招和虚招在上面已经返回了
@@ -1202,49 +1260,22 @@ export class XJZLItem extends Item {
 
         // B. 确定优势/劣势 (Advantage/Disadvantage)
 
-        // 现在很简单了，只需要看level是否大于0
-        let selfState = 0;
-        if (selfLevel > 0) selfState = 1;
-        else if (selfLevel < 0) selfState = -1;
-
-        // C. 目标预判 (Target Pre-Check)
-        // 核心逻辑：如果 targets 里有任何人导致我需要扔双骰，那就扔双骰 (needsTwoDice=true)
-        // 这样可以避免后续补骰，实现“一次投掷，多种解释”
-        let needsTwoDice = (selfState !== 0);
-        const targetStates = new Map(); // 存储每个目标的优劣状态
-
-        if (targets.length > 0) {
-          for (const targetToken of targets) {
-            const targetActor = targetToken.actor;
-            if (!targetActor) continue;
-
-            // 运行 CHECK 脚本
-            // const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
-            const checkContext = {
-              target: targetActor,
-              flags: {
-                grantLevel: 0
-              }
-            };
-            // runScripts 是 async 方法，即使 trigger 是同步的，外部调用最好也 await 保证顺序
-            await actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
-
-            //再次结合目标来判断优劣
-            //简单地只需要看计数了
-            const targetGrant = targetActor.xjzlStatuses.grantAttackLevel || 0;
-            const scriptGrant = checkContext.flags.grantLevel || 0;
-
-            const totalLevel = selfLevel + targetGrant + scriptGrant;
-
-            let finalState = 0;
-            if (totalLevel > 0) finalState = 1;
-            else if (totalLevel < 0) finalState = -1;
-
-            targetStates.set(targetToken.document.uuid, finalState);
-            if (finalState !== 0) needsTwoDice = true; // 只要有一个目标不平，就得投2个
+        // 判断是否需要 2d20 (只要有一个目标导致自身非平局)
+        // 逻辑：如果没有任何目标，就只看自身 selfLevel
+        let needsTwoDice = false;
+        if (targets.length === 0) {
+          if (selfLevel !== 0) needsTwoDice = true;
+        } else {
+          // 检查 Map 里是否有任意一个 state != 0
+          for (const ctx of targetContexts.values()) {
+            if (ctx.attackState !== 0) {
+              needsTwoDice = true;
+              break;
+            }
           }
         }
-        // D. 执行投掷
+
+        // C. 执行投掷
         // 如果需要补骰，公式显示 2d20，方便玩家知道“哦，我有优势/劣势处理”
         const diceFormula = needsTwoDice ? "2d20" : "1d20";
         attackRoll = await new Roll(`${diceFormula} + @mod`, { mod: hitMod }).evaluate();
@@ -1252,18 +1283,17 @@ export class XJZLItem extends Item {
         rollTooltip = await attackRoll.getTooltip();
         rollJSON = attackRoll.toJSON();
 
-        // E. 分配结果
+        // D. 分配结果
         const diceResults = attackRoll.terms[0].results.map(r => r.result);
         const d1 = diceResults[0];
         const d2 = diceResults[1] || d1;
 
-        // 逻辑：如果有目标，取第一个目标的优劣势状态；如果没有，取自身状态。
-        let primaryState = selfState;
-
+        // 计算显示用的 flavorText (取首要目标状态或自身状态)
+        let primaryState = 0;
         if (targets.length > 0) {
-          const firstId = targets[0].document.uuid;
-          // targetStates 在 C 步骤中已经计算好了
-          primaryState = targetStates.get(firstId) ?? 0;
+          primaryState = targetContexts.get(targets[0].document.uuid)?.attackState || 0;
+        } else {
+          primaryState = (selfLevel > 0) ? 1 : ((selfLevel < 0) ? -1 : 0);
         }
 
         // 根据主要状态计算大数字
@@ -1283,7 +1313,8 @@ export class XJZLItem extends Item {
           // 修改为使用 t.document.uuid 作为 Key，而不是 t.id
           // t.id 只是由 ID 组成的字符串，而 uuid 包含场景信息，更安全
           const tokenUuid = t.document.uuid;
-          const state = targetStates.get(tokenUuid) ?? 0;
+          const ctx = targetContexts.get(tokenUuid) || { attackState: 0 };
+          const state = ctx.attackState;
           let finalDie = d1;
           let outcomeLabel = "平";
           // 根据每个目标的最终状态，从 d1/d2 中选一个
@@ -1314,13 +1345,32 @@ export class XJZLItem extends Item {
             isHit: isHit,
             stateLabel: outcomeLabel,
             dodge: dodge,
-            die: finalDie // 调试用：显示用的哪个骰子
+            die: finalDie, //显示用的哪个骰子
+            feintState: ctx.feintState //对每个目标的虚招优劣势 
           };
         });
       }
+      else {
+        // 不需要检定 (如反击)，但我们仍需填充 targetsResults 以便显示 "必中"
+        // 同时，虽然没投攻击骰，但虚招优劣势 (feintState) 已经算好了存着了
+        targets.forEach(t => {
+          const tokenUuid = t.document.uuid;
+          const ctx = targetContexts.get(tokenUuid) || { attackState: 0 };
+          targetsResults[t.document.uuid] = {
+            name: t.name,
+            total: "-",
+            isHit: true, // 默认必中
+            stateLabel: "-",
+            dodge: "-",
+            die: "-",
+            feintState: ctx.feintState
+          };
+        });
+        flavorText = "施展 (无需检定)";
+      }
 
       // =====================================================
-      // 7. 发送消息
+      // 8. 发送消息
       // =====================================================
 
       // --- 计算是否显示虚招对抗按钮 ---
@@ -1386,7 +1436,8 @@ export class XJZLItem extends Item {
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
             contextLevel: {
-              selfLevel: selfLevel  // 存下 Roll 时的自身等级
+              selfLevel: selfLevel,  // 存下 Roll 时的自身等级
+              selfFeintLevel: selfFeintLevel //自身虚招等级
             },//只需要存数字了
             // 3. 掷骰结果
             // 我们存入 JSON，以便后续可以重新构建 Roll 对象 (roll = Roll.fromJSON(...))
@@ -1400,13 +1451,15 @@ export class XJZLItem extends Item {
             // 存储预判结果 Map
             // 这里的 Key 是 Token ID，Value 是预判的状态
             // 这样在 Apply Damage 时，直接通过 Token ID 查表即可
+            // Manager 如果要复用，会直接读这个；如果要重算，会读 contextFlags
             targetsResultMap: Object.keys(targetsResults).reduce((acc, tokenId) => {
               const res = targetsResults[tokenId];
               acc[tokenId] = {
                 stateLabel: res.stateLabel, // "优", "劣", "平"
                 isHit: res.isHit,           // 是否命中
                 total: res.total,           // 最终数值
-                dieUsed: res.die            // 用的哪个骰子
+                dieUsed: res.die,           // 用的哪个骰子
+                feintState: res.feintState
               };
               return acc;
             }, {})

@@ -145,21 +145,33 @@ XJZL.statusFlags = {
   // === 数值型优劣势计数器 ===
   // 逻辑：正数(+)代表优势，负数(-)代表劣势，0代表正常
   // 在 AE 中请使用 Mode 2 (ADD) 进行加减
-  
+
   // 1. 自身攻击修正 (Self)
   // 含义：我攻击别人时，我的状态让我 [更容易(+)/更难(-)] 命中
-  attackLevel: "XJZL.Status.AttackLevel", 
+  attackLevel: "XJZL.Status.AttackLevel",
 
   // 2. 被击修正 (Grant/Target)
   // 含义：别人攻击我时，我的状态让他 [更容易(+)/更难(-)] 命中
   // 例如：在这里写 +1，代表"空门大开"，任何打我的人获得 +1 优势
   grantAttackLevel: "XJZL.Status.GrantAttackLevel",
 
-  feintAdvantage: "XJZL.Status.FeintAdvantage",                   // 虚招对抗优势 (使用虚招时检定取高)
-  feintDisadvantage: "XJZL.Status.FeintDisadvantage",             // 虚招对抗劣势 (使用虚招时检定取低)
+  // feintAdvantage: "XJZL.Status.FeintAdvantage",                   // 虚招对抗优势 (使用虚招时检定取高)
+  // feintDisadvantage: "XJZL.Status.FeintDisadvantage",             // 虚招对抗劣势 (使用虚招时检定取低)
 
-  defendFeintAdvantage: "XJZL.Status.DefendFeintAdvantage",       // 被虚招优势 (抵抗虚招时检定取高)
-  defendFeintDisadvantage: "XJZL.Status.DefendFeintDisadvantage", // 被虚招劣势 (抵抗虚招时检定取低)
+  // defendFeintAdvantage: "XJZL.Status.DefendFeintAdvantage",       // 被虚招优势 (抵抗虚招时检定取高)
+  // defendFeintDisadvantage: "XJZL.Status.DefendFeintDisadvantage", // 被虚招劣势 (抵抗虚招时检定取低)
+
+  // 1. 虚招施展/抵抗修正 (Feint Level)
+  // 含义：自身在虚招对抗中的能力层级
+  // - 攻方: 施展虚招时，正数=优势，负数=劣势
+  // - 守方: 抵抗虚招时，正数=优势，负数=劣势 (对应之前的 feintAdvantage)
+  feintLevel: "XJZL.Status.FeintLevel",
+
+  // 2. 被虚招修正 (Grant/Target Feint Level)
+  // 含义：作为目标时，给对手赋予的层级
+  // - 攻方: (罕见) 如果攻方有此状态，守方看破获得优势
+  // - 守方: (常见) 如果守方有此状态，攻方虚招获得优势 (对应之前的 defendFeintAdvantage)
+  defendFeintLevel: "XJZL.Status.DefendFeintLevel",
 
   // --- B. 资源封锁类  ---
   noRecoverRage: "XJZL.Status.NoRecoverRage",     // 无法获得怒气 (怒气锁定)
