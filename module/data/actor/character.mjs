@@ -835,14 +835,6 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 酒量 = 体魄
     resources.alcohol.max = S.tipo;
 
-    // 钳制 HP 当前值 (防止 value > max)
-    if (resources.hp.value > resources.hp.max) {
-      resources.hp.value = resources.hp.max;
-    }
-
-    if (resources.mp.value > resources.mp.max) {
-      resources.mp.value = resources.mp.max;
-    }
 
     // 2. 抗性计算 (Resistances)
     // ------------------------------------

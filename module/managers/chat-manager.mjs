@@ -60,7 +60,7 @@ export class ChatCardManager {
         // 判定是防御者自己的行为，不需要攻击者或源物品参与
         if (action === "rollSave") {
             await ChatCardManager._rollSave(flags, message);
-            return; 
+            return;
         }
 
         // 1. 获取攻击者 (Speaker)
@@ -1429,12 +1429,20 @@ export class ChatCardManager {
 
         // 2. 调用 Actor 的检定方法
         // 这会弹出一个新的聊天卡片显示骰子结果
-        const roll = await actor.rollAttributeTest(flags.attribute);
+        // 读取 flags.level (发起请求时设定的优劣势)
+        const roll = await actor.rollAttributeTest(flags.attribute, {
+            level: flags.level || 0
+        });
 
         // 3. 比对结果
         const total = roll.total;
         const dc = flags.dc || 10;
         const isSuccess = total >= dc;
+
+        // 我们可以直接从 roll.data 里拿 (前提是 Actor 里传了)，或者重新读一遍
+        // 这里最简单的方法是直接读取 roll.data.val，这是我们在 Actor.rollAttributeTest 里传入的
+        const attrVal = roll.data.val || 0;
+        const diceResult = roll.terms[0].total; // 骰子本身的结果
 
         // 4. 处理结果
         let resultHtml = "";
@@ -1484,23 +1492,29 @@ export class ChatCardManager {
         // 5. 更新卡片 (禁用按钮，显示结果)
         // 构造替换 HTML
         const resultBlock = `
-            <div style="text-align:center; padding:10px; background:#fff; border:1px solid ${color}; border-radius:4px;">
-                <div style="font-size:0.9em; margin-bottom:5px;">
-                    1d20(${roll.terms[0].total}) + ${attrVal} = <span style="font-size:1.5em; font-weight:bold;">${total}</span>
+            <div style="text-align:center; padding:8px; background:#fff; border:1px solid ${color}; border-radius:4px; margin-top:5px;">
+                <div style="font-size:0.9em; color:#555; margin-bottom:4px;">
+                    1d20(${diceResult}) + ${attrVal} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}
                 </div>
                 ${resultHtml}
             </div>
         `;
 
         // 替换原来放置按钮的 .card-buttons 区域
-        // 但为了简单，我们可以利用 message.update 替换掉那个 button 的 HTML 字符串
-        // 简易替换法 (Regex)
-        // 把 <div class="card-buttons">...</div> 替换为结果
-        const newContent = message.content.replace(
-            /<div class="card-buttons">[\s\S]*?<\/div>/,
-            resultBlock
-        );
+        // 1. 创建临时 DOM 容器
+        const div = document.createElement("div");
+        div.innerHTML = message.content;
 
-        await message.update({ content: newContent });
+        // 2. 精准查找按钮容器
+        const btnContainer = div.querySelector(".card-buttons");
+
+        // 3. 替换内容
+        if (btnContainer) {
+            btnContainer.outerHTML = resultBlock;
+            // 4. 更新消息
+            await message.update({ content: div.innerHTML });
+        } else {
+            console.error("XJZL | 无法在卡片中找到 .card-buttons 容器");
+        }
     }
 }

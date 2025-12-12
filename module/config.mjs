@@ -131,7 +131,46 @@ XJZL.damageTypes = {
   liushi: "XJZL.Damage.Liushi"    // 流失 (真实伤害)
 };
 
-// 14. 系统状态标志 (逻辑开关)
+// 14. 技能列表 (本地化映射)
+XJZL.skills = {
+  // 力量系
+  jiaoli: "XJZL.Skills.Jiaoli",
+  zhengtuo: "XJZL.Skills.Zhengtuo",
+  paozhi: "XJZL.Skills.Paozhi",
+  qinbao: "XJZL.Skills.Qinbao",
+  // 身法系
+  qianxing: "XJZL.Skills.Qianxing",
+  qiaoshou: "XJZL.Skills.Qiaoshou",
+  qinggong: "XJZL.Skills.Qinggong",
+  mashu: "XJZL.Skills.Mashu",
+  // 体魄系
+  renxing: "XJZL.Skills.Renxing",
+  biqi: "XJZL.Skills.Biqi",
+  rennai: "XJZL.Skills.Rennai",
+  ningxue: "XJZL.Skills.Ningxue",
+  // 内息系
+  liaoshang: "XJZL.Skills.Liaoshang",
+  chongxue: "XJZL.Skills.Chongxue",
+  lianxi: "XJZL.Skills.Lianxi",
+  duqi: "XJZL.Skills.Duqi",
+  // 气感系
+  dianxue: "XJZL.Skills.Dianxue",
+  zhuizong: "XJZL.Skills.Zhuizong",
+  tancha: "XJZL.Skills.Tancha",
+  dongcha: "XJZL.Skills.Dongcha",
+  // 神采系
+  jiaoyi: "XJZL.Skills.Jiaoyi",
+  qiman: "XJZL.Skills.Qiman",
+  shuofu: "XJZL.Skills.Shuofu",
+  dingli: "XJZL.Skills.Dingli",
+  // 悟性系
+  wuxue: "XJZL.Skills.Wuxue",
+  jianding: "XJZL.Skills.Jianding",
+  bagua: "XJZL.Skills.Bagua",
+  shili: "XJZL.Skills.Shili"
+};
+
+// 15. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -199,3 +238,26 @@ XJZL.statusFlags = {
   // --- E. 其他类  ---
   passiveBlock: "XJZL.Status.PassiveBlock" // 被动格挡：即使未开启架招，基础格挡值依然生效
 };
+
+// 16. 检定优劣势计数器 (Check Flags)
+// 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
+// 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
+XJZL.checkFlags = {
+  // 全局修正
+  globalCheckLevel: "XJZL.Status.GlobalCheckLevel"
+};
+
+// 【自动化注入】
+// 遍历属性和技能，自动生成 CheckLevel Flag
+const _injectCheckFlags = (sourceObj) => {
+  for (const [key, labelKey] of Object.entries(sourceObj)) {
+    const flagKey = `${key}CheckLevel`;
+    // 这里存 labelKey，方便 UI 显示时能翻译
+    XJZL.checkFlags[flagKey] = labelKey; 
+  }
+};
+
+// 注入属性 (liliangCheckLevel...)
+_injectCheckFlags(XJZL.attributes);
+// 注入技能 (qiaoshouCheckLevel...)
+_injectCheckFlags(XJZL.skills);

@@ -145,19 +145,30 @@ export class XJZLActor extends Actor {
     // 而不需要写难看的 if (this.getFlag("xjzl-system", "exposed")) { ... }
     this.xjzlStatuses = {};
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
+    // 需要特殊处理为数字的 Key 列表 (战斗类)
+    const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel"];
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
       // 如果是那数值型的 Key，单独处理，否则按布尔处理
-      if (["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel"].includes(key)) continue;
-      this.xjzlStatuses[key] = this.getFlag("xjzl-system", key) || false;
+      if (numericCombatFlags.includes(key)) {
+        // 初始化数值计数器 (支持 AE 的 ADD 模式)
+        // 注意：getFlag 读取出来的可能是 undefined，必须保底为 0
+        this.xjzlStatuses[key] = parseInt(this.getFlag("xjzl-system", key)) || 0;
+      } else {
+        // 布尔型
+        this.xjzlStatuses[key] = this.getFlag("xjzl-system", key) || false;
+      }
     }
 
-    // 初始化数值计数器 (支持 AE 的 ADD 模式)
-    // 注意：getFlag 读取出来的可能是 undefined，必须保底为 0
-    this.xjzlStatuses.attackLevel = parseInt(this.getFlag("xjzl-system", "attackLevel")) || 0;
-    this.xjzlStatuses.grantAttackLevel = parseInt(this.getFlag("xjzl-system", "grantAttackLevel")) || 0;
-    this.xjzlStatuses.feintLevel = parseInt(this.getFlag("xjzl-system", "feintLevel")) || 0;
-    this.xjzlStatuses.defendFeintLevel = parseInt(this.getFlag("xjzl-system", "defendFeintLevel")) || 0;
+    // 处理检定状态 (Check Flags)
+    // 来源: CONFIG.XJZL.checkFlags
+    // 特性: 全部视为整数 (Level)
+    const checkFlags = CONFIG.XJZL.checkFlags || {};
+
+    for (const key of Object.keys(checkFlags)) {
+      // 直接读取并转为 Int，默认为 0
+      this.xjzlStatuses[key] = parseInt(this.getFlag("xjzl-system", key)) || 0;
+    }
 
     // ----------------------------------------------------
     // PHASE 2: 脚本干预 (Script Execution)
@@ -390,6 +401,105 @@ export class XJZLActor extends Actor {
   /* -------------------------------------------- */
 
   /**
+   * 执行属性或技能检定
+   * 
+   * @param {String} key 属性或技能的键名 (如 "liliang", "qiaoshou")
+   * @param {Object} options 额外配置
+   * @param {Number} options.level 临时优劣势层级 (正数=优, 负数=劣)
+   * @param {Number} options.bonus 额外数值加值
+   * @param {String} options.flavor 自定义 Flavor 文本
+   * @returns {Promise<Roll>} 返回 Roll 实例
+   */
+  async rollAttributeTest(key, options = {}) {
+    const sys = this.system;
+
+    let labelKey = "";
+    let val = 0;
+    let type = "unknown";
+
+    // 1. 识别类型 (Stat vs Skill)
+    // 直接使用 Config 判断，比检查 sys 对象更准确
+    if (CONFIG.XJZL.attributes[key]) {
+      val = sys.stats[key]?.total || 0;
+      labelKey = CONFIG.XJZL.attributes[key];
+      type = "stat";
+    }
+    else if (CONFIG.XJZL.skills[key]) {
+      val = sys.skills[key]?.total || 0;
+      labelKey = CONFIG.XJZL.skills[key];
+      type = "skill";
+    }
+    else {
+      ui.notifications.warn(`未知的属性/技能键名: ${key}`);
+      return null;
+    }
+
+    const label = game.i18n.localize(labelKey);
+
+    // =====================================================
+    // 2. 计算优劣势层级 (Level Calculation)
+    // =====================================================
+    // 来源 A: 临时传入 (Macros 里的配置)
+    let totalLevel = options.level || 0;
+
+    // 来源 B: 全局修正 
+    // 已经在 prepareDerivedData 里转为 int 存入 xjzlStatuses
+    totalLevel += (this.xjzlStatuses.globalCheckLevel || 0);
+
+    // 来源 C: 自身特定修正 
+    // 对应的 Flag Key 为: key + "CheckLevel" (e.g., qiaoshouCheckLevel)
+    const selfFlagKey = `${key}CheckLevel`;
+    totalLevel += (this.xjzlStatuses[selfFlagKey] || 0);
+
+    // =====================================================
+    // 3. 构建骰子公式
+    // =====================================================
+    let dice = "1d20";
+    let rollTypeLabel = "";
+
+    if (totalLevel > 0) {
+      dice = "2d20kh";
+      rollTypeLabel = " (优势)";
+    }
+    else if (totalLevel < 0) {
+      dice = "2d20kl";
+      rollTypeLabel = " (劣势)";
+    }
+
+    const bonus = options.bonus || 0;
+
+    // 构造公式: 1d20 + @val + @bonus
+    const formula = `${dice} + @val${bonus !== 0 ? " + @bonus" : ""}`;
+    const rollData = { val: val, bonus: bonus };
+
+    // 4. 执行投掷
+    const roll = new Roll(formula, rollData);
+    await roll.evaluate();
+
+    // 5. 准备消息
+    const flavorText = options.flavor || `${this.name} 进行 ${label} 检定${rollTypeLabel}`;
+
+    // 在下面的tomessage会自动调用动画，所以这里可以不用调用了
+    // if (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);
+
+    const messageData = {
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      flavor: flavorText,
+      flags: {
+        "xjzl-system": {
+          type: "attribute-test", // 消息类型
+          attribute: key,         // 检定 Key
+          testType: type,         // stat / skill
+          level: totalLevel       // 最终层级 (方便 Debug)
+        }
+      }
+    };
+
+    await roll.toMessage(messageData);
+    return roll;
+  }
+
+  /**
    * 应用可堆叠的特效
    * @param {Object} effectData  从物品里拿出来的特效数据 (toObject后的)
    */
@@ -549,7 +659,6 @@ export class XJZLActor extends Actor {
 
     // 3. 准备更新对象
     const updates = {};
-
     // --- 检查 HP ---
     if (sourceHP > res.hp.max) {
       updates["system.resources.hp.value"] = res.hp.max;
