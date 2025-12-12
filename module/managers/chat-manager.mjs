@@ -56,6 +56,12 @@ export class ChatCardManager {
             await ChatCardManager._undoDamage(message);
             return;
         }
+        // 0. 特殊处理2：属性判定请求处理 (前置拦截)
+        // 判定是防御者自己的行为，不需要攻击者或源物品参与
+        if (action === "rollSave") {
+            await ChatCardManager._rollSave(flags, message);
+            return; 
+        }
 
         // 1. 获取攻击者 (Speaker)
         // 对于防御请求卡，Speaker 可能是防御者自己，也可能是 GM
@@ -1404,4 +1410,97 @@ export class ChatCardManager {
         });
     }
 
+    /**
+     * 执行属性判定 (Saving Throw)
+     * 1. 读取 Actor 属性并投骰子
+     * 2. 比对 DC
+     * 3. 失败则自动创建 ActiveEffect
+     */
+    static async _rollSave(flags, message) {
+        // 1. 获取防御者 (Flags 里存的是 targetUuid)
+        const targetUuid = flags.targetUuid;
+        const doc = await fromUuid(targetUuid);
+        const actor = doc?.actor || doc;
+
+        if (!actor) return ui.notifications.warn("目标已不存在。");
+
+        // 权限检查：只有拥有者或GM可以点
+        if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
+
+        // 2. 调用 Actor 的检定方法
+        // 这会弹出一个新的聊天卡片显示骰子结果
+        const roll = await actor.rollAttributeTest(flags.attribute);
+
+        // 3. 比对结果
+        const total = roll.total;
+        const dc = flags.dc || 10;
+        const isSuccess = total >= dc;
+
+        // 4. 处理结果
+        let resultHtml = "";
+        let color = "";
+
+        if (isSuccess) {
+            color = "#27ae60"; // Green
+            resultHtml = `
+                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
+                    <i class="fas fa-check-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Success")}
+                </div>
+                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.SuccessHint")}</div>
+            `;
+            // 如果有成功回调（比如发个聊天消息），以后可以扩展
+        } else {
+            color = "#c0392b"; // Red
+            resultHtml = `
+                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
+                    <i class="fas fa-times-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Failure")}
+                </div>
+                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.FailureHint")}</div>
+            `;
+
+            // 应用惩罚 (Effects)
+            // 脚本里传递过来的 onFail 对象，应该是一个标准的 ActiveEffect Data 对象 (或数组)
+            if (flags.onFail) {
+                // 标准化为数组
+                const effectsData = Array.isArray(flags.onFail) ? flags.onFail : [flags.onFail];
+
+                // 确保 origin 指向该消息，方便回溯
+                const finalEffects = effectsData.map(e => ({
+                    ...e,
+                    origin: message.uuid,
+                    disabled: false
+                }));
+
+                await actor.createEmbeddedDocuments("ActiveEffect", finalEffects);
+
+                // 在卡片上追加一行小字
+                const appliedLabel = game.i18n.localize("XJZL.UI.Chat.RequestSave.EffectApplied");
+                resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(0,0,0,0.05); border-radius:4px;">
+                    ${appliedLabel}: <b>${finalEffects.map(e => e.name).join(", ")}</b>
+                </div>`;
+            }
+        }
+
+        // 5. 更新卡片 (禁用按钮，显示结果)
+        // 构造替换 HTML
+        const resultBlock = `
+            <div style="text-align:center; padding:10px; background:#fff; border:1px solid ${color}; border-radius:4px;">
+                <div style="font-size:0.9em; margin-bottom:5px;">
+                    1d20(${roll.terms[0].total}) + ${attrVal} = <span style="font-size:1.5em; font-weight:bold;">${total}</span>
+                </div>
+                ${resultHtml}
+            </div>
+        `;
+
+        // 替换原来放置按钮的 .card-buttons 区域
+        // 但为了简单，我们可以利用 message.update 替换掉那个 button 的 HTML 字符串
+        // 简易替换法 (Regex)
+        // 把 <div class="card-buttons">...</div> 替换为结果
+        const newContent = message.content.replace(
+            /<div class="card-buttons">[\s\S]*?<\/div>/,
+            resultBlock
+        );
+
+        await message.update({ content: newContent });
+    }
 }

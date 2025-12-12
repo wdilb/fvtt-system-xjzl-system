@@ -2,6 +2,7 @@
  * 扩展核心 Actor 类
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
+import { XJZLMacros } from "../utils/macros.mjs";
 
 // 【优化】将构造器缓存在模块作用域，避免每次 runScripts 重复创建
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
@@ -328,7 +329,9 @@ export class XJZLActor extends Actor {
       console: console,     // 允许打印日志
       game: game,           // 允许访问 game
       ui: ui,               // 允许访问 ui
-      trigger: trigger      // 告诉脚本当前是什么时机
+      trigger: trigger,      // 告诉脚本当前是什么时机
+      // 注入宏工具
+      Macros: XJZLMacros  // 脚本里可以用 Macros.requestSave(...)
     };
 
     // 3. 决定执行模式 (同步/异步)
