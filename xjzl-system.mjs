@@ -128,7 +128,10 @@ Hooks.once("init", async function () {
   // 预加载 Handlebars 模板,必须等待预加载完成
   await preloadHandlebarsTemplates();
 
-  //6.配置菜单
+  // ==========================================
+  //  6.注册 配置菜单
+  // ==========================================
+  // 是否允许玩家使用伤害工具
   game.settings.register("xjzl-system", "allowPlayerDamageTool", {
     name: "允许玩家使用伤害工具",
     hint: "如果开启，玩家也能在左侧 Token 工具栏看到并使用【通用伤害工具】。通常仅供 GM 或可信赖的助手使用。",
@@ -137,6 +140,17 @@ Hooks.once("init", async function () {
     type: Boolean,
     default: true,      // 默认开启，关闭则仅GM可用
     requiresReload: true // 修改后刷新页面生效
+  });
+
+  // 是否启用 Alt+左键 快速选择目标
+  game.settings.register("xjzl-system", "enableAltTargeting", {
+    name: "启用快速选择目标 (Alt + 左键)",
+    hint: "开启后，按住 Alt 键并左键点击 Token，可以快速选择目标（增量选择）。",
+    scope: "client",     // 客户端级设置，每个玩家可以自己决定是否开启
+    config: true,        // 显示在设置菜单中
+    type: Boolean,
+    default: true,       // 默认开启
+    requiresReload: false // 不需要刷新，即改即生效
   });
 });
 
