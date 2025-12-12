@@ -68,7 +68,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       // 默认选中的类型
       defaultType: "waigong",
       // 默认理由
-      defaultReason: "环境伤害"
+      defaultReason: game.i18n.localize("XJZL.UI.DamageTool.DefaultReason")
     };
   }
 
