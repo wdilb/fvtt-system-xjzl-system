@@ -113,8 +113,15 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
 
     // 4. 执行循环应用 (Batch Process)
     // 并不需要并行(Promise.all)，因为每个 applyDamage 都会生成卡片，顺序执行视觉效果更好
-    for (const actor of actors) {
-      await this._applyToActor(actor, amount, type, reason, config);
+    for (const token of tokens) {
+      // 容错：万一选中了个没有 Actor 的 Token (虽少见但存在)
+      if (!token.actor) continue;
+      
+      // 逻辑：Token 名字 > Actor 名字
+      const displayName = token.name || token.actor.name;
+      
+      // 注意：这里传 token.actor 以便调用方法，同时传 displayName
+      await this._applyToActor(token.actor, amount, type, reason, config, displayName, token);
     }
 
     // 提示完成
@@ -124,7 +131,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
   /**
    *  内部核心：单体应用逻辑
    */
-  async _applyToActor(actor, amount, type, reason, config) {
+  async _applyToActor(actor, amount, type, reason, config, displayName, token) {
     try {
       // 1. 调用 Actor 核心伤害接口
       // 注意：attacker 传 null，代表无来源/环境
@@ -146,7 +153,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[type] || type);
 
       const templateData = {
-        name: actor.name,
+        name: displayName,
         img: tokenImg,
         finalDamage: result.finalDamage,
         hutiLost: result.hutiLost,

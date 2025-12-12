@@ -173,25 +173,36 @@ export class ChatCardManager {
         // 提前计算公共加值 (修复 ReferenceError 的关键)
         const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
         const manualBonus = flags.attackBonus || 0;
-
-        // 恢复骰子数据
-        if (!flags.rollJSON) return null;
-        const baseRoll = Roll.fromData(flags.rollJSON);
-
-        // D1: 第一个骰子 (永远存在)
-        const d1 = baseRoll.terms[0].results[0].result;
-
-        // D2: 获取第二个骰子 (可能来自 2d20，也可能来自之前的补骰)
+        // =====================================================
+        // 1.5 安全获取骰子数据 (修正必中读取rolljson失败直接返回的问题)
+        // =====================================================
+        let d1 = "-"; // 默认值，用于必中情况显示
         let d2 = null;
-        let isNativeDouble = false; // 标记：是否本来就是双骰
-        if (baseRoll.terms[0].results.length > 1) {
-            // 情况 A: 初始 Roll 就是 2d20
-            d2 = baseRoll.terms[0].results[1].result;
-            isNativeDouble = true;
-        } else if (flags.supplementalDie !== undefined && flags.supplementalDie !== null) {
-            // 情况 B: 初始 Roll 是 1d20，但 flag 里有补骰记录
-            d2 = flags.supplementalDie;
+        let isNativeDouble = false;// 标记：是否本来就是双骰
+        // 只有在需要检定时，才去解析 rollJSON
+        if (needsCheck) {
+            // 如果需要检定但没有数据，说明出错了
+            if (!flags.rollJSON) {
+                console.error("XJZL | 命中检定需要 rollJSON 但数据缺失！");
+                return null;
+            }
+            const baseRoll = Roll.fromData(flags.rollJSON);
+
+            // D1: 第一个骰子 (永远存在)
+            d1 = baseRoll.terms[0].results[0].result;
+
+            // D2: 获取第二个骰子 (可能来自 2d20，也可能来自之前的补骰)
+            d2 = null;
+            if (baseRoll.terms[0].results.length > 1) {
+                // 情况 A: 初始 Roll 就是 2d20
+                d2 = baseRoll.terms[0].results[1].result;
+                isNativeDouble = true;
+            } else if (flags.supplementalDie !== undefined && flags.supplementalDie !== null) {
+                // 情况 B: 初始 Roll 是 1d20，但 flag 里有补骰记录
+                d2 = flags.supplementalDie;
+            }
         }
+
 
         // =====================================================
         // 2. 预计算目标优劣势状态 (Pre-Calculate States)

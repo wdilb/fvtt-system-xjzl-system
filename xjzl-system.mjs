@@ -31,6 +31,9 @@ import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
 
+//导入工具
+import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
+
 // 导入配置
 import { XJZL } from "./module/config.mjs";
 
@@ -242,35 +245,81 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
 });
 
 //  在 getSceneControlButtons 阶段注入按钮
-Hooks.on("getSceneControlButtons", (controls) => {
-  const tokenControls = controls.find((c) => c.name === "token");
-  if (!tokenControls) return;
+Hooks.on('getSceneControlButtons', (controls) => {
 
   // 检查权限
   const isGM = game.user.isGM;
   const allowPlayer = game.settings.get("xjzl-system", "allowPlayerDamageTool");
 
+  // 如果既不是GM，也没有开启玩家权限，直接退出
+  if (!isGM && !allowPlayer) return;
+
   // 只有 GM，或者设置允许玩家使用时，才显示
-  if (isGM || allowPlayer) {
-    tokenControls.tools.push({
-      name: "damage-tool",
-      title: "通用伤害工具 (Traps/Environment)",
-      icon: "fas fa-meteor", // 按钮图标
-      visible: true,
-      onClick: () => {
-        // 单例模式：如果已存在则渲染，不存在则新建
-        // 通过 id 查找现有实例
-        const existingApp = Object.values(ui.windows).find(
-          (app) => app.options.id === "xjzl-damage-tool"
-        );
-        if (existingApp) {
-          existingApp.render(true, { focus: true });
-        } else {
-          new GenericDamageTool().render(true);
+  const damageToolBtn = {
+    name: "damage-tool",
+    title: "XJZL.UI.DamageTool.Title",
+    icon: "fas fa-meteor",
+    visible: true,
+    button: true,
+    // V13 必须使用 onChange，废弃 onClick
+    onChange: () => {
+      // 单例模式：查找或新建
+      const existingApp = Object.values(ui.windows).find(
+        (app) => app.options.id === "xjzl-damage-tool"
+      );
+      if (existingApp) {
+        existingApp.render(true, { focus: true });
+      } else {
+        // 【修正点 2】确保 GenericDamageTool 已被导入
+        new GenericDamageTool().render(true);
+      }
+    }
+  };
+
+  // --- 步骤 1: 查找 Token 控制层级 (严格参考你的 QTE 代码逻辑) ---
+  let tokenLayer = null;
+
+  // V13 模式: controls 是对象，直接通过属性访问
+  if (controls.token) {
+    tokenLayer = controls.token; // 注意：V13 有时是 controls.token 而不是 controls.tokens，但你的参考代码用了 tokens，如果是 tokens 请看下一行
+  }
+  else if (controls.tokens) {
+    tokenLayer = controls.tokens; // 兼容 controls.tokens 的写法
+  }
+  // 兼容 Map 结构 (V13 的某些构建版本)
+  else if (controls instanceof Map && controls.has('token')) {
+    tokenLayer = controls.get('token');
+  }
+
+  // --- 步骤 2: 注入按钮到控制层 ---
+  if (tokenLayer) {
+    const tools = tokenLayer.tools;
+
+    // 情况 A: V13 Map/Object 结构
+    if (tools && !Array.isArray(tools)) {
+      // 如果是 Map 类型
+      if (tools instanceof Map) {
+        if (!tools.has('damage-tool')) {
+          tools.set('damage-tool', damageToolBtn);
         }
-      },
-      button: true // 这是一个点击按钮，不是切换工具
-    });
+      }
+      // 如果是普通 Object 类型
+      else {
+        // 防止重复添加 (虽然 Object Key 本身就防重复，但为了逻辑严谨)
+        if (!tools['damage-tool']) {
+          tokenLayer.tools['damage-tool'] = damageToolBtn;
+        }
+      }
+    }
+    // 情况 B: 数组结构 (V12 或 V13 早期)
+    // 既然你的 QTE 代码里保留了这个分支且能运行，我们为了稳妥也保留它
+    else if (Array.isArray(tools)) {
+      if (!tools.some(t => t.name === 'damage-tool')) {
+        tools.push(damageToolBtn);
+      }
+    }
+  } else {
+    console.warn("XJZL | 无法找到 Token 控制层级，按钮添加失败。");
   }
 });
 
