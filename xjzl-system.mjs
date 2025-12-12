@@ -30,6 +30,7 @@ import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
+import { TargetManager } from "./module/managers/target-manager.mjs";
 
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
@@ -165,6 +166,8 @@ Hooks.once("ready", async function () {
   // 等待系统完全加载后的操作，比如处理设置、欢迎弹窗等
   // 监听聊天消息渲染，绑定按钮事件
   Hooks.on("renderChatMessageHTML", ChatCardManager.onRenderChatMessage);
+  //目标选择管理器，修改为按下ALT后左键点击选择目标
+  TargetManager.init();
   console.log("侠界之旅系统 - 准备就绪");
 });
 
