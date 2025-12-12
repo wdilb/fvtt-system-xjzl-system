@@ -29,7 +29,7 @@ import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
 import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 
 //导入管理器
-import {ChatCardManager} from "./module/managers/chat-manager.mjs";
+import { ChatCardManager } from "./module/managers/chat-manager.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -127,6 +127,17 @@ Hooks.once("init", async function () {
 
   // 预加载 Handlebars 模板,必须等待预加载完成
   await preloadHandlebarsTemplates();
+
+  //6.配置菜单
+  game.settings.register("xjzl-system", "allowPlayerDamageTool", {
+    name: "允许玩家使用伤害工具",
+    hint: "如果开启，玩家也能在左侧 Token 工具栏看到并使用【通用伤害工具】。通常仅供 GM 或可信赖的助手使用。",
+    scope: "world",      // 这是一个世界级设置，所有客户端同步
+    config: true,        // 显示在设置菜单中
+    type: Boolean,
+    default: true,      // 默认开启，关闭则仅GM可用
+    requiresReload: true // 修改后刷新页面生效
+  });
 });
 
 /* -------------------------------------------- */
@@ -213,6 +224,39 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
     // 插入 datalist 到 DOM
     const dataListHtml = `<datalist id="${listId}">${options}</datalist>`;
     keyInput.after(dataListHtml);
+  }
+});
+
+//  在 getSceneControlButtons 阶段注入按钮
+Hooks.on("getSceneControlButtons", (controls) => {
+  const tokenControls = controls.find((c) => c.name === "token");
+  if (!tokenControls) return;
+
+  // 检查权限
+  const isGM = game.user.isGM;
+  const allowPlayer = game.settings.get("xjzl-system", "allowPlayerDamageTool");
+
+  // 只有 GM，或者设置允许玩家使用时，才显示
+  if (isGM || allowPlayer) {
+    tokenControls.tools.push({
+      name: "damage-tool",
+      title: "通用伤害工具 (Traps/Environment)",
+      icon: "fas fa-meteor", // 按钮图标
+      visible: true,
+      onClick: () => {
+        // 单例模式：如果已存在则渲染，不存在则新建
+        // 通过 id 查找现有实例
+        const existingApp = Object.values(ui.windows).find(
+          (app) => app.options.id === "xjzl-damage-tool"
+        );
+        if (existingApp) {
+          existingApp.render(true, { focus: true });
+        } else {
+          new GenericDamageTool().render(true);
+        }
+      },
+      button: true // 这是一个点击按钮，不是切换工具
+    });
   }
 });
 
@@ -342,7 +386,9 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/chat/move-card.hbs", //招式使用
     "systems/xjzl-system/templates/chat/request-defense.hbs", //虚招对抗
     "systems/xjzl-system/templates/chat/damage-card.hbs", //伤害卡片
-    "systems/xjzl-system/templates/chat/defend-result.hbs" //看破结果
+    "systems/xjzl-system/templates/chat/defend-result.hbs", //看破结果
+    //应用窗口
+    "systems/xjzl-system/templates/apps/damage-tool.hbs", //物品使用
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);

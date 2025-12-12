@@ -89,7 +89,7 @@ export class ChatCardManager {
             // 安全检查：因为绕过了后面的 switch，这里必须手动检查 item
             if (!item) return ui.notifications.warn("源物品数据已丢失。");
             if (event.shiftKey) {
-                // A. Shift模式：走手动强制流程
+                // Shift模式：走手动强制流程
                 await ChatCardManager._handleManualDamage(attacker, item, flags, message);
                 return;
             }
@@ -807,7 +807,7 @@ export class ChatCardManager {
         // =====================================================
         const diceTerm = roll.terms[0]; // 获取第一个 DiceTerm (1d20 或 2d20kh)
         const diceTotal = diceTerm.total; // 骰子本身的结果 (不含加值)
-        
+
         // 获取原始点数数组 [5, 18]
         const rawResults = diceTerm.results.map(r => {
             // 如果该骰子被丢弃(dropped)，通常加个样式标记（可选），这里简单只显示数字
@@ -815,7 +815,7 @@ export class ChatCardManager {
         }).join(", ");
 
         let rollDisplay = "";
-        
+
         // 格式化显示： 2d20kh (5, 18) ➔ 18
         if (diceTerm.results.length > 1) {
             rollDisplay = `${diceFormula} <span style="color:#666; font-size:0.9em;">(${rawResults})</span> <i class="fas fa-arrow-right" style="font-size:0.8em"></i> <b>${diceTotal}</b>`;
@@ -1171,6 +1171,226 @@ export class ChatCardManager {
         });
 
         ui.notifications.info("目标状态已回滚。但攻击者获得的怒气与触发的特效需要手动调整。");
+    }
+
+    /**
+     * 处理 Shift+点击 的手动伤害应用
+     * 特点：使用当前目标，忽略命中检定，允许 GM 强行覆盖参数
+     */
+    static async _handleManualDamage(attacker, item, flags, message) {
+        // 1. 强制获取当前选中的目标
+        const targets = Array.from(game.user.targets).map(t => t.document);
+
+        if (targets.length === 0) {
+            return ui.notifications.warn("【手动模式】请先在场景中选中至少一个目标。");
+        }
+
+        // 2. 弹出配置窗口 (使用 DialogV2)
+        // 默认值逻辑：
+        // - 伤害: 0 (修正值)
+        // - 暴击: false (是否强制暴击)
+        // - 暴击倍率: true (如果暴击了，是否乘倍率)
+        // - 击破架招: false
+        // - 强制命中: true
+        // - 无视格挡/防御: false
+        const config = await ChatCardManager._promptManualConfig(flags.damage);
+        if (!config) return; // 用户取消
+
+        // 3. 准备数据
+        // 基础伤害 = (面板伤害 + 手动修正)，不能小于0
+        const finalBaseDamage = Math.max(0, flags.damage + config.damageMod);
+
+        // 4. 循环应用
+        const summary = [];
+        let hitCount = 0;
+        const move = item.system.moves.find(m => m.id === flags.moveId);
+
+        for (const target of targets) {
+            const targetActor = target.actor || target;
+            if (!targetActor) continue;
+
+            // “是否命中（默认命中）”，之所以需要配置这个，是为了触发可能存在的未命中特效
+            const isHit = config.forceHit;
+
+            // 调用 Actor 伤害接口
+            const damageResult = await targetActor.applyDamage({
+                amount: finalBaseDamage,
+                type: flags.damageType,    // 沿用招式类型
+                attacker: attacker,
+                isHit: isHit,
+                isCrit: config.isCrit,     // 强制暴击状态
+                applyCritDamage: config.applyCritDamage, // 是否计算双倍
+                isBroken: config.isBroken, // 强制破防
+                ignoreBlock: config.ignoreBlock,
+                ignoreDefense: config.ignoreDefense
+            });
+
+            if (isHit) {
+                hitCount++;
+                // 发送伤害卡片 (复用 damage-card.hbs)
+                const templateData = {
+                    name: target.name,
+                    img: target.texture?.src || targetActor.img,
+                    finalDamage: damageResult.finalDamage,
+                    hutiLost: damageResult.hutiLost,
+                    hpLost: damageResult.hpLost,
+                    mpLost: damageResult.mpLost,
+                    isDead: damageResult.isDead,
+                    isDying: damageResult.isDying,
+                    rageGained: damageResult.rageGained,
+                    isUndone: false
+                };
+
+                const content = await renderTemplate(
+                    "systems/xjzl-system/templates/chat/damage-card.hbs",
+                    templateData
+                );
+
+                // 构造 Undo 数据
+                const undoData = {
+                    attackerUuid: attacker.uuid,
+                    targetUuid: target.uuid,
+                    hpLost: damageResult.hpLost,
+                    hutiLost: damageResult.hutiLost,
+                    mpLost: damageResult.mpLost,
+                    gainedDead: damageResult.isDead,
+                    gainedDying: damageResult.isDying,
+                    gainedRage: damageResult.rageGained
+                };
+
+                ChatMessage.create({
+                    user: game.user.id,
+                    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                    content: content,
+                    flags: {
+                        "xjzl-system": {
+                            type: "damage-card",
+                            undoData: undoData
+                        }
+                    }
+                });
+            }
+
+            // 收集结果用于触发脚本
+            const resultEntry = {
+                target: targetActor,
+                isHit: isHit,
+                isCrit: config.isCrit,
+                isBroken: config.isBroken,
+                baseDamage: finalBaseDamage,
+                ...damageResult,
+                damageResult: damageResult
+            };
+            summary.push(resultEntry);
+
+            // 触发 attacker 的 HIT 脚本
+            // 即使是手动应用，我们也希望吸血、附毒等特效能触发，这样最符合直觉
+            const hitContext = {
+                ...resultEntry,
+                attacker: attacker,
+                item: item,
+                move: move,
+                isManual: true // 给脚本一个标记，万一脚本需要区分
+            };
+            await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
+        }
+
+        // 5. 触发全局 HIT_ONCE 脚本 & 攻击者回怒
+        if (hitCount > 0) {
+            // 手动模式也回怒
+            const attRage = attacker.system.resources.rage;
+            const attNoRecover = attacker.xjzlStatuses?.noRecoverRage;
+            const isValidType = ["waigong", "neigong"].includes(flags.damageType);
+
+            if (isValidType && attRage.value < attRage.max && !attNoRecover) {
+                await attacker.update({ "system.resources.rage.value": attRage.value + 1 });
+            }
+        }
+
+        const globalContext = {
+            targets: summary,
+            hitCount: hitCount,
+            baseDamage: finalBaseDamage,
+            attacker: attacker,
+            item: item,
+            move: move,
+            isManual: true
+        };
+        await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
+    }
+
+    /**
+     * 弹出详细的手动伤害配置窗口
+     */
+    static async _promptManualConfig(baseDamage) {
+        const content = `
+        <div class="xjzl-dialog-content" style="padding:5px;">
+            <div class="form-group">
+                <label style="font-weight:bold;">当前面板伤害</label>
+                <div style="font-family:monospace; font-size:1.2em; text-align:right;">${baseDamage}</div>
+            </div>
+            
+            <hr>
+
+            <div class="form-group">
+                <label>伤害修正 (+/-)</label>
+                <input type="number" name="damageMod" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
+                <p class="notes">在原伤害基础上增减数值</p>
+            </div>
+
+            <div class="form-group">
+                <label>强制命中?</label>
+                <input type="checkbox" name="forceHit" checked/>
+            </div>
+
+            <div class="form-group">
+                <label>视为暴击? (触发特效)</label>
+                <input type="checkbox" name="isCrit"/>
+            </div>
+
+            <div class="form-group">
+                <label>应用暴击伤害? (x2)</label>
+                <input type="checkbox" name="applyCritDamage" checked/>
+            </div>
+
+            <div class="form-group">
+                <label>强制破防? (击破架招)</label>
+                <input type="checkbox" name="isBroken"/>
+            </div>
+
+            <div class="form-group">
+                <label>无视格挡?</label>
+                <input type="checkbox" name="ignoreBlock"/>
+            </div>
+
+            <div class="form-group">
+                <label>无视防御 (内/外)?</label>
+                <input type="checkbox" name="ignoreDefense"/>
+            </div>
+        </div>
+        `;
+
+        return foundry.applications.api.DialogV2.prompt({
+            window: { title: "手动应用伤害 (GM干预)", icon: "fas fa-wrench", width: 360 },
+            content: content,
+            ok: {
+                label: "执行",
+                icon: "fas fa-check",
+                callback: (event, button) => {
+                    const formData = new FormData(button.form);
+                    return {
+                        damageMod: parseInt(formData.get("damageMod")) || 0,
+                        forceHit: formData.get("forceHit") === "on",
+                        isCrit: formData.get("isCrit") === "on",
+                        applyCritDamage: formData.get("applyCritDamage") === "on",
+                        isBroken: formData.get("isBroken") === "on",
+                        ignoreBlock: formData.get("ignoreBlock") === "on",
+                        ignoreDefense: formData.get("ignoreDefense") === "on"
+                    };
+                }
+            },
+            rejectClose: true // 点击关闭或ESC返回 null
+        });
     }
 
 }
