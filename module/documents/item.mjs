@@ -937,12 +937,29 @@ export class XJZLItem extends Item {
 
     let content = `<form style="margin-bottom:10px;">`;
 
+    // 辅助函数：生成带加减号的输入框 HTML
+    const makeNumberInput = (name, label) => `
+      <div class="form-group">
+          <label>${label}</label>
+          <div class="form-fields" style="justify-content: flex-end; gap: 5px;">
+              <a class="adjustment-button" onclick="const input = this.nextElementSibling; input.stepDown(); input.dispatchEvent(new Event('change'));">
+                  <i class="fas fa-minus"></i>
+              </a>
+              <input type="number" name="${name}" value="0" style="text-align:center; max-width: 50px;" readonly/>
+              <a class="adjustment-button" onclick="const input = this.previousElementSibling; input.stepUp(); input.dispatchEvent(new Event('change'));">
+                  <i class="fas fa-plus"></i>
+              </a>
+          </div>
+      </div>`;
+
     if (needsAttack) {
       content += `
           <div class="form-group">
               <label>额外命中加值</label>
               <input type="number" name="bonusAttack" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
-          </div>`;
+          </div>
+          ${makeNumberInput("manualAttackLevel", "命中优劣势等级")}
+          <p class="notes" style="text-align:right; margin-top:-5px; font-size:0.8em; color:#666;">(正数=优势，负数=劣势)</p>`;
     }
 
     if (isFeint) {
@@ -950,7 +967,9 @@ export class XJZLItem extends Item {
           <div class="form-group">
               <label>额外虚招值</label>
               <input type="number" name="bonusFeint" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
-          </div>`;
+          </div>
+          ${makeNumberInput("manualFeintLevel", "虚招优劣势等级")}
+          <p class="notes" style="text-align:right; margin-top:-5px; font-size:0.8em; color:#666;">(正数=优势，负数=劣势)</p>`;
     }
 
     if (needsDamage) {
@@ -983,7 +1002,9 @@ export class XJZLItem extends Item {
             bonusAttack: parseInt(formData.get("bonusAttack")) || 0,
             bonusFeint: parseInt(formData.get("bonusFeint")) || 0,
             bonusDamage: parseInt(formData.get("bonusDamage")) || 0,
-            canCrit: formData.get("canCrit") === "on"
+            canCrit: formData.get("canCrit") === "on",
+            manualAttackLevel: parseInt(formData.get("manualAttackLevel")) || 0,
+            manualFeintLevel: parseInt(formData.get("manualFeintLevel")) || 0
           };
         }
       },
@@ -1056,7 +1077,7 @@ export class XJZLItem extends Item {
       const targets = options.targets || Array.from(game.user.targets);
 
       // === 玩家配置弹窗 (Dialog) ===
-      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true };
+      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0 };
 
       if (!options.skipDialog) {
         const dialogResult = await this._promptRollConfiguration(move);
@@ -1181,15 +1202,21 @@ export class XJZLItem extends Item {
       // =====================================================
       // 6. 目标状态预计算 (Target Pre-Calculation)
       // =====================================================
-      // 【核心修改】将这部分逻辑移出 needsHitCheck，对所有目标执行
+      // 将这部分逻辑移出 needsHitCheck，对所有目标执行
 
       const targetContexts = new Map(); // 存储每个目标的计算结果 (UUID -> Context)
 
       // 读取自身状态
       // 提前初始化自身优劣势计数，确保 flags 能读到
       // 直接读取 context 里的数字 (包含了 Actor 被动 + 脚本修改)
-      const selfLevel = attackContext.flags.level;
-      const selfFeintLevel = attackContext.flags.feintLevel;
+      const selfLevel = attackContext.flags.level + config.manualAttackLevel;;
+      const selfFeintLevel = attackContext.flags.feintLevel + config.manualFeintLevel;
+
+      // 获取攻击者自身的被动状态 (Base)
+      // 这里的逻辑是：如果攻击者身上本来就有"无视格挡"的Buff，那打谁都无视
+      const baseIgnoreBlock = s.ignoreBlock || false;
+      const baseIgnoreDefense = s.ignoreDefense || false;
+      const baseIgnoreStance = s.ignoreStance || false;
 
       // 遍历目标进行脚本运算
       if (targets.length > 0) {
@@ -1202,11 +1229,19 @@ export class XJZLItem extends Item {
             target: targetActor,
             flags: {
               grantLevel: 0,      // 攻击修正
-              grantFeintLevel: 0  // 虚招修正
+              grantFeintLevel: 0,  // 虚招修正
+              ignoreBlock: false,
+              ignoreDefense: false,
+              ignoreStance: false
             }
           };
 
           await actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
+
+          // 最终状态 = 攻击者自身被动 OR 脚本临时赋予
+          const finalIgnoreBlock = baseIgnoreBlock || checkContext.flags.ignoreBlock;
+          const finalIgnoreDefense = baseIgnoreDefense || checkContext.flags.ignoreDefense;
+          const finalIgnoreStance = baseIgnoreStance || checkContext.flags.ignoreStance;
 
           // 读取目标被动状态
           const tStatus = targetActor.xjzlStatuses || {};
@@ -1234,6 +1269,9 @@ export class XJZLItem extends Item {
             attackState: attackState,
             feintState: feintState,
             // 这里还可以存一些中间值备查
+            ignoreBlock: finalIgnoreBlock,
+            ignoreDefense: finalIgnoreDefense,
+            ignoreStance: finalIgnoreStance
           });
         }
       }
@@ -1346,7 +1384,10 @@ export class XJZLItem extends Item {
             stateLabel: outcomeLabel,
             dodge: dodge,
             die: finalDie, //显示用的哪个骰子
-            feintState: ctx.feintState //对每个目标的虚招优劣势 
+            feintState: ctx.feintState, //对每个目标的虚招优劣势 
+            ignoreBlock: ctx.ignoreBlock,
+            ignoreDefense: ctx.ignoreDefense,
+            ignoreStance: ctx.ignoreStance
           };
         });
       }
@@ -1459,7 +1500,11 @@ export class XJZLItem extends Item {
                 isHit: res.isHit,           // 是否命中
                 total: res.total,           // 最终数值
                 dieUsed: res.die,           // 用的哪个骰子
-                feintState: res.feintState
+                feintState: res.feintState,
+                // 保存穿透标志到数据库
+                ignoreBlock: res.ignoreBlock,
+                ignoreDefense: res.ignoreDefense,
+                ignoreStance: res.ignoreStance
               };
               return acc;
             }, {})

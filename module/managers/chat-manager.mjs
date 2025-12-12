@@ -169,12 +169,6 @@ export class ChatCardManager {
         // 反击(Counter) 或 非内外功招式 不需要投骰子比对闪避
         const needsCheck = isValidDamage && !isCounter;
 
-        // 如果不需要检定 (如气招/反击)，直接返回全命中
-        // if (!needsCheck) {
-        //     const results = {};
-        //     targets.forEach(t => results[t.uuid] = { isHit: true, total: 0 });
-        //     return results;
-        // }
 
         // 提前计算公共加值 (修复 ReferenceError 的关键)
         const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
@@ -222,6 +216,12 @@ export class ChatCardManager {
         const selfLevel = ctx.selfLevel || 0; // 读取数值等级
         const selfFeintLevel = ctx.selfFeintLevel || 0; // 虚招等级
 
+        // 获取攻击者基础被动 (用于重算)
+        const s = attacker.xjzlStatuses || {};
+        const baseIgnoreBlock = s.ignoreBlock || false;
+        const baseIgnoreDefense = s.ignoreDefense || false;
+        const baseIgnoreStance = s.ignoreStance || false;
+
         for (const target of targets) {
             const uuid = target.uuid;
             const targetActor = target.actor || target;
@@ -238,11 +238,19 @@ export class ChatCardManager {
                 target: targetActor,
                 flags: {
                     grantLevel: 0,
-                    grantFeintLevel: 0  // 虚招修正
+                    grantFeintLevel: 0,  // 虚招修正
+                    ignoreBlock: false,   
+                    ignoreDefense: false,
+                    ignoreStance: false
                 }
             }; //换成优劣势计数
             const move = item.system.moves.find(m => m.id === flags.moveId);
             await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
+
+            // 合并逻辑 (Base OR Script)
+            const finalIgnoreBlock = baseIgnoreBlock || checkContext.flags.ignoreBlock;
+            const finalIgnoreDefense = baseIgnoreDefense || checkContext.flags.ignoreDefense;
+            const finalIgnoreStance = baseIgnoreStance || checkContext.flags.ignoreStance;
 
             // --- 1. 计算命中优劣势 (Attack State) ---
             let attackState = 0;
@@ -271,7 +279,10 @@ export class ChatCardManager {
 
             targetStates.set(uuid, {
                 attackState: attackState,
-                feintState: feintState
+                feintState: feintState,
+                ignoreBlock: finalIgnoreBlock,
+                ignoreDefense: finalIgnoreDefense,
+                ignoreStance: finalIgnoreStance
             });
 
             // 关键判断：如果状态不平，且没有 D2，则需要补骰
@@ -450,7 +461,10 @@ export class ChatCardManager {
                 total: total, //total为0且isHit为true说明是不需要判断的必中攻击
                 dieUsed: needsCheck ? finalDie : "-", // 这里的 Key 改为 dieUsed 比较明确，之前的代码混用了 die 和 dieUsed
                 stateLabel: state === 1 ? "优" : (state === -1 ? "劣" : "平"),
-                feintState: states.feintState
+                feintState: states.feintState,
+                ignoreBlock: states.ignoreBlock,
+                ignoreDefense: states.ignoreDefense,
+                ignoreStance: states.ignoreStance
             };
         }
 
@@ -945,6 +959,10 @@ export class ChatCardManager {
             const isHit = res ? res.isHit : false;
             const die = res ? res.die : 0;
 
+            const ignoreBlock = res.ignoreBlock || false;
+            const ignoreDefense = res.ignoreDefense || false;
+            const ignoreStance = res.ignoreStance || false;
+
             // B. 判定暴击 (Critical)
             // 逻辑：只要命中且骰子点数 >= 阈值，就算暴击 (触发暴击特效)
             // 至于是否造成双倍伤害，由 flags.canCrit 控制，传给 Actor 处理
@@ -978,8 +996,9 @@ export class ChatCardManager {
                 isCrit: isCrit,            // 暴击状态 (用于触发特效)
                 applyCritDamage: flags.canCrit, // 配置: 是否应用暴击伤害倍率 (用于计算数值)
                 isBroken: isBroken,        // 破防状态
-                ignoreBlock: false,        //无视格挡，先预留
-                ignoreDefense: false       //无视内外功防御，先预留
+                ignoreBlock: ignoreBlock,    //无视格挡
+                ignoreDefense: ignoreDefense, //无视内外功防御
+                ignoreStance: ignoreStance  //无视架招
             });
 
             // 统计数据更新为该目标发送独立伤害卡片 (仅命中时)

@@ -937,10 +937,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 注意：bonuses.block 包含了经脉和AE的加值
     const baseBlock = (combat.block || 0) + bonuses.block;
 
+    // 新增一个字段用来记录架招的格挡值，这个字段不需要定义在 schema 里，直接挂在 combat 内存对象上即可
+    combat.stanceBlockValue = 0; 
+
     if (isStanceActive) {
       // 情况 1: 架招开启
       // Total = 基础(含装备/经脉) + 架招本体强度
       combat.blockTotal = baseBlock + stanceBlockValue;
+      combat.stanceBlockValue = stanceBlockValue;
     } else if (hasPassiveBlock) {
       // 情况 2: 架招关闭，但有“被动格挡”特效 (如密宗瑜伽内功)
       // Total = 基础(含装备/经脉)

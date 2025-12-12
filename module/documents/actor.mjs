@@ -692,7 +692,8 @@ export class XJZLActor extends Actor {
       applyCritDamage = true, // 是否应用暴击倍率
       isBroken = false,   // 是否被破防
       ignoreBlock = false,   // 强制无视格挡
-      ignoreDefense = false  // 强制无视防御
+      ignoreDefense = false,  // 强制无视防御
+      ignoreStance = false  // 强制无视架招
     } = data;
 
     // 0. 未命中直接返回
@@ -708,6 +709,9 @@ export class XJZLActor extends Actor {
         isHit: false,
         isCrit: false,
         isBroken: isBroken,
+        ignoreBlock: ignoreBlock,
+        ignoreDefense: ignoreDefense,
+        ignoreStance: ignoreStance,
         output: { damage: 0, abort: false }
       };
 
@@ -751,7 +755,17 @@ export class XJZLActor extends Actor {
     // 如果强制无视(ignoreBlock)，则格挡无效， 不能用isBroken来判断，因为我们存在即使没有架招也生效格挡的特效（无敌的密宗瑜伽，哎)
     let blockVal = 0;
     if (!ignoreBlock) {
-      blockVal = combat.blockTotal || 0;
+      // 读取总格挡
+      let total = combat.blockTotal || 0;
+
+      // 2. 如果无视架招 (且没无视格挡)，则扣除架招部分
+      if (ignoreStance) {
+        // 安全读取 stanceBlockValue (我们在 DataModel 里刚加的)
+        const stancePart = combat.stanceBlockValue || 0;
+        total = Math.max(0, total - stancePart);
+      }
+
+      blockVal = total;
     }
 
     // D. 抗性 (Resistance)
@@ -788,6 +802,9 @@ export class XJZLActor extends Actor {
       isHit: isHit,
       isCrit: isCrit,
       isBroken: isBroken,
+      ignoreBlock: ignoreBlock,
+      ignoreDefense: ignoreDefense,
+      ignoreStance: ignoreStance,
       // 允许脚本修改的输出对象
       output: {
         damage: reducedDamage,

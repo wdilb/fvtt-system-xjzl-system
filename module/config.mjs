@@ -236,7 +236,13 @@ XJZL.statusFlags = {
   wuxueBleedOnHit: "XJZL.Status.WuxueBleedOnHit",  // 仅受到内外功伤害时流失气血 (内伤/旧疾)
 
   // --- E. 其他类  ---
-  passiveBlock: "XJZL.Status.PassiveBlock" // 被动格挡：即使未开启架招，基础格挡值依然生效
+  passiveBlock: "XJZL.Status.PassiveBlock",     // 被动格挡：即使未开启架招，基础格挡值依然生效
+
+  // --- F. 攻击穿透类 (Attacker Penetration) ---
+  // 攻击者拥有此状态时，其攻击将获得对应效果
+  ignoreBlock: "XJZL.Status.IgnoreBlock",       // 攻击无视格挡
+  ignoreDefense: "XJZL.Status.IgnoreDefense",   // 攻击无视防御
+  ignoreStance: "XJZL.Status.IgnoreStance",     // 攻击无视/不触发架招特效
 };
 
 // 16. 检定优劣势计数器 (Check Flags)
