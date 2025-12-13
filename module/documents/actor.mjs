@@ -334,6 +334,7 @@ export class XJZLActor extends Actor {
     // 2. 准备基础沙盒变量
     const sandbox = {
       ...context,           // 展开传入的上下文
+      args: context,        // 将上下文打包为 args 对象，方便传递给辅助函数
       actor: this,          // 始终提供 actor
       system: this.system,  // 始终提供 system
       S: this.system,       // 简写别名
@@ -362,6 +363,10 @@ export class XJZLActor extends Actor {
   _runScriptsSync(scripts, sandbox) {
     for (const entry of scripts) {
       try {
+        // 动态注入 thisItem，指向当前脚本所属的物品
+        // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
+        // 主要用于类似装备上带的受击特效等没有传入 contextItem 的情况，可以找到触发的物品
+        sandbox.thisItem  = entry.source; 
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -384,6 +389,10 @@ export class XJZLActor extends Actor {
 
     for (const entry of scripts) {
       try {
+        // 动态注入 thisItem，指向当前脚本所属的物品
+        // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
+        // 主要用于类似装备上带的受击特效等没有传入 contextItem 的情况，可以找到触发的物品
+        sandbox.thisItem  = entry.source; 
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
         // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);

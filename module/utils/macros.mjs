@@ -25,7 +25,7 @@ export class XJZLMacros {
         // 兼容 stats 和 skills 的 Label 查找
         const labelKey = CONFIG.XJZL.attributes[type] || CONFIG.XJZL.skills[type] || type;
         const attrLabel = game.i18n.localize(labelKey);
-        
+
         const attackerName = attacker ? attacker.name : "未知来源";
         const targetName = target.name;
 
@@ -57,5 +57,38 @@ export class XJZLMacros {
             content: content,
             flags: { "xjzl-system": flags }
         });
+    }
+
+    /**
+     * 【脚本助手】检查当前是否满足触发架招特效的条件
+     * 
+     * 用于 DAMAGED 触发器。
+     * 逻辑：必须命中 + 必须是内外功 + 架招已开启 + 攻击未无视架招
+     * 这样就可以在写特效脚本时 if (!Macros.checkStance(actor, item, args)) return; 直接调用来判断是否触发架招特效了
+     * @param {Actor} actor 当前角色 (防御者)
+     * @param {Object} args 脚本上下文 (包含 type, isHit, ignoreStance 等)
+     * @returns {Boolean} 是否触发
+     */
+    static checkStance(actor, args) {
+        // 1. 基础校验
+        if (!actor || !args) return false;
+
+        // 2. 检查架招开启状态
+        const martial = actor.system.martial;
+        if (!martial.stanceActive) return false;
+
+        // 3. 检查攻击有效性
+        // A. 必须命中 (闪避不触发反震)
+        if (!args.isHit) return false;
+
+        // B. 必须是能够被格挡的伤害类型 (内功/外功)
+        // 流失、毒素、真实伤害通常不触发架招
+        const validTypes = ["waigong", "neigong"];
+        if (!validTypes.includes(args.type)) return false;
+
+        // C. 检查是否被“无视架招” (破招/虚招击破/特殊效果)
+        if (args.ignoreStance) return false;
+
+        return true;
     }
 }
