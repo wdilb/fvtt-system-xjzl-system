@@ -923,92 +923,90 @@ export class XJZLItem extends Item {
    * 根据招式类型显示不同的输入框
    */
   async _promptRollConfiguration(move) {
-    const isFeint = move.type === "feint";
-    const isCounter = move.type === "counter";
-
-    // 架招和气招不需要弹窗，直接瞬发
     if (move.type === "stance") return {};
 
-    //需要询问命中的
-    const needsAttack = ["real", "feint", "ultimate"].includes(move.type) && ["waigong", "neigong"].includes(move.damageType);
+    // 1. 生成唯一 ID
+    const formId = `roll-config-${foundry.utils.randomID()}`;
 
-    //需要询问伤害加值的
-    const needsDamage = ["real", "feint", "counter", "ultimate"].includes(move.type);
+    // 2. 准备模板数据
+    const context = {
+      formId: formId, // 传入 ID
+      needsAttack: ["real", "feint", "ultimate"].includes(move.type) && ["waigong", "neigong"].includes(move.damageType),
+      isFeint: move.type === "feint",
+      needsDamage: ["real", "feint", "counter", "ultimate"].includes(move.type),
+      isCounter: move.type === "counter",
+      canCrit: move.type !== "counter"
+    };
 
-    let content = `<form style="margin-bottom:10px;">`;
+    // 3. 渲染 HTML
+    const content = await renderTemplate("systems/xjzl-system/templates/apps/roll-config.hbs", context);
 
-    // 辅助函数：生成带加减号的输入框 HTML
-    const makeNumberInput = (name, label) => `
-      <div class="form-group">
-          <label>${label}</label>
-          <div class="form-fields" style="justify-content: flex-end; gap: 5px;">
-              <a class="adjustment-button" onclick="const input = this.nextElementSibling; input.stepDown(); input.dispatchEvent(new Event('change'));">
-                  <i class="fas fa-minus"></i>
-              </a>
-              <input type="number" name="${name}" value="0" style="text-align:center; max-width: 50px;" readonly/>
-              <a class="adjustment-button" onclick="const input = this.previousElementSibling; input.stepUp(); input.dispatchEvent(new Event('change'));">
-                  <i class="fas fa-plus"></i>
-              </a>
-          </div>
-      </div>`;
-
-    if (needsAttack) {
-      content += `
-          <div class="form-group">
-              <label>额外命中加值</label>
-              <input type="number" name="bonusAttack" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
-          </div>
-          ${makeNumberInput("manualAttackLevel", "命中优劣势等级")}
-          <p class="notes" style="text-align:right; margin-top:-5px; font-size:0.8em; color:#666;">(正数=优势，负数=劣势)</p>`;
-    }
-
-    if (isFeint) {
-      content += `
-          <div class="form-group">
-              <label>额外虚招值</label>
-              <input type="number" name="bonusFeint" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
-          </div>
-          ${makeNumberInput("manualFeintLevel", "虚招优劣势等级")}
-          <p class="notes" style="text-align:right; margin-top:-5px; font-size:0.8em; color:#666;">(正数=优势，负数=劣势)</p>`;
-    }
-
-    if (needsDamage) {
-      content += `
-          <div class="form-group">
-              <label>额外伤害加值</label>
-              <input type="number" name="bonusDamage" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
-          </div>`;
-    }
-
-    if (!isCounter) {
-      content += `
-          <div class="form-group">
-              <label>允许暴击?（仅指造成暴击伤害）</label>
-              <input type="checkbox" name="canCrit" checked/>
-          </div>`;
-    }
-
-    content += `</form>`;
-
-    return foundry.applications.api.DialogV2.prompt({
+    // 4. 使用 DialogV2.wait
+    return foundry.applications.api.DialogV2.wait({
       window: { title: `施展: ${move.name}`, icon: "fas fa-dice" },
       content: content,
-      ok: {
+      
+      // 【关键修正】使用 ID 查找，忽略回调参数
+      render: (event) => {
+        const root = document.getElementById(formId);
+        if (!root) return; // 安全检查
+
+        // 使用事件委托处理点击
+        root.addEventListener("click", (event) => {
+          const btn = event.target.closest("button[data-action]");
+          if (!btn) return;
+
+          event.preventDefault(); 
+          
+          const action = btn.dataset.action;
+          const targetName = btn.dataset.target;
+          
+          const input = root.querySelector(`input[name="${targetName}"]`);
+          if (!input) return;
+
+          let val = parseInt(input.value) || 0;
+
+          if (action === "increase") val++;
+          else if (action === "decrease") val--;
+
+          input.value = val;
+        });
+      },
+
+      buttons: [{
+        action: "ok",
         label: "执行",
         icon: "fas fa-check",
-        callback: (event, button) => {
-          const formData = new FormData(button.form);
+        default: true,
+        callback: (event, button, dialog) => {
+          // 【关键修正】同样使用 ID 获取数据，绝对稳健
+          const root = document.getElementById(formId);
+          if (!root) return {}; // 容错
+
+          // 手动构建数据，不依赖 FormData 自动解析（因为 root 可能不是 form 标签，只是个 div）
+          // 但为了方便，我们可以临时构造 FormData 也是可以的，或者直接 querySelector
+          
+          // 辅助取值函数
+          const getVal = (name) => {
+              const el = root.querySelector(`[name="${name}"]`);
+              if (!el) return 0;
+              if (el.type === "checkbox") return el.checked ? "on" : null;
+              return el.value;
+          };
+
           return {
-            bonusAttack: parseInt(formData.get("bonusAttack")) || 0,
-            bonusFeint: parseInt(formData.get("bonusFeint")) || 0,
-            bonusDamage: parseInt(formData.get("bonusDamage")) || 0,
-            canCrit: formData.get("canCrit") === "on",
-            manualAttackLevel: parseInt(formData.get("manualAttackLevel")) || 0,
-            manualFeintLevel: parseInt(formData.get("manualFeintLevel")) || 0
+            bonusAttack: parseInt(getVal("bonusAttack")) || 0,
+            bonusFeint: parseInt(getVal("bonusFeint")) || 0,
+            bonusDamage: parseInt(getVal("bonusDamage")) || 0,
+            canCrit: getVal("canCrit") === "on",
+            manualAttackLevel: parseInt(getVal("manualAttackLevel")) || 0,
+            manualFeintLevel: parseInt(getVal("manualFeintLevel")) || 0
           };
         }
-      },
-      rejectClose: true
+      }],
+      
+      rejectClose: false,
+      close: () => null
     });
   }
 

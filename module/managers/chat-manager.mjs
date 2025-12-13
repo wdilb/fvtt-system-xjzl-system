@@ -1425,7 +1425,7 @@ export class ChatCardManager {
                     };
                 }
             },
-            rejectClose: true // 点击关闭或ESC返回 null
+            rejectClose: false // 点击关闭或ESC返回 null
         });
     }
 
