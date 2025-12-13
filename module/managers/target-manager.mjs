@@ -62,6 +62,9 @@ export class TargetManager {
     static _onKeyDown(event) {
         // 检查设置
         if (!game.settings.get("xjzl-system", "enableAltTargeting")) return;
+        // 如果用户正在输入框里打字，不要触发准星
+        const targetTag = event.target.tagName;
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(targetTag)) return;
         // 当按下 Alt 键时，且当前鼠标在 Token 层上
         if (event.key === "Alt" && canvas.ready) {
             document.body.style.cursor = "crosshair"; // 变成十字准星

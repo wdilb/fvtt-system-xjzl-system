@@ -1258,7 +1258,8 @@ export class ChatCardManager {
                 applyCritDamage: config.applyCritDamage, // 是否计算双倍
                 isBroken: config.isBroken, // 强制破防
                 ignoreBlock: config.ignoreBlock,
-                ignoreDefense: config.ignoreDefense
+                ignoreDefense: config.ignoreDefense,
+                ignoreStance: config.ignoreStance
             });
 
             if (isHit) {
@@ -1369,39 +1370,44 @@ export class ChatCardManager {
             <hr>
 
             <div class="form-group">
-                <label>伤害修正 (+/-)</label>
+                <label>伤害修正</label>
                 <input type="number" name="damageMod" value="0" style="text-align:center; background:rgba(0,0,0,0.05);"/>
                 <p class="notes">在原伤害基础上增减数值</p>
             </div>
 
             <div class="form-group">
-                <label>强制命中?</label>
+                <label>是否命中</label>
                 <input type="checkbox" name="forceHit" checked/>
             </div>
 
             <div class="form-group">
-                <label>视为暴击? (触发特效)</label>
+                <label>是否暴击</label>
                 <input type="checkbox" name="isCrit"/>
             </div>
 
             <div class="form-group">
-                <label>应用暴击伤害? (x2)</label>
+                <label>可以造成暴击伤害</label>
                 <input type="checkbox" name="applyCritDamage" checked/>
             </div>
 
             <div class="form-group">
-                <label>强制破防? (击破架招)</label>
+                <label>强制破架(击破架招)</label>
                 <input type="checkbox" name="isBroken"/>
             </div>
 
             <div class="form-group">
-                <label>无视格挡?</label>
+                <label>无视格挡</label>
                 <input type="checkbox" name="ignoreBlock"/>
             </div>
 
             <div class="form-group">
-                <label>无视防御 (内/外)?</label>
+                <label>无视防御 (内/外)</label>
                 <input type="checkbox" name="ignoreDefense"/>
+            </div>
+
+            <div class="form-group">
+                <label>无视架招</label>
+                <input type="checkbox" name="ignoreStance"/>
             </div>
         </div>
         `;
@@ -1421,7 +1427,8 @@ export class ChatCardManager {
                         applyCritDamage: formData.get("applyCritDamage") === "on",
                         isBroken: formData.get("isBroken") === "on",
                         ignoreBlock: formData.get("ignoreBlock") === "on",
-                        ignoreDefense: formData.get("ignoreDefense") === "on"
+                        ignoreDefense: formData.get("ignoreDefense") === "on",
+                        ignoreStance: formData.get("ignoreStance") === "on"
                     };
                 }
             },

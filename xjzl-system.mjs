@@ -455,7 +455,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/chat/defend-result.hbs", //看破结果
     "systems/xjzl-system/templates/chat/request-save.hbs", //属性判定
     //应用窗口
-    "systems/xjzl-system/templates/apps/damage-tool.hbs", //物品使用
+    "systems/xjzl-system/templates/apps/damage-tool.hbs", //伤害工具
+    "systems/xjzl-system/templates/apps/damage-tool.hbs", //roll设置窗口
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);

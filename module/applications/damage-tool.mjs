@@ -93,8 +93,9 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     const config = {
       ignoreDefense: formData.get("ignoreDefense") === "on",
       ignoreBlock: formData.get("ignoreBlock") === "on",
-      isCrit: formData.get("isCrit") === "on",
-      forceHit: formData.get("forceHit") === "on"
+      ignoreStance: formData.get("ignoreStance") === "on",     // 新增
+      isCrit: formData.get("isCrit") === "on",                 // 仅触发特效
+      applyCritDamage: formData.get("applyCritDamage") === "on"// 实际翻倍
     };
 
     // 2. 基础校验
@@ -141,10 +142,11 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         attacker: null, 
         isHit: true,        // 默认命中
         isCrit: config.isCrit,
-        applyCritDamage: true, // 如果勾选暴击，这里默认应用暴击倍率
-        isBroken: config.ignoreBlock,
+        applyCritDamage: config.applyCritDamage,
+        isBroken: false,  //默认不击破架招，因为都没有招式来源，一般也不会触发破架特效
         ignoreDefense: config.ignoreDefense,
-        ignoreBlock: config.ignoreBlock
+        ignoreBlock: config.ignoreBlock,
+        ignoreStance: config.ignoreStance 
       });
 
       // 2. 准备聊天卡片数据 (复用 damage-card.hbs)
