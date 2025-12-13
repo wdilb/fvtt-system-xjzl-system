@@ -945,7 +945,7 @@ export class XJZLItem extends Item {
     return foundry.applications.api.DialogV2.wait({
       window: { title: `施展: ${move.name}`, icon: "fas fa-dice" },
       content: content,
-      
+
       // 【关键修正】使用 ID 查找，忽略回调参数
       render: (event) => {
         const root = document.getElementById(formId);
@@ -956,11 +956,11 @@ export class XJZLItem extends Item {
           const btn = event.target.closest("button[data-action]");
           if (!btn) return;
 
-          event.preventDefault(); 
-          
+          event.preventDefault();
+
           const action = btn.dataset.action;
           const targetName = btn.dataset.target;
-          
+
           const input = root.querySelector(`input[name="${targetName}"]`);
           if (!input) return;
 
@@ -985,13 +985,13 @@ export class XJZLItem extends Item {
 
           // 手动构建数据，不依赖 FormData 自动解析（因为 root 可能不是 form 标签，只是个 div）
           // 但为了方便，我们可以临时构造 FormData 也是可以的，或者直接 querySelector
-          
+
           // 辅助取值函数
           const getVal = (name) => {
-              const el = root.querySelector(`[name="${name}"]`);
-              if (!el) return 0;
-              if (el.type === "checkbox") return el.checked ? "on" : null;
-              return el.value;
+            const el = root.querySelector(`[name="${name}"]`);
+            if (!el) return 0;
+            if (el.type === "checkbox") return el.checked ? "on" : null;
+            return el.value;
           };
 
           return {
@@ -1004,7 +1004,7 @@ export class XJZLItem extends Item {
           };
         }
       }],
-      
+
       rejectClose: false,
       close: () => null
     });
@@ -1121,6 +1121,12 @@ export class XJZLItem extends Item {
       if (!foundry.utils.isEmpty(resourceUpdates)) {
         await actor.update(resourceUpdates);
       }
+
+      // =====================================================
+      // 3.5 触发 "出招" 特效 (Regen On Attack)
+      // =====================================================
+      // 这里的时机：资源已扣除，ATTACK 脚本尚未执行。
+      await actor.processRegen("Attack");
 
       // =====================================================
       // 4. 执行 ATTACK (Pre-Roll) 脚本

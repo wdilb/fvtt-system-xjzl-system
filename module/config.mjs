@@ -243,6 +243,25 @@ XJZL.statusFlags = {
   ignoreBlock: "XJZL.Status.IgnoreBlock",       // 攻击无视格挡
   ignoreDefense: "XJZL.Status.IgnoreDefense",   // 攻击无视防御
   ignoreStance: "XJZL.Status.IgnoreStance",     // 攻击无视/不触发架招特效
+
+  // --- G. 自动化回复/消耗 (Regen/Deplete) ---
+  // 命名规则: regen + Resource + Timing
+  // 值: 正数(回复), 负数(消耗)
+
+  // 1. 回合开始 (Turn Start)
+  regenHpTurnStart: "XJZL.Status.RegenHpTurnStart",
+  regenMpTurnStart: "XJZL.Status.RegenMpTurnStart",
+  regenRageTurnStart: "XJZL.Status.RegenRageTurnStart",
+
+  // 2. 回合结束 (Turn End)
+  regenHpTurnEnd: "XJZL.Status.RegenHpTurnEnd",
+  regenMpTurnEnd: "XJZL.Status.RegenMpTurnEnd",
+  regenRageTurnEnd: "XJZL.Status.RegenRageTurnEnd",
+
+  // 3. 出招时 (On Attack) - 每次使用招式触发
+  regenHpAttack: "XJZL.Status.RegenHpAttack",
+  regenMpAttack: "XJZL.Status.RegenMpAttack",
+  regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
 // 16. 检定优劣势计数器 (Check Flags)

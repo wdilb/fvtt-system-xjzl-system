@@ -150,7 +150,8 @@ export class XJZLActor extends Actor {
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
       // 如果是那数值型的 Key，单独处理，否则按布尔处理
-      if (numericCombatFlags.includes(key)) {
+      // 判定逻辑：如果是战斗计数器 OR 是自动回复(regen开头)，都转为数字
+      if (numericCombatFlags.includes(key) || key.startsWith("regen")) {
         // 初始化数值计数器 (支持 AE 的 ADD 模式)
         // 注意：getFlag 读取出来的可能是 undefined，必须保底为 0
         this.xjzlStatuses[key] = parseInt(this.getFlag("xjzl-system", key)) || 0;
@@ -366,7 +367,7 @@ export class XJZLActor extends Actor {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
         // 主要用于类似装备上带的受击特效等没有传入 contextItem 的情况，可以找到触发的物品
-        sandbox.thisItem  = entry.source; 
+        sandbox.thisItem = entry.source;
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -392,7 +393,7 @@ export class XJZLActor extends Actor {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
         // 主要用于类似装备上带的受击特效等没有传入 contextItem 的情况，可以找到触发的物品
-        sandbox.thisItem  = entry.source; 
+        sandbox.thisItem = entry.source;
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
         // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);
@@ -1018,4 +1019,74 @@ export class XJZLActor extends Actor {
     };
   }
 
+  /**
+   * 处理自动化回复/消耗
+   * @param {String} timing 时机标识: "TurnStart", "TurnEnd", "Attack"
+   */
+  async processRegen(timing) {
+    const updates = {};
+    const messages = [];
+    const resources = this.system.resources;
+
+    // 定义资源键名映射
+    const resKeys = ["hp", "mp", "rage"];
+    const labels = { hp: "气血", mp: "内力", rage: "怒气" };
+
+    for (const res of resKeys) {
+      // 拼接 Flag Key，例如: regenHpTurnStart
+      // 注意大小写：配置里是 regenHp... 所以这里要把 res 首字母大写
+      const capRes = res.charAt(0).toUpperCase() + res.slice(1);
+      const flagKey = `regen${capRes}${timing}`;
+
+      // 从 xjzlStatuses 读取数值 (我们在 prepareDerivedData 里已经转成 int 了)
+      const delta = this.xjzlStatuses[flagKey] || 0;
+
+      if (delta !== 0) {
+        const current = resources[res].value;
+        const max = resources[res].max;
+
+        // 计算新值 (限制在 0 ~ max 之间)
+        // 注意：如果是负数(消耗)，也不能扣到负数
+        let newVal = Math.max(0, Math.min(max, current + delta));
+
+        if (newVal !== current) {
+          updates[`system.resources.${res}.value`] = newVal;
+
+          // 记录日志文本
+          const sign = delta > 0 ? "+" : "";
+          messages.push(`${labels[res]} ${sign}${delta}`);
+        }
+      }
+    }
+
+    // 执行更新
+    if (!foundry.utils.isEmpty(updates)) {
+      await this.update(updates);
+
+      // 发送飘字或提示 (仅当有变动时)
+      if (messages.length > 0) {
+        const flavor = `${timing === "Attack" ? "出招" : (timing === "TurnStart" ? "回合开始" : "回合结束")}: ${messages.join(", ")}`;
+
+        // 飘字
+        if (this.token?.object) {
+          canvas.interface.createScrollingText(this.token.object.center, messages.join(" "), {
+            direction: 1,
+            fontSize: 28,
+            fill: "#00FF00",
+            stroke: "#000000",
+            strokeThickness: 4
+          });
+        }
+
+        // 发送个小的 ChatMessage 记录，防止玩家不知道为什么血变了
+
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this }),
+          content: `<div style="font-size:0.8em; color:#555;">${flavor}</div>`
+        });
+
+      }
+    }
+
+  }
 }
