@@ -267,6 +267,26 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         })
       }),
 
+      // 手动修正组列表
+      customModifiers: new fields.ArrayField(new fields.SchemaField({
+        // ID: 用于稳定索引和未来扩展
+        id: new fields.StringField({ required: true, initial: () => foundry.utils.randomID() }),
+
+        // 来源名称 (如 "剧情Buff", "重伤")
+        name: new fields.StringField({ required: true, initial: "新修正组", label: "XJZL.Modifier.Name" }),
+
+        // 启用开关
+        enabled: new fields.BooleanField({ initial: true, label: "XJZL.Modifier.Enabled" }),
+
+        // 具体的修正条目列表
+        changes: new fields.ArrayField(new fields.SchemaField({
+          // 目标属性路径 (如 "stats.liliang.mod", "combat.speed")
+          key: new fields.StringField({ required: true, label: "XJZL.Modifier.Key" }),
+          // 修正数值 (支持正负数)
+          value: new fields.NumberField({ required: true, initial: 0, label: "XJZL.Modifier.Value" })
+        }))
+      }), { label: "XJZL.Modifier.Label" }),
+
       // === 生平经历 (History / Audit Log) ===
       // 记录角色的所有关键变动。
       // 设计目标：支持 DM 查账 (审计模式) 和 玩家查看故事 (生平模式)
@@ -394,6 +414,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    * Actor 可以在运行脚本后，手动调用 recalculate() 来刷新数据。
    */
   prepareDerivedData() {
+    this._applyCustomModifiers(); //应用手动修正 (最优先)
     this._prepareStatsAndCultivation(); // 步骤A: 静态累加 (Pass 1 独有)
     this._calculateStatsTotals();       // 步骤B: 计算总值
     this._prepareSkills();              // 步骤C: 技能
@@ -411,6 +432,34 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     this._calculateStatsTotals();      // 重新计算 Total
     this._prepareSkills();             // 重新计算技能
     this._prepareCombatAndResources(); // 重新计算资源与战斗
+  }
+
+  /**
+   * 应用手动修正逻辑
+   * 遍历数组，修改内存中的 this (即 system)
+   */
+  _applyCustomModifiers() {
+    const groups = this.customModifiers || [];
+
+    for (const group of groups) {
+      // 1. 如果整组被禁用，直接跳过
+      if (!group.enabled) continue;
+
+      for (const change of group.changes) {
+        // 安全检查
+        if (!change.key) continue;
+
+        // 2. 获取当前值 (基于 this，即 system)
+        // 这个值是 prepareBaseData 初始化后的值 (包含 AE 的修改)
+        const current = foundry.utils.getProperty(this, change.key);
+
+        // 3. 累加修正
+        // 仅对数值型属性生效，防止错误的 Key 导致 NaN 或报错
+        if (typeof current === "number") {
+          foundry.utils.setProperty(this, change.key, current + change.value);
+        }
+      }
+    }
   }
 
   /**
@@ -514,11 +563,11 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         const moves = item.system.moves || [];
         // 遍历每一招
         for (const move of moves) {
-           // 读取 effectiveStage 不再读取computedLevel
+          // 读取 effectiveStage 不再读取computedLevel
           // 如果 mappedStage=5，effectiveStage 会是 0，这里 stage=0，后续 if (stage >= 2) 不会通过，完美忽略
           const stage = move.effectiveStage || 0;
           const wType = move.weaponType; // 武器类型
-          
+
           if (wType && wType !== 'none') { //确实存在不带武器类型的招式，哎
             // 初始化计数器
             if (!weaponCounts[wType]) weaponCounts[wType] = { t1: 0, t2: 0, t3: 0 };
@@ -940,7 +989,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     const baseBlock = (combat.block || 0) + bonuses.block;
 
     // 新增一个字段用来记录架招的格挡值，这个字段不需要定义在 schema 里，直接挂在 combat 内存对象上即可
-    combat.stanceBlockValue = 0; 
+    combat.stanceBlockValue = 0;
 
     if (isStanceActive) {
       // 情况 1: 架招开启

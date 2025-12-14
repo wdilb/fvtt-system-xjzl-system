@@ -40,7 +40,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
             // --- 其他 ---
             deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect, //删除状态
-            rollMove: XJZLCharacterSheet.prototype._onRollMove   //使用招式
+            rollMove: XJZLCharacterSheet.prototype._onRollMove,   //使用招式
+
+            //手工修正
+            addGroup: XJZLCharacterSheet.prototype._onAction,
+            deleteGroup: XJZLCharacterSheet.prototype._onAction,
+            addChange: XJZLCharacterSheet.prototype._onAction,
+            deleteChange: XJZLCharacterSheet.prototype._onAction
         }
     };
 
@@ -53,7 +59,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         skills: { template: "systems/xjzl-system/templates/actor/character/tab-skills.hbs", scrollable: [""] },
         combat: { template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs", scrollable: [""] },
         inventory: { template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs", scrollable: [""] },
-        effects: { template: "systems/xjzl-system/templates/actor/character/tab-effects.hbs", scrollable: [""] }
+        effects: { template: "systems/xjzl-system/templates/actor/character/tab-effects.hbs", scrollable: [""] },
+        config: { template: "systems/xjzl-system/templates/actor/character/tab-config.hbs", scrollable: [""] }
     };
 
     tabGroups = { primary: "stats" };
@@ -78,6 +85,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 内功
         context.neigongs = actor.itemTypes.neigong || [];
         context.neigongs.forEach(item => item.isRunning = item.system.active);
+
+        context.groupedModifierOptions = this._getGroupedModifierOptions();
 
         // =====================================================
         //  准备武学 (调用 Item 方法计算)
@@ -202,6 +211,140 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         return true;
+    }
+
+    /**
+     * 生成分组的属性选择列表 (支持 OptGroup)
+     * 返回结构: { "七维属性": { "key": "Label" }, "战斗属性": { ... } }
+     */
+    _getGroupedModifierOptions() {
+        const groups = {};
+
+        // 辅助函数: 添加到指定分组
+        const add = (groupName, key, label) => {
+            if (!groups[groupName]) groups[groupName] = {};
+            groups[groupName][key] = label;
+        };
+
+        // 1. 七维属性 (Stats)
+        const groupStats = game.i18n.localize("XJZL.Stats.Label");
+        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.attributes)) {
+            add(groupStats, `stats.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+        }
+        //上面的CONFIG的attributes是没有悟性的，所以手动加上
+        if (!groups["stats.wuxing.mod"]) {
+             add(groupStats, "stats.wuxing.mod", `${game.i18n.localize("XJZL.Stats.Wuxing")} (Mod)`);
+        }
+
+        // 2. 战斗属性 (Combat)
+        const groupCombat = game.i18n.localize("XJZL.Combat.Label");
+        const combatInputs = {
+            "speed": "XJZL.Combat.Speed", "dodge": "XJZL.Combat.Dodge",
+            "block": "XJZL.Combat.Block", "kanpo": "XJZL.Combat.Kanpo",
+            "initiative": "XJZL.Combat.Initiative", "xuzhao": "XJZL.Combat.XuZhao",
+            "def_waigong": "XJZL.Combat.DefWaigong", "def_neigong": "XJZL.Combat.DefNeigong",
+            "hit_waigong": "XJZL.Combat.HitWaigong", "hit_neigong": "XJZL.Combat.HitNeigong",
+            "crit_waigong": "XJZL.Combat.CritWaigong", "crit_neigong": "XJZL.Combat.CritNeigong"
+        };
+        for (const [k, labelKey] of Object.entries(combatInputs)) {
+            add(groupCombat, `combat.${k}`, `${game.i18n.localize(labelKey)} (Base/Mod)`);
+        }
+
+        // 武器等级 (Weapon Ranks .mod)
+        // 遍历 CONFIG.XJZL.weaponTypes
+        const groupWeaponRank = game.i18n.localize("XJZL.Combat.WeaponRanks");
+        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.weaponTypes)) {
+            // 排除 none
+            if (k === 'none') continue;
+            add(groupWeaponRank, `combat.weaponRanks.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+        }
+
+        // 3. 伤害/抗性 (Dmg/Res)
+        const groupDmg = "伤害与抗性"; // 也可以 localize
+        // 伤害
+        add(groupDmg, "combat.damages.global.mod", "全局伤害 (Mod)");
+        add(groupDmg, "combat.damages.skill.mod", "招式伤害 (Mod)");
+        add(groupDmg, "combat.damages.weapon.mod", "兵器伤害 (Mod)");
+        for (const k of ["yang", "yin", "gang", "rou", "taiji"]) {
+            add(groupDmg, `combat.damages.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Dmg." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);
+        }
+        // 抗性
+        for (const k of ["poison", "bleed", "fire", "mental", "liushi"]) {
+            add(groupDmg, `combat.resistances.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Res." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);
+        }
+
+        // 4. 技能 (Skills)
+        const groupSkills = game.i18n.localize("XJZL.Skills.Label");
+        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.skills)) {
+            add(groupSkills, `skills.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+        }
+
+        // 5. 资源上限 (Resources)
+        const groupRes = game.i18n.localize("XJZL.Resources.Label");
+        add(groupRes, "resources.hp.bonus", `${game.i18n.localize("XJZL.Resources.HP")} (Bonus)`);
+        add(groupRes, "resources.mp.bonus", `${game.i18n.localize("XJZL.Resources.MP")} (Bonus)`);
+
+        return groups;
+    }
+
+    /* -------------------------------------------- */
+    /*  通用动作处理 (Action Handler)                */
+    /* -------------------------------------------- */
+
+    async _onAction(event, target) {
+        const action = target.dataset.action;
+        // console.log("XJZL | Action Triggered:", action); // 调试用
+
+        // === 修正组操作 (Group Operations) ===
+
+        if (action === "addGroup") {
+            const groups = this.document.system.customModifiers || [];
+            // 创建一个新组，默认带一条数据
+            await this.document.update({
+                "system.customModifiers": [...groups, {
+                    name: "新修正组",
+                    enabled: true,
+                    changes: [{ key: "stats.liliang.mod", value: 0 }]
+                }]
+            });
+            return;
+        }
+
+        if (action === "deleteGroup") {
+            const index = Number(target.dataset.index);
+            // 数组没有 toObject，使用 deepClone 获取副本
+            const groups = foundry.utils.deepClone(this.document.system.customModifiers);
+            groups.splice(index, 1);
+            await this.document.update({ "system.customModifiers": groups });
+            return;
+        }
+
+        // === 条目操作 (Change Operations) ===
+
+        if (action === "addChange") {
+            const groupIndex = Number(target.dataset.groupIndex);
+            const groups = foundry.utils.deepClone(this.document.system.customModifiers);
+
+            // 向指定组的 changes 数组追加
+            if (groups[groupIndex]) {
+                groups[groupIndex].changes.push({ key: "stats.liliang.mod", value: 0 });
+                await this.document.update({ "system.customModifiers": groups });
+            }
+            return;
+        }
+
+        if (action === "deleteChange") {
+            const groupIndex = Number(target.dataset.groupIndex);
+            const changeIndex = Number(target.dataset.changeIndex);
+            const groups = foundry.utils.deepClone(this.document.system.customModifiers);
+
+            // 从指定组移除指定条目
+            if (groups[groupIndex] && groups[groupIndex].changes) {
+                groups[groupIndex].changes.splice(changeIndex, 1);
+                await this.document.update({ "system.customModifiers": groups });
+            }
+            return;
+        }
     }
 
     /* -------------------------------------------- */

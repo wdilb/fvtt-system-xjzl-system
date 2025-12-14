@@ -331,67 +331,67 @@ Hooks.on('getSceneControlButtons', (controls) => {
  * 用于处理 回合开始/回合结束 的自动回复与脚本
  */
 Hooks.on("updateCombat", async (combat, updateData, context) => {
-    // 1. 仅限 GM 处理 (防止重复触发)
-    if (!game.user.isGM) return;
+  // 1. 仅限 GM 处理 (防止重复触发)
+  if (!game.user.isGM) return;
 
-    // 2. 检查是否是回合变更 (turn 或 round 变化)
-    if (!("turn" in updateData) && !("round" in updateData)) return;
+  // 2. 检查是否是回合变更 (turn 或 round 变化)
+  if (!("turn" in updateData) && !("round" in updateData)) return;
 
-    // 3. 获取 上一位 (Previous) 和 当前位 (Current) 的 Combatant
-    // previous: 刚刚结束回合的人
-    // current:  即将开始回合的人
-    const prevId = combat.previous.combatantId;
-    const currId = combat.current.combatantId;
+  // 3. 获取 上一位 (Previous) 和 当前位 (Current) 的 Combatant
+  // previous: 刚刚结束回合的人
+  // current:  即将开始回合的人
+  const prevId = combat.previous.combatantId;
+  const currId = combat.current.combatantId;
 
-    // --- A. 处理回合结束 (Turn End) ---
-    if (prevId) {
-        const prevCombatant = combat.combatants.get(prevId);
-        const prevActor = prevCombatant?.actor;
-        if (prevActor) {
-            // 1. 执行数值回复
-            await prevActor.processRegen("TurnEnd");
-            // 2. 执行脚本 (Script Trigger)
-            await prevActor.runScripts("turnEnd", {});
-        }
+  // --- A. 处理回合结束 (Turn End) ---
+  if (prevId) {
+    const prevCombatant = combat.combatants.get(prevId);
+    const prevActor = prevCombatant?.actor;
+    if (prevActor) {
+      // 1. 执行数值回复
+      await prevActor.processRegen("TurnEnd");
+      // 2. 执行脚本 (Script Trigger)
+      await prevActor.runScripts("turnEnd", {});
     }
+  }
 
-    // --- B. 处理回合开始 (Turn Start) ---
-    if (currId) {
-        const currCombatant = combat.combatants.get(currId);
-        const currActor = currCombatant?.actor;
-        if (currActor) {
-            // 1. 执行数值回复
-            await currActor.processRegen("TurnStart");
-            // 2. 执行脚本 (Script Trigger)
-            await currActor.runScripts("turnStart", {});
-        }
+  // --- B. 处理回合开始 (Turn Start) ---
+  if (currId) {
+    const currCombatant = combat.combatants.get(currId);
+    const currActor = currCombatant?.actor;
+    if (currActor) {
+      // 1. 执行数值回复
+      await currActor.processRegen("TurnStart");
+      // 2. 执行脚本 (Script Trigger)
+      await currActor.runScripts("turnStart", {});
     }
+  }
 });
 
 /**
  * 监听战斗人员创建 (进入战斗)
  */
 Hooks.on("createCombatant", async (combatant, options, userId) => {
-    // 1. 仅限 GM 执行 (防止多客户端重复触发数据修改)
-    if (!game.user.isGM) return;
+  // 1. 仅限 GM 执行 (防止多客户端重复触发数据修改)
+  if (!game.user.isGM) return;
 
-    // 2. 获取 Actor
-    const actor = combatant.actor;
-    if (!actor) return;
+  // 2. 获取 Actor
+  const actor = combatant.actor;
+  if (!actor) return;
 
-    // 3. 执行脚本
-    // "combatStart" 时机通常不需要额外的 context，
-    // 但我们可以把 combatant 本身传进去，万一脚本想读取先攻值之类的
-    const context = {
-        combatant: combatant
-    };
+  // 3. 执行脚本
+  // "combatStart" 时机通常不需要额外的 context，
+  // 但我们可以把 combatant 本身传进去，万一脚本想读取先攻值之类的
+  const context = {
+    combatant: combatant
+  };
 
-    try {
-        await actor.runScripts("combatStart", context);
-        // 其他进入战斗触发的逻辑也可以写在这
-    } catch (err) {
-        console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
-    }
+  try {
+    await actor.runScripts("combatStart", context);
+    // 其他进入战斗触发的逻辑也可以写在这
+  } catch (err) {
+    console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
+  }
 });
 
 /* -------------------------------------------- */
@@ -475,6 +475,27 @@ function registerHandlebarsHelpers() {
     }
     return new Handlebars.SafeString(html);
   });
+
+  // 支持分组的 Select
+  Handlebars.registerHelper("selectOptionsGrouped", (groupedChoices, options) => {
+    const selected = String(options.hash.selected ?? "");
+    let html = "";
+
+    // 遍历每一个组
+    for (const [groupLabel, choices] of Object.entries(groupedChoices)) {
+      html += `<optgroup label="${groupLabel}">`;
+
+      // 遍历组内选项
+      for (const [key, label] of Object.entries(choices)) {
+        const isSelected = String(key) === selected ? " selected" : "";
+        html += `<option value="${key}"${isSelected}>${label}</option>`;
+      }
+
+      html += `</optgroup>`;
+    }
+
+    return new Handlebars.SafeString(html);
+  });
 }
 /**
  * 预加载模板片段
@@ -492,6 +513,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
     "systems/xjzl-system/templates/actor/character/tab-inventory.hbs",
     "systems/xjzl-system/templates/actor/character/tab-effects.hbs",
+    "systems/xjzl-system/templates/actor/character/tab-config.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
 
