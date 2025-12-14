@@ -37,7 +37,7 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // --- 2. 核心标签 ---
       type: new fields.StringField({
         initial: "real",
-        choices: ["qi", "real", "feint", "stance", "counter", "ultimate"],
+        choices: ["qi", "real", "feint", "stance", "counter"],
         label: "XJZL.Wuxue.Moves.Type"
       }),
       element: new fields.StringField({
@@ -45,6 +45,8 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         choices: ["taiji", "yin", "yang", "gang", "rou", "none"],
         label: "XJZL.Wuxue.Moves.Element"
       }),
+      // 新增绝招标记，把绝招从招式类别中分离出来，因为存在即是绝招也是气招的东西，哎
+      isUltimate: new fields.BooleanField({ initial: false, label: "XJZL.Wuxue.Moves.IsUltimate" }),
 
       // 武器限制 (移动到招式层级)
       // 对应 Character.system.combat.weaponRanks 中的 key (sword, blade...)
@@ -62,6 +64,22 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // 招式独立升级，不依赖套路总等级
       level: new fields.NumberField({ min: 1, initial: 1, label: "XJZL.Wuxue.Moves.Level" }),
       xpInvested: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Neigong.XPInvested" }),
+
+      // --- 进阶配置 (存在那种不是按照普通套路升级的武学，哎) ---
+      // 用于处理“只有学会/没学会”、“特殊修为需求”等特例
+      progression: new fields.SchemaField({
+        // 模式: standard(按品阶自动), custom(自定义门槛)
+        mode: new fields.StringField({ initial: "standard", choices: ["standard", "custom"] }),
+
+        // 自定义门槛 (仅在 custom 模式下生效)
+        // 例如: [5000] 表示 0-4999为未入门, 5000+为满级
+        customThresholds: new fields.ArrayField(new fields.NumberField({ min: 0 }), { initial: [] }),
+
+        // 境界映射 (Stat Equivalent Stage)
+        // 用于解决"只有1级但视为精通"的问题。
+        // 0=自动(等于当前level), 1=领悟, 2=掌握, 3=精通, 4=合一, 5=无
+        mappedStage: new fields.NumberField({ initial: 0, choices: [0, 1, 2, 3, 4] })
+      }),
 
       // 招式修为成分
       sourceBreakdown: new fields.SchemaField({
@@ -122,6 +140,14 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
       // 3. 描述与要求
       description: new fields.HTMLField({ label: "XJZL.Info.Bio" }),
+      // 自动化说明 (Automation Note)
+      // 用于告知玩家/GM：本武学的哪些特效已自动化，哪些需要手动修正
+      automationNote: new fields.StringField({
+        required: false,
+        initial: "",
+        label: "XJZL.Wuxue.AutomationNote",
+        hint: "XJZL.Wuxue.AutomationNoteHint" // 提示语：例如“说明本武学的脚本覆盖范围”
+      }),
       // 悟性要求等限制条件，仅作为文本提示，不强制自动化
       requirements: new fields.HTMLField({ label: "XJZL.Wuxue.Requirements" }),
 
@@ -136,35 +162,46 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
    */
   prepareDerivedData() {
     // 1. 获取当前武学品阶对应的 修为门槛表
-    // 逻辑与之前讨论的一致
-    let thresholds = [];
+    // 预设标准门槛表 (Standard Thresholds)
+    let standardThresholds = [];
     let feintCoef = 0; // 虚招系数
 
     if (this.category === "qinggong" || this.category === "zhenfa") {
       // 轻功/阵法: 一次性学会
-      if (this.tier === 1) thresholds = [1000];
-      else if (this.tier === 2) thresholds = [3000];
-      else if (this.tier === 3) thresholds = [6000];
+      if (this.tier === 1) standardThresholds = [1000];
+      else if (this.tier === 2) standardThresholds = [3000];
+      else if (this.tier === 3) standardThresholds = [6000];
     } else {
       // 常规武学: 多层进阶
       // 注意：这里存储的是【累积】所需修为
       if (this.tier === 1) {
-        thresholds = [0, 500, 1000]; // 1层(0), 2层(500), 3层(1000)
+        standardThresholds = [0, 500, 1000]; // 1层(0), 2层(500), 3层(1000)
         feintCoef = 2; // 人级系数
       } else if (this.tier === 2) {
-        thresholds = [500, 1500, 3000]; // 1层(500), 2层(1500)...
+        standardThresholds = [500, 1500, 3000]; // 1层(500), 2层(1500)...
         feintCoef = 3; // 地级系数
       } else if (this.tier === 3) {
-        thresholds = [1000, 3000, 6000, 10000]; // 4层(10000)
+        standardThresholds = [1000, 3000, 6000, 10000]; // 4层(10000)
         feintCoef = 4; // 天级系数
       }
     }
 
-    // 获取绝对上限
-    const absoluteMax = thresholds[thresholds.length - 1];
-
     // 2. 遍历每个招式，计算状态
     for (const move of this.moves) {
+      let thresholds = [];
+
+      // --- 门槛判定逻辑 ---
+      if (move.progression.mode === "custom" && move.progression.customThresholds.length > 0) {
+        // 使用自定义门槛
+        thresholds = move.progression.customThresholds;
+      } else {
+        // 使用标准门槛
+        thresholds = standardThresholds;
+      }
+
+      // 获取绝对上限
+      const absoluteMax = thresholds.length > 0 ? thresholds[thresholds.length - 1] : 0;
+
       // A. 计算等级 (Level)
       let lvl = 0;
       // 倒序查找满足的门槛
@@ -181,6 +218,18 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       move.computedLevel = lvl;
       move.maxLevel = thresholds.length;
 
+      // --- 计算“等效等级” (Stat Stage) ---
+      // 供 Actor 用来计算悟性加成和武器等级
+      // 如果 mappedStage 是 5 (无)，则 effectiveStage 为 0 (不参与计算)
+      // 如果 mappedStage 是 1-4 且已入门 (lvl>0)，则强制为该值
+      // 否则使用实际等级
+      if (move.progression.mappedStage === 5) {
+        move.effectiveStage = 0;
+      } else if (lvl > 0 && move.progression.mappedStage > 0) {
+        move.effectiveStage = move.progression.mappedStage;
+      } else {
+        move.effectiveStage = lvl;
+      }
       // B. 计算进度条数据 (Progress)
       // 结构: { current, max, pct, isMax }
       move.progress = { current: 0, max: 0, pct: 0, isMax: false, absoluteMax: absoluteMax };

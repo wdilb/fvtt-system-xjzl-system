@@ -514,10 +514,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         const moves = item.system.moves || [];
         // 遍历每一招
         for (const move of moves) {
-          const stage = move.computedLevel || 0;
+           // 读取 effectiveStage 不再读取computedLevel
+          // 如果 mappedStage=5，effectiveStage 会是 0，这里 stage=0，后续 if (stage >= 2) 不会通过，完美忽略
+          const stage = move.effectiveStage || 0;
           const wType = move.weaponType; // 武器类型
-
-          if (wType) {
+          
+          if (wType && wType !== 'none') { //确实存在不带武器类型的招式，哎
             // 初始化计数器
             if (!weaponCounts[wType]) weaponCounts[wType] = { t1: 0, t2: 0, t3: 0 };
 

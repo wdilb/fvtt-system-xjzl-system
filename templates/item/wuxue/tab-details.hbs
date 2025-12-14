@@ -4,30 +4,34 @@
 
     <div class="xjzl-flex-col">
         {{#each system.moves as |move i|}}
-        {{!-- 加上 data-move-index 方便 JS 查找父级 --}}
         <div class="xjzl-card" style="position: relative; margin-bottom: 15px;" data-move-index="{{i}}">
 
             {{!-- 1. 标题栏 --}}
             <div class="xjzl-flex-row" style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 10px;">
                 <img src="{{move.img}}" width="32" height="32" style="border:1px solid #000; background:#333;" />
 
-                {{!-- 招式名称 --}}
                 <input type="text" name="system.moves.{{i}}.name" value="{{move.name}}" class="xjzl-input"
-                    style="font-weight:bold; font-size:1.2em; text-align:left; flex:1;" placeholder="招式名称" />
+                    style="font-weight:bold; font-size:1.2em; text-align:left; flex:1;" placeholder="{{localize 'XJZL.Wuxue.Moves.Name'}}" />
 
-                {{!-- 类型选择 --}}
                 <select name="system.moves.{{i}}.type" class="xjzl-input" style="width: 80px;">
                     {{selectOptions ../choices.moveTypes selected=move.type}}
                 </select>
 
-                {{!-- 删除按钮 --}}
+                {{!-- 绝招勾选 --}}
+                <div class="xjzl-checkbox-wrapper"
+                    style="display: flex; align-items: center; margin-left: 10px; font-size: 0.8em;"
+                    title="{{localize 'XJZL.Wuxue.Moves.IsUltimate'}}">
+                    <label style="margin-right: 2px; font-weight: bold; color: #8b0000;">绝</label>
+                    <input type="checkbox" name="system.moves.{{i}}.isUltimate" {{checked move.isUltimate}} />
+                </div>
+
                 <a data-action="deleteMove" data-id="{{move.id}}" style="color:#999; margin-left:5px;"><i
                         class="fas fa-trash"></i></a>
             </div>
 
             {{!-- 2. 基础配置 (Grid) --}}
             <div class="xjzl-grid-2">
-                {{!-- 左侧：标签 --}}
+                {{!-- 左侧 --}}
                 <div class="xjzl-flex-col">
                     <div class="xjzl-flex-row">
                         <label>{{localize "XJZL.Wuxue.Moves.WeaponType"}}</label>
@@ -40,7 +44,6 @@
                         <input type="text" name="system.moves.{{i}}.weaponSubtype" value="{{move.weaponSubtype}}"
                             class="xjzl-input" placeholder="如: 重剑" />
                     </div>
-                    {{!-- 伤害类型 --}}
                     <div class="xjzl-flex-row">
                         <label>{{localize "XJZL.Wuxue.Moves.DamageType"}}</label>
                         <select name="system.moves.{{i}}.damageType" class="xjzl-input">
@@ -60,24 +63,22 @@
                     </div>
                 </div>
 
-                {{!-- 右侧：数值公式 (动态列表) --}}
+                {{!-- 右侧 --}}
                 <div class="xjzl-flex-col" style="background: rgba(0,0,0,0.03); padding: 5px; border-radius: 4px;">
                     <div class="xjzl-flex-row" style="border-bottom:1px dashed #ccc;">
-                        <label style="font-weight:bold;">{{localize "XJZL.Wuxue.Calc.Base"}} / {{localize
-                            "XJZL.Wuxue.Calc.Growth"}}</label>
+                        <label style="font-weight:bold;">{{localize "XJZL.Wuxue.Calc.Base"}} / {{localize "XJZL.Wuxue.Calc.Growth"}}</label>
                         <a data-action="addScaling" title="添加加成属性"><i class="fas fa-plus"></i></a>
                     </div>
 
                     <div class="xjzl-flex-row">
-                        <label>基础伤害</label>
+                        <label>{{localize "XJZL.Wuxue.Calc.Base"}}</label>
                         <input type="number" name="system.moves.{{i}}.calculation.base"
                             value="{{move.calculation.base}}" class="xjzl-input" />
-                        <label>成长伤害</label>
+                        <label>{{localize "XJZL.Wuxue.Calc.Growth"}}</label>
                         <input type="number" name="system.moves.{{i}}.calculation.growth"
                             value="{{move.calculation.growth}}" class="xjzl-input" />
                     </div>
 
-                    {{!-- 动态加成列表 --}}
                     {{#each move.calculation.scalings as |scale idx|}}
                     <div class="xjzl-flex-row">
                         <select name="system.moves.{{i}}.calculation.scalings.{{idx}}.prop" class="xjzl-input">
@@ -93,14 +94,47 @@
                 </div>
             </div>
 
+            {{!-- 3. 进阶配置 (Localize) --}}
+            <div class="xjzl-card" style="margin-top: 10px; background: rgba(0,0,0,0.02); border: 1px dashed #ccc;">
+                <div class="xjzl-flex-row" style="justify-content: space-between;">
+                    <label style="font-weight:bold; font-size: 0.9em; color: #555;">{{localize "XJZL.Wuxue.Progression.Title"}}</label>
+                    
+                    <div class="xjzl-flex-row" style="gap: 5px;">
+                        <label>{{localize "XJZL.Wuxue.Progression.Mode"}}:</label>
+                        <select name="system.moves.{{i}}.progression.mode" class="xjzl-input" style="height: 22px; font-size: 0.8em;">
+                            {{selectOptions ../choices.progressionModes selected=move.progression.mode}}
+                        </select>
+                    </div>
+                </div>
+
+                {{#if (eq move.progression.mode "custom")}}
+                <div class="xjzl-flex-col" style="margin-top: 5px;">
+                    <label style="font-size: 0.8em;">{{localize "XJZL.Wuxue.Progression.Thresholds"}}</label>
+                    {{!-- 使用 temp.thresholds 绕过自动解析 --}}
+                    <input type="text" name="temp.thresholds.{{i}}" 
+                           value="{{move.progression.customThresholds}}" 
+                           class="xjzl-input" placeholder="1000, 3000" />
+                    <p class="notes" style="font-size: 0.7em; color: #888; margin: 0;">{{localize "XJZL.Wuxue.Progression.ThresholdsHint"}}</p>
+                </div>
+                {{/if}}
+
+                <div class="xjzl-flex-row" style="margin-top: 5px; align-items: center;">
+                    <label style="font-size: 0.8em; flex: 1;">{{localize "XJZL.Wuxue.Progression.MappedStage"}}:</label>
+                    <select name="system.moves.{{i}}.progression.mappedStage" class="xjzl-input" style="flex: 1;">
+                        {{selectOptions ../choices.mappedStages selected=move.progression.mappedStage}}
+                    </select>
+                </div>
+                <p class="notes" style="font-size: 0.7em; color: #888; margin: 0;">{{localize "XJZL.Wuxue.Progression.MappedStageHint"}}</p>
+            </div>
+
             <hr style="border-color: #ddd; margin: 10px 0;">
 
-            {{!-- 3. 消耗配置 (手动三行版) --}}
+            {{!-- 4. 消耗配置 --}}
             <div class="xjzl-flex-col">
                 <label style="font-weight:bold;">{{localize "XJZL.Wuxue.Cost.Table"}}</label>
                 <div class="xjzl-flex-row" style="font-size:0.8em; text-align:center;">
                     <div style="width:40px;"></div>
-                    {{#each ../levelLabels as |label|}}
+                    {{#each move._ui.costLabels as |label|}}
                     <div style="flex:1;">{{label}}</div>
                     {{/each}}
                 </div>
@@ -108,7 +142,7 @@
                 {{!-- MP --}}
                 <div class="xjzl-flex-row">
                     <label style="width:40px; font-size:0.8em;">{{localize "XJZL.Wuxue.Cost.MP"}}</label>
-                    {{#each ../maxMoveLevels as |lvlIdx|}}
+                    {{#each move._ui.costLevels as |lvlIdx|}}
                     <input type="number" name="system.moves.{{i}}.costs.mp.{{lvlIdx}}"
                         value="{{lookup move.costs.mp lvlIdx}}" class="xjzl-input" />
                     {{/each}}
@@ -116,7 +150,7 @@
                 {{!-- Rage --}}
                 <div class="xjzl-flex-row">
                     <label style="width:40px; font-size:0.8em;">{{localize "XJZL.Wuxue.Cost.Rage"}}</label>
-                    {{#each ../maxMoveLevels as |lvlIdx|}}
+                    {{#each move._ui.costLevels as |lvlIdx|}}
                     <input type="number" name="system.moves.{{i}}.costs.rage.{{lvlIdx}}"
                         value="{{lookup move.costs.rage lvlIdx}}" class="xjzl-input" />
                     {{/each}}
@@ -124,7 +158,7 @@
                 {{!-- HP --}}
                 <div class="xjzl-flex-row">
                     <label style="width:40px; font-size:0.8em;">{{localize "XJZL.Wuxue.Cost.HP"}}</label>
-                    {{#each ../maxMoveLevels as |lvlIdx|}}
+                    {{#each move._ui.costLevels as |lvlIdx|}}
                     <input type="number" name="system.moves.{{i}}.costs.hp.{{lvlIdx}}"
                         value="{{lookup move.costs.hp lvlIdx}}" class="xjzl-input" />
                     {{/each}}
@@ -133,27 +167,23 @@
 
             <hr style="border-color: #ddd; margin: 10px 0;">
 
-            {{!-- 4. 描述与脚本列表 (Grid) --}}
+            {{!-- 5. 描述与脚本 --}}
             <div class="xjzl-grid-2" style="align-items: start; gap: 15px;">
-
-                {{!-- 左侧：描述 --}}
                 <div class="xjzl-flex-col">
-                    <label style="font-weight:bold; font-size:0.9em;">描述文本</label>
+                    <label style="font-weight:bold; font-size:0.9em;">{{localize "XJZL.Equipment.Description"}}</label>
                     <textarea name="system.moves.{{i}}.description" rows="8" class="xjzl-input"
                         style="text-align:left; height:auto; background: rgba(255,255,255,0.5);">{{move.description}}</textarea>
                 </div>
 
-                {{!-- 右侧：脚本列表 (【新增】核心改动) --}}
                 <div class="xjzl-flex-col">
                     <div class="xjzl-flex-row"
                         style="align-items: center; justify-content: space-between; margin-bottom: 5px;">
                         <label style="font-weight:bold; font-size:0.9em;">{{localize "XJZL.Script.ScriptList"}}</label>
-                        <a class="item-control" data-action="addMoveScript" title="添加新特效">
+                        <a class="item-control" data-action="addMoveScript" title="{{localize 'XJZL.UI.CreateNew'}}">
                             <i class="fas fa-plus"></i> 添加
                         </a>
                     </div>
 
-                    {{!-- 遍历该招式的脚本 --}}
                     {{#each move.scripts as |script sIdx|}}
                     <div class="xjzl-script-item"
                         style="border: 1px solid #ccc; padding: 5px; margin-bottom: 5px; border-radius: 4px; background: rgba(0,0,0,0.02);">
@@ -183,7 +213,7 @@
                     {{else}}
                     <div
                         style="text-align: center; color: #999; font-size: 0.9em; padding: 10px; border: 1px dashed #ddd;">
-                        无特效脚本
+                        {{localize "XJZL.Wuxue.Moves.NoScript"}}
                     </div>
                     {{/each}}
                 </div>
@@ -193,7 +223,7 @@
         {{/each}}
 
         <button type="button" data-action="addMove" style="margin-top:10px;">
-            <i class="fas fa-plus"></i> 添加新招式
+            <i class="fas fa-plus"></i> {{localize "XJZL.Wuxue.Moves.AddMove"}}
         </button>
     </div>
 

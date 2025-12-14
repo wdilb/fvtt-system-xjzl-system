@@ -14,6 +14,11 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         classes: ["xjzl-window", "item", "wuxue", "xjzl-system"],
         position: { width: 700, height: 800 }, // 武学卡需要宽一点
         window: { resizable: true },
+        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        form: {
+            submitOnChange: true,
+            closeOnSubmit: false
+        },
         actions: {
             // 招式操作
             addMove: XJZLWuxueSheet.prototype._onAddMove,
@@ -61,7 +66,20 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             weaponTypes: localizeConfig(XJZL.weaponTypes),
             damageTypes: localizeConfig(XJZL.damageTypes),
             triggers: localizeConfig(XJZL.effectTriggers),
-            targets: localizeConfig(XJZL.effectTargets)
+            targets: localizeConfig(XJZL.effectTargets),
+
+            progressionModes: {
+                standard: game.i18n.localize("XJZL.Wuxue.Progression.ModeList.standard"),
+                custom: game.i18n.localize("XJZL.Wuxue.Progression.ModeList.custom")
+            },
+            mappedStages: {
+                0: game.i18n.localize("XJZL.Wuxue.Progression.StageList.0"),
+                1: game.i18n.localize("XJZL.Wuxue.Progression.StageList.1"),
+                2: game.i18n.localize("XJZL.Wuxue.Progression.StageList.2"),
+                3: game.i18n.localize("XJZL.Wuxue.Progression.StageList.3"),
+                4: game.i18n.localize("XJZL.Wuxue.Progression.StageList.4"),
+                5: game.i18n.localize("XJZL.Wuxue.Progression.StageList.5")
+            }
         };
 
         // 触发器下拉选项
@@ -83,41 +101,109 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 isSuppressed: e.isSuppressed // V11+ 特性
             };
         });
+        // 3. 为每个招式单独准备消耗表的配置
+        // 我们不再使用全局 context.maxMoveLevels，而是把它注入到每个 move 对象里
+        context.system.moves.forEach(move => {
+            let levels = [];
+            let labels = [];
 
-        // 3. 计算当前最大层级 (用于渲染消耗表的列数)
-        // 逻辑：天级=4，其他人级/地级=3 (简单判定)
-        context.maxMoveLevels = (context.system.tier === 3) ? [0, 1, 2, 3] : [0, 1, 2];
-        context.levelLabels = (context.system.tier === 3)
-            ? ["领悟", "掌握", "精通", "合一"]
-            : ["领悟", "掌握", "精通"];
-        context.costConfig = [
-            { key: "mp", label: "XJZL.Wuxue.Cost.MP" },
-            { key: "rage", label: "XJZL.Wuxue.Cost.Rage" },
-            { key: "hp", label: "XJZL.Wuxue.Cost.HP" }
-        ];
+            // 判断模式
+            const mode = move.progression?.mode || "standard";
+
+            if (mode === "custom") {
+                // 自定义模式：根据 threshold 数量决定
+                // 如果是空数组或未填，默认显示 1 列
+                const count = Math.max(1, move.progression?.customThresholds?.length || 1);
+                for (let i = 0; i < count; i++) {
+                    levels.push(i);
+                    labels.push(`L${i + 1}`); // L1, L2...
+                }
+            } else {
+                // 标准模式：根据 Tier 决定
+                const tier = context.system.tier;
+                const count = (tier === 3) ? 4 : 3; // 天=4, 其他=3
+                const tierLabels = (tier === 3)
+                    ? ["领悟", "掌握", "精通", "合一"]
+                    : ["领悟", "掌握", "精通"];
+
+                for (let i = 0; i < count; i++) {
+                    levels.push(i);
+                    labels.push(tierLabels[i]);
+                }
+            }
+
+            // 注入到 move 临时对象供 HBS 使用
+            move._ui = {
+                costLevels: levels, // [0, 1, 2]
+                costLabels: labels  // ["领悟", "掌握"...]
+            };
+        });
         return context;
+    }
+
+    /**
+     * 处理表单提交数据
+     * 核心逻辑：拦截 "temp.thresholds" 代理字段，将字符串转换为数字数组，并写入 system 数据
+     */
+    _prepareSubmitData(event, form, formData) {
+        // 1. 获取基础数据
+        const data = super._prepareSubmitData(event, form, formData);
+
+        // 2. 直接遍历 FormData 查找临时字段 (比操作 data 对象更稳健)
+        for (const [key, value] of formData.entries()) {
+
+            // 匹配 HBS 中定义的 name="temp.thresholds.{{i}}"
+            if (key.startsWith("temp.thresholds.")) {
+
+                // 提取索引
+                const parts = key.split(".");
+                const indexStr = parts[parts.length - 1];
+                const i = parseInt(indexStr);
+
+                // 解析逻辑: "1000, 2000" -> [1000, 2000]
+                let arr = [];
+                if (typeof value === "string" && value.trim() !== "") {
+                    arr = value.split(/[,，]/) // 兼容中英文逗号
+                        .map(s => Number(s.trim()))
+                        .filter(n => !isNaN(n)); // 过滤非数字
+                } else if (typeof value === "number") {
+                    arr = [value];
+                }
+
+                // 3. 将处理好的数组写入正确的系统路径
+                // 使用 setProperty 确保深层路径正确创建
+                foundry.utils.setProperty(data, `system.moves.${i}.progression.customThresholds`, arr);
+            }
+        }
+
+        // 4. 清理临时数据容器，防止 Schema 校验报错
+        if ("temp" in data) {
+            delete data.temp;
+        }
+
+        return data;
     }
 
     /* -------------------------------------------- */
     /*  自动保存 (Auto-Save)                        */
     /* -------------------------------------------- */
-    _onRender(context, options) {
-        super._onRender(context, options);
-        // 【优化】只给 form 根元素绑定一次监听器
-        // 利用事件冒泡机制，捕获所有子元素的 change 事件
-        if (!this.element.dataset.delegated) {
-            this.element.addEventListener("change", (event) => {
-                const target = event.target;
-                // 只处理输入控件
-                if (target.matches("input, select, textarea")) {
-                    // event.preventDefault(); // change 事件通常不需要 preventDefault
-                    this.submit();
-                }
-            });
-            // 标记已绑定，防止重复
-            this.element.dataset.delegated = "true";
-        }
-    }
+    // _onRender(context, options) {
+    //     super._onRender(context, options);
+    //     // 【优化】只给 form 根元素绑定一次监听器
+    //     // 利用事件冒泡机制，捕获所有子元素的 change 事件
+    //     if (!this.element.dataset.delegated) {
+    //         this.element.addEventListener("change", (event) => {
+    //             const target = event.target;
+    //             // 只处理输入控件
+    //             if (target.matches("input, select, textarea")) {
+    //                 // event.preventDefault(); // change 事件通常不需要 preventDefault
+    //                 this.submit();
+    //             }
+    //         });
+    //         // 标记已绑定，防止重复
+    //         this.element.dataset.delegated = "true";
+    //     }
+    // }
 
     /* -------------------------------------------- */
     /*  嵌套数组操作                  */

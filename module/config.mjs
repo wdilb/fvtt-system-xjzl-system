@@ -21,8 +21,8 @@ XJZL.moveTypes = {
   feint: "XJZL.Wuxue.Type.feint",
   qi: "XJZL.Wuxue.Type.qi",
   stance: "XJZL.Wuxue.Type.stance",
-  counter: "XJZL.Wuxue.Type.counter",
-  ultimate: "XJZL.Wuxue.Type.ultimate"
+  counter: "XJZL.Wuxue.Type.counter"
+  // ultimate: "XJZL.Wuxue.Type.ultimate"  把绝招从招式类型中移除
 };
 
 // 4. 属性 (通用)
@@ -54,7 +54,8 @@ XJZL.weaponTypes = {
   dagger: "XJZL.Combat.Rank.Dagger",
   hidden: "XJZL.Combat.Rank.Hidden",
   instrument: "XJZL.Combat.Rank.Instrument",
-  special: "XJZL.Combat.Rank.Special"
+  special: "XJZL.Combat.Rank.Special",
+  none: "XJZL.Combat.Rank.None"
 };
 
 // 7. 特效触发时机

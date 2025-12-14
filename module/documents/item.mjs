@@ -931,9 +931,9 @@ export class XJZLItem extends Item {
     // 2. 准备模板数据
     const context = {
       formId: formId, // 传入 ID
-      needsAttack: ["real", "feint", "ultimate"].includes(move.type) && ["waigong", "neigong"].includes(move.damageType),
+      needsAttack: ["real", "feint"].includes(move.type) && ["waigong", "neigong"].includes(move.damageType),
       isFeint: move.type === "feint",
-      needsDamage: ["real", "feint", "counter", "ultimate"].includes(move.type),
+      needsDamage: ["real", "feint", "counter"].includes(move.type),
       isCounter: move.type === "counter",
       canCrit: move.type !== "counter"
     };
@@ -1061,7 +1061,7 @@ export class XJZLItem extends Item {
       if (s.blockQiZhao && move.type === "qi") return ui.notifications.warn("无法施展气招！");
       if (s.blockCounter && move.type === "counter") return ui.notifications.warn("无法施展反击！");
       if (s.blockStance && move.type === "stance") return ui.notifications.warn("无法开启架招！");
-      if (s.blockUltimate && move.type === "ultimate") return ui.notifications.warn("无法施展绝招！");
+      if (s.blockUltimate && move.isUltimate) return ui.notifications.warn("无法施展绝招！");
 
       // 插入 Hook：允许模组在招式执行前进行干预 (例如：定身状态下无法攻击)
       // 如果 Hook 返回 false，则流程中止
