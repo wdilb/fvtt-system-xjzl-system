@@ -5,35 +5,43 @@
 export class TargetManager {
     static init() {
         // 1. 监听鼠标按下事件 (使用 capture: true 确保在 Foundry 画布逻辑之前拦截)
-        window.addEventListener("mousedown", this._onMouseDown.bind(this), { capture: true });
-
-        // 2. 监听键盘事件 (用于改变鼠标样式)
-        window.addEventListener("keydown", this._onKeyDown.bind(this));
-        window.addEventListener("keyup", this._onKeyUp.bind(this));
+        window.addEventListener("pointerdown", this._onPointerDown.bind(this), { capture: true });
     }
 
     /**
      * 核心逻辑：拦截点击
      */
-    static _onMouseDown(event) {
+    static _onPointerDown(event) {
         // 检查设置：如果关闭，直接忽略，不拦截
         if (!game.settings.get("xjzl-system", "enableAltTargeting")) return;
 
-        // 1. 基本检查：必须按住 Alt，必须是左键(0)，画布必须就绪
-        if (!event.altKey || event.button !== 0 || !canvas.ready) return;
+        // 1. 基本检查
+        // event.button === 0 是左键
+        // 必须按住 Alt
+        if (!event.altKey || event.button !== 0) return;
 
-        // 2. 获取当前鼠标下的 Token
-        // canvas.tokens.hover 是 Foundry 提供的当前鼠标悬停的 Token
+        // 2. 确保 Canvas 就绪
+        if (!canvas.ready || !canvas.tokens) return;
+
+        // 3. 获取鼠标下的 Token
+        // V13 标准获取方式
         const hoveredToken = canvas.tokens.hover;
 
-        // 如果鼠标下没有 Token，或者该 Token 不可见/不可交互，直接返回
+        // 如果没有 Token，或者 Token 不可见，不拦截，交给 Foundry 处理（比如框选）
         if (!hoveredToken || !hoveredToken.isVisible) return;
 
         // 3. 【拦截】阻止 Foundry 默认行为 (比如默认的左键选择 Token)
-        event.stopPropagation();
+        // 阻止默认行为（防止文本选择等）
         event.preventDefault();
+        
+        // 阻止冒泡（防止事件向上传递）
+        event.stopPropagation();
+        
+        // 阻止同层监听器（防止同一节点上的其他监听器执行）
+        // 这能有效防止 Foundry 绑定在 Window 或 Canvas 上的其他 PointerDown 事件，暂时来看不需要
+        // event.stopImmediatePropagation();
 
-        // 4. 执行瞄准逻辑
+        // 4. 执行我们自己的逻辑：切换瞄准
         this._toggleTarget(hoveredToken);
     }
 
@@ -53,29 +61,5 @@ export class TargetManager {
 
         // 播放一个小音效反馈 (可选)
         // AudioHelper.play({src: "sounds/target.ogg", volume: 0.8, autoplay: true, loop: false}, false);
-    }
-
-    /* -------------------------------------------- */
-    /*  视觉优化: 鼠标样式                          */
-    /* -------------------------------------------- */
-
-    static _onKeyDown(event) {
-        // 检查设置
-        if (!game.settings.get("xjzl-system", "enableAltTargeting")) return;
-        // 如果用户正在输入框里打字，不要触发准星
-        const targetTag = event.target.tagName;
-        if (["INPUT", "TEXTAREA", "SELECT"].includes(targetTag)) return;
-        // 当按下 Alt 键时，且当前鼠标在 Token 层上
-        if (event.key === "Alt" && canvas.ready) {
-            document.body.style.cursor = "crosshair"; // 变成十字准星
-        }
-    }
-
-    static _onKeyUp(event) {
-        // 这里不需要严格检查设置，为了防止关闭设置瞬间卡在十字准星上，只要松开 Alt，尝试重置一下 cursor 总是安全的
-        // 松开 Alt 键，恢复默认
-        if (event.key === "Alt") {
-            document.body.style.cursor = "";
-        }
     }
 }
