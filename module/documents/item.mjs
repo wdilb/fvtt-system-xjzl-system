@@ -946,7 +946,7 @@ export class XJZLItem extends Item {
       window: { title: `施展: ${move.name}`, icon: "fas fa-dice" },
       content: content,
 
-      // 【关键修正】使用 ID 查找，忽略回调参数
+      // 使用 ID 查找，忽略回调参数
       render: (event) => {
         const root = document.getElementById(formId);
         if (!root) return; // 安全检查

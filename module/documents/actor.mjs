@@ -4,7 +4,7 @@
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 
-// 【优化】将构造器缓存在模块作用域，避免每次 runScripts 重复创建
+// 将构造器缓存在模块作用域，避免每次 runScripts 重复创建
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 export class XJZLActor extends Actor {
 
@@ -304,7 +304,38 @@ export class XJZLActor extends Actor {
       }
     }
 
-    // 4. 上下文对象 (Context Item/Move)
+    // ==========================================================
+    // 4. 武学全局被动 (极少数武学存在被动效果)
+    // ==========================================================
+    // 只有在 PASSIVE 时机，我们才遍历所有武学，寻找是否有被动脚本。
+    // 这样不会影响战斗时机 (ATTACK/HIT) 的性能。
+    if (trigger === SCRIPT_TRIGGERS.PASSIVE) {
+      // 使用 itemTypes.wuxue 快速访问，避免遍历所有 items
+      const allWuxues = this.itemTypes.wuxue || [];
+
+      for (const item of allWuxues) {
+        // 排除掉已经作为架招处理过的物品 (避免重复叠加)
+        if (item.id === martial?.stanceItemId && martial?.stanceActive) continue;
+
+        // 直接检查 system.scripts 数组长度，如果是空数组直接跳过，不进入 forEach
+        // (DataModel 的数组即使为空也是一个 Array 实例，length 访问极快)
+        const itemScripts = item.system.scripts;
+        if (!itemScripts || itemScripts.length === 0) continue;
+
+        // 只有真的有脚本时，才进入内层循环
+        for (const s of itemScripts) {
+          if (s.trigger === trigger && s.active) {
+            scripts.push({
+              script: s.script,
+              label: `${s.label} (${item.name})`,
+              source: item
+            });
+          }
+        }
+      }
+    }
+
+    // 5. 上下文对象 (Context Item/Move)
     // 这是在 roll()或者其他调用的时候传进来的，比如当前正在施展的招式
     if (contextItem && contextItem.scripts && Array.isArray(contextItem.scripts)) {
       contextItem.scripts.forEach(s => {
