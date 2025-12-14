@@ -1120,4 +1120,430 @@ export class XJZLActor extends Actor {
     }
 
   }
+
+  /* -------------------------------------------- */
+  /*  普通攻击 (Basic Attack)                      */
+  /* -------------------------------------------- */
+
+  /**
+   * 发起普通攻击
+   * 逻辑：构建虚拟招式 -> 弹窗配置 -> 运行脚本 -> 命中检定 -> 发送卡片
+   * @param {Object} options - 额外配置
+   */
+  async rollBasicAttack(options = {}) {
+    // 0. 状态阻断检查 (Status Check)
+    const s = this.xjzlStatuses || {};
+    if (s.stun) return ui.notifications.warn(`${this.name} 处于晕眩状态，无法行动！`);
+
+    // 1. 获取当前主武器信息
+    // 逻辑：寻找第一个已装备的武器，如果没有则视为徒手
+    const weapon = this.itemTypes.weapon.find(i => i.system.equipped);
+    const weaponType = weapon ? weapon.system.type : "unarmed";
+    const weaponName = weapon ? weapon.name : "徒手";
+    const baseDamage = weapon ? (weapon.system.damage || 0) : 0; // 徒手基础伤害通常为0
+
+    // 2. 弹窗配置 (Dialog)
+    // 普攻需要选择：伤害类型 (内功/外功)、手动修正
+    let config = {
+      damageType: "waigong",
+      bonusAttack: 0,
+      bonusDamage: 0,
+      canCrit: true, // 普攻默认可暴击
+      manualAttackLevel: 0
+    };
+
+    if (!options.skipDialog) {
+      const dialogResult = await this._promptBasicAttackConfig(weaponName);
+      if (!dialogResult) return; // 用户取消
+      config = { ...config, ...dialogResult };
+    }
+
+    // 3. 构建“虚拟招式”对象 (Virtual Move)
+    // 这是一个临时对象，结构模仿 Item 中的 move，以便兼容脚本引擎和聊天模板
+    const virtualMove = {
+      id: "basic-attack",
+      name: `普通攻击 (${weaponName})`,
+      type: "basic", // 新增加一种单独的类型，避免触发其他的特效
+      damageType: config.damageType, // 由弹窗决定
+      weaponType: weaponType,
+      isUltimate: false,
+      img: weapon ? weapon.img : "icons/skills/melee/unarmed-punch-fist.webp", // 图标
+      currentCost: { mp: 0, rage: 0, hp: 0 }, // 普攻无消耗
+      description: "发起一次基础攻击。"
+    };
+
+    // =====================================================
+    // 4. 触发 "出招" 回复 (Regen On Attack)
+    // =====================================================
+    // await this.processRegen("Attack");
+    // TODO 暂时来说没有普通攻击触发的，以后会有吗？
+
+    // =====================================================
+    // 5. 执行 ATTACK 阶段脚本
+    // =====================================================
+    const attackContext = {
+      move: virtualMove,
+      flags: {
+        level: s.attackLevel || 0,
+        feintLevel: 0, // 普攻没有虚招
+        abort: false,
+        abortReason: ""
+      }
+    };
+
+    // 运行脚本：虽然没有招式但内功、装备等可能对“普通攻击”有特殊加成
+    // 脚本中可以通过判断 trigger === 'attack' && args.move.type === 'basic' 来专门针对普攻写逻辑
+    await this.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, virtualMove);
+
+    if (attackContext.flags.abort) {
+      if (attackContext.flags.abortReason) ui.notifications.warn(attackContext.flags.abortReason);
+      return;
+    }
+
+    // =====================================================
+    // 6. 伤害计算
+    // =====================================================
+    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config);
+
+    // =====================================================
+    // 7. 目标命中检定 (Hit Check)
+    // =====================================================
+    const targets = options.targets || Array.from(game.user.targets);
+    const targetContexts = new Map();
+    const selfLevel = attackContext.flags.level + config.manualAttackLevel;
+
+    // 自身被动
+    const baseIgnoreBlock = s.ignoreBlock || false;
+    const baseIgnoreDefense = s.ignoreDefense || false;
+    const baseIgnoreStance = s.ignoreStance || false;
+
+    // 遍历目标运行 CHECK 脚本
+    for (const targetToken of targets) {
+      const targetActor = targetToken.actor;
+      if (!targetActor) continue;
+
+      const checkContext = {
+        target: targetActor,
+        flags: {
+          grantLevel: 0,
+          ignoreBlock: false,
+          ignoreDefense: false,
+          ignoreStance: false
+        }
+      };
+
+      // 普攻也触发 CHECK 脚本 (例如：某内功特效“普攻无视目标格挡”)
+      await this.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, virtualMove);
+
+      const tStatus = targetActor.xjzlStatuses || {};
+      const targetGrant = tStatus.grantAttackLevel || 0;
+      const totalLevel = selfLevel + targetGrant + checkContext.flags.grantLevel;
+
+      let attackState = 0;
+      if (totalLevel > 0) attackState = 1;
+      else if (totalLevel < 0) attackState = -1;
+
+      targetContexts.set(targetToken.document.uuid, {
+        attackState: attackState,
+        feintState: 0, // 普攻不涉及虚招
+        ignoreBlock: baseIgnoreBlock || checkContext.flags.ignoreBlock,
+        ignoreDefense: baseIgnoreDefense || checkContext.flags.ignoreDefense,
+        ignoreStance: baseIgnoreStance || checkContext.flags.ignoreStance
+      });
+    }
+
+    // =====================================================
+    // 8. 掷骰 (Roll)
+    // =====================================================
+    // 普攻必定需要命中检定
+    let hitMod = (config.damageType === "waigong" ? this.system.combat.hitWaigongTotal : this.system.combat.hitNeigongTotal);
+    hitMod += config.bonusAttack;
+
+    // 判定骰子类型 (是否需要 2d20)
+    let needsTwoDice = false;
+    if (targets.length === 0) {
+      if (selfLevel !== 0) needsTwoDice = true;
+    } else {
+      for (const ctx of targetContexts.values()) {
+        if (ctx.attackState !== 0) {
+          needsTwoDice = true;
+          break;
+        }
+      }
+    }
+
+    const diceFormula = needsTwoDice ? "2d20" : "1d20";
+    const attackRoll = await new Roll(`${diceFormula} + @mod`, { mod: hitMod }).evaluate();
+    const rollJSON = attackRoll.toJSON();
+    const rollTooltip = await attackRoll.getTooltip();
+
+    // 解析结果
+    const diceResults = attackRoll.terms[0].results.map(r => r.result);
+    const d1 = diceResults[0];
+    const d2 = diceResults[1] || d1;
+
+    // 计算主要显示的数值
+    let primaryState = 0;
+    if (targets.length > 0) {
+      primaryState = targetContexts.get(targets[0].document.uuid)?.attackState || 0;
+    } else {
+      primaryState = (selfLevel > 0) ? 1 : ((selfLevel < 0) ? -1 : 0);
+    }
+
+    let displayTotal = 0;
+    let flavorSuffix = "";
+    if (primaryState === 1) {
+      displayTotal = Math.max(d1, d2) + hitMod;
+      flavorSuffix = "(优势)";
+    } else if (primaryState === -1) {
+      displayTotal = Math.min(d1, d2) + hitMod;
+      flavorSuffix = "(劣势)";
+    } else {
+      displayTotal = d1 + hitMod;
+    }
+
+    // 填充目标结果
+    const targetsResults = {};
+    targets.forEach(t => {
+      const tokenUuid = t.document.uuid;
+      const ctx = targetContexts.get(tokenUuid) || { attackState: 0 };
+      const state = ctx.attackState;
+
+      let finalDie = d1;
+      let outcomeLabel = "平";
+      if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
+      else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
+
+      const total = finalDie + hitMod;
+      const dodge = t.actor?.system.combat.dodgeTotal || 10;
+
+      let isHit = false;
+      if (finalDie === 20) isHit = true;
+      else if (finalDie === 1) isHit = false;
+      else isHit = total >= dodge;
+
+      targetsResults[tokenUuid] = {
+        name: t.name,
+        total: total,
+        isHit: isHit,
+        stateLabel: outcomeLabel,
+        dodge: dodge,
+        die: finalDie,
+        feintState: 0,
+        ignoreBlock: ctx.ignoreBlock,
+        ignoreDefense: ctx.ignoreDefense,
+        ignoreStance: ctx.ignoreStance
+      };
+    });
+
+    // =====================================================
+    // 9. 发送聊天消息
+    // =====================================================
+    const templateData = {
+      actor: this,
+      item: null, // 普攻没有 Item
+      move: virtualMove,
+      calc: calcResult,
+      cost: virtualMove.currentCost,
+      isFeint: false,
+      system: this.system,
+      attackRoll: attackRoll,
+      rollTooltip: rollTooltip,
+      damageTypeLabel: game.i18n.localize(CONFIG.XJZL.damageTypes[config.damageType]),
+      displayTotal: displayTotal,
+      targetsResults: targetsResults,
+      hasTargets: Object.keys(targetsResults).length > 0,
+      showFeintBtn: false // 普攻不显示虚招
+    };
+
+    const content = await renderTemplate(
+      "systems/xjzl-system/templates/chat/move-card.hbs",
+      templateData
+    );
+
+    const chatData = {
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      flavor: `发起普通攻击 ${flavorSuffix}`,
+      content: content,
+      flags: {
+        "xjzl-system": {
+          actionType: "basic-attack", // 特殊标识
+          // 这里不传 itemId 和 moveId，或者传特定的标记
+          itemId: "basic",
+          moveId: "basic",
+          moveType: "basic",
+
+          damage: calcResult.damage,
+          feint: 0,
+          calc: calcResult,
+          damageType: config.damageType,
+          canCrit: config.canCrit,
+          attackBonus: config.bonusAttack,
+          contextLevel: {
+            selfLevel: selfLevel,
+            selfFeintLevel: 0
+          },
+          rollJSON: rollJSON,
+          targets: targets.map(t => t.document.uuid),
+          targetsResultMap: Object.keys(targetsResults).reduce((acc, tokenId) => {
+            const res = targetsResults[tokenId];
+            acc[tokenId] = {
+              stateLabel: res.stateLabel,
+              isHit: res.isHit,
+              total: res.total,
+              dieUsed: res.die,
+              feintState: 0,
+              ignoreBlock: res.ignoreBlock,
+              ignoreDefense: res.ignoreDefense,
+              ignoreStance: res.ignoreStance
+            };
+            return acc;
+          }, {})
+        }
+      }
+    };
+
+    ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+    const message = await ChatMessage.create(chatData);
+
+    if (game.dice3d) {
+      game.dice3d.showForRoll(attackRoll, game.user, true);
+    }
+  }
+
+  /**
+   * [内部] 普攻配置弹窗
+   */
+  async _promptBasicAttackConfig(weaponName) {
+    const content = `
+      <form>
+        <div class="form-group">
+          <label>武器</label>
+          <div class="form-fields"><input type="text" value="${weaponName}" disabled></div>
+        </div>
+        <div class="form-group">
+          <label>伤害类型</label>
+          <div class="form-fields">
+            <select name="damageType">
+              <option value="waigong">外功 (Waigong)</option>
+              <option value="neigong">内功 (Neigong)</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>命中修正</label>
+          <div class="form-fields"><input type="number" name="bonusAttack" value="0"></div>
+        </div>
+        <div class="form-group">
+          <label>伤害修正</label>
+          <div class="form-fields"><input type="number" name="bonusDamage" value="0"></div>
+        </div>
+        <div class="form-group">
+          <label>手动优势层级</label>
+          <div class="form-fields"><input type="number" name="manualAttackLevel" value="0" placeholder="正数优势/负数劣势"></div>
+        </div>
+      </form>
+    `;
+
+    return foundry.applications.api.DialogV2.wait({
+      window: { title: "普通攻击", icon: "fas fa-fist-raised" },
+      content: content,
+      buttons: [{
+        action: "ok",
+        label: "攻击",
+        icon: "fas fa-check",
+        default: true,
+        callback: (event, button, dialog) => {
+          const form = button.form;
+          return {
+            damageType: form.elements.damageType.value,
+            bonusAttack: parseInt(form.elements.bonusAttack.value) || 0,
+            bonusDamage: parseInt(form.elements.bonusDamage.value) || 0,
+            manualAttackLevel: parseInt(form.elements.manualAttackLevel.value) || 0
+          };
+        }
+      }],
+      close: () => null
+    });
+  }
+
+  /**
+   * [内部] 计算普攻伤害
+   * 公式：武器伤害 + 武器等级加成 + 属性加成(无) + 通用/类型加成
+   */
+  _calculateBasicAttackDamage(virtualMove, baseDamage, config) {
+    const sys = this.system;
+
+    // 1. 武器基础伤害
+    const weaponDmg = baseDamage;
+
+    // 2. 武器等级加成 (Weapon Ranks)
+    // 从 prepareDerivedData 里的 weaponRanks 中获取
+    // 普攻完整享受该武器类型的等级加成
+    let rankBonus = 0;
+    if (virtualMove.weaponType && sys.combat?.weaponRanks) {
+      const rankObj = sys.combat.weaponRanks[virtualMove.weaponType];
+      if (rankObj) {
+        const rank = rankObj.total || 0;
+        // 伤害加成公式 (同 Actor 里的逻辑)
+        if (rank <= 4) rankBonus = rank * 1;
+        else if (rank <= 8) rankBonus = rank * 2;
+        else rankBonus = rank * 3;
+      }
+    }
+
+    // 3. 固定增伤 (Flat Bonuses)
+    let flatBonus = 0;
+    if (sys.combat?.damages) {
+      flatBonus += (sys.combat.damages.global?.total || 0); // 全局加成
+      flatBonus += (sys.combat.damages.normal?.total || 0); // 专门针对普攻的加成
+      flatBonus += (sys.combat.damages.weapon?.total || 0); // 武器类伤害加成
+      //应该是没有其他的伤害加成了
+    }
+
+    // 4. 计算前脚本干预 (CALC Trigger)
+    let preScriptDmg = Math.floor(weaponDmg + rankBonus + flatBonus);
+
+    // 运行 CALC 脚本 (允许内功/Buff 修改普攻面板)
+    // 构造 context
+    const calcOutput = {
+      damage: preScriptDmg,
+      feint: 0,
+      bonusDesc: []
+    };
+
+    // 同步执行
+    this.runScripts(SCRIPT_TRIGGERS.CALC, {
+      move: virtualMove,
+      baseData: { base: weaponDmg, rank: rankBonus },
+      output: calcOutput
+    }, virtualMove);
+
+    // 5. 应用手动修正
+    let finalDamage = Math.floor(calcOutput.damage + config.bonusDamage);
+
+    // 6. 生成 Breakdown
+    let breakdownText = `武器基础: ${weaponDmg}\n`;
+    breakdownText += `+ 武器等级: ${rankBonus}\n`;
+    breakdownText += `+ 面板增伤: ${flatBonus}`;
+
+    const scriptBonus = Math.floor(calcOutput.damage) - preScriptDmg;
+    if (scriptBonus !== 0) {
+      breakdownText += `\n+ 特效修正: ${scriptBonus}`;
+    }
+    if (config.bonusDamage !== 0) {
+      breakdownText += `\n+ 手动修正: ${config.bonusDamage}`;
+    }
+
+    return {
+      damage: finalDamage,
+      feint: 0,// 普攻无虚招值
+      breakdown: breakdownText,
+      feintBreakdown: "",
+      neigongBonus: "", // 普攻通常不享受内功系数加成
+      cost: { mp: 0, rage: 0, hp: 0 },
+      isWeaponMatch: true
+    };
+  }
 }
