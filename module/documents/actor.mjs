@@ -1518,7 +1518,7 @@ export class XJZLActor extends Actor {
    * [内部] 计算普攻伤害
    * 公式：武器伤害 + 武器等级加成 + 属性加成(无) + 通用/类型加成
    */
-  _calculateBasicAttackDamage(virtualMove, baseDamage, config) {
+  _calculateBasicAttackDamage(virtualMove, baseDamage, config, mode) {
     const sys = this.system;
     const isOpportunity = mode === "opportunity";
     // 1. 武器基础伤害
