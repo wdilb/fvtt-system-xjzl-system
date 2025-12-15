@@ -49,7 +49,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             deleteChange: XJZLCharacterSheet.prototype._onAction,
 
             //普通攻击
-            rollBasicAttack: XJZLCharacterSheet.prototype._onRollBasicAttack
+            rollBasicAttack: XJZLCharacterSheet.prototype._onRollBasicAttack,
+            //趁虚而入
+            rollOpportunityAttack: XJZLCharacterSheet.prototype._onRollOpportunityAttack
         }
     };
 
@@ -717,5 +719,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         event.preventDefault();
         // 直接调用 Actor 中写好的方法
         await this.document.rollBasicAttack();
+    }
+
+    /**
+     * 触发趁虚而入
+     */
+    async _onRollOpportunityAttack(event, target) {
+        event.preventDefault();
+        await this.document.rollBasicAttack({ mode: "opportunity" });
     }
 }

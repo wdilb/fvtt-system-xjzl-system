@@ -1130,8 +1130,12 @@ export class XJZLActor extends Actor {
    * 发起普通攻击
    * 逻辑：构建虚拟招式 -> 弹窗配置 -> 运行脚本 -> 命中检定 -> 发送卡片
    * @param {Object} options - 额外配置
+   * @param {String} [options.mode="basic"] - "basic" | "opportunity"
    */
   async rollBasicAttack(options = {}) {
+    const mode = options.mode || "basic";
+    const isOpportunity = mode === "opportunity";
+    const label = isOpportunity ? "趁虚而入" : "普通攻击";
     // 0. 状态阻断检查 (Status Check)
     const s = this.xjzlStatuses || {};
     if (s.stun) return ui.notifications.warn(`${this.name} 处于晕眩状态，无法行动！`);
@@ -1162,21 +1166,21 @@ export class XJZLActor extends Actor {
     // 3. 构建“虚拟招式”对象 (Virtual Move)
     // 这是一个临时对象，结构模仿 Item 中的 move，以便兼容脚本引擎和聊天模板
     const virtualMove = {
-      id: "basic-attack",
-      name: `普通攻击 (${weaponName})`,
+      id: isOpportunity ? "opportunity-attack" : "basic-attack",
+      name: `${label} (${weaponName})`,
       type: "basic", // 新增加一种单独的类型，避免触发其他的特效
       damageType: config.damageType, // 由弹窗决定
       weaponType: weaponType,
       isUltimate: false,
-      img: weapon ? weapon.img : "icons/skills/melee/unarmed-punch-fist.webp", // 图标
+      img: isOpportunity ? "icons/skills/melee/strike-dagger-blood-red.webp" : (weapon ? weapon.img : "icons/skills/melee/unarmed-punch-fist.webp"), // 图标
       currentCost: { mp: 0, rage: 0, hp: 0 }, // 普攻无消耗
-      description: "发起一次基础攻击。"
+      description: isOpportunity ? "发起一次趁虚而入。" : "发起一次基础攻击。"
     };
 
     // =====================================================
     // 4. 触发 "出招" 回复 (Regen On Attack)
     // =====================================================
-    // await this.processRegen("Attack");
+    if (isOpportunity) await this.processRegen("Attack");
     // TODO 暂时来说没有普通攻击触发的，以后会有吗？
 
     // =====================================================
@@ -1204,7 +1208,7 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 6. 伤害计算
     // =====================================================
-    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config);
+    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode);
 
     // =====================================================
     // 7. 目标命中检定 (Hit Check)
@@ -1214,9 +1218,9 @@ export class XJZLActor extends Actor {
     const selfLevel = attackContext.flags.level + config.manualAttackLevel;
 
     // 自身被动
-    const baseIgnoreBlock = s.ignoreBlock || false;
+    const baseIgnoreBlock = isOpportunity ? true : (s.ignoreBlock || false); //趁虚而入必定无视格挡
     const baseIgnoreDefense = s.ignoreDefense || false;
-    const baseIgnoreStance = s.ignoreStance || false;
+    const baseIgnoreStance = isOpportunity ? true : (s.ignoreStance || false); //趁虚而入必定无视架招
 
     // 遍历目标运行 CHECK 脚本
     for (const targetToken of targets) {
@@ -1372,7 +1376,7 @@ export class XJZLActor extends Actor {
           actionType: "basic-attack", // 特殊标识
           // 这里不传 itemId 和 moveId，或者传特定的标记
           itemId: "basic",
-          moveId: "basic",
+          moveId: isOpportunity ? "opportunity" : "basic", // 区分 ID
           moveType: "basic",
 
           damage: calcResult.damage,
@@ -1541,6 +1545,9 @@ export class XJZLActor extends Actor {
       flatBonus += (sys.combat.damages.global?.total || 0); // 全局加成
       flatBonus += (sys.combat.damages.normal?.total || 0); // 专门针对普攻的加成
       flatBonus += (sys.combat.damages.weapon?.total || 0); // 武器类伤害加成
+      if (isOpportunity) {
+        flatBonus += (sys.combat.damages.skill?.total || 0); //趁虚而入还能享受到招式伤害加成
+      }
       //应该是没有其他的伤害加成了
     }
 
@@ -1569,6 +1576,7 @@ export class XJZLActor extends Actor {
     let breakdownText = `武器基础: ${weaponDmg}\n`;
     breakdownText += `+ 武器等级: ${rankBonus}\n`;
     breakdownText += `+ 面板增伤: ${flatBonus}`;
+    if (isOpportunity) breakdownText += ` (含招式加成)`; // 提示文本
 
     const scriptBonus = Math.floor(calcOutput.damage) - preScriptDmg;
     if (scriptBonus !== 0) {
