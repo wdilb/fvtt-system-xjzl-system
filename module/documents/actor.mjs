@@ -1393,7 +1393,8 @@ export class XJZLActor extends Actor {
           targets: targets.map(t => t.document.uuid),
           targetsResultMap: Object.keys(targetsResults).reduce((acc, tokenId) => {
             const res = targetsResults[tokenId];
-            acc[tokenId] = {
+            const safeKey = tokenId.replaceAll(".", "_");
+            acc[safeKey] = {
               stateLabel: res.stateLabel,
               isHit: res.isHit,
               total: res.total,

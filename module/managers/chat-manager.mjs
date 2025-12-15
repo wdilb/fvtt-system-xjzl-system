@@ -77,36 +77,7 @@ export class ChatCardManager {
         // 2. 获取源物品
         // 如果 flags 里没 ID (比如防御卡)，则可能不需要 item
         let item = null;
-        // 处理普通攻击
-        if (flags.actionType === "basic-attack") {
-            // 构造虚拟 Item 对象
-            // 满足后续 _applyDamage 对 item.name, item.img, item.actor 的调用需求
-            const moveId = flags.moveId || "basic";
-            item = {
-                id: "basic",
-                name: "普通攻击",
-                type: "basic",
-                img: "icons/skills/melee/unarmed-punch-fist.webp", // 或者从 message flags 里取
-                actor: attacker, // 重要：链接回攻击者
-                system: {
-                    // 构造一个数组，里面放一个 ID 匹配的虚拟招式
-                    moves: [
-                        {
-                            id: moveId,
-                            name: "普通攻击",
-                            type: "basic",
-                            damageType: flags.damageType || "waigong",
-                            calculation: {}, //以此防止读取属性报错
-                            effects: []      //以此防止读取特效报错
-                        }
-                    ]
-                }
-            };
-        }
-        // 常规逻辑：从数据库获取
-        else if (flags.itemId && attacker) {
-            item = attacker.items.get(flags.itemId);
-        }
+        if (flags.itemId && attacker) item = attacker.items.get(flags.itemId);
 
         // 3. 获取目标
         // 逻辑：如果历史有记录，强制使用历史记录
@@ -253,11 +224,12 @@ export class ChatCardManager {
 
         for (const target of targets) {
             const uuid = target.uuid;
+            const safeKey = uuid.replaceAll(".", "_");
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
             // A. 如果有缓存结果，直接跳过计算 (但在最终结算时直接用)
-            if (flags.targetsResultMap?.[uuid]) continue;
+            if (flags.targetsResultMap?.[safeKey]) continue;
 
             // 只要进入这里，说明有新目标
             hasNewTargets = true;
@@ -355,9 +327,10 @@ export class ChatCardManager {
 
             for (const target of targets) {
                 const uuid = target.uuid;
+                const safeKey = uuid.replaceAll(".", "_");
                 // 如果是旧缓存，跳过显示（因为已经在之前的卡片里显示过了）
                 // 这里我们只显示本次新计算的目标
-                if (flags.targetsResultMap?.[uuid]) continue;
+                if (flags.targetsResultMap?.[safeKey]) continue;
 
                 const tActor = target.actor || target;
                 if (!tActor) continue;
@@ -447,13 +420,14 @@ export class ChatCardManager {
 
         for (const target of targets) {
             const uuid = target.uuid;
+            const safeKey = uuid.replaceAll(".", "_");
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
             // A. 缓存优先 (如果是 ApplyDamage 二次调用，且不需要补骰，可能走缓存)
             // 但如果刚补了骰子，这里的缓存可能还是旧的，所以要注意 flags 更新时机
             // 通常建议如果 d2 存在，总是重新计算最稳妥
-            const cached = flags.targetsResultMap?.[uuid];
+            const cached = flags.targetsResultMap?.[safeKey];
             if (cached && !needsSupplemental) {
                 results[uuid] = cached;
                 continue;

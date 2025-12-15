@@ -1499,7 +1499,8 @@ export class XJZLItem extends Item {
             // Manager 如果要复用，会直接读这个；如果要重算，会读 contextFlags
             targetsResultMap: Object.keys(targetsResults).reduce((acc, tokenId) => {
               const res = targetsResults[tokenId];
-              acc[tokenId] = {
+              const safeKey = tokenId.replaceAll(".", "_");
+              acc[safeKey] = {
                 stateLabel: res.stateLabel, // "优", "劣", "平"
                 isHit: res.isHit,           // 是否命中
                 total: res.total,           // 最终数值
