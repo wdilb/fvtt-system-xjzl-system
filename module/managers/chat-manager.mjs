@@ -1493,7 +1493,7 @@ export class ChatCardManager {
         if (undoData.gainedDead) {
             await actor.toggleStatusEffect("dead", { active: false });
         }
-        // 濒死状态回退暂留空
+        // TODO 濒死状态回退暂留空
 
         // 4. 更新卡片状态
         const content = message.content.replace(

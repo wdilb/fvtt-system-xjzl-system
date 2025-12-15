@@ -46,7 +46,10 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             addGroup: XJZLCharacterSheet.prototype._onAction,
             deleteGroup: XJZLCharacterSheet.prototype._onAction,
             addChange: XJZLCharacterSheet.prototype._onAction,
-            deleteChange: XJZLCharacterSheet.prototype._onAction
+            deleteChange: XJZLCharacterSheet.prototype._onAction,
+
+            //普通攻击
+            rollBasicAttack: XJZLCharacterSheet.prototype._onRollBasicAttack
         }
     };
 
@@ -233,7 +236,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
         //上面的CONFIG的attributes是没有悟性的，所以手动加上
         if (!groups["stats.wuxing.mod"]) {
-             add(groupStats, "stats.wuxing.mod", `${game.i18n.localize("XJZL.Stats.Wuxing")} (Mod)`);
+            add(groupStats, "stats.wuxing.mod", `${game.i18n.localize("XJZL.Stats.Wuxing")} (Mod)`);
         }
 
         // 2. 战斗属性 (Combat)
@@ -705,5 +708,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             await effect.delete();
             ui.notifications.info(`已移除状态: ${effect.name}`);
         }
+    }
+
+    /**
+     * 触发普通攻击
+     */
+    async _onRollBasicAttack(event, target) {
+        event.preventDefault();
+        // 直接调用 Actor 中写好的方法
+        await this.document.rollBasicAttack();
     }
 }
