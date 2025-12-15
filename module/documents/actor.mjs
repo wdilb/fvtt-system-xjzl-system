@@ -1520,7 +1520,7 @@ export class XJZLActor extends Actor {
    */
   _calculateBasicAttackDamage(virtualMove, baseDamage, config) {
     const sys = this.system;
-
+    const isOpportunity = mode === "opportunity";
     // 1. 武器基础伤害
     const weaponDmg = baseDamage;
 
