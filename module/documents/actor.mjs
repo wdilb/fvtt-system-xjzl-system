@@ -6,6 +6,7 @@ import { XJZLMacros } from "../utils/macros.mjs";
 
 // 将构造器缓存在模块作用域，避免每次 runScripts 重复创建
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
+const renderTemplate = foundry.applications.handlebars.renderTemplate;
 export class XJZLActor extends Actor {
 
   /* -------------------------------------------- */
@@ -1416,54 +1417,95 @@ export class XJZLActor extends Actor {
    * [内部] 普攻配置弹窗
    */
   async _promptBasicAttackConfig(weaponName) {
-    const content = `
-      <form>
-        <div class="form-group">
-          <label>武器</label>
-          <div class="form-fields"><input type="text" value="${weaponName}" disabled></div>
-        </div>
-        <div class="form-group">
-          <label>伤害类型</label>
-          <div class="form-fields">
-            <select name="damageType">
-              <option value="waigong">外功 (Waigong)</option>
-              <option value="neigong">内功 (Neigong)</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>命中修正</label>
-          <div class="form-fields"><input type="number" name="bonusAttack" value="0"></div>
-        </div>
-        <div class="form-group">
-          <label>伤害修正</label>
-          <div class="form-fields"><input type="number" name="bonusDamage" value="0"></div>
-        </div>
-        <div class="form-group">
-          <label>手动优势层级</label>
-          <div class="form-fields"><input type="number" name="manualAttackLevel" value="0" placeholder="正数优势/负数劣势"></div>
-        </div>
-      </form>
+    // 1. 生成唯一 ID，防止 DOM 冲突
+    const formId = `roll-config-${foundry.utils.randomID()}`;
+
+    // 2. 准备模板数据 (复用 roll-config.hbs)
+    const context = {
+      formId: formId,
+      needsAttack: true,  // 普攻必检定
+      isFeint: false,     // 普攻非虚招
+      needsDamage: true,  // 普攻必有伤害
+      isCounter: false,
+      canCrit: true       // 普攻可暴击
+    };
+
+    const content = await renderTemplate("systems/xjzl-system/templates/apps/roll-config.hbs", context);
+
+    // 3. 额外注入：伤害类型的选择 (因为通用模板里没有这个下拉框)
+    // 我们将其插入到模板生成的 HTML 顶部
+    const extraContent = `
+      <div class="xjzl-rc-row" style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #ccc;">
+          <label class="xjzl-rc-label">使用武器</label>
+          <div style="text-align: right; font-weight: bold;">${weaponName}</div>
+      </div>
+      <div class="xjzl-rc-row">
+          <label class="xjzl-rc-label">伤害类型</label>
+          <select name="damageType" style="width: 50%; text-align: center;">
+            <option value="waigong">外功 (Waigong)</option>
+            <option value="neigong">内功 (Neigong)</option>
+          </select>
+      </div>
     `;
 
+    // 简单的字符串拼接，将额外选项插在 root div 开始标签之后
+    // 注意：roll-config.hbs 的第一行是 <div id="{{formId}}" class="xjzl-rc-root">
+    const finalContent = content.replace('class="xjzl-rc-root">', `class="xjzl-rc-root">${extraContent}`);
+
+    // 4. 调用 DialogV2
     return foundry.applications.api.DialogV2.wait({
-      window: { title: "普通攻击", icon: "fas fa-fist-raised" },
-      content: content,
+      window: { title: "普通攻击配置", icon: "fas fa-fist-raised" },
+      content: finalContent,
+
+      // --- 关键：挂载按钮监听 ---
+      render: (event) => {
+        const root = document.getElementById(formId);
+        if (!root) return;
+
+        root.addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-action]");
+          if (!btn) return;
+          e.preventDefault();
+
+          const action = btn.dataset.action;
+          const targetName = btn.dataset.target;
+          const input = root.querySelector(`input[name="${targetName}"]`);
+
+          if (input) {
+            let val = parseInt(input.value) || 0;
+            if (action === "increase") val++;
+            else if (action === "decrease") val--;
+            input.value = val;
+          }
+        });
+      },
+
       buttons: [{
         action: "ok",
         label: "攻击",
         icon: "fas fa-check",
         default: true,
-        callback: (event, button, dialog) => {
-          const form = button.form;
+        callback: (event, button) => {
+          const root = document.getElementById(formId);
+          if (!root) return {};
+
+          const getVal = (name) => {
+            const el = root.querySelector(`[name="${name}"]`);
+            if (!el) return 0;
+            if (el.type === "checkbox") return el.checked;
+            return el.value;
+          };
+
           return {
-            damageType: form.elements.damageType.value,
-            bonusAttack: parseInt(form.elements.bonusAttack.value) || 0,
-            bonusDamage: parseInt(form.elements.bonusDamage.value) || 0,
-            manualAttackLevel: parseInt(form.elements.manualAttackLevel.value) || 0
+            damageType: getVal("damageType"), // 获取上面的额外字段
+            bonusAttack: parseInt(getVal("bonusAttack")) || 0,
+            bonusDamage: parseInt(getVal("bonusDamage")) || 0,
+            manualAttackLevel: parseInt(getVal("manualAttackLevel")) || 0,
+            canCrit: getVal("canCrit") !== false // 默认为 true
           };
         }
       }],
+      rejectClose: false,
       close: () => null
     });
   }
