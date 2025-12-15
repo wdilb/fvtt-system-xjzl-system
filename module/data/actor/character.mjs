@@ -45,6 +45,29 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       total: new fields.NumberField({ initial: initial, integer: true })
     }, { label: label });
 
+    // =======================================================
+    // 动态构建技艺 Schema (Arts Helper)
+    // =======================================================
+    // 每一个技艺包含 6 个字段
+    const makeArtSchema = () => new fields.SchemaField({
+      // 1. 等级相关
+      value: new fields.NumberField({ initial: 0, min: 0, integer: true }), // 基础等级 (手动)
+      mod: new fields.NumberField({ initial: 0, integer: true }),           // AE修正
+      bookBonus: new fields.NumberField({ initial: 0, integer: true }),     // 书籍研读奖励
+      total: new fields.NumberField({ initial: 0, integer: true }),         // 最终等级
+
+      // 2. 检定相关
+      checkMod: new fields.NumberField({ initial: 0, integer: true }),      // 额外检定加值 (AE)
+      bookCheck: new fields.NumberField({ initial: 0, integer: true })      // 书籍研读检定加值
+    });
+
+    // 使用循环构建对象结构
+    const artsSchema = {};
+    // 直接遍历配置中的 Key (duanzao, chengyi...)
+    for (const artKey of Object.keys(CONFIG.XJZL.arts)) {
+      artsSchema[artKey] = makeArtSchema();
+    }
+
     return {
       // === A. 基础档案 (Info) ===
       // 记录角色的身份、外貌等 Roleplay 信息
@@ -287,6 +310,10 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         }))
       }), { label: "XJZL.Modifier.Label" }),
 
+      // === 技艺系统 (Arts) ===
+      // 直接将构建好的对象传给 SchemaField
+      arts: new fields.SchemaField(artsSchema, { label: "XJZL.Arts.Label" }),
+
       // === 生平经历 (History / Audit Log) ===
       // 记录角色的所有关键变动。
       // 设计目标：支持 DM 查账 (审计模式) 和 玩家查看故事 (生平模式)
@@ -418,6 +445,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     this._prepareStatsAndCultivation(); // 步骤A: 静态累加 (Pass 1 独有)
     this._calculateStatsTotals();       // 步骤B: 计算总值
     this._prepareSkills();              // 步骤C: 技能
+    this._prepareArts();                // 步骤C: 技艺
     this._prepareCombatAndResources();  // 步骤D: 资源与战斗
   }
 
@@ -431,6 +459,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
   recalculate() {
     this._calculateStatsTotals();      // 重新计算 Total
     this._prepareSkills();             // 重新计算技能
+    this._prepareArts();               // 重新计算技艺
     this._prepareCombatAndResources(); // 重新计算资源与战斗
   }
 
@@ -471,6 +500,16 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     const stats = this.stats;
     const actor = this.parent; // 获取 Actor 实例以访问 Items
     const combat = this.combat;
+    const arts = this.arts; // 获取技艺容器
+
+    // =======================================================
+    // 0. 重置技艺书加成 (防止污染)
+    // =======================================================
+    // 必须先归零，因为每次 prepareDerivedData 都是基于内存快照
+    for (const art of Object.values(arts)) {
+      art.bookBonus = 0;
+      art.bookCheck = 0;
+    }
 
     // =======================================================
     // 逻辑一：遍历 Items 计算 [境界]、[悟性加成]、[武器等级]
@@ -590,6 +629,20 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
             // 梯度3: 合一(Stage>=4) 且 天级
             if (stage >= 4 && tier >= 3) weaponCounts[wType].t3++;
           }
+        }
+      }
+
+      // --- 技艺书 (art_book) 统计 ---
+      const artBooks = actor.itemTypes.art_book || [];
+      
+      for (const book of artBooks) {
+        // 安全检查：书本对应的技艺类型是否存在
+        const type = book.system.artType;
+        if (arts[type]) {
+          // 累加书本计算好的加成
+          // book.system.totalLevelBonus 需在 ArtBookDataModel 中计算
+          arts[type].bookBonus += (book.system.totalLevelBonus || 0);
+          arts[type].bookCheck += (book.system.totalCheckBonus || 0);
         }
       }
 
@@ -1089,5 +1142,31 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     }
 
     return bonus;
+  }
+
+  /**
+   * [内部步骤 E] 计算技艺最终等级
+   * 【可重复执行】
+   * 公式: Total = Value(投入) + Mod(AE) + Book(读书)
+   */
+  _prepareArts() {
+    const arts = this.arts;
+
+    for (const art of Object.values(arts)) {
+      // 1. 等级汇总
+      // value: 手动填写的/投入的
+      // mod: 装备或BUFF提供的 (Active Effects)
+      // bookBonus: 书籍研读提供的 (在上一步计算)
+      art.total = (art.value || 0) + (art.mod || 0) + (art.bookBonus || 0);
+
+      // 确保不为负数 (视规则而定，通常技艺最低为0)
+      art.total = Math.max(0, art.total);
+
+      // 2. 检定加值汇总 (Check Mod)
+      // 这一步其实不存 Total，因为检定公式是: 1d20 + ArtTotal + checkMod + bookCheck
+      // 但为了方便调试或显示，我们确保数据是最新的即可
+      // checkMod: AE 提供的
+      // bookCheck: 书籍提供的
+    }
   }
 }

@@ -20,6 +20,7 @@ import { XJZLQizhenData } from "./module/data/item/qizhen.mjs";
 import { XJZLConsumableData } from "./module/data/item/consumable.mjs";
 import { XJZLManualData } from "./module/data/item/manual.mjs";
 import { XJZLMiscData } from "./module/data/item/misc.mjs";
+import { XJZLArtBookData } from "./module/data/item/art-book.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
@@ -27,6 +28,7 @@ import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
 import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
+import { XJZLArtBookSheet } from "./module/sheets/art-book-sheet.mjs";
 
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
@@ -71,7 +73,8 @@ Hooks.once("init", async function () {
     qizhen: XJZLQizhenData,
     consumable: XJZLConsumableData,
     manual: XJZLManualData,
-    misc: XJZLMiscData
+    misc: XJZLMiscData,
+    art_book: XJZLArtBookData
   };
 
   // 4. 注册 Sheets (表现层)
@@ -122,6 +125,13 @@ Hooks.once("init", async function () {
     makeDefault: true,
     label: "XJZL.Sheet.GeneralItem"
   });
+
+  //注册技艺书籍
+  Items.registerSheet("xjzl-system", XJZLArtBookSheet, {
+        types: ["art_book"],
+        makeDefault: true,
+        label: "技艺书籍编辑器"
+    });
 
   // ==========================================
   //  5.注册 常用Handlebars 辅助函数
@@ -537,6 +547,9 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/item/general/tabs.hbs",
     "systems/xjzl-system/templates/item/general/tab-details.hbs",
     "systems/xjzl-system/templates/item/general/tab-effects.hbs",
+    //技艺书
+    "systems/xjzl-system/templates/item/art-book/header.hbs",
+    "systems/xjzl-system/templates/item/art-book/details.hbs",
     //聊天卡片
     "systems/xjzl-system/templates/chat/item-card.hbs", //物品使用
     "systems/xjzl-system/templates/chat/move-card.hbs", //招式使用

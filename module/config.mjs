@@ -171,7 +171,29 @@ XJZL.skills = {
   shili: "XJZL.Skills.Shili"
 };
 
-// 15. 系统状态标志 (逻辑开关)
+// 15. 技艺列表
+XJZL.arts = {
+  duanzao: "XJZL.Arts.Duanzao", // 锻造
+  chengyi: "XJZL.Arts.Chengyi", // 成衣
+  zhibao: "XJZL.Arts.Zhibao",   // 制宝
+  pengren: "XJZL.Arts.Pengren", // 烹饪
+  yishu: "XJZL.Arts.Yishu",     // 医术
+  dushu: "XJZL.Arts.Dushu",     // 毒术
+  chadao: "XJZL.Arts.Chadao",   // 茶道
+  jiuyi: "XJZL.Arts.Jiuyi",     // 酒艺
+  shuxie: "XJZL.Arts.Shuxie",   // 书写
+  zuohua: "XJZL.Arts.Zuohua",   // 作画
+  yanzou: "XJZL.Arts.Yanzou",   // 演奏
+  qishu: "XJZL.Arts.Qishu",     // 棋术
+  fofa: "XJZL.Arts.Fofa",       // 佛法
+  daofa: "XJZL.Arts.Daofa",     // 道法
+  biaoyan: "XJZL.Arts.Biaoyan", // 表演
+  qitao: "XJZL.Arts.Qitao",     // 乞讨
+  yushou: "XJZL.Arts.Yushou",   // 驭兽
+  nongshi: "XJZL.Arts.Nongshi"  // 农事
+};
+
+// 16. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -265,7 +287,7 @@ XJZL.statusFlags = {
   regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
-// 16. 检定优劣势计数器 (Check Flags)
+// 17. 检定优劣势计数器 (Check Flags)
 // 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
 // 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
 XJZL.checkFlags = {
@@ -287,3 +309,5 @@ const _injectCheckFlags = (sourceObj) => {
 _injectCheckFlags(XJZL.attributes);
 // 注入技能 (qiaoshouCheckLevel...)
 _injectCheckFlags(XJZL.skills);
+// 注入技艺
+_injectCheckFlags(XJZL.arts);
