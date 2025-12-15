@@ -278,9 +278,16 @@ export class ChatCardManager {
             await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
             // 合并逻辑 (Base OR Script)
-            const finalIgnoreBlock = baseIgnoreBlock || checkContext.flags.ignoreBlock;
-            const finalIgnoreDefense = baseIgnoreDefense || checkContext.flags.ignoreDefense;
-            const finalIgnoreStance = baseIgnoreStance || checkContext.flags.ignoreStance;
+            let finalIgnoreBlock = baseIgnoreBlock || checkContext.flags.ignoreBlock;
+            let finalIgnoreDefense = baseIgnoreDefense || checkContext.flags.ignoreDefense;
+            let finalIgnoreStance = baseIgnoreStance || checkContext.flags.ignoreStance;
+
+            // 强制修正趁虚而入
+            // 这样即使是重算（没有缓存），也能保证无视架招生效
+            if (flags.moveId === "opportunity") {
+                finalIgnoreBlock = true;
+                finalIgnoreStance = true;
+            }
 
             // --- 1. 计算命中优劣势 (Attack State) ---
             let attackState = 0;
