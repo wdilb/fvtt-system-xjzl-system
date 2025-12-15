@@ -77,7 +77,36 @@ export class ChatCardManager {
         // 2. 获取源物品
         // 如果 flags 里没 ID (比如防御卡)，则可能不需要 item
         let item = null;
-        if (flags.itemId && attacker) item = attacker.items.get(flags.itemId);
+        // 处理普通攻击
+        if (flags.actionType === "basic-attack") {
+            // 构造虚拟 Item 对象
+            // 满足后续 _applyDamage 对 item.name, item.img, item.actor 的调用需求
+            const moveId = flags.moveId || "basic";
+            item = {
+                id: "basic",
+                name: "普通攻击",
+                type: "basic",
+                img: "icons/skills/melee/unarmed-punch-fist.webp", // 或者从 message flags 里取
+                actor: attacker, // 重要：链接回攻击者
+                system: {
+                    // 构造一个数组，里面放一个 ID 匹配的虚拟招式
+                    moves: [
+                        {
+                            id: moveId,
+                            name: "普通攻击",
+                            type: "basic",
+                            damageType: flags.damageType || "waigong",
+                            calculation: {}, //以此防止读取属性报错
+                            effects: []      //以此防止读取特效报错
+                        }
+                    ]
+                }
+            };
+        }
+        // 常规逻辑：从数据库获取
+        else if (flags.itemId && attacker) {
+            item = attacker.items.get(flags.itemId);
+        }
 
         // 3. 获取目标
         // 逻辑：如果历史有记录，强制使用历史记录
