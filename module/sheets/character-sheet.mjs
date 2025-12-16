@@ -317,7 +317,18 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             add(groupSkills, `skills.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
         }
 
-        // 5. 资源上限 (Resources)
+         // 5. 技艺 (Arts)
+        // 允许修改“等级”和“检定加值”
+        const groupArts = game.i18n.localize("XJZL.Arts.Label");
+        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.arts)) {
+            const label = game.i18n.localize(labelKey);
+            // 修改等级 (arts.duanzao.mod)
+            add(groupArts, `arts.${k}.mod`, `${label} (等级 Mod)`);
+            // 修改检定 (arts.duanzao.checkMod)
+            add(groupArts, `arts.${k}.checkMod`, `${label} (检定 Mod)`);
+        }
+
+        // 6. 资源上限 (Resources)
         const groupRes = game.i18n.localize("XJZL.Resources.Label");
         add(groupRes, "resources.hp.bonus", `${game.i18n.localize("XJZL.Resources.HP")} (Bonus)`);
         add(groupRes, "resources.mp.bonus", `${game.i18n.localize("XJZL.Resources.MP")} (Bonus)`);
