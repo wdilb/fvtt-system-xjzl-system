@@ -79,6 +79,17 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 { id: 3, label: "XJZL.Neigong.Stage3", key: "stage3" }
             ];
         }
+        // 3. 准备特效列表 (用于 Effects Tab)
+        context.effects = this.document.effects.map(e => {
+            return {
+                id: e.id,
+                name: e.name,
+                img: e.img,
+                disabled: e.disabled,
+                description: e.description,
+                isSuppressed: e.isSuppressed // V11+ 特性
+            };
+        });
 
         return context;
     }

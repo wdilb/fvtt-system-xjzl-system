@@ -87,6 +87,23 @@ export class XJZLActiveEffect extends ActiveEffect {
     return super.isSuppressed;
   }
 
+  // 添加静态方法确保生成slug的逻辑一致
+  static getSlug(effectData) {
+    // 1. 优先读显式设置的 Flag (绝对权威)
+    const flagSlug = foundry.utils.getProperty(effectData, "flags.xjzl-system.slug");
+    if (flagSlug) return flagSlug;
+
+    // 2. 其次读 Name (语义化匹配，叠层的核心)
+    // 只要名字叫 "Poison"，不管 ID 是多少，都认为是同一种毒
+    if (effectData.name) return effectData.name.slugify();
+
+    // 3. 最后读 ID (仅用于没有任何名字的特殊情况)
+    if (effectData._id) return effectData._id;
+
+    // 4. 实在没有就生成随机的 (防止空字符串)
+    return foundry.utils.randomID();
+  }
+
   /**
    * ---------------------------------------------------------------
    * Life Cycle: 数据生命周期钩子
@@ -111,10 +128,7 @@ export class XJZLActiveEffect extends ActiveEffect {
     if (!flags.slug) {
       // 优先尝试将 name 转为 slug (如 "Green Snake Poison" -> "green-snake-poison")
       // 如果 name 是中文，slugify 可能会变空，则使用随机 ID
-      let autoSlug = foundry.utils.slugify(data.name);
-      if (!autoSlug || autoSlug.length === 0) {
-        autoSlug = `effect-${foundry.utils.randomID()}`;
-      }
+      let autoSlug = XJZLActiveEffect.getSlug(data);
       updates["flags.xjzl-system.slug"] = autoSlug;
     }
 

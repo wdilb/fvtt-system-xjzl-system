@@ -1,5 +1,5 @@
 // module/managers/active-effect-manager.mjs
-
+import { XJZLActiveEffect } from "../documents/active-effect.mjs";
 export class ActiveEffectManager {
 
     /**
@@ -8,16 +8,29 @@ export class ActiveEffectManager {
      * @param {Object} effectData - 特效源数据 (普通 Object)
      * @returns {Promise<ActiveEffect|undefined>} 返回更新或创建的特效文档
      */
-    static async addEffect(actor, effectData) {
-        if (!actor || !effectData) return;
+    static async addEffect(actor, sourceEffectData) {
+        if (!actor || !sourceEffectData) return;
+
+        // 如果外部已经克隆过了，这里再克隆一次开销很小；
+        // 但如果外部忘了克隆（比如直接传了 CONFIG 对象），这一行能救命。
+        const effectData = foundry.utils.deepClone(sourceEffectData);
+
+        // game.i18n.localize 的特性是：如果找到了 key 就翻译，找不到就返回原字符串。
+        // 所以即使外部已经翻译过了（传进来的是中文），再 localize 一次通常也只是返回中文本身，没有副作用。
+        if (effectData.name) {
+            effectData.name = game.i18n.localize(effectData.name);
+        }
+
+        // 补全 statuses (用于系统逻辑判定)
+        if (effectData.id && !effectData.statuses) {
+            effectData.statuses = [effectData.id];
+        }
 
         // =====================================================
         // 1. 预处理：确定唯一标识符 (Slug)
         // =====================================================
-        // 优先读取 data 中的 slug，如果没有则通过 name 生成
-        // 这是判断“是否是同一个特效”的核心依据
-        const flagSlug = foundry.utils.getProperty(effectData, "flags.xjzl-system.slug");
-        const lookupSlug = flagSlug || foundry.utils.slugify(effectData.name);
+        // 直接调用通用方法
+        const lookupSlug = XJZLActiveEffect.getSlug(effectData);
 
         // =====================================================
         // 2. 查找：是否已存在同名/同Slug特效
@@ -56,6 +69,8 @@ export class ActiveEffectManager {
             if (maxStacks > 0 && currentStacks >= maxStacks) {
                 // 达到上限：不增加层数，不修改数值，仅在下方逻辑中刷新时间
                 ui.notifications.info(`${existingEffect.name} 已达到最大层数。`);
+                // 满层刷新：手动飘个灰色提示
+                this._showScrollingText(actor, `~ ${existingEffect.name}`, "neutral");
             } else {
                 // 未达上限：增加层数
                 const newStacks = currentStacks + 1;
@@ -65,6 +80,8 @@ export class ActiveEffectManager {
 
                 // 记录新层数
                 updateData["flags.xjzl-system.stacks"] = newStacks;
+                // 因为这是 Update 操作，核心默认不飘字，我们补上
+                this._showScrollingText(actor, `+ ${existingEffect.name} (${newStacks})`, "create");
             }
         } else {
             // --- 覆盖模式 (不可叠层) ---
@@ -72,6 +89,8 @@ export class ActiveEffectManager {
             // 如果希望保留旧的数值，可以在这里加判断逻辑
             if (effectData.changes) {
                 updateData.changes = effectData.changes;
+                // 覆盖时：手动字幕
+                this._showScrollingText(actor, `! ${existingEffect.name}`, "neutral");
             }
         }
 
@@ -158,10 +177,47 @@ export class ActiveEffectManager {
         // 重新计算数值
         const newChanges = effect.calculateChangesForStacks(newStacks);
 
+        // 核心 Update 不飘字，我们补上
+        this._showScrollingText(actor, `- ${effect.name} (${newStacks})`, "delete");
+
         await effect.update({
             changes: newChanges,
             "flags.xjzl-system.stacks": newStacks
         });
+    }
+
+    /**
+   * 私有辅助：在 Token 上显示浮动字幕
+   */
+    static _showScrollingText(actor, text, type = "neutral") {
+        if (!actor) return;
+        // 兼容 Token Actor 和 原生 Actor
+        // 只获取当前 Canvas 场景下的 Token，防止跨场景渲染报错
+        const tokens = actor.isToken ? [actor.token.object] : actor.getActiveTokens(true, true);
+
+        const colors = {
+            create: 0x00FF00, // 绿
+            delete: 0xFF0000, // 红
+            neutral: 0xFFFFFF // 白
+        };
+
+        const color = colors[type] || colors.neutral;
+
+        for (const token of tokens) {
+            // 确保 Token 真的在画布上且可见
+            if (!token || !token.visible || !token.renderable) continue;
+
+            canvas.interface.createScrollingText(token.center, text, {
+                anchor: CONST.TEXT_ANCHOR_POINTS.CENTER,
+                direction: CONST.TEXT_ANCHOR_POINTS.TOP,
+                distance: (2 * token.h),
+                fontSize: 28,
+                fill: color,
+                stroke: 0x000000,
+                strokeThickness: 4,
+                jitter: 0.25
+            });
+        }
     }
 
     /**
@@ -285,4 +341,5 @@ export class ActiveEffectManager {
             await actor.deleteEmbeddedDocuments("ActiveEffect", expiredIds);
         }
     }
+
 }

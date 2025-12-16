@@ -145,21 +145,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             { label: "TYPES.Item.misc", type: "misc", items: actor.itemTypes.misc }
         ];
 
-        // 特效列表
-        const allEffects = actor.effects.map(e => {
-            const source = fromUuidSync(e.origin);
-            return {
-                id: e.id,
-                name: e.name,
-                img: e.img,
-                disabled: e.disabled,
-                isTemporary: !e.transfer,
-                sourceName: source ? source.name : "未知来源",
-                description: e.description
-            };
-        });
-        context.temporaryEffects = allEffects.filter(e => e.isTemporary);
-        context.passiveEffects = allEffects.filter(e => !e.isTemporary);
+        // 调用特效准备函数
+        this._prepareEffects(context);
 
         // =====================================================
         //  准备技艺列表 (Arts)
@@ -187,6 +174,65 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 章节进度已经在 ArtBookDataModel.prepareDerivedData 中算好了
 
         return context;
+    }
+
+    /**
+     * 准备特效数据，处理分类逻辑
+     */
+    _prepareEffects(context) {
+        const temporaryEffects = [];
+        const passiveEffects = [];
+
+        // 1. 使用 appliedEffects (包含装备衍生的特效)
+        const effects = this.actor.appliedEffects;
+
+        for (const e of effects) {
+            // 过滤掉被禁用的 (可选，如果你想显示禁用的可以去掉这行)
+            if (e.disabled) continue;
+
+            // 2. 准备显示数据
+            // sourceName 是 V13 ActiveEffect 的原生 Getter，会自动解析 origin
+            let source = e.sourceName;
+            // 如果原生 Getter 获取失败 (比如 origin 链接断了)，做个兜底
+            if (source === "Unknown" || !source) {
+                // 尝试手动获取 Item 名字
+                if (e.parent instanceof Item) source = e.parent.name;
+                else source = "未知来源";
+            }
+
+            // 如果我们在 XJZLActiveEffect 里定义了 displayLabel (带层数)，就用它
+            // 否则用 e.name
+            const displayName = e.displayLabel || e.name;
+
+            const effectData = {
+                id: e.id,
+                name: displayName,
+                img: e.img,
+                description: e.description,
+                sourceName: source,
+                // 为了给 HBS 里的删除按钮用，如果特效属于 Item (被动)，通常不允许在 Actor 卡直接删除
+                isItemEffect: (e.parent instanceof Item) && e.transfer
+            };
+
+            // 3. 核心分类逻辑 (Wuxia 风格)
+
+            // 判定条件 A: 是系统认定的临时特效 (有持续时间, 或 StatusEffect)
+            const isTemp = e.isTemporary;
+
+            // 判定条件 B: 非被动传输 (即由脚本/消耗品产生，Transfer = false)
+            // 这种特效即使持续时间无限，也应该算作 Buff，而不是装备属性
+            const isActiveBuff = e.transfer === false;
+
+            if (isTemp || isActiveBuff) {
+                temporaryEffects.push(effectData);
+            } else {
+                // 剩下的归为被动 (装备/内功自带，且 Transfer = true)
+                passiveEffects.push(effectData);
+            }
+        }
+
+        context.temporaryEffects = temporaryEffects;
+        context.passiveEffects = passiveEffects;
     }
 
     /* -------------------------------------------- */
@@ -317,7 +363,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             add(groupSkills, `skills.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
         }
 
-         // 5. 技艺 (Arts)
+        // 5. 技艺 (Arts)
         // 允许修改“等级”和“检定加值”
         const groupArts = game.i18n.localize("XJZL.Arts.Label");
         for (const [k, labelKey] of Object.entries(CONFIG.XJZL.arts)) {

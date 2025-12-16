@@ -138,20 +138,22 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * 动作：应用通用状态
      */
     static async _onApplyStatus(event, target) {
-        // this 指向 Application 实例
+        const actors = EffectSelectionDialog.getControlledActors();
+        if (!actors.length) return; // 如果没选 Token，getControlledActors 内部会弹警告
+
         const slug = target.dataset.slug;
 
         // 从 CONFIG 中查找数据模板
         const statusData = CONFIG.statusEffects.find(e => e.id === slug);
         if (!statusData) return;
 
-        // 深拷贝并应用
-        const effectData = foundry.utils.deepClone(statusData);
+        for (const actor of actors) {
+            // 深拷贝并应用
+            const effectData = foundry.utils.deepClone(statusData);
+            await game.xjzl.api.effects.addEffect(actor, effectData);
+        }
 
-        // 调用我们的 Manager
-        await game.xjzl.api.effects.addEffect(this.actor, effectData);
-
-        ui.notifications.info(`已应用状态: ${game.i18n.localize(statusData.name)}`);
+        ui.notifications.info(`已对 ${actors.length} 个目标应用 [${game.i18n.localize(statusData.name)}]`);
         // 应用后关闭窗口？
         // this.close(); 
     }
@@ -221,6 +223,50 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
 
                 // 如果该组内没有匹配项，隐藏整组标题
                 group.style.display = hasVisible ? "block" : "none";
+            });
+        });
+
+        // =====================================================
+        // 2. 【新增】右键点击逻辑 (减层/移除)
+        // =====================================================
+
+        // 获取所有带有 data-action 的按钮
+        const actionButtons = html.querySelectorAll('[data-action]');
+
+        actionButtons.forEach(btn => {
+            btn.addEventListener('contextmenu', async (event) => {
+                event.preventDefault(); // 阻止浏览器默认菜单
+
+                const action = btn.dataset.action;
+                const actors = EffectSelectionDialog.getControlledActors();
+                if (!actors.length) return;
+
+                // 逻辑分支 A: 通用状态减层
+                if (action === "applyStatus") {
+                    const slug = btn.dataset.slug;
+                    // 直接调用 Manager 的移除
+                    for (const actor of actors) {
+                        await game.xjzl.api.effects.removeEffect(actor, slug, 1);
+                    }
+                    ui.notifications.info(`已对选中目标执行移除/减层操作。`);
+                }
+
+                // 逻辑分支 B: 物品特效减层
+                else if (action === "applyItemEffect") {
+                    const uuid = btn.dataset.uuid;
+                    const sourceEffect = await fromUuid(uuid);
+                    if (!sourceEffect) return;
+
+                    // 我们需要知道这个特效在目标身上叫什么 (Slug)
+                    // 通常逻辑是：优先取 flag.slug，否则取 slugify(name)
+                    const flagSlug = sourceEffect.getFlag("xjzl-system", "slug");
+                    const targetSlug = flagSlug || sourceEffect.name.slugify();
+
+                    for (const actor of actors) {
+                        await game.xjzl.api.effects.removeEffect(actor, targetSlug, 1);
+                    }
+                    ui.notifications.info(`已对选中目标执行移除/减层操作。`);
+                }
             });
         });
     }

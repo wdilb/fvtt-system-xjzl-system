@@ -217,79 +217,133 @@ Hooks.once("ready", async function () {
 });
 
 /* -------------------------------------------- */
-/*  Hooks: Active Effect Config                 */
+/*  Hooks: Active Effect Config (New Tab Style) */
 /* -------------------------------------------- */
 
-// 在打开特效编辑窗口时，注入“可堆叠”选项
 Hooks.on("renderActiveEffectConfig", (app, html, data) => {
-  // V13 兼容性处理：确保 html 是原生 DOM 元素
+  // 1. 获取原生 DOM
   const el = html instanceof HTMLElement ? html : html[0];
 
-  const disabledInput = el.querySelector('input[name="disabled"]');
-  if (!disabledInput) return;
+  // 2. 获取数据
+  const effect = app.document;
+  const flags = effect.flags["xjzl-system"] || {};
 
-  const disabledField = disabledInput.closest(".form-group");
+  const slug = flags.slug || "";
+  const isStackable = flags.stackable || false;
+  const maxStacks = flags.maxStacks || 0;
 
-  // 使用 app.document 而不是 app.object
-  // 读取 Flag
-  const isStackable = app.document.getFlag("xjzl-system", "stackable") || false;
-  const maxStacks = app.document.getFlag("xjzl-system", "maxStacks") || 0;
+  let autoSlug = "auto-generated-slug";
+  if (effect.name) {
+    autoSlug = effect.name.slugify();
+  }
 
-  // 构建 HTML (包含堆叠开关 和 最大层数)
-  const stackableHtml = `
-    <div class="form-group">
-        <label>可堆叠 (Stackable)</label>
-        <div class="form-fields">
-            <input type="checkbox" name="flags.xjzl-system.stackable" ${isStackable ? "checked" : ""}>
-        </div>
-        <p class="notes">勾选后，重复应用将增加层数而非覆盖。</p>
-    </div>
-    
-    <div class="form-group">
-        <label>最大层数 (Max Stacks)</label>
-        <div class="form-fields">
-            <input type="number" name="flags.xjzl-system.maxStacks" value="${maxStacks}" placeholder="0 为无限制">
-        </div>
-        <p class="notes">设为 0 表示无上限。</p>
+  // =====================================================
+  // 3. 注入导航栏 (Add Navigation Item)
+  // =====================================================
+  const nav = el.querySelector('nav.tabs');
+
+  if (nav) {
+    const navItem = document.createElement("a");
+    // 【关键修正 1】必须添加 data-action="tab"
+    navItem.dataset.action = "tab";
+    // 【关键修正 2】组名必须是 "sheet" (参考你的 HTML 截图)
+    navItem.dataset.group = "sheet";
+    navItem.dataset.tab = "xjzl-config";
+
+    // 为了保持样式一致，内部加 span
+    navItem.innerHTML = `<i class="fas fa-dragon"></i> <span>侠界配置</span>`;
+
+    nav.appendChild(navItem);
+  }
+
+  // =====================================================
+  // 4. 注入标签页内容 (Add Tab Content)
+  // =====================================================
+
+  // 使用 section 以匹配原生样式
+  const tabContent = document.createElement("section");
+  tabContent.className = "tab";
+  tabContent.dataset.tab = "xjzl-config";
+  // 【关键修正 3】组名必须匹配 "sheet"
+  tabContent.dataset.group = "sheet";
+
+  // 构建配置 HTML
+  tabContent.innerHTML = `
+    <div style="padding: 10px;">
+        <h3 class="form-header"><i class="fas fa-cogs"></i> 高级规则配置</h3>
+        <p class="notes" style="margin-bottom: 10px;">配置该特效在侠界系统中的自动化行为。</p>
+
+        <fieldset style="border: 1px solid #7a7971; border-radius: 5px; padding: 10px; margin-bottom: 10px;">
+            <legend>叠层逻辑 (Stacking)</legend>
+            
+            <div class="form-group">
+                <label>唯一标识 (Slug)</label>
+                <div class="form-fields">
+                    <input type="text" name="flags.xjzl-system.slug" value="${slug}" placeholder="${autoSlug}">
+                </div>
+                <p class="notes">用于识别同类效果。留空则自动生成。</p>
+            </div>
+
+            <div class="form-group">
+                <label>可堆叠 (Stackable)</label>
+                <div class="form-fields">
+                    <input type="checkbox" name="flags.xjzl-system.stackable" ${isStackable ? "checked" : ""}>
+                </div>
+                <p class="notes">允许重复应用以增加层数。</p>
+            </div>
+            
+            <div class="form-group">
+                <label>最大层数 (Max Stacks)</label>
+                <div class="form-fields">
+                    <input type="number" name="flags.xjzl-system.maxStacks" value="${maxStacks}" placeholder="0">
+                </div>
+                <p class="notes">0 表示无上限。</p>
+            </div>
+        </fieldset>
     </div>
   `;
 
-  disabledField.insertAdjacentHTML('afterend', stackableHtml);
+  // 插入到 footer 之前
+  const submitButton = el.querySelector('button[type="submit"]');
+  if (submitButton) {
+    submitButton.closest("footer").before(tabContent);
+  } else {
+    const form = el.querySelector('form');
+    if (form) form.appendChild(tabContent);
+  }
+
+  // =====================================================
+  // 5. 激活标签页切换逻辑 (Re-initialize Tabs)
+  // =====================================================
+  // 因为我们是动态注入的 Tab，需要告诉 Application 重新计算一下 Tab 逻辑
+  // 或者最简单的：因为我们注入了标准的 .item 和 .tab，
+  // Foundry 的 TabsV2 Controller 通常会自动识别点击事件。
+
+  // 调整高度以适应新 Tab (如果需要)
   app.setPosition({ height: "auto" });
 
-  // --- 新增：给 Attribute Key 添加自动补全 ---
 
-  // 1. 找到 Key 的输入框
-  // 注意：V13 DOM 结构可能稍有不同，建议用 name 属性查找
-  const keyInput = $(html).find('select[name="changes.0.key"], input[name="changes.0.key"]');
-
-  // 如果当前是 select (FVTT 默认给了一些)，我们可能不管它
-  // 如果是 input (通常是手输)，我们给它加个 datalist
-  if (keyInput.length && keyInput.prop("tagName") === "INPUT") {
-
-    // 创建 datalist ID
-    const listId = "xjzl-status-list";
-    keyInput.attr("list", listId);
-
-    // 构建选项 HTML
-    let options = "";
-
-    // A. 加入你的状态开关
-    for (const [key, label] of Object.entries(CONFIG.XJZL.statusFlags)) {
-      // 显示为: "flags.xjzl-system.stun (晕眩)"
-      // 这里的 value 必须是真正要写入数据库的完整路径
-      options += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
-    }
-
-    // B. 加入你的基础属性 (可选)
-    // 比如 system.resources.mp.value
-    options += `<option value="system.resources.mp.value">内力值</option>`;
-    options += `<option value="system.resources.hp.value">气血值</option>`;
-
-    // 插入 datalist 到 DOM
-    const dataListHtml = `<datalist id="${listId}">${options}</datalist>`;
-    keyInput.after(dataListHtml);
+  // =====================================================
+  // 6. 属性 Key 自动补全 (保持不变，因为这是全局生效的)
+  // =====================================================
+  const listId = `xjzl-status-list-${effect.id || foundry.utils.randomID()}`;
+  let options = "";
+  for (const [key, label] of Object.entries(CONFIG.XJZL.statusFlags)) {
+    options += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
   }
+  options += `<option value="system.resources.mp.value">内力值 (当前)</option>`;
+  options += `<option value="system.resources.hp.value">气血值 (当前)</option>`;
+
+  const datalist = document.createElement("datalist");
+  datalist.id = listId;
+  datalist.innerHTML = options;
+  el.appendChild(datalist);
+
+  const keyInputs = el.querySelectorAll('input[name^="changes."][name$=".key"]');
+  keyInputs.forEach(input => {
+    input.setAttribute("list", listId);
+    input.setAttribute("placeholder", "Key...");
+  });
 });
 
 //  在 getSceneControlButtons 阶段注入按钮
@@ -370,7 +424,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
     console.warn("XJZL | 无法找到 Token 控制层级，按钮添加失败。");
   }
 
-  // 2. 【新增】状态选取器逻辑
+  // 2. 状态选取器逻辑
   const allowPicker = game.settings.get("xjzl-system", "allowPlayerEffectPicker");
 
   if (isGM || allowPicker) {
@@ -412,6 +466,44 @@ Hooks.on('getSceneControlButtons', (controls) => {
       }
     }
   }
+});
+
+/* -------------------------------------------- */
+/*  Token HUD 改造（实现左键叠层，右键减少层）     */
+/* -------------------------------------------- */
+Hooks.on("renderTokenHUD", (app, html, data) => {
+  const actor = app.object.actor;
+  if (!actor) return;
+
+  const element = html instanceof HTMLElement ? html : html[0];
+  const statusIcons = element.querySelectorAll(".status-effects .effect-control");
+
+  statusIcons.forEach((icon) => {
+    const slug = icon.dataset.statusId;
+    const statusData = CONFIG.statusEffects.find(e => e.id === slug);
+    if (!statusData) return;
+
+    // 克隆节点移除旧事件
+    const newIcon = icon.cloneNode(true);
+
+    // 绑定左键 (添加/叠层)
+    newIcon.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      // 深拷贝数据，避免污染 CONFIG
+      const dataToAdd = foundry.utils.deepClone(statusData);
+      await game.xjzl.api.effects.addEffect(actor, dataToAdd);
+    });
+
+    // 绑定右键 (减层/移除)
+    newIcon.addEventListener("contextmenu", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await game.xjzl.api.effects.removeEffect(actor, slug, 1);
+    });
+
+    icon.replaceWith(newIcon);
+  });
 });
 
 /**
