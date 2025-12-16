@@ -153,6 +153,23 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.temporaryEffects = allEffects.filter(e => e.isTemporary);
         context.passiveEffects = allEffects.filter(e => !e.isTemporary);
 
+        // =====================================================
+        //  准备技艺列表 (Arts)
+        // =====================================================
+        context.artsList = [];
+        // 遍历配置中的技艺列表，确保顺序一致
+        for (const [key, labelKey] of Object.entries(XJZL.arts)) {
+            const artData = actor.system.arts[key];
+            if (artData) {
+                context.artsList.push({
+                    key: key,
+                    label: labelKey, // "XJZL.Arts.Duanzao"
+                    total: artData.total || 0,
+                    // 如果需要显示检定加值，可以在这里加: rollMod: (artData.checkMod || 0) + (artData.bookCheck || 0)
+                });
+            }
+        }
+
         return context;
     }
 
