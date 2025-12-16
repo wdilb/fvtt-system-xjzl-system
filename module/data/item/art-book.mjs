@@ -25,14 +25,14 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
 
       // --- 2. 描述与要求 ---
       description: new fields.HTMLField({ label: "XJZL.ArtBook.ChapterDesc" }),
-      
+
       // 修炼消耗 (填满这一篇章需要的 XP)
-      cost: new fields.NumberField({ 
-        required: true, 
-        min: 1, 
-        initial: 100, 
+      cost: new fields.NumberField({
+        required: true,
+        min: 1,
+        initial: 100,
         integer: true,
-        label: "XJZL.ArtBook.ChapterCost" 
+        label: "XJZL.ArtBook.ChapterCost"
       }),
 
       // 奖励 (读完这一篇给什么)
@@ -50,19 +50,25 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
       img: new fields.StringField({ initial: "icons/svg/book.svg" }),
 
       // 2. 关联技艺 (必填，决定了加哪个技艺)
-      artType: new fields.StringField({ 
-        required: true, 
+      artType: new fields.StringField({
+        required: true,
         choices: Object.keys(XJZL.arts), // 只能选配置中定义的技艺类型
         initial: "duanzao",
         label: "XJZL.ArtBook.ArtType"
       }),
 
       // 3. 修为投入 (总池)
-      xpInvested: new fields.NumberField({ 
-        min: 0, 
-        initial: 0, 
+      xpInvested: new fields.NumberField({
+        min: 0,
+        initial: 0,
         integer: true,
-        label: "XJZL.ArtBook.XPInvested" 
+        label: "XJZL.ArtBook.XPInvested"
+      }),
+
+      // 修为来源构成 (支持精准回退)
+      sourceBreakdown: new fields.SchemaField({
+        general: new fields.NumberField({ initial: 0, min: 0, integer: true }), // 来自通用
+        specific: new fields.NumberField({ initial: 0, min: 0, integer: true }) // 来自技艺专属
       }),
 
       // 4. 章节列表
@@ -104,7 +110,7 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
         chapter.progress.current = chapterCost;
         chapter.progress.pct = 100;
         chapter.progress.isCompleted = true;
-        
+
         // 累积奖励
         totalLevelReward += (chapter.reward?.level || 0);
         totalCheckReward += (chapter.reward?.check || 0);
