@@ -311,3 +311,162 @@ _injectCheckFlags(XJZL.attributes);
 _injectCheckFlags(XJZL.skills);
 // 注入技艺
 _injectCheckFlags(XJZL.arts);
+
+/**
+ * 通用状态效果配置
+ * 这些效果会出现在 Token HUD 和 Smart Picker 中
+ */
+XJZL.statusEffects = [
+  // ====================================================
+  // 1. 伤害与折磨类 (Stackable)
+  // ====================================================
+  {
+    id: "poison", // 唯一 ID (Slug)
+    name: "XJZL.Status.Poison", // 对应 zh-cn.json: "中毒"
+    img: "icons/svg/poison.svg", 
+    description: "XJZL.Status.PoisonDesc", // 描述 (可选，配合 Tooltip)
+    duration: { rounds: 3 }, // 默认持续 3 轮
+    flags: {
+      "xjzl-system": {
+        slug: "poison",
+        stackable: true, // 允许叠层
+        maxStacks: 0     // 无限叠
+      }
+    },
+    changes: [
+      // 示例：每层扣除气血 (这通常需要配合脚本，但这里可以先占位)
+      // 如果你有被动减属性的机制，写在这里
+    ]
+  },
+  {
+    id: "bleed",
+    name: "XJZL.Status.Bleed", // "流血"
+    img: "icons/svg/blood.svg",
+    duration: { rounds: 3 },
+    flags: {
+      "xjzl-system": {
+        slug: "bleed",
+        stackable: true,
+        maxStacks: 5
+      }
+    }
+  },
+  {
+    id: "internal-injury",
+    name: "XJZL.Status.InternalInjury", // "内伤"
+    img: "icons/svg/daze.svg",
+    flags: {
+      "xjzl-system": {
+        slug: "internal-injury",
+        stackable: true,
+        maxStacks: 10
+      }
+    },
+    changes: [
+      // 示例：内伤降低内力上限或回复效率
+      {
+        key: "system.attributes.neili.recovery", // 假设你有这个属性
+        mode: 2, // ADD (乘层数)
+        value: "-2" // 每层 -2 回复
+      }
+    ]
+  },
+
+  // ====================================================
+  // 2. 控制与封锁类 (Non-Stackable / Status)
+  // ====================================================
+  {
+    id: "stun",
+    name: "XJZL.Status.Stun", // "晕眩"
+    img: "icons/svg/stoned.svg",
+    // 晕眩通常不可叠层，重复应用只是刷新时间
+    flags: {
+      "xjzl-system": {
+        slug: "stun",
+        stackable: false 
+      }
+    },
+    changes: [
+      {
+        // 对应你之前定义的 statusFlags
+        key: "flags.xjzl-system.stun",
+        mode: 5, // OVERRIDE (强制设为 true)
+        value: "true"
+      }
+    ]
+  },
+  {
+    id: "blind",
+    name: "XJZL.Status.Blind", // "目盲"
+    img: "icons/svg/blind.svg",
+    flags: {
+      "xjzl-system": { slug: "blind", stackable: false }
+    },
+    changes: [
+      // 示例：目盲导致攻击劣势
+      {
+        key: "flags.xjzl-system.attackDisadvantage",
+        mode: 5,
+        value: "true"
+      }
+    ]
+  },
+  {
+    id: "silence",
+    name: "XJZL.Status.Silence", // "封穴/沉默"
+    img: "icons/svg/silenced.svg",
+    flags: {
+      "xjzl-system": { slug: "silence", stackable: false }
+    },
+    changes: [
+      {
+        key: "flags.xjzl-system.silence",
+        mode: 5,
+        value: "true"
+      }
+    ]
+  },
+  {
+    id: "disarm",
+    name: "XJZL.Status.Disarm", // "缴械"
+    img: "icons/svg/sword.svg", // 找一个类似断剑的图标
+    flags: {
+      "xjzl-system": { slug: "disarm", stackable: false }
+    },
+    changes: [
+      {
+        key: "flags.xjzl-system.forceUnarmed",
+        mode: 5,
+        value: "true"
+      }
+    ]
+  },
+
+  // ====================================================
+  // 3. 增益与架势 (Buffs)
+  // ====================================================
+  {
+    id: "meditate",
+    name: "XJZL.Status.Meditate", // "运功/调息"
+    img: "icons/svg/light.svg",
+    flags: {
+      "xjzl-system": { slug: "meditate", stackable: false }
+    },
+    changes: [
+        // 运功状态下回复增加
+        { key: "system.attributes.hp.recovery", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "rage",
+    name: "XJZL.Status.Rage", // "狂暴/走火入魔"
+    img: "icons/svg/skull.svg",
+    flags: {
+      "xjzl-system": { slug: "rage", stackable: true, maxStacks: 3 }
+    },
+    changes: [
+        { key: "system.attributes.attack", mode: 2, value: "2" }, // 攻击增加
+        { key: "system.attributes.defense", mode: 2, value: "-2" } // 防御减少
+    ]
+  }
+];

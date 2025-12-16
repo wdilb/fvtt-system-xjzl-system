@@ -1072,7 +1072,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.dodgeTotal = Math.floor(10 + (S.shenfa / 4) + (combat.dodge || 0) + bonuses.dodge);
 
     // 先攻 (身法 + 修正)
-    combat.initiativeTotal = Math.floor(S.shenfa + (combat.initiative || 0) + bonuses.initiative);
+    combat.initiativeTotal = Math.floor((S.shenfa / 10) + (combat.initiative || 0) + bonuses.initiative);
 
     // 士气影响暴击
     const moraleCritMod = Math.floor((resources.morale.value || 0) / 10);

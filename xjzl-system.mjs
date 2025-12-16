@@ -37,6 +37,7 @@ import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs
 
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
+import { EffectSelectionDialog } from "./module/applications/effect-selection-dialog.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -59,8 +60,19 @@ Hooks.once("init", async function () {
     }
   };
 
+  // 替换系统核心的状态效果列表
+  CONFIG.statusEffects = CONFIG.XJZL.statusEffects;
+
   // 修改世界时间配置
   CONFIG.time.roundTime = 2; // 设置 1 轮 = 2 秒 (我们侠界是这么快的)
+
+  // 1. 配置 Combat 先攻设置
+  CONFIG.Combat.initiative = {
+    // 这里填你的先攻公式字符串
+    // @attributes.shenfa.value 必须能通过 actor.getRollData() 访问到
+    formula: "1d20 + @init",
+    decimals: 2 // 出现平局时保留2位小数
+  };
 
   // 2. 注册自定义 Document 类 (逻辑层)
   // 告诉 Foundry 使用我们需要扩展的类，而不是默认的 Actor/Item
@@ -177,6 +189,17 @@ Hooks.once("init", async function () {
     type: Boolean,
     default: true,       // 默认开启
     requiresReload: false // 不需要刷新，即改即生效
+  });
+
+  // 是否允许玩家使用状态选取器
+  game.settings.register("xjzl-system", "allowPlayerEffectPicker", {
+    name: "允许玩家使用状态选取器",
+    hint: "开启后，玩家可以在 Token 工具栏看到【状态选取器】，并能查看场景内公开的特效。",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true, // 默认开启，关闭则仅GM可用
+    requiresReload: true
   });
 });
 
@@ -295,7 +318,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       if (existingApp) {
         existingApp.render(true, { focus: true });
       } else {
-        // 【修正点 2】确保 GenericDamageTool 已被导入
+        // 确保 GenericDamageTool 已被导入
         new GenericDamageTool().render(true);
       }
     }
@@ -346,6 +369,49 @@ Hooks.on('getSceneControlButtons', (controls) => {
   } else {
     console.warn("XJZL | 无法找到 Token 控制层级，按钮添加失败。");
   }
+
+  // 2. 【新增】状态选取器逻辑
+  const allowPicker = game.settings.get("xjzl-system", "allowPlayerEffectPicker");
+
+  if (isGM || allowPicker) {
+    const effectPickerBtn = {
+      name: "effect-picker",
+      title: "状态选取器 (Effect Picker)",
+      icon: "fas fa-hand-sparkles", // 找一个好看的图标
+      visible: true,
+      button: true,
+      onChange: () => {
+        // 单例模式：查找或新建
+        const existingApp = Object.values(ui.windows).find(
+          (app) => app.options.id === "xjzl-effect-picker"
+        );
+
+        if (existingApp) {
+          existingApp.render(true, { focus: true });
+        } else {
+          // 这里不再需要传 actor 参数，因为它是全局的
+          new EffectSelectionDialog().render(true);
+        }
+      }
+    };
+
+    // 注入逻辑 (复用你现有的稳健代码)
+    let tokenLayer = null;
+    if (controls.token) tokenLayer = controls.token;
+    else if (controls.tokens) tokenLayer = controls.tokens;
+    else if (controls instanceof Map && controls.has('token')) tokenLayer = controls.get('token');
+
+    if (tokenLayer) {
+      const tools = tokenLayer.tools;
+      if (tools instanceof Map) {
+        if (!tools.has('effect-picker')) tools.set('effect-picker', effectPickerBtn);
+      } else if (Array.isArray(tools)) {
+        if (!tools.some(t => t.name === 'effect-picker')) tools.push(effectPickerBtn);
+      } else if (tools && !tools['effect-picker']) {
+        tokenLayer.tools['effect-picker'] = effectPickerBtn;
+      }
+    }
+  }
 });
 
 /**
@@ -388,6 +454,13 @@ Hooks.on("updateCombat", async (combat, updateData, context) => {
       await currActor.runScripts("turnStart", {});
     }
   }
+
+  // 遍历战斗中的所有战斗员，清除过期的ae效果
+  for (const combatant of combat.combatants) {
+    if (combatant.actor) {
+      await ActiveEffectManager.cleanExpiredEffects(combatant.actor);
+    }
+  }
 });
 
 /**
@@ -415,6 +488,21 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
     console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
   }
 });
+// 应该没有必要浪费性能去实现这种功能
+// 监听世界时间变化 (Seconds 变化)来清理过期AE
+// 比如 GM 手动调整时间，或使用了 Calendar 模组
+// Hooks.on("updateWorldTime", async (worldTime, dt) => {
+//   if (!game.user.isGM) return;
+
+//   // 性能优化：只检查当前场景中的 Actor
+//   // 遍历画布上的所有 Token
+//   const tokens = canvas.tokens.placeables;
+//   for (const token of tokens) {
+//     if (token.actor) {
+//       await ActiveEffectManager.cleanExpiredEffects(token.actor);
+//     }
+//   }
+// });
 
 /* -------------------------------------------- */
 /*  辅助函数                                    */
@@ -573,6 +661,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/damage-tool.hbs", //伤害工具
     "systems/xjzl-system/templates/apps/roll-config.hbs", //roll设置窗口
     "systems/xjzl-system/templates/apps/defend-config.hbs", //看破设置窗口
+    "systems/xjzl-system/templates/apps/effect-selection.hbs", //特效选择
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);

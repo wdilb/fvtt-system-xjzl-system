@@ -254,4 +254,35 @@ export class ActiveEffectManager {
 
         return score;
     }
+
+    /**
+   * 清理过期特效
+   * 检查目标身上的所有特效，如果过期则删除
+   * @param {Actor} actor 
+   */
+    static async cleanExpiredEffects(actor) {
+        if (!actor || !actor.effects) return;
+
+        // 筛选出需要删除的 ID
+        const expiredIds = actor.effects.filter(e => {
+            // 1. 如果是临时特效 (有持续时间)
+            if (e.isTemporary) {
+                // 2. 获取剩余时间 (FVTT 核心已经帮我们算好了)
+                const duration = e.duration;
+
+                // 注意：remaining 属性在 V13 中通常是剩下的秒数或轮数
+                // 如果 remaining 存在且 <= 0，说明过期了
+                if (duration.remaining !== undefined && duration.remaining <= 0) {
+                    return true;
+                }
+            }
+            return false;
+        }).map(e => e.id);
+
+        // 执行批量删除
+        if (expiredIds.length > 0) {
+            console.log(`XJZL | 清理 ${actor.name} 的过期特效:`, expiredIds);
+            await actor.deleteEmbeddedDocuments("ActiveEffect", expiredIds);
+        }
+    }
 }

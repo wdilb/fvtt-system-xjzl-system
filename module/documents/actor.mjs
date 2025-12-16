@@ -215,15 +215,59 @@ export class XJZLActor extends Actor {
       data.rage = sys.resources.rage.value;
     }
 
-    // 3. 将战斗属性添加到顶层
-    // 例如: @wuxue (武学技能), @speed
-    if (sys.skills) {
-      for (const [key, skill] of Object.entries(sys.skills)) {
-        data[key] = skill.total || 0;
-      }
+    // 3. 创建战斗属性的快捷方式 (Combat Shortcuts)
+    // 你的计算代码把结果存为了 xxxTotal，我们可以做一些简化映射
+    if (sys.combat) {
+      // 先攻 (Initiative)
+      // 映射后，公式里可以用 @init 或 @combat.initiativeTotal
+      data.init = sys.combat.initiativeTotal || 0;
+
+      // 速度 (Speed) -> @speed
+      data.speed = sys.combat.speedTotal || 0;
+
+      // 闪避 (Dodge) -> @dodge
+      data.dodge = sys.combat.dodgeTotal || 0;
+
+      // 命中 (Hit)
+      data.hitWai = sys.combat.hitWaigongTotal || 0;
+      data.hitNei = sys.combat.hitNeigongTotal || 0;
+
+      // 暴击 (Crit)
+      data.critWai = sys.combat.critWaigongTotal || 0;
+      data.critNei = sys.combat.critNeigongTotal || 0;
     }
 
     return data;
+  }
+
+  /**
+   * 重写：决定哪些特效应该显示在 Token 图标上，为了在token上显示那些没有持续时间的非被动的AE
+   * 核心逻辑：显示所有“临时特效”以及所有“非被动传输的特效”
+   */
+  get temporaryEffects() {
+    // 1. 获取所有当前生效的特效
+    const effects = this.appliedEffects;
+
+    // 2. 过滤
+    return effects.filter(e => {
+      // A. 如果特效被禁用，不显示
+      if (e.disabled) return false;
+
+      // B. 如果没有图标，或者图标是默认的神秘人，不显示
+      if (!e.img || e.img === "icons/svg/mystery-man.svg") return false;
+
+      // C. 核心修改：
+      // 情况1: 是系统认定的临时特效 (有持续时间 或 是通用状态) -> 显示
+      if (e.isTemporary) return true;
+
+      // 情况2: 是“非传输”特效 (即 transfer: false) -> 显示
+      // 这意味着它是通过脚本、消耗品或技能“施加”在身上的，而不是装备自带的
+      // 满足“持续到战斗结束的Buff”这一需求
+      if (e.transfer === false) return true;
+
+      // 其他情况 (如装备自带的无时限被动) -> 不显示
+      return false;
+    });
   }
 
   /* -------------------------------------------- */
