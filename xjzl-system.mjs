@@ -33,6 +33,7 @@ import { XJZLArtBookSheet } from "./module/sheets/art-book-sheet.mjs";
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
 import { TargetManager } from "./module/managers/target-manager.mjs";
+import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs";
 
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
@@ -50,11 +51,22 @@ Hooks.once("init", async function () {
   // 1. 将自定义配置挂载到全局 CONFIG
   CONFIG.XJZL = XJZL;
 
+  // 挂载到全局命名空间
+  game.xjzl = {
+    api: {
+      // 将来可能有其他 API，所以这里放 effects 子命名空间
+      effects: ActiveEffectManager //这样就可以调用 game.xjzl.api.effects.addEffect
+    }
+  };
+
+  // 修改世界时间配置
+  CONFIG.time.roundTime = 2; // 设置 1 轮 = 2 秒 (我们侠界是这么快的)
+
   // 2. 注册自定义 Document 类 (逻辑层)
   // 告诉 Foundry 使用我们需要扩展的类，而不是默认的 Actor/Item
   CONFIG.Actor.documentClass = XJZLActor;
   CONFIG.Item.documentClass = XJZLItem;
-  // 注册 ActiveEffect 类，用来处理装备的自动抑制
+  // 注册 ActiveEffect 类，用来处理装备的自动抑制和其他我们自定义的AE规则
   CONFIG.ActiveEffect.documentClass = XJZLActiveEffect;
 
   // 3. 注册 DataModels (数据层) - V13 核心
@@ -128,10 +140,10 @@ Hooks.once("init", async function () {
 
   //注册技艺书籍
   Items.registerSheet("xjzl-system", XJZLArtBookSheet, {
-        types: ["art_book"],
-        makeDefault: true,
-        label: "技艺书籍编辑器"
-    });
+    types: ["art_book"],
+    makeDefault: true,
+    label: "技艺书籍编辑器"
+  });
 
   // ==========================================
   //  5.注册 常用Handlebars 辅助函数

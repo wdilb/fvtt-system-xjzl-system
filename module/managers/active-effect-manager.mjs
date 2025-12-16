@@ -1,0 +1,257 @@
+// module/managers/active-effect-manager.mjs
+
+export class ActiveEffectManager {
+
+    /**
+     * 核心方法：向 Actor 添加或叠加特效
+     * @param {Actor} actor - 目标角色
+     * @param {Object} effectData - 特效源数据 (普通 Object)
+     * @returns {Promise<ActiveEffect|undefined>} 返回更新或创建的特效文档
+     */
+    static async addEffect(actor, effectData) {
+        if (!actor || !effectData) return;
+
+        // =====================================================
+        // 1. 预处理：确定唯一标识符 (Slug)
+        // =====================================================
+        // 优先读取 data 中的 slug，如果没有则通过 name 生成
+        // 这是判断“是否是同一个特效”的核心依据
+        const flagSlug = foundry.utils.getProperty(effectData, "flags.xjzl-system.slug");
+        const lookupSlug = flagSlug || foundry.utils.slugify(effectData.name);
+
+        // =====================================================
+        // 2. 查找：是否已存在同名/同Slug特效
+        // =====================================================
+        const existingEffect = actor.effects.find(e => {
+            const eSlug = e.getFlag("xjzl-system", "slug");
+            // 优先匹配 slug，其次匹配 name (兼容老数据)
+            return eSlug === lookupSlug || (!eSlug && e.name === effectData.name);
+        });
+
+        // =====================================================
+        // 3. 分支 A: 不存在 -> 直接创建
+        // =====================================================
+        if (!existingEffect) {
+            // 创建时，系统会自动处理 duration.startTime 等初始化工作
+            const createdDocs = await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+            return createdDocs[0];
+        }
+
+        // =====================================================
+        // 4. 分支 B: 已存在 -> 准备更新数据
+        // =====================================================
+        const isStackable = existingEffect.getFlag("xjzl-system", "stackable");
+        const updateData = {}; // 用于收集所有需要变更的属性，最后一次性 update
+
+        // -----------------------------------------------------
+        // 4.1 叠层与数值逻辑
+        // -----------------------------------------------------
+        if (isStackable) {
+            // --- 叠层模式 ---
+            const currentStacks = existingEffect.getFlag("xjzl-system", "stacks") || 1;
+            const maxStacks = existingEffect.getFlag("xjzl-system", "maxStacks") || 0;
+
+            // 判断是否达到上限
+            // 注意：这里不再直接 return，而是由后续逻辑决定是否只刷新时间
+            if (maxStacks > 0 && currentStacks >= maxStacks) {
+                // 达到上限：不增加层数，不修改数值，仅在下方逻辑中刷新时间
+                ui.notifications.info(`${existingEffect.name} 已达到最大层数。`);
+            } else {
+                // 未达上限：增加层数
+                const newStacks = currentStacks + 1;
+
+                // 调用 Document 类的方法，基于 BaseChanges 快照重新计算数值
+                updateData.changes = existingEffect.calculateChangesForStacks(newStacks);
+
+                // 记录新层数
+                updateData["flags.xjzl-system.stacks"] = newStacks;
+            }
+        } else {
+            // --- 覆盖模式 (不可叠层) ---
+            // 如果新传入的数据带有 changes，我们通常认为新来源可能更强，予以覆盖
+            // 如果希望保留旧的数值，可以在这里加判断逻辑
+            if (effectData.changes) {
+                updateData.changes = effectData.changes;
+            }
+        }
+
+        // -----------------------------------------------------
+        // 4.2 持续时间逻辑 (Duration) - 核心修正
+        // -----------------------------------------------------
+        if (effectData.duration) {
+            // 判定是否需要更新持续时间：
+            // 1. 如果是可叠层的 (isStackable) -> 总是视为“刷新/重置”，需要更新
+            // 2. 如果不可叠层 -> 调用比较函数，只有新时间更长(或相等)时才更新
+            const shouldUpdateDuration = isStackable ||
+                this.compareDurations(effectData.duration, existingEffect.duration) >= 0;
+
+            if (shouldUpdateDuration) {
+                // 深拷贝一份新的时间数据
+                const newDuration = foundry.utils.deepClone(effectData.duration);
+
+                // 时间锚点重置
+                // 无论是在战斗内还是战斗外，必须更新“开始时刻”，否则系统会按旧的开始时间计算，导致瞬间过期
+
+                // 1. 重置世界时间 (秒) - 适用于大地图探索
+                newDuration.startTime = game.time.worldTime;
+
+                // 2. 重置战斗轮次 - 适用于战斗追踪器 (Combat Tracker)
+                if (game.combat) {
+                    // 如果当前处于战斗中，锁定为当前的 Round 和 Turn
+                    newDuration.startRound = game.combat.round;
+                    newDuration.startTurn = game.combat.turn;
+                } else {
+                    // 如果不在战斗中，清除战斗锚点
+                    // 防止遗留了旧的 round 数据，导致下次进战时计算错误
+                    newDuration.startRound = null;
+                    newDuration.startTurn = null;
+                }
+
+                updateData.duration = newDuration;
+            }
+        }
+
+        // -----------------------------------------------------
+        // 4.3 其他元数据更新
+        // -----------------------------------------------------
+        // 更新来源 (origin)，指向最新的那个物品或使用者
+        if (effectData.origin) updateData.origin = effectData.origin;
+
+        // =====================================================
+        // 5. 执行更新
+        // =====================================================
+        // 只有当 updateData 不为空时才执行数据库操作 (节省性能)
+        if (!foundry.utils.isEmpty(updateData)) {
+            return existingEffect.update(updateData);
+        }
+
+        return existingEffect;
+    }
+
+    /**
+     * 核心方法：移除或减少层数
+     * @param {Actor} actor 
+     * @param {string} targetId - 可以是 Effect ID，也可以是 Slug
+     * @param {number} amount - 移除的层数，默认 1
+     */
+    static async removeEffect(actor, targetId, amount = 1) {
+        if (!actor || !targetId) return;
+
+        // 1. 查找特效 (支持 ID 或 Slug)
+        const effect = actor.effects.get(targetId) ||
+            actor.effects.find(e => e.getFlag("xjzl-system", "slug") === targetId);
+
+        if (!effect) return;
+
+        // 2. 判断是否堆叠
+        const isStackable = effect.getFlag("xjzl-system", "stackable");
+        const currentStacks = effect.getFlag("xjzl-system", "stacks") || 1;
+
+        // 3. 分支 A: 不可叠 或 移除层数 >= 当前层数 -> 直接删除
+        if (!isStackable || amount >= currentStacks) {
+            return effect.delete();
+        }
+
+        // 4. 分支 B: 减少层数
+        const newStacks = currentStacks - amount;
+
+        // 重新计算数值
+        const newChanges = effect.calculateChangesForStacks(newStacks);
+
+        await effect.update({
+            changes: newChanges,
+            "flags.xjzl-system.stacks": newStacks
+        });
+    }
+
+    /**
+     * 辅助方法：切换状态 (类似 Core 的 toggleStatusEffect，但走我们的叠层逻辑)
+     * 用于 Token HUD 或 宏
+     * @param {Actor} actor 
+     * @param {string} slug - 通用状态的 Slug (如 "blind")
+     * @param {boolean} [active] - 强制开启(true) 或 关闭(false)。如果不填则切换。
+     * @param {Object} [options] - 额外选项，如 overlay
+     */
+    static async toggleStatus(actor, slug, active, options = {}) {
+        // 1. 从 CONFIG 中获取基础数据模板
+        const statusData = CONFIG.statusEffects.find(e => e.id === slug);
+        if (!statusData) {
+            console.warn(`XJZL | Status Effect "${slug}" not found in CONFIG.`);
+            return;
+        }
+
+        // 检查是否存在
+        const existing = actor.effects.find(e => e.getFlag("xjzl-system", "slug") === slug);
+
+        // 确定目标状态
+        const state = active !== undefined ? active : !existing;
+
+        if (state) {
+            // 开启：调用 addEffect (支持叠层)
+            // 我们需要把 CONFIG 里的数据转换成标准 effectData
+            // 注意：CONFIG.statusEffects 里的格式通常比较简化，这里要做一次深拷贝
+            const effectData = foundry.utils.deepClone(statusData);
+
+            // 确保 slug 存在 (防御性)
+            foundry.utils.setProperty(effectData, "flags.xjzl-system.slug", slug);
+
+            // 如果需要覆盖图标 (overlay)，可在 options 里传
+            if (options.overlay) effectData.flags.core = { overlay: true };
+
+            return this.addEffect(actor, effectData);
+        } else {
+            // 关闭：调用 removeEffect
+            // 如果是 toggle 逻辑，通常意味着完全移除，而不是减一层
+            // 所以我们传一个很大的数，或者扩展 removeEffect 支持 forceDelete
+            // 这里简单处理：直接删除，或者只减一层？
+            // 标准 toggle 行为通常是“关掉”，所以建议直接 delete
+            if (existing) return existing.delete();
+        }
+    }
+
+    /**
+     * 辅助工具：比较两个持续时间的长短
+     * @param {Object} d1 - 新持续时间
+     * @param {Object} d2 - 旧持续时间
+     * @returns {number} 1(d1长), -1(d2长), 0(相等)
+     */
+    static compareDurations(d1, d2) {
+        const val1 = this.getDurationScore(d1);
+        const val2 = this.getDurationScore(d2);
+
+        if (val1 > val2) return 1;
+        if (val1 < val2) return -1;
+        return 0;
+    }
+
+    /**
+     * 辅助工具：计算持续时间评分 (用于比较)
+     * 假设：
+     * 1. 没写 duration = 无限 (Infinity)
+     * 2. Rounds 优先级 > Turns
+     * 3. 忽略 Seconds (除非只有 Seconds)
+     */
+    static getDurationScore(d) {
+        if (!d) return Infinity;
+        // 全空视为无限
+        if (d.rounds === undefined && d.turns === undefined && d.seconds === undefined) return Infinity;
+
+        // 评分算法：
+        // Round * 100 + Turn
+        // 这样 1 Round (100分) > 10 Turns (10分)
+        // 10 Turns (10分) > 8 Turns (8分)
+        let score = 0;
+
+        if (typeof d.rounds === "number") score += d.rounds * 100;
+        if (typeof d.turns === "number") score += d.turns;
+
+        // 如果没有 Rounds/Turns 只有 Seconds (极少见)，折算一下
+        if (score === 0 && typeof d.seconds === "number") {
+            // 简单粗暴：读取定义的一轮的时间，然后一轮 = 100分 (1轮)
+            const roundSeconds = CONFIG.time?.roundTime || 2;  //侠界默认2秒一轮
+            score += (d.seconds / roundSeconds) * 100;
+        }
+
+        return score;
+    }
+}
