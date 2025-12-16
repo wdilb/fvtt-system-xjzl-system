@@ -37,6 +37,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             refundXP: XJZLCharacterSheet.prototype._onRefundXP,
             investMoveXP: XJZLCharacterSheet.prototype._onInvestMoveXP,
             refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
+            investArtXP: XJZLCharacterSheet.prototype._onInvestArtXP,
+            refundArtXP: XJZLCharacterSheet.prototype._onRefundArtXP,
 
             // --- 其他 ---
             deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect, //删除状态
@@ -114,7 +116,10 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // 技能组与 UI 状态
-        if (!this._cultivationSubTab) this._cultivationSubTab = "neigong";
+        // 简单的逻辑：如果当前 tab 不是 neigong/wuxue/arts，重置为 neigong
+        if (!["neigong", "wuxue", "arts"].includes(this._cultivationSubTab)) {
+            this._cultivationSubTab = "neigong";
+        }
         context.cultivationSubTab = this._cultivationSubTab;
 
         context.skillGroups = [
@@ -169,6 +174,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 });
             }
         }
+
+        // =====================================================
+        //  准备技艺书 (Arts Books)
+        // =====================================================
+        context.artBooks = actor.itemTypes.art_book || [];
+
+        // 我们不需要像武学那样预计算伤害，因为技艺书很简单
+        // 章节进度已经在 ArtBookDataModel.prepareDerivedData 中算好了
 
         return context;
     }
@@ -697,6 +710,52 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         });
 
         if (result !== null) await item.refundMove(move.id, result);
+    }
+
+    /**
+     * 技艺书修炼
+     */
+    async _onInvestArtXP(event, target) {
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return;
+
+        // 计算总消耗 (Max XP)
+        const totalCost = item.system.chapters.reduce((sum, c) => sum + (c.cost || 0), 0);
+
+        const result = await this._promptInvest({
+            title: `研读: ${item.name}`,
+            mode: "invest",
+            currentInvested: item.system.xpInvested,
+            maxXP: totalCost,
+            poolGeneral: this.document.system.cultivation.general,
+            poolSpecific: this.document.system.cultivation.arts || 0 // 传入技艺专属池
+        });
+
+        if (result !== null) {
+            // 调用 Item 中的标准方法
+            await item.investArt(result);
+        }
+    }
+
+    /**
+     * 技艺书回退
+     */
+    async _onRefundArtXP(event, target) {
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return;
+
+        const result = await this._promptInvest({
+            title: `放弃研读: ${item.name}`,
+            mode: "refund",
+            currentInvested: item.system.xpInvested,
+            // 传入 breakdown 供弹窗校验上限
+            breakdown: item.system.sourceBreakdown || { general: 0, specific: 0 }
+        });
+
+        if (result !== null) {
+            // 调用 Item 中的标准方法
+            await item.refundArt(result);
+        }
     }
 
     // --- 其他 ---

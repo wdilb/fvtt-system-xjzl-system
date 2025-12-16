@@ -364,8 +364,7 @@ export class XJZLItem extends Item {
   _getSpecificPoolKey() {
     if (this.type === "neigong") return "neigong";
     if (this.type === "wuxue") return "wuxue";
-    // 如果以后有技艺
-    // if (this.type === "art") return "arts";
+    if (this.type === "art_book") return "arts";
     return null;
   }
 
@@ -722,6 +721,182 @@ export class XJZLItem extends Item {
     ]);
 
     ui.notifications.info(`招式回退成功，返还 ${totalRefund} 点 (通:${refundGeneral}/专:${refundSpecific})。`);
+  }
+
+  /**
+   * 技艺书修炼：投入修为
+   * 逻辑对齐: investMove
+   * @param {Number|Object} amountOrAllocation - 数量或分配对象
+   */
+  async investArt(amountOrAllocation) {
+    if (this.type !== "art_book") return;
+    if (!this.actor) return ui.notifications.warn("物品不在角色身上。");
+
+    // === 1. 准备数据 ===
+    // 技艺书没有固定的 maxXP 属性，它是所有章节消耗的总和
+    // 这些数据都在 system 上，不需要像招式那样去数组里找
+    const totalCost = this.system.chapters.reduce((sum, c) => sum + (c.cost || 0), 0);
+    const currentInvested = this.system.xpInvested;
+
+    if (currentInvested >= totalCost) {
+      return ui.notifications.warn("该书籍已全部研读完毕。");
+    }
+
+    // === 2. 参数归一化 ===
+    let general = 0;
+    let specific = 0;
+    let totalTarget = 0;
+
+    // A. 自动模式
+    if (typeof amountOrAllocation === "number" || typeof amountOrAllocation === "string") {
+      totalTarget = parseInt(amountOrAllocation);
+      if (isNaN(totalTarget) || totalTarget <= 0) return ui.notifications.warn("无效数字");
+
+      // --- 核心逻辑：自动分配 (优先扣专属) ---
+      const specificKey = this._getSpecificPoolKey(); // "arts"
+      const actorSpecificBalance = this.actor.system.cultivation[specificKey] || 0;
+
+      specific = Math.min(totalTarget, actorSpecificBalance);
+      general = totalTarget - specific;
+    }
+    // B. 手动模式
+    else {
+      general = parseInt(amountOrAllocation.general) || 0;
+      specific = parseInt(amountOrAllocation.specific) || 0;
+      totalTarget = general + specific;
+    }
+    if (totalTarget <= 0) return ui.notifications.warn("请输入有效的投入数量。");
+
+    // === 3. 上限检查与溢出钳制 (Clamping) ===
+    const needed = totalCost - currentInvested;
+
+    // 溢出策略：优先保留专属，削减通用
+    if (totalTarget > needed) {
+      const overflow = totalTarget - needed;
+
+      if (general >= overflow) {
+        general -= overflow;
+      } else {
+        const remainder = overflow - general;
+        general = 0;
+        specific -= remainder;
+      }
+      ui.notifications.info(`投入溢出，已自动调整为：通用 ${general} / 专属 ${specific}。`);
+    }
+
+    const finalTotal = general + specific;
+    if (finalTotal <= 0) return; // 调整后可能为0
+
+    // === 4. 余额检查 ===
+    const specificKey = this._getSpecificPoolKey();
+    const actorGeneral = this.actor.system.cultivation.general;
+    const actorSpecific = this.actor.system.cultivation[specificKey] || 0;
+
+    if (actorGeneral < general) return ui.notifications.warn(`通用修为不足！需要 ${general}`);
+    if (actorSpecific < specific) return ui.notifications.warn(`技艺修为不足！需要 ${specific}`);
+
+    // === 5. 执行更新 ===
+    // 读取当前 breakdown (防空)
+    const currentBreakdown = this.system.sourceBreakdown || { general: 0, specific: 0 };
+
+    // 计算新 breakdown
+    const newBreakdown = {
+      general: currentBreakdown.general + general,
+      specific: currentBreakdown.specific + specific
+    };
+
+    // 准备 Actor 更新数据
+    const actorUpdates = {
+      "system.cultivation.general": actorGeneral - general
+    };
+    if (specific > 0) {
+      actorUpdates[`system.cultivation.${specificKey}`] = actorSpecific - specific;
+    }
+
+    // 并发提交
+    await Promise.all([
+      this.actor.update(actorUpdates),
+      this.update({
+        "system.xpInvested": currentInvested + finalTotal,
+        "system.sourceBreakdown": newBreakdown
+      })
+    ]);
+
+    ui.notifications.info(`${this.name} 研读进度 +${finalTotal} (通用:${general}, 专属:${specific})。`);
+  }
+
+  /**
+   * 技艺书散功：回收修为
+   * 逻辑对齐: refundMove (优先退还通用)
+   * @param {Number|Object} amountOrAllocation 
+   */
+  async refundArt(amountOrAllocation) {
+    if (this.type !== "art_book") return;
+    if (!this.actor) return;
+
+    // === 1. 获取数据 ===
+    // 读取当前存量 (Component Check)
+    const breakdown = this.system.sourceBreakdown || { general: 0, specific: 0 };
+
+    // === 2. 参数归一化 ===
+    let refundGeneral = 0;
+    let refundSpecific = 0;
+    let totalRefund = 0;
+
+    // A. 自动模式
+    if (typeof amountOrAllocation === "number" || typeof amountOrAllocation === "string") {
+      totalRefund = parseInt(amountOrAllocation);
+      if (isNaN(totalRefund) || totalRefund <= 0) return ui.notifications.warn("请输入有效数字。");
+
+      // --- 核心逻辑：优先退通用 (LIFO) ---
+      refundGeneral = Math.min(totalRefund, breakdown.general);
+      refundSpecific = totalRefund - refundGeneral;
+
+      // 如果通用不够退，才退专属
+      if (refundSpecific > breakdown.specific) {
+        refundSpecific = breakdown.specific;
+        totalRefund = refundGeneral + refundSpecific;
+      }
+    }
+    // B. 手动模式
+    else {
+      refundGeneral = parseInt(amountOrAllocation.general) || 0;
+      refundSpecific = parseInt(amountOrAllocation.specific) || 0;
+      totalRefund = refundGeneral + refundSpecific;
+
+      if (refundGeneral > breakdown.general) return ui.notifications.warn("通用存量不足");
+      if (refundSpecific > breakdown.specific) return ui.notifications.warn("专属存量不足");
+    }
+
+    if (totalRefund <= 0) return;
+
+    // === 3. 执行更新 ===
+    // 扣除书籍内数据
+    const newXP = this.system.xpInvested - totalRefund;
+    const newBreakdown = {
+      general: breakdown.general - refundGeneral,
+      specific: breakdown.specific - refundSpecific
+    };
+
+    // 准备 Actor 返还数据
+    const specificKey = this._getSpecificPoolKey(); // "arts"
+    const actorUpdates = {
+      "system.cultivation.general": this.actor.system.cultivation.general + refundGeneral
+    };
+    if (refundSpecific > 0) {
+      const currentActorSpecific = this.actor.system.cultivation[specificKey] || 0;
+      actorUpdates[`system.cultivation.${specificKey}`] = currentActorSpecific + refundSpecific;
+    }
+
+    await Promise.all([
+      this.actor.update(actorUpdates),
+      this.update({
+        "system.xpInvested": newXP,
+        "system.sourceBreakdown": newBreakdown
+      })
+    ]);
+
+    ui.notifications.info(`${this.name} 散功成功，返还 ${totalRefund} (通:${refundGeneral}/专:${refundSpecific})。`);
   }
 
   /* -------------------------------------------- */
