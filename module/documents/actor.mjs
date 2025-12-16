@@ -456,7 +456,8 @@ export class XJZLActor extends Actor {
     const sys = this.system;
 
     let labelKey = "";
-    let val = 0;
+    let val = 0;          // 基础等级 (属性值/技能总值/技艺总值)
+    let extraBonus = 0;   // 内部额外加值 (如技艺书提供的检定加值，非玩家临时输入的)
     let type = "unknown";
 
     // 1. 识别类型 (Stat vs Skill)
@@ -470,6 +471,18 @@ export class XJZLActor extends Actor {
       val = sys.skills[key]?.total || 0;
       labelKey = CONFIG.XJZL.skills[key];
       type = "skill";
+    }
+    else if (CONFIG.XJZL.arts[key]) {
+      const art = sys.arts[key];
+      // 基础值 = 技艺等级
+      val = art?.total || 0;
+
+      // 技艺特有的检定加成 (Buff + 书籍)
+      // 这些加成不加在等级上，但加在检定结果上
+      extraBonus = (art?.checkMod || 0) + (art?.bookCheck || 0);
+
+      labelKey = CONFIG.XJZL.arts[key];
+      type = "art";
     }
     else {
       ui.notifications.warn(`未知的属性/技能键名: ${key}`);
@@ -508,11 +521,19 @@ export class XJZLActor extends Actor {
       rollTypeLabel = " (劣势)";
     }
 
-    const bonus = options.bonus || 0;
+    const manualBonus = options.bonus || 0;
 
-    // 构造公式: 1d20 + @val + @bonus
-    const formula = `${dice} + @val${bonus !== 0 ? " + @bonus" : ""}`;
-    const rollData = { val: val, bonus: bonus };
+    // 构造公式: 1d20 + @val + @extra(内部加值) + @bonus(手动加值)
+    // 为了公式整洁，只有当值不为0时才拼接到字符串里
+    let formula = `${dice} + @val`;
+    if (extraBonus !== 0) formula += " + @extra";
+    if (manualBonus !== 0) formula += " + @bonus";
+
+    const rollData = {
+      val: val,
+      extra: extraBonus,
+      bonus: manualBonus
+    };
 
     // 4. 执行投掷
     const roll = new Roll(formula, rollData);

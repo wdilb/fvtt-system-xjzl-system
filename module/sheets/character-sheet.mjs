@@ -44,6 +44,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect, //删除状态
             rollMove: XJZLCharacterSheet.prototype._onRollMove,   //使用招式
 
+            // 通用属性/技能/技艺检定
+            rollAttribute: XJZLCharacterSheet.prototype._onRollAttribute,
+
             //手工修正
             addGroup: XJZLCharacterSheet.prototype._onAction,
             deleteGroup: XJZLCharacterSheet.prototype._onAction,
@@ -123,13 +126,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.cultivationSubTab = this._cultivationSubTab;
 
         context.skillGroups = [
-            { label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
-            { label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
-            { label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] },
-            { label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
-            { label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
-            { label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] },
-            { label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }
+            { key: "liliang", label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
+            { key: "shenfa", label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
+            { key: "tipo", label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] },
+            { key: "neixi", label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
+            { key: "qigan", label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
+            { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] },
+            { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }
         ];
 
         // 物品分类
@@ -627,6 +630,17 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         if (item) item.use();
     }
 
+    /**
+     * 点击触发检定 (属性、技能、技艺)
+     */
+    async _onRollAttribute(event, target) {
+        event.preventDefault();
+        const key = target.dataset.key;
+        if (!key) return;
+
+        // 调用 Actor 的核心检定方法
+        await this.document.rollAttributeTest(key);
+    }
     // --- 修炼系统 (使用 _promptInvest 简化) ---
 
     /**
