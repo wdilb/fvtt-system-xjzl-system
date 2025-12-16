@@ -71,8 +71,8 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
       // 5. 【衍生数据】累计奖励 (不需要存库，每次计算)
       // 这些字段会在 prepareDerivedData 中动态计算并附加到 this.system 上
       // 用于 Actor 读取
-      totalLevelBonus: new fields.NumberField({ initial: 0, integer: true, readonly: true }),
-      totalCheckBonus: new fields.NumberField({ initial: 0, integer: true, readonly: true })
+      totalLevelBonus: new fields.NumberField({ initial: 0, integer: true, required: false }),
+      totalCheckBonus: new fields.NumberField({ initial: 0, integer: true, required: false })
     };
   }
 
