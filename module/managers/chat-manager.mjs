@@ -963,7 +963,7 @@ export class ChatCardManager {
         }
 
         const displayName = targetDoc.name || targetActor.name;
-        // 【关键】将 UUID 中的点号替换为下划线，防止 update 时被解析为嵌套对象路径
+        // 将 UUID 中的点号替换为下划线，防止 update 时被解析为嵌套对象路径
         const safeKey = flags.targetUuid.replaceAll(".", "_");
 
         // =====================================================
@@ -1127,30 +1127,8 @@ export class ChatCardManager {
         // =====================================================
         // 6. 状态变更与视觉反馈 (State Updates & VFX)
         // =====================================================
-
-        if (isBroken) {
-            // A. 判定失败：移除架招状态
-            await targetActor.update({ "system.martial.stanceActive": false });
-
-            // B. 应用 "破防" 特效 (Active Effect)
-            // TODO 先随便编一个AE，之后我们完成新的AE之后再回来修改
-            const breakEffectData = {
-                name: "破防",
-                icon: "icons/svg/downgrade.svg",
-                origin: message.uuid,
-                duration: { rounds: 1 },
-                statuses: ["brokenDefense"],
-                description: "架招被虚招击破，处于破防状态。"
-            };
-            await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
-
-            // C. 视觉反馈 (飘字: 红色)
-            if (targetActor.token?.object) {
-                canvas.interface.createScrollingText(targetActor.token.object.center, "被击破架招！", {
-                    fill: "#ff0000", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                });
-            }
-        } else {
+        // 把击破架招放到应用伤害里，避免aoe虚招有一个人反击了
+        if (!isBroken) {
             // A. 判定成功：架招维持
             // B. 视觉反馈 (飘字: 绿色)
             if (targetActor.token?.object) {
@@ -1325,6 +1303,33 @@ export class ChatCardManager {
             const safeKey = uuid.replaceAll(".", "_");
             const feintStatus = feintResults[safeKey];
             const isBroken = (feintStatus === "broken");
+            // =====================================================
+            // 把击破架招移动到这里来处理
+            // =====================================================
+            if (isHit && isBroken && targetActor.system.martial.stanceActive) {
+
+                // A. 判定失败：移除架招状态
+                await targetActor.update({ "system.martial.stanceActive": false });
+
+                // B. 应用 "破防" 特效 (Active Effect)
+                // TODO 先随便编一个AE，之后我们完成新的AE之后再回来修改
+                const breakEffectData = {
+                    name: "破防",
+                    icon: "icons/svg/downgrade.svg",
+                    origin: message.uuid,
+                    duration: { rounds: 1 },
+                    statuses: ["brokenDefense"],
+                    description: "架招被虚招击破，处于破防状态。"
+                };
+                await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
+
+                // C. 视觉反馈 (飘字: 红色)
+                if (targetActor.token?.object) {
+                    canvas.interface.createScrollingText(targetActor.token.object.center, "被击破架招！", {
+                        fill: "#ff0000", stroke: "#000000", strokeThickness: 4, jitter: 0.25
+                    });
+                }
+            }
 
             // C. 调用 Actor 伤害处理
             const damageResult = await targetActor.applyDamage({
