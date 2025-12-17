@@ -301,7 +301,7 @@ const _injectCheckFlags = (sourceObj) => {
   for (const [key, labelKey] of Object.entries(sourceObj)) {
     const flagKey = `${key}CheckLevel`;
     // 这里存 labelKey，方便 UI 显示时能翻译
-    XJZL.checkFlags[flagKey] = labelKey; 
+    XJZL.checkFlags[flagKey] = labelKey;
   }
 };
 
@@ -316,157 +316,471 @@ _injectCheckFlags(XJZL.arts);
  * 通用状态效果配置
  * 这些效果会出现在 Token HUD 和 Smart Picker 中
  */
+// module/config.mjs
+
 XJZL.statusEffects = [
   // ====================================================
-  // 1. 伤害与折磨类 (Stackable)
+  // 1. 持续回合类 (Turn-based / Status)
   // ====================================================
   {
-    id: "poison", // 唯一 ID (Slug)
-    name: "XJZL.Status.Poison", // 对应 zh-cn.json: "中毒"
-    img: "icons/svg/poison.svg", 
-    description: "XJZL.Status.PoisonDesc", // 描述 (可选，配合 Tooltip)
-    duration: { rounds: 3 }, // 默认持续 3 轮
-    flags: {
-      "xjzl-system": {
-        slug: "poison",
-        stackable: true, // 允许叠层
-        maxStacks: 0     // 无限叠
-      }
-    },
+    id: "sielie",
+    name: "XJZL.Status.Sielie", // 撕裂
+    img: "icons/svg/blood.svg",
+    flags: { "xjzl-system": { slug: "sielie", stackable: false } },
     changes: [
-      // 示例：每层扣除气血 (这通常需要配合脚本，但这里可以先占位)
-      // 如果你有被动减属性的机制，写在这里
+      // 受到伤害时流失气血 -> 对应 flag
+      { key: "flags.xjzl-system.bleedOnHit", mode: 2, value: "10" }
     ]
   },
   {
-    id: "bleed",
-    name: "XJZL.Status.Bleed", // "流血"
-    img: "icons/svg/blood.svg",
-    duration: { rounds: 3 },
-    flags: {
-      "xjzl-system": {
-        slug: "bleed",
-        stackable: true,
-        maxStacks: 5
-      }
-    }
+    id: "pojia",
+    name: "XJZL.Status.Pojia", // 破甲
+    img: "icons/svg/downgrade.svg",
+    flags: { "xjzl-system": { slug: "pojia", stackable: false } },
+    changes: [
+      // 外功防御归零 -> 使用 OVERRIDE (5)
+      { key: "system.combat.def_waigong", mode: 5, value: "0" }
+    ]
   },
   {
-    id: "internal-injury",
-    name: "XJZL.Status.InternalInjury", // "内伤"
-    img: "icons/svg/daze.svg",
-    flags: {
-      "xjzl-system": {
-        slug: "internal-injury",
-        stackable: true,
-        maxStacks: 10
-      }
-    },
+    id: "bunu",
+    name: "XJZL.Status.Bunu", // 不怒
+    img: "icons/svg/ice-aura.svg",
+    flags: { "xjzl-system": { slug: "bunu", stackable: false } },
     changes: [
-      // 示例：内伤降低内力上限或回复效率
-      {
-        key: "system.attributes.neili.recovery", // 假设你有这个属性
-        mode: 2, // ADD (乘层数)
-        value: "-2" // 每层 -2 回复
-      }
+      { key: "flags.xjzl-system.noRecoverRage", mode: 5, value: "true" }
+    ]
+  },
+  {
+    id: "jinxu",
+    name: "XJZL.Status.Jinxu", // 禁虚
+    img: "icons/svg/cancel.svg",
+    flags: { "xjzl-system": { slug: "jinxu", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.blockXuZhao", mode: 5, value: "true" }]
+  },
+  {
+    id: "jinshi",
+    name: "XJZL.Status.Jinshi", // 禁实
+    img: "icons/svg/padlock.svg",
+    flags: { "xjzl-system": { slug: "jinshi", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.blockShiZhao", mode: 5, value: "true" }]
+  },
+  {
+    id: "jinfan",
+    name: "XJZL.Status.Jinfan", // 禁反
+    img: "icons/svg/shield.svg", // 暂时用盾牌表示反击相关
+    flags: { "xjzl-system": { slug: "jinfan", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.blockCounter", mode: 5, value: "true" }]
+  },
+  {
+    id: "jinqi",
+    name: "XJZL.Status.Jinqi", // 禁气
+    img: "icons/svg/daze.svg",
+    flags: { "xjzl-system": { slug: "jinqi", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.blockQiZhao", mode: 5, value: "true" }]
+  },
+  {
+    id: "jinjue",
+    name: "XJZL.Status.Jinjue", // 禁绝
+    img: "icons/svg/skull.svg",
+    flags: { "xjzl-system": { slug: "jinjue", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.blockUltimate", mode: 5, value: "true" }]
+  },
+  {
+    id: "jinliao",
+    name: "XJZL.Status.Jinliao", // 禁疗
+    img: "icons/svg/bones.svg",
+    flags: { "xjzl-system": { slug: "jinliao", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.noRecoverHP", mode: 5, value: "true" }]
+  },
+  {
+    id: "qizhi",
+    name: "XJZL.Status.Qizhi", // 气滞
+    img: "icons/svg/net.svg",
+    flags: { "xjzl-system": { slug: "qizhi", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.noRecoverNeili", mode: 5, value: "true" }]
+  },
+  {
+    id: "poyi",
+    name: "XJZL.Status.Poyi", // 破衣
+    img: "icons/svg/shield.svg", // 衣服图标
+    flags: { "xjzl-system": { slug: "poyi", stackable: false } },
+    changes: [
+      // [需脚本实现] 需要在计算装备属性时检测此 Flag
+      { key: "flags.xjzl-system.ignoreArmorEffects", mode: 5, value: "true" }
+    ]
+  },
+  {
+    id: "tuoli",
+    name: "XJZL.Status.Tuoli", // 脱力
+    img: "icons/svg/falling.svg",
+    flags: { "xjzl-system": { slug: "tuoli", stackable: false } },
+    changes: [
+      { key: "system.combat.xuzhao", mode: 2, value: "-3" }, // 虚招对抗-3
+      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" } // 虚招劣势
+    ]
+  },
+  {
+    id: "lianji",
+    name: "XJZL.Status.Lianji", // 连击
+    img: "icons/svg/lightning.svg",
+    flags: { "xjzl-system": { slug: "lianji", stackable: false } },
+    changes: [] // [需脚本实现] 在使用招式后检测此状态
+  },
+  {
+    id: "cuoluan",
+    name: "XJZL.Status.Cuoluan", // 错乱
+    img: "icons/svg/hazard.svg",
+    flags: { "xjzl-system": { slug: "cuoluan", stackable: false } },
+    changes: [] // [需脚本实现] 回合结束触发移动逻辑
+  },
+  {
+    id: "jiaoxie",
+    name: "XJZL.Status.Jiaoxie", // 缴械
+    img: "icons/svg/sword.svg", // 断剑图需找，暂时用剑
+    flags: { "xjzl-system": { slug: "jiaoxie", stackable: false } },
+    changes: [{ key: "flags.xjzl-system.forceUnarmed", mode: 5, value: "true" }]
+  },
+
+  // ====================================================
+  // 2. 叠加层数类 (Stackable)
+  // ====================================================
+  {
+    id: "yangxue",
+    name: "XJZL.Status.Yangxue", // 养血
+    img: "icons/svg/heal.svg",
+    flags: { "xjzl-system": { slug: "yangxue", stackable: true, maxStacks: 0 } },
+    changes: [
+      // 每层回合末回复10气血 -> 对应 flag (数值累加)
+      { key: "flags.xjzl-system.regenHpTurnEnd", mode: 2, value: "10" }
+    ]
+  },
+  {
+    id: "juqi",
+    name: "XJZL.Status.Juqi", // 聚气
+    img: "icons/svg/light.svg",
+    flags: { "xjzl-system": { slug: "juqi", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "flags.xjzl-system.regenMpTurnEnd", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "qixu",
+    name: "XJZL.Status.Qixu", // 气虚
+    img: "icons/svg/acid.svg",
+    flags: { "xjzl-system": { slug: "qixu", stackable: true, maxStacks: 0 } },
+    changes: [
+      // 负数回复 = 流失
+      { key: "flags.xjzl-system.regenMpTurnEnd", mode: 2, value: "-5" }
+    ]
+  },
+  {
+    id: "chengfeng",
+    name: "XJZL.Status.Chengfeng", // 乘风
+    img: "icons/svg/wing.svg",
+    flags: { "xjzl-system": { slug: "chengfeng", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.speed", mode: 2, value: "1" }
+    ]
+  },
+  {
+    id: "gangjin",
+    name: "XJZL.Status.Gangjin", // 刚劲
+    img: "icons/svg/explosion.svg",
+    flags: { "xjzl-system": { slug: "gangjin", stackable: true, maxStacks: 0 } },
+    changes: [
+      // [需脚本] 伤害计算时检测属性和此BUFF
+      // 暂时用通用伤害加成占位，或者你需要具体的 damage.gang 属性
+      { key: "system.bonuses.damage", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "mianjin",
+    name: "XJZL.Status.Mianjin", // 绵劲
+    img: "icons/svg/ice-aura.svg",
+    flags: { "xjzl-system": { slug: "mianjin", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.bonuses.damage", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "panshi",
+    name: "XJZL.Status.Panshi", // 磐石
+    img: "icons/svg/castle.svg",
+    flags: { "xjzl-system": { slug: "panshi", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.block", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "hushen",
+    name: "XJZL.Status.Hushen", // 护身
+    img: "icons/svg/shield.svg",
+    flags: { "xjzl-system": { slug: "hushen", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.def_waigong", mode: 2, value: "5" },
+      { key: "system.combat.def_neigong", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "xujin",
+    name: "XJZL.Status.Xujin", // 蓄劲
+    img: "icons/svg/target.svg",
+    flags: { "xjzl-system": { slug: "xujin", stackable: true, maxStacks: 0 } },
+    changes: [
+      // 暴击骰-1 (越低越好)
+      { key: "system.combat.crit_waigong", mode: 2, value: "-1" },
+      { key: "system.combat.crit_neigong", mode: 2, value: "-1" }
+    ]
+  },
+  {
+    id: "youyu",
+    name: "XJZL.Status.Youyu", // 犹豫
+    img: "systems/xjzl-system/assets/icons/ae/犹豫.svg",
+    flags: { "xjzl-system": { slug: "youyu", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.crit_waigong", mode: 2, value: "1" },
+      { key: "system.combat.crit_neigong", mode: 2, value: "1" }
+    ]
+  },
+  {
+    id: "yanzhan",
+    name: "XJZL.Status.Yanzhan", // 延展
+    img: "icons/svg/direction.svg",
+    flags: { "xjzl-system": { slug: "yanzhan", stackable: true, maxStacks: 0 } },
+    changes: [
+      // [需脚本] 判定距离时读取
+      { key: "system.bonuses.range", mode: 2, value: "1" }
+    ]
+  },
+  {
+    id: "yudun",
+    name: "XJZL.Status.Yudun", // 愚钝
+    img: "icons/svg/daze.svg",
+    flags: { "xjzl-system": { slug: "yudun", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.xuzhao", mode: 2, value: "-1" }
+    ]
+  },
+  {
+    id: "shizhun",
+    name: "XJZL.Status.Shizhun", // 失准
+    img: "icons/svg/blind.svg",
+    flags: { "xjzl-system": { slug: "shizhun", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.hit_waigong", mode: 2, value: "-5" },
+      { key: "system.combat.hit_neigong", mode: 2, value: "-5" }
+    ]
+  },
+  {
+    id: "yanli",
+    name: "XJZL.Status.Yanli", // 眼力
+    img: "icons/svg/eye.svg",
+    flags: { "xjzl-system": { slug: "yanli", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.hit_waigong", mode: 2, value: "5" },
+      { key: "system.combat.hit_neigong", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "qingling",
+    name: "XJZL.Status.Qingling", // 轻灵
+    img: "icons/svg/angel.svg",
+    flags: { "xjzl-system": { slug: "qingling", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.dodge", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "benzhuo",
+    name: "XJZL.Status.Benzhuo", // 笨拙
+    img: "icons/svg/anchor.svg",
+    flags: { "xjzl-system": { slug: "benzhuo", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.combat.dodge", mode: 2, value: "-5" }
+    ]
+  },
+  {
+    id: "jinli",
+    name: "XJZL.Status.Jinli", // 劲力
+    img: "icons/svg/combat.svg",
+    flags: { "xjzl-system": { slug: "jinli", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.bonuses.damage", mode: 2, value: "5" }
+    ]
+  },
+  {
+    id: "wuqishi",
+    name: "XJZL.Status.Wuqishi", // 武器势
+    img: "icons/svg/combat.svg",
+    flags: { "xjzl-system": { slug: "wuqishi", stackable: true, maxStacks: 0 } },
+    changes: [] // [需脚本] 判断武器类型加命中
+  },
+  {
+    id: "fali",
+    name: "XJZL.Status.Fali", // 乏力
+    img: "icons/svg/downgrade.svg",
+    flags: { "xjzl-system": { slug: "fali", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.bonuses.damage", mode: 2, value: "-10" }
+    ]
+  },
+  {
+    id: "chanshou",
+    name: "XJZL.Status.Chanshou", // 颤手
+    img: "icons/svg/paralysis.svg",
+    flags: { "xjzl-system": { slug: "chanshou", stackable: true, maxStacks: 5 } },
+    changes: [] // [需脚本] 监听 stack 变化，满5层触发缴械
+  },
+  {
+    id: "yishang",
+    name: "XJZL.Status.Yishang", // 易伤
+    img: "icons/svg/ruins.svg",
+    flags: { "xjzl-system": { slug: "yishang", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "flags.xjzl-system.bleedOnHit", mode: 2, value: "10" }
+    ]
+  },
+  {
+    id: "jinqi_stack", // 为了区别上面的禁气，这里用 jinqi_stack 或者 strong_jinqi
+    name: "XJZL.Status.JinqiStack", // 劲气 (天级)
+    img: "icons/svg/aura.svg",
+    flags: { "xjzl-system": { slug: "jinqi_stack", stackable: true, maxStacks: 0 } },
+    changes: [
+      { key: "system.bonuses.damage", mode: 2, value: "10" }
     ]
   },
 
   // ====================================================
-  // 2. 控制与封锁类 (Non-Stackable / Status)
+  // 3. 特殊命名类 (Named Special)
   // ====================================================
   {
-    id: "stun",
-    name: "XJZL.Status.Stun", // "晕眩"
-    img: "icons/svg/stoned.svg",
-    // 晕眩通常不可叠层，重复应用只是刷新时间
-    flags: {
-      "xjzl-system": {
-        slug: "stun",
-        stackable: false 
-      }
-    },
+    id: "unstable",
+    name: "XJZL.Status.Unstable", // 下盘不稳
+    img: "icons/svg/falling.svg",
+    flags: { "xjzl-system": { slug: "unstable", stackable: false } },
     changes: [
-      {
-        // 对应你之前定义的 statusFlags
-        key: "flags.xjzl-system.stun",
-        mode: 5, // OVERRIDE (强制设为 true)
-        value: "true"
-      }
+      // 速度减半 -> 乘 0.5
+      { key: "system.combat.speed", mode: 1, value: "0.5" }
     ]
   },
   {
     id: "blind",
-    name: "XJZL.Status.Blind", // "目盲"
+    name: "XJZL.Status.Blind", // 目盲
     img: "icons/svg/blind.svg",
-    flags: {
-      "xjzl-system": { slug: "blind", stackable: false }
-    },
+    flags: { "xjzl-system": { slug: "blind", stackable: false } },
     changes: [
-      // 示例：目盲导致攻击劣势
-      {
-        key: "flags.xjzl-system.attackDisadvantage",
-        mode: 5,
-        value: "true"
-      }
+      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" }, // 命中劣势
+      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" }, // 虚招劣势
+      { key: "flags.xjzl-system.grantAttackLevel", mode: 2, value: "1" }, // 被击优势
+      { key: "system.bonuses.range", mode: 2, value: "-5" } // [需脚本] 限制最低1
     ]
   },
   {
-    id: "silence",
-    name: "XJZL.Status.Silence", // "封穴/沉默"
-    img: "icons/svg/silenced.svg",
-    flags: {
-      "xjzl-system": { slug: "silence", stackable: false }
-    },
+    id: "deaf",
+    name: "XJZL.Status.Deaf", // 耳鸣
+    img: "icons/svg/sound.svg", // 需要找个耳朵或静音图标
+    flags: { "xjzl-system": { slug: "deaf", stackable: false } },
     changes: [
-      {
-        key: "flags.xjzl-system.silence",
-        mode: 5,
-        value: "true"
-      }
+      { key: "flags.xjzl-system.blockCounter", mode: 5, value: "true" }, // 无法反应(反击)
+      { key: "flags.xjzl-system.grantAttackLevel", mode: 2, value: "1" } // 被击优势
     ]
   },
   {
-    id: "disarm",
-    name: "XJZL.Status.Disarm", // "缴械"
-    img: "icons/svg/sword.svg", // 找一个类似断剑的图标
-    flags: {
-      "xjzl-system": { slug: "disarm", stackable: false }
-    },
+    id: "root",
+    name: "XJZL.Status.Root", // 禁足
+    img: "icons/svg/trap.svg",
+    flags: { "xjzl-system": { slug: "root", stackable: false } },
     changes: [
-      {
-        key: "flags.xjzl-system.forceUnarmed",
-        mode: 5,
-        value: "true"
-      }
+      // 速度/闪避归零 -> OVERRIDE (5)
+      { key: "system.combat.speed", mode: 5, value: "0" },
+      { key: "system.combat.dodge", mode: 5, value: "0" }
     ]
   },
-
-  // ====================================================
-  // 3. 增益与架势 (Buffs)
-  // ====================================================
   {
-    id: "meditate",
-    name: "XJZL.Status.Meditate", // "运功/调息"
-    img: "icons/svg/light.svg",
-    flags: {
-      "xjzl-system": { slug: "meditate", stackable: false }
-    },
+    id: "cuogu",
+    name: "XJZL.Status.Cuogu", // 错骨
+    img: "icons/svg/bones.svg", // 找个骨折图标
+    flags: { "xjzl-system": { slug: "cuogu", stackable: false } },
     changes: [
-        // 运功状态下回复增加
-        { key: "system.attributes.hp.recovery", mode: 2, value: "5" }
+      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" }, // 命中劣势
+      { key: "system.combat.kanpo", mode: 2, value: "-5" }
+      // [需脚本] 被击伤害+10
+    ]
+  },
+  {
+    id: "fushen",
+    name: "XJZL.Status.Fushen", // 缚身
+    img: "icons/svg/net.svg",
+    flags: { "xjzl-system": { slug: "fushen", stackable: false } },
+    changes: [] // [需脚本] 限制次要/简要动作
+  },
+  {
+    id: "chizhi",
+    name: "XJZL.Status.Chizhi", // 迟滞
+    img: "icons/svg/downgrade.svg",
+    flags: { "xjzl-system": { slug: "chizhi", stackable: false } },
+    changes: [
+      { key: "flags.xjzl-system.blockCounter", mode: 5, value: "true" }, // 无法反应
+      { key: "flags.xjzl-system.globalCheckLevel", mode: 2, value: "-1" } // 检定劣势
+      // 检定-5 需要具体 Attribute Check Hook
+    ]
+  },
+  {
+    id: "fengzhao",
+    name: "XJZL.Status.Fengzhao", // 封招
+    img: "icons/svg/padlock.svg",
+    flags: { "xjzl-system": { slug: "fengzhao", stackable: false } },
+    changes: [] // [需脚本] 限制主要动作
+  },
+  {
+    id: "stun", // 定身 (作为最通用的控制)
+    name: "XJZL.Status.Stun", // 定身
+    img: "icons/svg/stoned.svg",
+    flags: { "xjzl-system": { slug: "stun", stackable: false } },
+    changes: [
+      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }, // 晕眩/定身Flag
+      { key: "flags.xjzl-system.blockStance", mode: 5, value: "true" } // 解除架招
+    ]
+  },
+  {
+    id: "dianxue",
+    name: "XJZL.Status.Dianxue", // 点穴
+    img: "icons/svg/target.svg",
+    flags: { "xjzl-system": { slug: "dianxue", stackable: false } },
+    changes: [
+      // 效果同定身
+      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+    ]
+  },
+  {
+    id: "xuanyun",
+    name: "XJZL.Status.Xuanyun", // 眩晕 (天级)
+    img: "icons/svg/daze.svg",
+    flags: { "xjzl-system": { slug: "xuanyun", stackable: false } },
+    changes: [
+      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
     ]
   },
   {
     id: "rage",
-    name: "XJZL.Status.Rage", // "狂暴/走火入魔"
+    name: "XJZL.Status.Rage", // 走火入魔
     img: "icons/svg/skull.svg",
-    flags: {
-      "xjzl-system": { slug: "rage", stackable: true, maxStacks: 3 }
-    },
+    flags: { "xjzl-system": { slug: "rage", stackable: false } },
     changes: [
-        { key: "system.attributes.attack", mode: 2, value: "2" }, // 攻击增加
-        { key: "system.attributes.defense", mode: 2, value: "-2" } // 防御减少
+      // [需脚本] 随机攻击逻辑
+      { key: "flags.xjzl-system.rage", mode: 5, value: "true" }
+    ]
+  },
+  {
+    id: "zibi",
+    name: "XJZL.Status.Zibi", // 自闭
+    img: "icons/svg/sleep.svg",
+    flags: { "xjzl-system": { slug: "zibi", stackable: false } },
+    changes: [
+      { key: "flags.xjzl-system.stun", mode: 5, value: "true" },
+      { key: "flags.xjzl-system.globalCheckLevel", mode: 5, value: "-99" }, // 必定失败
+      { key: "flags.xjzl-system.grantAttackLevel", mode: 2, value: "99" } // 被击必暴击(模拟)
     ]
   }
 ];
