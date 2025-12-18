@@ -589,21 +589,20 @@ export class XJZLActor extends Actor {
 
   /**
    * 属性检定配置弹窗
-   * @param {String} label - 检定名称 (如 "体魄")
+   * @param {Object} context - 包含显示所需的数据
    */
-  async _promptAttributeTestConfig(label) {
+  async _promptAttributeTestConfig(context) {
     const formId = `attr-test-${foundry.utils.randomID()}`;
 
-    const content = await renderTemplate("systems/xjzl-system/templates/apps/attribute-test-config.hbs", {
-      formId: formId,
-      label: label
-    });
+    // 合并 ID 到上下文
+    const templateData = { ...context, formId };
+
+    const content = await renderTemplate("systems/xjzl-system/templates/apps/attribute-test-config.hbs", templateData);
 
     return foundry.applications.api.DialogV2.wait({
-      window: { title: `${label} 检定配置`, icon: "fas fa-dice-d20" },
+      window: { title: `${context.label} 检定配置`, icon: "fas fa-dice-d20" },
       content: content,
 
-      // 绑定事件 (复用之前的逻辑)
       render: (event) => {
         const root = document.getElementById(formId);
         if (!root) return;
@@ -696,37 +695,44 @@ export class XJZLActor extends Actor {
     const label = game.i18n.localize(labelKey);
 
     // =====================================================
-    // 1.5 玩家交互弹窗 (新增)
+    // 1.5 玩家交互弹窗
     // =====================================================
+    let sysLevel = (this.xjzlStatuses.globalCheckLevel || 0);
+    const selfFlagKey = `${key}CheckLevel`;
+    sysLevel += (this.xjzlStatuses[selfFlagKey] || 0);
+
     let manualBonus = options.bonus || 0;
     let manualLevel = options.level || 0;
 
     // 除非显式跳过，否则弹出配置框
     if (!options.skipDialog) {
-      const dialogConfig = await this._promptAttributeTestConfig(label);
+
+      // 将系统当前的状态传给弹窗显示
+      const context = {
+        label: label,
+        baseVal: val,        // 当前面板等级
+        sysBonus: extraBonus, // 系统额外修正
+        sysLevel: sysLevel,   // 系统优劣势
+        defaultBonus: manualBonus,
+        defaultLevel: manualLevel
+      };
+      const dialogConfig = await this._promptAttributeTestConfig(context);
 
       // 如果玩家点了关闭/取消，中止流程
       if (!dialogConfig) return null;
 
-      // 叠加数值
-      manualBonus += dialogConfig.bonus;
-      manualLevel += dialogConfig.level;
+      // 这里的逻辑是：弹窗里的值 是 最终的手动修正值
+      // 如果 options.bonus 传了 2，弹窗里默认显示 2。如果玩家改成了 3，那就是 3。
+      // 所以我们直接覆盖，而不是累加 (因为 defaultBonus 已经传进去了)
+      manualBonus = dialogConfig.bonus;
+      manualLevel = dialogConfig.level;
     }
 
     // =====================================================
     // 2. 计算优劣势层级 (Level Calculation)
     // =====================================================
-    // 来源 A: 临时传入 + 弹窗配置
-    let totalLevel = manualLevel;
-
-    // 来源 B: 全局修正 
-    // 已经在 prepareDerivedData 里转为 int 存入 xjzlStatuses
-    totalLevel += (this.xjzlStatuses.globalCheckLevel || 0);
-
-    // 来源 C: 自身特定修正 
-    // 对应的 Flag Key 为: key + "CheckLevel" (e.g., qiaoshouCheckLevel)
-    const selfFlagKey = `${key}CheckLevel`;
-    totalLevel += (this.xjzlStatuses[selfFlagKey] || 0);
+    // 最终层级 = 系统层级 + 手动层级
+    const totalLevel = sysLevel + manualLevel;
 
     // =====================================================
     // 3. 构建骰子公式
