@@ -1330,7 +1330,8 @@ export class ChatCardManager {
                     });
                 }
             }
-
+            // 判断是否是招式
+            const isSkillDamage = move.type !== "basic"; 
             // C. 调用 Actor 伤害处理
             const damageResult = await targetActor.applyDamage({
                 amount: flags.damage,      // 面板伤害
@@ -1342,7 +1343,8 @@ export class ChatCardManager {
                 isBroken: isBroken,        // 破防状态
                 ignoreBlock: ignoreBlock,    //无视格挡
                 ignoreDefense: ignoreDefense, //无视内外功防御
-                ignoreStance: ignoreStance  //无视架招
+                ignoreStance: ignoreStance,  //无视架招
+                isSkill: isSkillDamage
             });
 
             // 统计数据更新为该目标发送独立伤害卡片 (仅命中时)
@@ -1592,6 +1594,9 @@ export class ChatCardManager {
             // “是否命中（默认命中）”，之所以需要配置这个，是为了触发可能存在的未命中特效
             const isHit = config.forceHit;
 
+            // 判断是否为招式
+            const isSkillDamage = move.type !== "basic"; 
+
             // 调用 Actor 伤害接口
             const damageResult = await targetActor.applyDamage({
                 amount: finalBaseDamage,
@@ -1603,7 +1608,8 @@ export class ChatCardManager {
                 isBroken: config.isBroken, // 强制破防
                 ignoreBlock: config.ignoreBlock,
                 ignoreDefense: config.ignoreDefense,
-                ignoreStance: config.ignoreStance
+                ignoreStance: config.ignoreStance,
+                isSkill: isSkillDamage
             });
 
             if (isHit) {

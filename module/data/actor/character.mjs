@@ -200,7 +200,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           poison: makeModField(0, "XJZL.Combat.Res.Poison"),     // 毒素抗性 (基础=韧性)
           fire: makeModField(0, "XJZL.Combat.Res.Fire"),       // 火焰抗性
           mental: makeModField(0, "XJZL.Combat.Res.Mental"),      // 精神抗性
-          liushi: makeModField(0, "XJZL.Combat.Res.Liushi")      // 流失抗性
+          liushi: makeModField(0, "XJZL.Combat.Res.Liushi"),      // 流失抗性
+          skill: makeModField(0, "XJZL.Combat.Res.Skill")      // 招式抗性
         }, { label: "XJZL.Combat.Resistances" }),
 
         //6.消耗减少
@@ -634,7 +635,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
       // --- 技艺书 (art_book) 统计 ---
       const artBooks = actor.itemTypes.art_book || [];
-      
+
       for (const book of artBooks) {
         // 安全检查：书本对应的技艺类型是否存在
         const type = book.system.artType;
@@ -931,7 +932,23 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 1. 资源上限计算 (Resource Max)
     // ------------------------------------
     // HP = 体魄*4 + 力量*1 + 额外 + 经脉加成(Temp)
-    resources.hp.max = Math.floor(S.tipo * 4 + S.liliang * 1 + (resources.hp.bonus || 0) + hpAdd);
+    let hpMax = Math.floor(S.tipo * 4 + S.liliang * 1 + (resources.hp.bonus || 0) + hpAdd);
+    // 处理失血
+    const actor = this.parent;
+    // 确保 bloodLossLevel 已经在 Actor.prepareBaseData 的 numericCombatFlags 里注册过
+    const bloodLoss = actor?.xjzlStatuses?.bloodLossLevel || 0; 
+
+    if (bloodLoss > 0) {
+        // 计算扣除比例 (例如 3层 = 0.3)
+        // Math.min(1, ...) 防止超过 100% 导致负血量（虽然归零也死了）
+        const penaltyRatio = Math.min(1, bloodLoss * 0.1);
+        
+        // 应用扣除
+        hpMax = Math.floor(hpMax * (1 - penaltyRatio));
+    }
+    // 赋值 (保底为 0)
+    resources.hp.max = Math.max(0, hpMax);
+    
     // MP = 内息*1 + 额外
     resources.mp.max = Math.floor(S.neixi * 1 + (resources.mp.bonus || 0) + mpAdd);
     // 怒气上限固定
@@ -1011,7 +1028,6 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // 2. 获取 Flag: 是否允许被动格挡
     // 假设你的 Actor 逻辑已经处理好 Flags 并挂在 actor.xjzlStatuses 上
-    const actor = this.parent;
     const hasPassiveBlock = actor?.xjzlStatuses?.passiveBlock || false;
 
     // 3. 计算架招本身的强度 (仅当架招开启且ID有效时)
@@ -1068,8 +1084,29 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 注意：this.skills.qinggong.total 必须在步骤C已计算
     combat.speedTotal = Math.floor(5 + (this.skills.qinggong.total / 2) + (combat.speed || 0) + bonuses.speed);
 
+    // =======================================================
+    // 处理 "下盘不稳"和“速度归零” 状态 (Speed Penalty)
+    // =======================================================
+    // 直接读取原始 Flag
+    const isUnstable = this.parent?.getFlag("xjzl-system", "unstable");
+
+    if (isUnstable) {
+      // 规则：移动速度减半（向下取整）
+      combat.speedTotal = Math.floor(combat.speedTotal / 2);
+    }
+
+    // 2. 处理 "强制归零" (Force Zeros)
+    if (actor?.getFlag("xjzl-system", "forceSpeedZero")) {
+        combat.speedTotal = 0;
+    }
+
     // 闪避 (基础10 + 身法/4 + 修正)
     combat.dodgeTotal = Math.floor(10 + (S.shenfa / 4) + (combat.dodge || 0) + bonuses.dodge);
+
+    // 处理闪避归零状态
+    if (actor?.getFlag("xjzl-system", "forceDodgeZero")) {
+        combat.dodgeTotal = 0;
+    }
 
     // 先攻 (身法 + 修正)
     combat.initiativeTotal = Math.floor((S.shenfa / 10) + (combat.initiative || 0) + bonuses.initiative);
@@ -1091,8 +1128,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     const isBroken = actor?.getFlag("xjzl-system", "brokenDefense");
 
     if (isBroken) {
-        combat.defWaigongTotal = 0;
-        // combat.defNeigongTotal = 0; // 如果需要破内防
+      combat.defWaigongTotal = 0;
+      // combat.defNeigongTotal = 0; // 如果需要破内防
     }
 
     //消耗减少

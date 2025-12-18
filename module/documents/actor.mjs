@@ -229,7 +229,8 @@ export class XJZLActor extends Actor {
     this.xjzlStatuses = {};
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     // 需要特殊处理为数字的 Key 列表 (战斗类)
-    const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel", "bleedOnHit", "wuxueBleedOnHit"];
+    const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel", 
+      "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel"];
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
       // 如果是那数值型的 Key，单独处理，否则按布尔处理
@@ -814,7 +815,8 @@ export class XJZLActor extends Actor {
       isBroken = false,   // 是否被破防
       ignoreBlock = false,   // 强制无视格挡
       ignoreDefense = false,  // 强制无视防御
-      ignoreStance = false  // 强制无视架招
+      ignoreStance = false,  // 强制无视架招
+      isSkill = true // false表示普通攻击
     } = data;
 
     // 0. 未命中直接返回
@@ -892,6 +894,9 @@ export class XJZLActor extends Actor {
     // D. 抗性 (Resistance)
     const resMap = sys.combat.resistances;
     const globalRes = resMap.global.total || 0;
+    // 招式抗性
+    // 只有当 isSkill 为 true 时才生效
+    const skillRes = isSkill ? (resMap.skill?.total || 0) : 0;
     let specificRes = 0;
     // 根据类型映射抗性
     switch (type) {
@@ -904,7 +909,7 @@ export class XJZLActor extends Actor {
       default: specificRes = 0; break;
     }
 
-    const totalRes = globalRes + specificRes;
+    const totalRes = globalRes + specificRes + skillRes;
 
     // E. 执行减法
     // 公式：(伤害 - 防御 - 格挡 - 抗性)

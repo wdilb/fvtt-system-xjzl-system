@@ -64,6 +64,55 @@ export class ActiveEffectManager {
             const currentStacks = existingEffect.getFlag("xjzl-system", "stacks") || 1;
             const maxStacks = existingEffect.getFlag("xjzl-system", "maxStacks") || 0;
 
+            // =======================================================
+            // 颤手 (Chanshou) 特殊转化逻辑
+            // =======================================================
+            const isChanshou = existingEffect.getFlag("xjzl-system", "slug") === "chanshou";
+
+            if (isChanshou && (currentStacks + 1) >= 5) {
+                // 1. 删除 颤手 (静默)
+                await existingEffect.delete({ scrollingStatusText: false });
+
+                // 2. 添加 缴械
+                const jiaoxieData = foundry.utils.deepClone(
+                    CONFIG.statusEffects.find(e => e.id === "jiaoxie")
+                );
+
+                if (jiaoxieData) {
+                    // 强制缴械持续 1 回合
+                    jiaoxieData.duration = { rounds: 1 };
+                    await this.addEffect(actor, jiaoxieData);
+                }
+
+                // 3. 卸下所有已装备的武器
+                // 筛选条件：类型是 weapon 且 system.equipped 为 true
+                const equippedWeapons = actor.items.filter(i =>
+                    i.type === "weapon" && i.system.equipped
+                );
+
+                if (equippedWeapons.length > 0) {
+                    // 构建批量更新数据
+                    const weaponUpdates = equippedWeapons.map(w => ({
+                        _id: w.id,
+                        "system.equipped": false
+                    }));
+
+                    // 执行批量更新
+                    await actor.updateEmbeddedDocuments("Item", weaponUpdates);
+
+                    // 飘字提示
+                    this._showScrollingText(actor, "武器脱手!", "neutral");
+                } else {
+                    // 如果手里没武器，只提示转化
+                    this._showScrollingText(actor, "颤手 -> 缴械", "neutral");
+                }
+
+                // 终止后续逻辑
+                return;
+            }
+            // =======================================================
+
+
             // 判断是否达到上限
             // 注意：这里不再直接 return，而是由后续逻辑决定是否只刷新时间
             if (maxStacks > 0 && currentStacks >= maxStacks) {

@@ -95,7 +95,8 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       ignoreBlock: formData.get("ignoreBlock") === "on",
       ignoreStance: formData.get("ignoreStance") === "on",     // 新增
       isCrit: formData.get("isCrit") === "on",                 // 仅触发特效
-      applyCritDamage: formData.get("applyCritDamage") === "on"// 实际翻倍
+      applyCritDamage: formData.get("applyCritDamage") === "on",// 实际翻倍
+      isSkill: formData.get("isSkill") === "on" // 是否招式
     };
 
     // 2. 基础校验
@@ -146,7 +147,8 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         isBroken: false,  //默认不击破架招，因为都没有招式来源，一般也不会触发破架特效
         ignoreDefense: config.ignoreDefense,
         ignoreBlock: config.ignoreBlock,
-        ignoreStance: config.ignoreStance 
+        ignoreStance: config.ignoreStance,
+        isSkill: config.isSkill
       });
 
       // 2. 准备聊天卡片数据 (复用 damage-card.hbs)
