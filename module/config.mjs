@@ -418,8 +418,8 @@ XJZL.statusEffects = [
     img: "icons/svg/falling.svg",
     flags: { "xjzl-system": { slug: "tuoli", stackable: false } },
     changes: [
-      { key: "system.combat.xuzhao", mode: 2, value: "-3" }, // 虚招对抗-3
-      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" } // 虚招劣势
+      { key: "system.combat.xuzhao", mode: 2, value: "-3" },
+      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" }
     ]
   },
   {
@@ -427,14 +427,14 @@ XJZL.statusEffects = [
     name: "XJZL.Status.Lianji", // 连击
     img: "icons/svg/lightning.svg",
     flags: { "xjzl-system": { slug: "lianji", stackable: false } },
-    changes: [] // [需脚本实现] 在使用招式后检测此状态
+    changes: [] // 手动
   },
   {
     id: "cuoluan",
     name: "XJZL.Status.Cuoluan", // 错乱
     img: "icons/svg/hazard.svg",
     flags: { "xjzl-system": { slug: "cuoluan", stackable: false } },
-    changes: [] // [需脚本实现] 回合结束触发移动逻辑
+    changes: [] // 手动
   },
   {
     id: "jiaoxie",
@@ -453,7 +453,6 @@ XJZL.statusEffects = [
     img: "icons/svg/heal.svg",
     flags: { "xjzl-system": { slug: "yangxue", stackable: true, maxStacks: 0 } },
     changes: [
-      // 每层回合末回复10气血 -> 对应 flag (数值累加)
       { key: "flags.xjzl-system.regenHpTurnEnd", mode: 2, value: "10" }
     ]
   },
@@ -491,9 +490,7 @@ XJZL.statusEffects = [
     img: "icons/svg/explosion.svg",
     flags: { "xjzl-system": { slug: "gangjin", stackable: true, maxStacks: 0 } },
     changes: [
-      // [需脚本] 伤害计算时检测属性和此BUFF
-      // 暂时用通用伤害加成占位，或者你需要具体的 damage.gang 属性
-      { key: "system.bonuses.damage", mode: 2, value: "5" }
+      { key: "system.combat.damages.gang.mod", mode: 2, value: "5" } 
     ]
   },
   {
@@ -502,7 +499,7 @@ XJZL.statusEffects = [
     img: "icons/svg/ice-aura.svg",
     flags: { "xjzl-system": { slug: "mianjin", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.bonuses.damage", mode: 2, value: "5" }
+      { key: "system.combat.damages.rou.mod", mode: 2, value: "5" }
     ]
   },
   {
@@ -530,7 +527,6 @@ XJZL.statusEffects = [
     img: "icons/svg/target.svg",
     flags: { "xjzl-system": { slug: "xujin", stackable: true, maxStacks: 0 } },
     changes: [
-      // 暴击骰-1 (越低越好)
       { key: "system.combat.crit_waigong", mode: 2, value: "-1" },
       { key: "system.combat.crit_neigong", mode: 2, value: "-1" }
     ]
@@ -550,10 +546,7 @@ XJZL.statusEffects = [
     name: "XJZL.Status.Yanzhan", // 延展
     img: "icons/svg/direction.svg",
     flags: { "xjzl-system": { slug: "yanzhan", stackable: true, maxStacks: 0 } },
-    changes: [
-      // [需脚本] 判定距离时读取
-      { key: "system.bonuses.range", mode: 2, value: "1" }
-    ]
+    changes: [] // 手动
   },
   {
     id: "yudun",
