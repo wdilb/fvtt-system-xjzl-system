@@ -364,6 +364,17 @@ export class XJZLActor extends Actor {
     }
 
     // 2. 装备 (Weapon, Armor, Qizhen) - 筛选已装备的
+
+    // 获取破衣标记
+    // 注意：我们在 applyDamage 前已经把 flags 解析到 xjzlStatuses 里了
+    // 但在 collectScripts 运行时机可能不同，最稳妥是用 getFlag
+    const isArmorBroken = this.getFlag("xjzl-system", "ignoreArmorEffects");
+
+    // 定义受破衣影响的部位
+    // 假设你的 Armor DataModel 里，部位存储在 system.type 中
+    // 如果存在 system.slot，请替换为 i.system.slot
+    const bodySlots = ["head", "top", "bottom", "shoes"];
+
     const equipments = this.items.filter(i =>
       ["weapon", "armor", "qizhen"].includes(i.type) &&
       i.system.equipped &&
@@ -371,6 +382,13 @@ export class XJZLActor extends Actor {
     );
 
     for (const item of equipments) {
+      // --- 破衣拦截逻辑 ---
+      if (isArmorBroken && item.type === "armor") {
+        // 进一步检查是否属于身体部位 (排除掉护身符等可能也是 armor 类型的特殊物品)
+        if (bodySlots.includes(item.system.type)) {
+          continue; // 跳过此物品，不收集其脚本
+        }
+      }
       item.system.scripts.forEach(s => {
         if (s.trigger === trigger && s.active) {
           scripts.push({

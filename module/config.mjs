@@ -261,6 +261,7 @@ XJZL.statusFlags = {
 
   // --- E. 其他类  ---
   passiveBlock: "XJZL.Status.PassiveBlock",     // 被动格挡：即使未开启架招，基础格挡值依然生效
+  ignoreArmorEffects: "XJZL.Status.IgnoreArmorEffects", // 防具无效
 
   // --- F. 攻击穿透类 (Attacker Penetration) ---
   // 攻击者拥有此状态时，其攻击将获得对应效果
@@ -408,7 +409,6 @@ XJZL.statusEffects = [
     img: "icons/svg/shield.svg", // 衣服图标
     flags: { "xjzl-system": { slug: "poyi", stackable: false } },
     changes: [
-      // [需脚本实现] 需要在计算装备属性时检测此 Flag
       { key: "flags.xjzl-system.ignoreArmorEffects", mode: 5, value: "true" }
     ]
   },

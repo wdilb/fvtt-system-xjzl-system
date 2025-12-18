@@ -81,6 +81,25 @@ export class XJZLActiveEffect extends ActiveEffect {
           return true; // 抑制！
         }
       }
+
+      // B. 【新增】破衣 (Poyi) 逻辑
+      // 如果物品是防具，且拥有者有破衣 Flag
+      if (parent.type === "armor") {
+        // 获取拥有者 (Item -> Actor)
+        const actor = parent.parent;
+        if (actor) {
+          // 检查是否破衣
+          const isBroken = actor.getFlag("xjzl-system", "ignoreArmorEffects");
+
+          // 检查部位 (防止破衣把饰品也破了)
+          const bodySlots = ["head", "top", "bottom", "shoes"];
+          const isBodyPart = bodySlots.includes(itemData.type);
+
+          if (isBroken && isBodyPart) {
+            return true; // 抑制！防御力加成归零
+          }
+        }
+      }
     }
 
     // 4. 其他情况 (如特效在 Actor 身上)，保持默认行为
