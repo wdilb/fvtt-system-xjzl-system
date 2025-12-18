@@ -754,6 +754,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/roll-config.hbs", //roll设置窗口
     "systems/xjzl-system/templates/apps/defend-config.hbs", //看破设置窗口
     "systems/xjzl-system/templates/apps/effect-selection.hbs", //特效选择
+    "systems/xjzl-system/templates/apps/attribute-test-config.hbs", //属性检定设置窗口
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);

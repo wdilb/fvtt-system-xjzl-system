@@ -192,18 +192,18 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 检测让装备无效的flags，如果不在这里加载可能会因为加载AE顺序的问题导致flags生效的时候其他装备的AE已经被计算过了的问题
     // =====================================================
-    
+
     // 我们不再检查 slug === 'poyi'
     // 而是检查：是否有任何未禁用的特效，试图修改 'ignoreArmorEffects' 这个 Flag
     const targetFlagKey = "flags.xjzl-system.ignoreArmorEffects";
 
     this.isArmorBroken = this.effects.some(e => {
-        // 1. 基本过滤：特效必须是开启的
-        if (e.disabled) return false;
+      // 1. 基本过滤：特效必须是开启的
+      if (e.disabled) return false;
 
-        // 2. 扫描 Changes：看有没有针对目标 Flag 的修改
-        // 注意：e.changes 是一个数组对象
-        return e.changes.some(change => change.key === targetFlagKey);
+      // 2. 扫描 Changes：看有没有针对目标 Flag 的修改
+      // 注意：e.changes 是一个数组对象
+      return e.changes.some(change => change.key === targetFlagKey);
     });
   }
 
@@ -229,7 +229,7 @@ export class XJZLActor extends Actor {
     this.xjzlStatuses = {};
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     // 需要特殊处理为数字的 Key 列表 (战斗类)
-    const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel", 
+    const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel",
       "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel"];
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
@@ -588,6 +588,65 @@ export class XJZLActor extends Actor {
   /* -------------------------------------------- */
 
   /**
+   * 属性检定配置弹窗
+   * @param {String} label - 检定名称 (如 "体魄")
+   */
+  async _promptAttributeTestConfig(label) {
+    const formId = `attr-test-${foundry.utils.randomID()}`;
+
+    const content = await renderTemplate("systems/xjzl-system/templates/apps/attribute-test-config.hbs", {
+      formId: formId,
+      label: label
+    });
+
+    return foundry.applications.api.DialogV2.wait({
+      window: { title: `${label} 检定配置`, icon: "fas fa-dice-d20" },
+      content: content,
+
+      // 绑定事件 (复用之前的逻辑)
+      render: (event) => {
+        const root = document.getElementById(formId);
+        if (!root) return;
+
+        root.addEventListener("click", (e) => {
+          const btn = e.target.closest("button[data-action]");
+          if (!btn) return;
+          e.preventDefault();
+
+          const action = btn.dataset.action;
+          const targetName = btn.dataset.target;
+          const input = root.querySelector(`input[name="${targetName}"]`);
+
+          if (input) {
+            let val = parseInt(input.value) || 0;
+            if (action === "increase") val++;
+            else if (action === "decrease") val--;
+            input.value = val;
+          }
+        });
+      },
+
+      buttons: [{
+        action: "ok",
+        label: "投掷",
+        icon: "fas fa-check",
+        default: true,
+        callback: () => {
+          const root = document.getElementById(formId);
+          if (!root) return { bonus: 0, level: 0 };
+
+          return {
+            bonus: parseInt(root.querySelector('[name="bonus"]').value) || 0,
+            level: parseInt(root.querySelector('[name="level"]').value) || 0
+          };
+        }
+      }],
+      rejectClose: false,
+      close: () => null
+    });
+  }
+
+  /**
    * 执行属性或技能检定
    * 
    * @param {String} key 属性或技能的键名 (如 "liliang", "qiaoshou")
@@ -637,10 +696,28 @@ export class XJZLActor extends Actor {
     const label = game.i18n.localize(labelKey);
 
     // =====================================================
+    // 1.5 玩家交互弹窗 (新增)
+    // =====================================================
+    let manualBonus = options.bonus || 0;
+    let manualLevel = options.level || 0;
+
+    // 除非显式跳过，否则弹出配置框
+    if (!options.skipDialog) {
+      const dialogConfig = await this._promptAttributeTestConfig(label);
+
+      // 如果玩家点了关闭/取消，中止流程
+      if (!dialogConfig) return null;
+
+      // 叠加数值
+      manualBonus += dialogConfig.bonus;
+      manualLevel += dialogConfig.level;
+    }
+
+    // =====================================================
     // 2. 计算优劣势层级 (Level Calculation)
     // =====================================================
-    // 来源 A: 临时传入 (Macros 里的配置)
-    let totalLevel = options.level || 0;
+    // 来源 A: 临时传入 + 弹窗配置
+    let totalLevel = manualLevel;
 
     // 来源 B: 全局修正 
     // 已经在 prepareDerivedData 里转为 int 存入 xjzlStatuses
@@ -665,8 +742,6 @@ export class XJZLActor extends Actor {
       dice = "2d20kl";
       rollTypeLabel = " (劣势)";
     }
-
-    const manualBonus = options.bonus || 0;
 
     // 构造公式: 1d20 + @val + @extra(内部加值) + @bonus(手动加值)
     // 为了公式整洁，只有当值不为0时才拼接到字符串里
