@@ -147,7 +147,7 @@ export class XJZLActor extends Actor {
     this.xjzlStatuses = {};
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     // 需要特殊处理为数字的 Key 列表 (战斗类)
-    const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel"];
+    const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel", "bleedOnHit", "wuxueBleedOnHit"];
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
       // 如果是那数值型的 Key，单独处理，否则按布尔处理
@@ -851,62 +851,113 @@ export class XJZLActor extends Actor {
     // 4. 资源扣除 (Deduction)
     // 优先级：护体 -> 气血 -> (濒死) -> 内力
     // =====================================================
+    // 在任何计算和更新之前，拍摄当前血量的快照
+    // 用于后续判断是否是从“活”变“死”
+    const originalHP = sys.resources.hp.value;
+    // --- 计算流失伤害 (Liushi Damage) ---
+    // 逻辑：受伤时触发，受流失抗性抵消，随后进入通用扣除流程
+    let liushiDamage = 0;
+    // 只有常规伤害 > 0 (造成了实际伤害) 时才触发“受伤流失”
+    if (finalDamage > 0) {
+      // 1. 读取 Flags 
+      liushiDamage += (this.xjzlStatuses.bleedOnHit || 0);
 
+      if (["waigong", "neigong"].includes(type)) {
+        liushiDamage += (this.xjzlStatuses.wuxueBleedOnHit || 0);
+      }
+
+      // 2. 应用流失抗性
+      if (liushiDamage > 0) {
+        const liushiRes = sys.combat.resistances?.liushi?.total || 0;
+        liushiDamage = Math.max(0, liushiDamage - liushiRes);
+      }
+    }
     // 准备更新数据包 (Batch Update)
     const updates = {};
-    let remainingDamage = finalDamage;
+    // 获取当前资源快照 (用于连续计算)
+    let currentHuti = sys.resources.huti ?? 0;
+    let currentHP = sys.resources.hp.value;
+    let currentMP = sys.resources.mp.value;
 
-    // 追踪实际损失量 (用于返回统计)
-    let hutiLost = 0;
-    let hpLost = 0;
-    let mpLost = 0;
+    // 追踪损失量 (用于统计和更新)
+    // 我们把 常规损失 和 流失损失 分开统计，以便飘字区分
+    let stdHutiLost = 0, stdHpLost = 0, stdMpLost = 0;
+    let liuHutiLost = 0, liuHpLost = 0, liuMpLost = 0;
     let isDying = false; // 是否进入濒死
     let isDead = false;  // 是否彻底死亡
 
-    // A. 扣除护体真气 (Huti)
-    const currentHuti = sys.resources.huti ?? 0;
-    const currentHP = sys.resources.hp.value;
-    const currentMP = sys.resources.mp.value;
-    if (currentHuti > 0 && remainingDamage > 0) {
-      hutiLost = Math.min(currentHuti, remainingDamage);
-      remainingDamage -= hutiLost;
-      updates["system.resources.huti"] = currentHuti - hutiLost;
-    }
+    /**
+     * [内部辅助] 单次伤害扣除逻辑
+     * @param {number} dmg - 待扣除伤害值
+     * @param {number} ratio - 内力抵扣比率 (5:1 或 1:1)
+     * @returns {Object} { hutiLost, hpLost, mpLost } 本次扣除的具体数值
+     */
+    const applyDeduction = (dmg, ratio) => {
+      let res = { h: 0, p: 0, m: 0 }; // 局部统计
+      if (dmg <= 0) return res;
 
-    // B. 扣除气血 (HP)
-    if (remainingDamage > 0) {
-      if (currentHP > remainingDamage) {
-        // 够扣，还没死
-        hpLost = remainingDamage;
-        remainingDamage = 0;
-        updates["system.resources.hp.value"] = currentHP - hpLost;
-      } else {
-        // 不够扣，触发濒死逻辑
-        hpLost = currentHP; // 把血扣光
-        remainingDamage -= currentHP;
-        updates["system.resources.hp.value"] = 0;
-        isDying = true;
+      let remaining = dmg;
+
+      // A. 扣除护体真气 (Huti)
+      if (currentHuti > 0 && remaining > 0) {
+        const hTake = Math.min(currentHuti, remaining);
+        currentHuti -= hTake;
+        res.h += hTake;
+        remaining -= hTake;
       }
-    }
 
-    // C. 濒死转扣内力 (Overflow to MP)
-    // 仅当气血被扣光，且还有剩余伤害时触发
-    if (remainingDamage > 0) {
-      // 计算转换比率
-      // 内/外功 5:1，其他 1:1
-      const ratio = (type === "waigong" || type === "neigong") ? 5 : 1;
-      const mpDamage = Math.ceil(remainingDamage / ratio);
-
-      mpLost = Math.min(currentMP, mpDamage);
-
-      updates["system.resources.mp.value"] = currentMP - mpLost;
-
-      // 检查是否真正死亡 (内力也被扣光)
-      // 注意：如果 mpDamage > currentMP，说明内力不够抵扣剩余伤害 -> 死亡
-      if (mpDamage > currentMP) {
-        isDead = true;
+      // B. 扣除气血 (HP)
+      if (remaining > 0) {
+        if (currentHP > remaining) {
+          // 够扣，还没死
+          currentHP -= remaining;
+          res.p += remaining;
+          remaining = 0;
+        } else {
+          // 不够扣，触发濒死
+          const hpTake = currentHP;
+          currentHP = 0; // 血归零
+          res.p += hpTake;
+          remaining -= hpTake;
+          isDying = true; // 只要血归零，就算濒死
+        }
       }
+
+      // C. 扣内力 (濒死溢出)
+      if (remaining > 0) {
+        const mpDamage = Math.ceil(remaining / ratio);
+        const mpTake = Math.min(currentMP, mpDamage);
+
+        currentMP -= mpTake;
+        res.m += mpTake;
+
+        // 如果还不够扣 -> 死亡
+        if (mpDamage > mpTake) {
+          isDead = true;
+        }
+      }
+      return res;
     }
+    // --- 第一轮：常规伤害 ---
+    // 内/外功 5:1，其他 1:1
+    const standardRatio = (type === "waigong" || type === "neigong") ? 5 : 1;
+    const stdRes = applyDeduction(finalDamage, standardRatio);
+    stdHutiLost = stdRes.h; stdHpLost = stdRes.p; stdMpLost = stdRes.m;
+
+    // --- 第二轮：流失伤害 ---
+    // 转扣内力永远是 1:1 (特殊伤害)
+    const liuRes = applyDeduction(liushiDamage, 1);
+    liuHutiLost = liuRes.h; liuHpLost = liuRes.p; liuMpLost = liuRes.m;
+
+    // 汇总总损失 (用于更新数据库)
+    const totalHutiLost = stdHutiLost + liuHutiLost;
+    const totalHpLost = stdHpLost + liuHpLost;
+    const totalMpLost = stdMpLost + liuMpLost;
+
+    // 生成数据库更新包
+    if (totalHutiLost > 0) updates["system.resources.huti"] = currentHuti;
+    if (totalHpLost > 0) updates["system.resources.hp.value"] = currentHP;
+    if (totalMpLost > 0) updates["system.resources.mp.value"] = currentMP;
 
     // 执行数据库更新
     if (!foundry.utils.isEmpty(updates)) {
@@ -929,7 +980,7 @@ export class XJZLActor extends Actor {
 
     // A. 濒死触发
     // 判断条件：原本活着(currentHP > 0) 且 本次结算判定为濒死(isDying)
-    if (isDying && currentHP > 0) {
+    if (isDying && originalHP > 0) {
       await this.runScripts(SCRIPT_TRIGGERS.DYING, statusCtx);
 
       // 检查脚本是否挽救了角色
@@ -968,32 +1019,48 @@ export class XJZLActor extends Actor {
     // =====================================================
 
     // A. 飘字
-    if (this.token?.object && finalDamage > 0) {
-      let flavor = `-${finalDamage}`;
-      let color = "#ff0000"; // 默认红
-      let size = 32;
+    if (this.token?.object) {
+      // 1. 常规伤害飘字
+      const stdTotal = stdHutiLost + stdHpLost; // 只显示常规部分的扣血+护体
+      if (stdTotal > 0) {
+        let flavor = `-${stdTotal}`;
+        let color = "#ff0000";
+        let size = 32;
 
-      if (isCrit) {
-        flavor = `暴击! ${flavor}`;
-        size = 48;
-        color = "#ff4500"; // 橙红
-      }
-      if (hutiLost > 0 && hpLost === 0) {
-        color = "#00ffff"; // 护体扣除显示青色
-        flavor = `护体 -${hutiLost}`;
+        if (isCrit) {
+          flavor = `暴击! ${flavor}`;
+          size = 48;
+          color = "#ff4500";
+        }
+        if (stdHutiLost > 0 && stdHpLost === 0) {
+          color = "#00ffff"; // 纯护体扣除
+          flavor = `护体 -${stdHutiLost}`;
+        }
+
+        canvas.interface.createScrollingText(this.token.object.center, flavor, {
+          direction: 0, fontSize: size, fill: color,
+          stroke: "#000000", strokeThickness: 4, jitter: 0.25
+        });
       }
 
-      canvas.interface.createScrollingText(this.token.object.center, flavor, {
-        direction: 0,
-        fontSize: size,
-        fill: color,
-        stroke: "#000000",
-        strokeThickness: 4,
-        jitter: 0.25
-      });
-    } else if (finalDamage === 0 && isHit) {
-      // 命中但0伤 (被格挡/护甲抵消)
-      if (this.token?.object) {
+      // 2. 流失伤害飘字 (单独显示)
+      // 只有当真的产生了流失扣血(或扣护体)时才飘字
+      const liuTotal = liuHutiLost + liuHpLost;
+      if (liuTotal > 0) {
+        // 让流失字体稍微延后一点或颜色不同，深红色
+        canvas.interface.createScrollingText(this.token.object.center, `流失 -${liuTotal}`, {
+          direction: 0, // 向下飘或者换个方向
+          fontSize: 28,
+          fill: "#8b0000", // 深红/暗红
+          stroke: "#ffffff",
+          strokeThickness: 2,
+          jitter: 0.25,
+          anchor: 1 // 稍微偏移一点位置防止完全重叠
+        });
+      }
+
+      // 3. 无伤提示
+      if (stdTotal === 0 && liuTotal === 0 && isHit) {
         canvas.interface.createScrollingText(this.token.object.center, "无伤", {
           fill: "#cccccc", stroke: "#000000", strokeThickness: 4
         });
@@ -1003,7 +1070,7 @@ export class XJZLActor extends Actor {
     // B. 被击回怒 (Defender Rage)
     // 规则：受到 内/外功 伤害 +1 怒气
     let rageGained = false;
-    if (finalDamage > 0 && ["waigong", "neigong"].includes(type)) {
+    if (finalDamage > 0 && ["waigong", "neigong"].includes(type)) { //这里有一个细节，就是只要造成伤害就回怒了，即使被护体真气抵挡了，具体是不是这样后续可以再修改
       const currentRage = sys.resources.rage.value;
       const maxRage = sys.resources.rage.max;
       // 检查是否被封穴/禁怒 (通过 Flags)
