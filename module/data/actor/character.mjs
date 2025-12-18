@@ -1087,9 +1087,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 处理 "破甲" 状态 
     // =======================================================
     // 必须在算出 Total 之后进行判定
-    // 这里的 this.xjzlStatuses.brokenDefense 会在初始化阶段自动从 Flag 读取
-    if (this.xjzlStatuses.brokenDefense) {
+    // 直接读取原始 Flag
+    const isBroken = actor?.getFlag("xjzl-system", "brokenDefense");
+
+    if (isBroken) {
         combat.defWaigongTotal = 0;
+        // combat.defNeigongTotal = 0; // 如果需要破内防
     }
 
     //消耗减少

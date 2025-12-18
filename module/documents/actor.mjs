@@ -187,6 +187,26 @@ export class XJZLActor extends Actor {
   //   return super.applyActiveEffects();
   // }
 
+  prepareBaseData() {
+    super.prepareBaseData();
+    // =====================================================
+    // 检测让装备无效的flags，如果不在这里加载可能会因为加载AE顺序的问题导致flags生效的时候其他装备的AE已经被计算过了的问题
+    // =====================================================
+    
+    // 我们不再检查 slug === 'poyi'
+    // 而是检查：是否有任何未禁用的特效，试图修改 'ignoreArmorEffects' 这个 Flag
+    const targetFlagKey = "flags.xjzl-system.ignoreArmorEffects";
+
+    this.isArmorBroken = this.effects.some(e => {
+        // 1. 基本过滤：特效必须是开启的
+        if (e.disabled) return false;
+
+        // 2. 扫描 Changes：看有没有针对目标 Flag 的修改
+        // 注意：e.changes 是一个数组对象
+        return e.changes.some(change => change.key === targetFlagKey);
+    });
+  }
+
   /**
    * 数据准备流程的生命周期：
    * 1. prepareData()
@@ -1167,9 +1187,9 @@ export class XJZLActor extends Actor {
     // =====================================================
     return {
       finalDamage: finalDamage, // 实际总扣除 (HP+Huti)
-      hpLost: hpLost,
-      hutiLost: hutiLost,
-      mpLost: mpLost,
+      hpLost: stdHpLost,
+      hutiLost: stdHutiLost,
+      mpLost: stdMpLost,
       isDying: isDying,
       isDead: isDead,
       rageGained: rageGained,
