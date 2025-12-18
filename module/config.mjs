@@ -193,7 +193,54 @@ XJZL.arts = {
   nongshi: "XJZL.Arts.Nongshi"  // 农事
 };
 
-// 16. 系统状态标志 (逻辑开关)
+/**
+ * 16·性格预设 (Personality Presets)
+ * 定义了每种性格可选的 5 个技能
+ */
+XJZL.personalityPresets = {
+  "lengjing": {
+    label: "XJZL.Personality.Lengjing", // 冷静
+    options: ["qiaoshou", "liaoshang", "dongcha", "tancha", "dingli"],
+    bonus: 2
+  },
+  "xiaoxin": {
+    label: "XJZL.Personality.Xiaoxin", // 小心
+    options: ["qianxing", "qinggong", "lianxi", "tancha", "zhuizong"],
+    bonus: 2
+  },
+  "gangdan": {
+    label: "XJZL.Personality.Gangdan", // 刚胆
+    options: ["zhengtuo", "jiaoli", "rennai", "ningxue", "dingli"],
+    bonus: 2
+  },
+  "zhongyong": {
+    label: "XJZL.Personality.Zhongyong", // 中庸
+    options: ["zhengtuo", "paozhi", "mashu", "jiaoyi", "jianding"],
+    bonus: 2
+  },
+  "lumang": {
+    label: "XJZL.Personality.Lumang", // 鲁莽
+    options: ["qinbao", "mashu", "ningxue", "chongxue", "zhuizong"],
+    bonus: 2
+  },
+  "jiaoxia": {
+    label: "XJZL.Personality.Jiaoxia", // 狡黠
+    options: ["qianxing", "renxing", "lianxi", "dongcha", "qiman"],
+    bonus: 2
+  },
+  "zisi": {
+    label: "XJZL.Personality.Zisi", // 自私
+    options: ["qianxing", "qinggong", "qiaoshou", "rennai", "biqi"],
+    bonus: 2
+  },
+  "xionghen": {
+    label: "XJZL.Personality.Xionghen", // 凶狠
+    options: ["rennai", "ningxue", "renxing", "dianxue", "shuofu"],
+    bonus: 2
+  }
+};
+
+// 17. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
