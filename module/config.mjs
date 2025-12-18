@@ -836,7 +836,7 @@ XJZL.statusEffects = [
     id: "fatigue",
     name: "XJZL.Status.Fatigue", // 疲劳
     description: "XJZL.Status.FatigueDesc",
-    img: "icons/svg/tired.svg", // 如果没有，可用 clock 或 downgrade
+    img: "icons/svg/statue.svg",
     flags: { "xjzl-system": { slug: "fatigue", stackable: false } },
     changes: [
       { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
@@ -847,7 +847,7 @@ XJZL.statusEffects = [
     id: "hunger",
     name: "XJZL.Status.Hunger", // 饥饿
     description: "XJZL.Status.HungerDesc",
-    img: "icons/svg/meat.svg", // 如果没有，可用 acid
+    img: "icons/svg/acid.svg", // 如果没有，可用 acid
     flags: { "xjzl-system": { slug: "hunger", stackable: true, maxStacks: 0 } },
     changes: [
       { key: "system.attributes.tipo.mod", mode: 2, value: "-1" }
@@ -880,7 +880,7 @@ XJZL.statusEffects = [
     id: "bloodloss",
     name: "XJZL.Status.BloodLoss", // 失血
     description: "XJZL.Status.BloodLossDesc",
-    img: "icons/svg/dead.svg",
+    img: "icons/svg/skull.svg",
     flags: { "xjzl-system": { slug: "bloodloss", stackable: true, maxStacks: 0 } },
     changes: [
       { key: "flags.xjzl-system.bloodLossLevel", mode: 2, value: "1" }
