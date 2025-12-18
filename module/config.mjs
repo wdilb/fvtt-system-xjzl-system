@@ -257,6 +257,7 @@ XJZL.statusFlags = {
   // 在 Apply Damage 逻辑中检测
   bleedOnHit: "XJZL.Status.BleedOnHit",           // 受伤时流失气血
   wuxueBleedOnHit: "XJZL.Status.WuxueBleedOnHit",  // 仅受到内外功伤害时流失气血
+  brokenDefense: "XJZL.Status.BrokenDefense", // 破甲 (防御归零)
 
   // --- E. 其他类  ---
   passiveBlock: "XJZL.Status.PassiveBlock",     // 被动格挡：即使未开启架招，基础格挡值依然生效
@@ -326,20 +327,21 @@ XJZL.statusEffects = [
     id: "sielie",
     name: "XJZL.Status.Sielie", // 撕裂
     img: "icons/svg/blood.svg",
+    description: "XJZL.Status.SielieDesc", 
     flags: { "xjzl-system": { slug: "sielie", stackable: false } },
     changes: [
-      // 受到伤害时流失气血 -> 对应 flag
-      { key: "flags.xjzl-system.bleedOnHit", mode: 2, value: "10" }
+      { key: "flags.xjzl-system.wuxueBleedOnHit", mode: 2, value: "10" }
     ]
   },
   {
     id: "pojia",
     name: "XJZL.Status.Pojia", // 破甲
+    description: "XJZL.Status.SielieDesc", 
     img: "icons/svg/downgrade.svg",
     flags: { "xjzl-system": { slug: "pojia", stackable: false } },
     changes: [
       // 外功防御归零 -> 使用 OVERRIDE (5)
-      { key: "system.combat.def_waigong", mode: 5, value: "0" }
+      { key: "flags.xjzl-system.brokenDefense", mode: 5, value: "true" }
     ]
   },
   {

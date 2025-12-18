@@ -1083,6 +1083,15 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.hitWaigongTotal = Math.floor(S.shenfa / 2 + (combat.hit_waigong || 0) + bonuses.hitWaigong);
     combat.hitNeigongTotal = Math.floor(S.qigan / 2 + (combat.hit_neigong || 0) + bonuses.hitNeigong);
 
+    // =======================================================
+    // 处理 "破甲" 状态 
+    // =======================================================
+    // 必须在算出 Total 之后进行判定
+    // 这里的 this.xjzlStatuses.brokenDefense 会在初始化阶段自动从 Flag 读取
+    if (this.xjzlStatuses.brokenDefense) {
+        combat.defWaigongTotal = 0;
+    }
+
     //消耗减少
     combat.costs.neili.total = (combat.costs.neili.value || 0) + (combat.costs.neili.mod || 0);
     combat.costs.rage.total = (combat.costs.rage.value || 0) + (combat.costs.rage.mod || 0);
