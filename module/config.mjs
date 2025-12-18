@@ -336,7 +336,7 @@ XJZL.statusEffects = [
   {
     id: "pojia",
     name: "XJZL.Status.Pojia", // 破甲
-    description: "XJZL.Status.SielieDesc", 
+    description: "XJZL.Status.PojiaDesc", 
     img: "icons/svg/downgrade.svg",
     flags: { "xjzl-system": { slug: "pojia", stackable: false } },
     changes: [

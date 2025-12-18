@@ -25,6 +25,68 @@ export class XJZLActor extends Actor {
   }
 
   /**
+  * 数据库更新拦截器 (_preUpdate)
+  * 在数据写入数据库前触发，用于验证逻辑或修改数据
+  * @param {Object} changed - 即将更新的数据增量
+  * @param {Object} options - 更新选项
+  * @param {string} user - 操作用户 ID
+  */
+  async _preUpdate(changed, options, user) {
+    await super._preUpdate(changed, options, user);
+
+    // 只有当 system 数据发生变化时才检查
+    if (!changed.system) return;
+
+    // 辅助函数：检查并阻止资源恢复
+    // path: 资源的路径 (例如 "resources.hp.value")
+    // flagKey: 对应的 Flag 键名 (例如 "noRecoverHP")
+    // label: 报错时显示的资源名称
+    const blockRecovery = (path, flagKey, label) => {
+      // 1. 获取新值 (从 changed 对象中查找，支持嵌套或扁平写法)
+      const newValue = foundry.utils.getProperty(changed.system, path);
+
+      // 如果这次更新不包含这个属性，直接跳过
+      if (newValue === undefined) return;
+
+      // 2. 获取旧值 (当前 Actor 的值)
+      const currentValue = foundry.utils.getProperty(this.system, path);
+
+      // 3. 判断逻辑：如果数值增加 (New > Old) 且 有禁疗 Flag
+      if (newValue > currentValue && this.xjzlStatuses[flagKey]) {
+        // 4. 核心拦截：直接从 changed 对象中删除该字段
+        // 这样 FVTT 就认为“这个字段没有变化”，从而阻止更新
+        // 注意：我们需要处理 flatten 后的键名，通常 safe 的做法是直接操作 changed 对象结构
+
+        // 简单处理：如果 changed 是扁平的 "system.resources.hp.value"
+        if (`system.${path}` in changed) delete changed[`system.${path}`];
+
+        // 如果 changed 是嵌套的 { system: { resources: { hp: { value: ... } } } }
+        // 使用 delete foundry.utils.getProperty 是不行的，必须逐层查找删除，或者直接覆写为旧值
+        // 最稳妥的做法：强制把新值改回旧值
+        foundry.utils.setProperty(changed.system, path, currentValue);
+
+        // 5. 提示用户
+        ui.notifications.warn(`${this.name} 处于 [${game.i18n.localize("XJZL.Status." + capitalize(flagKey))}] 状态，无法恢复${label}！`);
+      }
+    };
+
+    // 辅助：首字母大写用于匹配 Locale Key (noRecoverHP -> NoRecoverHP)
+    const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+    // --- 执行检查 ---
+
+    // 1. 禁疗 (HP)
+    blockRecovery("resources.hp.value", "noRecoverHP", "气血");
+
+    // 2. 气滞 (MP/Neili)
+    blockRecovery("resources.mp.value", "noRecoverNeili", "内力");
+
+    // 3. 不怒 (Rage)
+    blockRecovery("resources.rage.value", "noRecoverRage", "怒气");
+  }
+
+
+  /**
    * 监控自身数据更新 (基础属性变动/升级)
    */
   _onUpdate(changed, options, userId) {
@@ -1095,6 +1157,108 @@ export class XJZLActor extends Actor {
       rageGained: rageGained,
       isHit: true
     };
+  }
+
+  /**
+   * [核心] 治疗处理函数
+   * @param {Object} data
+   * @param {number} data.amount - 治疗数值
+   * @param {string} data.type - 类型: "hp" | "neili" | "huti"
+   * @param {boolean} data.showScrolling - 是否显示飘字
+   */
+  async applyHealing(data) {
+    const { amount = 0, type = "hp", showScrolling = true } = data;
+    if (amount <= 0) return;
+
+    const updates = {};
+    let actualHeal = 0;
+    let label = "";
+    let color = "#00FF00"; // 默认绿色 (HP)
+
+    // A. 气血 (HP)
+    if (type === "hp") {
+      const current = this.system.resources.hp.value;
+      const max = this.system.resources.hp.max;
+
+      // 检查禁疗 (预检查，用于计算 actualHeal 显示 0 还是 真实值)
+      // 虽然 _preUpdate 会拦截，但为了飘字准确，这里先判一下
+      if (this.xjzlStatuses.noRecoverHP) {
+        actualHeal = 0;
+      } else {
+        // 手动计算 Min 是为了让飘字显示实际增加量，而不是溢出量
+        const newVal = Math.min(max, current + amount);
+        actualHeal = newVal - current;
+        if (actualHeal > 0) {
+          updates["system.resources.hp.value"] = newVal;
+        }
+      }
+      label = `+${actualHeal}`;
+    }
+
+    // B. 内力 (MP / Neili)
+    else if (type === "mp" || type === "neili") {
+      const current = this.system.resources.mp.value;
+      const max = this.system.resources.mp.max;
+
+      if (this.xjzlStatuses.noRecoverNeili) {
+        actualHeal = 0;
+      } else {
+        const newVal = Math.min(max, current + amount);
+        actualHeal = newVal - current;
+        if (actualHeal > 0) {
+          updates["system.resources.mp.value"] = newVal;
+        }
+      }
+      label = `内力 +${actualHeal}`;
+      color = "#0000FF"; // 蓝色
+    }
+
+    // C. 护体真气 (Huti)
+    else if (type === "huti") {
+      const current = this.system.resources.huti || 0;
+      // 护体通常没有固定上限，或者由 DataModel 限制
+      // 这里直接叠加
+      const newVal = current + amount;
+      actualHeal = amount;
+
+      updates["system.resources.huti"] = newVal;
+
+      label = `护体 +${actualHeal}`;
+      color = "#00FFFF"; // 青色/天蓝
+    }
+
+    // 执行更新
+    // 注意：如果 updates 为空（被 Flag 拦截导致 actualHeal=0），这里就不会执行
+    if (!foundry.utils.isEmpty(updates)) {
+      await this.update(updates);
+    }
+
+    // 视觉效果
+    // 逻辑：
+    // 1. 如果 actualHeal > 0，说明真的加血了，飘数字。
+    // 2. 如果 actualHeal == 0 且是因为被禁疗拦截了，飘“禁疗”提示 (可选优化)
+    if (showScrolling) {
+      if (actualHeal > 0) {
+        if (this.token?.object) {
+          canvas.interface.createScrollingText(this.token.object.center, label, {
+            direction: 0, fontSize: 32, fill: color,
+            stroke: "#000000", strokeThickness: 4, jitter: 0.25
+          });
+        }
+      } else {
+        // 可选：如果是因为禁疗导致加血失败，飘一个提示
+        let blockLabel = "";
+        if (type === "hp" && this.xjzlStatuses.noRecoverHP) blockLabel = "禁疗";
+        if ((type === "mp" || type === "neili") && this.xjzlStatuses.noRecoverNeili) blockLabel = "气滞";
+
+        if (blockLabel && this.token?.object) {
+          canvas.interface.createScrollingText(this.token.object.center, blockLabel, {
+            direction: 0, fontSize: 24, fill: "#cccccc", // 灰色
+            stroke: "#000000", strokeThickness: 2, jitter: 0.25
+          });
+        }
+      }
+    }
   }
 
   /**
