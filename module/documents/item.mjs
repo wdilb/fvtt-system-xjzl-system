@@ -9,6 +9,26 @@ export class XJZLItem extends Item {
   /* -------------------------------------------- */
 
   /**
+   * @override
+   * 数据库更新后的逻辑钩子
+   * 用于处理“数据变动后的副作用”，例如性格同步 AE、自动计算价格等
+   */
+  async _onUpdate(changed, options, userId) {
+    await super._onUpdate(changed, options, userId);
+
+    // 1. 仅由触发更新的客户端执行 (防止多端冲突)
+    if (game.user.id !== userId) return;
+
+    // 2. 逻辑分流：性格 (Personality)
+    // 只有当 'system.chosen' 字段确实发生变化时才触发
+    if (this.type === "personality" && foundry.utils.hasProperty(changed, "system.chosen")) {
+      // 调用 DataModel 中的同步方法
+      // 注意：这里不需要 try-catch，让错误暴露出来反而利于调试
+      await this.system.syncToEffect();
+    }
+  }
+
+  /**
    * 统一的使用接口
    * 外部调用 item.use() 即可，无需关心具体类型
    */

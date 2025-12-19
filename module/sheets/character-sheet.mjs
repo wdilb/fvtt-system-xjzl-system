@@ -173,6 +173,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 我们不需要像武学那样预计算伤害，因为技艺书很简单
         // 章节进度已经在 ArtBookDataModel.prepareDerivedData 中算好了
 
+        // =====================================================
+        //  查找背景 & 性格
+        // =====================================================
+        // 从 itemTypes 中获取第一个匹配项 (因为我们在 _preCreate 限制了单例，所以这里取第0个是安全的)
+        context.backgroundItem = actor.itemTypes.background?.[0] || null;
+        context.personalityItem = actor.itemTypes.personality?.[0] || null;
+
         return context;
     }
 

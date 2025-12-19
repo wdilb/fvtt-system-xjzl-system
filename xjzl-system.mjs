@@ -244,50 +244,64 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
   // 1. 获取原生 DOM
   const el = html instanceof HTMLElement ? html : html[0];
 
+  // =====================================================
+  // 0. 清理旧数据 (Clean Up)
+  // =====================================================
+  // 不要直接 return，而是先尝试移除可能残留的旧元素
+  // 这解决了“重复堆叠”问题，同时也解决了“误判导致不显示”的问题
+  const oldNav = el.querySelector('a[data-tab="xjzl-config"]');
+  if (oldNav) oldNav.remove();
+
+  const oldContent = el.querySelector('section[data-tab="xjzl-config"]');
+  if (oldContent) oldContent.remove();
+
+  // =====================================================
   // 2. 获取数据
+  // =====================================================
   const effect = app.document;
+  // 确保 flags 对象存在
   const flags = effect.flags["xjzl-system"] || {};
 
   const slug = flags.slug || "";
-  const isStackable = flags.stackable || false;
-  const maxStacks = flags.maxStacks || 0;
+  const isStackable = !!flags.stackable;
+
+  // 数值清洗：防止 "0,0" 报错
+  let maxStacks = flags.maxStacks;
+  if (!Number.isFinite(maxStacks)) {
+    maxStacks = parseInt(maxStacks);
+    if (isNaN(maxStacks)) maxStacks = 0;
+  }
 
   let autoSlug = "auto-generated-slug";
+  // 兼容性写法，防止 V13/V12 API 差异
   if (effect.name) {
-    autoSlug = effect.name.slugify();
+    autoSlug = typeof effect.name.slugify === 'function' ? effect.name.slugify() : effect.name;
   }
 
   // =====================================================
-  // 3. 注入导航栏 (Add Navigation Item)
+  // 3. 注入导航栏 (Inject Nav)
   // =====================================================
   const nav = el.querySelector('nav.tabs');
 
   if (nav) {
     const navItem = document.createElement("a");
-    // 【关键修正 1】必须添加 data-action="tab"
+    navItem.className = "item";
     navItem.dataset.action = "tab";
-    // 【关键修正 2】组名必须是 "sheet" (参考你的 HTML 截图)
-    navItem.dataset.group = "sheet";
+    navItem.dataset.group = "sheet"; // 关键：组名必须匹配
     navItem.dataset.tab = "xjzl-config";
-
-    // 为了保持样式一致，内部加 span
     navItem.innerHTML = `<i class="fas fa-dragon"></i> <span>侠界配置</span>`;
 
     nav.appendChild(navItem);
   }
 
   // =====================================================
-  // 4. 注入标签页内容 (Add Tab Content)
+  // 4. 注入标签页内容 (Inject Content)
   // =====================================================
-
-  // 使用 section 以匹配原生样式
   const tabContent = document.createElement("section");
   tabContent.className = "tab";
   tabContent.dataset.tab = "xjzl-config";
-  // 【关键修正 3】组名必须匹配 "sheet"
   tabContent.dataset.group = "sheet";
 
-  // 构建配置 HTML
   tabContent.innerHTML = `
     <div style="padding: 10px;">
         <h3 class="form-header"><i class="fas fa-cogs"></i> 高级规则配置</h3>
@@ -315,7 +329,11 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
             <div class="form-group">
                 <label>最大层数 (Max Stacks)</label>
                 <div class="form-fields">
-                    <input type="number" name="flags.xjzl-system.maxStacks" value="${maxStacks}" placeholder="0">
+                    <input type="number" 
+                           name="flags.xjzl-system.maxStacks" 
+                           value="${maxStacks}" 
+                           placeholder="0"
+                           min="0" step="1">
                 </div>
                 <p class="notes">0 表示无上限。</p>
             </div>
@@ -323,47 +341,56 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
     </div>
   `;
 
-  // 插入到 footer 之前
-  const submitButton = el.querySelector('button[type="submit"]');
-  if (submitButton) {
-    submitButton.closest("footer").before(tabContent);
+  // 插入位置逻辑：尝试插在最后一个 .tab 后面，如果找不到则插在 form 最后
+  // 这能保证它和原生的 Details/Duration/Effects 处于同一层级
+  const tabs = el.querySelectorAll('section.tab');
+  if (tabs.length > 0) {
+    const lastTab = tabs[tabs.length - 1];
+    lastTab.after(tabContent);
   } else {
     const form = el.querySelector('form');
     if (form) form.appendChild(tabContent);
   }
 
   // =====================================================
-  // 5. 激活标签页切换逻辑 (Re-initialize Tabs)
+  // 5. 调整窗口与激活 Tab
   // =====================================================
-  // 因为我们是动态注入的 Tab，需要告诉 Application 重新计算一下 Tab 逻辑
-  // 或者最简单的：因为我们注入了标准的 .item 和 .tab，
-  // Foundry 的 TabsV2 Controller 通常会自动识别点击事件。
-
-  // 调整高度以适应新 Tab (如果需要)
   app.setPosition({ height: "auto" });
 
+  // 如果用户当前正停留在我们的 Tab 上 (通过判断 active class)，刷新后需要重新激活显示
+  // (Foundry 有时会重置 Tab 状态，这一步是保险)
+  if (nav && nav.querySelector('.item.active[data-tab="xjzl-config"]')) {
+    tabContent.classList.add("active");
+  }
 
   // =====================================================
-  // 6. 属性 Key 自动补全 (保持不变，因为这是全局生效的)
+  // 6. 属性 Key 自动补全 (防重处理)
   // =====================================================
   const listId = `xjzl-status-list-${effect.id || foundry.utils.randomID()}`;
-  let options = "";
-  for (const [key, label] of Object.entries(CONFIG.XJZL.statusFlags)) {
-    options += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
+  if (!el.querySelector(`#${listId}`)) {
+    let options = "";
+
+    const statusFlags = CONFIG.XJZL?.statusFlags || {};
+    for (const [key, label] of Object.entries(statusFlags)) {
+      options += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
+    }
+    // 常用补充
+    options += `<option value="system.resources.mp.value">内力值 (当前)</option>`;
+    options += `<option value="system.resources.hp.value">气血值 (当前)</option>`;
+    options += `<option value="system.stats.liliang.mod">力量 (修正)</option>`;
+    options += `<option value="system.stats.shenfa.mod">身法 (修正)</option>`;
+
+    const datalist = document.createElement("datalist");
+    datalist.id = listId;
+    datalist.innerHTML = options;
+    el.appendChild(datalist);
+
+    const keyInputs = el.querySelectorAll('input[name^="changes."][name$=".key"]');
+    keyInputs.forEach(input => {
+      input.setAttribute("list", listId);
+      input.setAttribute("placeholder", "Key...");
+    });
   }
-  options += `<option value="system.resources.mp.value">内力值 (当前)</option>`;
-  options += `<option value="system.resources.hp.value">气血值 (当前)</option>`;
-
-  const datalist = document.createElement("datalist");
-  datalist.id = listId;
-  datalist.innerHTML = options;
-  el.appendChild(datalist);
-
-  const keyInputs = el.querySelectorAll('input[name^="changes."][name$=".key"]');
-  keyInputs.forEach(input => {
-    input.setAttribute("list", listId);
-    input.setAttribute("placeholder", "Key...");
-  });
 });
 
 //  在 getSceneControlButtons 阶段注入按钮

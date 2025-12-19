@@ -116,7 +116,5 @@ export class XJZLPersonalitySheet extends HandlebarsApplicationMixin(ItemSheetV2
 
         // 1. 更新数据
         await this.document.update({ "system.chosen": chosen });
-        // 2. 触发 DataModel 里的 AE 同步方法
-        await this.document.system.syncToEffect();
     }
 }
