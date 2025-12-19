@@ -719,10 +719,10 @@ function registerHandlebarsHelpers() {
     return new Handlebars.SafeString(html);
   });
 
-  Handlebars.registerHelper('includes', function(array, value) {
+  Handlebars.registerHelper('includes', function (array, value) {
     if (!Array.isArray(array)) return false;
     return array.includes(value);
-});
+  });
 }
 /**
  * 预加载模板片段
@@ -767,6 +767,13 @@ async function preloadHandlebarsTemplates() {
     //技艺书
     "systems/xjzl-system/templates/item/art-book/header.hbs",
     "systems/xjzl-system/templates/item/art-book/details.hbs",
+    //性格和背景
+    "systems/xjzl-system/templates/item/background/header.hbs",
+    "systems/xjzl-system/templates/item/background/tabs.hbs",
+    "systems/xjzl-system/templates/item/background/tab-details.hbs",
+    "systems/xjzl-system/templates/item/background/tab-effects.hbs",
+    "systems/xjzl-system/templates/item/personality/header.hbs",
+    "systems/xjzl-system/templates/item/personality/details.hbs",
     //聊天卡片
     "systems/xjzl-system/templates/chat/item-card.hbs", //物品使用
     "systems/xjzl-system/templates/chat/move-card.hbs", //招式使用
