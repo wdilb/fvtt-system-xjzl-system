@@ -19,4 +19,23 @@ export class XJZLBackgroundSheetV2 extends HandlebarsApplicationMixin(ItemSheetV
         context.system = this.document.system;
         return context;
     }
+
+    /**
+     * 处理物品拖拽到背景 Sheet 上，以后可能会用到，等物品都录入完再说
+     * @override
+     */
+    // async _onDrop(event) {
+    //     const data = TextEditor.getDragEventData(event);
+    //     if (data.type !== "Item") return super._onDrop(event);
+
+    //     const item = await Item.fromDropData(data);
+    //     if (!item) return;
+
+    //     // 将 UUID 存入 items 数组
+    //     const items = [...this.document.system.items];
+    //     items.push({ uuid: item.uuid, quantity: 1 });
+
+    //     await this.document.update({ "system.items": items });
+    //     ui.notifications.info(`已将 ${item.name} 关联至此背景`);
+    // }
 }

@@ -31,6 +31,8 @@ import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
 import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 import { XJZLArtBookSheet } from "./module/sheets/art-book-sheet.mjs";
+import { XJZLPersonalitySheet } from "./module/sheets/personality-sheet.mjs";
+import { XJZLBackgroundSheet } from "./module/sheets/background-sheet.mjs";
 
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
@@ -101,8 +103,8 @@ Hooks.once("init", async function () {
     manual: XJZLManualData,
     misc: XJZLMiscData,
     art_book: XJZLArtBookData,
-    personality : XJZLPersonalityData,
-    background : XJZLBackgroundData
+    personality: XJZLPersonalityData,
+    background: XJZLBackgroundData
   };
 
   // 4. 注册 Sheets (表现层)
@@ -158,7 +160,21 @@ Hooks.once("init", async function () {
   Items.registerSheet("xjzl-system", XJZLArtBookSheet, {
     types: ["art_book"],
     makeDefault: true,
-    label: "技艺书籍编辑器"
+    label: "XJZL.Sheet.ArtBook"
+  });
+
+  //注册性格特质
+  Items.registerSheet("xjzl-system", XJZLPersonalitySheet, {
+    types: ["personality"],
+    makeDefault: true,
+    label: "XJZL.Sheet.Personality"
+  });
+
+  //注册身世背景
+  Items.registerSheet("xjzl-system", XJZLBackgroundSheet, {
+    types: ["background"],
+    makeDefault: true,
+    label: "XJZL.Sheet.Background"
   });
 
   // ==========================================
