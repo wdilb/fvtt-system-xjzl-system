@@ -140,6 +140,35 @@ export class XJZLActor extends Actor {
     this.updateSource({ prototypeToken });
   }
 
+  /**
+ * 在创建嵌入文档前的拦截逻辑
+ * @override
+ */
+  async _preCreateEmbeddedDocuments(embeddedName, result, options, userId) {
+    const res = await super._preCreateEmbeddedDocuments(embeddedName, result, options, userId);
+    if (res === false) return false;
+
+    // 如果创建的是物品
+    if (embeddedName === "Item") {
+      for (const itemData of result) {
+        // 需要限制单例的类型
+        const singletonTypes = ["background", "personality"];
+
+        if (singletonTypes.includes(itemData.type)) {
+          // 检查该类型是否已经存在于当前 Actor 身上
+          const alreadyHas = this.itemTypes[itemData.type].length > 0;
+
+          if (alreadyHas) {
+            const typeLabel = game.i18n.localize(`TYPES.Item.${itemData.type}`);
+            ui.notifications.warn(`角色已拥有【${typeLabel}】，请先删除旧的再添加。`);
+            return false; // 拦截，不创建新文档
+          }
+        }
+      }
+    }
+    return true;
+  }
+
 
   /**
    * 应用 Active Effects

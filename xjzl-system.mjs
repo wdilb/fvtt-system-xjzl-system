@@ -21,6 +21,8 @@ import { XJZLConsumableData } from "./module/data/item/consumable.mjs";
 import { XJZLManualData } from "./module/data/item/manual.mjs";
 import { XJZLMiscData } from "./module/data/item/misc.mjs";
 import { XJZLArtBookData } from "./module/data/item/art-book.mjs";
+import { XJZLPersonalityData } from "./module/data/item/personality.mjs";
+import { XJZLBackgroundData } from "./module/data/item/background.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
@@ -98,7 +100,9 @@ Hooks.once("init", async function () {
     consumable: XJZLConsumableData,
     manual: XJZLManualData,
     misc: XJZLMiscData,
-    art_book: XJZLArtBookData
+    art_book: XJZLArtBookData,
+    personality : XJZLPersonalityData,
+    background : XJZLBackgroundData
   };
 
   // 4. 注册 Sheets (表现层)
