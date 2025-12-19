@@ -53,7 +53,13 @@ export class XJZLBackgroundSheet extends HandlebarsApplicationMixin(ItemSheetV2)
             name: "背景加成",
             icon: "icons/magic/symbols/clover.webp",
             origin: this.document.uuid,
-            transfer: true // 背景加成默认必须为被动
+            transfer: true, // 背景加成默认必须为被动
+            flags: {
+                "xjzl-system": {
+                    slug: "background-modifier", // 固定语义化 Slug
+                    stackable: false
+                }
+            }
         }, { parent: this.document });
     }
 
