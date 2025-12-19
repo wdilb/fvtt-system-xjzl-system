@@ -1,12 +1,16 @@
-const { ItemSheetV2, HandlebarsApplicationMixin } = foundry.applications.sheets;
+const { ItemSheetV2 } = foundry.applications.sheets;
+const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-export class XJZLBackgroundSheetV2 extends HandlebarsApplicationMixin(ItemSheetV2) {
+export class XJZLBackgroundSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
         classes: ["xjzl-window", "item", "background", "xjzl-system"],
         position: { width: 500, height: 600 },
         window: { resizable: true },
-        form: { submitOnChange: true, closeOnSubmit: false }
+        form: { submitOnChange: true, closeOnSubmit: false },
+        actions: {
+            editImage: XJZLBackgroundSheet._onEditImage
+        }
     };
 
     static PARTS = {
@@ -18,6 +22,16 @@ export class XJZLBackgroundSheetV2 extends HandlebarsApplicationMixin(ItemSheetV
         const context = await super._prepareContext(options);
         context.system = this.document.system;
         return context;
+    }
+
+    static async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: foundry.utils.getProperty(this.document, attr),
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
     }
 
     /**

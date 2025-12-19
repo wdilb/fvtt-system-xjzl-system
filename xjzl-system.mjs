@@ -718,6 +718,11 @@ function registerHandlebarsHelpers() {
 
     return new Handlebars.SafeString(html);
   });
+
+  Handlebars.registerHelper('includes', function(array, value) {
+    if (!Array.isArray(array)) return false;
+    return array.includes(value);
+});
 }
 /**
  * 预加载模板片段

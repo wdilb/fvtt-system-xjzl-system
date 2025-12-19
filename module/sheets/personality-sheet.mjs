@@ -1,9 +1,10 @@
 import { XJZL } from "../config.mjs";
 import { localizeConfig } from "../utils/utils.mjs";
 
-const { ItemSheetV2, HandlebarsApplicationMixin } = foundry.applications.sheets;
+const { ItemSheetV2 } = foundry.applications.sheets;
+const { HandlebarsApplicationMixin } = foundry.applications.api;
 
-export class XJZLPersonalitySheetV2 extends HandlebarsApplicationMixin(ItemSheetV2) {
+export class XJZLPersonalitySheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     constructor(options = {}) {
         super(options);
         this._isEditing = false; // 内部状态：仅控制 GM 编辑视图切换
@@ -20,8 +21,9 @@ export class XJZLPersonalitySheetV2 extends HandlebarsApplicationMixin(ItemSheet
         },
         actions: {
             toggleEditing: function () { this._isEditing = !this._isEditing; this.render(); },
-            manageOption: XJZLPersonalitySheetV2._onManageOption, // GM 选择 5 个可选技能
-            toggleChoice: XJZLPersonalitySheetV2._onToggleChoice   // 玩家勾选 2 个生效技能
+            manageOption: XJZLPersonalitySheet._onManageOption, // GM 选择 5 个可选技能
+            toggleChoice: XJZLPersonalitySheet._onToggleChoice,   // 玩家勾选 2 个生效技能
+            editImage: XJZLPersonalitySheet._onEditImage
         }
     };
 
@@ -49,6 +51,24 @@ export class XJZLPersonalitySheetV2 extends HandlebarsApplicationMixin(ItemSheet
         }));
 
         return context;
+    }
+
+    /**
+     * 处理图片编辑
+     */
+    static async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const current = foundry.utils.getProperty(this.document, attr);
+
+        // V13 标准写法：不再直接 new FilePicker
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: current,
+            callback: path => {
+                this.document.update({ [attr]: path });
+            }
+        });
+        return fp.browse();
     }
 
     /**
