@@ -51,7 +51,7 @@ export class XJZLBackgroundSheet extends HandlebarsApplicationMixin(ItemSheetV2)
     static async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: "背景加成",
-            icon: "icons/magic/symbols/clover.webp",
+            icon: "icons/svg/book.svg",
             origin: this.document.uuid,
             transfer: true, // 背景加成默认必须为被动
             flags: {
