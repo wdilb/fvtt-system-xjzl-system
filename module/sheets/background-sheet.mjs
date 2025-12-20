@@ -41,6 +41,8 @@ export class XJZLBackgroundSheet extends HandlebarsApplicationMixin(ItemSheetV2)
             transfer: e.transfer //被动
         }));
 
+        context.editable = this.isEditable; // 显式传递
+
         return context;
     }
 

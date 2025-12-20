@@ -49,6 +49,7 @@ export class XJZLPersonalitySheet extends HandlebarsApplicationMixin(ItemSheetV2
             label: XJZL.skills[key] || key,
             selected: system.chosen.includes(key)
         }));
+        context.editable = this.isEditable; // 显式传递
 
         return context;
     }

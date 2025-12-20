@@ -42,6 +42,7 @@ import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
 import { EffectSelectionDialog } from "./module/applications/effect-selection-dialog.mjs";
+import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -55,14 +56,6 @@ Hooks.once("init", async function () {
 
   // 1. 将自定义配置挂载到全局 CONFIG
   CONFIG.XJZL = XJZL;
-
-  // 挂载到全局命名空间
-  game.xjzl = {
-    api: {
-      // 将来可能有其他 API，所以这里放 effects 子命名空间
-      effects: ActiveEffectManager //这样就可以调用 game.xjzl.api.effects.addEffect
-    }
-  };
 
   // 替换系统核心的状态效果列表
   CONFIG.statusEffects = CONFIG.XJZL.statusEffects;
@@ -233,6 +226,25 @@ Hooks.once("ready", async function () {
   Hooks.on("renderChatMessageHTML", ChatCardManager.onRenderChatMessage);
   //目标选择管理器，修改为按下ALT后左键点击选择目标
   TargetManager.init();
+
+  //为了避免isGM没有初始化读取失败，把API容器的定义挪到这里
+  // 1. 初始化全局 API 容器
+  // 注意：防止重复定义，先判断是否存在
+  if (!game.xjzl) game.xjzl = {};
+
+  // 2. 挂载通用 API (所有玩家可用)
+  game.xjzl = {
+    api: {
+      // 将来可能有其他 API，所以这里放 effects 子命名空间
+      effects: ActiveEffectManager //这样就可以调用 game.xjzl.api.effects.addEffect
+    }
+  };
+
+  // 3. 挂载 GM 专用 API (生成器)
+  // 此时 game.user 已经不是 null 了，可以安全检查权限
+  if (game.user.isGM) {
+    game.xjzl.seed = SeedingManager;
+  }
   console.log("侠界之旅系统 - 准备就绪");
 });
 

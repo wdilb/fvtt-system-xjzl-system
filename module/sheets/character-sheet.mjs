@@ -453,21 +453,66 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     /*  Drag & Drop (堆叠逻辑)                      */
     /* -------------------------------------------- */
 
+    /**
+     * @override
+     * 统一处理物品拖拽逻辑
+     * 1. 互斥替换：背景/性格 (先删旧，再建新)
+     * 2. 堆叠逻辑：消耗品等 (只改数量，不建新)
+     * 3. 默认逻辑：创建新物品
+     */
     async _onDropItem(event, data) {
+        // 1. 基础检查
         if (!this.actor.isOwner) return false;
-        const item = await Item.implementation.fromDropData(data);
-        if (!item) return false;
 
-        const stackableTypes = ["consumable", "misc", "manual"];
-        if (stackableTypes.includes(item.type)) {
-            const existingItem = this.actor.items.find(i => i.type === item.type && i.name === item.name);
+        // 解析拖拽数据 (V13/V12 通用写法)
+        const itemData = await Item.implementation.fromDropData(data);
+        if (!itemData) return false;
+
+        // =====================================================
+        // A. 互斥替换逻辑 (背景 & 性格)
+        // =====================================================
+        const singletonTypes = ["background", "personality"];
+        if (singletonTypes.includes(itemData.type)) {
+            // 获取已存在的同类物品
+            const existingItems = this.actor.itemTypes[itemData.type];
+
+            if (existingItems && existingItems.length > 0) {
+                // 如果拖进来的是自己 (同一个 UUID)，什么都不做
+                if (existingItems.some(i => i.uuid === itemData.uuid)) return false;
+
+                // 核心：删除旧的
+                const idsToDelete = existingItems.map(i => i.id);
+                await this.actor.deleteEmbeddedDocuments("Item", idsToDelete);
+
+                // 提示 (可选)
+                // ui.notifications.info(`已替换新的${game.i18n.localize("TYPES.Item." + itemData.type)}`);
+            }
+            // 逻辑继续向下，交给 super._onDropItem 去创建新的
+            return super._onDropItem(event, data);
+        }
+
+        // =====================================================
+        // B. 堆叠逻辑 (消耗品/材料)
+        // =====================================================
+        const stackableTypes = ["consumable", "misc", "manual"]; // 根据需要调整类型
+        if (stackableTypes.includes(itemData.type)) {
+            // 查找是否已存在同名同类物品
+            const existingItem = this.actor.items.find(i => i.type === itemData.type && i.name === itemData.name);
+
             if (existingItem) {
-                const addQty = item.system.quantity || 1;
-                const newQty = existingItem.system.quantity + addQty;
+                // 计算新数量
+                const addQty = itemData.system.quantity || 1;
+                const newQty = (existingItem.system.quantity || 0) + addQty;
+
+                // 更新现有物品，并阻断后续创建
                 await existingItem.update({ "system.quantity": newQty });
-                return false;
+                return false; // 阻断默认创建
             }
         }
+
+        // =====================================================
+        // C. 默认逻辑 (创建新物品)
+        // =====================================================
         return super._onDropItem(event, data);
     }
 
