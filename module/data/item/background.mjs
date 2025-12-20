@@ -3,10 +3,8 @@
  * ==========================================
  * 核心逻辑：
  * 1. description: 存储背景故事描述。
- * 2. items: [预留口子] 未来用于存储背景赠送的物品 UUID 数组。
- * ------------------------------------------
- * 这种设计现在不强制任何逻辑，但未来如果你想实现“拖动物品到背景里”的功能，
- * 数据结构已经是现成的了。
+ * 2. assets: 存储初始行囊的文字描述。
+ * 3. items: [预留] 未来用于存储背景赠送的实体物品 UUID。
  * ==========================================
  */
 export class XJZLBackgroundData extends foundry.abstract.TypeDataModel {
@@ -16,21 +14,26 @@ export class XJZLBackgroundData extends foundry.abstract.TypeDataModel {
     const fields = foundry.data.fields;
 
     return {
-      // 背景故事/来源详细描述
-      description: new fields.HTMLField({ 
-        initial: "", 
-        label: "XJZL.Background.Description" 
+      // 1. 背景故事/来源详细描述
+      description: new fields.HTMLField({
+        initial: "",
+        label: "XJZL.Background.Description"
       }),
 
-      // 【未来预留：物资包】
-      // 存储背景关联的物品引用（如：武学、武器、行囊物品的 UUID）
-      // 当前仅作为数据接口存在，不触发自动化逻辑
+      // 2. 初始行囊描述 (文字版)
+      // 对应 JSON 中的 "assets" 字段，用于在界面显示 "粗麻上衣, 10两白银"
+      assets: new fields.HTMLField({
+        initial: "",
+        label: "XJZL.Background.AssetsHeader"
+      }),
+
+      // 3. [未来预留] 实体物品引用
       items: new fields.ArrayField(new fields.SchemaField({
         uuid: new fields.StringField({ required: true }),
         quantity: new fields.NumberField({ initial: 1, min: 1, integer: true })
-      }), { 
-        initial: [], 
-        label: "XJZL.Background.StoredItems" 
+      }), {
+        initial: [],
+        label: "XJZL.Background.StoredItems"
       })
     };
   }
