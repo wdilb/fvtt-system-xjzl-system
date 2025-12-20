@@ -623,7 +623,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     <label style="${labelStyle}">
                         ${isInvest ? "投入总数 (优先扣除专属)" : "取回总数 (优先取回通用)"}
                     </label>
-                    <input type="number" name="totalAmount" value="100" autofocus class="xjzl-input" style="${inputStyle}"/>
+                    <input type="number" name="totalAmount" value="${targetValue}" autofocus class="xjzl-input" style="${inputStyle}"/>
                 </div>
 
                 <div class="manual-mode-container" style="display:none;">
@@ -890,7 +890,12 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         if (!item) return;
 
         // 计算总消耗 (Max XP)
-        const totalCost = item.system.chapters.reduce((sum, c) => sum + (c.cost || 0), 0);
+        // 必须应用折扣系数，并向下取整，逻辑需与 DataModel 和 investArt 方法保持完全一致
+        const totalCost = item.system.chapters.reduce((sum, c) => {
+            const cost = c.cost || 0;
+            const ratio = c.xpCostRatio ?? 1; // 获取系数，默认1
+            return sum + Math.floor(cost * ratio);
+        }, 0);
 
         const result = await this._promptInvest({
             title: `研读: ${item.name}`,

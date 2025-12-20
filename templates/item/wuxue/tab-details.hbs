@@ -11,7 +11,8 @@
                 <img src="{{move.img}}" width="32" height="32" style="border:1px solid #000; background:#333;" />
 
                 <input type="text" name="system.moves.{{i}}.name" value="{{move.name}}" class="xjzl-input"
-                    style="font-weight:bold; font-size:1.2em; text-align:left; flex:1;" placeholder="{{localize 'XJZL.Wuxue.Moves.Name'}}" />
+                    style="font-weight:bold; font-size:1.2em; text-align:left; flex:1;"
+                    placeholder="{{localize 'XJZL.Wuxue.Moves.Name'}}" />
 
                 <select name="system.moves.{{i}}.type" class="xjzl-input" style="width: 80px;">
                     {{selectOptions ../choices.moveTypes selected=move.type}}
@@ -61,12 +62,48 @@
                         <input type="text" name="system.moves.{{i}}.actionCost" value="{{move.actionCost}}"
                             class="xjzl-input" />
                     </div>
+                    {{!-- 消耗系数 (优化版) --}}
+                    <details style="margin-top: 5px; border-top: 1px dotted #ccc; padding-top: 5px;" {{#if (ne
+                        move.xpCostRatio 1)}}open{{/if}}>
+
+                        <summary
+                            style="cursor: pointer; color: #555; font-size: 0.9em; outline: none; user-select: none; display: flex; align-items: center;">
+                            {{!-- 图标与标题 --}}
+                            <i class="fas fa-percentage" style="width: 20px; text-align: center;"></i>
+                            <span style="font-weight: bold;">{{localize "XJZL.Wuxue.Moves.XPCostRatio"}}</span>
+
+                            {{!-- 状态指示文本 --}}
+                            <span
+                                style="margin-left: auto; font-size: 0.9em; color: {{#if (ne move.xpCostRatio 1)}}#8b0000{{else}}#999{{/if}};">
+                                {{#if (ne move.xpCostRatio 1)}}
+                                (当前: {{move.xpCostRatio}})
+                                {{else}}
+                                (默认 1.0)
+                                {{/if}}
+                            </span>
+                        </summary>
+
+                        {{!-- 展开后的内容：包含提示语和输入框 --}}
+                        <div class="xjzl-flex-row"
+                            style="margin-top: 5px; align-items: center; justify-content: flex-end; gap: 5px; background: rgba(0,0,0,0.02); padding: 5px; border-radius: 4px;">
+
+                            <span style="font-size: 0.8em; color: #666; margin-right: auto;">
+                                1 = 100%, 0.8 = 8折
+                            </span>
+
+                            <input type="number" name="system.moves.{{i}}.xpCostRatio" value="{{move.xpCostRatio}}"
+                                class="xjzl-input" min="0.1" step="0.01" placeholder="1"
+                                style="width: 60px; text-align: center; color: #8b0000; font-weight: bold; border: 1px solid #ddd;"
+                                title="1.0 = 100%消耗, 0.8 = 80%消耗, 1.2 = 120%消耗" />
+                        </div>
+                    </details>
                 </div>
 
                 {{!-- 右侧 --}}
                 <div class="xjzl-flex-col" style="background: rgba(0,0,0,0.03); padding: 5px; border-radius: 4px;">
                     <div class="xjzl-flex-row" style="border-bottom:1px dashed #ccc;">
-                        <label style="font-weight:bold;">{{localize "XJZL.Wuxue.Calc.Base"}} / {{localize "XJZL.Wuxue.Calc.Growth"}}</label>
+                        <label style="font-weight:bold;">{{localize "XJZL.Wuxue.Calc.Base"}} / {{localize
+                            "XJZL.Wuxue.Calc.Growth"}}</label>
                         <a data-action="addScaling" title="添加加成属性"><i class="fas fa-plus"></i></a>
                     </div>
 
@@ -97,11 +134,13 @@
             {{!-- 3. 进阶配置 (Localize) --}}
             <div class="xjzl-card" style="margin-top: 10px; background: rgba(0,0,0,0.02); border: 1px dashed #ccc;">
                 <div class="xjzl-flex-row" style="justify-content: space-between;">
-                    <label style="font-weight:bold; font-size: 0.9em; color: #555;">{{localize "XJZL.Wuxue.Progression.Title"}}</label>
-                    
+                    <label style="font-weight:bold; font-size: 0.9em; color: #555;">{{localize
+                        "XJZL.Wuxue.Progression.Title"}}</label>
+
                     <div class="xjzl-flex-row" style="gap: 5px;">
                         <label>{{localize "XJZL.Wuxue.Progression.Mode"}}:</label>
-                        <select name="system.moves.{{i}}.progression.mode" class="xjzl-input" style="height: 22px; font-size: 0.8em;">
+                        <select name="system.moves.{{i}}.progression.mode" class="xjzl-input"
+                            style="height: 22px; font-size: 0.8em;">
                             {{selectOptions ../choices.progressionModes selected=move.progression.mode}}
                         </select>
                     </div>
@@ -111,10 +150,10 @@
                 <div class="xjzl-flex-col" style="margin-top: 5px;">
                     <label style="font-size: 0.8em;">{{localize "XJZL.Wuxue.Progression.Thresholds"}}</label>
                     {{!-- 使用 temp.thresholds 绕过自动解析 --}}
-                    <input type="text" name="temp.thresholds.{{i}}" 
-                           value="{{move.progression.customThresholds}}" 
-                           class="xjzl-input" placeholder="1000, 3000" />
-                    <p class="notes" style="font-size: 0.7em; color: #888; margin: 0;">{{localize "XJZL.Wuxue.Progression.ThresholdsHint"}}</p>
+                    <input type="text" name="temp.thresholds.{{i}}" value="{{move.progression.customThresholds}}"
+                        class="xjzl-input" placeholder="1000, 3000" />
+                    <p class="notes" style="font-size: 0.7em; color: #888; margin: 0;">{{localize
+                        "XJZL.Wuxue.Progression.ThresholdsHint"}}</p>
                 </div>
                 {{/if}}
 
@@ -124,7 +163,8 @@
                         {{selectOptions ../choices.mappedStages selected=move.progression.mappedStage}}
                     </select>
                 </div>
-                <p class="notes" style="font-size: 0.7em; color: #888; margin: 0;">{{localize "XJZL.Wuxue.Progression.MappedStageHint"}}</p>
+                <p class="notes" style="font-size: 0.7em; color: #888; margin: 0;">{{localize
+                    "XJZL.Wuxue.Progression.MappedStageHint"}}</p>
             </div>
 
             <hr style="border-color: #ddd; margin: 10px 0;">
