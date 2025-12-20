@@ -152,16 +152,63 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         //  准备技艺列表 (Arts)
         // =====================================================
         context.artsList = [];
+        // 获取我们在 DataModel 中算好的身份数据 (Raw Config)
+        const activeIdentities = actor.system.activeIdentities || {};
         // 遍历配置中的技艺列表，确保顺序一致
         for (const [key, labelKey] of Object.entries(XJZL.arts)) {
             const artData = actor.system.arts[key];
             if (artData) {
-                context.artsList.push({
+                // 基础数据
+                const artObj = {
                     key: key,
                     label: labelKey, // "XJZL.Arts.Duanzao"
                     total: artData.total || 0,
-                    // 如果需要显示检定加值，可以在这里加: rollMod: (artData.checkMod || 0) + (artData.bookCheck || 0)
-                });
+                    identity: null // 默认无身份
+                };
+
+                // 身份处理逻辑
+                // 检查该技艺是否有激活的身份
+                // identityData 现在是 { highest: {...}, all: [...] }
+                const identityData = activeIdentities[key];
+
+                if (identityData && identityData.highest) {
+                    const capKey = key.charAt(0).toUpperCase() + key.slice(1);
+
+                    // 1. 徽章显示的标题 (取最高级)
+                    const badgeTitleKey = `XJZL.Identity.${capKey}.${identityData.highest.titleKey}`;
+                    const badgeTitle = game.i18n.localize(badgeTitleKey);
+
+                    // 2. 构建 Tooltip (遍历所有已获得的身份)
+                    // 使用 map + join 生成长 HTML
+                    let tooltipRows = identityData.all.map(id => {
+                        const tKey = `XJZL.Identity.${capKey}.${id.titleKey}`;
+                        const dKey = `XJZL.Identity.${capKey}.${id.descKey}`;
+
+                        const title = game.i18n.localize(tKey);
+                        const desc = game.i18n.localize(dKey);
+
+                        // 每一项的样式：标题(黄色) + 描述(白色)
+                        return `
+                        <div style="margin-bottom: 8px;">
+                            <div style="color:var(--xjzl-gold); font-weight:bold; font-size:1.1em;">
+                                <i class="fas fa-caret-right" style="font-size:0.8em;"></i> ${title} <span style="opacity:0.6; font-size:0.8em;">(Lv.${id.level})</span>
+                            </div>
+                            <div style="padding-left: 10px; line-height: 1.4; color: #ddd; font-size: 0.9em;">
+                                ${desc}
+                            </div>
+                        </div>`;
+                    }).join("<hr style='border-color:#444; margin: 4px 0;'>"); // 用分割线连接
+
+                    // 包裹在外层容器中
+                    const tooltipHtml = `<div style="text-align:left; max-width:400px; padding:2px;">${tooltipRows}</div>`;
+
+                    artObj.identity = {
+                        title: badgeTitle,   // 徽章只显示最高头衔
+                        tooltip: tooltipHtml, // 悬停显示所有历史头衔
+                        level: identityData.highest.level
+                    };
+                }
+                context.artsList.push(artObj);
             }
         }
 

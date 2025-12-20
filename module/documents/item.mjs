@@ -755,7 +755,13 @@ export class XJZLItem extends Item {
     // === 1. 准备数据 ===
     // 技艺书没有固定的 maxXP 属性，它是所有章节消耗的总和
     // 这些数据都在 system 上，不需要像招式那样去数组里找
-    const totalCost = this.system.chapters.reduce((sum, c) => sum + (c.cost || 0), 0);
+    // 计算总消耗 (Max XP) 时，必须应用折扣系数
+    // 否则会导致溢出检查失效，允许玩家投入超过折后上限的修为
+    const totalCost = this.system.chapters.reduce((sum, c) => {
+      const rawCost = c.cost || 0;
+      const ratio = c.xpCostRatio ?? 1;
+      return sum + Math.floor(rawCost * ratio);
+    }, 0);
     const currentInvested = this.system.xpInvested;
 
     if (currentInvested >= totalCost) {

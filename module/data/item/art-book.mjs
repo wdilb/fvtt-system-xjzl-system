@@ -35,6 +35,12 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
         label: "XJZL.ArtBook.ChapterCost"
       }),
 
+       // 该章节的修炼消耗系数
+      xpCostRatio: new fields.NumberField({ 
+        required: true, initial: 1, min: 0, 
+        label: "XJZL.ArtBook.XPCostRatio" 
+      }),
+
       // 奖励 (读完这一篇给什么)
       reward: new fields.SchemaField({
         level: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.ArtBook.RewardLevel" }), // 技艺等级 +N
@@ -95,7 +101,12 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
 
     // 遍历所有章节，计算进度和累积奖励
     for (const chapter of this.chapters) {
-      const chapterCost = chapter.cost || 0;
+      // --- 计算实际消耗 ---
+      const rawCost = chapter.cost || 0;
+      const ratio = chapter.xpCostRatio ?? 1;
+      
+      // 这一章实际需要填的坑
+      const chapterCost = Math.floor(rawCost * ratio);
 
       // 进度条数据 (用于 UI 显示)
       chapter.progress = {

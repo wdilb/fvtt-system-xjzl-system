@@ -27,6 +27,13 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       // 该阶段的特效描述 (HTML富文本)
       effect: new fields.HTMLField({ label: "XJZL.Neigong.EffectConfig" }),
 
+      // 修炼消耗系数 (1 = 原价, 0.8 = 8折)
+      // 放在这里意味着每一层(stage1/2/3)都可以单独配置打折力度
+      xpCostRatio: new fields.NumberField({
+        required: true, initial: 1, min: 0,
+        label: "XJZL.Neigong.XPCostRatio"
+      }),
+
       // === 脚本列表 ===
       // 以前是 script: new fields.StringField(...)
       // 现在改为 ArrayField
@@ -91,11 +98,27 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     // 人级: 0(领) -> 1000(小) -> 3000(圆)
     // 地级: 1000(领) -> 4000(小) -> 10000(圆)
     // 天级: 2000(领) -> 12000(小) -> 30000(圆)
+    // 原始门槛 (Standard)
+    let rawThresholds  = [0, 0, 0];
+    if (this.tier === 1) rawThresholds  = [0, 1000, 3000];
+    else if (this.tier === 2) rawThresholds  = [1000, 4000, 10000];
+    else if (this.tier === 3) rawThresholds  = [2000, 12000, 30000];
 
-    let thresholds = [0, 0, 0];
-    if (this.tier === 1) thresholds = [0, 1000, 3000];
-    else if (this.tier === 2) thresholds = [1000, 4000, 10000];
-    else if (this.tier === 3) thresholds = [2000, 12000, 30000];
+    const ratio1 = this.config.stage1?.xpCostRatio ?? 1; // 阶段1系数
+    const ratio2 = this.config.stage2?.xpCostRatio ?? 1; // 阶段2系数
+    const ratio3 = this.config.stage3?.xpCostRatio ?? 1; // 阶段3系数
+
+    // 计算打折后的增量
+    const cost0 = rawThresholds[0] * ratio1;
+    const cost1 = (rawThresholds[1] - rawThresholds[0]) * ratio2;
+    const cost2 = (rawThresholds[2] - rawThresholds[1]) * ratio3;
+
+    // 重组门槛
+    const thresholds = [
+        Math.floor(cost0),
+        Math.floor(cost0 + cost1),
+        Math.floor(cost0 + cost1 + cost2)
+    ];
 
     // 定义该内功的绝对上限 (圆满所需的值)
     const absoluteMax = thresholds[2];

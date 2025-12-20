@@ -457,10 +457,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
   prepareDerivedData() {
     this._applyCustomModifiers(); //应用手动修正 (最优先)
     this._prepareStatsAndCultivation(); // 步骤A: 静态累加 (Pass 1 独有)
-    this._calculateStatsTotals();       // 步骤B: 计算总值
-    this._prepareSkills();              // 步骤C: 技能
-    this._prepareArts();                // 步骤C: 技艺
-    this._prepareCombatAndResources();  // 步骤D: 资源与战斗
+    // this._resetDynamicBonuses();        // 步骤A2: 重置动态加成（因为技艺改为只计算一次，所以不需要了）
+    this._prepareArts();                // 步骤B: 技艺(改为只计算一次，但是会导致“通过宏/脚本临时增加技艺等级”的情况，无法触发新的身份头衔，但技艺是个不重要的功能，我们简单处理)
+    this._resolveWeaponRankBases();     // 步骤B2: 结算武器等级(Pass 1 独有)
+    this._calculateStatsTotals();       // 步骤C: 计算总值
+    this._prepareSkills();              // 步骤D: 技能
+    this._prepareCombatAndResources();  // 步骤E: 资源与战斗
   }
 
   /**
@@ -473,7 +475,6 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
   recalculate() {
     this._calculateStatsTotals();      // 重新计算 Total
     this._prepareSkills();             // 重新计算技能
-    this._prepareArts();               // 重新计算技艺
     this._prepareCombatAndResources(); // 重新计算资源与战斗
   }
 
@@ -524,6 +525,11 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       art.bookBonus = 0;
       art.bookCheck = 0;
     }
+    //从局部变量改为直接存在 combat.weaponRanks 下面
+    for (const rankData of Object.values(combat.weaponRanks)) {
+      // 初始化计数缓存
+      rankData.counts = { t1: 0, t2: 0, t3: 0 };
+    }
 
     // =======================================================
     // 逻辑一：遍历 Items 计算 [境界]、[悟性加成]、[武器等级]
@@ -531,12 +537,6 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     let maxRealmLevel = 0; // 最高境界 (0-7)
     let wuxingBonus = 0;   // 悟性额外加成点数
-
-    // 武器等级的“基础值”暂存 (不直接写 Total，因为 Total 还需要加 Mod)
-    const rankBases = {};
-
-    // 武器积分计数器 { "blade": { t1: 0, t2: 0, t3: 0 } }
-    const weaponCounts = {};
 
     // 悟性加成计数器 (受人数限制)
     let wuxingHumanCount = 0; // 人级精通数
@@ -622,8 +622,6 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           const wType = move.weaponType; // 武器类型
 
           if (wType && wType !== 'none') { //确实存在不带武器类型的招式，哎
-            // 初始化计数器
-            if (!weaponCounts[wType]) weaponCounts[wType] = { t1: 0, t2: 0, t3: 0 };
 
             // 1. 统计悟性加成 (需达到 精通/Stage>=3)
             if (stage >= 3) {
@@ -634,14 +632,15 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
             if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
 
             // 2. 统计武器积分 (Tier 1/2/3 分组计数)
-            // 梯度1: 掌握(Stage>=2)
-            if (stage >= 2) weaponCounts[wType].t1++;
-
-            // 梯度2: 精通(Stage>=3) 且 地级以上
-            if (stage >= 3 && tier >= 2) weaponCounts[wType].t2++;
-
-            // 梯度3: 合一(Stage>=4) 且 天级
-            if (stage >= 4 && tier >= 3) weaponCounts[wType].t3++;
+            if (combat.weaponRanks[wType]) {
+              const counts = combat.weaponRanks[wType].counts;
+              // 梯度1: 掌握(Stage>=2)
+              if (stage >= 2) counts.t1++;
+              // 梯度2: 精通(Stage>=3) 且 地级以上
+              if (stage >= 3 && tier >= 2) counts.t2++;
+              // 梯度3: 合一(Stage>=4) 且 天级
+              if (stage >= 4 && tier >= 3) counts.t3++;
+            }
           }
         }
       }
@@ -672,47 +671,119 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     wuxingBonus += Math.min(wuxingHumanCount, 10); // 人级上限 10
     wuxingBonus += Math.min(wuxingEarthCount, 10); // 地级上限 10
     this.cultivation.wuxingBonus = wuxingBonus;
+  }
 
-    // =======================================================
-    // 逻辑二：结算武器等级基础值 (Weapon Ranks Base)
-    // =======================================================
+  /**
+   * [内部步骤 A2] 重置动态加成
+   * 应该不需要了，因为我们只运行一次技艺的运算
+   */
+  // _resetDynamicBonuses() {
+  //   // 1. 重置属性上的身份加成
+  //   for (const stat of Object.values(this.stats)) {
+  //     if (typeof stat === 'object' && 'value' in stat) {
+  //       stat.identityBonus = 0;
+  //     }
+  //   }
+  //   // 2. 重置武器等级上的身份加成 (这是最重要的)
+  //   for (const rankData of Object.values(this.combat.weaponRanks)) {
+  //     rankData.r2Bonus = 0;
+  //   }
+  // }
 
-    for (const [wType, counts] of Object.entries(weaponCounts)) {
-      // 1. 获取计数对象 (如果没练过该类武学，counts 为 undefined)
-      // 即使没有招式，背景加成也应该生效，所以给个默认空对象
-      const counts = weaponCounts[wType] || { t1: 0, t2: 0, t3: 0 };
+  /**
+   * [内部步骤B] 计算技艺最终等级 & 应用身份数值加成
+   * 纯逻辑层：不包含任何 UI/文本/翻译处理
+   */
+  _prepareArts() {
+    const arts = this.arts;
+    const config = CONFIG.XJZL.artIdentities || {};
 
-      // 2. 获取数据对象 (方便读取 r1Bonus / r2Bonus)
-      const rankData = this.combat.weaponRanks[wType];
+    // 内存容器：只存储当前激活的【最高身份配置对象】
+    // 供 Sheet 读取用来判断显示哪个头衔，也供宏脚本读取
+    this.activeIdentities = {};
 
-      // 3. 计算分级等级 (含上限逻辑)
-      // -------------------------------------------------
-      // 梯度1 (人级): 招式贡献 + 背景/特性加成 (上限 4)
-      // 逻辑：背景送的"匕首+1(限4)"会加在 r1Bonus 里
-      const r1 = Math.min((counts.t1 || 0) + (rankData.r1Bonus || 0), 4);
+    for (const [artKey, artData] of Object.entries(arts)) {
+      // 1. 计算技艺 Total (Value + Mod + Book)
+      let rawTotal = (artData.value || 0) + (artData.mod || 0) + (artData.bookBonus || 0);
 
-      // 梯度2 (地级): 招式贡献 + 背景/特性加成 (上限 8)
-      // 逻辑：必须是地级/天级招式(t2)才能填充此槽位
-      const r2 = Math.min((counts.t2 || 0) + (rankData.r2Bonus || 0), 4);
+      // 2. 封顶逻辑 (0-10)
+      artData.total = Math.min(10, Math.max(0, rawTotal));
 
-      // 梯度3 (天级): 仅由天级招式(t3)填充 (无上限)
-      const r3 = (counts.t3 || 0);
+      // 3. 身份匹配逻辑
+      const identities = config[artKey] || [];
 
-      // 4. 汇总 Base 值
-      // 注意：AE 中的 .mod (无视上限的通用加成) 会在 _prepareCombatAndResources 中叠加
-      // 这里只计算 "修为/背景" 带来的基础造诣
-      rankBases[wType] = r1 + r2 + r3;
-    }
+      // 筛选出所有达成的身份 (Level <= Total)
+      // 例如：等级5，会筛选出 [1级身份, 3级身份, 5级身份]
+      const earnedIdentities = identities.filter(id => artData.total >= id.level);
 
-    // 将计算出的 Base 填入 combat.weaponRanks.value
-    // 这样在后续步骤中就能计算 Total = Value(Base) + Mod(AE)
-    for (const key of Object.keys(combat.weaponRanks)) {
-      combat.weaponRanks[key].value = rankBases[key] || 0;
+      if (earnedIdentities.length > 0) {
+        // A. 记录最高身份 (Raw Config) 到内存，供 Sheet 使用
+        // 这样 Sheet 只需要拿着 titleKey 去翻译，不用重算一遍逻辑
+        const currentIdentity = earnedIdentities[earnedIdentities.length - 1];
+        this.activeIdentities[artKey] = {
+          highest: currentIdentity,
+          all: earnedIdentities // 这里包含了从低到高的所有身份配置
+        };
+
+        // B. 叠加数值加成 (遍历所有达成的身份)
+        for (const id of earnedIdentities) {
+          if (id.bonuses) {
+            for (const [propKey, value] of Object.entries(id.bonuses)) {
+
+              // 逻辑 A: 增加属性 (使用 identityBonus 桶)
+              // 对应 Config 如: "stats.liliang": 5
+              if (propKey.startsWith("stats.") && !propKey.endsWith(".mod")) {
+                const statName = propKey.split(".")[1];
+                const stat = this.stats[statName];
+                // 安全检查：确保属性存在
+                if (stat) {
+                  stat.identityBonus = (stat.identityBonus || 0) + value;
+                }
+              }
+              // 逻辑 B: 增加其他数值 (直接修改 System)
+              // 对应 Config 如: "combat.weaponRanks.blade.r2Bonus": 1
+              // 对应 Config 如: "arts.duanzao.checkMod": 2
+              else {
+                const currentVal = foundry.utils.getProperty(this, propKey);
+                // 仅当目标是数字时才修正，防止配错 Key 炸锅
+                if (typeof currentVal === "number") {
+                  foundry.utils.setProperty(this, propKey, currentVal + value);
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 
   /**
-   * [内部步骤 B] 计算七维属性最终值 (Totals)
+   * [内部步骤B2] 结算武器等级
+   */
+  _resolveWeaponRankBases() {
+    const combat = this.combat;
+
+    for (const rankData of Object.values(combat.weaponRanks)) {
+      // 1. 读取缓存 (来自 _prepareStatsAndCultivation)
+      const counts = rankData.counts || { t1: 0, t2: 0, t3: 0 };
+
+      // 2. 套用原公式
+      // r1Bonus: 静态，来自 DataModel/背景
+      const r1 = Math.min(counts.t1 + (rankData.r1Bonus || 0), 4);
+
+      // r2Bonus: 动态，刚刚在 _prepareArts 里被身份加过了！
+      const r2 = Math.min(counts.t2 + (rankData.r2Bonus || 0), 4);
+
+      // r3: 天级无上限
+      const r3 = counts.t3;
+
+      // 3. 写入结果
+      rankData.value = r1 + r2 + r3;
+    }
+  }
+
+  /**
+   * [内部步骤 C] 计算七维属性最终值 (Totals)
    * 【可重复执行】
    * 职责：覆盖型操作 (=)
    */
@@ -797,14 +868,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       // Total = Base + Assigned + Mod + NeigongBonus
       // mod: AE修正 + (如果有)脚本动态修正
       // neigongBonus: 内功静态修正
-      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0) + (stat.neigongBonus || 0);
+      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0) + (stat.neigongBonus || 0) + (stat.identityBonus || 0);
 
       // TODO 属性小于0 死亡
     }
   }
 
   /**
-   * [内部步骤 C] 计算技能 (Skills)
+   * [内部步骤 D] 计算技能 (Skills)
    * 【可重复执行】
    * 依赖：stats.total
    */
@@ -852,7 +923,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
   }
 
   /**
-   * [内部步骤 D] 计算资源与战斗面板
+   * [内部步骤 E] 计算资源与战斗面板
    * 【可重复执行】
    * 依赖：stats.total, skills.total
    */
@@ -1217,31 +1288,5 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     }
 
     return bonus;
-  }
-
-  /**
-   * [内部步骤 E] 计算技艺最终等级
-   * 【可重复执行】
-   * 公式: Total = Value(投入) + Mod(AE) + Book(读书)
-   */
-  _prepareArts() {
-    const arts = this.arts;
-
-    for (const art of Object.values(arts)) {
-      // 1. 等级汇总
-      // value: 手动填写的/投入的
-      // mod: 装备或BUFF提供的 (Active Effects)
-      // bookBonus: 书籍研读提供的 (在上一步计算)
-      art.total = (art.value || 0) + (art.mod || 0) + (art.bookBonus || 0);
-
-      // 确保不为负数 (视规则而定，通常技艺最低为0)
-      art.total = Math.max(0, art.total);
-
-      // 2. 检定加值汇总 (Check Mod)
-      // 这一步其实不存 Total，因为检定公式是: 1d20 + ArtTotal + checkMod + bookCheck
-      // 但为了方便调试或显示，我们确保数据是最新的即可
-      // checkMod: AE 提供的
-      // bookCheck: 书籍提供的
-    }
   }
 }

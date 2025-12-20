@@ -64,6 +64,11 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // 招式独立升级，不依赖套路总等级
       level: new fields.NumberField({ min: 1, initial: 1, label: "XJZL.Wuxue.Moves.Level" }),
       xpInvested: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Neigong.XPInvested" }),
+      // 该招式的修炼消耗系数
+      xpCostRatio: new fields.NumberField({
+        required: true, initial: 1, min: 0,
+        label: "XJZL.Wuxue.Moves.XPCostRatio"
+      }),
 
       // --- 进阶配置 (存在那种不是按照普通套路升级的武学，哎) ---
       // 用于处理“只有学会/没学会”、“特殊修为需求”等特例
@@ -188,16 +193,21 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
     // 2. 遍历每个招式，计算状态
     for (const move of this.moves) {
-      let thresholds = [];
+      let baseThresholds = [];
 
       // --- 门槛判定逻辑 ---
       if (move.progression.mode === "custom" && move.progression.customThresholds.length > 0) {
         // 使用自定义门槛
-        thresholds = move.progression.customThresholds;
+        baseThresholds = move.progression.customThresholds;
       } else {
         // 使用标准门槛
-        thresholds = standardThresholds;
+        baseThresholds = standardThresholds;
       }
+
+      const ratio = move.xpCostRatio ?? 1;
+      // 直接把所有门槛都乘以系数
+      // 例如 [500, 1000] * 0.8 = [400, 800]
+      const thresholds = baseThresholds.map(t => Math.floor(t * ratio));
 
       // 获取绝对上限
       const absoluteMax = thresholds.length > 0 ? thresholds[thresholds.length - 1] : 0;

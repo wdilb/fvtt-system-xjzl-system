@@ -193,8 +193,145 @@ XJZL.arts = {
   nongshi: "XJZL.Arts.Nongshi"  // 农事
 };
 
+// 16. 技艺身份配置 (Art Identities)
+XJZL.artIdentities = {
+  // === 锻造 ===
+  duanzao: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "stats.liliang": 5 } }, // 力量+5
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc", bonuses: { "arts.duanzao.checkMod": 2 } }, // 锻造+2
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: { 
+        "combat.weaponRanks.sword.mod": 1, "combat.weaponRanks.blade.mod": 1, 
+        "combat.weaponRanks.staff.mod": 1, "combat.weaponRanks.dagger.mod": 1, 
+        "combat.weaponRanks.hidden.mod": 1, "combat.weaponRanks.unarmed.mod": 1, 
+        "combat.weaponRanks.instrument.mod": 1, "combat.weaponRanks.special.mod": 1 
+    }} // 全武器等级+1
+  ],
+  // === 成衣 ===
+  chengyi: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc", bonuses: { "arts.chengyi.checkMod": 1 } }, // 成衣+1
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "stats.shenfa": 5 } }, // 身法+5
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc"}, 
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc"}
+  ],
+  // === 制宝 ===
+  zhibao: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" }, 
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "stats.shenfa": 5 } }, // 身法+5
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 烹饪 ===
+  pengren: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "stats.tipo": 5 } }, // 体魄+5
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "combat.weaponRanks.blade.r2Bonus": 1, "combat.weaponRanks.dagger.r2Bonus": 1 } }, // 刀/匕首+1
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc", bonuses: { "arts.pengren.checkMod": 2 } }, // 烹饪+2
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 医术 ===
+  yishu: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "stats.qigan": 5 } }, // 气感+5
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc", bonuses: { "arts.yishu.checkMod": 2 } }, // 医术+2
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: { "arts.yishu.checkMod": 1 } } // 医术+1
+  ],
+  // === 毒术 ===
+  dushu: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc", bonuses: { "arts.dushu.checkMod": 2 } }, // 毒术+2
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 茶道 ===
+  chadao: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "arts.chadao.checkMod": 1 } }, // 茶道+1
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "arts.chadao.checkMod": 2 } }, // 茶道+2
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 酒艺 ===
+  jiuyi: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "stats.tipo": 5 } }, // 体魄+5
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "resources.alcohol.bonus": 20 } }, // 酒量+20
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 书写 ===
+  shuxie: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc", bonuses: { "skills.shuofu.mod": 1 } }, // 说服+1
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 作画 ===
+  zuohua: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" }, // 易容检定暂无直接对应属性，暂不自动
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" } // 招式伤害暂不自动
+  ],
+  // === 棋术 ===
+  qishu: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "arts.qishu.checkMod": 2 } }, // 棋术+2
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 佛法 ===
+  fofa: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: { "arts.fofa.checkMod": 1 } } // 佛法+1
+  ],
+  // === 道法 ===
+  daofa: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "arts.daofa.checkMod": 1 } }, // 道法+1
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" }, 
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 表演 ===
+  biaoyan: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "arts.biaoyan.checkMod": 2 } }, // 表演+2
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: { "stats.shencai": 10 } } // 神采+10
+  ],
+  // === 驭兽 ===
+  yushou: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ],
+  // === 农事 ===
+  nongshi: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "arts.nongshi.checkMod": 2 } }, // 农事+2
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
+  ]
+};
 
-// 16. 系统状态标志 (逻辑开关)
+
+// 17. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -294,7 +431,7 @@ XJZL.statusFlags = {
   regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
-// 17. 检定优劣势计数器 (Check Flags)
+// 18. 检定优劣势计数器 (Check Flags)
 // 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
 // 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
 XJZL.checkFlags = {
