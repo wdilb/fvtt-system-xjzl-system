@@ -423,6 +423,19 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     if (!this.cultivation) this.cultivation = {};
     this.cultivation.wuxingBonus = 0;  // 存储计算后的悟性加成
     // 武器等级现在移到了 combat.weaponRanks，这里不需要初始化了
+
+    // =====================================================
+    // 初始化武器等级的“分级加成桶”
+    // -----------------------------------------------------
+    // 我们需要预置这些字段，以便 对应 的 AE 可以指向它们。
+    // r1Bonus: 人级加成 (上限4)
+    // r2Bonus: 地级加成 (上限4)
+    // =====================================================
+    for (const rank of Object.values(this.combat.weaponRanks)) {
+      rank.r1Bonus = 0; // 对应 "不可超过4" 的加成
+      rank.r2Bonus = 0; // 对应 "不可超过8" 的加成 (如果有的话)
+      // rank.mod 已经在 Schema 中定义了，这里不用管
+    }
   }
 
   /**
@@ -665,17 +678,30 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // =======================================================
 
     for (const [wType, counts] of Object.entries(weaponCounts)) {
-      let rank = 0;
-      // 梯度1 (1-4级): 只要掌握就算，上限 4
-      const r1 = Math.min(counts.t1, 4);
-      // 梯度2 (5-8级): 地/天级精通，上限 4
-      const r2 = Math.min(counts.t2, 4);
-      // 梯度3 (9+级): 天级合一，无上限
-      const r3 = counts.t3;
+      // 1. 获取计数对象 (如果没练过该类武学，counts 为 undefined)
+      // 即使没有招式，背景加成也应该生效，所以给个默认空对象
+      const counts = weaponCounts[wType] || { t1: 0, t2: 0, t3: 0 };
 
-      // 总等级 = 各梯度之和
-      rank = r1 + r2 + r3;
-      rankBases[wType] = rank;
+      // 2. 获取数据对象 (方便读取 r1Bonus / r2Bonus)
+      const rankData = this.combat.weaponRanks[wType];
+
+      // 3. 计算分级等级 (含上限逻辑)
+      // -------------------------------------------------
+      // 梯度1 (人级): 招式贡献 + 背景/特性加成 (上限 4)
+      // 逻辑：背景送的"匕首+1(限4)"会加在 r1Bonus 里
+      const r1 = Math.min((counts.t1 || 0) + (rankData.r1Bonus || 0), 4);
+
+      // 梯度2 (地级): 招式贡献 + 背景/特性加成 (上限 8)
+      // 逻辑：必须是地级/天级招式(t2)才能填充此槽位
+      const r2 = Math.min((counts.t2 || 0) + (rankData.r2Bonus || 0), 4);
+
+      // 梯度3 (天级): 仅由天级招式(t3)填充 (无上限)
+      const r3 = (counts.t3 || 0);
+
+      // 4. 汇总 Base 值
+      // 注意：AE 中的 .mod (无视上限的通用加成) 会在 _prepareCombatAndResources 中叠加
+      // 这里只计算 "修为/背景" 带来的基础造诣
+      rankBases[wType] = r1 + r2 + r3;
     }
 
     // 将计算出的 Base 填入 combat.weaponRanks.value
@@ -936,19 +962,19 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // 处理失血
     const actor = this.parent;
     // 确保 bloodLossLevel 已经在 Actor.prepareBaseData 的 numericCombatFlags 里注册过
-    const bloodLoss = actor?.xjzlStatuses?.bloodLossLevel || 0; 
+    const bloodLoss = actor?.xjzlStatuses?.bloodLossLevel || 0;
 
     if (bloodLoss > 0) {
-        // 计算扣除比例 (例如 3层 = 0.3)
-        // Math.min(1, ...) 防止超过 100% 导致负血量（虽然归零也死了）
-        const penaltyRatio = Math.min(1, bloodLoss * 0.1);
-        
-        // 应用扣除
-        hpMax = Math.floor(hpMax * (1 - penaltyRatio));
+      // 计算扣除比例 (例如 3层 = 0.3)
+      // Math.min(1, ...) 防止超过 100% 导致负血量（虽然归零也死了）
+      const penaltyRatio = Math.min(1, bloodLoss * 0.1);
+
+      // 应用扣除
+      hpMax = Math.floor(hpMax * (1 - penaltyRatio));
     }
     // 赋值 (保底为 0)
     resources.hp.max = Math.max(0, hpMax);
-    
+
     // MP = 内息*1 + 额外
     resources.mp.max = Math.floor(S.neixi * 1 + (resources.mp.bonus || 0) + mpAdd);
     // 怒气上限固定
@@ -1097,7 +1123,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // 2. 处理 "强制归零" (Force Zeros)
     if (actor?.getFlag("xjzl-system", "forceSpeedZero")) {
-        combat.speedTotal = 0;
+      combat.speedTotal = 0;
     }
 
     // 闪避 (基础10 + 身法/4 + 修正)
@@ -1105,7 +1131,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // 处理闪避归零状态
     if (actor?.getFlag("xjzl-system", "forceDodgeZero")) {
-        combat.dodgeTotal = 0;
+      combat.dodgeTotal = 0;
     }
 
     // 先攻 (身法 + 修正)
