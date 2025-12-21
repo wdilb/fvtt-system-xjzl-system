@@ -456,6 +456,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    */
   prepareDerivedData() {
     this._applyCustomModifiers(); //应用手动修正 (最优先)
+    this._prepareJingmaiState(); // 自动开启奇经八脉，放到这里，因为后续的 Stats 和 Combat 计算都严重依赖奇经八脉是否开启
     this._prepareStatsAndCultivation(); // 步骤A: 静态累加 (Pass 1 独有)
     // this._resetDynamicBonuses();        // 步骤A2: 重置动态加成（因为技艺改为只计算一次，所以不需要了）
     this._prepareArts();                // 步骤B: 技艺(改为只计算一次，但是会导致“通过宏/脚本临时增加技艺等级”的情况，无法触发新的身份头衔，但技艺是个不重要的功能，我们简单处理)
@@ -504,6 +505,129 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         }
       }
     }
+  }
+
+  /**
+   * [内部步骤 A0] 自动化计算奇经八脉状态
+   * 逻辑：根据十二正经开启情况 + 奇珍装备情况，覆写 this.jingmai.extra
+   * 
+   * @private
+   */
+  _prepareJingmaiState() {
+    const s = this.jingmai.standard;
+    const e = this.jingmai.extra;
+    const x = this.jingmai.xuanguan;
+    const actor = this.parent;
+
+    // =======================================================
+    // 1. 定义十二正经的元数据 (Metadata)
+    // =======================================================
+    // 用于快速统计阴阳数量和关卡层级
+    const MERIDIAN_MAP = {
+      // --- 第一关 (Tier 1) ---
+      hand_shaoyin: { type: "yin", tier: 1 }, // 手少阴心
+      foot_shaoyin: { type: "yin", tier: 1 }, // 足少阴肾
+      hand_shaoyang: { type: "yang", tier: 1 }, // 手少阳三焦
+      foot_shaoyang: { type: "yang", tier: 1 }, // 足少阳胆
+      // --- 第二关 (Tier 2) ---
+      hand_jueyin: { type: "yin", tier: 2 }, // 手厥阴心包
+      foot_jueyin: { type: "yin", tier: 2 }, // 足厥阴肝
+      hand_yangming: { type: "yang", tier: 2 }, // 手阳明大肠
+      foot_yangming: { type: "yang", tier: 2 }, // 足阳明胃
+      // --- 第三关 (Tier 3) ---
+      hand_taiyin: { type: "yin", tier: 3 }, // 手太阴肺
+      foot_taiyin: { type: "yin", tier: 3 }, // 足太阴脾
+      hand_taiyang: { type: "yang", tier: 3 }, // 手太阳小肠
+      foot_taiyang: { type: "yang", tier: 3 }  // 足太阳膀胱
+    };
+
+    // =======================================================
+    // 2. 获取奇珍装备情况 (Qizhen)
+    // =======================================================
+    // 我们需要知道哪些穴位被插了东西
+    // 使用 Set 提高查找性能
+    const equippedAcupoints = new Set();
+    if (actor) {
+      // 遍历所有装备中的奇珍 (qizhen)
+      for (const item of actor.itemTypes.qizhen || []) {
+        if (item.system.equipped && item.system.acupoint) {
+          equippedAcupoints.add(item.system.acupoint);
+        }
+      }
+    }
+
+    // =======================================================
+    // 3. 统计当前开启情况 (Statistics)
+    // =======================================================
+    const stats = {
+      yinOpen: 0,     // 打通的阴脉总数 (用于任脉)
+      yangOpen: 0,    // 打通的阳脉总数 (用于督脉)
+
+      yinCharged: 0,  // 【既打通+又装奇珍】的阴脉数 (用于阴维脉)
+      yangCharged: 0, // 【既打通+又装奇珍】的阳脉数 (用于阳维脉)
+
+      tiers: { 1: 0, 2: 0, 3: 0 },
+      yangTiers: { 1: false, 2: false, 3: false },
+      yinTiers: { 1: false, 2: false, 3: false }
+    };
+
+    for (const [key, meta] of Object.entries(MERIDIAN_MAP)) {
+      if (s[key]) { // 只有经脉被打通 (s[key] == true) 才进行统计
+
+        // A. 统计打通数量
+        if (meta.type === "yang") stats.yangOpen++;
+        if (meta.type === "yin") stats.yinOpen++;
+
+        // B. 统计“充能”数量 (对应武道穴位服食奇珍)
+        if (equippedAcupoints.has(key)) {
+          if (meta.type === "yang") stats.yangCharged++;
+          if (meta.type === "yin") stats.yinCharged++;
+        }
+
+        // C. 统计关卡层级 (用于冲脉/带脉/跷脉)
+        stats.tiers[meta.tier]++;
+        if (meta.type === "yang") stats.yangTiers[meta.tier] = true;
+        if (meta.type === "yin") stats.yinTiers[meta.tier] = true;
+      }
+    }
+
+    // =======================================================
+    // 4. 判定奇经八脉 (Logic)
+    // =======================================================
+
+    // 督脉 (Du): 打通六条阳脉
+    // 效果：全属性+10 (在 _calculateStatsTotals 处理)
+    e.du = (stats.yangOpen >= 6);
+
+    // 任脉 (Ren): 打通六条阴脉
+    // 效果：全属性+10
+    e.ren = (stats.yinOpen >= 6);
+
+    // 冲脉 (Chong): 打通一二三关各一条，并突破生死玄关
+    // 效果：气血+200
+    // 逻辑：只要每关总数 > 0 且 玄关=true
+    e.chong = (stats.tiers[1] > 0 && stats.tiers[2] > 0 && stats.tiers[3] > 0 && x.broken);
+
+    // 带脉 (Dai): 打通第一关，第二关所有经脉 (共8条)
+    // 效果：格挡+40
+    // 逻辑：第一关4条全通 + 第二关4条全通
+    e.dai = (stats.tiers[1] === 4 && stats.tiers[2] === 4);
+
+    // 阳维脉 (Yangwei): 打通四条阳脉，且对应穴位服食奇珍
+    // 效果：阳/刚伤害+20
+    e.yangwei = (stats.yangCharged >= 4); //只需要判断是否装备奇珍就好，因为没开的我们会阻止他装备
+
+    // 阴维脉 (Yinwei): 打通四条阴脉，且对应穴位服食奇珍
+    // 效果：阴/柔伤害+20
+    e.yinwei = (stats.yinCharged >= 4);
+
+    // 阳跷脉 (Yangqiao): 打通第一二三关各一条阳脉
+    // 效果：速度+1, 先攻+5, 暴击-1
+    e.yangqiao = (stats.yangTiers[1] && stats.yangTiers[2] && stats.yangTiers[3]);
+
+    // 阴跷脉 (Yinqiao): 打通第一二三关各一条阴脉
+    // 效果：速度+1, 闪避+5, 暴击-1
+    e.yinqiao = (stats.yinTiers[1] && stats.yinTiers[2] && stats.yinTiers[3]);
   }
 
   /**

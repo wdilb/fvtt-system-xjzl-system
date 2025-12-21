@@ -227,6 +227,78 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.backgroundItem = actor.itemTypes.background?.[0] || null;
         context.personalityItem = actor.itemTypes.personality?.[0] || null;
 
+        // =====================================================
+        // 经脉显示数据准备 (Jingmai Presentation)
+        // =====================================================
+
+        // --- 1. 十二正经 (Standard) 配置表 ---
+        // 定义元数据：Key -> {Tier, Type}
+        const standardMeta = {
+            // 第一关
+            "hand_shaoyin": { t: 1, type: "yin" }, "foot_shaoyin": { t: 1, type: "yin" },
+            "hand_shaoyang": { t: 1, type: "yang" }, "foot_shaoyang": { t: 1, type: "yang" },
+            // 第二关
+            "hand_jueyin": { t: 2, type: "yin" }, "foot_jueyin": { t: 2, type: "yin" },
+            "hand_yangming": { t: 2, type: "yang" }, "foot_yangming": { t: 2, type: "yang" },
+            // 第三关
+            "hand_taiyin": { t: 3, type: "yin" }, "foot_taiyin": { t: 3, type: "yin" },
+            "hand_taiyang": { t: 3, type: "yang" }, "foot_taiyang": { t: 3, type: "yang" }
+        };
+
+        // 构建 Standard List
+        context.jingmaiStandardList = Object.entries(standardMeta).map(([key, meta]) => {
+            const isOpen = actor.system.jingmai.standard[key];
+            const tierLabel = game.i18n.localize(`XJZL.Jingmai.T${meta.t}`);
+            const typeLabel = game.i18n.localize(`XJZL.Jingmai.Type.${meta.type.charAt(0).toUpperCase() + meta.type.slice(1)}`);
+            const effectLabel = game.i18n.localize(`XJZL.Jingmai.Effects.${key.charAt(0).toUpperCase() + key.slice(1)}`);
+
+            // 构建 HTML 格式的 Tooltip
+            // 格式:
+            // 第一关 (人级) · 阴脉
+            // ----------------
+            // 效果: 气血+10...
+            const tooltip = `
+                <div style='text-align:left; min-width:150px;'>
+                    <div style='font-weight:bold; color:var(--xjzl-gold); margin-bottom:4px;'>${tierLabel} · ${typeLabel}</div>
+                    <hr style='border-color:#555; margin:2px 0 4px 0;'>
+                    <div>${effectLabel}</div>
+                </div>
+            `;
+
+            return {
+                key: key,
+                label: `XJZL.Jingmai.${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                isActive: isOpen,
+                tooltip: tooltip
+            };
+        });
+
+        // --- 2. 奇经八脉 (Extra) ---
+        const extraOrder = ["du", "ren", "chong", "dai", "yangwei", "yinwei", "yangqiao", "yinqiao"];
+
+        context.jingmaiExtraList = extraOrder.map(key => {
+            const isActive = actor.system.jingmai.extra[key];
+            const capKey = key.charAt(0).toUpperCase() + key.slice(1);
+
+            const conditionLabel = game.i18n.localize(`XJZL.Jingmai.Conditions.${capKey}`);
+            const effectLabel = game.i18n.localize(`XJZL.Jingmai.Effects.${capKey}`);
+
+            // 构建 HTML 格式的 Tooltip
+            const tooltip = `
+                <div style='text-align:left; max-width:250px;'>
+                    <div style='margin-bottom:4px;'><b>条件:</b> ${conditionLabel}</div>
+                    <div style='color:#ccc;'><b>效果:</b> ${effectLabel}</div>
+                </div>
+            `;
+
+            return {
+                key: key,
+                label: `XJZL.Jingmai.${capKey}`,
+                isActive: isActive,
+                tooltip: tooltip
+            };
+        });
+
         return context;
     }
 
