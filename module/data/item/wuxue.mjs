@@ -45,6 +45,13 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         choices: ["taiji", "yin", "yang", "gang", "rou", "none"],
         label: "XJZL.Wuxue.Moves.Element"
       }),
+      // 功能类型 (仅气招使用)
+      // default=自动判断, heal=治疗流程, attack=攻击流程(即使是气招)
+      actionType: new fields.StringField({
+        initial: "default",
+        choices: ["default", "heal", "attack"], 
+        label: "XJZL.Wuxue.Moves.ActionType"
+      }),
       // 新增绝招标记，把绝招从招式类别中分离出来，因为存在即是绝招也是气招的东西，哎
       isUltimate: new fields.BooleanField({ initial: false, label: "XJZL.Wuxue.Moves.IsUltimate" }),
 

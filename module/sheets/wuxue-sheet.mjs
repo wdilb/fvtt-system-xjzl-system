@@ -62,6 +62,11 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             categories: localizeConfig(XJZL.wuxueCategories),
             moveTypes: localizeConfig(XJZL.moveTypes),
             elements: localizeConfig(XJZL.elements),
+            actionTypes: {
+                default: "默认", // 或者使用 game.i18n.localize("XJZL.ActionType.default")
+                heal: "治疗",   // game.i18n.localize("XJZL.ActionType.heal")
+                attack: "攻击"  // game.i18n.localize("XJZL.ActionType.attack")
+            },
             attributes: localizeConfig(XJZL.attributes),
             weaponTypes: localizeConfig(XJZL.weaponTypes),
             damageTypes: localizeConfig(XJZL.damageTypes),

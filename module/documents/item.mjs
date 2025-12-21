@@ -1386,7 +1386,7 @@ export class XJZLItem extends Item {
         ChatMessage.create({
           user: game.user.id,
           speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `开启了架招: ${move.name}`,
+          flavor: `开启了气招: ${move.name}`,
           content: `<div class="xjzl-chat-card"><div class="card-result">已使用气招</div></div>`
         });
         return; // 气招流程结束
