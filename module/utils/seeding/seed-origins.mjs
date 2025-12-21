@@ -3,8 +3,8 @@
 const PACK_NAME = "xjzl-system.origins";
 // 使用统一的图标
 const ICONS = {
-    personality: "icons/magic/life/heart-shadow-red.webp",
-    background: "icons/environment/settlement/house-farmland-small.webp",
+    personality: "systems/xjzl-system/assets/icons/items/personality.png",
+    background: "systems/xjzl-system/assets/icons/items/background.png",
     ae: "icons/svg/book.svg"
 };
 
