@@ -130,7 +130,7 @@ XJZL.damageTypes = {
   mental: "XJZL.Damage.Mental",   // 精神 (必中)
   fire: "XJZL.Damage.Fire",       // 火焰 (必中)
   liushi: "XJZL.Damage.Liushi",   // 流失 (真实伤害)
-  none: "XJZL.DamageType.None"  // 无(用于气招等地方)
+  none: "XJZL.Damage.None"  // 无(用于气招等地方)
 };
 
 // 14. 技能列表 (本地化映射)

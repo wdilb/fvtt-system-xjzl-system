@@ -1122,21 +1122,38 @@ export class XJZLItem extends Item {
   /**
    * 步骤 0: 动态配置弹窗
    * 根据招式类型显示不同的输入框
+   * [Updated] 支持 effectiveMode 参数，控制显示逻辑
    */
-  async _promptRollConfiguration(move) {
+  async _promptRollConfiguration(move, effectiveMode = "attack") {
     if (move.type === "stance") return {};
 
     // 1. 生成唯一 ID
     const formId = `roll-config-${foundry.utils.randomID()}`;
 
     // 2. 准备模板数据
+
+    // - 治疗模式(heal): 需要数值(damage)，不需要检定(attack)
+    // - 攻击模式(attack): 需要数值，只有内外功需要检定
+    // - Buff模式: 理论上不需要弹窗，或者只需要极其简单的确认（这里保留逻辑以防万一）
+
+    const isHeal = effectiveMode === "heal";
+    const isAttack = effectiveMode === "attack";
+    // 只有攻击模式，且伤害类型为内外功时，才显示“攻击修正”输入框
+    const needsAttack = isAttack && ["waigong", "neigong"].includes(move.damageType);
+    // 治疗和攻击都需要显示“数值修正”输入框
+    const needsDamage = isHeal || isAttack;
+
+    // 只有非反击类的攻击招式可以暴击 (治疗也不可以暴击)
+    const canCrit = move.type !== "counter";
+
     const context = {
-      formId: formId, // 传入 ID
-      needsAttack: ["real", "feint"].includes(move.type) && ["waigong", "neigong"].includes(move.damageType),
-      isFeint: move.type === "feint",
-      needsDamage: ["real", "feint", "counter"].includes(move.type),
+      formId: formId,
+      needsAttack: needsAttack,
+      isFeint: move.type === "feint", // 只有虚招才显示虚招修正
+      needsDamage: needsDamage,
+      isHeal: isHeal, // 传给模板，用于改变 Label (如 "伤害修正" -> "治疗修正")
       isCounter: move.type === "counter",
-      canCrit: move.type !== "counter"
+      canCrit: canCrit
     };
 
     // 3. 渲染 HTML
@@ -1144,7 +1161,7 @@ export class XJZLItem extends Item {
 
     // 4. 使用 DialogV2.wait
     return foundry.applications.api.DialogV2.wait({
-      window: { title: `施展: ${move.name}`, icon: "fas fa-dice" },
+      window: { title: `施展: ${move.name}`, icon: isHeal ? "fas fa-heart" : "fas fa-dice" },
       content: content,
 
       // 使用 ID 查找，忽略回调参数
@@ -1180,7 +1197,7 @@ export class XJZLItem extends Item {
         icon: "fas fa-check",
         default: true,
         callback: (event, button, dialog) => {
-          // 【关键修正】同样使用 ID 获取数据，绝对稳健
+          // 同样使用 ID 获取数据，绝对稳健
           const root = document.getElementById(formId);
           if (!root) return {}; // 容错
 
@@ -1237,6 +1254,20 @@ export class XJZLItem extends Item {
         return;
       }
 
+      // =====================================================
+      // 0. 确定生效模式 (Effective Mode)
+      // =====================================================
+      let effectiveMode = "attack"; // 默认为攻击 (Real/Feint/Counter)
+
+      if (move.type === "stance") {
+        effectiveMode = "buff";
+      }
+      else if (move.type === "qi") {
+        const at = move.actionType || "default";
+        if (at === "heal") effectiveMode = "heal";
+        else if (at === "attack") effectiveMode = "attack";
+        else effectiveMode = "buff"; // default 视为 buff
+      }
 
       // =====================================================
       // 1. 状态阻断检查 (Status Check)
@@ -1278,8 +1309,13 @@ export class XJZLItem extends Item {
       // === 玩家配置弹窗 (Dialog) ===
       let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0 };
 
-      if (!options.skipDialog) {
-        const dialogResult = await this._promptRollConfiguration(move);
+      // 架招不需要弹窗，Buff类气招如果没选目标也不弹窗
+      // 但如果是 heal/attack 类气招，即使没选目标也可能需要弹窗调数值
+      const needsDialog = effectiveMode !== "buff";
+
+      if (!options.skipDialog && needsDialog) {
+        //  传入 effectiveMode
+        const dialogResult = await this._promptRollConfiguration(move, effectiveMode);
         if (!dialogResult) return;
         config = dialogResult;
       }
@@ -1360,45 +1396,40 @@ export class XJZLItem extends Item {
         return;
       }
 
-      // === 特殊分支：架招 和 气招 ===
-      // 架招不消耗普通资源(通常)，不弹窗，直接生效
-      // 在伤害计算之前我们把架招和气招处理了，他们根本不造成伤害
-      if (move.type === "stance") {
-        // 1. 切换状态
-        await actor.update({
-          "system.martial.stanceActive": true,
-          "system.martial.stance": move.id,      // 存招式 ID (用于读取数值)
-          "system.martial.stanceItemId": this.id // 存物品 ID (用于快速查找)
-        });
+      // =====================================================
+      // 分流：Buff/架招 模式 (提前结束)
+      // =====================================================
+      if (effectiveMode === "buff") {
 
-        // 2. 发送简单卡片
+        // 特殊处理架招
+        if (move.type === "stance") {
+          await actor.update({
+            "system.martial.stanceActive": true,
+            "system.martial.stance": move.id,
+            "system.martial.stanceItemId": this.id
+          });
+        }
+
+        // 发送简单卡片
         ChatMessage.create({
           user: game.user.id,
           speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `开启了架招: ${move.name}`,
-          content: `<div class="xjzl-chat-card"><div class="card-result">已开启架招</div></div>`
+          flavor: move.type === 'stance' ? `开启架招: ${move.name}` : `施展气招: ${move.name}`,
+          content: `<div class="xjzl-chat-card"><div class="card-result">${move.description || '效果已应用'}</div></div>`
         });
-        return; // 架招流程结束
-      }
 
-      if (move.type === "qi") {
-        // 1. 发送简单卡片
-        ChatMessage.create({
-          user: game.user.id,
-          speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: `开启了气招: ${move.name}`,
-          content: `<div class="xjzl-chat-card"><div class="card-result">已使用气招</div></div>`
-        });
-        return; // 气招流程结束
+        // 纯Buff/气招流程结束
+        return;
       }
 
       // =====================================================
       // 5. 伤害计算 (Sync Calculation)
       // =====================================================
+      // 此时 effectiveMode 必定是 attack 或 heal
+      // calculateMoveDamage 负责算出数值 (damage)
       // 直接调用我们之前封装好的方法，保证和角色卡预览一致
       const calcResult = this.calculateMoveDamage(moveId);
-
-      if (!calcResult) return ui.notifications.error("伤害计算失败。");
+      if (!calcResult) return ui.notifications.error("数值计算失败。");
 
       // 应用手动修正
       calcResult.damage += config.bonusDamage;
@@ -1441,6 +1472,7 @@ export class XJZLItem extends Item {
             }
           };
 
+          // 即使是治疗，也跑一遍 CHECK 脚本 (脚本自己决定要不要对友方生效)
           await actor.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
           // 最终状态 = 攻击者自身被动 OR 脚本临时赋予
@@ -1451,14 +1483,17 @@ export class XJZLItem extends Item {
           // 读取目标被动状态
           const tStatus = targetActor.xjzlStatuses || {};
 
-          // --- A. 计算命中优劣势 ---
-          const targetGrant = tStatus.grantAttackLevel || 0;
-          const scriptGrant = checkContext.flags.grantLevel || 0;
-          const totalAttackLevel = selfLevel + targetGrant + scriptGrant;
-
+          // --- A. 计算命中优劣势 --- (仅 Attack 模式)
           let attackState = 0;
-          if (totalAttackLevel > 0) attackState = 1;
-          else if (totalAttackLevel < 0) attackState = -1;
+          if (effectiveMode === 'attack') {
+            const targetGrant = tStatus.grantAttackLevel || 0;
+            const scriptGrant = checkContext.flags.grantLevel || 0;
+            const totalAttackLevel = selfLevel + targetGrant + scriptGrant;
+
+
+            if (totalAttackLevel > 0) attackState = 1;
+            else if (totalAttackLevel < 0) attackState = -1;
+          }
 
           // --- B. 计算虚招优劣势 ---
           const targetFeintGrant = tStatus.defendFeintLevel || 0;
@@ -1480,7 +1515,8 @@ export class XJZLItem extends Item {
           });
         }
       }
-
+      //TODO才检查到这里
+      //问题：其实有一个小问题啊，治疗是不可以暴击的，或者说所有不需要投掷骰子的招数都是不能暴击的（所以其实只有造成内外功伤害的可以暴击，不过这里反正是手动，也并不是那么重要）
       // =====================================================
       // 7. 命中检定 (Hit Roll)
       // =====================================================
