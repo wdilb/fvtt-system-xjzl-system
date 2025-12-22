@@ -49,7 +49,7 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // default=自动判断, heal=治疗流程, attack=攻击流程(即使是气招)
       actionType: new fields.StringField({
         initial: "default",
-        choices: ["default", "heal", "attack"], 
+        choices: ["default", "heal", "attack"],
         label: "XJZL.Wuxue.Moves.ActionType"
       }),
       // 新增绝招标记，把绝招从招式类别中分离出来，因为存在即是绝招也是气招的东西，哎
@@ -66,6 +66,15 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       range: new fields.StringField({ initial: "2米", label: "XJZL.Wuxue.Moves.Range" }),
       targetInfo: new fields.StringField({ initial: "单体", label: "XJZL.Wuxue.Moves.Target" }),
       actionCost: new fields.StringField({ initial: "主要动作", label: "XJZL.Wuxue.Moves.ActionCost" }),
+
+      // 自动化说明 (Automation Note)
+      // 用于告知玩家/GM：本武学的哪些特效已自动化，哪些需要手动修正
+      automationNote: new fields.StringField({
+        required: false,
+        initial: "",
+        label: "XJZL.Wuxue.AutomationNote",
+        hint: "XJZL.Wuxue.AutomationNoteHint" // 提示语：例如“说明本武学的脚本覆盖范围”
+      }),
 
       // --- 4. 成长数据 ---
       // 招式独立升级，不依赖套路总等级
@@ -152,14 +161,6 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
       // 3. 描述与要求
       description: new fields.HTMLField({ label: "XJZL.Info.Bio" }),
-      // 自动化说明 (Automation Note)
-      // 用于告知玩家/GM：本武学的哪些特效已自动化，哪些需要手动修正
-      automationNote: new fields.StringField({
-        required: false,
-        initial: "",
-        label: "XJZL.Wuxue.AutomationNote",
-        hint: "XJZL.Wuxue.AutomationNoteHint" // 提示语：例如“说明本武学的脚本覆盖范围”
-      }),
       // 悟性要求等限制条件，仅作为文本提示，不强制自动化
       requirements: new fields.HTMLField({ label: "XJZL.Wuxue.Requirements" }),
 

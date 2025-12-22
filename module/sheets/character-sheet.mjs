@@ -161,8 +161,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     context.activeStance = {
                         name: move.name,
                         description: move.description,
-                        // 注意：automationNote 是在 Item 的 system 上
-                        automationNote: stanceItem.system.automationNote
+                        automationNote: move.automationNote 
                     };
                 }
             }
