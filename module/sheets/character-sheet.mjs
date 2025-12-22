@@ -140,7 +140,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // =====================================================
         // 查找当前架招名称 (Find Active Stance Name)
         // =====================================================
-        context.activeStanceName = null; // 默认无架招
+        context.activeStance = null; // 默认无架招
 
         const martial = actor.system.martial;
         if (martial.stanceActive && martial.stanceItemId && martial.stance) {
@@ -148,7 +148,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             if (stanceItem) {
                 const move = stanceItem.system.moves.find(m => m.id === martial.stance);
                 if (move) {
-                    context.activeStanceName = move.name;
+                    // 构建完整的数据对象
+                    context.activeStance = {
+                        name: move.name,
+                        description: move.description,
+                        // 注意：automationNote 是在 Item 的 system 上
+                        automationNote: stanceItem.system.automationNote
+                    };
                 }
             }
         }
