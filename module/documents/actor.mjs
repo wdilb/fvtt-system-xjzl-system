@@ -1289,20 +1289,24 @@ export class XJZLActor extends Actor {
    * @param {number} data.amount - 治疗数值
    * @param {string} data.type - 类型: "hp" | "neili" | "huti"
    * @param {boolean} data.showScrolling - 是否显示飘字
+   * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
    */
   async applyHealing(data) {
     const { amount = 0, type = "hp", showScrolling = true } = data;
-    if (amount <= 0) return;
+    if (amount <= 0) return { actualHeal: 0 };
 
     const updates = {};
     let actualHeal = 0;
     let label = "";
     let color = "#00FF00"; // 默认绿色 (HP)
+    let oldVal = 0;
+    let newVal = 0;
 
     // A. 气血 (HP)
     if (type === "hp") {
       const current = this.system.resources.hp.value;
       const max = this.system.resources.hp.max;
+      oldVal = current;
 
       // 检查禁疗 (预检查，用于计算 actualHeal 显示 0 还是 真实值)
       // 虽然 _preUpdate 会拦截，但为了飘字准确，这里先判一下
@@ -1310,7 +1314,7 @@ export class XJZLActor extends Actor {
         actualHeal = 0;
       } else {
         // 手动计算 Min 是为了让飘字显示实际增加量，而不是溢出量
-        const newVal = Math.min(max, current + amount);
+        newVal = Math.min(max, current + amount);
         actualHeal = newVal - current;
         if (actualHeal > 0) {
           updates["system.resources.hp.value"] = newVal;
@@ -1323,11 +1327,12 @@ export class XJZLActor extends Actor {
     else if (type === "mp" || type === "neili") {
       const current = this.system.resources.mp.value;
       const max = this.system.resources.mp.max;
+      oldVal = current;
 
       if (this.xjzlStatuses.noRecoverNeili) {
         actualHeal = 0;
       } else {
-        const newVal = Math.min(max, current + amount);
+        newVal = Math.min(max, current + amount);
         actualHeal = newVal - current;
         if (actualHeal > 0) {
           updates["system.resources.mp.value"] = newVal;
@@ -1340,9 +1345,10 @@ export class XJZLActor extends Actor {
     // C. 护体真气 (Huti)
     else if (type === "huti") {
       const current = this.system.resources.huti || 0;
+      oldVal = current;
+      newVal = current + amount;
       // 护体通常没有固定上限，或者由 DataModel 限制
       // 这里直接叠加
-      const newVal = current + amount;
       actualHeal = amount;
 
       updates["system.resources.huti"] = newVal;
@@ -1383,6 +1389,13 @@ export class XJZLActor extends Actor {
         }
       }
     }
+    // 返回详细结果供调用者使用
+    return {
+      actualHeal: actualHeal,
+      type: type,
+      overflow: amount - actualHeal, // 溢出/被浪费的治疗量
+      isBlocked: (actualHeal === 0 && amount > 0 && newVal === oldVal) // 是否完全无效
+    };
   }
 
   /**

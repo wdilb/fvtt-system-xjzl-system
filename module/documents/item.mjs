@@ -1139,12 +1139,13 @@ export class XJZLItem extends Item {
     const isHeal = effectiveMode === "heal";
     const isAttack = effectiveMode === "attack";
     // 只有攻击模式，且伤害类型为内外功时，才显示“攻击修正”输入框
-    const needsAttack = isAttack && ["waigong", "neigong"].includes(move.damageType);
+    const damageType = move.damageType || "waigong";
+    const needsAttack = isAttack && ["waigong", "neigong"].includes(damageType);
     // 治疗和攻击都需要显示“数值修正”输入框
     const needsDamage = isHeal || isAttack;
 
     // 只有非反击类的攻击招式可以暴击 (治疗也不可以暴击)
-    const canCrit = move.type !== "counter";
+    const canCrit = isAttack && move.type !== "counter";
 
     const context = {
       formId: formId,
@@ -1254,6 +1255,9 @@ export class XJZLItem extends Item {
         return;
       }
 
+      // 提前定义 damageType，确保后续作用域可访问
+      // 如果选了 'none'，这里就是 'none'
+      const damageType = move.damageType || "waigong";
       // =====================================================
       // 0. 确定生效模式 (Effective Mode)
       // =====================================================
@@ -1397,29 +1401,29 @@ export class XJZLItem extends Item {
       }
 
       // =====================================================
-      // 分流：Buff/架招 模式 (提前结束)
+      // 分流：架招 模式 (提前结束)
       // =====================================================
-      if (effectiveMode === "buff") {
+      // 只有 "架招" 这种完全不需要目标、不需要数值计算、只需要开关状态的招式，才提前结束。
+      // 普通的 "buff" 类型气招（可能需要选队友、可能需要脚本判定距离），应该继续向下执行，
+      // 走通用的 targets 遍历流程，并在最后发送带有 "应用效果" 按钮的卡片。
 
-        // 特殊处理架招
-        if (move.type === "stance") {
-          await actor.update({
-            "system.martial.stanceActive": true,
-            "system.martial.stance": move.id,
-            "system.martial.stanceItemId": this.id
-          });
-        }
+      if (move.type === "stance") {
+        // 1. 切换状态
+        await actor.update({
+          "system.martial.stanceActive": true,
+          "system.martial.stance": move.id,
+          "system.martial.stanceItemId": this.id
+        });
 
-        // 发送简单卡片
+        // 2. 发送简单卡片
         ChatMessage.create({
           user: game.user.id,
           speaker: ChatMessage.getSpeaker({ actor: actor }),
-          flavor: move.type === 'stance' ? `开启架招: ${move.name}` : `施展气招: ${move.name}`,
-          content: `<div class="xjzl-chat-card"><div class="card-result">${move.description || '效果已应用'}</div></div>`
+          flavor: `开启架招: ${move.name}`,
+          content: `<div class="xjzl-chat-card"><div class="card-result">${move.description || '架招已开启'}</div></div>`
         });
 
-        // 纯Buff/气招流程结束
-        return;
+        return; // 架招流程结束
       }
 
       // =====================================================
@@ -1515,8 +1519,6 @@ export class XJZLItem extends Item {
           });
         }
       }
-      //TODO才检查到这里
-      //问题：其实有一个小问题啊，治疗是不可以暴击的，或者说所有不需要投掷骰子的招数都是不能暴击的（所以其实只有造成内外功伤害的可以暴击，不过这里反正是手动，也并不是那么重要）
       // =====================================================
       // 7. 命中检定 (Hit Roll)
       // =====================================================
@@ -1524,11 +1526,21 @@ export class XJZLItem extends Item {
       let rollJSON = null;
       let rollTooltip = null;
       let displayTotal = 0; // 卡片上显示的数字，用来处理复杂的优势劣势情况下该显示什么数字
+      let needsHitCheck = false; 
       // 初始化 targetsResults，防止 ReferenceError
       const targetsResults = {};
-      const damageType = move.damageType || "waigong";
-      let needsHitCheck = ["waigong", "neigong"].includes(damageType); //只有内外功需要进行命中检定
-      if (move.type === "counter") needsHitCheck = false; //反击必中，其他的架招和虚招在上面已经返回了
+      // 判定是否需要命中检定
+      // 规则: 
+      // 1. 治疗模式 -> False
+      // 2. 气招(即使是Attack模式) -> False (除非未来有特殊需求，目前精神伤害等无需检定)
+      // 3. 虚招、实招且伤害类型为内/外 -> True
+      // 4. 反击 -> False
+      if (effectiveMode === "attack" && move.type !== "qi" && move.type !== "counter") {
+        // 如果选了 'none' 或 'mental'，这里就会是 False，完美符合逻辑
+        if (["waigong", "neigong"].includes(damageType)) {
+          needsHitCheck = true;
+        }
+      }
       // 将 flavorText 提到外层作用域，防止 needsHitCheck=false 时报错
       let flavorText = "";
 
@@ -1648,7 +1660,8 @@ export class XJZLItem extends Item {
             feintState: ctx.feintState
           };
         });
-        flavorText = "施展 (无需检定)";
+        if (effectiveMode === "heal") flavorText = "施展治疗";
+        else flavorText = "施展招式 (无需检定)";
       }
 
       // =====================================================
@@ -1678,6 +1691,8 @@ export class XJZLItem extends Item {
         calc: calcResult,   // 伤害计算结果 (包含 breakdown, damage, feint)
         cost: finalCost,    // 实际消耗
         isFeint: move.type === "feint",
+        isHeal: effectiveMode === "heal", // 传给 HBS 变色用
+        isBuff: effectiveMode === "buff", // 标记是buff类型气招
         system: this.system,// 方便在模板里直接用 system.tier 等
         attackRoll: attackRoll, // 骰子实例
         rollTooltip: rollTooltip, // 骰子详情 HTML
@@ -1705,7 +1720,7 @@ export class XJZLItem extends Item {
         flags: {
           "xjzl-system": {
             // 1. 基础标识
-            actionType: "move-attack", // 消息类型，用于监听器识别
+            actionType: effectiveMode, // "attack" | "heal"
             itemId: this.id,           // 武学 Item ID
             moveId: move.id,           // 招式 ID
             moveType: move.type,       // 招式类型

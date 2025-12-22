@@ -113,6 +113,7 @@ export class ChatCardManager {
         // 只有当历史记录为空时 (说明 Roll 的时候没选目标)，才允许使用当前选中的目标
         let targets = [];
         const historyUuids = flags.targets || [];
+        const actionType = flags.actionType || "attack"; // 获取我们在 Item.roll 里存的类型
 
         // 防御请求(rollDefendFeint)不需要目标
         if (action === "rollDefendFeint") {
@@ -130,19 +131,50 @@ export class ChatCardManager {
             }
         }
 
+        // --- 核心目标获取逻辑 ---
         if (historyUuids.length > 0) {
-            // A. 如果 Roll 阶段记录了目标，强制使用历史目标
-            // 使用 fromUuidSync 同步获取 (因为在同一场景下通常都在内存里)
+            // A. 优先使用历史记录
             targets = historyUuids.map(uuid => fromUuidSync(uuid)).filter(a => a);
-            if (targets.length === 0) return ui.notifications.warn("历史目标已不存在 (可能被删除)。");
-        } else {
-            // B. 如果 Roll 阶段没目标，使用当前选中
-            // 这里不能取t.actor，因为我们之前传递的是token的uuid
-            // game.user.targets 是 Token(Placeable)，它的 .document 是 TokenDocument
+            // 注意：如果历史目标被删了，这里 targets 可能会变空
+        }
+
+        // B. 如果没有历史目标 (或历史目标失效)，尝试使用当前选中
+        if (targets.length === 0) {
             targets = Array.from(game.user.targets).map(t => t.document).filter(t => t);
-            if (targets.length === 0 && action !== "rollDefendFeint") {
+        }
+
+        // --- 智能后置目标判断 (Implicit Self) ---
+        // 如果此时目标依然为空
+        if (targets.length === 0) {
+
+            // 情况 A: 治疗(applyHeal) 或 Buff(applyBuff/applyEffect)
+            // 逻辑: 没选人 -> 默认给自己
+            if (action === "applyHeal" || actionType === "buff") {
+                // 如果 attacker 存在 (通常是 TokenDocument 或 Actor)
+                if (attacker) {
+                    // 统一转为 TokenDocument (如果 attacker 是 Actor，尝试找他在当前场景的 Token)
+                    const selfToken = attacker.token || attacker.getActiveTokens()[0] || null;
+
+                    if (selfToken) {
+                        targets = [selfToken];
+                        ui.notifications.info("未选择目标，默认对自身生效。");
+                    } else if (attacker.uuid) {
+                        // 如果实在没 Token，就传 Actor 本身 (applyHeal 支持 Actor)
+                        targets = [attacker];
+                        ui.notifications.info("未选择目标，默认对自身生效。");
+                    }
+                }
+            }
+            // 情况 B: 攻击 (applyDamage)
+            // 逻辑: 没选人 -> 报错 (防止误伤自己)
+            else if (action === "applyDamage" && actionType !== "buff") {
                 return ui.notifications.warn("请先在场景中选中目标。");
             }
+        }
+
+        // 最后再次检查（防止上述补救措施也失败）
+        if (targets.length === 0 && action !== "rollDefendFeint") {
+            return ui.notifications.warn("无法确定生效目标。");
         }
 
         // === 分发逻辑 ===
@@ -150,6 +182,11 @@ export class ChatCardManager {
             case "applyDamage":
                 if (!item) return ui.notifications.warn("源物品数据已丢失。");
                 await ChatCardManager._applyDamage(attacker, item, flags, targets, message);
+                break;
+
+            case "applyHeal":
+                if (!item) return ui.notifications.warn("源物品数据已丢失。");
+                await ChatCardManager._applyHeal(attacker, item, flags, targets, message);
                 break;
 
             case "rollFeintContest":
@@ -1331,7 +1368,7 @@ export class ChatCardManager {
                 }
             }
             // 判断是否是招式
-            const isSkillDamage = move.type !== "basic"; 
+            const isSkillDamage = move.type !== "basic";
             // C. 调用 Actor 伤害处理
             const damageResult = await targetActor.applyDamage({
                 amount: flags.damage,      // 面板伤害
@@ -1595,7 +1632,7 @@ export class ChatCardManager {
             const isHit = config.forceHit;
 
             // 判断是否为招式
-            const isSkillDamage = move.type !== "basic"; 
+            const isSkillDamage = move.type !== "basic";
 
             // 调用 Actor 伤害接口
             const damageResult = await targetActor.applyDamage({
@@ -1892,5 +1929,151 @@ export class ChatCardManager {
         } else {
             console.error("XJZL | 无法在卡片中找到 .card-buttons 容器");
         }
+    }
+
+    /**
+     * 应用治疗 / Buff
+     * 同时也负责触发 HIT 脚本 (用于添加 ActiveEffect)
+     */
+    static async _applyHeal(attacker, item, flags, targets, message) {
+        // 1. 准备数据
+        // 从 flags 中读取“面板数值”。对于 Buff 招式，这里可能是 0。
+        const baseAmount = flags.damage || 0;
+        const move = item.system.moves.find(m => m.id === flags.moveId);
+
+        // 2. 循环处理目标
+        const summaryData = [];
+
+        for (const target of targets) {
+            const targetActor = target.actor || target;
+            if (!targetActor) continue;
+
+            const displayName = target.name || targetActor.name;
+            let finalRealHeal = 0; // 实际回血量
+            let isHealAction = false;
+
+            // A. 执行治疗 (仅当数值 > 0 时)
+            if (baseAmount > 0) {
+                isHealAction = true;
+                // 默认治疗类型为 HP，除非我们未来扩展，其他暂时用脚本来处理
+                // 调用 Actor 的 applyHealing (会处理飘字和数据库更新)
+                const result = await targetActor.applyHealing({
+                    amount: baseAmount,
+                    type: "hp", // 默认回血
+                    showScrolling: true
+                });
+
+                // 获取实际加了多少
+                finalRealHeal = result.actualHeal;
+            }
+
+            // B. 记录结果
+            summaryData.push({
+                name: displayName,
+                amount: finalRealHeal, // 显示实际值
+                baseAmount: baseAmount, // (可选) 保留原始值备查
+                isHeal: isHealAction,
+                isBlocked: (isHealAction && finalRealHeal === 0) // 标记是否被完全阻挡(禁疗)
+            });
+
+            // C. 构造高兼容性的上下文 (Safe Context)
+            // 补全了标准战斗参数，防止通用脚本报错
+            const hitContext = {
+                // 1. 核心身份
+                target: targetActor,
+                attacker: attacker,
+                item: item,
+                move: move,
+
+                // 2. 行为标识
+                type: "heal",         // 明确告知脚本这是治疗
+                isHeal: true,         // 便捷布尔值
+                isAttack: false,      // 明确不是攻击
+
+                // 3. 战斗状态 (Polyfill)
+                // 治疗/Buff 视为“必中”、“无暴击”、“无破防”
+                // 这样脚本如果写了 if (args.isHit) 也能正常工作
+                isHit: true,
+                isCrit: false,
+                isBroken: false,
+                ignoreBlock: false,    // 治疗无视格挡
+                ignoreDefense: false,  // 治疗无视防御
+
+                // 4. 数值结果
+                // 提供多套语义，方便脚本取用
+                baseAmount: baseAmount,     // 原始面板
+                finalAmount: finalRealHeal, // 传给脚本的是实际生效值
+                healAmount: finalRealHeal,   // 语义化名称
+
+                // 兼容性字段：攻击脚本通常找 hpLost，这里显式给 0，防止 undefined
+                hpLost: 0,
+                hutiLost: 0,
+                mpLost: 0,
+
+                // 5. 额外标记
+                isBuffOnly: (baseAmount === 0)
+            };
+
+            //  D.无论有没有数值，都执行 HIT 脚本
+            await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
+        }
+
+        // 3. 全局脚本 (HIT_ONCE)
+        // 比如：群奶后，自己获得 1 点怒气 (不管奶了多少人)
+        // 同样补全结构
+        const globalContext = {
+            targets: summaryData,
+            hitCount: targets.length, // 治疗视为全部命中
+
+            attacker: attacker,
+            item: item,
+            move: move,
+
+            type: "heal",
+            isHeal: true,
+            totalHealAmount: summaryData.reduce((acc, cur) => acc + cur.amount, 0) // 方便统计总奶量
+        };
+        await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
+        // =====================================================
+        // 4. 发送汇总卡片
+        // =====================================================
+        let listHtml = "";
+        for (const entry of summaryData) {
+            let valStr = "";
+
+            if (entry.isHeal) {
+                if (entry.amount > 0) {
+                    valStr = `<span style="color:green; font-weight:bold;">+${entry.amount} HP</span>`;
+                } else {
+                    // 如果是治疗操作，但实际回血0，显示无效/禁疗/满血
+                    valStr = `<span style="color:#888;">无效 (0)</span>`;
+                }
+            } else {
+                valStr = `<span style="color:#666;">效果已应用</span>`;
+            }
+
+            listHtml += `
+            <li style="display:flex; justify-content:space-between; border-bottom:1px dashed #eee; padding:3px 0;">
+                <span>${entry.name}</span>
+                ${valStr}
+            </li>`;
+        }
+
+        const flavorText = (baseAmount > 0) ? "治疗结算" : "BUFF结算";
+
+        ChatMessage.create({
+            user: game.user.id,
+            speaker: ChatMessage.getSpeaker({ actor: attacker }),
+            flavor: flavorText,
+            content: `
+            <div class="xjzl-chat-card">
+                <div class="card-header" style="border-bottom:1px solid #ccc; margin-bottom:5px; padding-bottom:3px;">
+                    <h3 style="margin:0;">${move?.name || "未知招式"}</h3>
+                </div>
+                <ul style="list-style:none; padding:0; margin:0; font-size:0.9em;">
+                    ${listHtml}
+                </ul>
+            </div>`
+        });
     }
 }
