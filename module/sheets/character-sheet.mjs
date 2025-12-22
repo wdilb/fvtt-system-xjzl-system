@@ -2,6 +2,10 @@
  * 角色卡片逻辑
  */
 import { XJZL } from "../config.mjs";
+// 引入工具函数
+import { rollDisabilityTable, promptDisabilityQuery } from "../utils/utils.mjs";
+// 引入卡片管理器 (用于复用死检的逻辑)
+import { ChatCardManager } from "../managers/chat-manager.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -52,6 +56,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             deleteGroup: XJZLCharacterSheet.prototype._onAction,
             addChange: XJZLCharacterSheet.prototype._onAction,
             deleteChange: XJZLCharacterSheet.prototype._onAction,
+
+            // 濒死/死亡交互
+            rollDisability: XJZLCharacterSheet.prototype._onRollDisability,
+            rollDeathSave: XJZLCharacterSheet.prototype._onRollDeathSave,
+            queryDisability: XJZLCharacterSheet.prototype._onQueryDisability,
 
             //普通攻击
             rollBasicAttack: XJZLCharacterSheet.prototype._onRollBasicAttack,
@@ -1083,5 +1092,35 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         event.preventDefault();
         // 调用 Actor 的方法
         await this.document.stopStance();
+    }
+
+    /* -------------------------------------------- */
+    /*  濒死与死亡交互 (Death & Dying)               */
+    /* -------------------------------------------- */
+
+    /**
+     * 主动投掷残疾表
+     */
+    async _onRollDisability(event, target) {
+        event.preventDefault();
+        // 调用 utils 中的函数
+        await rollDisabilityTable(this.actor);
+    }
+
+    /**
+     * 主动投掷生死一念
+     */
+    async _onRollDeathSave(event, target) {
+        event.preventDefault();
+        // 复用 ChatCardManager 中的静态逻辑，保证判定规则(>10活)一致
+        await ChatCardManager._rollDeathSave(this.actor);
+    }
+
+    /**
+     * 查询残疾表 (打开弹窗)
+     */
+    async _onQueryDisability(event, target) {
+        event.preventDefault();
+        await promptDisabilityQuery();
     }
 }

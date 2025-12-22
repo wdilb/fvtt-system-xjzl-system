@@ -3,6 +3,7 @@
  * 职责：监听聊天消息渲染，处理按钮点击，执行战斗结算流程
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
+import { rollDisabilityTable } from "../utils/utils.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 export class ChatCardManager {
@@ -193,6 +194,14 @@ export class ChatCardManager {
                 // 这是攻击者点的
                 if (!item) return ui.notifications.warn("源物品数据已丢失。");
                 await ChatCardManager._rollFeintContest(attacker, item, flags, targets, message);
+                break;
+            case "rollDisability":
+                // 调用 utils 中的投掷逻辑
+                await rollDisabilityTable(attacker);
+                break;
+
+            case "rollDeathSave":
+                await ChatCardManager._rollDeathSave(attacker);
                 break;
         }
     }
@@ -2090,6 +2099,55 @@ export class ChatCardManager {
 
             // 更新回消息中
             await message.update({ content: div.innerHTML });
+        }
+    }
+
+    /**
+     * 死检 (Death Save)
+     * d20 > 10: 活 (回1血1内，去状态)
+     * d20 <= 10: 死 (播报)
+     */
+    static async _rollDeathSave(actor) {
+        // 1. 投掷
+        const roll = await new Roll("1d20").evaluate();
+
+        // 2. 展示骰子
+        const total = roll.total;
+        const isSuccess = total > 10;
+
+        // 3. 构建结果内容
+        let flavor = isSuccess ? "回光返照！" : "回天乏术...";
+        let color = isSuccess ? "green" : "black";
+        let desc = isSuccess
+            ? "心脉护住了一口气，脱离死亡状态。"
+            : "彻底气绝身亡。";
+
+        // 4. 发送结果消息
+        // roll.toMessage 会自动处理 rolls 数组和 3D 骰子
+        await roll.toMessage({
+            user: game.user.id,
+            speaker: ChatMessage.getSpeaker({ actor: actor }),
+            flavor: flavor,
+            content: `
+            <div class="xjzl-chat-card">
+                <div style="font-size:1.5em; text-align:center; font-weight:bold; color:${color}; margin-bottom:5px;">
+                    ${total}
+                </div>
+                <div style="text-align:center; color:#555;">${desc}</div>
+            </div>`
+        });
+
+        // 5. 自动化处理 (仅成功时)
+        if (isSuccess) {
+            // A. 回复资源 (调用 Actor 接口，不仅改数据还飘字)
+            await actor.applyHealing({ amount: 1, type: "hp" });
+            await actor.applyHealing({ amount: 1, type: "mp" }); // 假设 mp 也是 1
+
+            // B. 移除死亡状态
+            // 注意：toggleStatusEffect 切换状态，如果当前有，toggle 会移除
+            await actor.toggleStatusEffect("dead", { active: false });
+
+            // 这里暂不移除 dying，只移除 dead，让玩家处于濒死(HP=1)状态比较合理
         }
     }
 }

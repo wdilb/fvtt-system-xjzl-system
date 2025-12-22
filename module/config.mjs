@@ -202,24 +202,26 @@ XJZL.artIdentities = {
     { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "stats.liliang": 5 } }, // 力量+5
     { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
     { level: 7, titleKey: "7.Title", descKey: "7.Desc", bonuses: { "arts.duanzao.checkMod": 2 } }, // 锻造+2
-    { level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: { 
-        "combat.weaponRanks.sword.mod": 1, "combat.weaponRanks.blade.mod": 1, 
-        "combat.weaponRanks.staff.mod": 1, "combat.weaponRanks.dagger.mod": 1, 
-        "combat.weaponRanks.hidden.mod": 1, "combat.weaponRanks.unarmed.mod": 1, 
-        "combat.weaponRanks.instrument.mod": 1, "combat.weaponRanks.special.mod": 1 
-    }} // 全武器等级+1
+    {
+      level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: {
+        "combat.weaponRanks.sword.mod": 1, "combat.weaponRanks.blade.mod": 1,
+        "combat.weaponRanks.staff.mod": 1, "combat.weaponRanks.dagger.mod": 1,
+        "combat.weaponRanks.hidden.mod": 1, "combat.weaponRanks.unarmed.mod": 1,
+        "combat.weaponRanks.instrument.mod": 1, "combat.weaponRanks.special.mod": 1
+      }
+    } // 全武器等级+1
   ],
   // === 成衣 ===
   chengyi: [
     { level: 1, titleKey: "1.Title", descKey: "1.Desc", bonuses: { "arts.chengyi.checkMod": 1 } }, // 成衣+1
     { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
     { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "stats.shenfa": 5 } }, // 身法+5
-    { level: 7, titleKey: "7.Title", descKey: "7.Desc"}, 
-    { level: 10, titleKey: "10.Title", descKey: "10.Desc"}
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
   ],
   // === 制宝 ===
   zhibao: [
-    { level: 1, titleKey: "1.Title", descKey: "1.Desc" }, 
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
     { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "stats.shenfa": 5 } }, // 身法+5
     { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
     { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
@@ -302,7 +304,7 @@ XJZL.artIdentities = {
     { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
     { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "arts.daofa.checkMod": 1 } }, // 道法+1
     { level: 5, titleKey: "5.Title", descKey: "5.Desc" },
-    { level: 7, titleKey: "7.Title", descKey: "7.Desc" }, 
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
     { level: 10, titleKey: "10.Title", descKey: "10.Desc" }
   ],
   // === 表演 ===
@@ -333,36 +335,36 @@ XJZL.artIdentities = {
 
 // 17. 技艺身份配置 (Art Identities)
 XJZL.disabilityTable = [
-    { min: 1, max: 1, key: "1" },
-    { min: 2, max: 2, key: "2" },
-    { min: 3, max: 6, key: "3_6" },
-    { min: 7, max: 14, key: "7_14" },
-    { min: 15, max: 16, key: "15_16" },
-    { min: 17, max: 18, key: "17_18" },
-    { min: 19, max: 20, key: "19_20" },
-    { min: 21, max: 23, key: "21_23" },
-    { min: 24, max: 25, key: "24_25" },
-    { min: 26, max: 29, key: "26_29" },
-    { min: 30, max: 34, key: "30_34" },
-    { min: 35, max: 35, key: "35" },
-    { min: 36, max: 39, key: "36_39" },
-    { min: 40, max: 50, key: "40_50" },
-    { min: 51, max: 51, key: "51" },
-    { min: 52, max: 54, key: "52_54" },
-    { min: 55, max: 55, key: "55" },
-    { min: 56, max: 59, key: "56_59" },
-    { min: 60, max: 62, key: "60_62" },
-    { min: 63, max: 65, key: "63_65" },
-    { min: 66, max: 66, key: "66" },
-    { min: 67, max: 68, key: "67_68" },
-    { min: 69, max: 70, key: "69_70" },
-    { min: 71, max: 74, key: "71_74" },
-    { min: 75, max: 79, key: "75_79" },
-    { min: 80, max: 80, key: "80" },
-    { min: 81, max: 95, key: "81_95" },
-    { min: 96, max: 98, key: "96_98" },
-    { min: 99, max: 99, key: "99" },
-    { min: 100, max: 100, key: "100" }
+  { min: 1, max: 1, key: "1" },
+  { min: 2, max: 2, key: "2" },
+  { min: 3, max: 6, key: "3_6" },
+  { min: 7, max: 14, key: "7_14" },
+  { min: 15, max: 16, key: "15_16" },
+  { min: 17, max: 18, key: "17_18" },
+  { min: 19, max: 20, key: "19_20" },
+  { min: 21, max: 23, key: "21_23" },
+  { min: 24, max: 25, key: "24_25" },
+  { min: 26, max: 29, key: "26_29" },
+  { min: 30, max: 34, key: "30_34" },
+  { min: 35, max: 35, key: "35" },
+  { min: 36, max: 39, key: "36_39" },
+  { min: 40, max: 50, key: "40_50" },
+  { min: 51, max: 51, key: "51" },
+  { min: 52, max: 54, key: "52_54" },
+  { min: 55, max: 55, key: "55" },
+  { min: 56, max: 59, key: "56_59" },
+  { min: 60, max: 62, key: "60_62" },
+  { min: 63, max: 65, key: "63_65" },
+  { min: 66, max: 66, key: "66" },
+  { min: 67, max: 68, key: "67_68" },
+  { min: 69, max: 70, key: "69_70" },
+  { min: 71, max: 74, key: "71_74" },
+  { min: 75, max: 79, key: "75_79" },
+  { min: 80, max: 80, key: "80" },
+  { min: 81, max: 95, key: "81_95" },
+  { min: 96, max: 98, key: "96_98" },
+  { min: 99, max: 99, key: "99" },
+  { min: 100, max: 100, key: "100" }
 ];
 
 
@@ -504,7 +506,7 @@ XJZL.statusEffects = [
   {
     id: "sielie",
     name: "XJZL.Status.Sielie", // 撕裂
-    description: "XJZL.Status.SielieDesc", 
+    description: "XJZL.Status.SielieDesc",
     img: "icons/svg/blood.svg",
     flags: { "xjzl-system": { slug: "sielie", stackable: false } },
     changes: [
@@ -514,7 +516,7 @@ XJZL.statusEffects = [
   {
     id: "pojia",
     name: "XJZL.Status.Pojia", // 破甲
-    description: "XJZL.Status.PojiaDesc", 
+    description: "XJZL.Status.PojiaDesc",
     img: "icons/svg/downgrade.svg",
     flags: { "xjzl-system": { slug: "pojia", stackable: false } },
     changes: [
@@ -525,7 +527,7 @@ XJZL.statusEffects = [
   {
     id: "bunu",
     name: "XJZL.Status.Bunu", // 不怒
-    description: "XJZL.Status.BunuDesc", 
+    description: "XJZL.Status.BunuDesc",
     img: "icons/svg/ice-aura.svg",
     flags: { "xjzl-system": { slug: "bunu", stackable: false } },
     changes: [
@@ -535,7 +537,7 @@ XJZL.statusEffects = [
   {
     id: "jinxu",
     name: "XJZL.Status.Jinxu", // 禁虚
-    description: "XJZL.Status.JinxuDesc", 
+    description: "XJZL.Status.JinxuDesc",
     img: "icons/svg/cancel.svg",
     flags: { "xjzl-system": { slug: "jinxu", stackable: false } },
     changes: [{ key: "flags.xjzl-system.blockXuZhao", mode: 5, value: "true" }]
@@ -543,7 +545,7 @@ XJZL.statusEffects = [
   {
     id: "jinshi",
     name: "XJZL.Status.Jinshi", // 禁实
-    description: "XJZL.Status.JinshiDesc", 
+    description: "XJZL.Status.JinshiDesc",
     img: "icons/svg/padlock.svg",
     flags: { "xjzl-system": { slug: "jinshi", stackable: false } },
     changes: [{ key: "flags.xjzl-system.blockShiZhao", mode: 5, value: "true" }]
@@ -551,7 +553,7 @@ XJZL.statusEffects = [
   {
     id: "jinfan",
     name: "XJZL.Status.Jinfan", // 禁反
-    description: "XJZL.Status.JinfanDesc", 
+    description: "XJZL.Status.JinfanDesc",
     img: "icons/svg/shield.svg",
     flags: { "xjzl-system": { slug: "jinfan", stackable: false } },
     changes: [{ key: "flags.xjzl-system.blockCounter", mode: 5, value: "true" }]
@@ -559,7 +561,7 @@ XJZL.statusEffects = [
   {
     id: "jinqi",
     name: "XJZL.Status.Jinqi", // 禁气
-    description: "XJZL.Status.JinqiDesc", 
+    description: "XJZL.Status.JinqiDesc",
     img: "icons/svg/daze.svg",
     flags: { "xjzl-system": { slug: "jinqi", stackable: false } },
     changes: [{ key: "flags.xjzl-system.blockQiZhao", mode: 5, value: "true" }]
@@ -567,7 +569,7 @@ XJZL.statusEffects = [
   {
     id: "jinjue",
     name: "XJZL.Status.Jinjue", // 禁绝
-    description: "XJZL.Status.JinjueDesc", 
+    description: "XJZL.Status.JinjueDesc",
     img: "icons/svg/skull.svg",
     flags: { "xjzl-system": { slug: "jinjue", stackable: false } },
     changes: [{ key: "flags.xjzl-system.blockUltimate", mode: 5, value: "true" }]
@@ -575,7 +577,7 @@ XJZL.statusEffects = [
   {
     id: "jinliao",
     name: "XJZL.Status.Jinliao", // 禁疗
-    description: "XJZL.Status.JinliaoDesc", 
+    description: "XJZL.Status.JinliaoDesc",
     img: "icons/svg/bones.svg",
     flags: { "xjzl-system": { slug: "jinliao", stackable: false } },
     changes: [{ key: "flags.xjzl-system.noRecoverHP", mode: 5, value: "true" }]
@@ -583,7 +585,7 @@ XJZL.statusEffects = [
   {
     id: "qizhi",
     name: "XJZL.Status.Qizhi", // 气滞
-    description: "XJZL.Status.QizhiDesc", 
+    description: "XJZL.Status.QizhiDesc",
     img: "icons/svg/net.svg",
     flags: { "xjzl-system": { slug: "qizhi", stackable: false } },
     changes: [{ key: "flags.xjzl-system.noRecoverNeili", mode: 5, value: "true" }]
@@ -591,7 +593,7 @@ XJZL.statusEffects = [
   {
     id: "poyi",
     name: "XJZL.Status.Poyi", // 破衣
-    description: "XJZL.Status.PoyiDesc", 
+    description: "XJZL.Status.PoyiDesc",
     img: "icons/svg/shield.svg",
     flags: { "xjzl-system": { slug: "poyi", stackable: false } },
     changes: [
@@ -601,7 +603,7 @@ XJZL.statusEffects = [
   {
     id: "tuoli",
     name: "XJZL.Status.Tuoli", // 脱力
-    description: "XJZL.Status.TuoliDesc", 
+    description: "XJZL.Status.TuoliDesc",
     img: "icons/svg/falling.svg",
     flags: { "xjzl-system": { slug: "tuoli", stackable: false } },
     changes: [
@@ -612,7 +614,7 @@ XJZL.statusEffects = [
   {
     id: "lianji",
     name: "XJZL.Status.Lianji", // 连击
-    description: "XJZL.Status.LianjiDesc", 
+    description: "XJZL.Status.LianjiDesc",
     img: "icons/svg/lightning.svg",
     flags: { "xjzl-system": { slug: "lianji", stackable: false } },
     changes: []
@@ -620,7 +622,7 @@ XJZL.statusEffects = [
   {
     id: "cuoluan",
     name: "XJZL.Status.Cuoluan", // 错乱
-    description: "XJZL.Status.CuoluanDesc", 
+    description: "XJZL.Status.CuoluanDesc",
     img: "icons/svg/hazard.svg",
     flags: { "xjzl-system": { slug: "cuoluan", stackable: false } },
     changes: []
@@ -628,7 +630,7 @@ XJZL.statusEffects = [
   {
     id: "jiaoxie",
     name: "XJZL.Status.Jiaoxie", // 缴械
-    description: "XJZL.Status.JiaoxieDesc", 
+    description: "XJZL.Status.JiaoxieDesc",
     img: "icons/svg/sword.svg",
     flags: { "xjzl-system": { slug: "jiaoxie", stackable: false } },
     changes: [{ key: "flags.xjzl-system.forceUnarmed", mode: 5, value: "true" }]
@@ -640,7 +642,7 @@ XJZL.statusEffects = [
   {
     id: "yangxue",
     name: "XJZL.Status.Yangxue", // 养血
-    description: "XJZL.Status.YangxueDesc", 
+    description: "XJZL.Status.YangxueDesc",
     img: "icons/svg/heal.svg",
     flags: { "xjzl-system": { slug: "yangxue", stackable: true, maxStacks: 0 } },
     changes: [
@@ -650,7 +652,7 @@ XJZL.statusEffects = [
   {
     id: "juqi",
     name: "XJZL.Status.Juqi", // 聚气
-    description: "XJZL.Status.JuqiDesc", 
+    description: "XJZL.Status.JuqiDesc",
     img: "icons/svg/light.svg",
     flags: { "xjzl-system": { slug: "juqi", stackable: true, maxStacks: 0 } },
     changes: [
@@ -660,7 +662,7 @@ XJZL.statusEffects = [
   {
     id: "qixu",
     name: "XJZL.Status.Qixu", // 气虚
-    description: "XJZL.Status.QixuDesc", 
+    description: "XJZL.Status.QixuDesc",
     img: "icons/svg/acid.svg",
     flags: { "xjzl-system": { slug: "qixu", stackable: true, maxStacks: 0 } },
     changes: [
@@ -670,7 +672,7 @@ XJZL.statusEffects = [
   {
     id: "chengfeng",
     name: "XJZL.Status.Chengfeng", // 乘风
-    description: "XJZL.Status.ChengfengDesc", 
+    description: "XJZL.Status.ChengfengDesc",
     img: "icons/svg/wing.svg",
     flags: { "xjzl-system": { slug: "chengfeng", stackable: true, maxStacks: 0 } },
     changes: [
@@ -680,7 +682,7 @@ XJZL.statusEffects = [
   {
     id: "gangjin",
     name: "XJZL.Status.Gangjin", // 刚劲
-    description: "XJZL.Status.GangjinDesc", 
+    description: "XJZL.Status.GangjinDesc",
     img: "icons/svg/explosion.svg",
     flags: { "xjzl-system": { slug: "gangjin", stackable: true, maxStacks: 0 } },
     changes: [
@@ -690,7 +692,7 @@ XJZL.statusEffects = [
   {
     id: "mianjin",
     name: "XJZL.Status.Mianjin", // 绵劲
-    description: "XJZL.Status.MianjinDesc", 
+    description: "XJZL.Status.MianjinDesc",
     img: "icons/svg/ice-aura.svg",
     flags: { "xjzl-system": { slug: "mianjin", stackable: true, maxStacks: 0 } },
     changes: [
@@ -700,7 +702,7 @@ XJZL.statusEffects = [
   {
     id: "panshi",
     name: "XJZL.Status.Panshi", // 磐石
-    description: "XJZL.Status.PanshiDesc", 
+    description: "XJZL.Status.PanshiDesc",
     img: "icons/svg/castle.svg",
     flags: { "xjzl-system": { slug: "panshi", stackable: true, maxStacks: 0 } },
     changes: [
@@ -710,7 +712,7 @@ XJZL.statusEffects = [
   {
     id: "hushen",
     name: "XJZL.Status.Hushen", // 护身
-    description: "XJZL.Status.HushenDesc", 
+    description: "XJZL.Status.HushenDesc",
     img: "icons/svg/shield.svg",
     flags: { "xjzl-system": { slug: "hushen", stackable: true, maxStacks: 0 } },
     changes: [
@@ -721,7 +723,7 @@ XJZL.statusEffects = [
   {
     id: "xujin",
     name: "XJZL.Status.Xujin", // 蓄劲
-    description: "XJZL.Status.XujinDesc", 
+    description: "XJZL.Status.XujinDesc",
     img: "icons/svg/target.svg",
     flags: { "xjzl-system": { slug: "xujin", stackable: true, maxStacks: 0 } },
     changes: [
@@ -732,7 +734,7 @@ XJZL.statusEffects = [
   {
     id: "youyu",
     name: "XJZL.Status.Youyu", // 犹豫
-    description: "XJZL.Status.YouyuDesc", 
+    description: "XJZL.Status.YouyuDesc",
     img: "systems/xjzl-system/assets/icons/ae/犹豫.svg",
     flags: { "xjzl-system": { slug: "youyu", stackable: true, maxStacks: 0 } },
     changes: [
@@ -743,7 +745,7 @@ XJZL.statusEffects = [
   {
     id: "yanzhan",
     name: "XJZL.Status.Yanzhan", // 延展
-    description: "XJZL.Status.YanzhanDesc", 
+    description: "XJZL.Status.YanzhanDesc",
     img: "icons/svg/direction.svg",
     flags: { "xjzl-system": { slug: "yanzhan", stackable: true, maxStacks: 0 } },
     changes: []
@@ -751,7 +753,7 @@ XJZL.statusEffects = [
   {
     id: "yudun",
     name: "XJZL.Status.Yudun", // 愚钝
-    description: "XJZL.Status.YudunDesc", 
+    description: "XJZL.Status.YudunDesc",
     img: "icons/svg/daze.svg",
     flags: { "xjzl-system": { slug: "yudun", stackable: true, maxStacks: 0 } },
     changes: [
@@ -762,7 +764,7 @@ XJZL.statusEffects = [
   {
     id: "shizhun",
     name: "XJZL.Status.Shizhun", // 失准
-    description: "XJZL.Status.ShizhunDesc", 
+    description: "XJZL.Status.ShizhunDesc",
     img: "icons/svg/blind.svg",
     flags: { "xjzl-system": { slug: "shizhun", stackable: true, maxStacks: 0 } },
     changes: [
@@ -773,7 +775,7 @@ XJZL.statusEffects = [
   {
     id: "yanli",
     name: "XJZL.Status.Yanli", // 眼力
-    description: "XJZL.Status.YanliDesc", 
+    description: "XJZL.Status.YanliDesc",
     img: "icons/svg/eye.svg",
     flags: { "xjzl-system": { slug: "yanli", stackable: true, maxStacks: 0 } },
     changes: [
@@ -784,7 +786,7 @@ XJZL.statusEffects = [
   {
     id: "qingling",
     name: "XJZL.Status.Qingling", // 轻灵
-    description: "XJZL.Status.QinglingDesc", 
+    description: "XJZL.Status.QinglingDesc",
     img: "icons/svg/angel.svg",
     flags: { "xjzl-system": { slug: "qingling", stackable: true, maxStacks: 0 } },
     changes: [
@@ -794,7 +796,7 @@ XJZL.statusEffects = [
   {
     id: "benzhuo",
     name: "XJZL.Status.Benzhuo", // 笨拙
-    description: "XJZL.Status.BenzhuoDesc", 
+    description: "XJZL.Status.BenzhuoDesc",
     img: "icons/svg/anchor.svg",
     flags: { "xjzl-system": { slug: "benzhuo", stackable: true, maxStacks: 0 } },
     changes: [
@@ -804,7 +806,7 @@ XJZL.statusEffects = [
   {
     id: "jinli",
     name: "XJZL.Status.Jinli", // 劲力
-    description: "XJZL.Status.JinliDesc", 
+    description: "XJZL.Status.JinliDesc",
     img: "icons/svg/combat.svg",
     flags: { "xjzl-system": { slug: "jinli", stackable: true, maxStacks: 0 } },
     changes: [
@@ -814,7 +816,7 @@ XJZL.statusEffects = [
   {
     id: "wuqishi",
     name: "XJZL.Status.Wuqishi", // 武器势
-    description: "XJZL.Status.WuqishiDesc", 
+    description: "XJZL.Status.WuqishiDesc",
     img: "icons/svg/combat.svg",
     flags: { "xjzl-system": { slug: "wuqishi", stackable: true, maxStacks: 0 } },
     changes: [
@@ -825,7 +827,7 @@ XJZL.statusEffects = [
   {
     id: "fali",
     name: "XJZL.Status.Fali", // 乏力
-    description: "XJZL.Status.FaliDesc", 
+    description: "XJZL.Status.FaliDesc",
     img: "icons/svg/downgrade.svg",
     flags: { "xjzl-system": { slug: "fali", stackable: true, maxStacks: 0 } },
     changes: [
@@ -835,7 +837,7 @@ XJZL.statusEffects = [
   {
     id: "chanshou",
     name: "XJZL.Status.Chanshou", // 颤手
-    description: "XJZL.Status.ChanshouDesc", 
+    description: "XJZL.Status.ChanshouDesc",
     img: "icons/svg/paralysis.svg",
     flags: { "xjzl-system": { slug: "chanshou", stackable: true, maxStacks: 5 } },
     changes: []
@@ -843,7 +845,7 @@ XJZL.statusEffects = [
   {
     id: "yishang",
     name: "XJZL.Status.Yishang", // 易伤
-    description: "XJZL.Status.YishangDesc", 
+    description: "XJZL.Status.YishangDesc",
     img: "icons/svg/ruins.svg",
     flags: { "xjzl-system": { slug: "yishang", stackable: true, maxStacks: 0 } },
     changes: [
@@ -853,7 +855,7 @@ XJZL.statusEffects = [
   {
     id: "jinqi_stack",
     name: "XJZL.Status.JinqiStack", // 劲气
-    description: "XJZL.Status.JinqiStackDesc", 
+    description: "XJZL.Status.JinqiStackDesc",
     img: "icons/svg/aura.svg",
     flags: { "xjzl-system": { slug: "jinqi_stack", stackable: true, maxStacks: 0 } },
     changes: [
@@ -867,7 +869,7 @@ XJZL.statusEffects = [
   {
     id: "unstable",
     name: "XJZL.Status.Unstable", // 下盘不稳
-    description: "XJZL.Status.UnstableDesc", 
+    description: "XJZL.Status.UnstableDesc",
     img: "icons/svg/falling.svg",
     flags: { "xjzl-system": { slug: "unstable", stackable: false } },
     changes: [
@@ -877,7 +879,7 @@ XJZL.statusEffects = [
   {
     id: "blind",
     name: "XJZL.Status.Blind", // 目盲
-    description: "XJZL.Status.BlindDesc", 
+    description: "XJZL.Status.BlindDesc",
     img: "icons/svg/blind.svg",
     flags: { "xjzl-system": { slug: "blind", stackable: false } },
     changes: [
@@ -889,7 +891,7 @@ XJZL.statusEffects = [
   {
     id: "deaf",
     name: "XJZL.Status.Deaf", // 耳鸣
-    description: "XJZL.Status.DeafDesc", 
+    description: "XJZL.Status.DeafDesc",
     img: "icons/svg/sound.svg",
     flags: { "xjzl-system": { slug: "deaf", stackable: false } },
     changes: [
@@ -899,7 +901,7 @@ XJZL.statusEffects = [
   {
     id: "root",
     name: "XJZL.Status.Root", // 禁足
-    description: "XJZL.Status.RootDesc", 
+    description: "XJZL.Status.RootDesc",
     img: "icons/svg/trap.svg",
     flags: { "xjzl-system": { slug: "root", stackable: false } },
     changes: [
@@ -910,7 +912,7 @@ XJZL.statusEffects = [
   {
     id: "cuogu",
     name: "XJZL.Status.Cuogu", // 错骨
-    description: "XJZL.Status.CuoguDesc", 
+    description: "XJZL.Status.CuoguDesc",
     img: "icons/svg/bones.svg",
     flags: { "xjzl-system": { slug: "cuogu", stackable: false } },
     changes: [
@@ -922,7 +924,7 @@ XJZL.statusEffects = [
   {
     id: "fushen",
     name: "XJZL.Status.Fushen", // 缚身
-    description: "XJZL.Status.FushenDesc", 
+    description: "XJZL.Status.FushenDesc",
     img: "icons/svg/net.svg",
     flags: { "xjzl-system": { slug: "fushen", stackable: false } },
     changes: []
@@ -930,7 +932,7 @@ XJZL.statusEffects = [
   {
     id: "chizhi",
     name: "XJZL.Status.Chizhi", // 迟滞
-    description: "XJZL.Status.ChizhiDesc", 
+    description: "XJZL.Status.ChizhiDesc",
     img: "icons/svg/downgrade.svg",
     flags: { "xjzl-system": { slug: "chizhi", stackable: false } },
     changes: []
@@ -938,7 +940,7 @@ XJZL.statusEffects = [
   {
     id: "fengzhao",
     name: "XJZL.Status.Fengzhao", // 封招
-    description: "XJZL.Status.FengzhaoDesc", 
+    description: "XJZL.Status.FengzhaoDesc",
     img: "icons/svg/padlock.svg",
     flags: { "xjzl-system": { slug: "fengzhao", stackable: false } },
     changes: []
@@ -946,7 +948,7 @@ XJZL.statusEffects = [
   {
     id: "stun", // 定身
     name: "XJZL.Status.Stun",
-    description: "XJZL.Status.StunDesc", 
+    description: "XJZL.Status.StunDesc",
     img: "icons/svg/stoned.svg",
     flags: { "xjzl-system": { slug: "stun", stackable: false } },
     changes: [
@@ -959,7 +961,7 @@ XJZL.statusEffects = [
   {
     id: "dianxue",
     name: "XJZL.Status.Dianxue", // 点穴
-    description: "XJZL.Status.DianxueDesc", 
+    description: "XJZL.Status.DianxueDesc",
     img: "icons/svg/target.svg",
     flags: { "xjzl-system": { slug: "dianxue", stackable: false } },
     changes: [
@@ -971,7 +973,7 @@ XJZL.statusEffects = [
   {
     id: "xuanyun",
     name: "XJZL.Status.Xuanyun", // 眩晕
-    description: "XJZL.Status.XuanyunDesc", 
+    description: "XJZL.Status.XuanyunDesc",
     img: "icons/svg/daze.svg",
     flags: { "xjzl-system": { slug: "xuanyun", stackable: false } },
     changes: [
@@ -981,7 +983,7 @@ XJZL.statusEffects = [
   {
     id: "rage",
     name: "XJZL.Status.Rage", // 走火入魔
-    description: "XJZL.Status.RageDesc", 
+    description: "XJZL.Status.RageDesc",
     img: "icons/svg/skull.svg",
     flags: { "xjzl-system": { slug: "rage", stackable: false } },
     changes: []
@@ -989,7 +991,7 @@ XJZL.statusEffects = [
   {
     id: "zibi",
     name: "XJZL.Status.Zibi", // 自闭
-    description: "XJZL.Status.ZibiDesc", 
+    description: "XJZL.Status.ZibiDesc",
     img: "icons/svg/sleep.svg",
     flags: { "xjzl-system": { slug: "zibi", stackable: false } },
     changes: []
@@ -1067,6 +1069,26 @@ XJZL.statusEffects = [
     flags: { "xjzl-system": { slug: "unconscious", stackable: false } },
     changes: [
       { key: "flags.xjzl-system.stun", mode: 5, value: "true" },
+    ]
+  },
+  {
+    id: "dying",
+    name: "XJZL.Status.Dying",  //濒死
+    description: "XJZL.Status.DyingDesc",
+    img: "icons/svg/down.svg", // 向下的箭头或倒地人影
+    flags: { "xjzl-system": { slug: "dying", stackable: false } },
+    changes: [
+      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+    ]
+  },
+  {
+    id: "dead",
+    name: "XJZL.Status.Dead", // 死亡
+    description: "XJZL.Status.DeadDesc",
+    img: "icons/svg/skull.svg",
+    flags: { "xjzl-system": { slug: "dead", stackable: false } },
+    changes: [
+      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
     ]
   }
 ];

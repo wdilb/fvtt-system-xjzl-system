@@ -94,6 +94,39 @@ export class XJZLActor extends Actor {
     if (userId !== game.user.id) return;
 
     this._enforceResourceIntegrity();
+
+    // =====================================================
+    // 2. 濒死/死亡状态自动解除
+    // =====================================================
+    // 检查本次更新是否涉及 HP 变化
+    const newHp = foundry.utils.getProperty(changed, "system.resources.hp.value");
+
+    // 如果 HP 发生了变化，且当前 HP > 0
+    // (注意：this.system.resources.hp.value 此时已经是更新后的新值了)
+    if (newHp !== undefined && this.system.resources.hp.value > 0) {
+
+      // 查找身上是否有 dying 或 dead 状态
+      const effectsToDelete = [];
+      this.effects.forEach(e => {
+        if (e.statuses.has("dying") || e.statuses.has("dead")) {
+          effectsToDelete.push(e.id);
+        }
+      });
+
+      // 如果有，移除它们
+      if (effectsToDelete.length > 0) {
+        this.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
+
+        // 视觉反馈
+        if (this.token?.object) {
+          canvas.interface.createScrollingText(
+            this.token.object.center,
+            "脱离濒死",
+            { fill: "#00FF00", stroke: "#000000", strokeThickness: 4, jitter: 0.25 }
+          );
+        }
+      }
+    }
   }
 
 
@@ -1164,40 +1197,67 @@ export class XJZLActor extends Actor {
       preventDeath: false  // [输出参数] 脚本设为 true 可阻止死亡判定
     };
 
-    // A. 濒死触发
-    // 判断条件：原本活着(currentHP > 0) 且 本次结算判定为濒死(isDying)
-    if (isDying && originalHP > 0) {
-      await this.runScripts(SCRIPT_TRIGGERS.DYING, statusCtx);
+    // [Pre-Check] 如果已经是尸体 (Dead)，通常不再触发濒死/死亡逻辑 (鞭尸不判定)
+    const wasDead = this.effects.some(e => e.statuses.has("dead"));
+    // 只有在没死透的情况下才进行后续判定
+    if (!wasDead) {
+      // A. 濒死触发
+      // 规则：进入濒死 OR 濒死时受击 -> 都要投残疾表
+      const isHitWhileDying = (originalHP <= 0 && finalDamage > 0);
+      if (isDying || isHitWhileDying) {
+        await this.runScripts(SCRIPT_TRIGGERS.DYING, statusCtx);
 
-      // 检查脚本是否挽救了角色
-      if (statusCtx.preventDying) {
-        isDying = false; // 取消濒死标记
-        // 注意：脚本里应该已经写了回血逻辑，否则血量还是0
-      } else {
-        // 把触发濒死的代码移到了这里，因为有可能有特效阻止濒死
-        // TODO: 触发【濒死】状态 (AE & Event)
-        // await this.applyDyingEffect(); 
-        // 触发濒死检定
+        // 检查脚本是否挽救了角色
+        if (statusCtx.preventDying) {
+          isDying = false; // 取消濒死标记
+          // 注意：脚本里应该已经写了回血逻辑，否则血量还是0
+        } else {
+          // 把触发濒死的代码移到了这里，因为有可能有特效阻止濒死
+          // 1. 挂载濒死状态 (使用 config 中定义的 id: "dying")
+          // 检查防重
+          const hasDying = this.effects.some(e => e.statuses.has("dying"));
+          if (!hasDying) {
+            await this.toggleStatusEffect("dying", { active: true });
+          }
+
+          // 2. 发送濒死通知卡 (提供投掷残疾表的按钮)
+          const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: false });
+
+          ChatMessage.create({
+            user: game.user.id,
+            speaker: ChatMessage.getSpeaker({ actor: this }),
+            content: content,
+            flags: { "xjzl-system": { type: "death-card" } }
+          });
+        }
+      }
+
+      // B. 死亡触发
+      if (isDead) {
+        await this.runScripts(SCRIPT_TRIGGERS.DEATH, statusCtx);
+
+        // 检查脚本是否免死
+        if (statusCtx.preventDeath) {
+          isDead = false; // 取消死亡标记
+          // 同样，脚本里需要负责把内力/血量拉回来
+        }
+        else {
+          // 这里不需要 check wasDead，因为最外层已经 check 过了
+          await this.toggleStatusEffect("dead", { overlay: true, active: true });
+
+          // 2. 发送死亡通知卡 (生死一念)
+          const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: true });
+
+          ChatMessage.create({
+            user: game.user.id,
+            speaker: ChatMessage.getSpeaker({ actor: this }),
+            content: content,
+            flags: { "xjzl-system": { type: "death-card" } }
+          });
+        }
       }
     }
 
-    // B. 死亡触发
-    if (isDead) {
-      await this.runScripts(SCRIPT_TRIGGERS.DEATH, statusCtx);
-
-      // 检查脚本是否免死
-      if (statusCtx.preventDeath) {
-        isDead = false; // 取消死亡标记
-        // 同样，脚本里需要负责把内力/血量拉回来
-      }
-      else {
-        // TODO: 触发死亡逻辑 (Overlay图标、发送聊天信息等)
-        // 使用 Actor 的方法切换状态
-        // "dead" 是 Foundry 核心默认的死亡状态 ID，通常会自动挂载骷髅图标
-        // overlay: true 表示这是一个覆盖全图的大图标
-        // await this.toggleStatusEffect("dead", { overlay: true, active: true });
-      }
-    }
 
 
     // =====================================================

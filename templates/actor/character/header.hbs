@@ -63,6 +63,100 @@
       </div>
     </div>
 
+    {{!--
+    =====================================================
+    生存状态与工具栏 (Life Status & Tools)
+    常驻显示，但在濒死/死亡时改变样式高亮
+    =====================================================
+    --}}
+    <div class="life-status-bar" style="
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 4px 8px; 
+            border-radius: 4px; 
+            margin: 5px 0;
+            border: 1px solid transparent;
+            transition: all 0.3s ease;
+            {{#if (lte system.resources.hp.value 0)}}
+                {{!-- 危机模式样式 --}}
+                background: linear-gradient(90deg, #2c0b0e 0%, #1a0505 100%); 
+                border-color: #8b0000;
+                border-left: 4px solid #e74c3c;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+                color: #ecf0f1;
+            {{else}}
+                {{!-- 正常模式样式 --}}
+                background: rgba(0,0,0,0.03);
+                border-color: #ccc;
+                color: #555;
+            {{/if}}
+         ">
+
+      {{!-- 左侧：当前状态文本 --}}
+      <div style="font-weight: bold; font-size: 0.95em; display: flex; align-items: center; gap: 6px;">
+        {{#if (lte system.resources.hp.value 0)}}
+        {{!-- 危机状态 --}}
+        <i class="fas fa-heart-pulse" style="color: #e74c3c; animation: pulse 1.5s infinite;"></i>
+
+        {{#if (gt system.resources.mp.value 0)}}
+        <span style="color: #e74c3c; text-transform: uppercase;">{{localize "XJZL.Status.Dying"}}</span>
+        {{else}}
+        <span style="color: #7f8c8d; text-transform: uppercase;">{{localize "XJZL.Status.Dead"}}</span>
+        {{/if}}
+        {{else}}
+        {{!-- 正常状态 --}}
+        <i class="fas fa-user-check" style="color: #27ae60;"></i>
+        <span>{{localize "XJZL.UI.Chat.DeathCard.Normal" fallback="状态良好"}}</span>
+        {{/if}}
+      </div>
+
+      {{!-- 右侧：三合一工具按钮组 --}}
+      <div class="life-tools" style="display: flex; gap: 4px;">
+
+        {{!-- 1. 查表 --}}
+        <button type="button" data-action="queryDisability" data-tooltip="{{localize 'XJZL.Disability.QueryTitle'}}"
+          style="
+                        width: 24px; height: 24px; padding: 0; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);
+                        background: {{#if (lte system.resources.hp.value 0)}}rgba(255,255,255,0.1){{else}}#fff{{/if}};
+                        color: {{#if (lte system.resources.hp.value 0)}}#ccc{{else}}#333{{/if}};
+                    ">
+          <i class="fas fa-search" style="font-size: 0.8em;"></i>
+        </button>
+
+        {{!-- 2. 残疾判定 (D100) --}}
+        <button type="button" data-action="rollDisability"
+          data-tooltip="{{localize 'XJZL.UI.Chat.DeathCard.RollDisability'}}" style="
+                        width: 24px; height: 24px; padding: 0; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);
+                        {{#if (lte system.resources.hp.value 0)}}
+                            background: #8b0000; color: white; border-color: #a93226;
+                        {{else}}
+                            background: #fff; color: #8b0000;
+                        {{/if}}
+                    ">
+          <i class="fas fa-crutch" style="font-size: 0.8em;"></i>
+        </button>
+
+        {{!-- 3. 死检 (D20) --}}
+        <button type="button" data-action="rollDeathSave" data-tooltip="{{localize 'XJZL.UI.Chat.DeathCard.DeathSave'}}"
+          style="
+                        width: 24px; height: 24px; padding: 0; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);
+                        {{#if (lte system.resources.hp.value 0)}}
+                            {{#if (lte system.resources.mp.value 0)}}
+                                background: #000; color: #e74c3c; border-color: #444; /* 死亡时高亮 */
+                            {{else}}
+                                background: rgba(0,0,0,0.5); color: #999; /* 濒死时略暗 */
+                            {{/if}}
+                        {{else}}
+                            background: #fff; color: #333;
+                        {{/if}}
+                    ">
+          <i class="fas fa-skull" style="font-size: 0.8em;"></i>
+        </button>
+
+      </div>
+    </div>
+
     {{!-- 按钮组：使用 action-row 控制高度 --}}
     <div class="action-row">
       <button type="button" class="roll-basic-attack-btn" data-action="rollBasicAttack">
