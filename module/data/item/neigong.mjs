@@ -71,6 +71,14 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
         })
         , { initial: [] }),
 
+      // 全局自动化说明
+      // 用于告知 GM：这个内功的各个阶段特效中，哪些已经脚本化，哪些需要手动
+      automationNote: new fields.StringField({
+        required: false,
+        initial: "",
+        label: "XJZL.AutomationNote"
+      }),
+
       // === 2. 动态数据 (玩家存档) ===
 
       // 核心：已投入修为 (银行账户)
@@ -99,10 +107,10 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     // 地级: 1000(领) -> 4000(小) -> 10000(圆)
     // 天级: 2000(领) -> 12000(小) -> 30000(圆)
     // 原始门槛 (Standard)
-    let rawThresholds  = [0, 0, 0];
-    if (this.tier === 1) rawThresholds  = [0, 1000, 3000];
-    else if (this.tier === 2) rawThresholds  = [1000, 4000, 10000];
-    else if (this.tier === 3) rawThresholds  = [2000, 12000, 30000];
+    let rawThresholds = [0, 0, 0];
+    if (this.tier === 1) rawThresholds = [0, 1000, 3000];
+    else if (this.tier === 2) rawThresholds = [1000, 4000, 10000];
+    else if (this.tier === 3) rawThresholds = [2000, 12000, 30000];
 
     const ratio1 = this.config.stage1?.xpCostRatio ?? 1; // 阶段1系数
     const ratio2 = this.config.stage2?.xpCostRatio ?? 1; // 阶段2系数
@@ -115,9 +123,9 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
 
     // 重组门槛
     const thresholds = [
-        Math.floor(cost0),
-        Math.floor(cost0 + cost1),
-        Math.floor(cost0 + cost1 + cost2)
+      Math.floor(cost0),
+      Math.floor(cost0 + cost1),
+      Math.floor(cost0 + cost1 + cost2)
     ];
 
     // 定义该内功的绝对上限 (圆满所需的值)
