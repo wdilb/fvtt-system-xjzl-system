@@ -331,8 +331,42 @@ XJZL.artIdentities = {
   ]
 };
 
+// 17. 技艺身份配置 (Art Identities)
+XJZL.disabilityTable = [
+    { min: 1, max: 1, key: "1" },
+    { min: 2, max: 2, key: "2" },
+    { min: 3, max: 6, key: "3_6" },
+    { min: 7, max: 14, key: "7_14" },
+    { min: 15, max: 16, key: "15_16" },
+    { min: 17, max: 18, key: "17_18" },
+    { min: 19, max: 20, key: "19_20" },
+    { min: 21, max: 23, key: "21_23" },
+    { min: 24, max: 25, key: "24_25" },
+    { min: 26, max: 29, key: "26_29" },
+    { min: 30, max: 34, key: "30_34" },
+    { min: 35, max: 35, key: "35" },
+    { min: 36, max: 39, key: "36_39" },
+    { min: 40, max: 50, key: "40_50" },
+    { min: 51, max: 51, key: "51" },
+    { min: 52, max: 54, key: "52_54" },
+    { min: 55, max: 55, key: "55" },
+    { min: 56, max: 59, key: "56_59" },
+    { min: 60, max: 62, key: "60_62" },
+    { min: 63, max: 65, key: "63_65" },
+    { min: 66, max: 66, key: "66" },
+    { min: 67, max: 68, key: "67_68" },
+    { min: 69, max: 70, key: "69_70" },
+    { min: 71, max: 74, key: "71_74" },
+    { min: 75, max: 79, key: "75_79" },
+    { min: 80, max: 80, key: "80" },
+    { min: 81, max: 95, key: "81_95" },
+    { min: 96, max: 98, key: "96_98" },
+    { min: 99, max: 99, key: "99" },
+    { min: 100, max: 100, key: "100" }
+];
 
-// 17. 系统状态标志 (逻辑开关)
+
+// 18. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -432,7 +466,7 @@ XJZL.statusFlags = {
   regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
-// 18. 检定优劣势计数器 (Check Flags)
+// 19. 检定优劣势计数器 (Check Flags)
 // 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
 // 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
 XJZL.checkFlags = {
