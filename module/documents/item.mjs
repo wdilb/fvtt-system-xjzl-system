@@ -1415,12 +1415,34 @@ export class XJZLItem extends Item {
           "system.martial.stanceItemId": this.id
         });
 
-        // 2. 发送简单卡片
+        // 2. 准备模板数据 (架招比较简单，不需要计算伤害和检定)
+        // 这里的 finalCost 是在上面第4步就已经算好的
+        const templateData = {
+          actor: actor,
+          item: this,
+          move: move,
+          cost: finalCost,
+          system: this.system,
+          isStance: true, // [NEW] 标记为架招，供模板变色
+          hasTargets: false
+        };
+
+        const content = await renderTemplate("systems/xjzl-system/templates/chat/move-card.hbs", templateData);
+
+        // 3. 发送卡片
         ChatMessage.create({
           user: game.user.id,
           speaker: ChatMessage.getSpeaker({ actor: actor }),
           flavor: `开启架招: ${move.name}`,
-          content: `<div class="xjzl-chat-card"><div class="card-result">${move.description || '架招已开启'}</div></div>`
+          content: content,
+          flags: {
+            "xjzl-system": {
+              actionType: "buff",
+              moveType: "stance",
+              itemId: this.id,
+              moveId: move.id
+            }
+          }
         });
 
         return; // 架招流程结束
@@ -1526,7 +1548,7 @@ export class XJZLItem extends Item {
       let rollJSON = null;
       let rollTooltip = null;
       let displayTotal = 0; // 卡片上显示的数字，用来处理复杂的优势劣势情况下该显示什么数字
-      let needsHitCheck = false; 
+      let needsHitCheck = false;
       // 初始化 targetsResults，防止 ReferenceError
       const targetsResults = {};
       // 判定是否需要命中检定

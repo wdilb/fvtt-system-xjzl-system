@@ -2075,5 +2075,21 @@ export class ChatCardManager {
                 </ul>
             </div>`
         });
+
+        // 5. 更新原始卡片按钮 (防止重复点击)
+        // 获取包含按钮的 DOM
+        const div = document.createElement("div");
+        div.innerHTML = message.content;
+        const btn = div.querySelector('button[data-action="applyHeal"]');
+
+        if (btn) {
+            btn.disabled = true;
+            btn.style.backgroundColor = "#78909c"; // 变灰
+            btn.style.cursor = "not-allowed";
+            btn.innerHTML = `<i class="fas fa-check"></i> ${game.i18n.localize("XJZL.UI.Chat.MoveCard.TargetSelected") || "已应用"}`;
+
+            // 更新回消息中
+            await message.update({ content: div.innerHTML });
+        }
     }
 }

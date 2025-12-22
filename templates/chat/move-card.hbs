@@ -19,8 +19,26 @@
             </div>
         </div>
     </header>
+    {{else if isStance}}
+    {{!-- B. 架招/蓝色模式 (新增) --}}
+    <header class="card-header"
+        style="border-bottom: 2px solid #2980b9; padding-bottom: 5px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
+        <img src="{{move.img}}" width="40" height="40"
+            style="border:1px solid #2471a3; background:#000; border-radius: 4px;" />
+        <div style="flex: 1;">
+            <h3 style="margin: 0; font-weight: 900; border: none; color: #2980b9; font-size: 1.2em;">
+                <i class="fas fa-shield-alt" style="font-size:0.8em; margin-right:4px;"></i> {{move.name}}
+            </h3>
+            <div style="font-size: 0.8em; color: #555;">
+                <span style="background: #333; color: #fff; padding: 0 4px; border-radius: 2px;">
+                    {{localize (concat "XJZL.Wuxue.Type." move.type)}}
+                </span>
+                - {{item.name}}
+            </div>
+        </div>
+    </header>
     {{else}}
-    {{!-- B. 默认/攻击/红色模式 --}}
+    {{!-- C. 默认/攻击/红色模式 --}}
     <header class="card-header"
         style="border-bottom: 2px solid var(--xjzl-gold); padding-bottom: 5px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;">
         <img src="{{move.img}}" width="40" height="40"
@@ -38,8 +56,9 @@
     {{/if}}
 
     {{!-- 2. 描述与详情 (可折叠区域) --}}
+    {{!-- 架招默认展开 (open)，其他默认折叠 --}}
     {{#if (or move.description item.system.automationNote)}}
-    <details class="card-details" style="margin-bottom: 10px;">
+    <details class="card-details" style="margin-bottom: 10px;" {{#if isStance}}open{{/if}}>
         <summary style="cursor: pointer; font-size: 0.85em; color: #666; outline: none;">
             <i class="fas fa-book-open"></i> {{localize "XJZL.UI.Chat.MoveCard.ShowDetails"}}
         </summary>
@@ -61,7 +80,8 @@
     </details>
     {{/if}}
 
-    {{!-- 3. 命中检定 (仅当存在骰子时显示) --}}
+    {{!-- 3. 命中检定 (架招不显示) --}}
+    {{#unless isStance}}
     {{#if attackRoll}}
     <div class="card-roll" style="margin-bottom: 10px;">
         <div class="roll-header"
@@ -133,12 +153,15 @@
     {{/if}}
 
     {{/if}}
+    {{/unless}}
 
-    {{!-- 4. 核心数值展示 --}}
+    {{!-- 4. 核心数值展示 (架招只显示消耗，不显示0伤害) --}}
+    {{!-- 只要有任意一个数值或者消耗，就渲染这个块 --}}
+    {{#if (or (gt calc.damage 0) (gt calc.feint 0) cost.mp cost.rage cost.hp)}}
     <div class="card-stats"
         style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 15px; background: #fff; border: 1px dashed #ccc; padding: 5px; border-radius: 4px;">
 
-        {{!-- 伤害 / 治疗 --}}
+        {{!-- 伤害 / 治疗 (架招通常不显示，除非有数值) --}}
         {{#if (gt calc.damage 0)}}
         <div style="text-align: center;">
             <div style="font-size: 0.8em; color: #666;">
@@ -179,8 +202,10 @@
         </div>
         {{/if}}
     </div>
+    {{/if}}
 
-    {{!-- 5. 交互按钮组 --}}
+    {{!-- 5. 交互按钮组 (架招无需按钮，因为已经立即生效) --}}
+    {{#unless isStance}}
     <div class="card-buttons" style="display: flex; flex-direction: column; gap: 5px;">
 
         {{!-- 虚招对抗 --}}
@@ -219,4 +244,6 @@
         {{/if}}
 
     </div>
+    {{/unless}}
+
 </div>
