@@ -768,228 +768,6 @@ export class ChatCardManager {
         }
     }
 
-    /* module/applications/chat-card-manager.mjs */
-
-    /**
-     * 动作: 响应虚招防御 (Defend)
-     */
-    static async _onDefendFeint(defender, flags, message) {
-        // 1. 获取文档对象
-        const targetDoc = await fromUuid(flags.targetUuid);
-        if (!targetDoc) return ui.notifications.warn("目标已不存在。");
-
-        const targetActor = targetDoc.actor || targetDoc;
-        if (!targetActor || !targetActor.system) return ui.notifications.error("无法获取目标数据。");
-
-        const displayName = targetDoc.name || targetActor.name;
-        const safeKey = flags.targetUuid.replaceAll(".", "_");
-
-        // --- 防重复检查 ---
-        const originMsg = game.messages.get(flags.originMessageId);
-        if (originMsg) {
-            const currentResults = originMsg.flags["xjzl-system"]?.feintResults || {};
-            if (currentResults[safeKey]) {
-                // 如果已点过，尝试视觉禁用
-                const div = document.createElement("div");
-                div.innerHTML = message.content;
-                const btn = div.querySelector('button[data-action="rollDefendFeint"]');
-                if (btn && !btn.disabled) {
-                    btn.disabled = true;
-                    btn.style.background = "#555";
-                    btn.style.color = "#999";
-                    btn.style.cursor = "not-allowed";
-                    btn.innerText = "已检定";
-                    await message.update({ content: div.innerHTML });
-                }
-                return ui.notifications.warn(`${displayName} 已经进行过对抗了。`);
-            }
-        } else {
-            return ui.notifications.warn("原始攻击消息已丢失，无法记录对抗结果。");
-        }
-
-        // =====================================================
-        // 1.5 获取攻击者 & 计算优劣势
-        // =====================================================
-        let attackerActor = null;
-        const speaker = originMsg.speaker;
-        if (speaker.token) attackerActor = game.actors.tokens[speaker.token];
-        if (!attackerActor) attackerActor = game.actors.get(speaker.actor);
-
-        const selfLevel = targetActor.xjzlStatuses?.feintLevel || 0;
-        let grantLevel = 0;
-        if (attackerActor) {
-            grantLevel = attackerActor.xjzlStatuses?.defendFeintLevel || 0;
-        }
-
-        const autoLevel = selfLevel + grantLevel;
-        const kanpoBase = targetActor.system.combat.kanpoTotal || 0;
-
-        // =====================================================
-        // 2. 弹窗询问加值
-        // =====================================================
-        const formId = `defend-config-${foundry.utils.randomID()}`;
-
-        // 【修改变量名 1】dialogHtml
-        const dialogHtml = await renderTemplate("systems/xjzl-system/templates/apps/defend-config.hbs", {
-            formId: formId,
-            attackTotal: flags.attackTotal,
-            kanpoBase: kanpoBase,
-            autoLevel: autoLevel
-        });
-
-        const dialogResult = await foundry.applications.api.DialogV2.wait({
-            window: { title: `看破检定: ${displayName}`, icon: "fas fa-eye" },
-            content: dialogHtml,
-
-            render: (event) => {
-                const root = document.getElementById(formId);
-                if (!root) return;
-                root.addEventListener("click", (e) => {
-                    const btn = e.target.closest("button[data-action]");
-                    if (!btn) return;
-                    e.preventDefault();
-                    const action = btn.dataset.action;
-                    const targetName = btn.dataset.target;
-                    const input = root.querySelector(`input[name="${targetName}"]`);
-                    if (!input) return;
-                    let val = parseInt(input.value) || 0;
-                    if (action === "increase") val++;
-                    else if (action === "decrease") val--;
-                    input.value = val;
-                });
-            },
-
-            buttons: [{
-                action: "ok",
-                label: "投掷",
-                icon: "fas fa-dice",
-                default: true,
-                callback: (event, button, dialog) => {
-                    const root = document.getElementById(formId);
-                    if (!root) return null;
-                    return {
-                        bonus: parseInt(root.querySelector('[name="bonus"]').value) || 0,
-                        manualLevel: parseInt(root.querySelector('[name="manualLevel"]').value) || 0
-                    };
-                }
-            }],
-            rejectClose: false,
-            close: () => null
-        });
-
-        if (!dialogResult) return;
-
-        // =====================================================
-        // 3. 投掷计算
-        // =====================================================
-        const finalLevel = autoLevel + dialogResult.manualLevel;
-        const bonus = dialogResult.bonus;
-
-        let diceFormula = "1d20";
-        let flavorStatus = "";
-
-        if (finalLevel > 0) {
-            diceFormula = "2d20kh";
-            flavorStatus = "(优势)";
-        } else if (finalLevel < 0) {
-            diceFormula = "2d20kl";
-            flavorStatus = "(劣势)";
-        }
-
-        const roll = await new Roll(`${diceFormula} + @kanpo + @bonus`, { kanpo: kanpoBase, bonus: bonus }).evaluate();
-        if (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);
-
-        const defTotal = roll.total;
-        const atkTotal = flags.attackTotal;
-        const isBroken = atkTotal >= defTotal;
-
-        // 4. 状态变更
-        if (isBroken) {
-            await targetActor.update({ "system.martial.stanceActive": false });
-
-            const breakEffectData = {
-                name: "破防",
-                icon: "icons/svg/downgrade.svg",
-                origin: message.uuid,
-                duration: { rounds: 1 },
-                statuses: ["brokenDefense"],
-                description: "架招被虚招击破，处于破防状态。"
-            };
-            await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
-
-            if (targetActor.token?.object) {
-                canvas.interface.createScrollingText(targetActor.token.object.center, "被击破架招！", {
-                    fill: "#ff0000", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                });
-            }
-        } else {
-            if (targetActor.token?.object) {
-                canvas.interface.createScrollingText(targetActor.token.object.center, "看破！", {
-                    fill: "#00ff00", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                });
-            }
-        }
-
-        // =====================================================
-        // 5. 发送结果
-        // =====================================================
-        const diceTerm = roll.terms[0];
-        const diceTotal = diceTerm.total;
-        const rawResults = diceTerm.results.map(r => r.result).join(", ");
-        let rollDisplay = "";
-
-        if (diceTerm.results.length > 1) {
-            rollDisplay = `${diceFormula} <span style="color:#666; font-size:0.9em;">(${rawResults})</span> <i class="fas fa-arrow-right" style="font-size:0.8em"></i> <b>${diceTotal}</b>`;
-        } else {
-            rollDisplay = `${diceFormula} <i class="fas fa-arrow-right" style="font-size:0.8em"></i> <b>${diceTotal}</b>`;
-        }
-
-        const templateData = {
-            rollDisplay: rollDisplay,
-            kanpoBase: kanpoBase,
-            bonus: bonus,
-            defTotal: defTotal,
-            isBroken: isBroken
-        };
-
-        // 【修改变量名 2】resultHtml
-        const resultHtml = await renderTemplate(
-            "systems/xjzl-system/templates/chat/defend-result.hbs",
-            templateData
-        );
-
-        ChatMessage.create({
-            user: game.user.id,
-            speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-            flavor: `看破检定结果 ${flavorStatus}`,
-            content: resultHtml
-        });
-
-        // 6. 更新数据
-        const resultValue = isBroken ? "broken" : "resisted";
-        await originMsg.update({
-            [`flags.xjzl-system.feintResults.${safeKey}`]: resultValue
-        });
-
-        // 7. 更新当前卡片按钮 (变灰)
-        const div = document.createElement("div");
-        div.innerHTML = message.content;
-        const btn = div.querySelector('button[data-action="rollDefendFeint"]');
-
-        if (btn) {
-            btn.disabled = true;
-            btn.style.background = "#555";
-            btn.style.color = "#999";
-            btn.style.cursor = "not-allowed";
-            btn.innerText = "已检定";
-
-            await message.update({ content: div.innerHTML });
-        } else {
-            // 保底方案
-            console.warn("XJZL | 无法定位防御按钮进行更新");
-        }
-    }
-
     /**
      * 响应虚招对抗
      */
@@ -1356,18 +1134,22 @@ export class ChatCardManager {
 
                 // A. 判定失败：移除架招状态
                 await targetActor.update({ "system.martial.stanceActive": false });
+                // B. 应用 "破防" 状态
+                // 从配置中获取标准数据
+                const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
 
-                // B. 应用 "破防" 特效 (Active Effect)
-                // TODO 先随便编一个AE，之后我们完成新的AE之后再回来修改
-                const breakEffectData = {
-                    name: "破防",
-                    icon: "icons/svg/downgrade.svg",
-                    origin: message.uuid,
-                    duration: { rounds: 1 },
-                    statuses: ["brokenDefense"],
-                    description: "架招被虚招击破，处于破防状态。"
-                };
-                await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
+
+                if (statusConfig) {
+                    // [Optimized] 直接展开配置对象
+                    // 这样 name, img, changes, duration, statuses 全部自动继承
+                    const breakEffectData = {
+                        ...statusConfig,
+                        name: game.i18n.localize(statusConfig.name), // 确保本地化
+                        description: game.i18n.localize(statusConfig.description),
+                        origin: attacker ? attacker.uuid : message.uuid  // 只有来源是动态的
+                    };
+                    await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
+                }
 
                 // C. 视觉反馈 (飘字: 红色)
                 if (targetActor.token?.object) {

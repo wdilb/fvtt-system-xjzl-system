@@ -1072,6 +1072,17 @@ XJZL.statusEffects = [
     ]
   },
   {
+    id: "pofang",
+    name: "XJZL.Status.Pofang", // 破防
+    description: "XJZL.Status.PofangDesc", 
+    img: "icons/svg/downgrade.svg",
+    flags: { "xjzl-system": { slug: "pofang", stackable: false } },
+    duration: { rounds: 1 }, //破防就是持续1回合
+    changes: [
+      { key: "flags.xjzl-system.blockStance", mode: 5, value: "true" }
+    ]
+  },
+  {
     id: "dying",
     name: "XJZL.Status.Dying",  //濒死
     description: "XJZL.Status.DyingDesc",
