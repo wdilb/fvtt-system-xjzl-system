@@ -1814,4 +1814,124 @@ export class XJZLItem extends Item {
       this._rolling = false;
     }
   }
+
+  /**
+   * 将物品详情发送到聊天窗口 (Info Card)
+   */
+  async postToChat() {
+    const system = this.system;
+
+    // 1. 准备通用数据
+    const templateData = {
+      item: this,
+      system: system,
+      subtitle: "",
+      properties: [] // 结构: { label: "标签名", value: "值" }
+    };
+
+    // 辅助函数: 添加标签
+    const addProp = (label, value) => {
+      if (value !== undefined && value !== null && value !== "") {
+        templateData.properties.push({ label, value });
+      }
+    };
+
+    // 2. 通用属性处理
+    // A. 价格与数量 (所有实体物品)
+    if ("price" in system) addProp(game.i18n.localize("XJZL.Equipment.Price"), system.price);
+    // if ("quantity" in system && system.quantity > 1) addProp(game.i18n.localize("XJZL.Equipment.Quantity"), system.quantity);
+
+    // B. 品质 (Quality 0-4) vs 品阶 (Tier 1-3)
+    if (["weapon", "armor", "qizhen", "consumable"].includes(this.type)) {
+      if (system.quality !== undefined) {
+        addProp(game.i18n.localize("XJZL.Qualities.Label"), game.i18n.localize(`XJZL.Qualities.${system.quality}`));
+      }
+    } else if (["neigong", "wuxue", "manual"].includes(this.type)) {
+      if (system.tier !== undefined) {
+        addProp(
+          this.type === "manual" ? game.i18n.localize("XJZL.Tiers.Label") : game.i18n.localize("XJZL.Neigong.Tier"),
+          game.i18n.localize(`XJZL.Tiers.${system.tier}`)
+        );
+      }
+    }
+
+    // 3. 特定类型处理
+    switch (this.type) {
+      case "weapon":
+        // 武器类型
+        if (system.type) addProp(game.i18n.localize("XJZL.Wuxue.Category"), game.i18n.localize(CONFIG.XJZL.weaponTypes[system.type]));
+        if (system.subtype) addProp("", system.subtype); // 子类型直接显示，不带Label
+        if (system.damage) addProp(game.i18n.localize("XJZL.Equipment.Damage"), system.damage);
+        if (system.block) addProp(game.i18n.localize("XJZL.Equipment.Block"), system.block);
+        if (system.equipped) templateData.subtitle = game.i18n.localize("XJZL.Equipment.Equipped");
+        break;
+
+      case "armor":
+        // 防具部位
+        if (system.type) addProp(game.i18n.localize("XJZL.Wuxue.Category"), game.i18n.localize(CONFIG.XJZL.armorTypes[system.type]));
+        if (system.equipped) templateData.subtitle = game.i18n.localize("XJZL.Equipment.Equipped");
+        break;
+
+      case "qizhen":
+        // 穴位
+        if (system.acupoint) {
+          addProp(game.i18n.localize("XJZL.Equipment.Acupoint"), game.i18n.localize(CONFIG.XJZL.acupoints[system.acupoint]));
+        } else {
+          addProp("", "未镶嵌");
+        }
+        if (system.equipped) templateData.subtitle = "已镶嵌";
+        break;
+
+      case "neigong":
+        // 五行
+        if (system.element) addProp(game.i18n.localize("XJZL.Neigong.Element"), game.i18n.localize(`XJZL.Elements.${system.element.charAt(0).toUpperCase() + system.element.slice(1)}`));
+        if (system.active) templateData.subtitle = "运行中";
+        // 进度
+        if (system.progressData) {
+          const stageLabels = ["未入门", "领悟", "小成", "圆满"];
+          addProp("境界", stageLabels[this.system.stage || 0]);
+        }
+        break;
+
+      case "wuxue":
+        // 门派
+        if (system.sect) addProp(game.i18n.localize("XJZL.Info.Sect"), system.sect);
+        break;
+
+      case "consumable":
+        // 类型
+        if (system.type) addProp(game.i18n.localize("XJZL.Consumable.TypeLabel"), game.i18n.localize(CONFIG.XJZL.consumableTypes[system.type]));
+        // 恢复效果
+        const rec = system.recovery;
+        if (rec) {
+          if (rec.hp) addProp("恢复", `${rec.hp} 气血`);
+          if (rec.mp) addProp("恢复", `${rec.mp} 内力`);
+          if (rec.rage) addProp("恢复", `${rec.rage} 怒气`);
+        }
+        break;
+
+      case "art_book":
+        // 技艺类型
+        if (system.artType) addProp(game.i18n.localize("XJZL.ArtBook.ArtType"), game.i18n.localize(CONFIG.XJZL.arts[system.artType]));
+        // 累计奖励
+        if (this.totalLevelBonus) addProp("累计等级", `+${this.totalLevelBonus}`);
+        break;
+
+      case "manual":
+        if (system.destroyOnUse) addProp("", "一次性消耗品");
+        break;
+    }
+
+    // 4. 渲染模板
+    const content = await renderTemplate("systems/xjzl-system/templates/chat/item-info.hbs", templateData);
+
+    // 5. 发送消息
+    ChatMessage.create({
+      author: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      // flavor: `展示物品: ${this.name}`, // 可选：如果觉得太啰嗦可以去掉
+      content: content,
+      flags: { "xjzl-system": { type: "item-info", itemId: this.id } }
+    });
+  }
 }

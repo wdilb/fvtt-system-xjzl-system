@@ -50,7 +50,14 @@ export class XJZLConsumableData extends foundry.abstract.TypeDataModel {
       // 逻辑：使用消耗品时，将 transfer=false 的特效复制给 Actor。
 
       // === 描述 ===
-      description: new fields.HTMLField({ label: "XJZL.Info.Bio" })
+      description: new fields.HTMLField({ label: "XJZL.Info.Bio" }),
+
+      // 自动化说明
+      automationNote: new fields.StringField({
+        required: false,
+        initial: "",
+        label: "XJZL.AutomationNote" // 使用全局 Key
+      })
     };
   }
 }

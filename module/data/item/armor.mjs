@@ -32,7 +32,14 @@ export class XJZLArmorData extends foundry.abstract.TypeDataModel {
         label: "XJZL.Item.ScriptList"
       }),
 
-      description: new fields.HTMLField({ label: "XJZL.Info.Bio" }) // 描述
+      description: new fields.HTMLField({ label: "XJZL.Info.Bio" }), // 描述
+
+      // 自动化说明
+      automationNote: new fields.StringField({
+        required: false,
+        initial: "",
+        label: "XJZL.AutomationNote" // 使用全局 Key
+      })
     };
   }
 }
