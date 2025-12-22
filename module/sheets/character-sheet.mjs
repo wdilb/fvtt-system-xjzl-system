@@ -56,7 +56,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             //普通攻击
             rollBasicAttack: XJZLCharacterSheet.prototype._onRollBasicAttack,
             //趁虚而入
-            rollOpportunityAttack: XJZLCharacterSheet.prototype._onRollOpportunityAttack
+            rollOpportunityAttack: XJZLCharacterSheet.prototype._onRollOpportunityAttack,
+            // 解除架招
+            stopStance: XJZLCharacterSheet.prototype._onStopStance
         }
     };
 
@@ -134,6 +136,22 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] },
             { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }
         ];
+
+        // =====================================================
+        // 查找当前架招名称 (Find Active Stance Name)
+        // =====================================================
+        context.activeStanceName = null; // 默认无架招
+
+        const martial = actor.system.martial;
+        if (martial.stanceActive && martial.stanceItemId && martial.stance) {
+            const stanceItem = actor.items.get(martial.stanceItemId);
+            if (stanceItem) {
+                const move = stanceItem.system.moves.find(m => m.id === martial.stance);
+                if (move) {
+                    context.activeStanceName = move.name;
+                }
+            }
+        }
 
         // 物品分类
         context.inventory = [
@@ -1050,5 +1068,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     async _onRollOpportunityAttack(event, target) {
         event.preventDefault();
         await this.document.rollBasicAttack({ mode: "opportunity" });
+    }
+
+    /**
+     * 解除当前架招
+     */
+    async _onStopStance(event, target) {
+        event.preventDefault();
+        // 调用 Actor 的方法
+        await this.document.stopStance();
     }
 }

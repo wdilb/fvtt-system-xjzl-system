@@ -1944,4 +1944,77 @@ export class XJZLActor extends Actor {
       isWeaponMatch: true
     };
   }
+
+  /* -------------------------------------------- */
+  /*  架招管理 (Stance Management)                */
+  /* -------------------------------------------- */
+
+  /**
+   * 主动解除当前架招
+   * 1. 重置 martial 状态
+   * 2. 移除源自该架招的临时特效 (如果有)
+   * 3. 视觉反馈
+   */
+  async stopStance() {
+    // 1. 检查当前是否有架招
+    const martial = this.system.martial;
+    if (!martial.stanceActive) return;
+
+    // 2. 准备更新数据
+    const updates = {
+      "system.martial.stanceActive": false,
+      "system.martial.stance": "",       // 清空招式ID
+      "system.martial.stanceItemId": ""  // 清空物品ID
+    };
+
+    // 3. 查找并移除相关的临时特效 (Cleanup)
+    // 逻辑：如果某个临时特效的 origin 指向了当前架招物品，则一并移除
+    // 这对于“开启架招获得3回合反伤Buff”之类的设计很有用
+    const effectsToDelete = [];
+    if (martial.stanceItemId) {
+      // 获取架招物品的 UUID
+      const stanceItem = this.items.get(martial.stanceItemId);
+      if (stanceItem) {
+        const originUuid = stanceItem.uuid;
+        // 遍历 Actor 身上的特效
+        for (const effect of this.effects) {
+          // 只删除临时的、且来源匹配的
+          if (effect.isTemporary && effect.origin === originUuid) {
+            effectsToDelete.push(effect.id);
+          }
+        }
+      }
+    }
+
+    // 4. 执行更新
+    await this.update(updates);
+
+    if (effectsToDelete.length > 0) {
+      await this.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
+    }
+
+    // 5. 视觉反馈
+    if (this.token?.object) {
+      canvas.interface.createScrollingText(
+        this.token.object.center,
+        "解除架招",
+        {
+          direction: 1, // 向下飘
+          fontSize: 28,
+          fill: "#cccccc", // 灰色
+          stroke: "#000000",
+          strokeThickness: 4,
+          jitter: 0.25
+        }
+      );
+    }
+
+    // 可选：发送一条聊天提示
+    /*
+    ChatMessage.create({
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: `<div style="font-size:0.8em; color:#555;">已解除架招姿态。</div>`
+    });
+    */
+  }
 }
