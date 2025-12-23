@@ -27,7 +27,7 @@ import { XJZLBackgroundData } from "./module/data/item/background.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
-import { XJZLCreatureSheet } from "./module/sheets/creature-sheet.mjs"; 
+import { XJZLCreatureSheet } from "./module/sheets/creature-sheet.mjs";
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
@@ -112,13 +112,13 @@ Hooks.once("init", async function () {
 
   // 注意：V13 中虽然推荐 AppV2，但注册方式仍需兼容 DocumentSheetConfig
   Actors.registerSheet("xjzl-system", XJZLCharacterSheet, {
-    types: ["character", "npc"], 
+    types: ["character", "npc"],
     makeDefault: true,
     label: "XJZL.Sheet.Character"
   });
 
   Actors.registerSheet("xjzl-system", XJZLCreatureSheet, {
-    types: ["creature"], 
+    types: ["creature"],
     makeDefault: true,
     label: "XJZL.Sheet.Creature"
   });
@@ -221,6 +221,34 @@ Hooks.once("init", async function () {
     type: Boolean,
     default: true, // 默认开启，关闭则仅GM可用
     requiresReload: true
+  });
+
+  // --- 野兽伤害规则设置 ---
+
+  // 1. 计算模式
+  game.settings.register("xjzl-system", "creatureDamageMode", {
+    name: "野兽伤害计算模式",
+    hint: "定义野兽受到伤害时如何扣除体力。\n规则书模式: 伤害>防护值，固定扣1点。\n倍率模式: 伤害越高，扣除体力越多。",
+    scope: "world",
+    config: true,
+    type: String,
+    choices: {
+      "strict": "规则书模式 (固定 1 点)",
+      "scaling": "倍率模式 (基于伤害量)"
+    },
+    default: "strict", // 默认遵从规则书
+    requiresReload: false
+  });
+
+  // 2. 倍率阈值 (仅在倍率模式下生效)
+  game.settings.register("xjzl-system", "creatureDamageScaling", {
+    name: "野兽伤害倍率阈值",
+    hint: "仅在倍率模式下生效。计算公式: 体力损失 = 向下取整( 伤害 / Max(防护, 阈值) )。\n例如设为10: 伤害35打防护0的野兽 -> 35/10=3体力; 打防护20的野兽 -> 35/20=1体力。",
+    scope: "world",
+    config: true,
+    type: Number,
+    default: 10, // 默认每 10 点溢出伤害扣 1 体力
+    requiresReload: false
   });
 });
 

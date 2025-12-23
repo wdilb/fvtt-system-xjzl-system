@@ -919,6 +919,86 @@ export class XJZLActor extends Actor {
    * @returns {Object} 结算结果 { finalDamage, hpLost, mpLost, isDead, ... }
    */
   async applyDamage(data) {
+
+    // =====================================================
+    // 0. 野兽/怪物特化逻辑 (Creature Logic)
+    // =====================================================
+    if (this.type === "creature") {
+      const { amount, isHit } = data;
+
+      // 1. 未命中直接返回
+      if (!isHit) {
+        if (this.token?.object) {
+          canvas.interface.createScrollingText(this.token.object.center, "闪避", {
+            direction: 0, fontSize: 32, fill: "#ffffff", stroke: "#000000", strokeThickness: 4
+          });
+        }
+        return { finalDamage: 0, isDead: false };
+      }
+
+      // 2. 获取配置
+      const mode = game.settings.get("xjzl-system", "creatureDamageMode");
+      const scalingBase = game.settings.get("xjzl-system", "creatureDamageScaling");
+      const protection = this.system.combat.protection || 0;
+
+      let tiliLost = 0;
+      let isDead = false;
+
+      // 3. 伤害计算
+      if (amount > protection) {
+        if (mode === "strict") {
+          // A. 规则书模式：固定扣 1
+          tiliLost = 1;
+        } else {
+          // B. 倍率模式：根据伤害量计算
+          // 分母逻辑：取 防护值 和 设置阈值 中的较大者
+          // 解释：如果防护是 0 (凡兽)，不能除以 0，必须有一个基础分母 (如 10)
+          // 如果防护是 50 (神兽)，那么 60 伤害应该只扣 1 点，而不是 60/10=6 点
+          const divisor = Math.max(protection, scalingBase);
+
+          // 向下取整，且至少扣 1 点 (因为已经大于防护了)
+          tiliLost = Math.floor(amount / divisor);
+          tiliLost = Math.max(1, tiliLost);
+        }
+
+        // 执行扣除
+        const current = this.system.resources.tili.value;
+        if (current > 0) {
+          // 防止扣成负数
+          const actualLost = Math.min(current, tiliLost);
+          const newVal = current - actualLost;
+
+          await this.update({ "system.resources.tili.value": newVal });
+
+          // 飘字
+          if (this.token?.object) {
+            canvas.interface.createScrollingText(this.token.object.center, `-${actualLost} 体力`, {
+              fill: "#ff0000", stroke: "#000000", strokeThickness: 4, fontSize: 32, jitter: 0.25
+            });
+          }
+
+          // 死亡检查 (野兽无濒死，直接死)
+          if (newVal <= 0) {
+            isDead = true;
+            const hasDead = this.effects.some(e => e.statuses.has("dead"));
+            if (!hasDead) {
+              await this.toggleStatusEffect("dead", { overlay: true, active: true });
+            }
+          }
+        }
+      } else {
+        // 未破防
+        if (this.token?.object) {
+          canvas.interface.createScrollingText(this.token.object.center, "未破防", {
+            fill: "#cccccc", stroke: "#000000", strokeThickness: 4
+          });
+        }
+      }
+
+      // 返回结果 (finalDamage 返回体力损失量)
+      return { finalDamage: tiliLost, isDead: isDead };
+    }
+
     const {
       amount,             // 原始伤害 (面板)
       type = "waigong",   // 伤害类型
