@@ -1,6 +1,7 @@
 /**
  * 野兽/怪物 专用角色卡
  */
+import { localizeConfig } from "../utils/utils.mjs";
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -30,9 +31,9 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     async _prepareContext(options) {
         const context = await super._prepareContext(options);
         const actor = this.document;
-        
+
         context.system = actor.system;
-        context.config = CONFIG.XJZL; // 用于下拉菜单
+        context.creatureTypes = localizeConfig(CONFIG.XJZL.creatureTypes); // 用于下拉菜单
 
         // 准备体力百分比
         const tili = actor.system.resources.tili;
