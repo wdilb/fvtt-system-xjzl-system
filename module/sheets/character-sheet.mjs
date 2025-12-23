@@ -45,11 +45,18 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             refundArtXP: XJZLCharacterSheet.prototype._onRefundArtXP,
 
             // --- 其他 ---
-            deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect, //删除状态
-            rollMove: XJZLCharacterSheet.prototype._onRollMove,   //使用招式
+            //删除状态
+            deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect,
+
+            //使用招式
+            rollMove: XJZLCharacterSheet.prototype._onRollMove,
 
             // 通用属性/技能/技艺检定
             rollAttribute: XJZLCharacterSheet.prototype._onRollAttribute,
+
+            // 发送物品详情卡片到聊天
+            postItem: XJZLCharacterSheet.prototype._onPostItem,
+            postMove: XJZLCharacterSheet.prototype._onPostMove,
 
             //手工修正
             addGroup: XJZLCharacterSheet.prototype._onAction,
@@ -161,7 +168,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     context.activeStance = {
                         name: move.name,
                         description: move.description,
-                        automationNote: move.automationNote 
+                        automationNote: move.automationNote
                     };
                 }
             }
@@ -1121,5 +1128,40 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     async _onQueryDisability(event, target) {
         event.preventDefault();
         await promptDisabilityQuery();
+    }
+
+    /* -------------------------------------------- */
+    /*  聊天卡片交互 (Chat Integration)             */
+    /* -------------------------------------------- */
+
+    /**
+     * 发送物品详情卡片
+     * 需要 HTML: data-action="postItem" data-item-id="..."
+     */
+    async _onPostItem(event, target) {
+        event.preventDefault();
+        const itemId = target.dataset.itemId;
+        const item = this.document.items.get(itemId);
+
+        if (item) {
+            await item.postToChat();
+        }
+    }
+
+    /**
+     * 发送招式详情卡片
+     * 需要 HTML: data-action="postMove" data-item-id="..." data-move-id="..."
+     */
+    async _onPostMove(event, target) {
+        event.preventDefault();
+        // 需要同时获取 父物品ID 和 招式ID
+        const itemId = target.dataset.itemId;
+        const moveId = target.dataset.moveId;
+
+        const item = this.document.items.get(itemId);
+        if (item) {
+            // 调用我们在 Item 类里刚写好的方法
+            await item.postMoveToChat(moveId);
+        }
     }
 }
