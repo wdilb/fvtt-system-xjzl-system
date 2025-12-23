@@ -995,8 +995,16 @@ export class XJZLActor extends Actor {
         }
       }
 
-      // 返回结果 (finalDamage 返回体力损失量)
-      return { finalDamage: tiliLost, isDead: isDead };
+      // 返回结果
+      return {
+        finalDamage: tiliLost, // 总伤害 (数值上等于体力损失)
+        tiliLost: tiliLost,    // 明确标记体力损失
+        hpLost: 0,             // 兼容填充
+        hutiLost: 0,           // 兼容填充
+        mpLost: 0,             // 兼容填充
+        isDead: isDead,
+        isDying: false
+      };
     }
 
     const {
@@ -1039,15 +1047,7 @@ export class XJZLActor extends Actor {
           direction: 0, fontSize: 32, fill: "#ffffff", stroke: "#000000", strokeThickness: 4
         });
       }
-      return {
-        finalDamage: tiliLost, // 总伤害 (数值上等于体力损失)
-        tiliLost: tiliLost,    // 明确标记体力损失
-        hpLost: 0,             // 兼容填充
-        hutiLost: 0,           // 兼容填充
-        mpLost: 0,             // 兼容填充
-        isDead: isDead,
-        isDying: false
-      };
+      return { finalDamage: 0, hpLost: 0, isDead: false };
     }
 
     const sys = this.system;
