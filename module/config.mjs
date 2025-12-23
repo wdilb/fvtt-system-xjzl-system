@@ -367,8 +367,15 @@ XJZL.disabilityTable = [
   { min: 100, max: 100, key: "100" }
 ];
 
+// 18. 野兽品级
+XJZL.creatureTypes = {
+  fan: "XJZL.Creature.Types.Fan",
+  meng: "XJZL.Creature.Types.Meng",
+  zhen: "XJZL.Creature.Types.Zhen"
+};
 
-// 18. 系统状态标志 (逻辑开关)
+
+// 19. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -468,7 +475,7 @@ XJZL.statusFlags = {
   regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
-// 19. 检定优劣势计数器 (Check Flags)
+// 20. 检定优劣势计数器 (Check Flags)
 // 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
 // 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
 XJZL.checkFlags = {

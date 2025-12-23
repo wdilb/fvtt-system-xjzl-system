@@ -11,7 +11,8 @@ import { XJZLActiveEffect } from "./module/documents/active-effect.mjs";
 
 // 导入 DataModels (数据结构)
 import { XJZLCharacterData } from "./module/data/actor/character.mjs";
-// import { XJZLNPCData } from "./module/data/actor/npc.mjs"; // 暂时注释，写了再开
+// import { XJZLNPCData } from "./module/data/actor/npc.mjs"; // npc就使用和character一样的数据好了
+import { XJZLCreatureData } from "./module/data/actor/creature.mjs";
 import { XJZLNeigongData } from "./module/data/item/neigong.mjs";
 import { XJZLWuxueData } from "./module/data/item/wuxue.mjs"
 import { XJZLWeaponData } from "./module/data/item/weapon.mjs";
@@ -26,6 +27,7 @@ import { XJZLBackgroundData } from "./module/data/item/background.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
+import { XJZLCreatureSheet } from "./module/sheets/creature-sheet.mjs"; 
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
@@ -82,8 +84,8 @@ Hooks.once("init", async function () {
   // 将 system.json 中定义的类型与 JS 类绑定
   CONFIG.Actor.dataModels = {
     character: XJZLCharacterData,
-    // npc: XJZLNPCData,
-    // creature: XJZLCreatureData (未来添加)
+    npc: XJZLCharacterData,
+    creature: XJZLCreatureData
   };
 
   CONFIG.Item.dataModels = {
@@ -110,9 +112,15 @@ Hooks.once("init", async function () {
 
   // 注意：V13 中虽然推荐 AppV2，但注册方式仍需兼容 DocumentSheetConfig
   Actors.registerSheet("xjzl-system", XJZLCharacterSheet, {
-    types: ["character"], // 暂时只绑定 character 类型
+    types: ["character", "npc"], 
     makeDefault: true,
     label: "XJZL.Sheet.Character"
+  });
+
+  Actors.registerSheet("xjzl-system", XJZLCreatureSheet, {
+    types: ["creature"], 
+    makeDefault: true,
+    label: "XJZL.Sheet.Creature"
   });
 
   // ---注册 Item Sheet ---
