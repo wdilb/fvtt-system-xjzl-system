@@ -62,10 +62,24 @@ export class ActiveEffectManager {
         if (isStackable) {
             // --- 叠层模式 ---
             const currentStacks = existingEffect.getFlag("xjzl-system", "stacks") || 1;
-            const maxStacks = existingEffect.getFlag("xjzl-system", "maxStacks") || 0;
+            // 使用 let，因为可能存在同一个id的AE但是叠层上限不同的情况
+            let maxStacks = existingEffect.getFlag("xjzl-system", "maxStacks") || 0;
+
+            // 判断一下传入的AE的最大层数是否比已经在身上的大，如果是，更新它（有那种升级武学加叠层上限的情况，虽然这极其罕见）
+            const incomingMax = foundry.utils.getProperty(effectData, "flags.xjzl-system.maxStacks");
+            
+            if (Number.isFinite(incomingMax) && incomingMax > maxStacks) {
+                // 写入数据库更新队列
+                updateData["flags.xjzl-system.maxStacks"] = incomingMax;
+                // 更新内存变量，确保本次就能叠加上去
+                maxStacks = incomingMax; 
+            }
 
             // =======================================================
-            // 颤手 (Chanshou) 特殊转化逻辑
+            // 颤手 (Chanshou) 特殊转化逻辑，目前就这一个，保留在这，
+            // 以后如果多了可以考虑抛出一个自定义钩子:
+            // Hooks.callAll("xjzl.preStackEffect", actor, existingEffect, newStacks);
+            // 在其他地方监听处理
             // =======================================================
             const isChanshou = existingEffect.getFlag("xjzl-system", "slug") === "chanshou";
 

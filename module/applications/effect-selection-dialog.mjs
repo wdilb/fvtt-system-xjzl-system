@@ -73,6 +73,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         for (const token of tokens) {
             const actor = token.actor;
             if (!actor) continue;
+            if (!token.visible) continue; //隐藏的token不显示
 
             const actorEffects = [];
 
