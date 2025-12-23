@@ -881,34 +881,70 @@ export class XJZLActor extends Actor {
   }
 
   /**
-   * 强制资源完整性检查 (HP & MP)
-   * 如果 数据库原值 > 当前计算出的上限，则执行截断写入
+   * 强制资源完整性检查 (Integrity Check)
+   * 职责：如果 数据库原值 > 当前计算出的上限，则执行截断写入。
+   * 覆盖范围：HP, MP, Tili (野兽), Rage (怒气)
    */
   _enforceResourceIntegrity() {
     // 1. 获取计算后的衍生数据 (包含最新的 max)
     const res = this.system.resources;
 
-    // 2. 获取数据库里的原始数据 (Source Data)
-    // 使用 getProperty 安全读取，防止数据结构缺失报错
-    const sourceHP = foundry.utils.getProperty(this._source, "system.resources.hp.value") || 0;
-    const sourceMP = foundry.utils.getProperty(this._source, "system.resources.mp.value") || 0;
-
-    // 3. 准备更新对象
+    // 准备更新对象
     const updates = {};
-    // --- 检查 HP ---
-    if (sourceHP > res.hp.max) {
-      updates["system.resources.hp.value"] = res.hp.max;
+
+    // 辅助函数：安全获取 Source 数据
+    const getSource = (path) => foundry.utils.getProperty(this._source, path) || 0;
+
+    // =====================================================
+    // A. 通用资源检查 (怒气 Rage)
+    // =====================================================
+    // 怒气是野兽和侠客共有的
+    if (res.rage) {
+      const sourceRage = getSource("system.resources.rage.value");
+      // 怒气上限通常固定为 10，但读取 max 更稳健
+      const maxRage = res.rage.max || 10;
+
+      if (sourceRage > maxRage) {
+        updates["system.resources.rage.value"] = maxRage;
+      }
     }
 
-    // --- 检查 MP ---
-    if (sourceMP > res.mp.max) {
-      updates["system.resources.mp.value"] = res.mp.max;
+    // =====================================================
+    // B. 类型特化检查
+    // =====================================================
+    if (this.type === "creature") {
+      // --- 野兽：检查体力 (Tili) ---
+      if (res.tili) {
+        const sourceTili = getSource("system.resources.tili.value");
+        const maxTili = res.tili.max; // 野兽体力上限通常固定或由 DataModel 决定
+
+        if (sourceTili > maxTili) {
+          updates["system.resources.tili.value"] = maxTili;
+        }
+      }
+    } else {
+      // --- 侠客/NPC：检查气血 (HP) & 内力 (MP) ---
+
+      // 1. 检查 HP
+      const sourceHP = getSource("system.resources.hp.value");
+      if (sourceHP > res.hp.max) {
+        updates["system.resources.hp.value"] = res.hp.max;
+      }
+
+      // 2. 检查 MP
+      const sourceMP = getSource("system.resources.mp.value");
+      if (sourceMP > res.mp.max) {
+        updates["system.resources.mp.value"] = res.mp.max;
+      }
     }
 
-    // 4. 如果有需要更新的内容，一次性提交
+    // =====================================================
+    // C. 执行更新
+    // =====================================================
     if (!foundry.utils.isEmpty(updates)) {
       this.update(updates);
-      // 可选：在这里加个 ui.notifications.info("境界跌落，气血/内力已流失...") 更有修仙味
+      // 开发调试提示 (可选)
+      // console.log("XJZL | 资源溢出自动截断:", updates);
     }
   }
 
