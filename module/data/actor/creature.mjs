@@ -151,4 +151,14 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
         // F. 技艺 (Arts)
         this.arts = {};
     }
+
+    /**
+     * [接口兼容] 重新计算
+     * 即使野兽不需要重算，也必须保留这个空方法，防止 Actor 调用报错
+     */
+    recalculate() {
+        // 野兽逻辑简单，脚本修改数值后不需要复杂的二次计算，留空即可
+        // 或者如果未来野兽也有复杂逻辑，可以在这里再次调用 prepareDerivedData
+        // this.prepareDerivedData(); 
+    }
 }
