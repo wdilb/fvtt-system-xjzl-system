@@ -1185,6 +1185,7 @@ export class ChatCardManager {
                     hutiLost: damageResult.hutiLost,
                     hpLost: damageResult.hpLost,
                     mpLost: damageResult.mpLost,
+                    tiliLost: damageResult.tiliLost, // 传递体力损失，仅用于野兽
                     isDead: damageResult.isDead,
                     isDying: damageResult.isDying,
                     rageGained: damageResult.rageGained, // 防御者是否回怒
@@ -1203,6 +1204,7 @@ export class ChatCardManager {
                     hpLost: damageResult.hpLost,
                     hutiLost: damageResult.hutiLost,
                     mpLost: damageResult.mpLost,
+                    tiliLost: damageResult.tiliLost, // 记录体力损失，仅用于野兽
                     gainedDead: damageResult.isDead,
                     gainedDying: damageResult.isDying,
                     gainedRage: damageResult.rageGained // 防御者回怒状态
@@ -1341,6 +1343,12 @@ export class ChatCardManager {
 
         // A. 恢复数值 (注意兼容 NumberField 和 SchemaField)
         if (undoData.hpLost > 0) updates["system.resources.hp.value"] = sys.resources.hp.value + undoData.hpLost;
+
+         // 恢复体力，用于野兽
+        if (undoData.tiliLost > 0) {
+             const currentTili = sys.resources.tili.value;
+             updates["system.resources.tili.value"] = currentTili + undoData.tiliLost;
+        }
 
         // Huti 兼容
         const currentHuti = typeof sys.resources.huti === 'object' ? sys.resources.huti.value : sys.resources.huti;
