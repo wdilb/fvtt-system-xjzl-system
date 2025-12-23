@@ -1886,10 +1886,48 @@ export class XJZLItem extends Item {
         // 五行
         if (system.element) addProp(game.i18n.localize("XJZL.Neigong.Element"), game.i18n.localize(`XJZL.Elements.${system.element.charAt(0).toUpperCase() + system.element.slice(1)}`));
         if (system.active) templateData.subtitle = "运行中";
-        // 进度
+
+        // 境界
         if (system.progressData) {
           const stageLabels = ["未入门", "领悟", "小成", "圆满"];
           addProp("境界", stageLabels[this.system.stage || 0]);
+        }
+
+        // [NEW] 构建阶段特效详情 (Custom Content)
+        // 将三个阶段的特效拼成一个可折叠的列表
+        let stagesHtml = "";
+        const stageNames = ["领悟", "小成", "圆满"];
+        const stageKeys = ["stage1", "stage2", "stage3"];
+
+        stageKeys.forEach((key, index) => {
+          const cfg = system.config[key];
+          // 只有当有特效描述时才显示
+          if (cfg && cfg.effect) {
+            // 检查是否已达到该境界 (用于高亮)
+            const isUnlocked = (this.system.stage || 0) >= (index + 1);
+            const color = isUnlocked ? "#2c3e50" : "#95a5a6";
+            const icon = isUnlocked ? "fa-check-circle" : "fa-lock";
+            const titleWeight = isUnlocked ? "bold" : "normal";
+
+            stagesHtml += `
+                    <details style="margin-top: 4px; border: 1px solid #eee; border-radius: 4px; padding: 4px;">
+                        <summary style="cursor:pointer; color:${color}; font-weight:${titleWeight}; font-size:0.9em;">
+                            <i class="fas ${icon}" style="width:16px;"></i> 第${index + 1}重 - ${stageNames[index]}
+                        </summary>
+                        <div style="margin-top:4px; padding-left:20px; font-size:0.85em; color:#555;">
+                            ${cfg.effect}
+                        </div>
+                    </details>`;
+          }
+        });
+
+        if (stagesHtml) {
+          // 注入到模板中
+          templateData.customContent = `
+                <div style="margin-top:10px; border-top:1px dashed #ccc; padding-top:5px;">
+                    <div style="font-weight:bold; font-size:0.9em; color:#8b0000; margin-bottom:5px;">境界特效:</div>
+                    ${stagesHtml}
+                </div>`;
         }
         break;
 
@@ -1932,6 +1970,68 @@ export class XJZLItem extends Item {
       // flavor: `展示物品: ${this.name}`, // 可选：如果觉得太啰嗦可以去掉
       content: content,
       flags: { "xjzl-system": { type: "item-info", itemId: this.id } }
+    });
+  }
+
+  /**
+   * 将单个招式的详情发送到聊天
+   * @param {String} moveId 
+   */
+  async postMoveToChat(moveId) {
+    const move = this.system.moves.find(m => m.id === moveId);
+    if (!move) return ui.notifications.warn("招式不存在");
+
+    // 1. 构造伪 Item 数据结构
+    // 这样做是为了复用 item-info.hbs 模板，因为它预期的是 item.name, item.img 等
+    const fakeItem = {
+      name: move.name,
+      img: move.img,
+      type: "wuxue", // 用于图标或颜色识别
+    };
+
+    // 2. 构造伪 System 数据
+    const fakeSystem = {
+      description: move.description,
+      automationNote: move.automationNote
+    };
+
+    // 3. 准备 Properties
+    const properties = [];
+    const addProp = (label, value) => properties.push({ label, value });
+
+    // 招式类型
+    addProp("类型", game.i18n.localize(CONFIG.XJZL.moveTypes[move.type]));
+
+    // 伤害类型 (如果不是 None)
+    if (move.damageType && move.damageType !== "none") {
+      addProp("伤害", game.i18n.localize(CONFIG.XJZL.damageTypes[move.damageType]));
+    }
+
+    // 消耗
+    const cost = move.currentCost; // DataModel 里算好的当前等级消耗
+    const costs = [];
+    if (cost.mp) costs.push(`${cost.mp}内力`);
+    if (cost.rage) costs.push(`${cost.rage}怒气`);
+    if (cost.hp) costs.push(`${cost.hp}气血`);
+    if (costs.length > 0) addProp("消耗", costs.join(" / "));
+
+    // 距离与范围
+    if (move.range) addProp("距离", move.range);
+
+    // 4. 渲染模板
+    const content = await renderTemplate("systems/xjzl-system/templates/chat/item-info.hbs", {
+      item: fakeItem,
+      system: fakeSystem,
+      subtitle: `招式 (Lv.${move.computedLevel || 1})`,
+      properties: properties
+    });
+
+    // 5. 发送
+    ChatMessage.create({
+      author: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      content: content,
+      flags: { "xjzl-system": { type: "move-info", itemId: this.id, moveId: move.id } }
     });
   }
 }
