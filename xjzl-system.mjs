@@ -412,33 +412,54 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
   }
 
   // =====================================================
-  // 6. 属性 Key 自动补全 (防重处理)
+  // 6. 属性 Key 自动补全 (修复版)
   // =====================================================
-  const listId = `xjzl-status-list-${effect.id || foundry.utils.randomID()}`;
+  const listId = `xjzl-status-list-${app.document.id || foundry.utils.randomID()}`;
+
+  // 如果列表已存在，直接复用，否则创建
   if (!el.querySelector(`#${listId}`)) {
-    let options = "";
-
-    const statusFlags = CONFIG.XJZL?.statusFlags || {};
-    for (const [key, label] of Object.entries(statusFlags)) {
-      options += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
-    }
-    // 常用补充
-    options += `<option value="system.resources.mp.value">内力值 (当前)</option>`;
-    options += `<option value="system.resources.hp.value">气血值 (当前)</option>`;
-    options += `<option value="system.stats.liliang.mod">力量 (修正)</option>`;
-    options += `<option value="system.stats.shenfa.mod">身法 (修正)</option>`;
-
     const datalist = document.createElement("datalist");
     datalist.id = listId;
-    datalist.innerHTML = options;
-    el.appendChild(datalist);
 
-    const keyInputs = el.querySelectorAll('input[name^="changes."][name$=".key"]');
-    keyInputs.forEach(input => {
-      input.setAttribute("list", listId);
-      input.setAttribute("placeholder", "Key...");
-    });
+    // 构建选项
+    const options = [
+      // 常用快捷选项
+      { val: "system.resources.hp.value", label: "气血 (HP)" },
+      { val: "system.resources.mp.value", label: "内力 (MP)" },
+      { val: "system.stats.liliang.mod", label: "力量修正" },
+      { val: "system.stats.shenfa.mod", label: "身法修正" },
+      { val: "system.stats.tipo.mod", label: "根骨修正" },
+      { val: "system.stats.neixi.mod", label: "内息修正" },
+      { val: "system.stats.qigan.mod", label: "气感修正" },
+      { val: "system.stats.shencai.mod", label: "神采修正" }
+    ];
+
+    // 也可以从 CONFIG 读取
+    // if (CONFIG.XJZL?.statusFlags) ...
+
+    datalist.innerHTML = options.map(o => `<option value="${o.val}">${o.label}</option>`).join("");
+    el.appendChild(datalist);
   }
+
+  // 核心修复：针对 V13 的动态 input
+  // 监听 input 获得焦点事件，因为用户添加新行时 input 是动态生成的
+  el.addEventListener("focusin", (event) => {
+    const target = event.target;
+    // 检查是否是 key 输入框 (name 属性包含 .key)
+    if (target.tagName === "INPUT" && target.name && target.name.endsWith(".key")) {
+      // 只有当没有 list 属性时才设置，防止重复
+      if (!target.hasAttribute("list")) {
+        target.setAttribute("list", listId);
+        target.setAttribute("placeholder", "输入或选择 Key...");
+      }
+    }
+  });
+
+  // 对已存在的 input 初始化一次
+  const existingInputs = el.querySelectorAll('input[name$=".key"]');
+  existingInputs.forEach(input => {
+    input.setAttribute("list", listId);
+  });
 });
 
 //  在 getSceneControlButtons 阶段注入按钮
