@@ -250,13 +250,25 @@ export class ActiveEffectManager {
     }
 
     /**
-   * 私有辅助：在 Token 上显示浮动字幕
-   */
+     * 私有辅助：在 Token 上显示浮动字幕
+     */
     static _showScrollingText(actor, text, type = "neutral") {
         if (!actor) return;
         // 兼容 Token Actor 和 原生 Actor
         // 只获取当前 Canvas 场景下的 Token，防止跨场景渲染报错
-        const tokens = actor.isToken ? [actor.token.object] : actor.getActiveTokens(true, true);
+        // 确保获取的是 PlaceableObject (Token) 而不是 TokenDocument
+        // actor.getActiveTokens(true, false) -> 第二个参数 false 代表获取渲染对象
+        let tokens = [];
+        if (actor.isToken && actor.token) {
+            // Unlinked Actor (合成角色/NPC)
+            // actor.token 是 Document，.object 是 Placeable
+            // 如果当前不在该 Token 的场景，.object 可能为空或未初始化
+            if (actor.token.object) tokens.push(actor.token.object);
+        } else {
+            // Linked Actor (原生角色/PC)
+            // 获取当前画布上该角色的所有 Token 对象
+            tokens = actor.getActiveTokens(true, false);
+        }
 
         const colors = {
             create: 0x00FF00, // 绿
@@ -267,8 +279,14 @@ export class ActiveEffectManager {
         const color = colors[type] || colors.neutral;
 
         for (const token of tokens) {
-            // 确保 Token 真的在画布上且可见
+            // 格的安全检查
+            // 1. token 必须存在
+            // 2. token 必须是可见的 (visible) 且可渲染的 (renderable)
+            //    如果 GM 在看地图 A，而 Token 在地图 B，这里必须跳过，否则会崩
             if (!token || !token.visible || !token.renderable) continue;
+
+            // 额外安全检查：确保 center 属性存在
+            if (!token.center) continue;
 
             canvas.interface.createScrollingText(token.center, text, {
                 anchor: CONST.TEXT_ANCHOR_POINTS.CENTER,

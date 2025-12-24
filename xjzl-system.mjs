@@ -412,33 +412,50 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
   }
 
   // =====================================================
-  // 6. 属性 Key 自动补全 (防重处理)
+  // 6. 属性 Key 自动补全 (Flag 优先版)
   // =====================================================
-  const listId = `xjzl-status-list-${effect.id || foundry.utils.randomID()}`;
+  const listId = `xjzl-status-list-${app.document.id || foundry.utils.randomID()}`;
+
   if (!el.querySelector(`#${listId}`)) {
-    let options = "";
-
-    const statusFlags = CONFIG.XJZL?.statusFlags || {};
-    for (const [key, label] of Object.entries(statusFlags)) {
-      options += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
-    }
-    // 常用补充
-    options += `<option value="system.resources.mp.value">内力值 (当前)</option>`;
-    options += `<option value="system.resources.hp.value">气血值 (当前)</option>`;
-    options += `<option value="system.stats.liliang.mod">力量 (修正)</option>`;
-    options += `<option value="system.stats.shenfa.mod">身法 (修正)</option>`;
-
     const datalist = document.createElement("datalist");
     datalist.id = listId;
-    datalist.innerHTML = options;
-    el.appendChild(datalist);
 
-    const keyInputs = el.querySelectorAll('input[name^="changes."][name$=".key"]');
-    keyInputs.forEach(input => {
-      input.setAttribute("list", listId);
-      input.setAttribute("placeholder", "Key...");
-    });
+    let optionsHtml = "";
+
+    // 1. 优先加载系统配置的状态 Flags (核心需求)
+    const statusFlags = CONFIG.XJZL?.statusFlags || {};
+    for (const [key, label] of Object.entries(statusFlags)) {
+      // value = flags.xjzl-system.poison
+      optionsHtml += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
+    }
+
+    // 2. 常用属性补充 (可选)
+    const commonStats = [
+      { val: "system.resources.hp.value", label: "气血 (HP)" },
+      { val: "system.resources.mp.value", label: "内力 (MP)" }
+    ];
+    optionsHtml += commonStats.map(o => `<option value="${o.val}">${o.label}</option>`).join("");
+
+    datalist.innerHTML = optionsHtml;
+    el.appendChild(datalist);
   }
+
+  // 事件委托：监听动态生成的 Key 输入框
+  el.addEventListener("focusin", (event) => {
+    const target = event.target;
+    // 匹配 name="changes.0.key" 或 name="changes[0][key]" 等形式
+    if (target.tagName === "INPUT" && target.name && target.name.endsWith("key")) {
+      if (!target.hasAttribute("list")) {
+        target.setAttribute("list", listId);
+        target.setAttribute("placeholder", "flags...");
+      }
+    }
+  });
+
+  // 初始化现有输入框
+  el.querySelectorAll('input[name*="key"]').forEach(input => {
+    input.setAttribute("list", listId);
+  });
 });
 
 //  在 getSceneControlButtons 阶段注入按钮
