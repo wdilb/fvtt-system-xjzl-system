@@ -12,8 +12,8 @@ export class XJZLPersonalitySheet extends HandlebarsApplicationMixin(ItemSheetV2
 
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "personality", "xjzl-system"],
-        position: { width: 500, height: "auto" },
+        classes: ["xjzl-window", "item", "personality"],
+        position: { width: 800, height: 600 }, // 宽一点适配三栏
         window: { resizable: true },
         form: {
             submitOnChange: true,
@@ -29,6 +29,7 @@ export class XJZLPersonalitySheet extends HandlebarsApplicationMixin(ItemSheetV2
 
     static PARTS = {
         header: { template: "systems/xjzl-system/templates/item/personality/header.hbs" },
+        tabs: { template: "systems/xjzl-system/templates/item/personality/tabs.hbs" }, // 新增 Tabs
         details: { template: "systems/xjzl-system/templates/item/personality/details.hbs", scrollable: [""] }
     };
 
