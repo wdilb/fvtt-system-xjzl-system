@@ -9,8 +9,9 @@ import { TRIGGER_CHOICES } from "../data/common.mjs";
 export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "neigong", "xjzl-system"],
-        position: { width: 650, height: 800 },
+        // xjzl-window 触发 Grid 布局, item-neigong 用于特定样式
+        classes: ["xjzl-window", "item-neigong"],
+        position: { width: 1000, height: 700 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
@@ -34,11 +35,15 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         }
     };
 
+    /* 
+       定义各个部分。
+       注意：Header 对应侧栏，Tabs 对应右侧书脊，其余对应中间内容。
+    */
     static PARTS = {
         header: { template: "systems/xjzl-system/templates/item/neigong/header.hbs" },
         tabs: { template: "systems/xjzl-system/templates/item/neigong/tabs.hbs" },
-        config: { template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs", scrollable: [""] },
-        effects: { template: "systems/xjzl-system/templates/item/neigong/tab-effects.hbs", scrollable: [""] }
+        config: { template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs", scrollable: [".xjzl-body-scroll"] },
+        effects: { template: "systems/xjzl-system/templates/item/neigong/tab-effects.hbs", scrollable: [".xjzl-body-scroll"] }
     };
 
     tabGroups = { primary: "config" };
