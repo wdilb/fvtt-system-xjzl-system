@@ -441,16 +441,20 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
   }
 
   // 事件委托：监听动态生成的 Key 输入框
-  el.addEventListener("focusin", (event) => {
-    const target = event.target;
-    // 匹配 name="changes.0.key" 或 name="changes[0][key]" 等形式
-    if (target.tagName === "INPUT" && target.name && target.name.endsWith("key")) {
-      if (!target.hasAttribute("list")) {
-        target.setAttribute("list", listId);
-        target.setAttribute("placeholder", "flags...");
+  // 只有当这个 App 实例还没有绑定过我们的监听器时，才绑定
+  if (!app._hasXJZLListener) {
+    el.addEventListener("focusin", (event) => {
+      const target = event.target;
+      if (target.tagName === "INPUT" && target.name && target.name.endsWith("key")) {
+        if (!target.hasAttribute("list")) {
+          target.setAttribute("list", listId);
+          target.setAttribute("placeholder", "flags...");
+        }
       }
-    }
-  });
+    });
+    // 打个标记，下次重绘就不再绑了
+    app._hasXJZLListener = true;
+  }
 
   // 初始化现有输入框
   el.querySelectorAll('input[name*="key"]').forEach(input => {
