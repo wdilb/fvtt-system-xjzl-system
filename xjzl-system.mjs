@@ -412,52 +412,52 @@ Hooks.on("renderActiveEffectConfig", (app, html, data) => {
   }
 
   // =====================================================
-  // 6. 属性 Key 自动补全 (修复版)
+  // 6. 属性 Key 自动补全 (Flag 优先版)
   // =====================================================
   const listId = `xjzl-status-list-${app.document.id || foundry.utils.randomID()}`;
 
-  // 如果列表已存在，直接复用，否则创建
   if (!el.querySelector(`#${listId}`)) {
     const datalist = document.createElement("datalist");
     datalist.id = listId;
 
-    // 构建选项
-    const options = [
-      // 常用快捷选项
+    let optionsHtml = "";
+
+    // 1. 优先加载系统配置的状态 Flags (核心需求)
+    const statusFlags = CONFIG.XJZL?.statusFlags || {};
+    for (const [key, label] of Object.entries(statusFlags)) {
+      // value = flags.xjzl-system.poison
+      optionsHtml += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
+    }
+
+    // 2. 常用属性补充 (可选)
+    const commonStats = [
       { val: "system.resources.hp.value", label: "气血 (HP)" },
-      { val: "system.resources.mp.value", label: "内力 (MP)" },
-      { val: "system.stats.liliang.mod", label: "力量修正" },
-      { val: "system.stats.shenfa.mod", label: "身法修正" },
-      { val: "system.stats.tipo.mod", label: "根骨修正" },
-      { val: "system.stats.neixi.mod", label: "内息修正" },
-      { val: "system.stats.qigan.mod", label: "气感修正" },
-      { val: "system.stats.shencai.mod", label: "神采修正" }
+      { val: "system.resources.mp.value", label: "内力 (MP)" }
     ];
+    optionsHtml += commonStats.map(o => `<option value="${o.val}">${o.label}</option>`).join("");
 
-    // 也可以从 CONFIG 读取
-    // if (CONFIG.XJZL?.statusFlags) ...
-
-    datalist.innerHTML = options.map(o => `<option value="${o.val}">${o.label}</option>`).join("");
+    datalist.innerHTML = optionsHtml;
     el.appendChild(datalist);
   }
 
-  // 核心修复：针对 V13 的动态 input
-  // 监听 input 获得焦点事件，因为用户添加新行时 input 是动态生成的
-  el.addEventListener("focusin", (event) => {
-    const target = event.target;
-    // 检查是否是 key 输入框 (name 属性包含 .key)
-    if (target.tagName === "INPUT" && target.name && target.name.endsWith(".key")) {
-      // 只有当没有 list 属性时才设置，防止重复
-      if (!target.hasAttribute("list")) {
-        target.setAttribute("list", listId);
-        target.setAttribute("placeholder", "输入或选择 Key...");
+  // 事件委托：监听动态生成的 Key 输入框
+  // 只有当这个 App 实例还没有绑定过我们的监听器时，才绑定
+  if (!app._hasXJZLListener) {
+    el.addEventListener("focusin", (event) => {
+      const target = event.target;
+      if (target.tagName === "INPUT" && target.name && target.name.endsWith("key")) {
+        if (!target.hasAttribute("list")) {
+          target.setAttribute("list", listId);
+          target.setAttribute("placeholder", "flags...");
+        }
       }
-    }
-  });
+    });
+    // 打个标记，下次重绘就不再绑了
+    app._hasXJZLListener = true;
+  }
 
-  // 对已存在的 input 初始化一次
-  const existingInputs = el.querySelectorAll('input[name$=".key"]');
-  existingInputs.forEach(input => {
+  // 初始化现有输入框
+  el.querySelectorAll('input[name*="key"]').forEach(input => {
     input.setAttribute("list", listId);
   });
 });
