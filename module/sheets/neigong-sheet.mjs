@@ -31,7 +31,9 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             createEffect: XJZLNeigongSheet.prototype._onCreateEffect,
             editEffect: XJZLNeigongSheet.prototype._onEditEffect,
             deleteEffect: XJZLNeigongSheet.prototype._onDeleteEffect,
-            toggleEffect: XJZLNeigongSheet.prototype._onToggleEffect
+            toggleEffect: XJZLNeigongSheet.prototype._onToggleEffect,
+            // 修改图片
+            editImage: XJZLNeigongSheet.prototype._onEditImage,
         }
     };
 
@@ -42,8 +44,8 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static PARTS = {
         header: { template: "systems/xjzl-system/templates/item/neigong/header.hbs" },
         tabs: { template: "systems/xjzl-system/templates/item/neigong/tabs.hbs" },
-        config: { template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs", scrollable: [".xjzl-body-scroll"] },
-        effects: { template: "systems/xjzl-system/templates/item/neigong/tab-effects.hbs", scrollable: [".xjzl-body-scroll"] }
+        config: { template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs", scrollable: [""] },
+        effects: { template: "systems/xjzl-system/templates/item/neigong/tab-effects.hbs", scrollable: [""] }
     };
 
     tabGroups = { primary: "config" };
@@ -95,6 +97,13 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 isSuppressed: e.isSuppressed // V11+ 特性
             };
         });
+
+        // === 动态样式数据 ===
+        // 1. 品阶 Class: tier-1 (凡/人), tier-2 (地), tier-3 (天)
+        context.tierClass = `tier-${this.document.system.tier || 1}`;
+
+        // 2. 五行 Class: element-taiji, element-yin, element-yang
+        context.elementClass = `element-${this.document.system.element || "taiji"}`;
 
         return context;
     }
@@ -226,5 +235,18 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         const effectId = target.dataset.id;
         const effect = this.document.effects.get(effectId);
         if (effect) await effect.update({ disabled: !effect.disabled });
+    }
+
+    /**
+     * 打开文件选择器更改图片
+     */
+    async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: foundry.utils.getProperty(this.document, attr),
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
     }
 }
