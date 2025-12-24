@@ -8,8 +8,8 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "general", "xjzl-system"],
-        position: { width: 550, height: 600 },
+        classes: ["xjzl-window", "item", "general"],
+        position: { width: 800, height: 600 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
@@ -21,12 +21,16 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
             createEffect: XJZLGeneralItemSheet.prototype._onCreateEffect,
             editEffect: XJZLGeneralItemSheet.prototype._onEditEffect,
             deleteEffect: XJZLGeneralItemSheet.prototype._onDeleteEffect,
-            toggleEffect: XJZLGeneralItemSheet.prototype._onToggleEffect
+            toggleEffect: XJZLGeneralItemSheet.prototype._onToggleEffect,
+            // 移除秘籍关联
+            removeManualTarget: XJZLGeneralItemSheet.prototype._onRemoveManualTarget,
+            // 修改图片
+            editImage: XJZLGeneralItemSheet.prototype._onEditImage
         }
     };
 
     static PARTS = {
-        header: { template: "systems/xjzl-system/templates/item/general/header.hbs" },
+        header: { template: "systems/xjzl-system/templates/item/general/header.hbs", scrollable: [".xjzl-sidebar__content"] },
         tabs: { template: "systems/xjzl-system/templates/item/general/tabs.hbs" },
         details: { template: "systems/xjzl-system/templates/item/general/tab-details.hbs", scrollable: [""] },
         effects: { template: "systems/xjzl-system/templates/item/general/tab-effects.hbs", scrollable: [""] }
@@ -74,17 +78,50 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
     /* 自动保存 */
     _onRender(context, options) {
         super._onRender(context, options);
-        // if (!this.element.dataset.delegated) {
-        //     this.element.addEventListener("change", (e) => {
-        //         if (e.target.matches("input, select, textarea")) {
-        //             e.preventDefault();
-        //             this.submit();
-        //         }
-        //     });
-        //     this.element.dataset.delegated = "true";
-        // }
+        // 1. 注入基础类型类名
+        this.element.classList.add(`type-${this.document.type}`);
 
-        // 秘籍拖拽监听
+        // 2. 清理旧的品级类名
+        const allRanks = [
+            "rank-fan", "rank-tong", "rank-yin", "rank-jin", "rank-yu",
+            "rank-ren", "rank-di", "rank-tian"
+        ];
+        this.element.classList.remove(...allRanks);
+
+        // 3. 注入新的品级类名
+        if (this.document.type === "manual") {
+            // === 秘籍 (Tiers: 1-3) ===
+            const tierMap = {
+                1: "ren",
+                2: "di",
+                3: "tian"
+            };
+            const val = this.document.system.tier;
+            const targetClass = tierMap[val] || "ren"; // 默认为人级
+
+            this.element.classList.add(`rank-${targetClass}`);
+
+        } else {
+            // === 消耗品/杂物 (Qualities: 0-4) ===
+            const qualityMap = {
+                0: "fan",  // 凡
+                1: "tong", // 铜
+                2: "yin",  // 银
+                3: "jin",  // 金
+                4: "yu"    // 玉
+            };
+
+            const val = this.document.system.quality;
+
+            // 注意：这里不能用 || "fan"，因为 0 也是有效值
+            // 如果 val 是 null/undefined，或者不在表中，才用默认值
+            let targetClass = qualityMap[val];
+            if (!targetClass) targetClass = "fan"; // 默认凡品
+
+            this.element.classList.add(`rank-${targetClass}`);
+        }
+
+        // 4. 秘籍拖拽监听
         if (context.isManual) {
             const dropZone = this.element.querySelector(".manual-drop-zone");
             if (dropZone) {
@@ -93,6 +130,20 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
                 dropZone.addEventListener("dragover", (e) => e.preventDefault());
             }
         }
+    }
+
+    /**
+     * 图片点击更换逻辑
+     */
+    async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const current = foundry.utils.getProperty(this.document, attr);
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: current,
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
     }
 
     /**
@@ -138,11 +189,20 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
         }
     }
 
+    /* 移除秘籍目标 */
+    async _onRemoveManualTarget(event, target) {
+        // 清空 UUID，为了安全起见，不自动重置名字和图片，防止误操作
+        await this.document.update({
+            "system.learnItemUuid": ""
+        });
+        ui.notifications.info("已清空秘籍记载的内容。");
+    }
+
     /* 特效逻辑 (消耗品专用) */
     async _onCreateEffect(event, target) {
         return ActiveEffect.create({
             name: "新状态",
-            icon: "icons/svg/potion.svg",
+            icon: "icons/svg/aura.svg",
             origin: this.document.uuid,
             // 消耗品的特效通常不是 Transfer (被动)，而是使用时触发
             // 但也可以做成 Transfer (只要放在包里就生效？通常不是)
