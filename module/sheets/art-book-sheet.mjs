@@ -8,8 +8,8 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "art-book", "xjzl-system"],
-        position: { width: 650, height: 700 },
+        classes: ["xjzl-window", "item", "art-book"],
+        position: { width: 800, height: 700 },
         window: { resizable: true },
         form: {
             submitOnChange: true,
@@ -17,19 +17,27 @@ export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         },
         actions: {
             addChapter: XJZLArtBookSheet.prototype._onAddChapter,
-            deleteChapter: XJZLArtBookSheet.prototype._onDeleteChapter
+            deleteChapter: XJZLArtBookSheet.prototype._onDeleteChapter,
+            editImage: XJZLArtBookSheet.prototype._onEditImage // 更换图片
         }
     };
 
     static PARTS = {
-        header: { template: "systems/xjzl-system/templates/item/art-book/header.hbs" },
-        // 不需要 Tabs，因为内容比较少，直接单页展示即可，或者简单的详情页
+        header: {
+            template: "systems/xjzl-system/templates/item/art-book/header.hbs",
+            scrollable: [".xjzl-sidebar__content"]
+        },
+        tabs: { template: "systems/xjzl-system/templates/item/art-book/tabs.hbs" }, // 即使只有一个也要加
         details: { template: "systems/xjzl-system/templates/item/art-book/details.hbs", scrollable: [""] }
     };
 
     async _prepareContext(options) {
         const context = await super._prepareContext(options);
         context.system = this.document.system;
+
+        // 构造虚拟的 tabs 对象，因为 details.hbs 可能会用到 tabs.primary 判断
+        // 虽然这里只有一个页面，但保持结构一致性是个好习惯
+        context.tabs = { primary: "details" };
 
         // 准备下拉菜单
         context.choices = {
@@ -46,6 +54,18 @@ export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     /* -------------------------------------------- */
     /*  Action Handlers                             */
     /* -------------------------------------------- */
+
+    // 图片编辑
+    async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const current = foundry.utils.getProperty(this.document, attr);
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: current,
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
+    }
 
     async _onAddChapter(event, target) {
         const source = this.document.system.toObject();

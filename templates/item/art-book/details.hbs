@@ -1,121 +1,124 @@
-{{!-- templates/item/art-book/details.hbs --}}
+<section class="xjzl-body xjzl-body-scroll" data-application-part="details">
 
-{{!-- 1. 【修复滚动】添加 overflow-y: auto 和 height: 100% --}}
-<section class="scroll-area" style="padding: 10px; overflow-y: auto; height: 100%;">
+    <div class="xjzl-bg-deco">书</div>
 
-    {{!-- 全局描述 --}}
-    <div class="xjzl-card" style="margin-bottom: 15px;">
-        <label class="xjzl-card-header">{{localize "XJZL.ArtBook.Description"}}</label>
-        <prose-mirror name="system.description" data-document-u-u-i-d="{{document.uuid}}" value="{{system.description}}"
-            style="min-height: 100px;"></prose-mirror>
+    {{!-- 1. 简介 (保留云纹标题) --}}
+    <div class="xjzl-card">
+        <h3 class="cloud-header">{{localize "XJZL.ArtBook.Description"}}</h3>
+        <textarea name="system.description" rows="3"
+            style="width:100%; background:rgba(0,0,0,0.03); border:1px solid rgba(0,0,0,0.1); border-radius:4px; padding:10px;">{{system.description}}</textarea>
     </div>
 
-    {{!-- 章节列表头部 --}}
-    <div class="xjzl-flex-row" style="justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        {{!-- 2. 添加 color: #8b0000 (深红) 和 font-weight --}}
-        <h3 style="margin:0; border:none; color: #8b0000; font-weight: 900; font-family: inherit;">
-            {{localize "XJZL.ArtBook.Chapters"}}
-            <span style="font-size: 0.8em; color: #666; font-weight: normal;">(共 {{totalLevelReward}} 等级奖励)</span>
-        </h3>
-        <button type="button" data-action="addChapter" style="width: auto; padding: 0 10px;">
-            <i class="fas fa-plus"></i> 添加篇章
-        </button>
-    </div>
+    {{!-- 2. 章节列表 --}}
+    <div style="margin-top: 30px;">
 
-    {{!-- 章节循环 --}}
-    <div class="xjzl-flex-col" style="gap: 10px; padding-bottom: 10px;">
-        {{#each system.chapters as |chapter i|}}
-        <div class="xjzl-card" style="padding: 5px; background: rgba(255,255,255,0.8);">
+        {{!-- 标题栏：改为工具栏样式，解决重叠问题 --}}
+        <div class="xjzl-flex-row"
+            style="align-items: center; justify-content: space-between; margin-bottom: 15px; border-bottom: 2px solid var(--c-theme-border); padding-bottom: 8px;">
+            <span style="font-family: var(--font-title); font-size: 24px; color: var(--c-theme-main);">
+                {{localize "XJZL.ArtBook.Chapters"}}
+            </span>
+            <button type="button" data-action="addChapter" class="xjzl-btn-seal"
+                style="width: auto; padding: 2px 10px; border-color: var(--c-theme-main); color: var(--c-theme-main);">
+                <i class="fas fa-plus"></i> 添加
+            </button>
+        </div>
 
-            {{!-- 章节标题栏 --}}
-            <div class="xjzl-flex-row" style="border-bottom: 1px solid #ccc; padding-bottom: 5px; margin-bottom: 8px;">
-                <img src="{{chapter.img}}" width="24" height="24" style="border:1px solid #000; margin-right: 5px;" />
+        {{!-- 章节卡片循环 --}}
+        <div class="xjzl-flex-col" style="gap: 15px;">
+            {{#each system.chapters as |chapter i|}}
+            <div class="chapter-card">
 
-                {{!-- 修复输入框样式，确保文字可见 --}}
-                <input type="text" name="system.chapters.{{i}}.name" value="{{chapter.name}}" class="xjzl-input"
-                    style="font-weight:bold; flex:1; text-align:left; color: #000;" placeholder="篇章名称" />
+                {{!-- 头部 --}}
+                <div class="chapter-header">
+                    <img src="{{chapter.img}}" width="32" height="32">
+                    <input type="text" name="system.chapters.{{i}}.name" value="{{chapter.name}}" placeholder="篇章名称"
+                        style="flex:1;">
+                    <a data-action="deleteChapter" data-idx="{{i}}" style="color:#999; cursor:pointer;">
+                        <i class="fas fa-trash"></i>
+                    </a>
+                </div>
 
-                <a data-action="deleteChapter" data-idx="{{i}}" style="color:#666; margin-left: 8px;" title="删除">
-                    <i class="fas fa-trash"></i>
-                </a>
-            </div>
+                {{!-- 内容：两列布局 --}}
+                <div class="chapter-body">
+                    {{!-- 左侧：数值配置 --}}
+                    <div class="xjzl-flex-col" style="gap: 10px;">
 
-            {{!-- 章节内容：两列布局 --}}
-            <div class="xjzl-grid-2" style="align-items: start;">
-
-                {{!-- 左侧：数值配置 --}}
-                <div class="xjzl-flex-col" style="gap: 5px;">
-                    {{!-- 消耗 --}}
-                    <div class="xjzl-flex-row">
-                        <label style="color:#333; font-weight:bold;">{{localize
-                            "XJZL.ArtBook.ChapterCost"}}</label>
-                        <input type="number" name="system.chapters.{{i}}.cost" value="{{chapter.cost}}"
-                            class="xjzl-input" min="1" style="color: #000;" />
-                    </div>
-
-                    {{!-- 消耗系数 --}}
-                    <details style="margin-top: 5px; border-top: 1px dotted #ccc; padding-top: 5px;" {{#if (ne
-                        chapter.xpCostRatio 1)}}open{{/if}}>
-
-                        <summary
-                            style="cursor: pointer; color: #555; font-size: 0.9em; outline: none; user-select: none; display: flex; align-items: center;">
-                            <i class="fas fa-percentage" style="width: 20px; text-align: center;"></i>
-                            <span style="font-weight: bold;">{{localize "XJZL.ArtBook.XPCostRatio"}}</span>
-
-                            <span
-                                style="margin-left: auto; font-size: 0.9em; color: {{#if (ne chapter.xpCostRatio 1)}}#8b0000{{else}}#999{{/if}};">
-                                {{#if (ne chapter.xpCostRatio 1)}}
-                                (当前: {{chapter.xpCostRatio}})
-                                {{else}}
-                                (默认 1.0)
-                                {{/if}}
-                            </span>
-                        </summary>
-
-                        <div class="xjzl-flex-row"
-                            style="margin-top: 5px; align-items: center; justify-content: flex-end; gap: 5px; background: rgba(0,0,0,0.02); padding: 5px; border-radius: 4px;">
-                            <span style="font-size: 0.8em; color: #666; margin-right: auto;">
-                                1 = 100%, 0.8 = 8折
-                            </span>
-                            <input type="number" name="system.chapters.{{i}}.xpCostRatio"
-                                value="{{chapter.xpCostRatio}}" class="xjzl-input" min="0.1" step="0.01" placeholder="1"
-                                style="width: 60px; text-align: center; color: #8b0000; font-weight: bold; border: 1px solid #ddd;"
-                                title="1.0 = 100%消耗, 0.8 = 80%消耗, 1.2 = 120%消耗" />
+                        {{!-- 消耗 --}}
+                        <div class="xjzl-ink-field" style="margin-bottom:0; padding:5px; border-left-color: #888;">
+                            <label>{{localize "XJZL.ArtBook.ChapterCost"}}</label>
+                            <input type="number" name="system.chapters.{{i}}.cost" value="{{chapter.cost}}">
                         </div>
-                    </details>
 
-                    <hr style="margin: 2px 0; border-color: #eee;">
+                        {{!-- 奖励：等级 + 检定 --}}
+                        <div class="xjzl-flex-row" style="gap: 5px;">
+                            <div class="xjzl-ink-field"
+                                style="margin-bottom:0; padding:5px; flex:1; border-left-color: var(--c-theme-main);">
+                                <label>{{localize "XJZL.ArtBook.RewardLevel"}}</label>
+                                <input type="number" name="system.chapters.{{i}}.reward.level"
+                                    value="{{chapter.reward.level}}">
+                            </div>
+                            <div class="xjzl-ink-field"
+                                style="margin-bottom:0; padding:5px; flex:1; border-left-color: var(--c-theme-main);">
+                                <label>{{localize "XJZL.ArtBook.RewardCheck"}}</label>
+                                <input type="number" name="system.chapters.{{i}}.reward.check"
+                                    value="{{chapter.reward.check}}">
+                            </div>
+                        </div>
 
-                    {{!-- 奖励 --}}
-                    <div class="xjzl-flex-row">
-                        <label style="color: #8b0000; font-weight:bold;">{{localize
-                            "XJZL.ArtBook.RewardLevel"}}</label>
-                        <input type="number" name="system.chapters.{{i}}.reward.level" value="{{chapter.reward.level}}"
-                            class="xjzl-input" style="color: #000;" />
+                        {{!-- 消耗系数折叠 (内功卡同款样式) --}}
+                        {{#with chapter.xpCostRatio as |ratio|}}
+                        <div class="xjzl-details-box" style="margin:0;">
+                            <details {{#if (ne ratio 1)}}open{{/if}}>
+                                <summary style="padding:5px;">
+                                    <i class="fas fa-coins" style="margin-right: 5px;"></i>
+                                    {{localize "XJZL.ArtBook.XPCostRatio"}}
+
+                                    {{!-- 状态指示器 --}}
+                                    <span class="status {{#if (ne ratio 1)}}modified{{/if}}"
+                                        style="font-size:10px; margin-left: auto;">
+                                        {{#if (ne ratio 1)}}
+                                        {{!-- 这里复用内功的本地化 Key，或者你在语言包里加对应的 ArtBook Key --}}
+                                        {{localize "XJZL.Neigong.Ratio"}}: x{{ratio}}
+                                        {{else}}
+                                        ({{localize "XJZL.Neigong.DefaultRatio"}} 1.0)
+                                        {{/if}}
+                                    </span>
+                                </summary>
+
+                                <div class="content" style="padding:5px;">
+                                    <label style="white-space:nowrap;">{{localize
+                                        "XJZL.Neigong.XPCostRatioLabel"}}:</label>
+
+                                    {{!-- 注意 name 的写法，必须包含 index {{i}} --}}
+                                    <input type="number" name="system.chapters.{{i}}.xpCostRatio" value="{{ratio}}"
+                                        min="0.1" step="0.1" placeholder="1.0"
+                                        style="width: 60px; text-align: center; border-bottom: 1px solid var(--c-cinnabar) !important;">
+
+                                    <span style="color:#999; font-size: 10px;">(1.0 = 标准)</span>
+                                </div>
+                            </details>
+                        </div>
+                        {{/with}}
                     </div>
-                    <div class="xjzl-flex-row">
-                        <label style="color:#333; font-weight:bold;">{{localize
-                            "XJZL.ArtBook.RewardCheck"}}</label>
-                        <input type="number" name="system.chapters.{{i}}.reward.check" value="{{chapter.reward.check}}"
-                            class="xjzl-input" style="color: #000;" />
-                    </div>
-                </div>
 
-                {{!-- 右侧：简短描述 --}}
-                <div class="xjzl-flex-col">
-                    <label style="font-size: 0.9em; font-weight: bold; color:#333;">{{localize
-                        "XJZL.ArtBook.ChapterDesc"}}</label>
-                    <textarea name="system.chapters.{{i}}.description" rows="4" class="xjzl-input"
-                        style="text-align: left; background: rgba(0,0,0,0.05); resize: none; color: #000;">{{chapter.description}}</textarea>
+                    {{!-- 右侧：描述 --}}
+                    <div class="xjzl-flex-col" style="height: 100%;">
+                        <label style="font-size:11px; color:#888; margin-bottom:2px; display:block;">
+                            {{localize "XJZL.ArtBook.ChapterDesc"}}
+                        </label>
+                        <textarea name="system.chapters.{{i}}.description"
+                            placeholder="在此输入篇章内容...">{{chapter.description}}</textarea>
+                    </div>
                 </div>
             </div>
-
+            {{else}}
+            <div
+                style="text-align: center; color: #999; padding: 30px; border: 2px dashed rgba(0,0,0,0.1); border-radius: 8px;">
+                暂无篇章，点击右上角添加
+            </div>
+            {{/each}}
         </div>
-        {{else}}
-        <div style="text-align: center; color: #666; padding: 20px; border: 2px dashed #999; border-radius: 6px;">
-            点击右上角按钮添加新的篇章
-        </div>
-        {{/each}}
     </div>
 
 </section>
