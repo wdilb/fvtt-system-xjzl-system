@@ -25,7 +25,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     tag: "form",
     id: "xjzl-damage-tool",
     // 样式类名：xjzl-window (通用窗口样式), damage-tool (本窗口专用)
-    classes: ["xjzl-window", "damage-tool"],
+    classes: ["damage-tool"], 
     position: { 
       width: 420, 
       height: "auto" 
