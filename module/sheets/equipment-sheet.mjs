@@ -8,9 +8,8 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        // 添加 equipment 类，方便 CSS 定位
-        classes: ["xjzl-window", "item", "equipment", "xjzl-system"],
-        position: { width: 550, height: 650 },
+        classes: ["xjzl-window", "item", "equipment"],
+        position: { width: 800, height: 650 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
@@ -23,12 +22,14 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
             deleteEffect: XJZLEquipmentSheet.prototype._onDeleteEffect,
             toggleEffect: XJZLEquipmentSheet.prototype._onToggleEffect,
             addScript: XJZLEquipmentSheet.prototype._onAddScript,
-            deleteScript: XJZLEquipmentSheet.prototype._onDeleteScript
+            deleteScript: XJZLEquipmentSheet.prototype._onDeleteScript,
+            // 图片编辑
+            editImage: XJZLEquipmentSheet.prototype._onEditImage
         }
     };
 
     static PARTS = {
-        header: { template: "systems/xjzl-system/templates/item/equipment/header.hbs" },
+        header: { template: "systems/xjzl-system/templates/item/equipment/header.hbs", scrollable: [".xjzl-sidebar__content"] },
         tabs: { template: "systems/xjzl-system/templates/item/equipment/tabs.hbs" },
         details: { template: "systems/xjzl-system/templates/item/equipment/tab-details.hbs", scrollable: [""] },
         effects: { template: "systems/xjzl-system/templates/item/equipment/tab-effects.hbs", scrollable: [""] }
@@ -85,18 +86,41 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
     /* -------------------------------------------- */
     /*  自动保存 (事件委托)                         */
     /* -------------------------------------------- */
-    // _onRender(context, options) {
-    //     super._onRender(context, options);
-    //     if (!this.element.dataset.delegated) {
-    //         this.element.addEventListener("change", (e) => {
-    //             if (e.target.matches("input, select, textarea")) {
-    //                 e.preventDefault();
-    //                 this.submit();
-    //             }
-    //         });
-    //         this.element.dataset.delegated = "true";
-    //     }
-    // }
+    _onRender(context, options) {
+        super._onRender(context, options);
+        // 1. 注入基础类型 (type-weapon, type-armor...)
+        this.element.classList.add(`type-${this.document.type}`);
+
+        // 2. 注入品阶类名 (Dynamic Rank Classes)
+        const allRanks = ["rank-fan", "rank-tong", "rank-yin", "rank-jin", "rank-yu"];
+        this.element.classList.remove(...allRanks);
+
+        // 装备使用的是 quality (0-4)
+        const qualityMap = {
+            0: "fan",  // 凡
+            1: "tong", // 铜
+            2: "yin",  // 银
+            3: "jin",  // 金
+            4: "yu"    // 玉
+        };
+
+        const val = this.document.system.quality;
+        // 默认凡品
+        const targetClass = qualityMap[val] || "fan";
+
+        this.element.classList.add(`rank-${targetClass}`);
+    }
+
+    async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const current = foundry.utils.getProperty(this.document, attr);
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: current,
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
+    }
 
     /* -------------------------------------------- */
     /*  Script Logic (脚本管理)                      */
