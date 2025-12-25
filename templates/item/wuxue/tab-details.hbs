@@ -1,7 +1,7 @@
 <section class="tab xjzl-body xjzl-body-scroll {{#if (eq tabs.primary 'details')}}active{{/if}}" data-tab="details"
     data-group="primary" data-application-part="details">
 
-    <div class="xjzl-bg-deco">招</div>
+    <div class="xjzl-bg-deco">{{localize "XJZL.Wuxue.BgDeco"}}</div>
 
     <div class="xjzl-flex-col">
         {{#each system.moves as |move i|}}
@@ -11,21 +11,22 @@
             <div class="move-header">
                 <img src="{{move.img}}" />
                 <input type="text" name="system.moves.{{i}}.name" value="{{move.name}}" class="move-name"
-                    placeholder="招式名称" style="flex:1;">
+                    placeholder="{{localize 'XJZL.Wuxue.Moves.Name'}}" style="flex:1;">
 
                 <select name="system.moves.{{i}}.type" style="width: 80px;">
                     {{selectOptions @root.choices.moveTypes selected=move.type}}
                 </select>
 
                 {{#if (eq move.type "qi")}}
-                <select name="system.moves.{{i}}.actionType" style="width: 75px;" title="功能">
+                <select name="system.moves.{{i}}.actionType" style="width: 75px;"
+                    title="{{localize 'XJZL.Wuxue.Moves.ActionTypeHint'}}">
                     {{selectOptions @root.choices.actionTypes selected=move.actionType}}
                 </select>
                 {{/if}}
 
-                <div class="xjzl-checkbox-wrapper" title="绝招"
+                <div class="xjzl-checkbox-wrapper" title="{{localize 'XJZL.Wuxue.Moves.IsUltimate'}}"
                     style="display:flex; align-items:center; gap:2px; margin-left:10px;">
-                    <label style="font-weight:900; color:#b7950b;">绝</label>
+                    <label style="font-weight:900; color:#b7950b;">{{localize "XJZL.Wuxue.Moves.UltimateChar"}}</label>
                     <input type="checkbox" name="system.moves.{{i}}.isUltimate" {{checked move.isUltimate}}>
                 </div>
 
@@ -34,51 +35,34 @@
                 </a>
             </div>
 
-            {{!-- 2. 头部配置区 (垂直排列) --}}
-
-            {{!-- (A) 消耗系数 (使用内功本地化) --}}
-            <div style="margin-bottom: 10px;">
-                {{#with move.xpCostRatio as |ratio|}}
-                <div class="xjzl-details-box" style="margin:0;">
-                    <details {{#if (ne ratio 1)}}open{{/if}}>
-                        <summary style="padding:5px;">
-                            <i class="fas fa-coins" style="margin-right: 5px;"></i>
-                            {{localize "XJZL.Neigong.XPCostRatio"}}
-
-                            <span class="status {{#if (ne ratio 1)}}modified{{/if}}"
-                                style="font-size:10px; margin-left:auto;">
-                                {{#if (ne ratio 1)}}
-                                {{localize "XJZL.Neigong.Ratio"}}: x{{ratio}}
-                                {{else}}
-                                ({{localize "XJZL.Neigong.DefaultRatio"}} 1.0)
-                                {{/if}}
-                            </span>
-                        </summary>
-                        <div class="content" style="padding:5px;">
-                            <label style="white-space:nowrap;">{{localize "XJZL.Neigong.XPCostRatioLabel"}}:</label>
-                            <input type="number" name="system.moves.{{i}}.xpCostRatio" value="{{ratio}}" min="0.1"
-                                step="0.01" style="width:60px; text-align:center;">
-                            <span style="font-size: 0.8em; color: #888; margin-left: 10px;">(1.0 = 标准)</span>
-                        </div>
-                    </details>
-                </div>
-                {{/with}}
+            {{!-- 2. [核心调整] 消耗系数：独占一行，放在标题下 --}}
+            {{#with move.xpCostRatio as |ratio|}}
+            <div class="xjzl-details-box" style="margin-bottom: 15px;">
+                <details {{#if (ne ratio 1)}}open{{/if}}>
+                    <summary style="padding:5px;">
+                        <span><i class="fas fa-coins"></i> {{localize "XJZL.Wuxue.Moves.XPCostRatio"}}</span>
+                        <span class="status {{#if (ne ratio 1)}}modified{{/if}}" style="font-size:10px;">
+                            {{#if (ne ratio 1)}}x{{ratio}}{{else}}(1.0){{/if}}
+                        </span>
+                    </summary>
+                    <div class="content" style="padding:5px;">
+                        <label style="white-space:nowrap;">{{localize "XJZL.Neigong.XPCostRatioLabel"}}:</label>
+                        <input type="number" name="system.moves.{{i}}.xpCostRatio" value="{{ratio}}" min="0.1"
+                            step="0.01" style="width:60px; text-align:center;">
+                        <span style="font-size: 0.8em; color: #888; margin-left: 10px;">{{localize
+                            "XJZL.ArtBook.RatioStandardHint"}}</span>
+                    </div>
+                </details>
             </div>
+            {{/with}}
 
-            {{!-- (B) 自动化说明 (单独一行) --}}
-            <div class="xjzl-ink-field" style="margin-bottom: 15px; padding:5px; border-left-color:var(--c-mp-blue);">
-                <label><i class="fas fa-robot"></i> {{localize "XJZL.AutomationNote"}}</label>
-                <input type="text" name="system.moves.{{i}}.automationNote" value="{{move.automationNote}}"
-                    placeholder="{{localize 'XJZL.Neigong.AutomationPlaceholder'}}" style="font-size:12px; width:100%;">
-            </div>
-
-            {{!-- 3. 主体内容布局 (Grid: 左消耗 | 右加成+脚本) --}}
+            {{!-- 3. 核心双栏布局 --}}
             <div class="move-body">
 
-                {{!-- ================= 左侧：基础参数 & 消耗表 ================= --}}
-                <div class="xjzl-flex-col" style="gap: 10px;">
+                {{!-- === 左侧：基础属性 + 消耗表 === --}}
+                <div class="xjzl-flex-col" style="gap: 15px;">
 
-                    {{!-- 基础参数 (2x2 Grid) --}}
+                    {{!-- A. 基础参数 --}}
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
                         <div class="xjzl-ink-field" style="margin:0; padding:5px;">
                             <label>{{localize "XJZL.Wuxue.Moves.WeaponType"}}</label>
@@ -87,27 +71,28 @@
                             </select>
                         </div>
                         <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>子类型</label>
+                            <label>{{localize "XJZL.Wuxue.Moves.WeaponSubtypeLabel"}}</label>
                             <input type="text" name="system.moves.{{i}}.weaponSubtype" value="{{move.weaponSubtype}}"
-                                placeholder="如: 重剑">
+                                placeholder="{{localize 'XJZL.Wuxue.Moves.SubtypePlaceholder'}}">
                         </div>
                         <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>伤害类型</label>
+                            <label>{{localize "XJZL.Wuxue.Moves.DamageType"}}</label>
                             <select name="system.moves.{{i}}.damageType">
                                 {{selectOptions @root.choices.damageTypes selected=move.damageType}}
                             </select>
                         </div>
                         <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>五行属性</label>
+                            <label>{{localize "XJZL.Wuxue.Moves.ElementLabel"}}</label>
                             <select name="system.moves.{{i}}.element">
                                 {{selectOptions @root.choices.elements selected=move.element}}
                             </select>
                         </div>
                     </div>
 
-                    {{!-- 消耗表 --}}
+                    {{!-- B. 消耗表 --}}
                     <div>
-                        <label style="font-weight:bold; font-size:11px; color:#666;">消耗配置</label>
+                        <label style="font-weight:bold; font-size:11px; color:#666;">{{localize
+                            "XJZL.Wuxue.Cost.Label"}}</label>
                         <div class="cost-table {{#if (eq ../system.tier 3)}}tier-3{{/if}}">
                             <div class="label"></div>
                             {{#each move._ui.costLabels as |label|}}<div>{{label}}</div>{{/each}}
@@ -133,21 +118,64 @@
                     </div>
                 </div>
 
-                <div class="xjzl-flex-col" style="gap: 15px;">
+                {{!-- === 右侧：自动化 + 进阶 + 加成 === --}}
+                <div class="xjzl-flex-col" style="gap: 10px;">
 
-                    {{!-- A. 属性加成 --}}
+                    {{!-- C. 自动化说明 (移到这里) --}}
+                    <div class="xjzl-ink-field" style="margin:0; padding:5px; border-left-color:var(--c-mp-blue);">
+                        <label><i class="fas fa-robot"></i> {{localize "XJZL.AutomationNote"}}</label>
+                        <input type="text" name="system.moves.{{i}}.automationNote" value="{{move.automationNote}}"
+                            placeholder="{{localize 'XJZL.Neigong.AutomationPlaceholder'}}"
+                            style="font-size:12px; width:100%;">
+                    </div>
+
+                    {{!-- D. 进阶配置 --}}
+                    <div class="xjzl-card"
+                        style="margin:0; padding:8px; background:rgba(0,0,0,0.03); border:1px dashed #ccc;">
+                        <div class="xjzl-flex-row" style="justify-content:space-between; margin-bottom:5px;">
+                            <label style="font-weight:bold; font-size:11px;">{{localize
+                                "XJZL.Wuxue.Progression.Title"}}</label>
+                            <select name="system.moves.{{i}}.progression.mode"
+                                style="height:20px; font-size:11px; width:auto; background:transparent; border:none;">
+                                {{selectOptions @root.choices.progressionModes selected=move.progression.mode}}
+                            </select>
+                        </div>
+
+                        {{#if (eq move.progression.mode "custom")}}
+                        <div class="xjzl-flex-col" style="margin-bottom:5px;">
+                            <input type="text" name="temp.thresholds.{{i}}"
+                                value="{{move.progression.customThresholds}}" class="xjzl-input"
+                                placeholder="1000, 3000" style="font-size:11px; border-bottom:1px dashed #999;">
+                        </div>
+                        {{/if}}
+
+                        <div class="xjzl-flex-row" style="align-items:center; gap:5px;">
+                            <label style="font-size:11px; white-space:nowrap; flex:1;">{{localize
+                                "XJZL.Wuxue.Progression.MappedStage"}}:</label>
+                            <select name="system.moves.{{i}}.progression.mappedStage"
+                                style="height:20px; font-size:11px; flex:1;">
+                                {{selectOptions @root.choices.mappedStages selected=move.progression.mappedStage}}
+                            </select>
+                        </div>
+                    </div>
+
+                    {{!-- E. 属性加成 --}}
                     <div class="scaling-box">
                         <div class="xjzl-flex-row" style="justify-content:space-between; margin-bottom:5px;">
-                            <label style="font-weight:bold; font-size:11px;">加成属性 (Scalings)</label>
-                            <a data-action="addScaling" title="添加"><i class="fas fa-plus"></i></a>
+                            <label style="font-weight:bold; font-size:11px;">{{localize
+                                "XJZL.Wuxue.Calc.Label"}}</label>
+                            <a data-action="addScaling" title="{{localize 'XJZL.UI.Add'}}"><i
+                                    class="fas fa-plus"></i></a>
                         </div>
 
                         <div class="xjzl-grid-inline" style="margin-bottom:8px;">
-                            <label style="font-size:11px; white-space:nowrap;">基</label>
+                            <label style="font-size:11px; white-space:nowrap;">{{localize
+                                "XJZL.Wuxue.Calc.BaseShort"}}</label>
                             <input type="number" name="system.moves.{{i}}.calculation.base"
                                 value="{{move.calculation.base}}" class="xjzl-input xjzl-input-short" placeholder="0">
 
-                            <label style="font-size:11px; margin-left:10px; white-space:nowrap;">长</label>
+                            <label style="font-size:11px; margin-left:10px; white-space:nowrap;">{{localize
+                                "XJZL.Wuxue.Calc.GrowthShort"}}</label>
                             <input type="number" name="system.moves.{{i}}.calculation.growth"
                                 value="{{move.calculation.growth}}" class="xjzl-input xjzl-input-short" placeholder="0">
                         </div>
@@ -166,39 +194,50 @@
                         {{/each}}
                     </div>
 
-                    {{!-- B. 脚本列表 (移回右侧栏) --}}
-                    <div>
-                        <div class="xjzl-flex-row" style="justify-content:space-between; margin-bottom:5px;">
-                            <label style="font-weight:bold; font-size:11px;">{{localize
-                                "XJZL.Script.ScriptList"}}</label>
-                            <a data-action="addMoveScript" title="添加"><i class="fas fa-plus"></i></a>
-                        </div>
-
-                        {{#each move.scripts as |script sIdx|}}
-                        <div class="xjzl-script-item">
-                            <div class="xjzl-flex-row" style="gap:5px; margin-bottom:5px;">
-                                <input type="text" name="system.moves.{{i}}.scripts.{{sIdx}}.label"
-                                    value="{{script.label}}" placeholder="名称" style="flex:2; font-weight:bold;">
-
-                                <select name="system.moves.{{i}}.scripts.{{sIdx}}.trigger"
-                                    style="flex:1.5; font-size:11px;">
-                                    {{selectOptions @root.scriptTriggerChoices selected=script.trigger localize=false}}
-                                </select>
-
-                                <input type="checkbox" name="system.moves.{{i}}.scripts.{{sIdx}}.active" {{checked
-                                    script.active}}>
-                                <a data-action="deleteMoveScript" data-idx="{{sIdx}}" style="color:#999;"><i
-                                        class="fas fa-trash"></i></a>
-                            </div>
-                            <textarea name="system.moves.{{i}}.scripts.{{sIdx}}.script" class="script-editor"
-                                placeholder="// Code...">{{script.script}}</textarea>
-                        </div>
-                        {{/each}}
-                    </div>
-
                 </div> {{!-- 右侧结束 --}}
-
             </div>
+
+            {{!-- 4. 底部通栏：脚本列表 --}}
+            <div style="margin-top: 15px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 10px;">
+                <div class="xjzl-flex-row"
+                    style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="font-weight:bold; font-size:12px; color:#555;">
+                        <i class="fas fa-code"></i> {{localize "XJZL.Script.ScriptList"}}
+                    </label>
+                    <a data-action="addMoveScript" style="font-size:11px; color:var(--c-theme-main); cursor:pointer;">
+                        <i class="fas fa-plus"></i> {{localize "XJZL.Wuxue.Moves.ScriptAdd"}}
+                    </a>
+                </div>
+
+                {{#each move.scripts as |script sIdx|}}
+                <div class="xjzl-script-item">
+                    <div class="xjzl-flex-row" style="gap:5px; margin-bottom:5px;">
+                        <input type="text" name="system.moves.{{i}}.scripts.{{sIdx}}.label" value="{{script.label}}"
+                            placeholder="{{localize 'XJZL.Wuxue.Moves.ScriptNamePlaceholder'}}"
+                            style="flex:2; font-weight:bold;">
+                        <select name="system.moves.{{i}}.scripts.{{sIdx}}.trigger" style="flex:1.5; font-size:11px;">
+                            {{selectOptions @root.scriptTriggerChoices selected=script.trigger localize=false}}
+                        </select>
+                        <div title="{{localize 'XJZL.UI.ToggleEnable'}}" style="display:flex; align-items:center;">
+                            <input type="checkbox" name="system.moves.{{i}}.scripts.{{sIdx}}.active" {{checked
+                                script.active}}>
+                        </div>
+                        <a data-action="deleteMoveScript" data-idx="{{sIdx}}" style="color:#999;"><i
+                                class="fas fa-trash"></i></a>
+                    </div>
+                    <textarea name="system.moves.{{i}}.scripts.{{sIdx}}.script" class="script-editor"
+                        placeholder="{{localize 'XJZL.UI.CodePlaceholder'}}">{{script.script}}</textarea>
+                </div>
+                {{/each}}
+            </div>
+
+            {{!-- 5. 底部通栏：描述 --}}
+            <div style="margin-top: 10px;">
+                <textarea name="system.moves.{{i}}.description" rows="2"
+                    placeholder="{{localize 'XJZL.Wuxue.Moves.DescriptionPlaceholder'}}"
+                    style="width:100%; min-height:50px; background:rgba(255,255,255,0.4); border:1px solid rgba(0,0,0,0.1); border-radius:4px; padding:5px; resize:vertical;">{{move.description}}</textarea>
+            </div>
+
         </div>
         {{/each}}
 

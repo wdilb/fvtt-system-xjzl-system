@@ -207,7 +207,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         const tierMap = { 1: "ren", 2: "di", 3: "tian" };
         const val = this.document.system.tier;
         const targetClass = tierMap[val] || "ren";
-
+        
         this.element.classList.add(`rank-${targetClass}`);
     }
 
