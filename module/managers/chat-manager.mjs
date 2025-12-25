@@ -484,12 +484,14 @@ export class ChatCardManager {
                     flavor: "命中结算详情",
                     content: `
                     <div class="xjzl-chat-card">
-                        <div style="font-size:1.1em; text-align:center; padding:5px; border-bottom:1px solid #ccc;">
-                            ${headerHtml}
+                        <div class="card-content-wrapper">
+                            <div style="font-size:1.1em; text-align:center; padding:5px; border-bottom:1px solid #ccc;">
+                                ${headerHtml}
+                            </div>
+                            <ul style="list-style:none; padding:5px; margin:0;">
+                                ${resultListHtml}
+                            </ul>
                         </div>
-                        <ul style="list-style:none; padding:5px; margin:0;">
-                            ${resultListHtml}
-                        </ul>
                     </div>`
                 });
             }
@@ -1344,10 +1346,10 @@ export class ChatCardManager {
         // A. 恢复数值 (注意兼容 NumberField 和 SchemaField)
         if (undoData.hpLost > 0) updates["system.resources.hp.value"] = sys.resources.hp.value + undoData.hpLost;
 
-         // 恢复体力，用于野兽
+        // 恢复体力，用于野兽
         if (undoData.tiliLost > 0) {
-             const currentTili = sys.resources.tili.value;
-             updates["system.resources.tili.value"] = currentTili + undoData.tiliLost;
+            const currentTili = sys.resources.tili.value;
+            updates["system.resources.tili.value"] = currentTili + undoData.tiliLost;
         }
 
         // Huti 兼容
@@ -1866,12 +1868,14 @@ export class ChatCardManager {
             flavor: flavorText,
             content: `
             <div class="xjzl-chat-card">
-                <div class="card-header" style="border-bottom:1px solid #ccc; margin-bottom:5px; padding-bottom:3px;">
-                    <h3 style="margin:0;">${move?.name || "未知招式"}</h3>
+                <div class="card-content-wrapper">
+                    <div class="card-header" style="border-bottom:1px solid #ccc; margin-bottom:5px; padding-bottom:3px;">
+                        <h3 style="margin:0;">${move?.name || "未知招式"}</h3>
+                    </div>
+                    <ul style="list-style:none; padding:0; margin:0; font-size:0.9em;">
+                        ${listHtml}
+                    </ul>
                 </div>
-                <ul style="list-style:none; padding:0; margin:0; font-size:0.9em;">
-                    ${listHtml}
-                </ul>
             </div>`
         });
 
