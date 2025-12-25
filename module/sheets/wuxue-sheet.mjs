@@ -11,8 +11,8 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "wuxue", "xjzl-system"],
-        position: { width: 700, height: 800 }, // 武学卡需要宽一点
+        classes: ["xjzl-window", "item", "wuxue"],
+        position: { width: 1050, height: 800 }, // 武学卡需要宽一点
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
@@ -36,12 +36,14 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             createEffect: XJZLWuxueSheet.prototype._onCreateEffect,
             editEffect: XJZLWuxueSheet.prototype._onEditEffect,
             deleteEffect: XJZLWuxueSheet.prototype._onDeleteEffect,
-            toggleEffect: XJZLWuxueSheet.prototype._onToggleEffect
+            toggleEffect: XJZLWuxueSheet.prototype._onToggleEffect,
+            //编辑图片
+            editImage: XJZLWuxueSheet.prototype._onEditImage
         }
     };
 
     static PARTS = {
-        header: { template: "systems/xjzl-system/templates/item/wuxue/header.hbs" },
+        header: { template: "systems/xjzl-system/templates/item/wuxue/header.hbs", scrollable: [".xjzl-sidebar__content"] },
         tabs: { template: "systems/xjzl-system/templates/item/wuxue/tabs.hbs" },
 
         // 内容 Parts
@@ -111,6 +113,9 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.system.moves.forEach(move => {
             let levels = [];
             let labels = [];
+            // 注入 CSS 类名，用于招式卡片变色
+            // type-real, type-feint, type-stance, type-qi
+            move._uiClass = `type-${move.type || 'real'}`;
 
             // 判断模式
             const mode = move.progression?.mode || "standard";
@@ -192,23 +197,19 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     /* -------------------------------------------- */
     /*  自动保存 (Auto-Save)                        */
     /* -------------------------------------------- */
-    // _onRender(context, options) {
-    //     super._onRender(context, options);
-    //     // 【优化】只给 form 根元素绑定一次监听器
-    //     // 利用事件冒泡机制，捕获所有子元素的 change 事件
-    //     if (!this.element.dataset.delegated) {
-    //         this.element.addEventListener("change", (event) => {
-    //             const target = event.target;
-    //             // 只处理输入控件
-    //             if (target.matches("input, select, textarea")) {
-    //                 // event.preventDefault(); // change 事件通常不需要 preventDefault
-    //                 this.submit();
-    //             }
-    //         });
-    //         // 标记已绑定，防止重复
-    //         this.element.dataset.delegated = "true";
-    //     }
-    // }
+    _onRender(context, options) {
+        super._onRender(context, options);
+        // 注入品阶类名 (Rank Coloring)
+        const allRanks = ["rank-ren", "rank-di", "rank-tian"];
+        this.element.classList.remove(...allRanks);
+
+        // 武学品阶: 1(人) / 2(地) / 3(天)
+        const tierMap = { 1: "ren", 2: "di", 3: "tian" };
+        const val = this.document.system.tier;
+        const targetClass = tierMap[val] || "ren";
+
+        this.element.classList.add(`rank-${targetClass}`);
+    }
 
     /* -------------------------------------------- */
     /*  嵌套数组操作                  */
@@ -349,5 +350,17 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             move.scripts.splice(scriptIndex, 1);
             await this.document.update({ "system.moves": moves });
         }
+    }
+
+    // 图片编辑
+    async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const current = foundry.utils.getProperty(this.document, attr);
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: current,
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
     }
 }
