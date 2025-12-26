@@ -140,7 +140,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
     };
 
-    tabGroups = { primary: "stats" };
+    tabGroups = { primary: "combat" };
 
     /* -------------------------------------------- */
     /*  数据准备 (Data Preparation)                  */
