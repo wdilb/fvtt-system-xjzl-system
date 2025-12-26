@@ -3,7 +3,7 @@
  */
 import { XJZL } from "../config.mjs";
 // 引入工具函数
-import { rollDisabilityTable, promptDisabilityQuery } from "../utils/utils.mjs";
+import { localizeConfig, rollDisabilityTable, promptDisabilityQuery } from "../utils/utils.mjs";
 // 引入卡片管理器 (用于复用死检的逻辑)
 import { ChatCardManager } from "../managers/chat-manager.mjs";
 
@@ -13,8 +13,8 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "actor", "character", "xjzl-system"],
-        position: { width: 900, height: 800 },
+        classes: ["xjzl-window", "actor", "character"],
+        position: { width: 1100, height: 750 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
@@ -74,21 +74,70 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             //趁虚而入
             rollOpportunityAttack: XJZLCharacterSheet.prototype._onRollOpportunityAttack,
             // 解除架招
-            stopStance: XJZLCharacterSheet.prototype._onStopStance
+            stopStance: XJZLCharacterSheet.prototype._onStopStance,
+            // 更换图片
+            editImage: XJZLCharacterSheet.prototype._onEditImage
         }
     };
 
+    /* 
+     * 2. 定义部件 (PARTS)
+     * V2 会把这些模板渲染出来并塞进 window-content
+     * 我们需要给每个模板最外层加 CSS 类，以便 Grid 布局识别
+     */
     static PARTS = {
-        header: { template: "systems/xjzl-system/templates/actor/character/header.hbs" },
-        tabs: { template: "systems/xjzl-system/templates/actor/character/tabs.hbs" },
-        stats: { template: "systems/xjzl-system/templates/actor/character/tab-stats.hbs", scrollable: [""] },
-        cultivation: { template: "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs", scrollable: [""] },
-        jingmai: { template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs", scrollable: [""] },
-        skills: { template: "systems/xjzl-system/templates/actor/character/tab-skills.hbs", scrollable: [""] },
-        combat: { template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs", scrollable: [""] },
-        inventory: { template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs", scrollable: [""] },
-        effects: { template: "systems/xjzl-system/templates/actor/character/tab-effects.hbs", scrollable: [""] },
-        config: { template: "systems/xjzl-system/templates/actor/character/tab-config.hbs", scrollable: [""] }
+        // 左侧栏
+        header: {
+            template: "systems/xjzl-system/templates/actor/character/header.hbs",
+            classes: ["xjzl-sidebar"] // 自动加类名
+        },
+        // 右侧导航
+        tabs: {
+            template: "systems/xjzl-system/templates/actor/character/tabs.hbs",
+            classes: ["xjzl-nav"]
+        },
+        // --- 中间 Tab 内容 (Tab Body) ---
+        // V2 会自动处理 Tab 的显示/隐藏，我们只需要标记它们是 Body 的一部分
+        stats: {
+            template: "systems/xjzl-system/templates/actor/character/tab-stats.hbs",
+            scrollable: [".xjzl-body-scroll"], // 内部滚动容器
+            classes: ["xjzl-body"]
+        },
+        combat: {
+            template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs",
+            scrollable: [".xjzl-body-scroll"],
+            classes: ["xjzl-body"]
+        },
+        cultivation: {
+            template: "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs",
+            scrollable: [".xjzl-body-scroll"],
+            classes: ["xjzl-body"]
+        },
+        skills: {
+            template: "systems/xjzl-system/templates/actor/character/tab-skills.hbs",
+            scrollable: [".xjzl-body-scroll"],
+            classes: ["xjzl-body"]
+        },
+        jingmai: {
+            template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
+            scrollable: [".xjzl-body-scroll"],
+            classes: ["xjzl-body"]
+        },
+        inventory: {
+            template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs",
+            scrollable: [".xjzl-body-scroll"],
+            classes: ["xjzl-body"]
+        },
+        bio: {
+            template: "systems/xjzl-system/templates/actor/character/tab-bio.hbs",
+            scrollable: [".xjzl-body-scroll"],
+            classes: ["xjzl-body"]
+        },
+        config: {
+            template: "systems/xjzl-system/templates/actor/character/tab-config.hbs",
+            scrollable: [".xjzl-body-scroll"],
+            classes: ["xjzl-body"]
+        }
     };
 
     tabGroups = { primary: "stats" };
@@ -338,6 +387,32 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             };
         });
 
+        // 获取当前内功名称
+        let activeNeigongName = "";
+        let activeNeigongDesc = "";
+        if (actor.system.martial.active_neigong) {
+            const ng = actor.items.get(actor.system.martial.active_neigong);
+            if (ng) {
+                activeNeigongName = ng.name;
+                // 提取纯文本描述，或者显示默认说明
+                activeNeigongDesc = ng.system.description || "";
+            }
+        }
+        context.activeNeigongName = activeNeigongName;
+        context.activeNeigongDesc = activeNeigongDesc;
+
+        context.choices = {
+            genders: localizeConfig(XJZL.genders),
+            sects: localizeConfig(XJZL.sects)
+        };
+
+        // 气血百分比计算 (用于 width: %)
+        context.percents = {
+            hp: actor.system.resources.hp.max ? Math.min(100, (actor.system.resources.hp.value / actor.system.resources.hp.max) * 100) : 0,
+            mp: actor.system.resources.mp.max ? Math.min(100, (actor.system.resources.mp.value / actor.system.resources.mp.max) * 100) : 0,
+            rage: (actor.system.resources.rage.value / 10) * 100
+        };
+
         return context;
     }
 
@@ -550,6 +625,19 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     /* -------------------------------------------- */
     /*  通用动作处理 (Action Handler)                */
     /* -------------------------------------------- */
+
+
+    // 图片编辑
+    async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const current = foundry.utils.getProperty(this.document, attr);
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: current,
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
+    }
 
     async _onAction(event, target) {
         const action = target.dataset.action;

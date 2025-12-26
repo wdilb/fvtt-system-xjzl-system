@@ -1,215 +1,166 @@
 {{!-- templates/actor/character/header.hbs --}}
-<header class="xjzl-header">
-  {{!-- 左侧：头像 --}}
-  <img class="char-portrait" src="{{document.img}}" data-edit="img" title="{{document.name}}" />
+<div>
+  {{!-- 1. 顶部身份区 --}}
+  <div class="sidebar-identity">
 
-  {{!-- 中间：身份信息 --}}
-  <div class="header-identity xjzl-flex-col">
+    {{!-- A. 文本信息列 (左侧) --}}
+    <div class="identity-text-col">
+      {{!-- 顶部：性别与表字 --}}
+      <div class="identity-meta">
+        <select name="system.info.gender" class="char-gender-select" data-tooltip="{{localize 'XJZL.Info.Gender'}}">
+          {{selectOptions choices.genders selected=system.info.gender localize=true}}
+        </select>
 
-    {{!-- 姓名 --}}
-    <div class="identity-row">
-      <label>{{localize "XJZL.Info.Name"}}</label>
-      <input type="text" name="name" value="{{document.name}}" placeholder="输入姓名" class="xjzl-input name-input" />
-    </div>
-
-    {{!-- 称号 --}}
-    <div class="identity-row">
-      <label>{{localize "XJZL.Info.Title"}}</label>
-      <input type="text" name="system.info.title" value="{{system.info.title}}" placeholder="输入江湖称号"
-        class="xjzl-input title-input" />
-    </div>
-
-    {{!-- 门派 --}}
-    <div class="identity-row">
-      <label>{{localize "XJZL.Info.Sect"}}</label>
-      <input type="text" name="system.info.sect" value="{{system.info.sect}}" placeholder="无门无派" class="xjzl-input" />
-    </div>
-
-    <div class="identity-row split-row">
-      {{!-- 左半：背景 --}}
-      <div class="identity-half">
-        <label>{{localize "XJZL.Background.Label"}}</label>
-        {{!-- 添加了 header-slot-box 类名 --}}
-        <div class="item-placeholder-box header-slot-box">
-          {{#if backgroundItem}}
-          <a class="content-link" data-action="editItem" data-item-id="{{backgroundItem.id}}">
-            <i class="fas fa-history"></i> {{backgroundItem.name}}
-          </a>
-          <a class="delete-link" data-action="deleteItem" data-item-id="{{backgroundItem.id}}" title="移除背景">
-            <i class="fas fa-times"></i>
-          </a>
-          {{else}}
-          <span class="placeholder-text">拖入背景</span>
-          {{/if}}
-        </div>
+        <input type="text" name="system.info.zi" class="char-zi-input" value="{{system.info.zi}}"
+          placeholder="{{localize 'XJZL.Info.Zi'}}">
       </div>
 
-      {{!-- 右半：性格 --}}
-      <div class="identity-half">
-        <label>{{localize "XJZL.Personality.Label"}}</label>
-        {{!-- 【关键】添加了 header-slot-box 类名 --}}
-        <div class="item-placeholder-box header-slot-box">
-          {{#if personalityItem}}
-          <a class="content-link" data-action="editItem" data-item-id="{{personalityItem.id}}">
-            <i class="fas fa-theater-masks"></i> {{personalityItem.name}}
-          </a>
-          <a class="delete-link" data-action="deleteItem" data-item-id="{{personalityItem.id}}" title="移除性格">
-            <i class="fas fa-times"></i>
-          </a>
+      {{!-- 中部：竖排姓名 --}}
+      <div class="identity-name">
+        <input type="text" name="name" class="char-name-input" value="{{document.name}}"
+          placeholder="{{localize 'XJZL.Info.NamePlaceholder'}}">
+      </div>
+    </div>
+
+    {{!-- B. 立绘列 (右侧) --}}
+    <div class="portrait-col">
+      <div class="portrait-box realm-{{system.cultivation.realmLevel}}" data-action="editImage"
+        data-tooltip="{{localize 'XJZL.UI.EditImage'}}">
+        <img src="{{document.img}}" class="portrait-img">
+        {{!-- 渐变遮罩 --}}
+        <div class="portrait-gradient"></div>
+        {{!-- 边框光效 --}}
+        <div class="portrait-glow"></div>
+      </div>
+
+      {{!-- C. 印章行 (浮在图片底部) --}}
+      <div class="stamps-row">
+        {{!-- 门派选择 --}}
+        <div class="sect-seal-wrapper" data-tooltip="{{localize 'XJZL.Info.Sect'}}">
+          <select name="system.info.sect" class="sect-select">
+            {{selectOptions choices.sects selected=system.info.sect localize=true}}
+          </select>
+        </div>
+
+        {{!-- 境界腰牌 --}}
+        <div class="realm-tag" data-tooltip="{{localize 'XJZL.Cultivation.Realm'}}">
+          {{#if (gte system.cultivation.realmLevel 0)}}
+          {{localize (concat "XJZL.Realm." system.cultivation.realmLevel)}}
           {{else}}
-          <span class="placeholder-text">拖入性格</span>
+          {{localize "XJZL.Realm.0"}}
           {{/if}}
         </div>
       </div>
     </div>
-
-    {{!--
-    =====================================================
-    生存状态与工具栏 (Life Status & Tools)
-    常驻显示，但在濒死/死亡时改变样式高亮
-    =====================================================
-    --}}
-    <div class="life-status-bar" style="
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            padding: 4px 8px; 
-            border-radius: 4px; 
-            margin: 5px 0;
-            border: 1px solid transparent;
-            transition: all 0.3s ease;
-            {{#if (lte system.resources.hp.value 0)}}
-                {{!-- 危机模式样式 --}}
-                background: linear-gradient(90deg, #2c0b0e 0%, #1a0505 100%); 
-                border-color: #8b0000;
-                border-left: 4px solid #e74c3c;
-                box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-                color: #ecf0f1;
-            {{else}}
-                {{!-- 正常模式样式 --}}
-                background: rgba(0,0,0,0.03);
-                border-color: #ccc;
-                color: #555;
-            {{/if}}
-         ">
-
-      {{!-- 左侧：当前状态文本 --}}
-      <div style="font-weight: bold; font-size: 0.95em; display: flex; align-items: center; gap: 6px;">
-        {{#if (lte system.resources.hp.value 0)}}
-        {{!-- 危机状态 --}}
-        <i class="fas fa-heart-pulse" style="color: #e74c3c; animation: pulse 1.5s infinite;"></i>
-
-        {{#if (gt system.resources.mp.value 0)}}
-        <span style="color: #e74c3c; text-transform: uppercase;">{{localize "XJZL.Status.Dying"}}</span>
-        {{else}}
-        <span style="color: #7f8c8d; text-transform: uppercase;">{{localize "XJZL.Status.Dead"}}</span>
-        {{/if}}
-        {{else}}
-        {{!-- 正常状态 --}}
-        <i class="fas fa-user-check" style="color: #27ae60;"></i>
-        <span>{{localize "XJZL.UI.Chat.DeathCard.Normal" fallback="状态良好"}}</span>
-        {{/if}}
-      </div>
-
-      {{!-- 右侧：三合一工具按钮组 --}}
-      <div class="life-tools" style="display: flex; gap: 4px;">
-
-        {{!-- 1. 查表 --}}
-        <button type="button" data-action="queryDisability" data-tooltip="{{localize 'XJZL.Disability.QueryTitle'}}"
-          style="
-                        width: 24px; height: 24px; padding: 0; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);
-                        background: {{#if (lte system.resources.hp.value 0)}}rgba(255,255,255,0.1){{else}}#fff{{/if}};
-                        color: {{#if (lte system.resources.hp.value 0)}}#ccc{{else}}#333{{/if}};
-                    ">
-          <i class="fas fa-search" style="font-size: 0.8em;"></i>
-        </button>
-
-        {{!-- 2. 残疾判定 (D100) --}}
-        <button type="button" data-action="rollDisability"
-          data-tooltip="{{localize 'XJZL.UI.Chat.DeathCard.RollDisability'}}" style="
-                        width: 24px; height: 24px; padding: 0; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);
-                        {{#if (lte system.resources.hp.value 0)}}
-                            background: #8b0000; color: white; border-color: #a93226;
-                        {{else}}
-                            background: #fff; color: #8b0000;
-                        {{/if}}
-                    ">
-          <i class="fas fa-crutch" style="font-size: 0.8em;"></i>
-        </button>
-
-        {{!-- 3. 死检 (D20) --}}
-        <button type="button" data-action="rollDeathSave" data-tooltip="{{localize 'XJZL.UI.Chat.DeathCard.DeathSave'}}"
-          style="
-                        width: 24px; height: 24px; padding: 0; border-radius: 4px; border: 1px solid rgba(0,0,0,0.2);
-                        {{#if (lte system.resources.hp.value 0)}}
-                            {{#if (lte system.resources.mp.value 0)}}
-                                background: #000; color: #e74c3c; border-color: #444; /* 死亡时高亮 */
-                            {{else}}
-                                background: rgba(0,0,0,0.5); color: #999; /* 濒死时略暗 */
-                            {{/if}}
-                        {{else}}
-                            background: #fff; color: #333;
-                        {{/if}}
-                    ">
-          <i class="fas fa-skull" style="font-size: 0.8em;"></i>
-        </button>
-
-      </div>
-    </div>
-
-    {{!-- 按钮组：使用 action-row 控制高度 --}}
-    <div class="action-row">
-      <button type="button" class="roll-basic-attack-btn" data-action="rollBasicAttack">
-        <i class="fas fa-fist-raised"></i> <span>普通攻击</span>
-      </button>
-      <button type="button" class="roll-opportunity-attack-btn" data-action="rollOpportunityAttack" title="趁虚而入">
-        <i class="fas fa-bolt"></i> <span>趁虚</span>
-      </button>
-    </div>
-
   </div>
 
-  {{!-- 右侧：核心资源 (保持不变) --}}
-  <div class="header-resources xjzl-flex-col">
-    {{!-- ...资源部分保持原样... --}}
-    <div class="resource-row">
-      <label>{{localize "XJZL.Resources.HP"}}</label>
-      <div class="resource-inputs">
-        <input type="number" name="system.resources.hp.value" value="{{system.resources.hp.value}}" class="xjzl-input"
-          title="当前气血" />
-        <span class="sep">/</span>
-        <span class="max">{{system.resources.hp.max}}</span>
+  {{!-- 2. 核心维生区 --}}
+  <div class="sidebar-vitals">
+    {{!-- 气血 --}}
+    <div class="vital-group hp-group">
+      <div class="vital-label-row">
+        <label><i class="fas fa-heartbeat"></i> {{localize "XJZL.Resources.HP"}}</label>
+
+        {{!-- 急救工具 --}}
+        <div class="life-tools-inline">
+          <a data-action="queryDisability" data-tooltip="{{localize 'XJZL.Disability.QueryTitle'}}"><i
+              class="fas fa-search"></i></a>
+          <a data-action="rollDisability" class="danger"
+            data-tooltip="{{localize 'XJZL.UI.Chat.DeathCard.RollDisability'}}"><i class="fas fa-crutch"></i></a>
+          <a data-action="rollDeathSave" class="critical"
+            data-tooltip="{{localize 'XJZL.UI.Chat.DeathCard.DeathSave'}}"><i class="fas fa-skull"></i></a>
+        </div>
+
+        {{!-- 数值 (最大值只读) --}}
+        <div class="vital-values">
+          <input type="number" name="system.resources.hp.value" value="{{system.resources.hp.value}}" class="val-input">
+          <span class="sep">/</span>
+          <input type="number" class="val-input max readonly" value="{{system.resources.hp.max}}" readonly>
+        </div>
       </div>
-    </div>
-    <div class="resource-bar-bg">
-      <div class="resource-bar-fill hp" style="width: {{percents.hp}}%"></div>
+
+      <div class="ink-track">
+        {{#if (gt system.resources.huti 0)}}
+        <div class="huti-overlay" style="width: {{percents.hp}}%;"
+          data-tooltip="{{localize 'XJZL.Resources.Huti'}}: {{system.resources.huti}}"></div>
+        {{/if}}
+        <div class="ink-fill red" style="width: {{percents.hp}}%;"></div>
+      </div>
     </div>
 
-    <div class="resource-row">
-      <label>{{localize "XJZL.Resources.MP"}}</label>
-      <div class="resource-inputs">
-        <input type="number" name="system.resources.mp.value" value="{{system.resources.mp.value}}" class="xjzl-input"
-          title="当前内力" />
-        <span class="sep">/</span>
-        <span class="max">{{system.resources.mp.max}}</span>
+    {{!-- 内力 --}}
+    <div class="vital-group mp-group">
+      <div class="vital-label-row">
+        <label><i class="fas fa-yin-yang"></i> {{localize "XJZL.Resources.MP"}}</label>
+        <div class="vital-values">
+          <input type="number" name="system.resources.mp.value" value="{{system.resources.mp.value}}" class="val-input">
+          <span class="sep">/</span>
+          <input type="number" class="val-input max readonly" value="{{system.resources.mp.max}}" readonly>
+        </div>
       </div>
-    </div>
-    <div class="resource-bar-bg">
-      <div class="resource-bar-fill mp" style="width: {{percents.mp}}%"></div>
+      <div class="ink-track">
+        <div class="ink-fill blue" style="width: {{percents.mp}}%;"></div>
+      </div>
     </div>
 
-    <div class="resource-row">
-      <label>{{localize "XJZL.Resources.Rage"}}</label>
-      <div class="resource-inputs">
-        <input type="number" name="system.resources.rage.value" value="{{system.resources.rage.value}}"
-          class="xjzl-input" />
-        <span class="sep">/</span>
-        <span class="max">{{system.resources.rage.max}}</span>
+    {{!-- 怒气 --}}
+    <div class="vital-group rage-group">
+      <div class="vital-label-row">
+        <label><i class="fas fa-fire"></i> {{localize "XJZL.Resources.Rage"}}</label>
+        <div class="vital-values">
+          <input type="number" name="system.resources.rage.value" value="{{system.resources.rage.value}}"
+            class="val-input">
+          <span class="sep">/</span>
+          <span class="max-val">10</span>
+        </div>
       </div>
-    </div>
-    <div class="resource-bar-bg">
-      <div class="resource-bar-fill rage"
-        style="width: {{calculatePercentage system.resources.rage.value 10}}%; background: var(--xjzl-gold);"></div>
+      <div class="rage-track">
+        <div class="rage-fill" style="width: {{percents.rage}}%;"></div>
+      </div>
     </div>
   </div>
-</header>
+
+  {{!-- 3. 状态监控 (去除了 margin-top: auto) --}}
+  <div class="sidebar-states">
+    {{!-- 内功 --}}
+    <details class="state-details-box">
+      <summary>
+        <div class="state-icon"><i class="fas fa-bahai"></i></div>
+        <div class="state-info">
+          <label>{{localize "XJZL.Resources.ActiveNeigong"}}</label>
+          <div class="val">{{#if activeNeigongName}}{{activeNeigongName}}{{else}}{{localize
+            "XJZL.Resources.ActiveNeigongNone"}}{{/if}}</div>
+        </div>
+        <i class="fas fa-caret-down toggle-icon"></i>
+      </summary>
+      <div class="details-content">
+        {{#if activeNeigongName}}
+        <p>{{activeNeigongDesc}}</p>
+        {{else}}
+        <p class="empty-hint">{{localize "XJZL.Neigong.NoActiveDescription"}}</p>
+        {{/if}}
+      </div>
+    </details>
+
+    {{!-- 架招 --}}
+    <details class="state-details-box">
+      <summary>
+        <div class="state-icon"><i class="fas fa-shield-alt"></i></div>
+        <div class="state-info">
+          <label>{{localize "XJZL.Martial.Stance"}}</label>
+          <div class="val {{#if activeStance}}highlight{{/if}}">
+            {{#if activeStance}}{{activeStance.name}}{{else}}{{localize "XJZL.Martial.NoStance"}}{{/if}}
+          </div>
+        </div>
+        {{#if activeStance}}
+        <a data-action="stopStance" class="stop-btn"><i class="fas fa-times"></i></a>
+        {{/if}}
+      </summary>
+      {{#if activeStance}}
+      <div class="details-content">
+        <p>{{activeStance.description}}</p>
+      </div>
+      {{/if}}
+    </details>
+  </div>
+</div>
