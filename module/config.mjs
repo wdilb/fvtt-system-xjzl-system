@@ -374,8 +374,38 @@ XJZL.creatureTypes = {
   zhen: "XJZL.Creature.Types.Zhen"
 };
 
+// 19. 性别定义
+XJZL.genders = {
+    "male": "XJZL.Info.Genders.Male",
+    "female": "XJZL.Info.Genders.Female"
+};
 
-// 19. 系统状态标志 (逻辑开关)
+// 20. 门派定义
+XJZL.sects = {
+    "none": "XJZL.Sect.None",
+    "zhengqizong": "XJZL.Sect.ZhengQiZong",
+    "zhenwujiao": "XJZL.Sect.ZhenWuJiao",
+    "wanfosi": "XJZL.Sect.WanFoSi",
+    "xiaoyaopai": "XJZL.Sect.XiaoYaoPai",
+    "qingtianmen": "XJZL.Sect.QingTianMen",
+    "emeipai": "XJZL.Sect.EMeiPai",
+    "huashanpai": "XJZL.Sect.HuaShanPai",
+    "tangmen": "XJZL.Sect.TangMen",
+    "mingjiao": "XJZL.Sect.MingJiao",
+    "gaibang": "XJZL.Sect.GaiBang",
+    "fenghuayuan": "XJZL.Sect.FengHuaYuan",
+    "liushanmen": "XJZL.Sect.LiuShanMen",
+    "jiangnange": "XJZL.Sect.JiangNanGe",
+    "shenfengbang": "XJZL.Sect.ShenFengBang",
+    "sihaibiaomeng": "XJZL.Sect.SiHaiBiaoMeng",
+    "jiangjunying": "XJZL.Sect.JiangJunYing",
+    "wanshoushanzhuang": "XJZL.Sect.WanShouShanZhuang",
+    "baicaoge": "XJZL.Sect.BaiCaoGe",
+    "jianghushili": "XJZL.Sect.JiangHuShiLi"
+};
+
+
+// 21. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -475,7 +505,7 @@ XJZL.statusFlags = {
   regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
-// 20. 检定优劣势计数器 (Check Flags)
+// 22. 检定优劣势计数器 (Check Flags)
 // 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
 // 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
 XJZL.checkFlags = {
