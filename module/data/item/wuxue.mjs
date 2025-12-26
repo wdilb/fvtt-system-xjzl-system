@@ -99,7 +99,7 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         // 境界映射 (Stat Equivalent Stage)
         // 用于解决"只有1级但视为精通"的问题。
         // 0=自动(等于当前level), 1=领悟, 2=掌握, 3=精通, 4=合一, 5=无
-        mappedStage: new fields.NumberField({ initial: 0, choices: [0, 1, 2, 3, 4] })
+        mappedStage: new fields.NumberField({ initial: 0, choices: [0, 1, 2, 3, 4, 5] })
       }),
 
       // 招式修为成分
