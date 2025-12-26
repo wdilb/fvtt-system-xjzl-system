@@ -1377,20 +1377,41 @@ export class ChatCardManager {
         if (undoData.gainedDead) {
             await actor.toggleStatusEffect("dead", { active: false });
         }
-        // TODO 濒死状态回退暂留空
 
         // 4. 更新卡片状态
-        const content = message.content.replace(
-            /<button data-action="undoDamage".*?<\/button>/,
-            `<div style="text-align:center; color:#888; border:1px solid #ccc; padding:5px; background:#eee;">已撤销</div>`
-        );
+        // const content = message.content.replace(
+        //     /<button data-action="undoDamage".*?<\/button>/,
+        //     `<div style="text-align:center; color:#888; border:1px solid #ccc; padding:5px; background:#eee;">已撤销</div>`
+        // );
 
-        await message.update({
-            content: content,
-            "flags.xjzl-system.isUndone": true
-        });
+        // await message.update({
+        //     content: content,
+        //     "flags.xjzl-system.isUndone": true
+        // });
+        const div = document.createElement("div");
+        div.innerHTML = message.content;
 
-        ui.notifications.info("目标状态已回滚。但攻击者获得的怒气与触发的特效需要手动调整。");
+        // 精准查找撤销按钮
+        const undoBtn = div.querySelector('button[data-action="undoDamage"]');
+
+        if (undoBtn) {
+            // 创建替代的提示元素
+            const replacement = document.createElement("div");
+            replacement.style.cssText = "text-align:center; color:#888; border:1px solid #ccc; padding:5px; background:#eee; font-size:0.85em; margin-top:5px;";
+            replacement.innerHTML = '<i class="fas fa-history"></i> 已撤销';
+
+            // 执行替换
+            undoBtn.replaceWith(replacement);
+
+            // 更新消息
+            await message.update({
+                content: div.innerHTML,
+                "flags.xjzl-system.isUndone": true
+            });
+            ui.notifications.info("目标状态已回滚。但攻击者获得的怒气与触发的特效需要手动调整。");
+        }
+
+
     }
 
     /**
