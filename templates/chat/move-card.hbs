@@ -40,7 +40,6 @@
                 {{#if move.description}}<div>{{{move.description}}}</div>{{/if}}
                 {{#if move.automationNote}}
                 <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ccc; color:#2c3e50;">
-                    <!-- 修复：加回"自动化提示"的本地化标签 -->
                     <i class="fas fa-robot"></i> <b>{{localize "XJZL.Wuxue.AutomationNote"}}:</b>
                     {{move.automationNote}}
                 </div>
@@ -57,7 +56,6 @@
                 <div class="label">{{localize "XJZL.UI.Chat.MoveCard.RollHeader" type=damageTypeLabel}}</div>
                 <div class="value">{{displayTotal}}</div>
                 <div class="formula">{{attackRoll.formula}}</div>
-                <!-- 修复：恢复 RollHint 本地化 -->
                 <div class="hint">{{localize "XJZL.UI.Chat.MoveCard.RollHint"}}</div>
             </div>
 
@@ -79,7 +77,6 @@
         </div>
 
         {{else}}
-        <!-- 修复：找回了被 AI 删掉的“非攻击性招式（Buff/治疗）”的目标显示列表 -->
         {{#if hasTargets}}
         <div
             style="margin-bottom: 10px; font-size: 0.85em; background: rgba(0,0,0,0.02); padding: 5px; border-radius: 4px;">
@@ -109,13 +106,13 @@
         {{/if}}
         {{/unless}}
 
-        {{!-- 4. 数值展示 --}}
-        <!-- 修复：加回了 cost.rage 的判断 -->
+        {{!-- 4. 数值展示 (核心重构区) --}}
         {{#if (or (gt calc.damage 0) (gt calc.feint 0) cost.mp cost.hp cost.rage)}}
         <div class="card-stats">
+
+            {{!-- 伤害格 --}}
             {{#if (gt calc.damage 0)}}
             <div class="stat-block">
-                <!-- 修复：恢复本地化标签 -->
                 <div class="stat-label">
                     {{#if isHeal}}{{localize "XJZL.UI.Chat.MoveCard.HealAmount"}}{{else}}{{localize
                     "XJZL.UI.Chat.MoveCard.Damage"}}{{/if}}
@@ -127,25 +124,42 @@
             </div>
             {{/if}}
 
+            {{!-- 虚招格 --}}
             {{#if (gt calc.feint 0)}}
             <div class="stat-block">
-                <!-- 修复：恢复本地化标签 -->
                 <div class="stat-label">{{localize "XJZL.UI.Chat.MoveCard.FeintVal"}}</div>
-                <div class="stat-value" style="color: #6a1b9a;" title="{{calc.feintBreakdown}}">{{calc.feint}}</div>
+                <div class="stat-value" style="color: #6a1b9a;" title="{{calc.feintBreakdown}}">
+                    {{calc.feint}}
+                </div>
             </div>
             {{/if}}
 
+            {{!-- 消耗格 --}}
             {{#if (or cost.mp cost.hp cost.rage)}}
-            <div class="stat-block" style="text-align:left; padding-left:15px; font-size:0.85em;">
-                <!-- 修复：恢复本地化标签 和 怒气消耗显示 -->
-                {{#if cost.mp}}<div><b style="color:#2980b9">{{localize "XJZL.UI.Chat.MoveCard.Cost.MP"}}:</b>
-                    {{cost.mp}}</div>{{/if}}
-                {{#if cost.rage}}<div><b style="color:#c5a059">{{localize "XJZL.UI.Chat.MoveCard.Cost.Rage"}}:</b>
-                    {{cost.rage}}</div>{{/if}}
-                {{#if cost.hp}}<div><b style="color:#c0392b">{{localize "XJZL.UI.Chat.MoveCard.Cost.HP"}}:</b>
-                    {{cost.hp}}</div>{{/if}}
+            <div class="stat-block">
+                {{#if cost.mp}}
+                <div class="cost-row">
+                    <span class="cost-label" style="color:#2980b9">{{localize "XJZL.UI.Chat.MoveCard.Cost.MP"}}</span>
+                    <span class="cost-val">{{cost.mp}}</span>
+                </div>
+                {{/if}}
+
+                {{#if cost.rage}}
+                <div class="cost-row">
+                    <span class="cost-label" style="color:#c5a059">{{localize "XJZL.UI.Chat.MoveCard.Cost.Rage"}}</span>
+                    <span class="cost-val">{{cost.rage}}</span>
+                </div>
+                {{/if}}
+
+                {{#if cost.hp}}
+                <div class="cost-row">
+                    <span class="cost-label" style="color:#c0392b">{{localize "XJZL.UI.Chat.MoveCard.Cost.HP"}}</span>
+                    <span class="cost-val">{{cost.hp}}</span>
+                </div>
+                {{/if}}
             </div>
             {{/if}}
+
         </div>
         {{/if}}
 
@@ -153,7 +167,6 @@
         {{#unless isStance}}
         <div class="card-buttons">
             {{#if isFeint}}
-            <!-- 修复：恢复了 showFeintBtn 逻辑，如果当前没选中架招，会提示用户 -->
             {{#if showFeintBtn}}
             <button data-action="rollFeintContest" class="btn-check">
                 <i class="fas fa-dice-d20"></i> {{localize "XJZL.UI.Chat.MoveCard.FeintContest"}}
