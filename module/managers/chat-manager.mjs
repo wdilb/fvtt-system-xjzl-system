@@ -1373,10 +1373,17 @@ export class ChatCardManager {
             await actor.update(updates);
         }
 
+<<<<<<< HEAD
         // C. 移除状态
         if (undoData.gainedDead) {
             await actor.toggleStatusEffect("dead", { active: false });
         }
+=======
+        // =====================================================
+        // C. 移除状态 (可以不用，因为已经在回血里处理了，所以删掉了)
+        // =====================================================
+        
+>>>>>>> master
 
         // 4. 更新卡片状态
         // const content = message.content.replace(
