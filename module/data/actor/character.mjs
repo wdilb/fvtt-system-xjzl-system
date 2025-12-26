@@ -713,7 +713,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         // tier: 1(人), 2(地), 3(天)
         // stage: 1(领), 2(小/掌), 3(圆/精), 4(合)
         const tier = item.system.tier || 1;
-        const stage = item.system.stage || 1;
+        const stage = item.system.stage ?? 0;
         let realm = 0;
 
         // 境界判定规则
