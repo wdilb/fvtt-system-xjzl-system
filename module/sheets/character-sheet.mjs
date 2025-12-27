@@ -100,42 +100,42 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // V2 会自动处理 Tab 的显示/隐藏，我们只需要标记它们是 Body 的一部分
         stats: {
             template: "systems/xjzl-system/templates/actor/character/tab-stats.hbs",
-            scrollable: [".xjzl-body-scroll"], // 内部滚动容器
+            scrollable: [""], // 内部滚动容器
             classes: ["xjzl-body"]
         },
         combat: {
             template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs",
-            scrollable: [".xjzl-body-scroll"],
+            scrollable: [""],
             classes: ["xjzl-body"]
         },
         cultivation: {
             template: "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs",
-            scrollable: [".xjzl-body-scroll"],
+            scrollable: [""],
             classes: ["xjzl-body"]
         },
         skills: {
             template: "systems/xjzl-system/templates/actor/character/tab-skills.hbs",
-            scrollable: [".xjzl-body-scroll"],
+            scrollable: [""],
             classes: ["xjzl-body"]
         },
         jingmai: {
             template: "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
-            scrollable: [".xjzl-body-scroll"],
+            scrollable: [""],
             classes: ["xjzl-body"]
         },
         inventory: {
             template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs",
-            scrollable: [".xjzl-body-scroll"],
+            scrollable: [""],
             classes: ["xjzl-body"]
         },
         bio: {
             template: "systems/xjzl-system/templates/actor/character/tab-bio.hbs",
-            scrollable: [".xjzl-body-scroll"],
+            scrollable: [""],
             classes: ["xjzl-body"]
         },
         config: {
             template: "systems/xjzl-system/templates/actor/character/tab-config.hbs",
-            scrollable: [".xjzl-body-scroll"],
+            scrollable: [""],
             classes: ["xjzl-body"]
         }
     };
@@ -185,22 +185,28 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             });
         }
 
-        // 技能组与 UI 状态
-        // 简单的逻辑：如果当前 tab 不是 neigong/wuxue/arts，重置为 neigong
+        // =====================================================
+        // 技能组与 UI 状态 (Skill Groups)
+        // =====================================================
         if (!["neigong", "wuxue", "arts"].includes(this._cultivationSubTab)) {
             this._cultivationSubTab = "neigong";
         }
         context.cultivationSubTab = this._cultivationSubTab;
 
-        context.skillGroups = [
+        // 定义所有分组
+        const allSkillGroups = [
+            { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }, // 悟性放在定义里方便提取
             { key: "liliang", label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
             { key: "shenfa", label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
             { key: "tipo", label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] },
             { key: "neixi", label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
             { key: "qigan", label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
-            { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] },
-            { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }
+            { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
         ];
+
+        // 拆分悟性和普通属性
+        context.wuxingGroup = allSkillGroups.find(g => g.key === 'wuxing');
+        context.standardSkillGroups = allSkillGroups.filter(g => g.key !== 'wuxing');
 
         // =====================================================
         // 查找当前架招名称 (Find Active Stance Name)
@@ -239,9 +245,12 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // =====================================================
         //  准备技艺列表 (Arts)
         // =====================================================
-        context.artsList = [];
+        // 使用临时数组收集所有技艺，后续进行拆分
+        const allArts = [];
+
         // 获取我们在 DataModel 中算好的身份数据 (Raw Config)
         const activeIdentities = actor.system.activeIdentities || {};
+
         // 遍历配置中的技艺列表，确保顺序一致
         for (const [key, labelKey] of Object.entries(XJZL.arts)) {
             const artData = actor.system.arts[key];
@@ -275,10 +284,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         const title = game.i18n.localize(tKey);
                         const desc = game.i18n.localize(dKey);
 
-                        // 每一项的样式：标题(黄色) + 描述(白色)
+                        // 每一项的样式：标题(金色) + 描述(白色)
+                        // 将颜色变量修正为 --c-highlight 以匹配当前主题
                         return `
                         <div style="margin-bottom: 8px;">
-                            <div style="color:var(--xjzl-gold); font-weight:bold; font-size:1.1em;">
+                            <div style="color:var(--c-highlight); font-weight:bold; font-size:1.1em;">
                                 <i class="fas fa-caret-right" style="font-size:0.8em;"></i> ${title} <span style="opacity:0.6; font-size:0.8em;">(Lv.${id.level})</span>
                             </div>
                             <div style="padding-left: 10px; line-height: 1.4; color: #ddd; font-size: 0.9em;">
@@ -296,9 +306,17 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         level: identityData.highest.level
                     };
                 }
-                context.artsList.push(artObj);
+
+                // 推入临时数组
+                allArts.push(artObj);
             }
         }
+
+        // 拆分数组：供模板分别渲染
+        // learnedArts: 已入门 (Level > 0)
+        context.learnedArts = allArts.filter(a => a.total > 0);
+        // unlearnedArts: 未入门 (Level == 0)
+        context.unlearnedArts = allArts.filter(a => a.total === 0);
 
         // =====================================================
         //  准备技艺书 (Arts Books)

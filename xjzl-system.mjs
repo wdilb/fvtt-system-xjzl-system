@@ -761,6 +761,12 @@ function registerHandlebarsHelpers() {
     return args;
   });
 
+  // 截取字符串: {{substring "string" 0 1}}
+  Handlebars.registerHelper('substring', function(string, start, end) {
+    if (typeof string !== 'string') return "";
+    return string.substring(start, end);
+  });
+
   // 增加 selectOptions (Item Sheet 用到了)
   Handlebars.registerHelper("selectOptions", (choices, options) => {
     // 获取当前选中的值，转为字符串以便比较
