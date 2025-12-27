@@ -326,7 +326,13 @@ export class XJZLItem extends Item {
     // 2. 防具 (同部位互斥，戒指限2，饰品限6)
     else if (this.type === "armor") {
       const type = this.system.type;
-      const limit = (type === "ring") ? 2 : 1;
+      // 设置不同部位的装备上限
+      let limit = 1;
+      if (type === "ring") {
+        limit = 2;
+      } else if (type === "accessory") {
+        limit = 6;
+      }
       // 找到同部位已装备的
       const equippedArmor = actor.itemTypes.armor.filter(i => i.system.equipped && i.system.type === type);
 
