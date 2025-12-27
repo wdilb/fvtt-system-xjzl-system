@@ -1,113 +1,66 @@
-<section class="tab scroll-area {{#if (eq tabs.primary 'jingmai')}}active{{/if}}" data-tab="jingmai"
+{{!-- templates/actor/character/tab-jingmai.hbs --}}
+<section class="xjzl-body tab scroll-area {{#if (eq tabs.primary 'jingmai')}}active{{/if}}" data-tab="jingmai"
     data-group="primary">
 
-    {{!-- 1. 十二正经 (Standard) --}}
-    <div class="xjzl-card">
-        <div class="xjzl-card-header">
-            {{localize "XJZL.Jingmai.Label"}} {{localize "XJZL.Jingmai.StandardLabelSuffix"}}
-        </div>
+    <div class="xjzl-bg-deco">脉</div>
 
-        <div class="xjzl-grid-2">
-            {{!-- 【修改】这里改为遍历 jingmaiStandardList --}}
-            {{#each jingmaiStandardList}}
+    <div class="jingmai-stage">
+        <div class="stage-decoration left">气行周天</div>
+        <div class="stage-decoration right">道法自然</div>
 
-            {{!-- 添加 data-tooltip --}}
-            <div style="display: flex; align-items: center; padding: 5px; border-radius: 4px; background: rgba(0,0,0,0.1); margin: 2px;"
-                data-tooltip="{{this.tooltip}}" data-tooltip-class="xjzl-tooltip" {{!-- 可选：如果你想自定义CSS --}}
-                data-tooltip-direction="UP">
+        <img src="systems/xjzl-system/assets/icons/character/dazuo.svg" class="body-bg">
 
-                {{!-- 复选框 (注意：name 依然需要指向真实的 system 数据路径) --}}
-                <input type="checkbox" name="system.jingmai.standard.{{this.key}}" {{checked this.isActive}}
-                    style="margin-right: 8px; cursor: pointer;" />
+        {{!-- 十二正经 --}}
+        {{#each jingmaiStandardList as |node|}}
+        {{!-- 增加了 {{node.type}} 类名 --}}
+        <div class="meridian-node {{node.type}} {{#if node.isActive}}active{{/if}} {{#if node.equippedItem}}equipped{{/if}}"
+            style="left: {{node.x}}%; top: {{node.y}}%;" data-tooltip="{{node.tooltip}}">
 
-                <div class="xjzl-flex-col" style="gap: 0;">
-                    {{!-- 名称 --}}
-                    <span
-                        style="{{#if this.isActive}}color: var(--xjzl-gold); text-shadow: 0 0 5px rgba(212,175,55,0.3);{{/if}} font-weight: bold;">
-                        {{localize this.label}}
-                    </span>
-
-                    {{!-- 状态 --}}
-                    {{#if this.isActive}}
-                    <span style="font-size: 0.7em; color: #888;">{{localize "XJZL.Jingmai.Opened"}}</span>
-                    {{/if}}
+            <div class="node-click-area">
+                {{#if node.equippedItem}}
+                <div class="qizhen-icon-wrapper" data-action="toggleEquip" data-item-id="{{node.equippedItem.id}}">
+                    <img src="{{node.equippedItem.img}}">
                 </div>
+                {{else}}
+                <input type="checkbox" name="system.jingmai.standard.{{node.key}}" {{checked node.isActive}}>
+                <div class="node-dot"></div>
+                {{/if}}
             </div>
-            {{/each}}
+
+            <div class="node-info-stack">
+                {{#if node.equippedItem}}
+                <span class="info-line qizhen">{{node.equippedItem.name}}</span>
+                {{/if}}
+
+                <span class="info-line tier">{{localize node.tierLabel}}</span>
+                <span class="info-line name">{{localize node.label}}</span>
+            </div>
+
+        </div>
+        {{/each}}
+
+        {{!-- 生死玄关 (正中心) --}}
+        <div class="xuanguan-core {{#if system.jingmai.xuanguan.broken}}broken{{/if}}"
+            data-tooltip="{{localize 'XJZL.Jingmai.XuanguanEffect'}}">
+            <input type="checkbox" name="system.jingmai.xuanguan.broken" {{checked system.jingmai.xuanguan.broken}}>
+            <div class="core-visual"><i class="fas fa-infinity"></i></div>
+            <div class="core-rings"></div>
+            <span class="node-label main-label">{{localize "XJZL.Jingmai.Xuanguan"}}</span>
         </div>
     </div>
 
-    {{!-- 2. 奇经八脉 (Extra) --}}
-    <div class="xjzl-card" style="margin-top: 10px;">
-        <div class="xjzl-card-header">
-            {{localize "XJZL.Jingmai.Extra"}}
-            <span style="font-size: 0.8em; font-weight: normal; opacity: 0.7; margin-left: auto;">
-                <i class="fas fa-magic"></i> {{localize "XJZL.Jingmai.AutoHint"}}
-            </span>
-        </div>
-
-        <div class="xjzl-grid-2">
-            {{#each jingmaiExtraList}}
-
-            {{!-- 添加 data-tooltip --}}
-            <div style="display: flex; align-items: center; padding: 8px; border-radius: 4px; margin: 2px;
-                        {{#if isActive}}background: rgba(212, 175, 55, 0.15); border: 1px solid rgba(212, 175, 55, 0.3);{{else}}background: rgba(0,0,0,0.2); opacity: 0.6;{{/if}}"
-                data-tooltip="{{this.tooltip}}" data-tooltip-direction="UP">
-
-                <div style="margin-right: 10px; font-size: 1.2em; width: 20px; text-align: center;">
-                    {{#if isActive}}
-                    <i class="fas fa-check-circle"
-                        style="color: var(--xjzl-gold); text-shadow: 0 0 8px var(--xjzl-gold);"></i>
-                    {{else}}
-                    <i class="far fa-circle" style="color: #555;"></i>
-                    {{/if}}
+    {{!-- 奇经八脉 --}}
+    <div class="extra-meridians-bar">
+        <div class="bar-title">{{localize "XJZL.Jingmai.Extra"}}</div>
+        <div class="extra-grid">
+            {{#each jingmaiExtraList as |extra|}}
+            <div class="extra-node {{#if extra.isActive}}active{{/if}}" data-tooltip="{{extra.tooltip}}">
+                <div class="icon-circle">
+                    {{#if extra.isActive}}<i class="fas fa-check"></i>{{else}}<i class="fas fa-lock"></i>{{/if}}
                 </div>
-
-                <div class="xjzl-flex-col" style="gap: 2px;">
-                    <span
-                        style="font-weight: bold; {{#if isActive}}color: var(--xjzl-gold);{{else}}color: #999;{{/if}}">
-                        {{localize label}}
-                    </span>
-                    <span style="font-size: 0.75em; color: #aaa;">
-                        {{#if isActive}}
-                        {{localize "XJZL.Jingmai.Active"}}
-                        {{else}}
-                        {{localize "XJZL.Jingmai.Locked"}}
-                        {{/if}}
-                    </span>
-                </div>
+                <span class="name">{{localize extra.label}}</span>
             </div>
             {{/each}}
-        </div>
-    </div>
-
-    {{!-- 3. 生死玄关 (保持不变) --}}
-    <div class="xjzl-card"
-        style="margin-top: 10px; border-color: var(--xjzl-gold); background: linear-gradient(to bottom, rgba(0,0,0,0.5), rgba(50,40,10,0.3));">
-        <div class="xjzl-card-header"
-            style="color: var(--xjzl-gold) !important; border-bottom-color: var(--xjzl-gold);">
-            {{localize "XJZL.Jingmai.Xuanguan"}}
-        </div>
-        <div style="text-align: center; padding: 15px;">
-            <div style="margin-bottom: 10px; font-size: 1.1em;">
-                {{localize "XJZL.Jingmai.XuanguanDesc"}}
-            </div>
-
-            <label class="switch-toggle">
-                <input type="checkbox" name="system.jingmai.xuanguan.broken" {{checked
-                    system.jingmai.xuanguan.broken}} />
-                <span class="slider round"></span>
-            </label>
-
-            {{#if system.jingmai.xuanguan.broken}}
-            <div style="margin-top: 10px; color: var(--xjzl-gold); font-weight: bold; animation: pulse 2s infinite;">
-                <i class="fas fa-infinity"></i> {{localize "XJZL.Jingmai.XuanguanEffect"}}
-            </div>
-            {{else}}
-            <p style="font-size: 0.9em; color: #888; margin-top: 5px;">
-                {{localize "XJZL.Jingmai.XuanguanHint"}}
-            </p>
-            {{/if}}
         </div>
     </div>
 

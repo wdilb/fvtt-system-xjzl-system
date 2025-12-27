@@ -340,49 +340,108 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 经脉显示数据准备 (Jingmai Presentation)
         // =====================================================
 
-        // --- 1. 十二正经 (Standard) 配置表 ---
-        // 定义元数据：Key -> {Tier, Type}
+        // 1. 定义坐标 (左右分列，按层级 T3->T2->T1 从上到下排列)
+        const MERIDIAN_COORDS = {
+            // === 左侧屏幕 (阴脉 Yin) ===
+            // 手太阴肺 (左肩/胸) - T3
+            "hand_taiyin": { x: 32, y: 35 },
+            // 手厥阴心包 (左肘/臂内) - T2
+            "hand_jueyin": { x: 22, y: 48 },
+            // 手少阴心 (左手腕/掌) - T1
+            "hand_shaoyin": { x: 30, y: 65 },
+
+            // 足太阴脾 (左膝上) - T3
+            "foot_taiyin": { x: 28, y: 75 },
+            // 足厥阴肝 (左大腿内侧) - T2
+            "foot_jueyin": { x: 42, y: 80 },
+            // 足少阴肾 (左足底/丹田下) - T1
+            "foot_shaoyin": { x: 48, y: 88 },
+
+            // === 右侧屏幕 (阳脉 Yang) ===
+            // 足太阳膀胱 (头顶/眉心) - T3 (特例，属阳，居中偏上)
+            "foot_taiyang": { x: 50, y: 20 },
+
+            // 手阳明大肠 (右肩) - T2
+            "hand_yangming": { x: 68, y: 35 },
+            // 手少阳三焦 (右臂外侧) - T1
+            "hand_shaoyang": { x: 78, y: 48 },
+            // 手太阳小肠 (右手腕) - T3
+            "hand_taiyang": { x: 70, y: 65 },
+
+            // 足阳明胃 (右胸/腹) - T2
+            "foot_yangming": { x: 62, y: 55 },
+            // 足少阳胆 (右膝/侧腹) - T1
+            "foot_shaoyang": { x: 72, y: 75 },
+        };
+
+        // 2. 获取已装备的奇珍 (按穴位索引)
+        const equippedQizhenMap = {};
+        const qizhenItems = actor.itemTypes.qizhen || [];
+        for (const item of qizhenItems) {
+            if (item.system.equipped && item.system.acupoint) {
+                equippedQizhenMap[item.system.acupoint] = item;
+            }
+        }
+
+        // 3. 构建 Standard List (增强版)
         const standardMeta = {
-            // 第一关
             "hand_shaoyin": { t: 1, type: "yin" }, "foot_shaoyin": { t: 1, type: "yin" },
             "hand_shaoyang": { t: 1, type: "yang" }, "foot_shaoyang": { t: 1, type: "yang" },
-            // 第二关
             "hand_jueyin": { t: 2, type: "yin" }, "foot_jueyin": { t: 2, type: "yin" },
             "hand_yangming": { t: 2, type: "yang" }, "foot_yangming": { t: 2, type: "yang" },
-            // 第三关
             "hand_taiyin": { t: 3, type: "yin" }, "foot_taiyin": { t: 3, type: "yin" },
             "hand_taiyang": { t: 3, type: "yang" }, "foot_taiyang": { t: 3, type: "yang" }
         };
 
-        // 构建 Standard List
         context.jingmaiStandardList = Object.entries(standardMeta).map(([key, meta]) => {
             const isOpen = actor.system.jingmai.standard[key];
+            const coord = MERIDIAN_COORDS[key] || { x: 50, y: 50 };
+            const equippedItem = equippedQizhenMap[key];
+
+            // 1. 获取完整名称
+            const fullName = game.i18n.localize(`XJZL.Jingmai.${key.charAt(0).toUpperCase() + key.slice(1)}`);
+
+            // 2. 提取短名称 (括号内的内容)
+            // 正则匹配 (...)，如果匹配不到则使用原名
+            const match = fullName.match(/\(([^)]+)\)/);
+            const shortLabel = match ? match[1] : fullName; // 如果没有括号就显示全名
+
+            // Tooltip (显示完整信息)
             const tierLabel = game.i18n.localize(`XJZL.Jingmai.T${meta.t}`);
-            const typeLabel = game.i18n.localize(`XJZL.Jingmai.Type.${meta.type.charAt(0).toUpperCase() + meta.type.slice(1)}`);
             const effectLabel = game.i18n.localize(`XJZL.Jingmai.Effects.${key.charAt(0).toUpperCase() + key.slice(1)}`);
 
-            // 构建 HTML 格式的 Tooltip
-            // 格式:
-            // 第一关 (人级) · 阴脉
-            // ----------------
-            // 效果: 气血+10...
-            const tooltip = `
-                <div style='text-align:left; min-width:150px;'>
-                    <div style='font-weight:bold; color:var(--xjzl-gold); margin-bottom:4px;'>${tierLabel} · ${typeLabel}</div>
-                    <hr style='border-color:#555; margin:2px 0 4px 0;'>
-                    <div>${effectLabel}</div>
+            let tooltip = `
+                <div style='text-align:left; min-width:200px;'>
+                    <div style='font-weight:bold; color:var(--c-highlight); font-size:14px;'>${fullName}</div>
+                    <div style='font-size:10px; color:#ccc; margin-bottom:6px;'>${tierLabel} · ${meta.type === 'yin' ? '阴脉' : '阳脉'}</div>
+                    <div style='padding:4px; background:rgba(255,255,255,0.1); border-radius:4px;'>${effectLabel}</div>
                 </div>
             `;
 
+            if (equippedItem) {
+                // 奇珍描述
+                const desc = equippedItem.system.description || "暂无描述";
+                tooltip += `
+                <hr style='border-color:#555; margin:8px 0;'>
+                <div style='color:#a2e8dd; font-weight:bold; margin-bottom:4px;'><i class='fas fa-gem'></i> ${equippedItem.name}</div>
+                <div style='font-size:11px; color:#aaa; line-height:1.4;'>${desc}</div>
+                `;
+            }
+
             return {
                 key: key,
-                label: `XJZL.Jingmai.${key.charAt(0).toUpperCase() + key.slice(1)}`,
+                label: shortLabel, // 传递短名
+                tierLabel: `XJZL.Jingmai.T${meta.t}`,
                 isActive: isOpen,
-                tooltip: tooltip
+                tooltip: tooltip,
+                x: coord.x,
+                y: coord.y,
+                equippedItem: equippedItem,
+                type: meta.type // 传递类型: 'yin' 或 'yang'
             };
         });
 
-        // --- 2. 奇经八脉 (Extra) ---
+        // --- 4. 奇经八脉 (Extra) ---
         const extraOrder = ["du", "ren", "chong", "dai", "yangwei", "yinwei", "yangqiao", "yinqiao"];
 
         context.jingmaiExtraList = extraOrder.map(key => {
