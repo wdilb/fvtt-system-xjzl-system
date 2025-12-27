@@ -1,88 +1,220 @@
-<section class="tab scroll-area {{#if (eq tabs.primary 'inventory')}}active{{/if}}" data-tab="inventory"
+<section class="xjzl-body tab scroll-area {{#if (eq tabs.primary 'inventory')}}active{{/if}}" data-tab="inventory"
     data-group="primary">
 
-    {{!-- 遍历我们在 JS 里分好的组 (weapon, armor, qizhen...) --}}
-    {{#each inventory as |section|}}
-    <div class="xjzl-flex-col" style="margin-bottom: 15px;">
+    <div class="xjzl-bg-deco">囊</div>
 
-        {{!-- 分类标题 + 添加按钮 --}}
-        <div class="xjzl-flex-row"
-            style="border-bottom: 2px solid var(--xjzl-ink-500); padding-bottom: 5px; align-items: center;">
-            <h3 class="inventory-header" style="margin:0; border:none; flex:1;">{{localize section.label}}</h3>
-            <a data-action="createItem" data-type="{{section.type}}" title="{{localize 'UI.CreateNew'}}"><i
-                    class="fas fa-plus"></i></a>
-        </div>
+    <div class="inventory-split-view">
 
-        {{!-- 物品列表 --}}
-        <div class="xjzl-flex-col" style="gap: 5px;">
-            {{#each section.items as |item|}}
-            <div class="xjzl-card neigong-item"
-                style="flex-direction: row; align-items: center; padding: 5px; min-height: auto;">
+        {{!-- LEFT: 纸娃娃 --}}
+        <div class="paper-doll-container">
+            {{!-- 背景 --}}
+            <img src="{{dollBg}}" class="doll-bg">
 
-                {{!-- 图标 --}}
-                <a class="item-icon" data-action="editItem" data-item-id="{{item.id}}"
-                    style="flex: 0 0 40px; height: 40px;">
-                    <img src="{{item.img}}" />
-                </a>
+            {{!-- === 左侧列 (Center: 50px) - [整体上移] === --}}
 
-                {{!-- 信息 --}}
-                <div class="xjzl-flex-col xjzl-grow" style="gap: 2px; margin-left: 10px;">
-                    <div class="item-name" style="font-size: 1em;">
-                        {{item.name}}
-                        {{#if (gt item.system.quantity 1)}}
-                        <span style="font-weight:bold; color:var(--xjzl-gold);">x{{item.system.quantity}}</span>
-                        {{/if}}
-                    </div>
-                    <div style="font-size: 0.8em; color: #aaa;">
-                        {{!-- 根据类型显示不同简略信息 --}}
-                        {{#if (eq item.type "weapon")}} 伤:{{item.system.damage}} {{/if}}
-                        {{#if (eq item.type "armor")}} {{item.system.type}} {{/if}}
-                        {{#if (eq item.type "qizhen")}} {{item.system.acupoint}} {{/if}}
-                        {{#if (eq item.type "consumable")}} {{item.system.type}} {{/if}}
-                        {{#if (eq item.type "manual")}} {{item.system.tier}}阶 {{/if}}
-                    </div>
+            {{!-- 头饰 (10% -> 5%) --}}
+            <div class="doll-slot head quality-{{equipped.head.system.quality}}" style="top: 5%; left: 50px;">
+                {{#if equipped.head}}
+                <div class="doll-item" data-action="toggleEquip" data-item-id="{{equipped.head.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.head.name}}</b><hr>{{equipped.head.system.description}}</div>">
+                    <img src="{{equipped.head.img}}">
+                    <span class="doll-label">{{equipped.head.name}}</span>
                 </div>
-
-                {{!-- 操作区 --}}
-                <div style="display: flex; align-items: center; gap: 10px;">
-
-                    {{!-- 1. 装备开关 (仅限装备类) --}}
-                    {{#if (or (eq item.type "weapon") (eq item.type "armor") (eq item.type "qizhen"))}}
-                    <a data-action="toggleEquip" data-item-id="{{item.id}}"
-                        title="{{#if item.system.equipped}}卸下{{else}}装备{{/if}}"
-                        style="font-size: 1.5em; color: {{#if item.system.equipped}}var(--xjzl-jade){{else}}#444{{/if}};">
-                        <i class="fas {{#if item.system.equipped}}fa-toggle-on{{else}}fa-toggle-off{{/if}}"></i>
-                    </a>
-                    {{/if}}
-
-                    {{!-- 2. 使用按钮 (仅限消耗品) --}}
-                    {{#if (eq item.type "consumable")}}
-                    <a data-action="useConsumable" data-item-id="{{item.id}}" title="使用"
-                        style="font-size: 1.2em; color: var(--xjzl-accent);">
-                        <i class="fas fa-flask"></i>
-                    </a>
-                    {{/if}}
-
-                    {{!-- 3. 阅读按钮 (仅限秘籍) --}}
-                    {{#if (eq item.type "manual")}}
-                    <a data-action="readManual" data-item-id="{{item.id}}" title="阅读/学习"
-                        style="font-size: 1.2em; color: var(--xjzl-gold);">
-                        <i class="fas fa-book-open"></i>
-                    </a>
-                    {{/if}}
-
-                    {{!-- 删除 --}}
-                    <a data-action="deleteItem" data-item-id="{{item.id}}" style="color: #666;"><i
-                            class="fas fa-trash"></i></a>
-                </div>
-
+                {{else}}<i class="fas fa-helmet-safety placeholder"></i>{{/if}}
             </div>
-            {{else}}
-            <div style="text-align: center; color: #999; font-size: 0.8em;">空</div>
-            {{/each}}
+
+            {{!-- 下衣 (30% -> 25%) --}}
+            <div class="doll-slot bottom quality-{{equipped.bottom.system.quality}}" style="top: 25%; left: 50px;">
+                {{#if equipped.bottom}}
+                <div class="doll-item" data-action="toggleEquip" data-item-id="{{equipped.bottom.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.bottom.name}}</b><hr>{{equipped.bottom.system.description}}</div>">
+                    <img src="{{equipped.bottom.img}}">
+                    <span class="doll-label">{{equipped.bottom.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-user-ninja placeholder"></i>{{/if}}
+            </div>
+
+            {{!-- 耳环 (50% -> 45%) --}}
+            <div class="doll-slot earring quality-{{equipped.earring.system.quality}}" style="top: 45%; left: 50px;">
+                {{#if equipped.earring}}
+                <div class="doll-item" data-action="toggleEquip" data-item-id="{{equipped.earring.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.earring.name}}</b><hr>{{equipped.earring.system.description}}</div>">
+                    <img src="{{equipped.earring.img}}">
+                    <span class="doll-label">{{equipped.earring.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-ear-listen placeholder"></i>{{/if}}
+            </div>
+
+            {{!-- 戒指 1 (68% -> 63%) --}}
+            <div class="doll-slot small quality-{{equipped.rings.0.system.quality}}" style="top: 63%; left: 50px;">
+                {{#with (lookup equipped.rings 0) as |item|}}
+                <div class="doll-item small" data-action="toggleEquip" data-item-id="{{item.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{item.name}}</b><hr>{{item.system.description}}</div>">
+                    <img src="{{item.img}}">
+                    <span class="doll-label">{{item.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-ring placeholder small"></i>{{/with}}
+            </div>
+
+
+            {{!-- === 右侧列 (Center: 270px) - [整体上移] === --}}
+
+            {{!-- 上衣 (10% -> 5%) --}}
+            <div class="doll-slot top quality-{{equipped.top.system.quality}}" style="top: 5%; left: 270px;">
+                {{#if equipped.top}}
+                <div class="doll-item" data-action="toggleEquip" data-item-id="{{equipped.top.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.top.name}}</b><hr>{{equipped.top.system.description}}</div>">
+                    <img src="{{equipped.top.img}}">
+                    <span class="doll-label">{{equipped.top.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-shirt placeholder"></i>{{/if}}
+            </div>
+
+            {{!-- 鞋子 (30% -> 25%) --}}
+            <div class="doll-slot shoes quality-{{equipped.shoes.system.quality}}" style="top: 25%; left: 270px;">
+                {{#if equipped.shoes}}
+                <div class="doll-item" data-action="toggleEquip" data-item-id="{{equipped.shoes.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.shoes.name}}</b><hr>{{equipped.shoes.system.description}}</div>">
+                    <img src="{{equipped.shoes.img}}">
+                    <span class="doll-label">{{equipped.shoes.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-boot placeholder"></i>{{/if}}
+            </div>
+
+            {{!-- 项链 (50% -> 45%) --}}
+            <div class="doll-slot necklace quality-{{equipped.necklace.system.quality}}" style="top: 45%; left: 270px;">
+                {{#if equipped.necklace}}
+                <div class="doll-item" data-action="toggleEquip" data-item-id="{{equipped.necklace.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.necklace.name}}</b><hr>{{equipped.necklace.system.description}}</div>">
+                    <img src="{{equipped.necklace.img}}">
+                    <span class="doll-label">{{equipped.necklace.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-gem placeholder"></i>{{/if}}
+            </div>
+
+            {{!-- 戒指 2 (68% -> 63%) --}}
+            <div class="doll-slot small quality-{{equipped.rings.1.system.quality}}" style="top: 63%; left: 270px;">
+                {{#with (lookup equipped.rings 1) as |item|}}
+                <div class="doll-item small" data-action="toggleEquip" data-item-id="{{item.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{item.name}}</b><hr>{{item.system.description}}</div>">
+                    <img src="{{item.img}}">
+                    <span class="doll-label">{{item.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-ring placeholder small"></i>{{/with}}
+            </div>
+
+
+            {{!-- === 底部底座 - [大幅上移] === --}}
+
+            {{!-- 武器 (85% -> 80%) --}}
+            <div class="doll-slot weapon quality-{{equipped.weapon.system.quality}}" style="top: 80%; left: 100px;">
+                {{#if equipped.weapon}}
+                <div class="doll-item weapon-visual" data-action="toggleEquip" data-item-id="{{equipped.weapon.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.weapon.name}}</b><hr>{{equipped.weapon.system.description}}</div>">
+                    <img src="{{equipped.weapon.img}}">
+                    <span class="doll-label">{{equipped.weapon.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-sword placeholder"></i>{{/if}}
+            </div>
+
+            {{!-- 暗器 (85% -> 80%) --}}
+            <div class="doll-slot hidden-weapon quality-{{equipped.hidden.system.quality}}"
+                style="top: 80%; left: 220px;">
+                {{#if equipped.hidden}}
+                <div class="doll-item" data-action="toggleEquip" data-item-id="{{equipped.hidden.id}}"
+                    data-tooltip="<div class='xjzl-tooltip-item'><b>{{equipped.hidden.name}}</b><hr>{{equipped.hidden.system.description}}</div>">
+                    <img src="{{equipped.hidden.img}}">
+                    <span class="doll-label">{{equipped.hidden.name}}</span>
+                </div>
+                {{else}}<i class="fas fa-fan placeholder"></i>{{/if}}
+            </div>
+
+            {{!-- 饰品 (保持在底部，现在有了充足空间) --}}
+            <div class="accessories-row">
+                {{#each equipped.accessories as |item|}}
+                <div class="doll-slot small quality-{{item.system.quality}}">
+                    {{#if item}}
+                    <div class="doll-item small" data-action="toggleEquip" data-item-id="{{item.id}}"
+                        data-tooltip="<div class='xjzl-tooltip-item'><b>{{item.name}}</b><hr>{{item.system.description}}</div>">
+                        <img src="{{item.img}}">
+                        <span class="doll-label">{{item.name}}</span>
+                    </div>
+                    {{else}}<i class="fas fa-star placeholder small"></i>{{/if}}
+                </div>
+                {{/each}}
+            </div>
         </div>
 
+        {{!-- RIGHT: 列表 (保持不变) --}}
+        <div class="inventory-main">
+            {{!-- ... 内容略，因为没有变动 ... --}}
+            {{!-- 如果你需要完整代码，请告诉我，不过这一块完全没变 --}}
+            <div class="inventory-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    {{!-- [修改] 移除了 data-action，加了 class="inventory-search-input" --}}
+                    <input type="text" name="inventory-search" class="inventory-search-input"
+                        placeholder="{{localize 'XJZL.UI.Search'}}">
+                </div>
+                <div class="silver-tag">
+                    <i class="fas fa-coins"></i>
+                    <input type="number" name="system.resources.silver" value="{{system.resources.silver}}">
+                </div>
+            </div>
+
+            <div class="inventory-list-container">
+                {{#each inventory as |section|}}
+                {{#if section.items.length}}
+                <details class="inventory-section" open>
+                    <summary class="section-header">
+                        <span class="label">{{localize section.label}}</span>
+                        <span class="count">{{section.items.length}}</span>
+                        <span class="line"></span>
+                        {{!-- [视觉提示] 箭头图标通过CSS ::after 添加 --}}
+                    </summary>
+
+                    <div class="item-grid">
+                        {{#each section.items as |item|}}
+                        <div class="item-grid-card quality-{{item.system.quality}} {{#if item.system.equipped}}equipped{{/if}}"
+                            data-item-id="{{item.id}}"
+                            data-tooltip="<div class='xjzl-tooltip-item'><b>{{item.name}}</b><hr>{{item.system.description}}</div>">
+
+                            {{#if item.system.equipped}}
+                            <div class="equipped-badge" title="已装备"><i class="fas fa-check"></i></div>
+                            {{/if}}
+
+                            <div class="card-icon" data-action="toggleEquip" data-item-id="{{item.id}}">
+                                <img src="{{item.img}}">
+                                {{#if (gt item.system.quantity 1)}}
+                                <span class="qty">{{item.system.quantity}}</span>
+                                {{/if}}
+                            </div>
+
+                            <div class="card-info">
+                                <div class="item-name" data-action="editItem" data-item-id="{{item.id}}">{{item.name}}
+                                </div>
+                                <div class="meta">
+                                    <span class="quality-text q-{{item.system.quality}}">
+                                        {{localize (concat "XJZL.Qualities." item.system.quality)}}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div class="card-actions">
+                                <a data-action="postItem" data-item-id="{{item.id}}"
+                                    title="{{localize 'XJZL.UI.Chat.ItemCard.Send'}}"><i class="fas fa-comment"></i></a>
+                                <a data-action="editItem" data-item-id="{{item.id}}"><i class="fas fa-edit"></i></a>
+                                <a data-action="deleteItem" data-item-id="{{item.id}}" class="delete"><i
+                                        class="fas fa-trash"></i></a>
+                            </div>
+                        </div>
+                        {{/each}}
+                    </div>
+                </details>
+                {{/if}}
+                {{/each}}
+            </div>
+        </div>
     </div>
-    {{/each}}
 
 </section>

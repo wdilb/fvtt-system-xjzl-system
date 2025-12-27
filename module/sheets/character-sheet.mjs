@@ -35,6 +35,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             toggleEquip: XJZLCharacterSheet.prototype._onToggleEquip,
             useConsumable: XJZLCharacterSheet.prototype._onUseConsumable,
             readManual: XJZLCharacterSheet.prototype._onReadManual,
+            // 添加搜索监听
+            searchInventory: XJZLCharacterSheet.prototype._onSearchInventory,
 
             // --- 修炼系统 (统一使用辅助方法) ---
             investXP: XJZLCharacterSheet.prototype._onInvestXP,
@@ -150,36 +152,128 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     /* -------------------------------------------- */
 
     async _prepareContext(options) {
+        // =====================================================
+        // ✦ 1. 核心上下文初始化 (Core Initialization)
+        // -----------------------------------------------------
+        // 获取基础上下文，准备 actor 和 system 的简写引用
         const context = await super._prepareContext(options);
         const actor = this.document;
+        const system = actor.system;
 
-        context.system = actor.system;
-        context.tabs = this.tabGroups;
+        context.system = system;     // 方便 Handlebars 中直接使用 system.xxx
+        context.tabs = this.tabGroups; // 标签页配置
 
-        // 资源百分比
-        context.percents = {
-            hp: actor.system.resources.hp.max ? Math.min(100, (actor.system.resources.hp.value / actor.system.resources.hp.max) * 100) : 0,
-            mp: actor.system.resources.mp.max ? Math.min(100, (actor.system.resources.mp.value / actor.system.resources.mp.max) * 100) : 0
+        // =====================================================
+        // ✦ 2. 表单下拉选项配置 (Form Choices & Config)
+        // -----------------------------------------------------
+        // 这里集中处理所有 <select> 标签需要的枚举数据
+        // localizeConfig 会将 key 转换为翻译后的文本
+        context.choices = {
+            // [基础信息页] 性别选择
+            genders: localizeConfig(XJZL.genders),
+
+            // [基础信息页] 门派选择
+            sects: localizeConfig(XJZL.sects),
+
+            // [基础信息页] 处世态度
+            attitudes: localizeConfig(XJZL.attitudes),
+
+            // [基础信息页] 嗜好列表
+            hobbies: localizeConfig(XJZL.hobbies)
         };
 
-        // 内功
-        context.neigongs = actor.itemTypes.neigong || [];
-        context.neigongs.forEach(item => item.isRunning = item.system.active);
+        // =====================================================
+        // ✦ 3. 角色状态与基础信息 (Status & Bio)
+        // -----------------------------------------------------
+        // [UI显示] 计算资源百分比，主要用于前端 CSS 的 width: xx% 进度条
+        context.percents = {
+            hp: system.resources.hp.max ? Math.min(100, (system.resources.hp.value / system.resources.hp.max) * 100) : 0,
+            mp: system.resources.mp.max ? Math.min(100, (system.resources.mp.value / system.resources.mp.max) * 100) : 0,
+            rage: (system.resources.rage.value / 10) * 100 // 怒气上限固定为 10
+        };
 
+        // [单例物品] 获取背景和性格物品，用于在首页显示详情
+        context.backgroundItem = actor.itemTypes.background?.[0] || null;
+        context.personalityItem = actor.itemTypes.personality?.[0] || null;
+
+        // [嗜好槽位] 构造固定长度为3的数组，确保界面上始终显示3个下拉框
+        // 逻辑：读取现有嗜好 -> 填充空位 -> 映射为对象
+        const currentHobbies = system.info.shihao || [];
+        context.hobbySlots = [0, 1, 2].map(i => ({
+            index: i,
+            value: currentHobbies[i] || "" // 如果该槽位没数据，则为空，显示“请选择”
+        }));
+
+        // =====================================================
+        // ✦ 4. 属性技能面板 (Attributes & Skills Tab)
+        // -----------------------------------------------------
+        // [子标签页] 确保 cultivationSubTab 在合法范围内 (默认切回内功)
+        if (!["neigong", "wuxue", "arts"].includes(this._cultivationSubTab)) {
+            this._cultivationSubTab = "neigong";
+        }
+        context.cultivationSubTab = this._cultivationSubTab;
+
+        // [技能分组] 定义属性与对应技能的映射关系
+        // 用于在模板中通过 {{#each}} 循环渲染七大属性块
+        const allSkillGroups = [
+            { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }, // 悟性
+            { key: "liliang", label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] }, // 力量
+            { key: "shenfa", label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] }, // 身法
+            { key: "tipo", label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] }, // 体魄
+            { key: "neixi", label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] }, // 内息
+            { key: "qigan", label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] }, // 气感
+            { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }  // 神采
+        ];
+
+        // 将“悟性”单独提取（可能 UI 布局特殊），其余作为标准组
+        context.wuxingGroup = allSkillGroups.find(g => g.key === 'wuxing');
+        context.standardSkillGroups = allSkillGroups.filter(g => g.key !== 'wuxing');
+
+        // [编辑器] 获取属性调整选项 (用于 Active Effects 编辑弹窗)
         context.groupedModifierOptions = this._getGroupedModifierOptions();
 
         // =====================================================
-        //  准备武学 (调用 Item 方法计算)
-        // =====================================================
-        context.wuxues = actor.itemTypes.wuxue || [];
+        // ✦ 5. 战斗核心数据 (Combat & Martial Arts)
+        // -----------------------------------------------------
+        // [内功] 列表与激活状态标记
+        context.neigongs = actor.itemTypes.neigong || [];
+        context.neigongs.forEach(item => item.isRunning = item.system.active);
 
+        // [当前运行内功] 用于顶部状态栏显示名称与简述
+        context.activeNeigongName = "";
+        context.activeNeigongDesc = "";
+        if (system.martial.active_neigong) {
+            const ng = actor.items.get(system.martial.active_neigong);
+            if (ng) {
+                context.activeNeigongName = ng.name;
+                context.activeNeigongDesc = ng.system.description || "";
+            }
+        }
+
+        // [架招] 获取当前激活的架招 (Stance) 及其自动化描述
+        context.activeStance = null;
+        const martial = system.martial;
+        if (martial.stanceActive && martial.stanceItemId && martial.stance) {
+            const stanceItem = actor.items.get(martial.stanceItemId);
+            const move = stanceItem?.system.moves.find(m => m.id === martial.stance);
+            if (move) {
+                context.activeStance = {
+                    name: move.name,
+                    description: move.description,
+                    automationNote: move.automationNote
+                };
+            }
+        }
+
+        // [外功/武学] 预计算招式伤害 (Pre-calculation)
+        // 说明: 让 Sheet 保持轻量，具体的伤害公式委托给 Item.calculateMoveDamage 处理
+        context.wuxues = actor.itemTypes.wuxue || [];
         for (const wuxue of context.wuxues) {
             const moves = wuxue.system.moves || [];
             moves.forEach(move => {
-                // 委托 Item 计算数值 (瘦 Sheet)
                 const result = wuxue.calculateMoveDamage(move.id);
-
                 if (result) {
+                    // 添加调试/提示信息，告知用户这是基于标准木桩的数值
                     result.breakdown += `\n\n------------------\n注: 预估基于100气血/100内力/0怒气\n无内功和招式抗性的标准木桩`;
                     move.derived = result;
                 } else {
@@ -189,201 +283,81 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // =====================================================
-        // 技能组与 UI 状态 (Skill Groups)
-        // =====================================================
-        if (!["neigong", "wuxue", "arts"].includes(this._cultivationSubTab)) {
-            this._cultivationSubTab = "neigong";
-        }
-        context.cultivationSubTab = this._cultivationSubTab;
-
-        // 定义所有分组
-        const allSkillGroups = [
-            { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }, // 悟性放在定义里方便提取
-            { key: "liliang", label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
-            { key: "shenfa", label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
-            { key: "tipo", label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] },
-            { key: "neixi", label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
-            { key: "qigan", label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
-            { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
-        ];
-
-        // 拆分悟性和普通属性
-        context.wuxingGroup = allSkillGroups.find(g => g.key === 'wuxing');
-        context.standardSkillGroups = allSkillGroups.filter(g => g.key !== 'wuxing');
-
-        // =====================================================
-        // 查找当前架招名称 (Find Active Stance Name)
-        // =====================================================
-        context.activeStance = null; // 默认无架招
-
-        const martial = actor.system.martial;
-        if (martial.stanceActive && martial.stanceItemId && martial.stance) {
-            const stanceItem = actor.items.get(martial.stanceItemId);
-            if (stanceItem) {
-                const move = stanceItem.system.moves.find(m => m.id === martial.stance);
-                if (move) {
-                    // 构建完整的数据对象
-                    context.activeStance = {
-                        name: move.name,
-                        description: move.description,
-                        automationNote: move.automationNote
-                    };
-                }
-            }
-        }
-
-        // 物品分类
-        context.inventory = [
-            { label: "TYPES.Item.weapon", type: "weapon", items: actor.itemTypes.weapon },
-            { label: "TYPES.Item.armor", type: "armor", items: actor.itemTypes.armor },
-            { label: "TYPES.Item.qizhen", type: "qizhen", items: actor.itemTypes.qizhen },
-            { label: "TYPES.Item.consumable", type: "consumable", items: actor.itemTypes.consumable },
-            { label: "TYPES.Item.manual", type: "manual", items: actor.itemTypes.manual },
-            { label: "TYPES.Item.misc", type: "misc", items: actor.itemTypes.misc }
-        ];
-
-        // 调用特效准备函数
-        this._prepareEffects(context);
-
-        // =====================================================
-        //  准备技艺列表 (Arts)
-        // =====================================================
-        // 使用临时数组收集所有技艺，后续进行拆分
+        // ✦ 6. 技艺与身份系统 (Arts & Identities)
+        // -----------------------------------------------------
         const allArts = [];
+        const activeIdentities = system.activeIdentities || {};
 
-        // 获取我们在 DataModel 中算好的身份数据 (Raw Config)
-        const activeIdentities = actor.system.activeIdentities || {};
-
-        // 遍历配置中的技艺列表，确保顺序一致
+        // 遍历所有定义的技艺，合并数据
         for (const [key, labelKey] of Object.entries(XJZL.arts)) {
-            const artData = actor.system.arts[key];
-            if (artData) {
-                // 基础数据
-                const artObj = {
-                    key: key,
-                    label: labelKey, // "XJZL.Arts.Duanzao"
-                    total: artData.total || 0,
-                    identity: null // 默认无身份
+            const artData = system.arts[key];
+            if (!artData) continue;
+
+            const artObj = {
+                key: key,
+                label: labelKey,
+                total: artData.total || 0,
+                identity: null // 默认无身份
+            };
+
+            // [身份处理] 如果该技艺有激活的身份，生成徽章(Badge)和悬浮提示(Tooltip)
+            const identityData = activeIdentities[key];
+            if (identityData && identityData.highest) {
+                const capKey = key.charAt(0).toUpperCase() + key.slice(1);
+                const badgeTitle = game.i18n.localize(`XJZL.Identity.${capKey}.${identityData.highest.titleKey}`);
+
+                // 生成复杂的 HTML Tooltip，展示所有已获得的身份历史
+                const tooltipRows = identityData.all.map(id => {
+                    const title = game.i18n.localize(`XJZL.Identity.${capKey}.${id.titleKey}`);
+                    const desc = game.i18n.localize(`XJZL.Identity.${capKey}.${id.descKey}`);
+                    return `
+                <div style="margin-bottom: 8px;">
+                    <div style="color:var(--c-highlight); font-weight:bold; font-size:1.1em;">
+                        <i class="fas fa-caret-right" style="font-size:0.8em;"></i> ${title} <span style="opacity:0.6; font-size:0.8em;">(Lv.${id.level})</span>
+                    </div>
+                    <div style="padding-left: 10px; line-height: 1.4; color: #ddd; font-size: 0.9em;">${desc}</div>
+                </div>`;
+                }).join("<hr style='border-color:#444; margin: 4px 0;'>");
+
+                artObj.identity = {
+                    title: badgeTitle, // 界面上只显示最高头衔
+                    tooltip: `<div style="text-align:left; max-width:400px; padding:2px;">${tooltipRows}</div>`,
+                    level: identityData.highest.level
                 };
-
-                // 身份处理逻辑
-                // 检查该技艺是否有激活的身份
-                // identityData 现在是 { highest: {...}, all: [...] }
-                const identityData = activeIdentities[key];
-
-                if (identityData && identityData.highest) {
-                    const capKey = key.charAt(0).toUpperCase() + key.slice(1);
-
-                    // 1. 徽章显示的标题 (取最高级)
-                    const badgeTitleKey = `XJZL.Identity.${capKey}.${identityData.highest.titleKey}`;
-                    const badgeTitle = game.i18n.localize(badgeTitleKey);
-
-                    // 2. 构建 Tooltip (遍历所有已获得的身份)
-                    // 使用 map + join 生成长 HTML
-                    let tooltipRows = identityData.all.map(id => {
-                        const tKey = `XJZL.Identity.${capKey}.${id.titleKey}`;
-                        const dKey = `XJZL.Identity.${capKey}.${id.descKey}`;
-
-                        const title = game.i18n.localize(tKey);
-                        const desc = game.i18n.localize(dKey);
-
-                        // 每一项的样式：标题(金色) + 描述(白色)
-                        // 将颜色变量修正为 --c-highlight 以匹配当前主题
-                        return `
-                        <div style="margin-bottom: 8px;">
-                            <div style="color:var(--c-highlight); font-weight:bold; font-size:1.1em;">
-                                <i class="fas fa-caret-right" style="font-size:0.8em;"></i> ${title} <span style="opacity:0.6; font-size:0.8em;">(Lv.${id.level})</span>
-                            </div>
-                            <div style="padding-left: 10px; line-height: 1.4; color: #ddd; font-size: 0.9em;">
-                                ${desc}
-                            </div>
-                        </div>`;
-                    }).join("<hr style='border-color:#444; margin: 4px 0;'>"); // 用分割线连接
-
-                    // 包裹在外层容器中
-                    const tooltipHtml = `<div style="text-align:left; max-width:400px; padding:2px;">${tooltipRows}</div>`;
-
-                    artObj.identity = {
-                        title: badgeTitle,   // 徽章只显示最高头衔
-                        tooltip: tooltipHtml, // 悬停显示所有历史头衔
-                        level: identityData.highest.level
-                    };
-                }
-
-                // 推入临时数组
-                allArts.push(artObj);
             }
+            allArts.push(artObj);
         }
 
-        // 拆分数组：供模板分别渲染
-        // learnedArts: 已入门 (Level > 0)
+        // [拆分列表] 界面上分为 "已入门(Learned)" 和 "未入门(Unlearned)" 两个区域
         context.learnedArts = allArts.filter(a => a.total > 0);
-        // unlearnedArts: 未入门 (Level == 0)
         context.unlearnedArts = allArts.filter(a => a.total === 0);
 
-        // =====================================================
-        //  准备技艺书 (Arts Books)
-        // =====================================================
+        // [技艺书] 单独传递，用于阅读界面
         context.artBooks = actor.itemTypes.art_book || [];
 
-        // 我们不需要像武学那样预计算伤害，因为技艺书很简单
-        // 章节进度已经在 ArtBookDataModel.prepareDerivedData 中算好了
-
         // =====================================================
-        //  查找背景 & 性格
-        // =====================================================
-        // 从 itemTypes 中获取第一个匹配项 (因为我们在 _preCreate 限制了单例，所以这里取第0个是安全的)
-        context.backgroundItem = actor.itemTypes.background?.[0] || null;
-        context.personalityItem = actor.itemTypes.personality?.[0] || null;
-
-        // =====================================================
-        // 经脉显示数据准备 (Jingmai Presentation)
-        // =====================================================
-
-        // 1. 定义坐标 (左右分列，按层级 T3->T2->T1 从上到下排列)
+        // ✦ 7. 经脉可视化数据 (Jingmai Visualization)
+        // -----------------------------------------------------
+        // A. [坐标定义] 背景图上穴位的绝对定位 (百分比)
         const MERIDIAN_COORDS = {
-            // === 左侧屏幕 (阴脉 Yin) ===
-            // 手太阴肺 (左肩/胸) - T3
-            "hand_taiyin": { x: 32, y: 35 },
-            // 手厥阴心包 (左肘/臂内) - T2
-            "hand_jueyin": { x: 22, y: 48 },
-            // 手少阴心 (左手腕/掌) - T1
-            "hand_shaoyin": { x: 30, y: 65 },
-
-            // 足太阴脾 (左膝上) - T3
-            "foot_taiyin": { x: 28, y: 75 },
-            // 足厥阴肝 (左大腿内侧) - T2
-            "foot_jueyin": { x: 42, y: 80 },
-            // 足少阴肾 (左足底/丹田下) - T1
-            "foot_shaoyin": { x: 48, y: 88 },
-
-            // === 右侧屏幕 (阳脉 Yang) ===
-            // 足太阳膀胱 (头顶/眉心) - T3 (特例，属阳，居中偏上)
-            "foot_taiyang": { x: 50, y: 20 },
-
-            // 手阳明大肠 (右肩) - T2
-            "hand_yangming": { x: 68, y: 35 },
-            // 手少阳三焦 (右臂外侧) - T1
-            "hand_shaoyang": { x: 78, y: 48 },
-            // 手太阳小肠 (右手腕) - T3
-            "hand_taiyang": { x: 70, y: 65 },
-
-            // 足阳明胃 (右胸/腹) - T2
-            "foot_yangming": { x: 62, y: 55 },
-            // 足少阳胆 (右膝/侧腹) - T1
-            "foot_shaoyang": { x: 72, y: 75 },
+            // --- 阴脉 (左侧身体) ---
+            "hand_taiyin": { x: 32, y: 35 }, "hand_jueyin": { x: 22, y: 48 }, "hand_shaoyin": { x: 30, y: 65 },
+            "foot_taiyin": { x: 28, y: 75 }, "foot_jueyin": { x: 42, y: 80 }, "foot_shaoyin": { x: 48, y: 88 },
+            // --- 阳脉 (右侧身体) ---
+            "foot_taiyang": { x: 50, y: 20 }, // 眉心
+            "hand_yangming": { x: 68, y: 35 }, "hand_shaoyang": { x: 78, y: 48 }, "hand_taiyang": { x: 70, y: 65 },
+            "foot_yangming": { x: 62, y: 55 }, "foot_shaoyang": { x: 72, y: 75 },
         };
 
-        // 2. 获取已装备的奇珍 (按穴位索引)
+        // B. [装备检查] 获取已装备在特定穴位上的“奇珍”
         const equippedQizhenMap = {};
-        const qizhenItems = actor.itemTypes.qizhen || [];
-        for (const item of qizhenItems) {
+        (actor.itemTypes.qizhen || []).forEach(item => {
             if (item.system.equipped && item.system.acupoint) {
                 equippedQizhenMap[item.system.acupoint] = item;
             }
-        }
+        });
 
-        // 3. 构建 Standard List (增强版)
+        // C. [构建列表] 生成正经十二脉的完整渲染数据
         const standardMeta = {
             "hand_shaoyin": { t: 1, type: "yin" }, "foot_shaoyin": { t: 1, type: "yin" },
             "hand_shaoyang": { t: 1, type: "yang" }, "foot_shaoyang": { t: 1, type: "yang" },
@@ -394,118 +368,145 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         };
 
         context.jingmaiStandardList = Object.entries(standardMeta).map(([key, meta]) => {
-            const isOpen = actor.system.jingmai.standard[key];
+            const isOpen = system.jingmai.standard[key]; // 穴位是否已打通
             const coord = MERIDIAN_COORDS[key] || { x: 50, y: 50 };
             const equippedItem = equippedQizhenMap[key];
 
-            // 1. 获取完整名称
+            // 名称处理
             const fullName = game.i18n.localize(`XJZL.Jingmai.${key.charAt(0).toUpperCase() + key.slice(1)}`);
-
-            // 2. 提取短名称 (括号内的内容)
-            // 正则匹配 (...)，如果匹配不到则使用原名
             const match = fullName.match(/\(([^)]+)\)/);
-            const shortLabel = match ? match[1] : fullName; // 如果没有括号就显示全名
+            const shortLabel = match ? match[1] : fullName;
 
-            // Tooltip (显示完整信息)
-            const tierLabel = game.i18n.localize(`XJZL.Jingmai.T${meta.t}`);
-            const effectLabel = game.i18n.localize(`XJZL.Jingmai.Effects.${key.charAt(0).toUpperCase() + key.slice(1)}`);
-
+            // Tooltip 构建: 包含经脉效果 + 奇珍装备信息
             let tooltip = `
-                <div style='text-align:left; min-width:200px;'>
-                    <div style='font-weight:bold; color:var(--c-highlight); font-size:14px;'>${fullName}</div>
-                    <div style='font-size:10px; color:#ccc; margin-bottom:6px;'>${tierLabel} · ${meta.type === 'yin' ? '阴脉' : '阳脉'}</div>
-                    <div style='padding:4px; background:rgba(255,255,255,0.1); border-radius:4px;'>${effectLabel}</div>
+            <div style='text-align:left; min-width:200px;'>
+                <div style='font-weight:bold; color:var(--c-highlight); font-size:14px;'>${fullName}</div>
+                <div style='font-size:10px; color:#ccc; margin-bottom:6px;'>
+                    ${game.i18n.localize(`XJZL.Jingmai.T${meta.t}`)} · ${meta.type === 'yin' ? '阴脉' : '阳脉'}
                 </div>
-            `;
+                <div style='padding:4px; background:rgba(255,255,255,0.1); border-radius:4px;'>
+                    ${game.i18n.localize(`XJZL.Jingmai.Effects.${key.charAt(0).toUpperCase() + key.slice(1)}`)}
+                </div>
+            </div>`;
 
             if (equippedItem) {
-                // 奇珍描述
-                const desc = equippedItem.system.description || "暂无描述";
                 tooltip += `
-                <hr style='border-color:#555; margin:8px 0;'>
-                <div style='color:#a2e8dd; font-weight:bold; margin-bottom:4px;'><i class='fas fa-gem'></i> ${equippedItem.name}</div>
-                <div style='font-size:11px; color:#aaa; line-height:1.4;'>${desc}</div>
-                `;
+            <hr style='border-color:#555; margin:8px 0;'>
+            <div style='color:#a2e8dd; font-weight:bold; margin-bottom:4px;'><i class='fas fa-gem'></i> ${equippedItem.name}</div>
+            <div style='font-size:11px; color:#aaa; line-height:1.4;'>${equippedItem.system.description || "暂无描述"}</div>`;
             }
 
             return {
-                key: key,
-                label: shortLabel, // 传递短名
-                tierLabel: `XJZL.Jingmai.T${meta.t}`,
+                key,
+                label: shortLabel,
                 isActive: isOpen,
-                tooltip: tooltip,
+                tooltip,
                 x: coord.x,
                 y: coord.y,
-                equippedItem: equippedItem,
-                type: meta.type // 传递类型: 'yin' 或 'yang'
+                equippedItem,
+                type: meta.type,
+                // ▼▼▼ 补上这一行 ▼▼▼
+                tierLabel: `XJZL.Jingmai.T${meta.t}`
             };
         });
 
-        // --- 4. 奇经八脉 (Extra) ---
+        // D. [奇经八脉] 仅列表显示，无坐标
         const extraOrder = ["du", "ren", "chong", "dai", "yangwei", "yinwei", "yangqiao", "yinqiao"];
-
         context.jingmaiExtraList = extraOrder.map(key => {
-            const isActive = actor.system.jingmai.extra[key];
             const capKey = key.charAt(0).toUpperCase() + key.slice(1);
-
-            const conditionLabel = game.i18n.localize(`XJZL.Jingmai.Conditions.${capKey}`);
-            const effectLabel = game.i18n.localize(`XJZL.Jingmai.Effects.${capKey}`);
-
-            // 构建 HTML 格式的 Tooltip
-            const tooltip = `
-                <div style='text-align:left; max-width:250px;'>
-                    <div style='margin-bottom:4px;'><b>条件:</b> ${conditionLabel}</div>
-                    <div style='color:#ccc;'><b>效果:</b> ${effectLabel}</div>
-                </div>
-            `;
-
             return {
                 key: key,
                 label: `XJZL.Jingmai.${capKey}`,
-                isActive: isActive,
-                tooltip: tooltip
+                isActive: system.jingmai.extra[key],
+                tooltip: `
+                <div style='text-align:left; max-width:250px;'>
+                    <div style='margin-bottom:4px;'><b>条件:</b> ${game.i18n.localize(`XJZL.Jingmai.Conditions.${capKey}`)}</div>
+                    <div style='color:#ccc;'><b>效果:</b> ${game.i18n.localize(`XJZL.Jingmai.Effects.${capKey}`)}</div>
+                </div>`
             };
         });
 
-        // 获取当前内功名称
-        let activeNeigongName = "";
-        let activeNeigongDesc = "";
-        if (actor.system.martial.active_neigong) {
-            const ng = actor.items.get(actor.system.martial.active_neigong);
-            if (ng) {
-                activeNeigongName = ng.name;
-                // 提取纯文本描述，或者显示默认说明
-                activeNeigongDesc = ng.system.description || "";
+        // =====================================================
+        // ✦ 8. 物品清单(Inventory)
+        // -----------------------------------------------------
+        // 对物品按类型分类，方便模板通过 {{#each inventory}} 渲染多个 tab 或列表
+        context.inventory = [
+            { label: "TYPES.Item.weapon", type: "weapon", items: actor.itemTypes.weapon },
+            { label: "TYPES.Item.armor", type: "armor", items: actor.itemTypes.armor },
+            { label: "TYPES.Item.qizhen", type: "qizhen", items: actor.itemTypes.qizhen },
+            { label: "TYPES.Item.consumable", type: "consumable", items: actor.itemTypes.consumable },
+            { label: "TYPES.Item.manual", type: "manual", items: actor.itemTypes.manual },
+            { label: "TYPES.Item.misc", type: "misc", items: actor.itemTypes.misc }
+        ];
+
+        // =====================================================
+        // ✦ 9. 装备架数据 (Equipment Rack - Visual Slots)
+        // -----------------------------------------------------
+        // [新增逻辑] 提取已装备的物品，填入对应的视觉槽位中
+        // 用于 tab-inventory.hbs 顶部的九宫格展示
+
+        const equipped = {
+            weapon: null,
+            head: null, top: null, bottom: null, shoes: null,
+            necklace: null, earring: null, hidden: null, //  之前忘了暗器，毫无存在感啊这东西
+            rings: [], // 数组，支持多戒
+            accessories: [] // 数组，支持多饰品
+        };
+
+        // 遍历所有物品，寻找已装备项 (equipped === true)
+        if (actor.items) {
+            for (const item of actor.items) {
+                if (!item.system.equipped) continue; // 跳过未装备
+
+                const type = item.type;
+                const armorType = item.system.type; // head, top, etc.
+
+                if (type === "weapon") {
+                    // 武器 (目前逻辑只取第一个，未来可扩展主副手)
+                    if (!equipped.weapon) equipped.weapon = item;
+                }
+                else if (type === "armor") {
+                    switch (armorType) {
+                        case "head": equipped.head = item; break;
+                        case "top": equipped.top = item; break;
+                        case "bottom": equipped.bottom = item; break;
+                        case "shoes": equipped.shoes = item; break;
+                        case "necklace": equipped.necklace = item; break;
+                        case "earring": equipped.earring = item; break;
+                        case "hidden": equipped.hidden = item; break;
+                        case "ring":
+                            // 戒指最多显示2个
+                            if (equipped.rings.length < 2) equipped.rings.push(item);
+                            break;
+                        case "accessory":
+                            // 饰品最多显示6个
+                            if (equipped.accessories.length < 6) equipped.accessories.push(item);
+                            break;
+                    }
+                }
             }
         }
-        context.activeNeigongName = activeNeigongName;
-        context.activeNeigongDesc = activeNeigongDesc;
 
-        context.choices = {
-            genders: localizeConfig(XJZL.genders),
-            sects: localizeConfig(XJZL.sects)
-        };
+        // [填充空位] 确保数组长度固定，方便前端模板循环渲染空槽图标
+        // Ring 补齐到 2
+        for (let i = equipped.rings.length; i < 2; i++) equipped.rings.push(null);
+        // Accessory 补齐到 6
+        for (let i = equipped.accessories.length; i < 6; i++) equipped.accessories.push(null);
 
-        // 气血百分比计算 (用于 width: %)
-        context.percents = {
-            hp: actor.system.resources.hp.max ? Math.min(100, (actor.system.resources.hp.value / actor.system.resources.hp.max) * 100) : 0,
-            mp: actor.system.resources.mp.max ? Math.min(100, (actor.system.resources.mp.value / actor.system.resources.mp.max) * 100) : 0,
-            rage: (actor.system.resources.rage.value / 10) * 100
-        };
+        // 挂载到上下文
+        context.equipped = equipped;
 
-        // 处事态度下拉选项
-        context.choices.attitudes = localizeConfig(XJZL.attitudes);
+        // =====================================================
+        // 动态背景 (根据性别)
+        // =====================================================
+        const gender = actor.system.info.gender;
+        // 默认为男版，如果是 female 则切换
+        context.dollBg = (gender === "female")
+            ? "systems/xjzl-system/assets/icons/character/zhanli-f.svg"
+            : "systems/xjzl-system/assets/icons/character/zhanli.svg";
 
-        // 传递嗜好选项
-        context.choices.hobbies = localizeConfig(XJZL.hobbies);
-
-        // 准备 3 个嗜好槽位 (用于循环渲染下拉框)
-        // 无论当前存了几个，都补齐到 3 个，方便界面显示
-        const currentHobbies = this.document.system.info.shihao || [];
-        context.hobbySlots = [0, 1, 2].map(i => ({
-            index: i,
-            value: currentHobbies[i] || ""
-        }));
+        // [特效计算] 调用父类或混入的方法准备 Active Effects 列表
+        this._prepareEffects(context);
 
         return context;
     }
@@ -573,19 +574,22 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     /*  事件监听与自动保存                           */
     /* -------------------------------------------- */
 
-    // _onRender(context, options) {
-    //     super._onRender(context, options);
+    _onRender(context, options) {
+        super._onRender(context, options);
+        // 1. 绑定即时搜索 (Live Search)
+        const html = this.element; // AppV2 中 this.element 就是根节点
+        const searchInput = html.querySelector(".inventory-search-input");
 
-    //     if (!this.element.dataset.delegated) {
-    //         this.element.addEventListener("change", (event) => {
-    //             const target = event.target;
-    //             if (target.matches("input, select, textarea")) {
-    //                 this.submit();
-    //             }
-    //         });
-    //         this.element.dataset.delegated = "true";
-    //     }
-    // }
+        if (searchInput) {
+            // 使用 "input" 事件，能在打字的同时触发
+            searchInput.addEventListener("input", (event) => {
+                this._onSearchInventory(event, event.target);
+            });
+
+            // 可选：恢复之前的搜索词（防止重绘后清空，虽然如果是纯客户端过滤一般不需要）
+            // searchInput.value = this._lastSearchTerm || "";
+        }
+    }
 
     /**
      * 处理输入框变化 (增加属性验证)
@@ -1373,5 +1377,34 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 调用我们在 Item 类里刚写好的方法
             await item.postMoveToChat(moveId);
         }
+    }
+
+    /**
+     * 简单的纯前端搜索过滤
+     */
+    _onSearchInventory(event, target) {
+        event.preventDefault();
+        const query = target.value.toLowerCase();
+
+        // 保存搜索词（可选，如果希望切换 Tab 回来还在的话）
+        // this._lastSearchTerm = query;
+
+        const html = this.element;
+        // 找到所有物品卡片
+        const items = html.querySelectorAll(".item-grid-card");
+
+        items.forEach(item => {
+            // 找到名字元素
+            const nameEl = item.querySelector(".item-name");
+            if (!nameEl) return;
+
+            const name = nameEl.innerText.toLowerCase();
+            // 包含搜索词则显示，否则隐藏
+            if (name.includes(query)) {
+                item.style.display = "flex"; // 恢复为 Flex 布局
+            } else {
+                item.style.display = "none";
+            }
+        });
     }
 }

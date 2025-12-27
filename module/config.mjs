@@ -82,7 +82,8 @@ XJZL.armorTypes = {
   ring: "XJZL.Armor.Type.Ring",       // 戒指
   earring: "XJZL.Armor.Type.Earring", // 耳环
   necklace: "XJZL.Armor.Type.Necklace",// 项链
-  accessory: "XJZL.Armor.Type.Accessory" // 饰品
+  accessory: "XJZL.Armor.Type.Accessory", // 饰品
+  hidden: "XJZL.Armor.Type.Hidden" // 暗器
 };
 
 // 10. 穴位列表 (用于遍历和UI显示)
