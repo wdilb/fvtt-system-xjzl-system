@@ -345,8 +345,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             "foot_taiyin": { x: 28, y: 75 }, "foot_jueyin": { x: 42, y: 80 }, "foot_shaoyin": { x: 48, y: 88 },
             // --- 阳脉 (右侧身体) ---
             "foot_taiyang": { x: 50, y: 20 }, // 眉心
-            "hand_yangming": { x: 68, y: 35 }, "hand_shaoyang": { x: 78, y: 48 }, "hand_taiyang": { x: 70, y: 65 },
-            "foot_yangming": { x: 62, y: 55 }, "foot_shaoyang": { x: 72, y: 75 },
+            "hand_taiyang": { x: 68, y: 35 }, "hand_yangming": { x: 78, y: 48 }, "hand_shaoyang": { x: 70, y: 65 },
+            "foot_yangming": { x: 62, y: 55 }, "foot_shaoyang": { x: 57, y: 80 },
         };
 
         // B. [装备检查] 获取已装备在特定穴位上的“奇珍”
