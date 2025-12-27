@@ -63,6 +63,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             deleteGroup: XJZLCharacterSheet.prototype._onAction,
             addChange: XJZLCharacterSheet.prototype._onAction,
             deleteChange: XJZLCharacterSheet.prototype._onAction,
+            //处理关系
+            addRelation: XJZLCharacterSheet.prototype._onAction,
+            deleteRelation: XJZLCharacterSheet.prototype._onAction,
 
             // 濒死/死亡交互
             rollDisability: XJZLCharacterSheet.prototype._onRollDisability,
@@ -431,6 +434,20 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             rage: (actor.system.resources.rage.value / 10) * 100
         };
 
+        // 处事态度下拉选项
+        context.choices.attitudes = localizeConfig(XJZL.attitudes);
+
+        // 传递嗜好选项
+        context.choices.hobbies = localizeConfig(XJZL.hobbies);
+
+        // 准备 3 个嗜好槽位 (用于循环渲染下拉框)
+        // 无论当前存了几个，都补齐到 3 个，方便界面显示
+        const currentHobbies = this.document.system.info.shihao || [];
+        context.hobbySlots = [0, 1, 2].map(i => ({
+            index: i,
+            value: currentHobbies[i] || ""
+        }));
+
         return context;
     }
 
@@ -659,7 +676,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     async _onAction(event, target) {
         const action = target.dataset.action;
-        // console.log("XJZL | Action Triggered:", action); // 调试用
+        console.log("XJZL | Action Triggered:", action); // 调试用
 
         // === 修正组操作 (Group Operations) ===
 
@@ -709,6 +726,34 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 groups[groupIndex].changes.splice(changeIndex, 1);
                 await this.document.update({ "system.customModifiers": groups });
             }
+            return;
+        }
+
+        // === 人际关系操作 ===
+        if (action === "addRelation") {
+            // 获取当前数组副本
+            const relations = this.document.system.social.relations || [];
+
+            // 创建新条目
+            const newRel = {
+                id: foundry.utils.randomID(),
+                name: "新相识",
+                type: "普通",
+                value: 0
+            };
+
+            // 更新 Actor
+            await this.document.update({ "system.social.relations": [...relations, newRel] });
+            return;
+        }
+
+        if (action === "deleteRelation") {
+            const index = Number(target.dataset.index);
+            // 复制数组进行剪接
+            const relations = foundry.utils.deepClone(this.document.system.social.relations);
+            relations.splice(index, 1);
+
+            await this.document.update({ "system.social.relations": relations });
             return;
         }
     }

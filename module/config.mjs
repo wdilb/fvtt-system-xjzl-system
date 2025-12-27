@@ -404,8 +404,28 @@ XJZL.sects = {
     "jianghushili": "XJZL.Sect.JiangHuShiLi"
 };
 
+// 21. 态度
+XJZL.attitudes = {
+    "respect": "XJZL.Social.Attitude.Respect", // 敬重
+    "disdain": "XJZL.Social.Attitude.Disdain" // 无视
+};
 
-// 21. 系统状态标志 (逻辑开关)
+// 22. 嗜好
+XJZL.hobbies = {
+    "weapon": "XJZL.Hobbies.Weapon", // 喜好兵器
+    "clothes": "XJZL.Hobbies.Clothes", // 喜好华服
+    "jewelry": "XJZL.Hobbies.Jewelry", // 喜好首饰
+    "manual": "XJZL.Hobbies.Manual",   // 喜好秘籍
+    "qizhen": "XJZL.Hobbies.Qizhen",   // 喜好奇珍
+    "food": "XJZL.Hobbies.Food",       // 喜好美食
+    "pills": "XJZL.Hobbies.Pills",     // 喜好丹药
+    "money": "XJZL.Hobbies.Money",     // 喜好金银
+    "beauty": "XJZL.Hobbies.Beauty",   // 喜好美色
+    "antique": "XJZL.Hobbies.Antique"  // 喜好古玩
+};
+
+
+// 23. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -505,7 +525,7 @@ XJZL.statusFlags = {
   regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
-// 22. 检定优劣势计数器 (Check Flags)
+// 24. 检定优劣势计数器 (Check Flags)
 // 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
 // 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
 XJZL.checkFlags = {

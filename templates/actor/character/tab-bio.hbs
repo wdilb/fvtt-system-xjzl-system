@@ -1,62 +1,206 @@
-<section class="tab scroll-area {{#if (eq tabs.primary 'effects')}}active{{/if}}" data-tab="effects"
+{{!-- templates/actor/character/tab-bio.hbs --}}
+<section class="tab scroll-area {{#if (eq tabs.primary 'bio')}}active{{/if}}" data-tab="bio"
     data-group="primary">
 
-    <div class="xjzl-flex-col">
+    <div class="xjzl-bg-deco">侠</div>
 
-        {{!-- 1. 临时状态 (Buff/Debuff) --}}
-        <div class="xjzl-card">
-            <div class="xjzl-card-header" style="background: #ffe4e1; color: #8b0000 !important;">临时状态 (Buff / Debuff)
-            </div>
-            <p style="font-size: 0.8em; color: #666; text-align: center; margin: 0 0 5px 0;">来自 招式特效 或 消耗品，可手动移除。</p>
-
-            {{#each temporaryEffects as |effect|}}
-            <div class="xjzl-card neigong-item"
-                style="flex-direction: row; align-items: center; padding: 5px; background: rgba(30,30,30,0.9); margin-bottom: 5px; min-height: auto;">
-
-                {{!-- 给图片加一个固定大小的容器 --}}
-                <div
-                    style="flex: 0 0 32px; height: 32px; width: 32px; border: 1px solid #666; border-radius: 4px; overflow: hidden; background: #000;">
-                    <img src="{{effect.img}}" title="{{effect.name}}" />
-                </div>
-
-                <div class="xjzl-flex-col xjzl-grow" style="margin-left: 10px; gap: 0;">
-                    <span style="font-weight: bold; color: #fff;">{{effect.name}}</span>
-                    <span style="font-size: 0.8em; color: #aaa;">来源: {{effect.sourceName}}</span>
-                </div>
-
-                {{!-- 删除按钮 --}}
-                <a data-action="deleteEffect" data-id="{{effect.id}}" title="移除此状态"
-                    style="color: #ff4444; font-size: 1.2em; padding: 5px; cursor: pointer;">
-                    <i class="fas fa-times-circle"></i>
-                </a>
-            </div>
-            {{else}}
-            <div style="text-align: center; color: #999; padding: 10px;">无临时状态</div>
-            {{/each}}
-        </div>
-
-        {{!-- 2. 被动属性 (装备/内功) --}}
-        <div class="xjzl-card" style="margin-top: 10px; opacity: 0.8;">
-            <div class="xjzl-card-header" style="background: #e6e6fa; color: #483d8b !important;">被动属性 (装备/内功)</div>
-            <p style="font-size: 0.8em; color: #666; text-align: center; margin: 0 0 5px 0;">来自 装备 或 内功，无法在此移除，请卸下装备。
-            </p>
-
-            {{#each passiveEffects as |effect|}}
-            <div class="xjzl-flex-row" style="padding: 4px 0; border-bottom: 1px dashed #ccc;">
-
-                {{!-- 同样的图片容器处理 --}}
-                <div
-                    style="flex: 0 0 24px; height: 24px; width: 24px; border: 1px solid #999; border-radius: 2px; overflow: hidden;">
-                    <img src="{{effect.img}}" title="{{effect.name}}" />
-                </div>
-
-                <span style="font-weight: bold; color: #333;">{{effect.name}}</span>
-                <span style="margin-left: auto; font-size: 0.8em; color: #666;">{{effect.sourceName}}</span>
-            </div>
-            {{else}}
-            <div style="text-align: center; color: #999; padding: 10px;">无被动属性</div>
-            {{/each}}
-        </div>
-
+    {{!-- 1. 基础体貌 --}}
+    <div class="section-title-row">
+        <span class="title-text">{{localize "XJZL.Info.Appearance"}}</span>
+        <span class="title-line"></span>
     </div>
+
+    <div class="bio-grid-top">
+        <div class="bio-physique-box">
+            <div class="xjzl-ink-field">
+                <label>{{localize "XJZL.Info.Age"}}</label>
+                <input type="number" name="system.info.age" value="{{system.info.age}}">
+            </div>
+            <div class="xjzl-ink-field">
+                <label>{{localize "XJZL.Info.Height"}}</label>
+                <input type="text" name="system.info.height" value="{{system.info.height}}">
+            </div>
+            <div class="xjzl-ink-field">
+                <label>{{localize "XJZL.Info.Weight"}}</label>
+                <input type="text" name="system.info.weight" value="{{system.info.weight}}">
+            </div>
+        </div>
+
+        <div class="bio-hobbies-box">
+            <label class="box-label">{{localize "XJZL.Info.Hobbies"}} (选3项)</label>
+            <div class="hobbies-inputs">
+                {{#each hobbySlots as |slot|}}
+                <select name="system.info.shihao.{{slot.index}}">
+                    {{selectOptions @root.choices.hobbies selected=slot.value blank="-" localize=true}}
+                </select>
+                {{/each}}
+            </div>
+        </div>
+    </div>
+
+    <div class="xjzl-ink-field full-width" style="margin-top: 10px;">
+        <label>{{localize "XJZL.Info.Appearance"}}</label>
+        <textarea name="system.info.appearance" rows="2">{{system.info.appearance}}</textarea>
+    </div>
+
+    <div class="spacer-block"></div>
+
+    {{!-- 2. 江湖声望与业障 --}}
+    <div class="section-title-row">
+        <span class="title-text">{{localize "XJZL.Social.Label"}}</span>
+        <span class="title-line"></span>
+    </div>
+
+    <div class="bio-grid-middle">
+
+        {{!-- A. 声望 --}}
+        <div class="bio-card">
+            <div class="card-header">{{localize "XJZL.Social.Label"}}</div>
+            <div class="card-body">
+                <div class="rep-row">
+                    <span class="rep-label">{{localize "XJZL.Social.Chaoting"}}</span>
+                    <div class="rep-inputs">
+                        <div class="xjzl-ink-field compact">
+                            <label>{{localize "XJZL.Social.RepChaoting"}}</label>
+                            <input type="number" name="system.social.rep_chaoting"
+                                value="{{system.social.rep_chaoting}}">
+                        </div>
+                        <div class="xjzl-ink-field compact">
+                            <label>{{localize "XJZL.Social.Attitude.Label"}}</label>
+                            <select name="system.social.attitude_chaoting">
+                                {{selectOptions choices.attitudes selected=system.social.attitude_chaoting
+                                localize=true}}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rep-row">
+                    <span class="rep-label">{{localize "XJZL.Social.Wulin"}}</span>
+                    <div class="rep-inputs">
+                        <div class="xjzl-ink-field compact">
+                            <label>{{localize "XJZL.Social.RepWulin"}}</label>
+                            <input type="number" name="system.social.rep_wulin" value="{{system.social.rep_wulin}}">
+                        </div>
+                        <div class="xjzl-ink-field compact">
+                            <label>{{localize "XJZL.Social.Attitude.Label"}}</label>
+                            <select name="system.social.attitude_wulin">
+                                {{selectOptions choices.attitudes selected=system.social.attitude_wulin localize=true}}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rep-row">
+                    <span class="rep-label">{{localize "XJZL.Social.Shisu"}}</span>
+                    <div class="rep-inputs">
+                        <div class="xjzl-ink-field compact full">
+                            <label>{{localize "XJZL.Social.Attitude.Label"}}</label>
+                            <select name="system.social.attitude_shisu">
+                                {{selectOptions choices.attitudes selected=system.social.attitude_shisu localize=true}}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {{!-- B. 业障 --}}
+        <div class="bio-card">
+            <div class="card-header">{{localize "XJZL.Social.Karma"}}</div>
+            <div class="card-body grid-2col">
+                <div class="xjzl-seal-box small">
+                    <label>{{localize "XJZL.Social.Xiayi"}}</label>
+                    <input type="number" name="system.social.xiayi" value="{{system.social.xiayi}}"
+                        style="color:var(--c-mp-blue);">
+                </div>
+                <div class="xjzl-seal-box small">
+                    <label>{{localize "XJZL.Social.Exing"}}</label>
+                    <input type="number" name="system.social.exing" value="{{system.social.exing}}"
+                        style="color:var(--c-cinnabar);">
+                </div>
+                <div class="xjzl-seal-box small">
+                    <label>{{localize "XJZL.Resources.Shalu"}}</label>
+                    <div class="split-val">
+                        <input type="number" name="system.resources.shalu.value"
+                            value="{{system.resources.shalu.value}}">
+                        <span class="sep">/</span>
+                        <span class="max">100</span>
+                    </div>
+                </div>
+                <div class="xjzl-seal-box small">
+                    <label>{{localize "XJZL.Resources.Shanie"}}</label>
+                    <input type="number" name="system.resources.shanie" value="{{system.resources.shanie}}"
+                        style="color:#555;">
+                </div>
+                <div class="xjzl-seal-box small">
+                    <label>{{localize "XJZL.Resources.Satiety"}}</label>
+                    <div class="split-val">
+                        <input type="number" name="system.resources.satiety.value"
+                            value="{{system.resources.satiety.value}}">
+                        <span class="sep">/</span>
+                        <span class="max">{{system.resources.satiety.max}}</span>
+                    </div>
+                </div>
+                <div class="xjzl-seal-box small">
+                    <label>{{localize "XJZL.Resources.Alcohol"}}</label>
+                    <div class="split-val">
+                        <input type="number" name="system.resources.alcohol.value"
+                            value="{{system.resources.alcohol.value}}">
+                        <span class="sep">/</span>
+                        <span class="max">{{system.resources.alcohol.max}}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="spacer-block"></div>
+
+    {{!-- 3. 人物传记 --}}
+    <div class="section-title-row">
+        <span class="title-text">{{localize "XJZL.Info.Bio"}}</span>
+        <span class="title-line"></span>
+    </div>
+
+    <div class="bio-editor-container">
+        <prose-mirror name="system.info.bio" data-document-u-u-i-d="{{document.uuid}}" value="{{system.info.bio}}">
+            {{{system.info.bio}}}
+        </prose-mirror>
+    </div>
+
+    {{!-- 4. 人际关系 --}}
+    <div class="section-title-row" style="margin-top: 30px;">
+        <span class="title-text">{{localize "XJZL.Social.Relations"}}</span>
+        <span class="title-line"></span>
+        <a class="xjzl-btn-seal small" data-action="addRelation">
+            <i class="fas fa-plus"></i> {{localize "XJZL.Social.AddRelation"}}
+        </a>
+    </div>
+
+    {{#if system.social.relations.length}}
+    <div class="relations-list">
+        {{#each system.social.relations as |rel i|}}
+        <div class="relation-row">
+            {{!-- 姓名 --}}
+            <input type="text" name="system.social.relations.{{i}}.name" value="{{rel.name}}"
+                placeholder="{{localize 'XJZL.Social.RelationName'}}" class="rel-name">
+
+            {{!-- 关系类型改为 Input --}}
+            <input type="text" name="system.social.relations.{{i}}.type" value="{{rel.type}}"
+                placeholder="{{localize 'XJZL.Social.RelationTypePlaceholder'}}" class="rel-type">
+
+            {{!-- 数值 --}}
+            <input type="number" name="system.social.relations.{{i}}.value" value="{{rel.value}}" placeholder="0"
+                class="rel-val">
+
+            {{!-- 删除 --}}
+            <a data-action="deleteRelation" data-index="{{i}}" class="delete-rel"><i class="fas fa-trash"></i></a>
+        </div>
+        {{/each}}
+    </div>
+    {{else}}
+    <div class="empty-arts-hint">{{localize "XJZL.Social.None"}}</div>
+    {{/if}}
+
 </section>
