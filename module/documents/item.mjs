@@ -996,6 +996,13 @@ export class XJZLItem extends Item {
       }
     }
 
+    // ============================================
+    // 消除浮点数精度误差
+    // 乘以 10000 再除以 10000，相当于保留4位小数的精度并四舍五入
+    // 这会将 1.9999999998 修正回 2
+    // ============================================
+    attrBonus = Math.round(attrBonus * 10000) / 10000;
+
     // --- E. 固定增伤 (Flat Bonuses from Actor) ---
     let flatBonus = 0;
     if (actor.system.combat?.damages) {
