@@ -39,7 +39,9 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // 招式里的 Tier 初始值设为 null
       // null 代表 "继承书本的品阶"
       tier: new fields.NumberField({
-        initial: null, // <--- 重点：默认空，不要默认1
+        required: false, // 非必填
+        nullable: true,  // <--- 关键点！允许值为 null (即继承)
+        initial: null,   // 初始值为 null
         choices: [1, 2, 3],
         label: "XJZL.Wuxue.Tier"
       }),
