@@ -6,6 +6,7 @@ import { XJZL } from "../config.mjs";
 import { localizeConfig, rollDisabilityTable, promptDisabilityQuery } from "../utils/utils.mjs";
 // 引入卡片管理器 (用于复用死检的逻辑)
 import { ChatCardManager } from "../managers/chat-manager.mjs";
+import { XJZLAuditLog } from "../applications/audit-log.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -21,6 +22,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             submitOnChange: true,
             closeOnSubmit: false
         },
+        // 拖拽配置，用于wuxue自定义排序
+        dragDrop: [{
+            dragSelector: ".wuxue-group[draggable='true']",
+            dropSelector: ".wuxue-list"
+        }],
         actions: {
             // --- 核心切换 ---
             toggleNeigong: XJZLCharacterSheet.prototype._onToggleNeigong,
@@ -47,6 +53,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             refundArtXP: XJZLCharacterSheet.prototype._onRefundArtXP,
             togglePin: XJZLCharacterSheet.prototype._onTogglePin, //标记常用武学
             manageXP: XJZLCharacterSheet.prototype._onManageXP,  //管理修为
+            viewHistory: XJZLCharacterSheet.prototype._onViewHistory, //查看修为日志
 
             // --- 其他 ---
             //删除状态
@@ -83,7 +90,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 解除架招
             stopStance: XJZLCharacterSheet.prototype._onStopStance,
             // 更换图片
-            editImage: XJZLCharacterSheet.prototype._onEditImage
+            editImage: XJZLCharacterSheet.prototype._onEditImage,
+            // 是否进入排序模式
+            toggleSort: XJZLCharacterSheet.prototype._onToggleSort
         }
     };
 
@@ -327,6 +336,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         <span style='font-family:Consolas; color:${getCol(v3, c3)}'>${v3} / ${c3}</span>
                      </div>`;
 
+            // 插入自动化说明
+            if (system.automationNote) {
+                html += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px; margin:6px 0; font-size:11px; color:#aed6f1;'>
+                                    <i class='fas fa-robot'></i> ${system.automationNote}
+                                </div>`;
+            }
+
             if (system.description) {
                 html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#888;'>${system.description}</div>`;
             }
@@ -369,30 +385,174 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const pinnedSet = new Set(pinnedList);
 
         // 2. 预处理武学与招式
-        context.wuxues = actor.itemTypes.wuxue || [];
+        // 先获取，然后按 sort 字段排序 (a.sort - b.sort)
+        let wuxueItems = actor.itemTypes.wuxue || [];
+        wuxueItems.sort((a, b) => (a.sort || 0) - (b.sort || 0));
+        context.wuxues = wuxueItems;
         for (const wuxue of context.wuxues) {
             const moves = wuxue.system.moves || [];
 
             // 遍历每个招式
             moves.forEach(move => {
-                // 计算伤害 (保留原有逻辑)
+                // --- 1. 基础计算 ---
                 const result = wuxue.calculateMoveDamage(move.id);
-                if (result) {
-                    result.breakdown += `\n\n------------------\n注: 预估基于100气血/100内力/0怒气\n无内功和招式抗性的标准木桩`;
-                    move.derived = result;
-                } else {
-                    move.derived = { damage: 0, feint: 0, breakdown: "计算错误", cost: { mp: 0, rage: 0, hp: 0 } };
-                }
+                // 确保 derived 对象存在，即使计算失败
+                move.derived = result || {
+                    damage: 0,
+                    breakdown: "无数据",
+                    cost: { mp: 0, rage: 0, hp: 0 },
+                    isWeaponMatch: true
+                };
 
-                // [新增] 注入 isPinned 状态
-                // 组合 Key: ItemID.MoveID
+                // 注入 isPinned 状态
                 const refKey = `${wuxue.id}.${move.id}`;
                 move.isPinned = pinnedSet.has(refKey);
 
-                // [新增] 注入百分比 (用于进度条)
-                const max = move.progress.absoluteMax || 1;
-                move.percent = Math.min(100, (move.xpInvested / max) * 100);
+                // --- 2. 进度分级计算 ---
+                // --- 2. 进度分级计算 (核心重写) ---
+                const tier = move.computedTier; // 1, 2, 3
+                const ratio = move.xpCostRatio ?? 1;
+
+                // 复刻 DataModel 的门槛逻辑
+                let rawThresholds = [];
+                let labels = [];
+
+                // 判断分类 (轻功/阵法只有一级，普通武学有多级)
+                if (wuxue.system.category === "qinggong" || wuxue.system.category === "zhenfa") {
+                    if (tier === 1) rawThresholds = [1000];
+                    else if (tier === 2) rawThresholds = [3000];
+                    else rawThresholds = [6000];
+                    labels = ["习得"];
+                } else {
+                    // 常规武学
+                    if (tier === 1) {
+                        rawThresholds = [0, 500, 1000];
+                        labels = ["领悟", "掌握", "精通"];
+                    } else if (tier === 2) {
+                        rawThresholds = [500, 1500, 3000];
+                        labels = ["领悟", "掌握", "精通"];
+                    } else { // Tier 3
+                        rawThresholds = [1000, 3000, 6000, 10000];
+                        labels = ["领悟", "掌握", "精通", "合一"];
+                    }
+                }
+
+                // 应用折扣并取整
+                const thresholds = rawThresholds.map(t => Math.floor(t * ratio));
+                const xp = move.xpInvested;
+
+                // 取数组最后一个值作为“毕业”所需的总 XP
+                const absoluteMax = thresholds.length > 0 ? thresholds[thresholds.length - 1] : 0;
+
+                // 确保 progress 对象存在 (DataModel 通常有，但防卫性编程更好)
+                if (!move.progress) move.progress = {};
+
+                // 挂载数值供 HBS 使用: {{move.progress.currentMax}}
+                move.progress.currentMax = absoluteMax;
+
+                // --- 3. 构建招式主 Tooltip ---
+                let tooltipHTML = `<div style='text-align:left; min-width:180px; font-family:var(--font-serif);'>`;
+
+                // 标题
+                const typeLabel = game.i18n.localize(`XJZL.Wuxue.Type.${move.type}`);
+                tooltipHTML += `<div style='border-bottom:1px solid rgba(255,255,255,0.2); margin-bottom:6px; padding-bottom:4px; font-weight:bold; color:#fff; display:flex; justify-content:space-between;'>
+                                    <span>${move.name}</span>
+                                    <span style='font-size:11px; color:#aaa; border:1px solid #555; padding:0 4px; border-radius:4px;'>${typeLabel}</span>
+                                 </div>`;
+
+                // === 特殊逻辑：视为境界 (Mapped Stage) ===
+                if (move.progression.mappedStage && move.progression.mappedStage !== 0 && move.progression.mappedStage !== 5) {
+                    // 如果有强制映射 (例如：虽然XP是0，但视为精通)
+                    // mappedStage: 1=领悟, 2=掌握, 3=精通, 4=合一
+                    const stageNames = ["", "领悟", "掌握", "精通", "合一"];
+                    const mappedName = stageNames[move.progression.mappedStage] || "未知";
+
+                    tooltipHTML += `<div style='margin-bottom:8px; padding:6px; background:rgba(255,215,0,0.1); border:1px solid #ffd700; border-radius:4px; text-align:center;'>
+                                        <div style='color:#ffd700; font-weight:bold;'>境界锁定</div>
+                                        <div style='font-size:12px; color:#fff;'>视为：${mappedName}</div>
+                                    </div>`;
+                } else {
+                    // === 正常逻辑：显示分段进度 ===
+                    // 遍历每一级，计算该级的 进度/上限
+                    // 逻辑：该级的进度 = min( 该级上限, max(0, 总XP - 上一级门槛) )
+                    // 该级上限 (Delta) = 本级门槛 - 上一级门槛
+
+                    for (let i = 0; i < thresholds.length; i++) {
+                        const label = labels[i];
+                        const currentT = thresholds[i]; // 当前级累积门槛
+                        const prevT = i > 0 ? thresholds[i - 1] : 0; // 上一级累积门槛
+
+                        const segmentMax = currentT - prevT; // 本段需要多少XP
+
+                        // 计算本段填了多少
+                        // 如果 segmentMax 是 0 (例如人级领悟是0)，则只要入门就算满
+                        let segmentVal = 0;
+                        if (segmentMax === 0) {
+                            segmentVal = (xp >= currentT) ? 0 : 0; // 0/0 显示
+                        } else {
+                            segmentVal = Math.max(0, Math.min(segmentMax, xp - prevT));
+                        }
+
+                        // 颜色逻辑
+                        let color = "#999"; // 未达成
+                        if (segmentMax === 0) color = "#2ecc71"; // 自动达成
+                        else if (segmentVal >= segmentMax) color = "#2ecc71"; // 已满
+                        else if (segmentVal > 0) color = "#f1c40f"; // 进行中
+
+                        tooltipHTML += `<div style='display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px;'>
+                                            <span style='color:#ccc'>${label}:</span>
+                                            <span style='font-family:Consolas; color:${color}'>${segmentVal} / ${segmentMax}</span>
+                                        </div>`;
+                    }
+                }
+
+                tooltipHTML += `<div style='font-size:11px; color:#aaa; margin-top:6px; padding-top:4px; border-top:1px dashed #555;'>总投入: ${move.xpInvested}</div>`;
+
+                // 自动化说明
+                if (move.automationNote) {
+                    tooltipHTML += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px; margin:6px 0; font-size:11px; color:#aed6f1;'>
+                                        <i class='fas fa-robot'></i> ${move.automationNote}
+                                    </div>`;
+                }
+
+                // 描述
+                if (move.description) {
+                    tooltipHTML += `<hr style='border:0; border-top:1px dashed rgba(255,255,255,0.1); margin:4px 0;'>`;
+
+                    // 1. 去除 HTML 标签 (将富文本转为纯文本)
+                    let descText = move.description.replace(/<[^>]*>?/gm, '');
+
+                    // 2. 转义双引号，防止截断 data-tooltip 属性
+                    descText = descText.replace(/"/g, '&quot;');
+
+                    // 3. 截取长度 (可选，防止太长刷屏，设为 200 字)
+                    if (descText.length > 200) descText = descText.substring(0, 200) + "...";
+
+                    tooltipHTML += `<div style='font-size:11px; color:#ccc; line-height:1.4;'>${descText}</div>`;
+                }
+
+                tooltipHTML += `</div>`;
+                move.tooltip = tooltipHTML;
+
+                // Breakdown Tooltip
+                if (move.derived.damage) {
+                    const bdHtml = move.derived.breakdown.replace(/\n/g, "<br>");
+                    move.derived.breakdownTooltip = `<div style='text-align:left; font-family:Consolas; font-size:11px;'>${bdHtml}</div>`;
+                }
             });
+
+            // --- 5. 构建武学本体 Tooltip (书本描述) ---
+            let bookTooltip = `<div style='text-align:left; max-width:250px;'>`;
+            bookTooltip += `<div style='font-weight:bold; margin-bottom:5px; color:#fff;'>${wuxue.name}</div>`;
+            if (wuxue.system.description) {
+                bookTooltip += `<div style='font-size:11px; color:#ccc;'>${wuxue.system.description}</div>`;
+            }
+            // 也可以加上悟性要求等
+            if (wuxue.system.requirements) {
+                bookTooltip += `<hr style='border-color:#555;'><div style='font-size:10px; color:#e74c3c;'>${wuxue.system.requirements}</div>`;
+            }
+            bookTooltip += `</div>`;
+            wuxue.tooltip = bookTooltip;
         }
 
         // [Helper] 动态构建 Tooltip (Base + Mod + Total) - [新增]
@@ -459,7 +619,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             damages: {}      // 稍后填充
         };
 
-        // [修复] 正确获取 Schema 中的 Label，避免 undefined 错误
+        // 正确获取 Schema 中的 Label，避免 undefined 错误
         const statsSchema = system.schema.fields.stats.fields;
         const resSchema = system.schema.fields.combat.fields.resistances.fields;
         const dmgSchema = system.schema.fields.combat.fields.damages.fields;
@@ -478,7 +638,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             const mod = stat.mod ?? 0;
             let tooltip = "";
 
-            // [核心修改] 针对悟性的特殊 Tooltip 构建
+            // 针对悟性的特殊 Tooltip 构建
             if (key === "wuxing") {
                 // 读取境界/武学带来的加成 (在 prepareDerivedData 中计算并存入 cultivation.wuxingBonus)
                 const cultBonus = system.cultivation?.wuxingBonus || 0;
@@ -643,9 +803,6 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // [拆分列表] 界面上分为 "已入门(Learned)" 和 "未入门(Unlearned)" 两个区域
         context.learnedArts = allArts.filter(a => a.total > 0);
         context.unlearnedArts = allArts.filter(a => a.total === 0);
-
-        // [技艺书] 单独传递，用于阅读界面
-        context.artBooks = actor.itemTypes.art_book || [];
 
         // =====================================================
         // ✦ 7. 经脉可视化数据 (Jingmai Visualization)
@@ -817,8 +974,76 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             ? "systems/xjzl-system/assets/icons/character/zhanli-f.svg"
             : "systems/xjzl-system/assets/icons/character/zhanli.svg";
 
+        // =====================================================
+        // ✦ 10. 技艺书籍 (Art Books) - [增强版]
+        // -----------------------------------------------------
+        // 预处理：计算总XP上限 + 构建描述 Tooltip
+        const rawArtBooks = actor.itemTypes.art_book || [];
+        context.artBooks = rawArtBooks.map(book => {
+            // 1. 计算总消耗 (Max XP)
+            const maxXP = book.system.chapters.reduce((sum, c) => {
+                const cost = c.cost || 0;
+                const ratio = c.xpCostRatio ?? 1;
+                return sum + Math.floor(cost * ratio);
+            }, 0);
+
+            // [新增] 统计已完成章节数
+            // 数据模型已经在 prepareDerivedData 里给每个 chapter 算好了 progress.isCompleted
+            let completedCount = 0;
+            if (book.system.chapters) {
+                for (const ch of book.system.chapters) {
+                    // 兼容性检查：确保 progress 对象存在
+                    if (ch.progress && ch.progress.isCompleted) {
+                        completedCount++;
+                    }
+                }
+            }
+
+            // 判断是否全书通读
+            const totalChap = book.system.chapters.length;
+            const isCompleted = (totalChap > 0 && completedCount >= totalChap);
+
+            // 2. 构建 Tooltip
+            let tooltip = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
+            tooltip += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${book.name}</div>`;
+
+            if (book.system.description) {
+                let desc = book.system.description.replace(/<[^>]*>?/gm, '');
+                if (desc.length > 150) desc = desc.substring(0, 150) + "...";
+                desc = desc.replace(/"/g, '&quot;');
+                tooltip += `<div style='font-size:12px; color:#ccc; line-height:1.5;'>${desc}</div>`;
+            } else {
+                tooltip += `<div style='font-size:12px; color:#999; font-style:italic;'>暂无描述</div>`;
+            }
+
+            // [核心修正] 进度显示逻辑
+            // 显示已完成章节数 / 总章节数
+            // 颜色：满级绿色，未满黄色
+            const progressColor = isCompleted ? "#2ecc71" : "var(--c-highlight)";
+            const progressText = isCompleted ? "已通读" : `完成: ${completedCount} / ${totalChap} 章`;
+
+            tooltip += `<div style='margin-top:8px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:11px; color:${progressColor};'>
+                            进度: ${progressText}
+                        </div>`;
+
+            tooltip += `</div>`;
+
+            // 挂载衍生数据
+            book.derived = {
+                maxXP: maxXP,
+                tooltip: tooltip,
+                percent: maxXP > 0 ? Math.min(100, (book.system.xpInvested / maxXP) * 100) : 0,
+                isCompleted: isCompleted
+            };
+
+            return book;
+        });
+
         // [特效计算] 调用父类或混入的方法准备 Active Effects 列表
         this._prepareEffects(context);
+
+        // 传递排序模式状态
+        context.isSorting = this._isSorting || false;
 
         return context;
     }
@@ -1737,78 +1962,65 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-     * 手动管理修为 (XP Manager Dialog)
+     * 手动管理修为 (XP Manager Dialog) - [最终样式修复版]
      * HTML: <a data-action="manageXP">
      */
     async _onManageXP(event, target) {
         const cult = this.document.system.cultivation;
 
-        // 构建弹窗内容
-        // 样式微调：增加字段，保持整洁
+        // 构建弹窗内容 - 使用 .xjzl-dialog-wrapper 和 flex 布局
         const content = `
-    <div class="xjzl-dialog-content">
-        <p class="hint" style="margin-bottom:10px; color:#aaa; font-size:0.9em;">
-            <i class="fas fa-edit"></i> 
-            手动修改修为池余额并生成日志。
-        </p>
-        
-        <form style="display:flex; flex-direction:column; gap:8px;">
-            <!-- 第一行：池类型与数值 -->
-            <div style="display:flex; gap:10px;">
-                <div class="form-group" style="flex:1;">
-                    <label>目标池</label>
-                    <div class="form-fields">
-                        <select name="poolKey" style="width:100%;">
-                            <option value="general">通用修为 (${cult.general})</option>
-                            <option value="neigong">内功修为 (${cult.neigong})</option>
-                            <option value="wuxue">武学修为 (${cult.wuxue})</option>
-                            <option value="arts">技艺修为 (${cult.arts})</option>
+        <div class="xjzl-dialog-wrapper">
+            <p class="hint">
+                <i class="fas fa-edit"></i> 
+                手动修改修为池余额并生成审计日志。
+            </p>
+            
+            <form>
+                <!-- Row 1 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>目标池</label>
+                        <select name="poolKey">
+                            <option value="general">通用修为 (当前: ${cult.general})</option>
+                            <option value="neigong">内功修为 (当前: ${cult.neigong})</option>
+                            <option value="wuxue">武学修为 (当前: ${cult.wuxue})</option>
+                            <option value="arts">技艺修为 (当前: ${cult.arts})</option>
                         </select>
                     </div>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label>变动数值</label>
-                    <div class="form-fields">
-                        <input type="number" name="amount" placeholder="+/- 数值" autofocus required style="text-align:right;" />
+                    <div class="form-group">
+                        <label>变动数值 (+/-)</label>
+                        <input type="number" name="amount" placeholder="例如: 100 或 -50" autofocus required />
                     </div>
                 </div>
-            </div>
 
-            <hr style="border:0; border-top:1px dashed #444; margin:5px 0;">
-
-            <!-- 第二行：标题与时间 -->
-            <div style="display:flex; gap:10px;">
-                <div class="form-group" style="flex:1;">
-                    <label>事件标题</label>
-                    <div class="form-fields">
-                        <input type="text" name="title" value="奇遇调整" placeholder="简短标题" />
+                <!-- Row 2 -->
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>事件标题</label>
+                        <input type="text" name="title" value="手动调整" />
+                    </div>
+                    <div class="form-group">
+                        <label>游戏时间 (可选)</label>
+                        <input type="text" name="gameDate" placeholder="例如: 乾元三年冬" />
                     </div>
                 </div>
-                <div class="form-group" style="flex:1;">
-                    <label>游戏时间</label>
-                    <div class="form-fields">
-                        <input type="text" name="gameDate" placeholder="留空则仅记录现实时间" />
-                    </div>
-                </div>
-            </div>
 
-            <!-- 第三行：详细备注 -->
-            <div class="form-group">
-                <label>备注详情</label>
-                <div class="form-fields">
-                    <input type="text" name="reason" placeholder="例如: 于绝情谷底闭关十年..." />
+                <!-- Row 3 -->
+                <div class="form-group">
+                    <label>备注详情</label>
+                    <input type="text" name="reason" placeholder="例如: DM奖励，或 闭关十年..." />
                 </div>
-            </div>
-        </form>
-    </div>
-    `;
+            </form>
+        </div>
+        `;
 
         // 使用 DialogV2
         const result = await foundry.applications.api.DialogV2.prompt({
-            window: { title: "修为管理与审计", icon: "fas fa-history" },
+            window: { title: "修为管理", icon: "fas fa-coins" },
             content: content,
             ok: {
-                label: "执行记录",
+                label: "执行",
                 icon: "fas fa-check",
                 callback: (event, button) => {
                     const form = button.form;
@@ -1823,11 +2035,10 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 }
             },
             rejectClose: false,
-            position: { width: 400 } // 稍微宽一点以容纳双列
+            position: { width: 420 }
         });
 
         if (result && !isNaN(result.amount) && result.amount !== 0) {
-            // 调用 Actor 业务逻辑，传递解构后的参数
             await this.document.manualModifyXP(result.poolKey, result.amount, {
                 title: result.title,
                 gameDate: result.gameDate,
@@ -1836,6 +2047,20 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
     }
 
+    /**
+      * 查看审计日志 - [调用独立 App 类]
+      */
+    _onViewHistory(event, target) {
+        // 防止重复打开
+        const existingApp = Object.values(ui.windows).find(w => w instanceof XJZLAuditLog && w.actor.id === this.document.id);
+        if (existingApp) {
+            existingApp.bringToTop();
+            return;
+        }
+
+        // 实例化并渲染
+        new XJZLAuditLog({ actor: this.document }).render(true);
+    }
     /**
      * 修练列表即时搜索
      * 需要在 _onRender 中绑定
@@ -1878,5 +2103,93 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 group.style.display = "none";
             }
         });
+    }
+
+    /**
+     * 处理拖拽放置
+     * 核心逻辑：获取拖拽源和放置目标，计算新的 sort 值
+     */
+    /**
+     * 处理拖拽放置 (手动排序版 - 稳健无报错)
+     * 核心逻辑：获取目标位置的上下邻居，取中间值作为新 sort
+     */
+    async _onDrop(event) {
+        event.preventDefault();
+
+        // 1. 解析数据 (弃用 TextEditor)
+        let data;
+        try {
+            data = JSON.parse(event.dataTransfer.getData("text/plain"));
+        } catch (err) {
+            return super._onDrop(event, data);
+        }
+
+        if (data.type !== "Item") return super._onDrop(event, data);
+
+        // 2. 锁定源物品 (Source)
+        if (!data.uuid) return;
+        // 假设 uuid 格式最后一段是 ID
+        const sourceId = data.uuid.split(".").pop();
+        const sourceItem = this.actor.items.get(sourceId);
+
+        // 安全检查：必须是当前 Actor 的物品
+        if (!sourceItem || sourceItem.parent !== this.actor) return;
+
+        // 3. 锁定目标位置 (Target Row)
+        const targetRow = event.target.closest(".wuxue-group");
+        if (!targetRow) return;
+
+        const targetId = targetRow.dataset.itemId;
+        if (!targetId || targetId === sourceId) return; // 没拖动或目标是自己
+
+        const targetItem = this.actor.items.get(targetId);
+        if (!targetItem) return;
+
+        // 4. 获取同类兄弟列表 (排除自己，并按当前 sort 排序)
+        const siblings = this.actor.itemTypes[sourceItem.type]
+            .filter(i => i.id !== sourceId)
+            .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+
+        // 5. 计算插入位置
+        const targetIndex = siblings.findIndex(i => i.id === targetId);
+        if (targetIndex === -1) return;
+
+        // 判断是插入到目标上方还是下方
+        // 获取目标元素的几何中心
+        const box = targetRow.getBoundingClientRect();
+        const midPoint = box.top + box.height / 2;
+        const isBefore = event.clientY < midPoint;
+
+        let sortBefore, sortAfter;
+
+        if (isBefore) {
+            // 插在 target 前面
+            const prevItem = siblings[targetIndex - 1];
+            sortBefore = prevItem ? prevItem.sort : (siblings[0].sort - 200000);
+            sortAfter = siblings[targetIndex].sort;
+        } else {
+            // 插在 target 后面
+            const nextItem = siblings[targetIndex + 1];
+            sortBefore = siblings[targetIndex].sort;
+            sortAfter = nextItem ? nextItem.sort : (siblings[siblings.length - 1].sort + 200000);
+        }
+
+        // 6. 计算新 Sort 值 (取平均)
+        const newSort = (sortBefore + sortAfter) / 2;
+
+        // 7. 执行更新 (手动构造，确保 _id 存在)
+        await this.actor.updateEmbeddedDocuments("Item", [{
+            _id: sourceId,
+            sort: newSort
+        }]);
+    }
+
+    /**
+     * 切换排序模式
+     */
+    _onToggleSort(event, target) {
+        event.preventDefault();
+        this._isSorting = !this._isSorting;
+        this.render(); // 重绘界面以应用 draggable 属性
     }
 }

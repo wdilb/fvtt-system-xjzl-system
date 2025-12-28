@@ -1,11 +1,18 @@
+<!-- ================================================== -->
+<!-- Tab: 修行 (Cultivation)                            -->
+<!-- ================================================== -->
 <section class="tab scroll-area {{#if (eq tabs.primary 'cultivation')}}active{{/if}}" data-tab="cultivation"
     data-group="primary">
 
     <div class="cultivation-container">
+        <!-- 动态背景图容器 (CSS控制呼吸动画) -->
         <div class="cultivation-bg"></div>
 
-        {{!-- 1. 顶部 Header (保持不变) --}}
+        <!-- ================================================== -->
+        <!-- 1. 顶部栏: 丹田气海 (Header & Controls)            -->
+        <!-- ================================================== -->
         <div class="cultivation-header">
+            <!-- 四大修为池显示 -->
             <div class="pools-container">
                 <div class="xp-pool general" data-tooltip="XJZL.Cultivation.General">
                     <span class="pool-label">通用</span>
@@ -24,20 +31,39 @@
                     <span class="pool-val">{{system.cultivation.arts}}</span>
                 </div>
             </div>
+
+            <!-- 控制按钮区 -->
             <div class="cultivation-controls">
+                <!-- 实时搜索框 (JS 监听 input 事件) -->
                 <div class="search-box">
                     <i class="fas fa-search"></i>
                     <input type="text" class="cultivation-search-input" placeholder="搜索..." />
                 </div>
-                <button class="btn-manage-xp" data-action="manageXP" data-tooltip="手动修改修为 & 审计">
-                    <i class="fas fa-book-medical"></i>
+
+                <!-- 排序模式开关 (active类控制外观) -->
+                <button class="btn-manage-xp {{#if isSorting}}active{{/if}}" data-action="toggleSort"
+                    data-tooltip="{{#if isSorting}}完成排序{{else}}调整武学顺序{{/if}}">
+                    <i class="fas fa-sort"></i>
+                </button>
+
+                <!-- 审计日志按钮 -->
+                <button class="btn-manage-xp" data-action="viewHistory" data-tooltip="查看生平经历 / 审计日志">
+                    <i class="fas fa-history"></i>
+                </button>
+
+                <!-- 手动管理按钮 -->
+                <button class="btn-manage-xp" data-action="manageXP" data-tooltip="手动修改修为">
+                    <i class="fas fa-plus-minus"></i>
                 </button>
             </div>
         </div>
 
-        {{!-- 2. 内功心法 (Neigong) --}}
+        <!-- ================================================== -->
+        <!-- 2. 内功心法 (Neigong Section)                      -->
+        <!-- ================================================== -->
         <div class="cultivation-section">
             <details open>
+                <!-- 区域标题 (支持折叠) -->
                 <summary class="section-title-row clickable">
                     <span class="title-text">内功心法</span>
                     <div class="title-line"></div>
@@ -46,28 +72,35 @@
 
                 <div class="neigong-grid">
                     {{#each neigongs as |item|}}
+                    <!-- 内功卡片: data-element 用于CSS五行染色, tooltip 渲染 HTML -->
                     <div class="neigong-card {{#if item.isRunning}}active{{/if}}" data-element="{{item.system.element}}"
                         data-tier="{{item.system.tier}}" data-tooltip="{{{item.xpTooltip}}}">
 
+                        <!-- 图标区域 (注灵进度效果) -->
                         <div class="ng-icon-wrapper" data-action="editItem" data-item-id="{{item.id}}">
+                            <!-- 底图 (灰) -->
                             <img class="ng-icon-bg" src="{{item.img}}" />
-                            {{!-- 进度条高度 --}}
+                            <!-- 顶图 (彩) - 高度由百分比控制 -->
                             <div class="ng-icon-fill-container" style="height: {{item.system.progressData.percent}}%;">
                                 <img class="ng-icon-fill" src="{{item.img}}" />
                             </div>
 
+                            <!-- 运功时的呼吸光环 -->
                             {{#if item.isRunning}}
                             <div class="ng-active-glow"></div>
                             {{/if}}
                         </div>
 
+                        <!-- 文本信息 -->
                         <div class="ng-content">
                             <span class="ng-name" data-action="editItem" data-item-id="{{item.id}}">{{item.name}}</span>
+                            <!-- 进度数值胶囊 -->
                             <div class="ng-meta">
                                 {{item.system.xpInvested}} / {{item.system.progressData.absoluteMax}}
                             </div>
                         </div>
 
+                        <!-- 底部操作栏 -->
                         <div class="ng-actions">
                             <a class="btn-icon-circle toggle" data-action="toggleNeigong" data-item-id="{{item.id}}"
                                 data-tooltip="{{#if item.isRunning}}停止运功{{else}}开始运功{{/if}}">
@@ -88,7 +121,9 @@
             </details>
         </div>
 
-        {{!-- 3. 武学招式 (Wuxue) --}}
+        <!-- ================================================== -->
+        <!-- 3. 武学招式 (Wuxue Section)                        -->
+        <!-- ================================================== -->
         <div class="cultivation-section">
             <details open>
                 <summary class="section-title-row clickable">
@@ -99,43 +134,115 @@
 
                 <div class="wuxue-list">
                     {{#each wuxues as |wuxue|}}
-                    <div class="wuxue-group" data-name="{{wuxue.name}}">
+                    <!-- 
+                        武学分组容器 
+                        - draggable: 仅在排序模式(isSorting)下启用
+                        - ondragstart: 必须设置数据传输，否则 _onDrop 无法识别源
+                        - sorting-active: CSS类，用于改变外观(虚线框)
+                    -->
+                    <div class="wuxue-group {{#if @root.isSorting}}sorting-active{{/if}}"
+                        draggable="{{@root.isSorting}}" data-name="{{wuxue.name}}" data-item-id="{{wuxue.id}}"
+                        ondragstart="event.dataTransfer.setData('text/plain', JSON.stringify({type: 'Item', uuid: '{{wuxue.uuid}}'}));">
+
                         <details open>
+                            <!-- 武学标题栏 -->
                             <summary class="wuxue-header">
-                                <h3 class="wuxue-name-link" data-action="editItem" data-item-id="{{wuxue.id}}"
-                                    data-tooltip="查看武学详情">
+                                <!-- 模式切换: 排序时显示抓手图标，平时显示物品图标 -->
+                                {{#if @root.isSorting}}
+                                <i class="fas fa-grip-vertical wuxue-drag-handle"></i>
+                                {{else}}
+                                <img src="{{wuxue.img}}" class="wuxue-icon" />
+                                {{/if}}
+
+                                <!-- 武学名称 -->
+                                <h3 class="wuxue-name-link" {{!-- 排序模式下禁用点击，防止误触打开 --}} {{#unless @root.isSorting}}
+                                    data-action="editItem" data-item-id="{{wuxue.id}}"
+                                    data-tooltip="{{{wuxue.tooltip}}}" {{/unless}} onclick="event.stopPropagation();">
+                                    <!-- 防止触发折叠 -->
                                     {{wuxue.name}}
                                 </h3>
+
+                                <!-- 发送按钮 (仅非排序模式显示) -->
+                                {{#unless @root.isSorting}}
+                                <a class="wuxue-action" data-action="postItem" data-item-id="{{wuxue.id}}"
+                                    data-tooltip="发送详情" onclick="event.preventDefault();"> <!-- 阻止折叠 -->
+                                    <i class="fas fa-comment"></i>
+                                </a>
+                                {{/unless}}
+
                                 <span class="realm-badge">{{wuxue.system.tierLabel}}</span>
                             </summary>
 
+                            <!-- 招式列表 (仅非排序模式显示，方便拖拽时缩短高度) -->
+                            {{#unless @root.isSorting}}
                             <div class="moves-grid">
                                 {{#each wuxue.system.moves as |move|}}
-                                <div class="move-card" data-name="{{move.name}}">
+                                <!-- 增加 data-type 用于染色 -->
+                                <div class="move-card" data-name="{{move.name}}" data-type="{{move.type}}"
+                                    data-is-ultimate="{{move.isUltimate}}" data-tooltip="{{{move.tooltip}}}">
+
+                                    <!-- 1. 顶部: 名字与Pin -->
                                     <div class="move-top">
-                                        <div class="move-name">{{move.name}}</div>
+                                        <div class="move-name clickable-link" data-action="editItem"
+                                            data-item-id="{{wuxue.id}}" data-tooltip="点击编辑武学">
+                                            {{move.name}}
+                                        </div>
                                         <a class="move-pin {{#if move.isPinned}}active{{/if}}" data-action="togglePin"
                                             data-item-id="{{wuxue.id}}" data-move-id="{{move.id}}">
                                             <i class="fas {{#if move.isPinned}}fa-star{{else}}fa-star{{/if}}"></i>
                                         </a>
                                     </div>
+
+                                    <!-- 2. 信息行: 等级 & 伤害 -->
                                     <div class="move-stats">
                                         <span>Lv.{{move.computedLevel}}</span>
-                                        {{#if move.derived.damage}}<span>Dmg: {{move.derived.damage}}</span>{{/if}}
+                                        {{#if move.derived.damage}}
+                                        <span class="move-dmg-preview"
+                                            data-tooltip="{{{move.derived.breakdownTooltip}}}">
+                                            Dmg: {{move.derived.damage}}
+                                        </span>
+                                        {{/if}}
                                     </div>
-                                    <div class="move-progress" data-tooltip="XP: {{move.xpInvested}}">
-                                        <div class="fill" style="width: {{move.percent}}%;"></div>
+
+                                    <!-- 3. 消耗图标 (只显示有的) -->
+                                    <div class="move-cost-row">
+                                        {{#if move.currentCost.mp}}
+                                        <span style="color:#3498db" data-tooltip="内力消耗"><i class="fas fa-tint"></i>
+                                            {{move.currentCost.mp}}</span>
+                                        {{/if}}
+                                        {{#if move.currentCost.rage}}
+                                        <span style="color:#e74c3c" data-tooltip="怒气消耗"><i class="fas fa-fire"></i>
+                                            {{move.currentCost.rage}}</span>
+                                        {{/if}}
+                                        {{!-- 如果有气式消耗也可以加 --}}
                                     </div>
+
+                                    <!-- 4. [修改] 进度数值胶囊 -->
+                                    <div class="move-xp-pill" data-tooltip="当前投入 / 升级所需">
+                                        {{move.xpInvested}} / {{move.progress.currentMax}}
+                                    </div>
+
+                                    <!-- 5. 底部工具栏 -->
                                     <div class="move-toolbar">
+                                        <!-- 发招 -->
                                         <a class="btn-icon-action roll" data-action="rollMove"
                                             data-item-id="{{wuxue.id}}" data-move-id="{{move.id}}" data-tooltip="发招">
-                                            <i class="fas fa-dice-d20"></i> 发招
+                                            <i class="fas fa-dice-d20"></i>
                                         </a>
-                                        <div style="flex:1;"></div>
+                                        <!-- 发送详情 -->
+                                        <a class="btn-icon-action" data-action="postMove" data-item-id="{{wuxue.id}}"
+                                            data-move-id="{{move.id}}" data-tooltip="发送详情">
+                                            <i class="fas fa-comment-alt"></i>
+                                        </a>
+
+                                        <div style="flex:1;"></div> {{!-- 占位符挤开左右 --}}
+
+                                        <!-- 修炼 -->
                                         <a class="btn-icon-action" data-action="investMoveXP"
                                             data-item-id="{{wuxue.id}}" data-move-id="{{move.id}}" data-tooltip="修炼">
                                             <i class="fas fa-arrow-up"></i>
                                         </a>
+                                        <!-- 散功 -->
                                         <a class="btn-icon-action" data-action="refundMoveXP"
                                             data-item-id="{{wuxue.id}}" data-move-id="{{move.id}}" data-tooltip="散功">
                                             <i class="fas fa-undo"></i>
@@ -144,6 +251,7 @@
                                 </div>
                                 {{/each}}
                             </div>
+                            {{/unless}}
                         </details>
                     </div>
                     {{/each}}
@@ -151,34 +259,67 @@
             </details>
         </div>
 
-        {{!-- 4. 技艺研读 (Arts) --}}
+        <!-- ================================================== -->
+        <!-- 4. 技艺书籍 (Art Books Section)                    -->
+        <!-- ================================================== -->
         <div class="cultivation-section">
             <details open>
+                <!-- [修复] 补回了折叠标题栏 -->
                 <summary class="section-title-row clickable">
                     <span class="title-text">技艺经籍</span>
                     <div class="title-line"></div>
                     <i class="fas fa-minus collapse-icon"></i>
                 </summary>
 
-                <div class="inventory-grid-container"
-                    style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
-                    {{#each artBooks as |item|}}
-                    <div class="item-grid-card">
-                        <div class="card-icon" data-action="editItem" data-item-id="{{item.id}}" data-tooltip="查看详情">
-                            <img src="{{item.img}}" />
+                <div class="art-books-grid">
+                    {{#each artBooks as |book|}}
+                    <!-- data-full 用于 CSS 染色 -->
+                    <div class="art-book-card"
+                        data-full="{{#if (gte book.system.xpInvested book.derived.maxXP)}}true{{/if}}"
+                        data-tooltip="{{{book.derived.tooltip}}}">
+
+                        <div class="book-main">
+                            <img class="book-icon" src="{{book.img}}" data-action="editItem"
+                                data-item-id="{{book.id}}" />
+
+                            <div class="book-info">
+                                <div class="book-title" data-action="editItem" data-item-id="{{book.id}}">
+                                    {{book.name}}
+                                </div>
+                                <div class="book-xp-row">
+                                    <i class="fas fa-scroll" style="font-size:9px;"></i>
+                                    {{book.system.xpInvested}} / {{book.derived.maxXP}}
+                                </div>
+                            </div>
                         </div>
-                        <div class="card-info">
-                            <div class="item-name" data-action="editItem" data-item-id="{{item.id}}">{{item.name}}</div>
-                            <div class="quality-text">XP: {{item.system.xpInvested}}</div>
+
+                        <!-- 进度条 -->
+                        <div class="book-progress-line">
+                            <div class="fill" style="width: {{book.derived.percent}}%;"></div>
                         </div>
-                        <div class="card-actions" style="display:flex;">
-                            <a data-action="investArtXP" data-item-id="{{item.id}}" data-tooltip="研读"><i
-                                    class="fas fa-book-reader"></i></a>
-                            <a data-action="refundArtXP" data-item-id="{{item.id}}" data-tooltip="放弃"><i
-                                    class="fas fa-undo"></i></a>
-                            <a data-action="postItem" data-item-id="{{item.id}}"><i class="fas fa-comment"></i></a>
+
+                        <!-- 底部操作 -->
+                        <div class="book-actions">
+                            <!-- 只有未满级才显示研读 -->
+                            {{#unless (gte book.system.xpInvested book.derived.maxXP)}}
+                            <a class="btn-book-action study" data-action="investArtXP" data-item-id="{{book.id}}"
+                                data-tooltip="研读 (投入XP)">
+                                <i class="fas fa-book-reader"></i>
+                            </a>
+                            {{/unless}}
+
+                            <a class="btn-book-action" data-action="refundArtXP" data-item-id="{{book.id}}"
+                                data-tooltip="放弃 (回退XP)">
+                                <i class="fas fa-undo"></i>
+                            </a>
+                            <a class="btn-book-action" data-action="postItem" data-item-id="{{book.id}}"
+                                data-tooltip="发送详情">
+                                <i class="fas fa-comment"></i>
+                            </a>
                         </div>
                     </div>
+                    {{else}}
+                    <div class="empty-hint" style="grid-column: 1 / -1;">暂无技艺书籍，请从背包添加。</div>
                     {{/each}}
                 </div>
             </details>
