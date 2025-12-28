@@ -61,6 +61,13 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 1. 准备下拉菜单选项(使用工具函数)
         context.choices = {
             tiers: localizeConfig(XJZL.tiers),
+            // 招式专用Tier选项 (包含继承)
+            moveTiers: {
+                "": "继承 (默认)", // 对应 null/undefined
+                1: game.i18n.localize("XJZL.Tiers.1"),
+                2: game.i18n.localize("XJZL.Tiers.2"),
+                3: game.i18n.localize("XJZL.Tiers.3")
+            },
             categories: localizeConfig(XJZL.wuxueCategories),
             moveTypes: localizeConfig(XJZL.moveTypes),
             elements: localizeConfig(XJZL.elements),
@@ -129,10 +136,15 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                     labels.push(`L${i + 1}`); // L1, L2...
                 }
             } else {
-                // 标准模式：根据 Tier 决定
-                const tier = context.system.tier;
-                const count = (tier === 3) ? 4 : 3; // 天=4, 其他=3
-                const tierLabels = (tier === 3)
+                // 标准模式
+                // 使用招式自身的 computedTier (如果DataModel里没存，这里就现场算)
+                // 逻辑：招式Tier > 书本Tier > 默认1
+                // DataModel 的 prepareDerivedData 运行时机可能早于 Sheet 渲染，所以 move.computedTier 应该是存在的
+                // 如果不存在，做一个安全回退
+                const moveTier = move.computedTier ?? (move.tier ?? (context.system.tier || 1));
+                
+                const count = (moveTier === 3) ? 4 : 3; // 天=4, 其他=3
+                const tierLabels = (moveTier === 3)
                     ? ["领悟", "掌握", "精通", "合一"]
                     : ["领悟", "掌握", "精通"];
 
@@ -140,6 +152,10 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                     levels.push(i);
                     labels.push(tierLabels[i]);
                 }
+                
+                // 注入一个标记，告诉模板这一招实际上是按什么品阶算的
+                // 方便前端加个提示 "继承(天)" 之类的
+                move._uiTier = moveTier; 
             }
 
             // 注入到 move 临时对象供 HBS 使用
@@ -253,6 +269,8 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             name: "新招式",
             img: "icons/svg/sword.svg",
             type: "real",
+            // 明确初始化 tier 为 null (继承)
+            tier: null, 
             costs: { mp: [], rage: [], hp: [] },
             applyEffects: [],
             calculation: { scalings: [] }
