@@ -34,6 +34,16 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       name: new fields.StringField({ required: true, initial: "新招式", label: "XJZL.Wuxue.Moves.Name" }),
       img: new fields.StringField({ required: true, initial: "icons/svg/sword.svg" }), // 招式独立图标
 
+      // === Tier 移动到了这里 ===
+      // 每个招式独立拥有品阶
+      // 招式里的 Tier 初始值设为 null
+      // null 代表 "继承书本的品阶"
+      tier: new fields.NumberField({
+        initial: null, // <--- 重点：默认空，不要默认1
+        choices: [1, 2, 3],
+        label: "XJZL.Wuxue.Tier"
+      }),
+
       // --- 2. 核心标签 ---
       type: new fields.StringField({
         initial: "real",
@@ -154,11 +164,12 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         label: "XJZL.Wuxue.Category"
       }),
       sect: new fields.StringField({ label: "XJZL.Wuxue.Sect" }),
-
-      // 2. 核心规则属性
-      // 1=人, 2=地, 3=天 (使用 XJZL.Tiers 本地化)
-      tier: new fields.NumberField({ initial: 1, choices: [1, 2, 3], label: "XJZL.Wuxue.Tier" }),
-
+      // 把 Tier 加回顶层，作为整本书的默认值
+      tier: new fields.NumberField({
+        initial: 1,
+        choices: [1, 2, 3],
+        label: "XJZL.Wuxue.Tier"
+      }),
       // 3. 描述与要求
       description: new fields.HTMLField({ label: "XJZL.Info.Bio" }),
       // 悟性要求等限制条件，仅作为文本提示，不强制自动化
@@ -174,33 +185,40 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
    * 核心职责：计算每个招式的当前等级、升级门槛、当前消耗
    */
   prepareDerivedData() {
-    // 1. 获取当前武学品阶对应的 修为门槛表
-    // 预设标准门槛表 (Standard Thresholds)
-    let standardThresholds = [];
-    let feintCoef = 0; // 虚招系数
-
-    if (this.category === "qinggong" || this.category === "zhenfa") {
-      // 轻功/阵法: 一次性学会
-      if (this.tier === 1) standardThresholds = [1000];
-      else if (this.tier === 2) standardThresholds = [3000];
-      else if (this.tier === 3) standardThresholds = [6000];
-    } else {
-      // 常规武学: 多层进阶
-      // 注意：这里存储的是【累积】所需修为
-      if (this.tier === 1) {
-        standardThresholds = [0, 500, 1000]; // 1层(0), 2层(500), 3层(1000)
-        feintCoef = 2; // 人级系数
-      } else if (this.tier === 2) {
-        standardThresholds = [500, 1500, 3000]; // 1层(500), 2层(1500)...
-        feintCoef = 3; // 地级系数
-      } else if (this.tier === 3) {
-        standardThresholds = [1000, 3000, 6000, 10000]; // 4层(10000)
-        feintCoef = 4; // 天级系数
-      }
-    }
-
+    // 1. 获取顶层的默认 Tier (书本品阶)
+    const bookTier = this.tier ?? 1;
     // 2. 遍历每个招式，计算状态
     for (const move of this.moves) {
+      // 如果招式自己设定了 tier (不为null)，就用招式的；否则用书本的
+      // 这行代码把计算结果存入 move 对象内存中，供后续逻辑使用
+      move.computedTier = move.tier ?? bookTier;
+      // === 门槛计算逻辑下沉到循环内部 ===
+      // 1. 获取当前武学品阶对应的 修为门槛表
+      // 预设标准门槛表 (Standard Thresholds)
+      let standardThresholds = [];
+      let feintCoef = 0; // 虚招系数
+      // 使用 move.tier 而不是 this.tier
+      const currentTier = move.computedTier;
+
+      if (this.category === "qinggong" || this.category === "zhenfa") {
+        // 轻功/阵法: 一次性学会
+        if (currentTier === 1) standardThresholds = [1000];
+        else if (currentTier === 2) standardThresholds = [3000];
+        else if (currentTier === 3) standardThresholds = [6000];
+      } else {
+        // 常规武学: 多层进阶
+        // 注意：这里存储的是【累积】所需修为
+        if (currentTier === 1) {
+          standardThresholds = [0, 500, 1000]; // 1层(0), 2层(500), 3层(1000)
+          feintCoef = 2; // 人级系数
+        } else if (currentTier === 2) {
+          standardThresholds = [500, 1500, 3000]; // 1层(500), 2层(1500)...
+          feintCoef = 3; // 地级系数
+        } else if (currentTier === 3) {
+          standardThresholds = [1000, 3000, 6000, 10000]; // 4层(10000)
+          feintCoef = 4; // 天级系数
+        }
+      }
       let baseThresholds = [];
 
       // --- 门槛判定逻辑 ---

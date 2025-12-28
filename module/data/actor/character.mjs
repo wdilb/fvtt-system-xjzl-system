@@ -736,10 +736,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
       const wuxues = actor.itemTypes.wuxue || [];
       for (const item of wuxues) {
-        const tier = item.system.tier || 1;
         const moves = item.system.moves || [];
+        // 获取书本默认 Tier
+        const bookTier = item.system.tier ?? 1;
         // 遍历每一招
         for (const move of moves) {
+          // 现在必须针对每一招单独获取 tier
+          // 如果数据迁移没做好，move.tier 可能是 undefined，给个默认值 1 (人级)
+          const tier = move.tier ?? bookTier;
           // 读取 effectiveStage 不再读取computedLevel
           // 如果 mappedStage=5，effectiveStage 会是 0，这里 stage=0，后续 if (stage >= 2) 不会通过，完美忽略
           const stage = move.effectiveStage || 0;
