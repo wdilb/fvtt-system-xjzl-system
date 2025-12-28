@@ -1113,8 +1113,38 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     _onRender(context, options) {
         super._onRender(context, options);
-        // 1. 绑定即时搜索 (Live Search)
         const html = this.element; // AppV2 中 this.element 就是根节点
+        // --- 折叠状态记忆 (Accordion Memory) ---
+        // 初始化存储容器 (如果不存在)
+        if (!this._collapsedDetails) this._collapsedDetails = new Set();
+
+        const details = html.querySelectorAll("details[data-uid]");
+        details.forEach(el => {
+            const uid = el.dataset.uid;
+
+            // A. 恢复状态
+            // 如果这个ID在“已关闭”名单里，这就移除 open 属性
+            if (this._collapsedDetails.has(uid)) {
+                el.removeAttribute("open");
+            } else {
+                // 否则强制展开 (因为模板默认有open，这里双重保险)
+                el.setAttribute("open", "");
+            }
+
+            // B. 绑定监听
+            // 使用 toggle 事件监听用户开关操作
+            el.addEventListener("toggle", (event) => {
+                // 注意：toggle 事件在打开和关闭时都会触发
+                if (el.open) {
+                    // 用户展开了，从“已关闭”名单移除
+                    this._collapsedDetails.delete(uid);
+                } else {
+                    // 用户关闭了，加入“已关闭”名单
+                    this._collapsedDetails.add(uid);
+                }
+            });
+        });
+        // 1. 绑定即时搜索 (Live Search)
         const searchInput = html.querySelector(".inventory-search-input");
 
         if (searchInput) {
