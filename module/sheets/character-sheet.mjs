@@ -45,6 +45,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
             investArtXP: XJZLCharacterSheet.prototype._onInvestArtXP,
             refundArtXP: XJZLCharacterSheet.prototype._onRefundArtXP,
+            togglePin: XJZLCharacterSheet.prototype._onTogglePin, //标记常用武学
+            manageXP: XJZLCharacterSheet.prototype._onManageXP,  //管理修为
 
             // --- 其他 ---
             //删除状态
@@ -794,6 +796,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         assignInputs.forEach(input => {
             input.addEventListener("change", (event) => this._onStatAssign(event));
         });
+
+        // 3· 修练界面搜索
+        const cultSearch = this.element.querySelector(".cultivation-search-input");
+        if (cultSearch) {
+            cultSearch.addEventListener("input", (event) => {
+                this._onSearchCultivation(event, event.target);
+            });
+        }
     }
 
     /**
@@ -1595,6 +1605,164 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 item.style.display = "flex"; // 恢复为 Flex 布局
             } else {
                 item.style.display = "none";
+            }
+        });
+    }
+
+    /**
+     * 切换常用招式 (Pin)
+     * HTML: <a data-action="togglePin" data-item-id="..." data-move-id="...">
+     */
+    async _onTogglePin(event, target) {
+        const itemId = target.dataset.itemId;
+        const moveId = target.dataset.moveId;
+
+        // 视觉反馈 (可选，为了极速响应，可以先改 DOM class，再等后端更新)
+        // target.classList.toggle("active"); 
+
+        await this.document.togglePinnedMove(itemId, moveId);
+    }
+
+    /**
+     * 手动管理修为 (XP Manager Dialog)
+     * HTML: <a data-action="manageXP">
+     */
+    async _onManageXP(event, target) {
+        const cult = this.document.system.cultivation;
+
+        // 构建弹窗内容
+        // 样式微调：增加字段，保持整洁
+        const content = `
+    <div class="xjzl-dialog-content">
+        <p class="hint" style="margin-bottom:10px; color:#aaa; font-size:0.9em;">
+            <i class="fas fa-edit"></i> 
+            手动修改修为池余额并生成日志。
+        </p>
+        
+        <form style="display:flex; flex-direction:column; gap:8px;">
+            <!-- 第一行：池类型与数值 -->
+            <div style="display:flex; gap:10px;">
+                <div class="form-group" style="flex:1;">
+                    <label>目标池</label>
+                    <div class="form-fields">
+                        <select name="poolKey" style="width:100%;">
+                            <option value="general">通用修为 (${cult.general})</option>
+                            <option value="neigong">内功修为 (${cult.neigong})</option>
+                            <option value="wuxue">武学修为 (${cult.wuxue})</option>
+                            <option value="arts">技艺修为 (${cult.arts})</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>变动数值</label>
+                    <div class="form-fields">
+                        <input type="number" name="amount" placeholder="+/- 数值" autofocus required style="text-align:right;" />
+                    </div>
+                </div>
+            </div>
+
+            <hr style="border:0; border-top:1px dashed #444; margin:5px 0;">
+
+            <!-- 第二行：标题与时间 -->
+            <div style="display:flex; gap:10px;">
+                <div class="form-group" style="flex:1;">
+                    <label>事件标题</label>
+                    <div class="form-fields">
+                        <input type="text" name="title" value="奇遇调整" placeholder="简短标题" />
+                    </div>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>游戏时间</label>
+                    <div class="form-fields">
+                        <input type="text" name="gameDate" placeholder="留空则仅记录现实时间" />
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第三行：详细备注 -->
+            <div class="form-group">
+                <label>备注详情</label>
+                <div class="form-fields">
+                    <input type="text" name="reason" placeholder="例如: 于绝情谷底闭关十年..." />
+                </div>
+            </div>
+        </form>
+    </div>
+    `;
+
+        // 使用 DialogV2
+        const result = await foundry.applications.api.DialogV2.prompt({
+            window: { title: "修为管理与审计", icon: "fas fa-history" },
+            content: content,
+            ok: {
+                label: "执行记录",
+                icon: "fas fa-check",
+                callback: (event, button) => {
+                    const form = button.form;
+                    const formData = new FormData(form);
+                    return {
+                        poolKey: formData.get("poolKey"),
+                        amount: parseInt(formData.get("amount")),
+                        title: formData.get("title"),
+                        gameDate: formData.get("gameDate"),
+                        reason: formData.get("reason")
+                    };
+                }
+            },
+            rejectClose: false,
+            position: { width: 400 } // 稍微宽一点以容纳双列
+        });
+
+        if (result && !isNaN(result.amount) && result.amount !== 0) {
+            // 调用 Actor 业务逻辑，传递解构后的参数
+            await this.document.manualModifyXP(result.poolKey, result.amount, {
+                title: result.title,
+                gameDate: result.gameDate,
+                reason: result.reason
+            });
+        }
+    }
+
+    /**
+     * 修练列表即时搜索
+     * 需要在 _onRender 中绑定
+     */
+    _onSearchCultivation(event, target) {
+        const query = target.value.toLowerCase().trim();
+        const html = this.element;
+
+        // 1. 搜索内功 (Neigong)
+        const neigongs = html.querySelectorAll(".neigong-item"); // 假设这是卡片类名
+        neigongs.forEach(item => {
+            const name = item.dataset.name?.toLowerCase() || "";
+            item.style.display = name.includes(query) ? "flex" : "none";
+        });
+
+        // 2. 搜索武学 (Wuxue) - 这是一个双层结构
+        const wuxueGroups = html.querySelectorAll(".wuxue-group"); // 武学标题栏
+        wuxueGroups.forEach(group => {
+            const wuxueName = group.dataset.name?.toLowerCase() || "";
+            const moves = group.querySelectorAll(".move-card"); // 内部招式
+
+            let hasVisibleMove = false;
+
+            // 先搜招式
+            moves.forEach(move => {
+                const moveName = move.dataset.name?.toLowerCase() || "";
+                // 匹配逻辑：如果搜到了招式名，或者搜到了所属武学名
+                const isMatch = moveName.includes(query) || wuxueName.includes(query);
+                move.style.display = isMatch ? "flex" : "none";
+                if (isMatch) hasVisibleMove = true;
+            });
+
+            // 决定武学容器是否显示
+            // 如果搜的是武学名，或者内部有匹配的招式，则显示该武学组
+            if (wuxueName.includes(query) || hasVisibleMove) {
+                group.style.display = "block";
+                // 体验优化：如果正在搜索且有匹配，自动展开详情？
+                // group.querySelector("details").open = true; 
+            } else {
+                group.style.display = "none";
             }
         });
     }
