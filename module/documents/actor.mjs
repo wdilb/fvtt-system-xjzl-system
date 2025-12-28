@@ -2201,4 +2201,84 @@ export class XJZLActor extends Actor {
     });
     */
   }
+
+  /**
+   * 切换招式的“常用”状态 (Pin/Unpin)
+   * 操作 flags.xjzl-system.pinnedMoves
+   * @param {String} itemId - 武学物品 ID
+   * @param {String} moveId - 招式 ID
+   */
+  async togglePinnedMove(itemId, moveId) {
+    // 1. 获取当前列表 (Set 自动去重)
+    const currentList = this.getFlag("xjzl-system", "pinnedMoves") || [];
+    const targetRef = `${itemId}.${moveId}`;
+    const newSet = new Set(currentList);
+
+    // 2. 切换状态
+    if (newSet.has(targetRef)) {
+      newSet.delete(targetRef);
+      // ui.notifications.info("已取消常用招式"); // 可选反馈
+    } else {
+      newSet.add(targetRef);
+      // ui.notifications.info("已设为常用招式");
+    }
+
+    // 3. 保存
+    await this.setFlag("xjzl-system", "pinnedMoves", Array.from(newSet));
+  }
+
+  /**
+   * 手动修改修为池 (带审计日志) - [修正版]
+   * @param {String} poolKey - 目标池 (general, neigong, wuxue, arts)
+   * @param {Number} amount - 变动数值
+   * @param {Object} details - 日志详情 { title, reason, gameDate }
+   */
+  async manualModifyXP(poolKey, amount, { title, reason, gameDate } = {}) {
+    const system = this.system;
+
+    // 1. 验证目标池
+    if (!["general", "neigong", "wuxue", "arts"].includes(poolKey)) {
+      ui.notifications.error(`无效的修为池类型: ${poolKey}`);
+      return;
+    }
+
+    // 2. 计算新余额
+    const currentBalance = system.cultivation[poolKey] || 0;
+    const newBalance = currentBalance + amount;
+
+    if (newBalance < 0) {
+      ui.notifications.warn(`操作失败：${poolKey} 余额不足 (当前: ${currentBalance})`);
+      return;
+    }
+
+    // 3. 构建历史日志 (History Object)
+    const historyEntry = {
+      id: foundry.utils.randomID(),
+      realTime: Date.now(), // 现实时间永远记录，作为技术底层的排序依据
+
+      // 玩家手动输入的游戏时间，留空则前端显示时通常会回退显示现实时间
+      gameDate: gameDate || "",
+
+      type: "resource",
+      // 固定为 1 (正常显示)，因为手动调整通常都是值得记录的大事
+      importance: 1,
+
+      // 优先使用玩家输入的标题
+      title: title || "修为调整",
+
+      delta: (amount > 0 ? "+" : "") + amount,
+      balance: `${poolKey}: ${newBalance}`,
+      reason: reason || "手动调整",
+      refId: this.uuid
+    };
+
+    // 4. 执行更新
+    const updateData = {
+      [`system.cultivation.${poolKey}`]: newBalance,
+      "system.history": [historyEntry, ...system.history]
+    };
+
+    await this.update(updateData);
+    ui.notifications.info(`修为已更新: ${poolKey} ${amount > 0 ? '+' : ''}${amount}`);
+  }
 }
