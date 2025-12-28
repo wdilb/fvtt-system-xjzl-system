@@ -233,7 +233,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.groupedModifierOptions = this._getGroupedModifierOptions();
 
         // =====================================================
-        // ✦ 5. 战斗核心数据 (Combat & Martial Arts)
+        // ✦ 5. 战斗核心数据 (Combat & Martial Arts) - [修复与增强版]
         // -----------------------------------------------------
         // [内功] 列表与激活状态标记
         context.neigongs = actor.itemTypes.neigong || [];
@@ -266,20 +266,217 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // [外功/武学] 预计算招式伤害 (Pre-calculation)
-        // 说明: 让 Sheet 保持轻量，具体的伤害公式委托给 Item.calculateMoveDamage 处理
         context.wuxues = actor.itemTypes.wuxue || [];
         for (const wuxue of context.wuxues) {
             const moves = wuxue.system.moves || [];
             moves.forEach(move => {
                 const result = wuxue.calculateMoveDamage(move.id);
                 if (result) {
-                    // 添加调试/提示信息，告知用户这是基于标准木桩的数值
                     result.breakdown += `\n\n------------------\n注: 预估基于100气血/100内力/0怒气\n无内功和招式抗性的标准木桩`;
                     move.derived = result;
                 } else {
                     move.derived = { damage: 0, feint: 0, breakdown: "计算错误", cost: { mp: 0, rage: 0, hp: 0 } };
                 }
             });
+        }
+
+        // [Helper] 动态构建 Tooltip (Base + Mod + Total) - [新增]
+        // 解决只显示 Total 的问题，通过反向计算显示来源
+        const buildBreakdown = (label, total, mod, extra = "") => {
+            const safeMod = mod || 0;
+            const base = total - safeMod;
+
+            // 样式优化：黑色半透背景，高对比度文字
+            return `
+            <div style="text-align:left; min-width:150px; font-family:var(--font-serif);">
+                <div style="border-bottom:1px solid rgba(255,255,255,0.2); margin-bottom:6px; padding-bottom:2px; font-weight:bold; font-size:14px; color:#fff;">
+                    ${label} <span style="float:right; color:var(--c-highlight); font-family:Consolas;">${total}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; line-height:1.6;">
+                    <span>基础能力:</span> 
+                    <span style="font-family:Consolas;">${base}</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; line-height:1.6;">
+                    <span>装备/状态:</span> 
+                    <span style="font-family:Consolas; color:${safeMod > 0 ? '#2ecc71' : (safeMod < 0 ? '#e74c3c' : '#ccc')}">
+                        ${safeMod >= 0 ? '+' : ''}${safeMod}
+                    </span>
+                </div>
+                ${extra ? `<div style="margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:11px; color:#aaa;">${extra}</div>` : ''}
+            </div>`;
+        };
+
+        // 构建 combatStats 对象供模板使用 - [完全重构]
+        context.combatStats = {
+            // 1. 属性 (Attributes) - 重组为左右两翼
+            attributesLeft: [],  // 力、身、内
+            attributesRight: [], // 体、气、神
+            wuxing: null,        // 悟性 (居中)
+
+            // 2. 仪表盘核心 (Cockpit) - 绑定 buildBreakdown 生成的 Tooltip
+            hitWaigong: { val: system.combat.hitWaigongTotal, tooltip: buildBreakdown("外功命中", system.combat.hitWaigongTotal, system.combat.hit_waigong) },
+            critWaigong: { val: system.combat.critWaigongTotal, tooltip: buildBreakdown("外功暴击", system.combat.critWaigongTotal, system.combat.crit_waigong, "<div style='color:#e74c3c; font-size:10px;'>*越低越容易暴击</div>") },
+
+            hitNeigong: { val: system.combat.hitNeigongTotal, tooltip: buildBreakdown("内功命中", system.combat.hitNeigongTotal, system.combat.hit_neigong) },
+            critNeigong: { val: system.combat.critNeigongTotal, tooltip: buildBreakdown("内功暴击", system.combat.critNeigongTotal, system.combat.crit_neigong, "<div style='color:#e74c3c; font-size:10px;'>*越低越容易暴击</div>") },
+
+            defWaigong: { val: system.combat.defWaigongTotal, tooltip: buildBreakdown("外功防御", system.combat.defWaigongTotal, system.combat.def_waigong) },
+            defNeigong: { val: system.combat.defNeigongTotal, tooltip: buildBreakdown("内功防御", system.combat.defNeigongTotal, system.combat.def_neigong) },
+
+            // 特殊处理格挡 (含架招额外加成)
+            block: {
+                val: system.combat.blockTotal,
+                tooltip: buildBreakdown("格挡值", system.combat.blockTotal, (system.combat.block || 0), system.combat.stanceBlockValue ? `<div style='color:#f1c40f'>架招加成: +${system.combat.stanceBlockValue}</div>` : "")
+            },
+
+            speed: { val: system.combat.speedTotal, tooltip: buildBreakdown("移动速度", system.combat.speedTotal, system.combat.speed) },
+            initiative: { val: system.combat.initiativeTotal, tooltip: buildBreakdown("先攻值", system.combat.initiativeTotal, system.combat.initiative) },
+            dodge: { val: system.combat.dodgeTotal, tooltip: buildBreakdown("闪避值", system.combat.dodgeTotal, system.combat.dodge) },
+
+            kanpo: { val: system.combat.kanpoTotal, tooltip: buildBreakdown("看破", system.combat.kanpoTotal, system.combat.kanpo) },
+            xuzhao: { val: system.combat.xuzhaoTotal, tooltip: buildBreakdown("虚招", system.combat.xuzhaoTotal, system.combat.xuzhao) },
+
+            // 3. 武器等级 (Weapon Ranks) - [新增]
+            weaponRanks: [],
+
+            // 4. 详情 (Details) - [修复]
+            resistances: {}, // 稍后填充
+            damages: {}      // 稍后填充
+        };
+
+        // [修复] 正确获取 Schema 中的 Label，避免 undefined 错误
+        const statsSchema = system.schema.fields.stats.fields;
+        const resSchema = system.schema.fields.combat.fields.resistances.fields;
+        const dmgSchema = system.schema.fields.combat.fields.damages.fields;
+
+        // --- 填充属性与悟性 (Attributes) ---
+        // 定义显示顺序：左翼(力身内) -> 悟性 -> 右翼(体气神)
+        const attrKeys = ["liliang", "shenfa", "neixi", "wuxing", "tipo", "qigan", "shencai"];
+
+        attrKeys.forEach((key, index) => {
+            const stat = system.stats[key];
+            const labelKey = statsSchema[key]?.label || `XJZL.Stats.${key}`;
+            const label = game.i18n.localize(labelKey).charAt(0);
+
+            // 基础变量
+            const base = stat.value ?? 0;
+            const mod = stat.mod ?? 0;
+            let tooltip = "";
+
+            // [核心修改] 针对悟性的特殊 Tooltip 构建
+            if (key === "wuxing") {
+                // 读取境界/武学带来的加成 (在 prepareDerivedData 中计算并存入 cultivation.wuxingBonus)
+                const cultBonus = system.cultivation?.wuxingBonus || 0;
+
+                tooltip = `
+                <div style="text-align:left; min-width:140px;">
+                    <strong style="border-bottom:1px solid #555; display:block; margin-bottom:4px;">${game.i18n.localize(labelKey)}: ${stat.total}</strong>
+                    <table style="width:100%; font-size:11px; color:#ddd;">
+                        <tr><td>先天根骨:</td><td style="text-align:right">${base}</td></tr>
+                        <tr><td>境界/武学:</td><td style="text-align:right; color:#ffd700;">+${cultBonus}</td></tr>
+                        <tr><td>奇遇修正:</td><td style="text-align:right">${mod >= 0 ? '+' : ''}${mod}</td></tr>
+                    </table>
+                    <div style="font-size:10px; color:#999; margin-top:4px;">*悟性不可自由分配</div>
+                </div>`;
+            } else {
+                // 其他属性的标准 Tooltip
+                const assigned = stat.assigned ? `<tr><td>分配:</td><td style="text-align:right">+${stat.assigned}</td></tr>` : "";
+                const neigongBonus = stat.neigongBonus ? `<tr><td>内功:</td><td style="text-align:right">+${stat.neigongBonus}</td></tr>` : "";
+                const identity = stat.identityBonus ? `<tr><td>身份:</td><td style="text-align:right">+${stat.identityBonus}</td></tr>` : "";
+
+                tooltip = `
+                <div style="text-align:left; min-width:120px;">
+                    <strong style="border-bottom:1px solid #555; display:block; margin-bottom:4px;">${game.i18n.localize(labelKey)}: ${stat.total}</strong>
+                    <table style="width:100%; font-size:11px; color:#ddd;">
+                        <tr><td>基础:</td><td style="text-align:right">${base}</td></tr>
+                        ${assigned}
+                        ${neigongBonus}
+                        ${identity}
+                        <tr><td>修正:</td><td style="text-align:right">${mod >= 0 ? '+' : ''}${mod}</td></tr>
+                    </table>
+                </div>`;
+            }
+
+            const data = {
+                key: key,
+                label: label,
+                total: stat.total,
+                assigned: stat.assigned,
+                tooltip: tooltip
+            };
+
+            if (key === "wuxing") {
+                context.combatStats.wuxing = data;
+            } else if (index < 3) {
+                context.combatStats.attributesLeft.push(data);
+            } else {
+                context.combatStats.attributesRight.push(data);
+            }
+        });
+
+        // --- 填充武器等级 (Weapon Ranks) ---
+        // [修改] 使用汉字代替图标
+        const weaponChars = {
+            sword: "剑", blade: "刀", staff: "棍",
+            dagger: "匕", hidden: "暗", unarmed: "拳",
+            instrument: "乐", special: "奇"
+        };
+
+        for (const [key, rankData] of Object.entries(system.combat.weaponRanks)) {
+            context.combatStats.weaponRanks.push({
+                label: game.i18n.localize(`XJZL.Combat.Rank.${key.charAt(0).toUpperCase() + key.slice(1)}`),
+                val: rankData.total,
+                // 直接存单个汉字
+                char: weaponChars[key] || "武"
+            });
+        }
+
+        // --- 填充抗性 (Resistances) ---
+        for (const [key, stat] of Object.entries(system.combat.resistances)) {
+            const labelKey = resSchema[key]?.label || key;
+            context.combatStats.resistances[key] = {
+                label: game.i18n.localize(labelKey),
+                total: stat.total
+            };
+        }
+
+        // --- 填充伤害 (Damages) ---
+        for (const [key, stat] of Object.entries(system.combat.damages)) {
+            const labelKey = dmgSchema[key]?.label || key;
+            context.combatStats.damages[key] = {
+                label: game.i18n.localize(labelKey),
+                total: stat.total
+            };
+        }
+
+        // 常用招式 (Pinned Moves)
+        // 读取 Actor Flag: ["ItemUUID.MoveID", ...]
+        const pinnedRefs = actor.getFlag("xjzl-system", "pinnedMoves") || [];
+        context.pinnedMoves = [];
+
+        for (const ref of pinnedRefs) {
+            try {
+                // 格式 "ItemUUID.MoveID"
+                const [itemUuid, moveId] = ref.split("."); // 注意：如果是合成 UUID 可能会有更多点，建议用特定分隔符或只存 ID
+                // 实际上 FVTT UUID 通常是 Scene.ID.Token.ID.Item.ID，太长了。
+                // 建议 Flag 只存 { itemId: "xxx", moveId: "yyy" } 对象，或者 "ItemID.MoveID" (如果只在 Actor 内部用)
+
+                // 这里假设我们存的是 "ItemID.MoveID" (简易版)
+                const item = actor.items.get(itemUuid); // 这里的 itemUuid 其实是 ID
+                if (item) {
+                    const move = item.system.moves.find(m => m.id === moveId);
+                    if (move) {
+                        context.pinnedMoves.push({
+                            name: move.name,
+                            parentName: item.name,
+                            itemId: item.id,
+                            moveId: moveId
+                        });
+                    }
+                }
+            } catch (e) {
+                console.error("解析常用招式失败:", ref, e);
+            }
         }
 
         // =====================================================
@@ -589,50 +786,44 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 可选：恢复之前的搜索词（防止重绘后清空，虽然如果是纯客户端过滤一般不需要）
             // searchInput.value = this._lastSearchTerm || "";
         }
+
+        // 2. 绑定属性分配输入框
+        // 这里的 input 没有 name 属性，所以不会触发 form 的 submitOnChange
+        // 我们手动监听 change 事件来处理业务逻辑
+        const assignInputs = html.querySelectorAll(".seal-assign-input");
+        assignInputs.forEach(input => {
+            input.addEventListener("change", (event) => this._onStatAssign(event));
+        });
     }
 
     /**
-     * 处理输入框变化 (增加属性验证)
+     * 处理自由属性点分配 (完全接管逻辑)
      */
-    async _onChangeInput(event) {
+    async _onStatAssign(event) {
         event.preventDefault();
-        const input = event.target;
-        const name = input.name;
-        const value = input.type === "number" ? Number(input.value) : input.value;
+        event.stopPropagation(); // 阻止冒泡，虽然没有name也不会提交，但好习惯
 
-        // 1. 验证：自由属性点分配
-        // 优化：将验证逻辑委托给 Actor，Sheet 只负责处理 UI (回滚值/提示)
-        if (name.includes(".assigned")) {
-            if (!this._validateStatAssignment(name, value, input)) {
-                return; // 验证失败，阻止提交
+        const input = event.target;
+        const field = input.dataset.prop; // 从 data-prop 获取字段路径
+
+        // 1. 强制转为数字 (解决 must be an integer 报错的根源)
+        let value = Number(input.value);
+        if (isNaN(value)) value = 0;
+
+        // 2. 调用 Actor 的验证逻辑
+        // 注意：这里我们不需要判断 name.includes，因为这个函数只绑定在分配框上
+        if (typeof this.actor.canUpdateStat === "function") {
+            const validation = this.actor.canUpdateStat(field, value);
+            if (!validation.valid) {
+                ui.notifications.warn(validation.message || "无法分配属性点。");
+                input.value = validation.oldValue ?? 0; // 回滚界面显示
+                return;
             }
         }
 
-        // 2. 提交保存
-        await this.submit();
-    }
-
-    /**
-     * 调用 Actor 的方法来判断是否合法
-     */
-    _validateStatAssignment(fieldName, newValue, inputElement) {
-        // 安全检查：防止 Actor 还没写这个方法时报错
-        if (typeof this.actor.canUpdateStat !== "function") {
-            console.warn("XJZLActor 尚未实现 canUpdateStat 方法，跳过验证。");
-            return true;
-        }
-
-        // 调用 Actor 业务逻辑
-        const validation = this.actor.canUpdateStat(fieldName, newValue);
-
-        if (!validation.valid) {
-            ui.notifications.warn(validation.message || "无法分配属性点。");
-            // 重置 UI 为旧值
-            inputElement.value = validation.oldValue;
-            return false;
-        }
-
-        return true;
+        // 3. 手动提交更新
+        // 这会绕过 Form 的全量验证，直接点对点更新数据
+        await this.document.update({ [field]: value });
     }
 
     /**

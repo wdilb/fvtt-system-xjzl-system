@@ -762,9 +762,28 @@ function registerHandlebarsHelpers() {
   });
 
   // 截取字符串: {{substring "string" 0 1}}
-  Handlebars.registerHelper('substring', function(string, start, end) {
+  Handlebars.registerHelper('substring', function (string, start, end) {
     if (typeof string !== 'string') return "";
     return string.substring(start, end);
+  });
+
+  Handlebars.registerHelper("split", function (string, separator) {
+    if (typeof string !== "string") return [];
+    return string.split(separator);
+  });
+
+  /* math 帮助函数 */
+  Handlebars.registerHelper("math", function (lvalue, operator, rvalue, options) {
+    lvalue = parseFloat(lvalue);
+    rvalue = parseFloat(rvalue);
+
+    return {
+      "+": lvalue + rvalue,
+      "-": lvalue - rvalue,
+      "*": lvalue * rvalue,
+      "/": lvalue / rvalue,
+      "%": lvalue % rvalue
+    }[operator];
   });
 
   // 增加 selectOptions (Item Sheet 用到了)

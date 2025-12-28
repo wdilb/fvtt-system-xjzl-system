@@ -1,158 +1,269 @@
 <section class="tab scroll-area {{#if (eq tabs.primary 'combat')}}active{{/if}}" data-tab="combat" data-group="primary">
 
-    {{!-- 当前架招 (Current Stance) --}}
-    <div class="xjzl-card stance-card" style="margin-bottom: 15px;">
-        <div class="xjzl-card-header" style="display: flex; align-items: center; justify-content: space-between;">
-            <span>{{localize "XJZL.Martial.Stance"}}</span>
+    {{!-- 1. 顶部：七维属性 (保持不变) --}}
+    <div class="combat-header-seals">
+        <div class="attr-group left">
+            {{#each combatStats.attributesLeft as |stat|}}
+            <div class="seal-box">
+                <div class="seal-stamp" data-tooltip="{{stat.tooltip}}">
+                    <span class="seal-label">{{stat.label}}</span>
+                    <span class="seal-val">{{stat.total}}</span>
+                </div>
+                <div class="seal-assign" data-tooltip="输入数字分配点数">
+                    <input type="number" class="seal-assign-input" data-prop="system.stats.{{stat.key}}.assigned"
+                        value="{{stat.assigned}}" placeholder="0">
+                </div>
+            </div>
+            {{/each}}
         </div>
 
-        {{#if system.martial.stanceActive}}
-        {{!-- A. 已开启架招 --}}
-        <div style="background: #2c3e50; border-radius: 4px; padding: 5px;">
+        <div class="wuxing-wrapper">
+            {{#with combatStats.wuxing}}
+            <div class="seal-box wuxing" data-tooltip="{{tooltip}}">
+                <div class="wuxing-taiji"></div>
+                <div class="wuxing-content">
+                    <span class="wuxing-label">悟性</span>
+                    <span class="wuxing-num">{{total}}</span>
+                </div>
+            </div>
+            {{/with}}
 
-            {{!-- 标题行 --}}
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <i class="fas fa-shield-alt" style="color: #3498db; font-size: 1.2em;"></i>
-                    <span style="font-weight: bold; color: white; font-size: 1.1em;">
-                        {{activeStance.name}}
-                    </span>
+            {{#if system.stats.freePoints.total}}
+            <div class="free-points-pill" data-tooltip="可自由分配的属性点">
+                <i class="fas fa-plus-circle"></i> 剩余: {{system.stats.freePoints.total}}
+            </div>
+            {{/if}}
+        </div>
+
+        <div class="attr-group right">
+            {{#each combatStats.attributesRight as |stat|}}
+            <div class="seal-box">
+                <div class="seal-stamp" data-tooltip="{{stat.tooltip}}">
+                    <span class="seal-label">{{stat.label}}</span>
+                    <span class="seal-val">{{stat.total}}</span>
+                </div>
+                <div class="seal-assign" data-tooltip="输入数字分配点数">
+                    <input type="number" class="seal-assign-input" data-prop="system.stats.{{stat.key}}.assigned"
+                        value="{{stat.assigned}}" placeholder="0">
+                </div>
+            </div>
+            {{/each}}
+        </div>
+    </div>
+
+    {{!-- 2. 核心战斗仪表盘 --}}
+    <div class="combat-dashboard">
+        <div class="dashboard-bg"></div>
+
+        {{!-- 罗盘布局容器 --}}
+        <div class="compass-layout">
+
+            {{!-- [左侧列：攻击/属性] --}}
+            <div class="compass-side-col left">
+
+                {{!-- 概览视图 (默认显示) --}}
+                <div class="dashboard-view main-view">
+                    <div class="sat-card atk" data-tooltip="{{combatStats.hitWaigong.tooltip}}">
+                        <div class="sat-label">外功命中</div>
+                        <div class="sat-val">{{combatStats.hitWaigong.val}}</div>
+                    </div>
+                    <div class="sat-card atk" data-tooltip="{{combatStats.critWaigong.tooltip}}">
+                        <div class="sat-label">外功暴击</div>
+                        <div class="sat-val">{{combatStats.critWaigong.val}}</div>
+                    </div>
+                    <div class="sat-card atk" data-tooltip="{{combatStats.hitNeigong.tooltip}}">
+                        <div class="sat-label">内功命中</div>
+                        <div class="sat-val">{{combatStats.hitNeigong.val}}</div>
+                    </div>
+                    <div class="sat-card atk" data-tooltip="{{combatStats.critNeigong.tooltip}}">
+                        <div class="sat-label">内功暴击</div>
+                        <div class="sat-val">{{combatStats.critNeigong.val}}</div>
+                    </div>
                 </div>
 
-                {{!-- 解除按钮 --}}
-                <a data-action="stopStance" title="{{localize 'XJZL.Martial.StopStance'}}"
-                    style="color: #bdc3c7; cursor: pointer;">
-                    <i class="fas fa-times-circle"></i>
-                </a>
+                {{!-- 详细视图 (切换显示) --}}
+                <div class="dashboard-view detail-view">
+                    <div class="detail-header">抗性列表</div>
+                    <div class="detail-scroll-container">
+                        {{#each combatStats.resistances as |res|}}
+                        <div class="detail-strip">
+                            <span class="lbl">{{res.label}}</span>
+                            <span class="val">{{res.total}}</span>
+                        </div>
+                        {{/each}}
+                        {{!-- 这里的元素多了会自动滚动，且绝不会遮挡 Header --}}
+                    </div>
+                </div>
             </div>
 
-            {{!-- 详情与说明 (可折叠) --}}
-            {{#if (or activeStance.description activeStance.automationNote)}}
-            <details style="margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 5px;">
-                <summary style="color: #bdc3c7; font-size: 0.8em; cursor: pointer; outline: none;">
-                    <i class="fas fa-info-circle"></i> {{localize "XJZL.UI.Chat.MoveCard.ShowDetails"}}
-                </summary>
-                <div style="margin-top: 5px; color: #ecf0f1; font-size: 0.9em; line-height: 1.4; padding: 0 5px;">
-                    {{#if activeStance.description}}
-                    <div style="font-style: italic; margin-bottom: 5px; opacity: 0.9;">
-                        {{{activeStance.description}}}
-                    </div>
-                    {{/if}}
+            {{!-- [中间核心：切换按钮] --}}
+            <div class="compass-core clickable"
+                onclick="this.closest('.combat-dashboard').classList.toggle('details-mode')"
+                data-tooltip="<div style='text-align:center'>点击切换<br>详细属性视图</div>">
 
-                    {{#if activeStance.automationNote}}
-                    <div
-                        style="border-top: 1px dashed rgba(255,255,255,0.2); padding-top: 4px; margin-top: 4px; color: #81ecec;">
-                        <i class="fas fa-robot"></i> <b>{{localize "XJZL.Wuxue.AutomationNote"}}:</b>
-                        {{activeStance.automationNote}}
+                <div class="core-content-normal">
+                    <div class="core-stat-main">
+                        <div class="core-label">先攻</div>
+                        <div class="core-val">{{combatStats.initiative.val}}</div>
                     </div>
-                    {{/if}}
+                    <div class="core-sub-stats">
+                        <div class="sub-stat">
+                            <div class="sub-val">{{combatStats.speed.val}}</div>
+                            <div style="font-size:10px;">速度</div>
+                        </div>
+                        <div class="sub-stat">
+                            <div class="sub-val">{{combatStats.kanpo.val}}</div>
+                            <div style="font-size:10px;">看破</div>
+                        </div>
+                    </div>
                 </div>
-            </details>
-            {{/if}}
 
+                <div class="core-content-detail">
+                    <i class="fas fa-undo-alt" style="font-size:24px; color:var(--c-cinnabar); margin-bottom:5px;"></i>
+                    <div style="font-weight:bold; font-size:14px; color:#555;">返回</div>
+                </div>
+            </div>
+
+            {{!-- [右侧列：防御/伤害] --}}
+            <div class="compass-side-col right">
+
+                {{!-- 概览视图 --}}
+                <div class="dashboard-view main-view">
+                    <div class="sat-card def" data-tooltip="{{combatStats.defWaigong.tooltip}}">
+                        <div class="sat-label">外功防御</div>
+                        <div class="sat-val">{{combatStats.defWaigong.val}}</div>
+                    </div>
+                    <div class="sat-card def" data-tooltip="{{combatStats.defNeigong.tooltip}}">
+                        <div class="sat-label">内功防御</div>
+                        <div class="sat-val">{{combatStats.defNeigong.val}}</div>
+                    </div>
+                    <div class="sat-card blk" data-tooltip="{{combatStats.block.tooltip}}">
+                        <div class="sat-label">格挡值</div>
+                        <div class="sat-val">{{combatStats.block.val}}</div>
+                    </div>
+                    <div class="sat-card def" data-tooltip="{{combatStats.dodge.tooltip}}">
+                        <div class="sat-label">闪避值</div>
+                        <div class="sat-val">{{combatStats.dodge.val}}</div>
+                    </div>
+                </div>
+
+                {{!-- 详细视图 --}}
+                <div class="dashboard-view detail-view">
+                    <div class="detail-header">伤害加成</div>
+                    <div class="detail-scroll-container">
+                        {{#each combatStats.damages as |dmg|}}
+                        <div class="detail-strip">
+                            <span class="lbl">{{dmg.label}}</span>
+                            <span class="val">{{dmg.total}}</span>
+                        </div>
+                        {{/each}}
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        {{!-- 临时状态栏 (保持不变) --}}
+        <div class="active-effects-row">
+            {{#if temporaryEffects.length}}
+            {{#each temporaryEffects as |effect|}}
+            <div class="effect-chip {{#if effect.isSuppressed}}suppressed{{/if}}" data-tooltip="{{effect.description}}">
+                <img src="{{effect.img}}" class="effect-icon">
+                <span class="effect-label">{{effect.name}}</span>
+                {{#if effect.duration.rounds}}
+                <span class="effect-rounds">({{effect.duration.rounds}})</span>
+                {{/if}}
+                <a class="effect-delete" data-action="deleteEffect" data-id="{{effect.id}}"><i
+                        class="fas fa-times"></i></a>
+            </div>
+            {{/each}}
+            {{else}}
+            <div class="no-effects-hint">无生效状态</div>
+            {{/if}}
+        </div>
+
+        {{!-- 武器等级条 (保持不变) --}}
+        <div class="weapon-ranks-bar">
+            {{#each combatStats.weaponRanks as |rank|}}
+            <div class="rank-item" data-tooltip="{{rank.label}}等级: {{rank.val}}">
+                <span class="rank-char">{{rank.char}}</span>
+                <span class="rank-val">{{rank.val}}</span>
+            </div>
+            {{/each}}
+        </div>
+    </div>
+
+    {{!-- 3. 架招与被动 (保持不变) --}}
+    <div class="hud-bottom-row">
+        {{#if activeStance}}
+        <div class="stance-small-card"
+            data-tooltip="{{#if activeStance.description}}{{activeStance.description}}{{else}}{{activeStance.automationNote}}{{/if}}">
+            <div class="stance-icon"><i class="fas fa-user-shield"></i></div>
+            <div class="stance-content">
+                <div class="label">当前架招</div>
+                <div class="name">{{activeStance.name}}</div>
+            </div>
+            <a class="stop-stance-btn" data-action="stopStance" title="解除"><i class="fas fa-times"></i></a>
         </div>
         {{else}}
-        {{!-- B. 未开启架招 --}}
-        <div style="text-align: center; color: #7f8c8d; font-style: italic; font-size: 0.9em; padding: 5px;">
-            {{localize "XJZL.Martial.NoStance"}}
+        <div class="stance-small-card empty">
+            <div class="stance-icon"><i class="fas fa-user-shield"></i></div>
+            <div class="stance-content">
+                <div class="label">无架招</div>
+            </div>
         </div>
+        {{/if}}
+
+        {{#if passiveEffects.length}}
+        <details class="passive-effects-pill">
+            <summary>
+                <i class="fas fa-shield-alt"></i> 被动特性 ({{passiveEffects.length}})
+            </summary>
+            <div class="passive-list">
+                {{#each passiveEffects as |effect|}}
+                <div class="passive-item {{#if effect.isSuppressed}}suppressed{{/if}}"
+                    data-tooltip="{{#if effect.isSuppressed}}已失效{{else}}{{effect.name}}: {{effect.description}}{{/if}}">
+                    <img src="{{effect.img}}">
+                    <span>{{effect.name}}</span>
+                </div>
+                {{/each}}
+            </div>
+        </details>
         {{/if}}
     </div>
 
-    <div class="xjzl-grid-2">
-        {{!-- 基础战斗 --}}
-        <div class="xjzl-card">
-            <div class="xjzl-card-header">{{localize "XJZL.Combat.Label"}}</div> {{!-- 战斗面板 --}}
-            <div class="xjzl-grid-2">
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Block"}}</label> {{!-- 格挡 --}}
-                    <b>{{system.combat.blockTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Kanpo"}}</label> {{!-- 看破 --}}
-                    <b>{{system.combat.kanpoTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Speed"}}</label> {{!-- 速度 --}}
-                    <b>{{system.combat.speedTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Dodge"}}</label> {{!-- 闪避 --}}
-                    <b>{{system.combat.dodgeTotal}}</b>
-                </div>
-            </div>
+    {{!-- 4. 底部战术区 (保持不变) --}}
+    <div class="combat-actions-area">
+        <div class="action-buttons-row">
+            <button class="action-btn-large attack" data-action="rollBasicAttack">
+                <div class="btn-bg"></div>
+                <span class="btn-label">普通攻击</span>
+            </button>
+            <button class="action-btn-large opportunity" data-action="rollOpportunityAttack">
+                <div class="btn-bg"></div>
+                <span class="btn-label">趁虚而入</span>
+            </button>
         </div>
 
-        {{!-- 攻防修正 --}}
-        <div class="xjzl-card">
-            <div class="xjzl-card-header">{{localize "XJZL.Combat.Damages"}}</div> {{!-- 这里暂借伤害/修正的标题 --}}
-            <div class="xjzl-grid-2">
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.DefWaigong"}}</label>
-                    <b>{{system.combat.defWaigongTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.DefNeigong"}}</label>
-                    <b>{{system.combat.defNeigongTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.HitWaigong"}}</label>
-                    <b>{{system.combat.hitWaigongTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.HitNeigong"}}</label>
-                    <b>{{system.combat.hitNeigongTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.CritWaigong"}}</label>
-                    <b>{{system.combat.critWaigongTotal}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.CritNeigong"}}</label>
-                    <b>{{system.combat.critNeigongTotal}}</b>
-                </div>
-            </div>
+        <div class="section-title-row">
+            <span class="title-text" style="font-size:16px;">常用招式</span>
+            <div class="title-line"></div>
         </div>
 
-        {{!-- 伤害修正 --}}
-        <div class="xjzl-card">
-            <div class="xjzl-card-header">{{localize "XJZL.Combat.Dmg.Global"}}</div> {{!-- 伤害 --}}
-            <div class="xjzl-grid-2">
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Dmg.Skill"}}</label>
-                    <b>{{system.combat.damages.skill.total}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Dmg.Yang"}}</label>
-                    <b>{{system.combat.damages.yang.total}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Dmg.Yin"}}</label>
-                    <b>{{system.combat.damages.yin.total}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Dmg.Gang"}}</label>
-                    <b>{{system.combat.damages.gang.total}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Dmg.Rou"}}</label>
-                    <b>{{system.combat.damages.rou.total}}</b>
+        <div class="pinned-moves-grid">
+            {{#each pinnedMoves as |move|}}
+            <div class="pinned-move-card rollable" data-action="rollMove" data-item-id="{{move.itemId}}"
+                data-move-id="{{move.moveId}}">
+                <div class="move-name" style="font-weight:bold;">{{move.name}}</div>
+                <div class="move-info" style="font-size:11px; color:#666; margin-left:auto;">
+                    {{move.parentName}}
                 </div>
             </div>
-        </div>
-        {{!-- 消耗减少 --}}
-        <div class="xjzl-card">
-            <div class="xjzl-card-header">{{localize "XJZL.Combat.ReduceCost"}}</div> {{!-- 伤害 --}}
-            <div class="xjzl-grid-2">
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Cost.Neili"}}</label>
-                    <b>{{system.combat.costs.neili.total}}</b>
-                </div>
-                <div style="justify-content: space-between;">
-                    <label>{{localize "XJZL.Combat.Cost.Rage"}}</label>
-                    <b>{{system.combat.costs.rage.total}}</b>
-                </div>
+            {{else}}
+            <div class="empty-pinned-hint">
+                暂无常用招式。请前往【功】页面标记常用武学招式。
             </div>
+            {{/each}}
         </div>
     </div>
 </section>
