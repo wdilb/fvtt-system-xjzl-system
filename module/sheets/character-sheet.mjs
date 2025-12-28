@@ -237,9 +237,104 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // =====================================================
         // ✦ 5. 战斗核心数据 (Combat & Martial Arts) - [修复与增强版]
         // -----------------------------------------------------
-        // [内功] 列表与激活状态标记
-        context.neigongs = actor.itemTypes.neigong || [];
-        context.neigongs.forEach(item => item.isRunning = item.system.active);
+        // 获取内功列表
+        let neigongs = actor.itemTypes.neigong || [];
+
+        // [新增] 排序逻辑：运行中的排在最前 > 品阶高 > 品阶低
+        neigongs.sort((a, b) => {
+            // 优先检查运行状态 (active = true 排前)
+            if (a.system.active !== b.system.active) {
+                return a.system.active ? -1 : 1;
+            }
+            // 其次按品阶 (Tier 3 > 2 > 1)
+            return b.system.tier - a.system.tier;
+        });
+
+        // 挂载并处理内功数据
+        context.neigongs = neigongs;
+        context.neigongs.forEach(item => {
+            item.isRunning = item.system.active;
+
+            // === [核心修复] 分阶段进度计算 ===
+            const system = item.system;
+            const tier = system.tier;
+            const config = system.config;
+
+            // 1. 获取各阶段折扣系数 (默认为 1)
+            const r1 = config.stage1?.xpCostRatio ?? 1;
+            const r2 = config.stage2?.xpCostRatio ?? 1;
+            const r3 = config.stage3?.xpCostRatio ?? 1;
+
+            // 2. 定义【增量】门槛 (即每一级单独修满需要多少)
+            // 规则：
+            // 人级(1): 领悟0 / 小成1000 / 圆满2000 (总3000)
+            // 地级(2): 领悟1000 / 小成3000 / 圆满6000 (总10000)
+            // 天级(3): 领悟2000 / 小成10000 / 圆满18000 (总30000)
+            let baseCosts = [0, 0, 0];
+            if (tier === 1) baseCosts = [0, 1000, 2000];
+            else if (tier === 2) baseCosts = [1000, 3000, 6000];
+            else if (tier === 3) baseCosts = [2000, 10000, 18000];
+
+            // 3. 应用折扣，计算实际需求 (Cap)
+            const c1 = Math.floor(baseCosts[0] * r1); // 领悟需求
+            const c2 = Math.floor(baseCosts[1] * r2); // 小成需求
+            const c3 = Math.floor(baseCosts[2] * r3); // 圆满需求
+
+            // 4. 分配已投入的修为 (像倒水一样填满杯子)
+            let remaining = system.xpInvested;
+
+            // 杯子1 (领悟)
+            const v1 = Math.min(remaining, c1);
+            remaining = Math.max(0, remaining - c1);
+
+            // 杯子2 (小成)
+            const v2 = Math.min(remaining, c2);
+            remaining = Math.max(0, remaining - c2);
+
+            // 杯子3 (圆满)
+            const v3 = Math.min(remaining, c3);
+
+            // 5. 构建 Tooltip HTML
+            // 辅助函数: 进度颜色 (满=绿, 有=黄, 空=灰)
+            const getCol = (v, max) => {
+                if (max === 0) return "#2ecc71"; // 0/0 算完成
+                return v >= max ? "#2ecc71" : (v > 0 ? "#f1c40f" : "#999");
+            };
+
+            let html = `<div style='text-align:left; min-width:160px; font-family:var(--font-serif);'>`;
+
+            // 标题栏：总进度
+            html += `<div style='border-bottom:1px solid rgba(255,255,255,0.2); margin-bottom:6px; padding-bottom:4px; font-weight:bold; color:#fff; display:flex; justify-content:space-between;'>
+                        <span>${item.name}</span>
+                        <span style='font-family:Consolas; color:var(--c-highlight);'>${system.xpInvested} / ${system.progressData.absoluteMax}</span>
+                     </div>`;
+
+            // 阶段1：领悟
+            html += `<div style='display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px;'>
+                        <span style='color:#ccc'>领悟:</span>
+                        <span style='font-family:Consolas; color:${getCol(v1, c1)}'>${v1} / ${c1}</span>
+                     </div>`;
+
+            // 阶段2：小成
+            html += `<div style='display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px;'>
+                        <span style='color:#ccc'>小成:</span>
+                        <span style='font-family:Consolas; color:${getCol(v2, c2)}'>${v2} / ${c2}</span>
+                     </div>`;
+
+            // 阶段3：圆满
+            html += `<div style='display:flex; justify-content:space-between; font-size:12px;'>
+                        <span style='color:#ccc'>圆满:</span>
+                        <span style='font-family:Consolas; color:${getCol(v3, c3)}'>${v3} / ${c3}</span>
+                     </div>`;
+
+            if (system.description) {
+                html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#888;'>${system.description}</div>`;
+            }
+
+            html += `</div>`;
+
+            item.xpTooltip = html;
+        });
 
         // [当前运行内功] 用于顶部状态栏显示名称与简述
         context.activeNeigongName = "";
@@ -268,10 +363,19 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // [外功/武学] 预计算招式伤害 (Pre-calculation)
+        // 1. 先获取常用列表 Set (用于快速查找)
+        const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
+        // pinnedList 格式 ["ItemID.MoveID", ...]
+        const pinnedSet = new Set(pinnedList);
+
+        // 2. 预处理武学与招式
         context.wuxues = actor.itemTypes.wuxue || [];
         for (const wuxue of context.wuxues) {
             const moves = wuxue.system.moves || [];
+
+            // 遍历每个招式
             moves.forEach(move => {
+                // 计算伤害 (保留原有逻辑)
                 const result = wuxue.calculateMoveDamage(move.id);
                 if (result) {
                     result.breakdown += `\n\n------------------\n注: 预估基于100气血/100内力/0怒气\n无内功和招式抗性的标准木桩`;
@@ -279,6 +383,15 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 } else {
                     move.derived = { damage: 0, feint: 0, breakdown: "计算错误", cost: { mp: 0, rage: 0, hp: 0 } };
                 }
+
+                // [新增] 注入 isPinned 状态
+                // 组合 Key: ItemID.MoveID
+                const refKey = `${wuxue.id}.${move.id}`;
+                move.isPinned = pinnedSet.has(refKey);
+
+                // [新增] 注入百分比 (用于进度条)
+                const max = move.progress.absoluteMax || 1;
+                move.percent = Math.min(100, (move.xpInvested / max) * 100);
             });
         }
 
@@ -417,7 +530,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         });
 
         // --- 填充武器等级 (Weapon Ranks) ---
-        // [修改] 使用汉字代替图标
+        // 使用汉字代替图标
         const weaponChars = {
             sword: "剑", blade: "刀", staff: "棍",
             dagger: "匕", hidden: "暗", unarmed: "拳",
