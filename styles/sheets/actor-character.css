@@ -3385,19 +3385,141 @@
 
 
 /* -----------------------------------------------------------
-   3. HUD Bottom Row (架招与被动)
+   3. HUD Bottom Row (架招与被动 - 修复列表弹出崩坏)
    ----------------------------------------------------------- */
 .xjzl-window.actor.character .hud-bottom-row {
+  position: relative;
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
-  gap: 20px;
-  margin-bottom: 20px;
-
-  /* [修复] 防止被挤压 */
+  height: 60px;
+  margin-bottom: 15px;
+  padding: 0 10px;
   flex-shrink: 0;
+
+  /* [关键修复] 提高层级，防止向上弹出的列表被上方的仪表盘遮挡 */
+  z-index: 100;
 }
 
+/* 左右侧容器 */
+.xjzl-window.actor.character .hud-side-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.xjzl-window.actor.character .hud-side-wrapper.left {
+  justify-content: flex-end;
+  padding-right: 40px;
+}
+
+.xjzl-window.actor.character .hud-side-wrapper.right {
+  justify-content: flex-start;
+  padding-left: 40px;
+}
+
+
+/* --- 战意/士气中央指示器 (保持不变) --- */
+.xjzl-window.actor.character .morale-trigger {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  opacity: 0.3;
+  filter: grayscale(100%);
+  transform: translate(-50%, -50%) scale(0.8);
+}
+
+.xjzl-window.actor.character .morale-trigger:hover {
+  opacity: 0.8;
+  filter: grayscale(20%);
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.xjzl-window.actor.character .fire-icon-wrapper {
+  font-size: 20px;
+  color: #555;
+  transition: 0.3s;
+  pointer-events: none;
+  margin-bottom: -2px;
+}
+
+.xjzl-window.actor.character .morale-input {
+  background: transparent !important;
+  border: none !important;
+  text-align: center;
+  font-family: "Consolas", monospace;
+  font-weight: bold;
+  font-size: 14px;
+  color: #555;
+  width: 50px;
+  height: 20px;
+  padding: 0 !important;
+  cursor: text;
+  transition: 0.3s;
+}
+
+.xjzl-window.actor.character .morale-input:focus {
+  outline: none;
+  border-bottom: 1px solid var(--c-cinnabar) !important;
+  color: #000;
+}
+
+.xjzl-window.actor.character .morale-input::-webkit-outer-spin-button,
+.xjzl-window.actor.character .morale-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* 激活态 */
+.xjzl-window.actor.character .morale-trigger.active {
+  opacity: 1;
+  filter: grayscale(0);
+  transform: translate(-50%, -50%) scale(1.1);
+}
+
+.xjzl-window.actor.character .morale-trigger.active .fire-icon-wrapper {
+  font-size: 28px;
+  background: linear-gradient(to bottom, #f1c40f, #e74c3c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 0 5px rgba(231, 76, 60, 0.6));
+  animation: morale-burn 1.5s infinite alternate;
+  margin-bottom: 0;
+}
+
+.xjzl-window.actor.character .morale-trigger.active .morale-input {
+  color: #c0392b;
+  font-size: 18px;
+  text-shadow: 0 1px 0 #f1c40f;
+  font-family: var(--font-title);
+  height: 24px;
+}
+
+@keyframes morale-burn {
+  0% {
+    filter: drop-shadow(0 0 2px rgba(241, 196, 15, 0.4));
+    transform: translateY(0);
+  }
+
+  100% {
+    filter: drop-shadow(0 -5px 10px rgba(231, 76, 60, 0.8));
+    transform: translateY(-2px) scale(1.05);
+  }
+}
+
+
+/* --- 架招卡片 (保持不变) --- */
 .xjzl-window.actor.character .stance-small-card {
   background: #333;
   color: #eee;
@@ -3407,7 +3529,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-width: 160px;
+  min-width: 140px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
 }
 
@@ -3448,11 +3570,14 @@
   color: #e74c3c;
 }
 
+
+/* --- [核心修复] 被动特性列表 --- */
 .xjzl-window.actor.character .passive-effects-pill {
   background: rgba(255, 255, 255, 0.6);
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   position: relative;
+  /* 作为定位锚点 */
 }
 
 .xjzl-window.actor.character .passive-effects-pill summary {
@@ -3477,24 +3602,31 @@
   display: none;
 }
 
+/* 弹出的列表 */
 .xjzl-window.actor.character .passive-list {
   position: absolute;
-  bottom: 100%;
-  left: 0;
+  /* 往上弹，留一点空隙 */
+  bottom: calc(100% + 8px);
+  /* [修复] 靠右对齐，而不是靠左，防止向右溢出 */
+  right: 0;
+  left: auto;
+
   width: 260px;
   background: rgba(30, 30, 30, 0.95);
   color: #eee;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 4px;
   padding: 8px;
-  margin-bottom: 8px;
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.5);
-  z-index: 50;
+  z-index: 200;
+  /* 确保极高，盖住仪表盘 */
+
   max-height: 250px;
   overflow-y: auto;
   backdrop-filter: blur(5px);
 }
 
+/* 列表项 */
 .xjzl-window.actor.character .passive-item {
   display: flex;
   align-items: center;
@@ -3526,7 +3658,6 @@
   color: #999;
   text-decoration: line-through;
 }
-
 
 /* -----------------------------------------------------------
    4. Bottom Actions & Grid (战术区与网格)
