@@ -584,8 +584,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 构建 combatStats 对象供模板使用 - [完全重构]
         context.combatStats = {
             // 1. 属性 (Attributes) - 重组为左右两翼
-            attributesLeft: [],  // 力、身、内
-            attributesRight: [], // 体、气、神
+            attributesLeft: [],  // 力、身、体
+            attributesRight: [], // 内、气、神
             wuxing: null,        // 悟性 (居中)
 
             // 2. 仪表盘核心 (Cockpit) - 绑定 buildBreakdown 生成的 Tooltip
@@ -625,8 +625,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const dmgSchema = system.schema.fields.combat.fields.damages.fields;
 
         // --- 填充属性与悟性 (Attributes) ---
-        // 定义显示顺序：左翼(力身内) -> 悟性 -> 右翼(体气神)
-        const attrKeys = ["liliang", "shenfa", "neixi", "wuxing", "tipo", "qigan", "shencai"];
+        // 定义显示顺序：左翼(力身体) -> 悟性 -> 右翼(内气神)
+        const attrKeys = ["liliang", "shenfa", "tipo", "wuxing", "neixi", "qigan", "shencai"];
 
         attrKeys.forEach((key, index) => {
             const stat = system.stats[key];
