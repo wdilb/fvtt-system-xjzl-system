@@ -2163,17 +2163,17 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-     * 处理拖拽放置
-     * 核心逻辑：获取拖拽源和放置目标，计算新的 sort 值
-     */
-    /**
-     * 处理拖拽放置 (手动排序版 - 稳健无报错)
-     * 核心逻辑：获取目标位置的上下邻居，取中间值作为新 sort
+     * @override
+     * 处理拖拽放置逻辑
+     * 1. 外来物品（新建）：总是交给 super 处理
+     * 2. 内部物品（排序）：只有在 _isSorting 为 true 时才执行
      */
     async _onDrop(event) {
         event.preventDefault();
 
-        // 1. 解析数据 (弃用 TextEditor)
+        // -----------------------------------------------------
+        // 1. 数据解析 (Data Parsing)
+        // -----------------------------------------------------
         let data;
         try {
             data = JSON.parse(event.dataTransfer.getData("text/plain"));
@@ -2183,36 +2183,62 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
         if (data.type !== "Item") return super._onDrop(event, data);
 
-        // 2. 锁定源物品 (Source)
-        if (!data.uuid) return;
-        // 假设 uuid 格式最后一段是 ID
-        const sourceId = data.uuid.split(".").pop();
-        const sourceItem = this.actor.items.get(sourceId);
+        // -----------------------------------------------------
+        // 2. 身份识别 (Identity Check)
+        // -----------------------------------------------------
+        // 尝试获取源物品信息
+        let sourceItem = null;
+        if (data.uuid) {
+            // 兼容不同版本的 UUID 解析，最稳妥的方式是用 fromDropData
+            const resolved = await Item.implementation.fromDropData(data);
+            sourceItem = resolved;
+        }
 
-        // 安全检查：必须是当前 Actor 的物品
-        if (!sourceItem || sourceItem.parent !== this.actor) return;
+        // -----------------------------------------------------
+        // 3. 核心分流 (Logic Branching)
+        // -----------------------------------------------------
 
-        // 3. 锁定目标位置 (Target Row)
+        // 【情况 A：外来物品】
+        // 如果物品不存在（比如数据错误），或者物品的父母不是当前 Actor
+        // 说明这是“创建新物品”的操作，必须放行！
+        if (!sourceItem || sourceItem.parent !== this.actor) {
+            return super._onDrop(event, data);
+        }
+
+        // 【情况 B：内部物品】
+        // 代码走到这里，说明 sourceItem 必然是当前 Actor 自己的物品
+
+        // >>> 排序模式检查 (Sort Guard) <<<
+        // 如果当前没有开启排序模式，直接交给父类处理（父类通常什么都不做，或者按默认逻辑处理）
+        // 这就完美保护了你的列表不被意外打乱
+        if (!this._isSorting) {
+            return super._onDrop(event, data);
+        }
+
+        // -----------------------------------------------------
+        // 4. 自定义排序逻辑 (Custom Sorting)
+        // -----------------------------------------------------
+
+        // A. 锁定目标位置
         const targetRow = event.target.closest(".wuxue-group");
-        if (!targetRow) return;
+        if (!targetRow) return super._onDrop(event, data); // 没拖对位置
 
+        // B. 目标检查
         const targetId = targetRow.dataset.itemId;
-        if (!targetId || targetId === sourceId) return; // 没拖动或目标是自己
+        if (!targetId || targetId === sourceItem.id) return false; // 拖给自己
 
         const targetItem = this.actor.items.get(targetId);
         if (!targetItem) return;
 
-        // 4. 获取同类兄弟列表 (排除自己，并按当前 sort 排序)
+        // C. 获取兄弟列表
         const siblings = this.actor.itemTypes[sourceItem.type]
-            .filter(i => i.id !== sourceId)
+            .filter(i => i.id !== sourceItem.id)
             .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
-        // 5. 计算插入位置
+        // D. 计算位置
         const targetIndex = siblings.findIndex(i => i.id === targetId);
         if (targetIndex === -1) return;
 
-        // 判断是插入到目标上方还是下方
-        // 获取目标元素的几何中心
         const box = targetRow.getBoundingClientRect();
         const midPoint = box.top + box.height / 2;
         const isBefore = event.clientY < midPoint;
@@ -2220,23 +2246,20 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         let sortBefore, sortAfter;
 
         if (isBefore) {
-            // 插在 target 前面
             const prevItem = siblings[targetIndex - 1];
-            sortBefore = prevItem ? prevItem.sort : (siblings[0].sort - 200000);
+            sortBefore = prevItem ? prevItem.sort : (siblings[0].sort - 100000);
             sortAfter = siblings[targetIndex].sort;
         } else {
-            // 插在 target 后面
             const nextItem = siblings[targetIndex + 1];
             sortBefore = siblings[targetIndex].sort;
-            sortAfter = nextItem ? nextItem.sort : (siblings[siblings.length - 1].sort + 200000);
+            sortAfter = nextItem ? nextItem.sort : (siblings[siblings.length - 1].sort + 100000);
         }
 
-        // 6. 计算新 Sort 值 (取平均)
+        // E. 执行更新
         const newSort = (sortBefore + sortAfter) / 2;
 
-        // 7. 执行更新 (手动构造，确保 _id 存在)
-        await this.actor.updateEmbeddedDocuments("Item", [{
-            _id: sourceId,
+        return this.actor.updateEmbeddedDocuments("Item", [{
+            _id: sourceItem.id,
             sort: newSort
         }]);
     }
