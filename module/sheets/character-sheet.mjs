@@ -199,6 +199,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // [UI显示] 计算资源百分比，主要用于前端 CSS 的 width: xx% 进度条
         context.percents = {
             hp: system.resources.hp.max ? Math.min(100, (system.resources.hp.value / system.resources.hp.max) * 100) : 0,
+            // 护体百分比：基于气血上限计算，最大不超过 100%
+            huti: system.resources.hp.max ? Math.min(100, (system.resources.huti / system.resources.hp.max) * 100) : 0,
             mp: system.resources.mp.max ? Math.min(100, (system.resources.mp.value / system.resources.mp.max) * 100) : 0,
             rage: (system.resources.rage.value / 10) * 100 // 怒气上限固定为 10
         };
