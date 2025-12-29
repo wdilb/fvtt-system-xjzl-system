@@ -37,12 +37,13 @@ XJZL.elements = {
 
 // 5. 角色属性 (对应 system.stats.xxx)
 XJZL.attributes = {
-  liliang: "XJZL.Stats.Liliang",
+liliang: "XJZL.Stats.Liliang",
   shenfa: "XJZL.Stats.Shenfa",
-  neixi: "XJZL.Stats.Neixi",
   tipo: "XJZL.Stats.Tipo",
+  neixi: "XJZL.Stats.Neixi",
   qigan: "XJZL.Stats.Qigan",
-  shencai: "XJZL.Stats.Shencai"
+  shencai: "XJZL.Stats.Shencai",
+  wuxing: "XJZL.Stats.Wuxing"
 };
 
 // 6. 武器类型 (对应 Character 的 weaponRanks)
