@@ -2119,22 +2119,29 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         new XJZLAuditLog({ actor: this.document }).render(true);
     }
     /**
-     * 修练列表即时搜索
-     * 需要在 _onRender 中绑定
+     * 修练列表即时搜索 (内功、武学、技艺书籍)
      */
     _onSearchCultivation(event, target) {
         const query = target.value.toLowerCase().trim();
         const html = this.element;
 
+        // -----------------------------------------------------
         // 1. 搜索内功 (Neigong)
-        const neigongs = html.querySelectorAll(".neigong-item"); // 假设这是卡片类名
+        // -----------------------------------------------------
+        const neigongs = html.querySelectorAll(".neigong-card"); // 修正了类名，之前是 .neigong-item
         neigongs.forEach(item => {
-            const name = item.dataset.name?.toLowerCase() || "";
+            // 通过查找内部的 .ng-name 来获取名字，比 dataset 更可靠
+            const nameEl = item.querySelector(".ng-name");
+            const name = nameEl ? nameEl.innerText.toLowerCase() : "";
+
+            // 如果搜索词为空，显示所有；否则根据名字匹配
             item.style.display = name.includes(query) ? "flex" : "none";
         });
 
-        // 2. 搜索武学 (Wuxue) - 这是一个双层结构
-        const wuxueGroups = html.querySelectorAll(".wuxue-group"); // 武学标题栏
+        // -----------------------------------------------------
+        // 2. 搜索武学 (Wuxue)
+        // -----------------------------------------------------
+        const wuxueGroups = html.querySelectorAll(".wuxue-group");
         wuxueGroups.forEach(group => {
             const wuxueName = group.dataset.name?.toLowerCase() || "";
             const moves = group.querySelectorAll(".move-card"); // 内部招式
@@ -2144,20 +2151,41 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 先搜招式
             moves.forEach(move => {
                 const moveName = move.dataset.name?.toLowerCase() || "";
-                // 匹配逻辑：如果搜到了招式名，或者搜到了所属武学名
+
+                // 匹配逻辑：搜到招式名 OR 搜到武学名
                 const isMatch = moveName.includes(query) || wuxueName.includes(query);
+
                 move.style.display = isMatch ? "flex" : "none";
                 if (isMatch) hasVisibleMove = true;
             });
 
-            // 决定武学容器是否显示
-            // 如果搜的是武学名，或者内部有匹配的招式，则显示该武学组
+            // 决定武学组容器是否显示
             if (wuxueName.includes(query) || hasVisibleMove) {
                 group.style.display = "block";
-                // 体验优化：如果正在搜索且有匹配，自动展开详情？
-                // group.querySelector("details").open = true; 
+                // 体验优化：如果正在搜索且有内容，确保 details 展开
+                if (query.length > 0) {
+                    const details = group.querySelector("details");
+                    if (details) details.open = true;
+                }
             } else {
                 group.style.display = "none";
+            }
+        });
+
+        // -----------------------------------------------------
+        // 3. 搜索技艺书籍 (Art Books) - [新增部分]
+        // -----------------------------------------------------
+        const artBooks = html.querySelectorAll(".art-book-card");
+        artBooks.forEach(book => {
+            // 获取书籍名称
+            const titleEl = book.querySelector(".book-title");
+            const bookName = titleEl ? titleEl.innerText.toLowerCase() : "";
+
+            // 匹配逻辑
+            if (bookName.includes(query)) {
+                book.style.display = "flex"; // 根据你的CSS，可能是 flex 或 grid
+            } else {
+                book.style.display = "none";
             }
         });
     }
@@ -2186,33 +2214,34 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // -----------------------------------------------------
         // 2. 身份识别 (Identity Check)
         // -----------------------------------------------------
-        // 尝试获取源物品信息
+        // A. 先尝试解析出 ID
         let sourceItem = null;
+        let isInternal = false;
+
         if (data.uuid) {
-            // 兼容不同版本的 UUID 解析，最稳妥的方式是用 fromDropData
-            const resolved = await Item.implementation.fromDropData(data);
-            sourceItem = resolved;
+            // V13 UUID 格式通常是 "Actor.ID.Item.ID" 或 "Item.ID"
+            // 取最后一部分作为 ID
+            const sourceId = data.uuid.split(".").pop();
+
+            // B. 直接在当前 Actor 的缓存集合里找 (同步操作，不需要 await)
+            sourceItem = this.actor.items.get(sourceId);
+
+            // 如果能找到，说明肯定是我自己的物品
+            if (sourceItem) isInternal = true;
         }
 
         // -----------------------------------------------------
         // 3. 核心分流 (Logic Branching)
         // -----------------------------------------------------
 
-        // 【情况 A：外来物品】
-        // 如果物品不存在（比如数据错误），或者物品的父母不是当前 Actor
-        // 说明这是“创建新物品”的操作，必须放行！
-        if (!sourceItem || sourceItem.parent !== this.actor) {
+        // 【情况 A：外来物品】(本地找不到，或者是空的) -> 交给父类去创建/处理
+        if (!isInternal) {
             return super._onDrop(event, data);
         }
 
-        // 【情况 B：内部物品】
-        // 代码走到这里，说明 sourceItem 必然是当前 Actor 自己的物品
-
-        // >>> 排序模式检查 (Sort Guard) <<<
-        // 如果当前没有开启排序模式，直接交给父类处理（父类通常什么都不做，或者按默认逻辑处理）
-        // 这就完美保护了你的列表不被意外打乱
+        // 【情况 B：内部物品】-> 检查排序开关
         if (!this._isSorting) {
-            return super._onDrop(event, data);
+            return super._onDrop(event, data); // 甚至可以直接 return false; 阻断一切
         }
 
         // -----------------------------------------------------
