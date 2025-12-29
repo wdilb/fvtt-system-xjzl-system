@@ -830,12 +830,23 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // A. [坐标定义] 背景图上穴位的绝对定位 (百分比)
         const MERIDIAN_COORDS = {
             // --- 阴脉 (左侧身体) ---
-            "hand_taiyin": { x: 32, y: 35 }, "hand_jueyin": { x: 22, y: 48 }, "hand_shaoyin": { x: 30, y: 65 },
-            "foot_taiyin": { x: 28, y: 75 }, "foot_jueyin": { x: 42, y: 80 }, "foot_shaoyin": { x: 48, y: 88 },
+            "hand_taiyin": { x: 30, y: 32 },   // 左肩/胸 - 稍微上提，留出下方空间
+            "hand_jueyin": { x: 16, y: 48 },   // 左臂外侧 - 向左大幅移动，利用空白区域
+            "hand_shaoyin": { x: 24, y: 65 },  // 左手/腰 - 向左移动，避开正下方的腿部穴位
+
+            "foot_taiyin": { x: 34, y: 80 },   // 左膝 - 下移，对应盘坐的膝盖位置
+            "foot_jueyin": { x: 42, y: 90 },   // 左踝 - 进一步下移，贴近底部
+            "foot_shaoyin": { x: 50, y: 95 },  // 足底 (涌泉) - 放在正中最低点，作为视觉锚点
+
             // --- 阳脉 (右侧身体) ---
-            "foot_taiyang": { x: 50, y: 20 }, // 眉心
-            "hand_taiyang": { x: 68, y: 35 }, "hand_yangming": { x: 78, y: 48 }, "hand_shaoyang": { x: 70, y: 65 },
-            "foot_yangming": { x: 62, y: 55 }, "foot_shaoyang": { x: 57, y: 80 },
+            "foot_taiyang": { x: 50, y: 20 },  // 眉心 - 保持不变，位置很好
+
+            "hand_taiyang": { x: 70, y: 32 },  // 右肩 - 稍微上提
+            "hand_yangming": { x: 84, y: 48 }, // 右臂外侧 - 向右大幅移动
+            "hand_shaoyang": { x: 76, y: 65 }, // 右手/腰 - 向右移动
+
+            "foot_yangming": { x: 62, y: 50 }, // 腹部/胃经 - 稍微上提，避免和下方太挤
+            "foot_shaoyang": { x: 58, y: 90 }, // 右踝 - 下移，与左侧对称
         };
 
         // B. [装备检查] 获取已装备在特定穴位上的“奇珍”
