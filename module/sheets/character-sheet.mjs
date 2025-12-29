@@ -1271,10 +1271,6 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         for (const [k, labelKey] of Object.entries(CONFIG.XJZL.attributes)) {
             add(groupStats, `stats.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
         }
-        //上面的CONFIG的attributes是没有悟性的，所以手动加上
-        if (!groups["stats.wuxing.mod"]) {
-            add(groupStats, "stats.wuxing.mod", `${game.i18n.localize("XJZL.Stats.Wuxing")} (Mod)`);
-        }
 
         // 2. 战斗属性 (Combat)
         const groupCombat = game.i18n.localize("XJZL.Combat.Label");
