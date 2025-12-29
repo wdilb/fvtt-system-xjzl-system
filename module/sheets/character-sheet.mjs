@@ -114,11 +114,6 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         },
         // --- 中间 Tab 内容 (Tab Body) ---
         // V2 会自动处理 Tab 的显示/隐藏，我们只需要标记它们是 Body 的一部分
-        stats: {
-            template: "systems/xjzl-system/templates/actor/character/tab-stats.hbs",
-            scrollable: [""], // 内部滚动容器
-            classes: ["xjzl-body"]
-        },
         combat: {
             template: "systems/xjzl-system/templates/actor/character/tab-combat.hbs",
             scrollable: [""],

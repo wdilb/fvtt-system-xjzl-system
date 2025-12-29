@@ -855,7 +855,6 @@ async function preloadHandlebarsTemplates() {
     // 角色卡
     "systems/xjzl-system/templates/actor/character/header.hbs",
     "systems/xjzl-system/templates/actor/character/tabs.hbs",
-    "systems/xjzl-system/templates/actor/character/tab-stats.hbs",
     "systems/xjzl-system/templates/actor/character/tab-cultivation.hbs",
     "systems/xjzl-system/templates/actor/character/tab-combat.hbs",
     "systems/xjzl-system/templates/actor/character/tab-jingmai.hbs",
