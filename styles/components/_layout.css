@@ -186,3 +186,217 @@
     background: var(--c-cinnabar);
     box-shadow: -2px 0 10px var(--c-cinnabar);
 }
+
+/* =========================================
+   XJZL System: 无边框窗口与美化按钮 (完整版)
+   ========================================= */
+
+/* 1. 窗口头部容器：透明化 + 绝对定位 + 布局控制 */
+.xjzl-window .window-header {
+    /* 定位与层级：浮在最上层 */
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 40px;
+    /* 稍微给一点高度，方便判定 */
+    z-index: 1000;
+    /* 确保在所有内容之上 */
+
+    /* 视觉去除：完全透明，无边框 */
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+
+    /* 布局：强制内容靠右对齐 */
+    display: flex;
+    justify-content: flex-end;
+    /* 按钮靠右 */
+    align-items: flex-start;
+    /* 顶对齐 */
+    padding-top: 6px;
+    /* 顶部留白 */
+    padding-right: 8px;
+    /* 右侧留白，不要贴边 */
+
+    /* 交互：头部本身不阻挡点击，但利用伪元素做拖拽 */
+    pointer-events: none;
+}
+
+/* 2. 隐藏原本的标题文字 */
+.xjzl-window .window-header .window-title {
+    display: none;
+}
+
+/* 3. 拖拽区域修复 (隐形地毯) */
+/* 在左侧留出大面积区域用于拖拽窗口 */
+.xjzl-window .window-header::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: calc(100% - 80px);
+    /* 减去右侧按钮的大概宽度 */
+    pointer-events: auto;
+    /* 恢复拖拽交互 */
+    cursor: grab;
+}
+
+/* =========================================
+   按钮美化核心样式
+   ========================================= */
+
+/* 4. 按钮基础样式：暗金琉璃风格 */
+.xjzl-window .window-header .header-control {
+    pointer-events: auto;
+    /* 按钮必须可点 */
+    position: relative;
+    /* 为了做微动画 */
+
+    /* 尺寸调整：稍微做大一点点，更像触摸按钮 */
+    width: 26px;
+    height: 26px;
+    line-height: 24px;
+    /* 垂直居中图标 */
+    margin-left: 6px;
+    /* 按钮之间的间距加大，避免拥挤 */
+
+    /* 颜色与背景：半透明黑底 + 描边，保证在任何背景下都可见 */
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    /* 稍微圆角，不要纯方 */
+    color: #cbb389;
+    /* 图标颜色：沉稳的暗金色/纸莎草色 */
+
+    /* 字体大小 */
+    font-size: 14px;
+
+    /* 过渡动画 */
+    transition: all 0.2s ease;
+    backdrop-filter: blur(2px);
+    /* (可选) 稍微有点磨砂玻璃感 */
+}
+
+/* 5. 鼠标悬停通用效果：点亮 */
+.xjzl-window .window-header .header-control:hover {
+    background: rgba(20, 20, 20, 0.9);
+    /* 背景变深实 */
+    border-color: #ffdb85;
+    /* 边框变亮金 */
+    color: #ffdb85;
+    /* 图标变亮金 */
+    transform: translateY(-1px);
+    /* 微微上浮 */
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    /* 增加投影 */
+}
+
+/* 6. 关闭按钮特化：悬停时变红 (警示色) */
+.xjzl-window .window-header .header-control.close:hover {
+    border-color: #ff6b6b;
+    color: #ff6b6b;
+    background: rgba(50, 0, 0, 0.8);
+}
+
+/* =========================================
+   最小化状态特化处理 (Minimized Fix - 终极完整版)
+   ========================================= */
+
+/* 1. 窗口容器本身：清理残余背景和边框，防止漏边 */
+/* 这一步至关重要，它让FVTT知道这个窗口现在只有标题栏那么大 */
+.xjzl-window.minimized {
+    background: transparent !important;
+    /* 去掉底色 */
+    box-shadow: none !important;
+    /* 去掉外围大阴影 */
+    border: none !important;
+    /* 去掉外边框 */
+    height: auto !important;
+    /* 让窗口高度自动适应 Header */
+    min-height: 0 !important;
+    /* 解除最小高度限制 */
+}
+
+/* 2. 彻底隐藏内容区域和拉伸手柄 */
+/* 只要窗口最小化，下面的所有立绘、属性、Tabs统统不渲染，物理消失 */
+.xjzl-window.minimized .window-content,
+.xjzl-window.minimized .window-resize-handle {
+    display: none !important;
+}
+
+/* 3. Header 回归文档流并美化为书签样式 */
+.xjzl-window.minimized .window-header {
+    /* 核心修复：不再绝对定位悬浮，而是变成相对定位来撑开窗口 */
+    position: relative !important;
+    top: auto;
+    left: auto;
+    margin: 0;
+    width: 100%;
+
+    /* 视觉样式：米色纸张风格 */
+    background: #f3ebd6 !important;
+    border: 1px solid #dcb378 !important;
+    border-radius: 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3) !important;
+    /* 给书签加个小阴影 */
+
+    /* 内部布局 */
+    height: 32px;
+    /* 固定高度 */
+    align-items: center;
+    /* 垂直居中对齐 */
+    padding-top: 0;
+    /* 去掉展开时的 padding */
+    padding-right: 4px;
+    /* 右侧留一点缝隙 */
+}
+
+/* 4. 恢复显示标题文字 */
+.xjzl-window.minimized .window-header .window-title {
+    display: block !important;
+    /* 强制显示 */
+    flex: 1;
+    /* 占据左侧空间 */
+
+    /* 文字排版 */
+    color: #5c4b3e;
+    /* 深褐色，像墨迹 */
+    font-size: 14px;
+    font-weight: bold;
+    text-align: left;
+    line-height: 30px;
+    padding-left: 10px;
+
+    /* 溢出处理 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+
+    pointer-events: none;
+    /* 文字本身不阻挡点击拖拽 */
+    z-index: 1002;
+}
+
+/* 5. 按钮样式微调 (更紧凑、适配米色背景) */
+.xjzl-window.minimized .window-header .header-control {
+    /* 尺寸缩小 */
+    width: 20px;
+    height: 20px;
+    line-height: 18px;
+    font-size: 12px;
+
+    /* 颜色适配 */
+    background: rgba(0, 0, 0, 0.05);
+    color: #5c4b3e;
+    border-color: rgba(92, 75, 62, 0.3);
+    margin-left: 4px;
+}
+
+/* 6. 拖拽区域全覆盖 */
+.xjzl-window.minimized .window-header::before {
+    width: 100%;
+    /* 全条都可以拖，不再需要避让按钮 */
+    left: 0;
+}
