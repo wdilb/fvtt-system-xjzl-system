@@ -731,21 +731,41 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
         for (const ref of pinnedRefs) {
             try {
-                // 格式 "ItemUUID.MoveID"
-                const [itemUuid, moveId] = ref.split("."); // 注意：如果是合成 UUID 可能会有更多点，建议用特定分隔符或只存 ID
-                // 实际上 FVTT UUID 通常是 Scene.ID.Token.ID.Item.ID，太长了。
-                // 建议 Flag 只存 { itemId: "xxx", moveId: "yyy" } 对象，或者 "ItemID.MoveID" (如果只在 Actor 内部用)
+                // 格式可能是 "ItemUUID.MoveID" 或 "ItemID.MoveID"
+                // 简单起见假设是 "ItemID.MoveID" 或者 split后取最后一部分
+                const parts = ref.split(".");
+                const moveId = parts.pop(); // 最后一部分是 moveId
+                const itemId = parts.pop(); // 倒数第二部分是 itemId (如果是UUID，这通常也是ID)
 
-                // 这里假设我们存的是 "ItemID.MoveID" (简易版)
-                const item = actor.items.get(itemUuid); // 这里的 itemUuid 其实是 ID
+                // 尝试获取物品
+                const item = actor.items.get(itemId);
+
                 if (item) {
+                    // 注意：这里的 move 对象已经被前面的 wuxue 循环处理过了
+                    // 带有 derived, tooltip, currentCost, isUltimate 等临时属性
                     const move = item.system.moves.find(m => m.id === moveId);
+
                     if (move) {
+                        // 构造扁平化数据对象供模板直接使用
                         context.pinnedMoves.push({
+                            // --- 基础数据 ---
                             name: move.name,
+                            type: move.type, // 用于染色
+                            isUltimate: move.isUltimate, // 用于绝招特效
+                            computedLevel: move.computedLevel, // 等级
+
+                            // --- 衍生数据 (来自 wuxue 循环的预计算) ---
+                            derived: move.derived,
+                            tooltip: move.tooltip,
+                            currentCost: move.currentCost,
+
+                            // --- 上下文数据 ---
                             parentName: item.name,
                             itemId: item.id,
-                            moveId: moveId
+                            moveId: moveId,
+
+                            // --- 标记为已Pin (用于显示实心星星) ---
+                            isPinned: true
                         });
                     }
                 }
@@ -1143,32 +1163,34 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
         // --- 折叠状态记忆 (Accordion Memory) ---
         // 初始化存储容器 (如果不存在)
-        if (!this._collapsedDetails) this._collapsedDetails = new Set();
+        if (!this._collapsedDetails || !(this._collapsedDetails instanceof Map)) {
+            this._collapsedDetails = new Map();
+        }
 
         const details = html.querySelectorAll("details[data-uid]");
         details.forEach(el => {
             const uid = el.dataset.uid;
+            const userState = this._collapsedDetails.get(uid);
 
             // A. 恢复状态
             // 如果这个ID在“已关闭”名单里，这就移除 open 属性
-            if (this._collapsedDetails.has(uid)) {
-                el.removeAttribute("open");
-            } else {
-                // 否则强制展开 (因为模板默认有open，这里双重保险)
-                el.setAttribute("open", "");
+            if (userState !== undefined) {
+                // 1. 如果用户操作过，以用户最后的状态为准 (无论 HTML 默认是什么)
+                if (userState) {
+                    el.setAttribute("open", "");
+                } else {
+                    el.removeAttribute("open");
+                }
             }
+            // 如果 userState 是 undefined (用户没动过)
+            // -> 什么都不做！直接保留 HTML 模板里的默认状态。
 
             // B. 绑定监听
             // 使用 toggle 事件监听用户开关操作
             el.addEventListener("toggle", (event) => {
-                // 注意：toggle 事件在打开和关闭时都会触发
-                if (el.open) {
-                    // 用户展开了，从“已关闭”名单移除
-                    this._collapsedDetails.delete(uid);
-                } else {
-                    // 用户关闭了，加入“已关闭”名单
-                    this._collapsedDetails.add(uid);
-                }
+                // 只要状态变了，就记录下来
+                // 注意：这里我们记录的是“当前是开还是关”，这就完美兼容了两种默认情况
+                this._collapsedDetails.set(uid, el.open);
             });
         });
         // 1. 绑定即时搜索 (Live Search)
