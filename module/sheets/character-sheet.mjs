@@ -1114,6 +1114,33 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     _onRender(context, options) {
         super._onRender(context, options);
         const html = this.element; // AppV2 中 this.element 就是根节点
+        // =====================================================
+        // Header 滚动条记忆修复 (Capture + Passive)
+        // 解决了 V13 原生 scrollable 无法监听 header滚动条的问题
+        // =====================================================
+
+        // 1. RAF 确保在 CSS 布局计算完成后执行
+        window.requestAnimationFrame(() => {
+            const sidebar = this.element.querySelector(".sidebar-scroll-wrapper");
+            if (sidebar && this._sidebarScrollPos > 0) {
+                // 只有偏差较大时才修正，避免微小抖动
+                if (Math.abs(sidebar.scrollTop - this._sidebarScrollPos) > 5) {
+                    sidebar.scrollTop = this._sidebarScrollPos;
+                }
+            }
+        });
+
+        // 2. [绑定监听] 检查当前 DOM 引用是否已绑定
+        if (this._boundScrollElement !== this.element) {
+            this.element.addEventListener("scroll", (event) => {
+                // 过滤目标：只记录 sidebar 的滚动
+                if (event.target.classList?.contains("sidebar-scroll-wrapper")) {
+                    this._sidebarScrollPos = event.target.scrollTop;
+                }
+            }, { capture: true, passive: true }); // passive: true 确保零性能损耗
+
+            this._boundScrollElement = this.element;
+        }
         // --- 折叠状态记忆 (Accordion Memory) ---
         // 初始化存储容器 (如果不存在)
         if (!this._collapsedDetails) this._collapsedDetails = new Set();
