@@ -700,6 +700,11 @@ export class XJZLActor extends Actor {
     // 直接使用 Config 判断，比检查 sys 对象更准确
     if (CONFIG.XJZL.attributes[key]) {
       val = sys.stats[key]?.total || 0;
+      // 如果是属性(stat)且 key 不是 "wuxing"，则将数值除以 10 向下取整
+      // 例如: 力量 165 -> 16
+      if (key !== "wuxing") {
+        val = Math.floor(val / 10);
+      }
       labelKey = CONFIG.XJZL.attributes[key];
       type = "stat";
     }
