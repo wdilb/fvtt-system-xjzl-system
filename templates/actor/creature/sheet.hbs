@@ -1,139 +1,164 @@
-<div class="xjzl-flex-col scroll-area" style="height: 100%; padding: 5px; gap: 10px; overflow-y: auto;">
+{{!-- templates/actor/creature/sheet.hbs --}}
+<div class="xjzl-creature-sheet">
 
-    {{!-- 1. 头部信息 --}}
-    <header class="xjzl-header">
-        <img class="char-portrait" src="{{document.img}}" data-edit="img"
-            style="flex:0 0 80px; height:80px; border-radius:4px; margin-right:10px;" />
+    {{!-- 背景纹理 --}}
+    <div class="bg-deco">兽</div>
 
-        <div class="xjzl-flex-col xjzl-grow" style="justify-content: space-between;">
-            <input type="text" name="name" value="{{document.name}}" class="xjzl-input"
-                style="font-size:1.8em; font-weight:bold; border:none; border-bottom:2px solid #444;" />
+    {{!-- 1. 头部：立绘与基础信息 --}}
+    <header class="creature-header">
 
-            <div class="xjzl-grid-3" style="gap: 5px;">
-                <div class="xjzl-flex-col">
-                    <label>{{localize "XJZL.Creature.Type"}}</label>
+        {{!--
+        【已修复】立绘
+        移除了 data-edit="img"，防止表单提交时覆盖 img 属性为空字符串。
+        点击仍会触发 _onEditImage，JS 会默认处理 img 路径更新。
+        --}}
+        <div class="portrait-wrapper" data-action="editImage" data-tooltip="点击更换图片">
+            <img src="{{document.img}}" />
+            <div class="portrait-frame"></div>
+        </div>
+
+        {{!-- 核心信息 --}}
+        <div class="header-content">
+            {{!-- 名字 (书法大字) --}}
+            <input type="text" name="name" value="{{document.name}}" class="creature-name" placeholder="未命名野兽" />
+
+            {{!-- 标签行 (Type / Size / Diff / Price) --}}
+            <div class="tags-row">
+                {{!-- 类型印章 --}}
+                <div class="tag-seal type-{{system.info.type}}">
                     <select name="system.info.type">
                         {{selectOptions creatureTypes selected=system.info.type}}
                     </select>
                 </div>
-                <div class="xjzl-flex-col">
-                    <label>{{localize "XJZL.Creature.Difficulty"}}</label>
-                    <input type="number" name="system.info.difficulty" value="{{system.info.difficulty}}"
-                        class="xjzl-input" />
+
+                {{!-- 体型 --}}
+                <div class="info-pill">
+                    <i class="fas fa-expand"></i>
+                    <select name="system.info.size" style="width:auto; min-width:60px;">
+                        {{selectOptions choices.sizes selected=system.info.size localize=true}}
+                    </select>
                 </div>
-                <div class="xjzl-flex-col">
-                    <label>{{localize "XJZL.Equipment.Price"}}</label>
-                    <input type="text" name="system.info.price" value="{{system.info.price}}" class="xjzl-input" />
+
+                {{!-- 难度 --}}
+                <div class="info-pill" data-tooltip="{{localize 'XJZL.Creature.Difficulty'}}">
+                    <i class="fas fa-crosshairs"></i>
+                    <input type="number" name="system.info.difficulty" value="{{system.info.difficulty}}"
+                        placeholder="10" />
+                </div>
+
+                {{!-- 价格 --}}
+                <div class="info-pill" data-tooltip="{{localize 'XJZL.Equipment.Price'}}">
+                    <i class="fas fa-coins"></i>
+                    <input type="text" name="system.info.price" value="{{system.info.price}}" placeholder="价格" />
                 </div>
             </div>
         </div>
     </header>
 
-    {{!-- 2. 资源条 (体力 & 怒气) --}}
-    <div class="xjzl-card" style="padding: 5px;">
-        {{!-- 体力 --}}
-        <div class="resource-row" style="margin-bottom: 5px;">
-            <label style="font-weight:bold; flex:0 0 40px;">{{localize "XJZL.Creature.Tili"}}</label>
-            <div class="resource-inputs" style="flex:1; display:flex; gap:5px; align-items:center;">
-                <input type="number" name="system.resources.tili.value" value="{{system.resources.tili.value}}"
-                    class="xjzl-input" />
-                <span>/</span>
-                <input type="number" name="system.resources.tili.max" value="{{system.resources.tili.max}}"
-                    class="xjzl-input" />
-            </div>
-        </div>
-        <div class="resource-bar-bg" style="height: 8px; background: #333; border-radius: 4px; overflow:hidden;">
-            <div style="height:100%; background:#c0392b; width: {{tiliPercent}}%"></div>
-        </div>
+    {{!-- 2. 核心资源条 (体力 & 怒气) --}}
+    <section class="vitals-section">
 
-        {{!-- 怒气 --}}
-        <div class="resource-row" style="margin-top: 8px; margin-bottom: 5px;">
-            <label style="font-weight:bold; flex:0 0 40px;">{{localize "XJZL.Resources.Rage"}}</label>
-            <div class="resource-inputs" style="flex:1; display:flex; gap:5px; align-items:center;">
-                <input type="number" name="system.resources.rage.value" value="{{system.resources.rage.value}}"
-                    class="xjzl-input" />
-                <span style="color:#666;">/ 10</span>
-            </div>
-        </div>
-        <div class="resource-bar-bg" style="height: 6px; background: #333; border-radius: 4px; overflow:hidden;">
-            <div
-                style="height:100%; background:#f1c40f; width: {{calculatePercentage system.resources.rage.value 10}}%">
-            </div>
-        </div>
-    </div>
-
-    {{!-- 3. 战斗属性 --}}
-    <div class="xjzl-card">
-        <div class="xjzl-card-header">{{localize "XJZL.Combat.Label"}}</div>
-
-        {{!-- 这里的 class 必须是 xjzl-grid-4，下面的 CSS 针对它写的 --}}
-        <div class="xjzl-grid-4">
-
-            <div class="stat-box">
-                <label>{{localize "XJZL.Combat.Speed"}}</label>
-                <input type="number" name="system.combat.speed" value="{{system.combat.speed}}" />
-            </div>
-
-            <div class="stat-box">
-                <label>{{localize "XJZL.Creature.Hit"}}</label>
-                <input type="number" name="system.combat.hit" value="{{system.combat.hit}}" />
-            </div>
-
-            <div class="stat-box">
-                <label>{{localize "XJZL.Combat.Dodge"}}</label>
-                <input type="number" name="system.combat.dodge" value="{{system.combat.dodge}}" />
-            </div>
-
-            {{!-- 防护值加上 protection 类 --}}
-            <div class="stat-box protection">
-                <label>{{localize "XJZL.Creature.Protection"}}</label>
-                <input type="number" name="system.combat.protection" value="{{system.combat.protection}}" />
-            </div>
-        </div>
-
-        <div class="xjzl-flex-row" style="margin-top: 5px; align-items: center; justify-content: center;">
-            <label>{{localize "XJZL.Creature.DamageBase"}}:</label>
-            {{!-- 加上 damage-base 类 --}}
-            <input type="number" name="system.combat.damage" value="{{system.combat.damage}}"
-                class="xjzl-input damage-base" style="width: 60px;" />
-        </div>
-    </div>
-
-    {{!-- 4. 描述 --}}
-    <div class="xjzl-card" style="flex: 1;">
-        <label class="xjzl-card-header">{{localize "XJZL.Info.Description"}}</label>
-        {{!-- 野兽描述通常较短，直接用 Textarea 即可 --}}
-        <textarea name="system.description" class="xjzl-input"
-            style="height: 100px; resize: vertical;">{{system.description}}</textarea>
-    </div>
-
-    {{!-- 5. 特性与技能 (Abilities) --}}
-    <div class="xjzl-card">
-        <div class="xjzl-flex-row xjzl-card-header" style="justify-content: space-between;">
-            <span>{{localize "XJZL.Creature.Abilities"}}</span>
-            <a data-action="addAbility"><i class="fas fa-plus"></i></a>
-        </div>
-
-        <div class="xjzl-flex-col" style="gap: 5px;">
-            {{#each system.abilities as |ability i|}}
-            <div style="border: 1px solid #ccc; padding: 5px; border-radius: 4px; background: rgba(0,0,0,0.02);">
-                <div class="xjzl-flex-row" style="margin-bottom: 4px; align-items: center;">
-                    <input type="text" name="system.abilities.{{i}}.name" value="{{ability.name}}" class="xjzl-input"
-                        style="font-weight: bold; flex: 1;" placeholder="技能名称" />
-
-                    {{!-- 快捷操作 --}}
-                    <a data-action="postAbility" data-index="{{i}}" title="发送详情" style="margin: 0 5px; color: #555;"><i
-                            class="fas fa-comment"></i></a>
-                    <a data-action="deleteAbility" data-index="{{i}}" title="删除" style="color: #999;"><i
-                            class="fas fa-trash"></i></a>
+        {{!-- 体力条 --}}
+        <div class="vital-bar hp">
+            <div class="label"><i class="fas fa-heartbeat"></i> {{localize "XJZL.Creature.Tili"}}</div>
+            <div class="bar-track">
+                <div class="bar-fill" style="width: {{tiliPercent}}%"></div>
+                <div class="bar-text">
+                    <input type="number" name="system.resources.tili.value" value="{{system.resources.tili.value}}">
+                    <span>/</span>
+                    <input type="number" name="system.resources.tili.max" value="{{system.resources.tili.max}}">
                 </div>
-                <textarea name="system.abilities.{{i}}.description" rows="2" class="xjzl-input"
-                    style="font-size: 0.9em; resize: vertical;" placeholder="技能效果...">{{ability.description}}</textarea>
             </div>
-            {{else}}
-            <div style="text-align: center; color: #999; font-size: 0.9em; padding: 10px;">暂无特性</div>
-            {{/each}}
+        </div>
+
+        {{!-- 怒气条 --}}
+        <div class="vital-bar rage">
+            <div class="label"><i class="fas fa-fire"></i> {{localize "XJZL.Resources.Rage"}}</div>
+            <div class="bar-track">
+                {{!-- 注意：确保你注册了 calculatePercentage 这个 helper，或者在 JS _prepareContext 中计算好传进来 --}}
+                <div class="bar-fill" style="width: {{calculatePercentage system.resources.rage.value 10}}%"></div>
+                <div class="bar-text">
+                    <input type="number" name="system.resources.rage.value" value="{{system.resources.rage.value}}">
+                    <span style="opacity:0.6">/ 10</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{!-- 3. 战斗属性网格 --}}
+    <section class="combat-grid">
+        {{!-- 速度 --}}
+        <div class="stat-cell">
+            <div class="stat-label">{{localize "XJZL.Combat.Speed"}}</div>
+            <input type="number" class="stat-val" name="system.combat.speed" value="{{system.combat.speed}}" />
+        </div>
+
+        {{!-- 命中 --}}
+        <div class="stat-cell">
+            <div class="stat-label">{{localize "XJZL.Creature.Hit"}}</div>
+            <input type="number" class="stat-val" name="system.combat.hit" value="{{system.combat.hit}}" />
+        </div>
+
+        {{!-- 闪避 --}}
+        <div class="stat-cell">
+            <div class="stat-label">{{localize "XJZL.Combat.Dodge"}}</div>
+            <input type="number" class="stat-val" name="system.combat.dodge" value="{{system.combat.dodge}}" />
+        </div>
+
+        {{!-- 防护 --}}
+        <div class="stat-cell protection">
+            <div class="stat-label">{{localize "XJZL.Creature.Protection"}}</div>
+            <input type="number" class="stat-val" name="system.combat.protection"
+                value="{{system.combat.protection}}" />
+            <i class="fas fa-shield-alt icon-bg"></i>
+        </div>
+    </section>
+
+    {{!-- 基础伤害 (独立一行) --}}
+    <div class="damage-row">
+        <label>{{localize "XJZL.Creature.DamageBase"}}</label>
+        <div class="damage-input-wrapper">
+            <i class="fas fa-claw-marks"></i>
+            <input type="number" name="system.combat.damage" value="{{system.combat.damage}}" />
         </div>
     </div>
 
+    {{!-- 4. 描述与特性 --}}
+    <div class="bottom-split">
+
+        {{!-- 左侧：描述 --}}
+        <div class="desc-col">
+            <div class="section-title">{{localize "XJZL.Info.Description"}}</div>
+            <textarea name="system.description" class="desc-input"
+                placeholder="输入野兽的生态描述...">{{system.description}}</textarea>
+        </div>
+
+        {{!-- 右侧：特性列表 --}}
+        <div class="abilities-col">
+            <div class="section-title action-header">
+                <span>{{localize "XJZL.Creature.Abilities"}}</span>
+                <a data-action="addAbility" data-tooltip="添加特性"><i class="fas fa-plus-circle"></i></a>
+            </div>
+
+            <div class="ability-list">
+                {{#each system.abilities as |ability i|}}
+                <div class="ability-card">
+                    <div class="ability-header">
+                        <input type="text" class="ability-name" name="system.abilities.{{i}}.name"
+                            value="{{ability.name}}" placeholder="特性名称" />
+                        <div class="ability-tools">
+                            <a data-action="postAbility" data-index="{{i}}"><i class="fas fa-comment-alt"></i></a>
+                            <a data-action="deleteAbility" data-index="{{i}}" class="delete"><i
+                                    class="fas fa-trash"></i></a>
+                        </div>
+                    </div>
+                    <textarea class="ability-desc" name="system.abilities.{{i}}.description" rows="2"
+                        placeholder="效果描述...">{{ability.description}}</textarea>
+                </div>
+                {{else}}
+                <div class="empty-hint">暂无特殊能力</div>
+                {{/each}}
+            </div>
+        </div>
+    </div>
 </div>

@@ -8,7 +8,7 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "actor", "creature", "xjzl-system"],
+        classes: ["xjzl-window", "actor", "creature"],
         position: { width: 600, height: 600 }, // 不需要太大
         window: { resizable: true },
         form: {
@@ -16,6 +16,8 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             closeOnSubmit: false
         },
         actions: {
+            // --- 图片编辑动作 ---
+            editImage: XJZLCreatureSheet.prototype._onEditImage,
             // 技能管理
             addAbility: XJZLCreatureSheet.prototype._onAddAbility,
             deleteAbility: XJZLCreatureSheet.prototype._onDeleteAbility,
@@ -25,7 +27,7 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     };
 
     static PARTS = {
-        main: { template: "systems/xjzl-system/templates/actor/creature/sheet.hbs", scrollable: [""] }
+        main: { template: "systems/xjzl-system/templates/actor/creature/sheet.hbs", scrollable: [".xjzl-creature-sheet", ".ability-list"] }
     };
 
     async _prepareContext(options) {
@@ -34,6 +36,9 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
 
         context.system = actor.system;
         context.creatureTypes = localizeConfig(CONFIG.XJZL.creatureTypes); // 用于下拉菜单
+        context.choices = {
+            sizes: { small: "小型", medium: "中型", large: "大型", huge: "巨型" }
+        };
 
         // 准备体力百分比
         const tili = actor.system.resources.tili;
@@ -45,6 +50,20 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     /* -------------------------------------------- */
     /*  交互 Actions                                */
     /* -------------------------------------------- */
+
+    /* -------------------------------------------- */
+    /*  通用图片编辑器处理                            */
+    /* -------------------------------------------- */
+    async _onEditImage(event, target) {
+        const attr = target.dataset.edit || "img";
+        const current = foundry.utils.getProperty(this.document, attr);
+        const fp = new foundry.applications.apps.FilePicker({
+            type: "image",
+            current: current,
+            callback: path => this.document.update({ [attr]: path })
+        });
+        return fp.browse();
+    }
 
     async _onAddAbility(event, target) {
         const abilities = this.document.system.abilities || [];
