@@ -552,7 +552,7 @@ export class ChatCardManager {
             results[uuid] = {
                 isHit: isHit,
                 total: total, //total为0且isHit为true说明是不需要判断的必中攻击
-                dieUsed: needsCheck ? finalDie : "-", // 这里的 Key 改为 dieUsed 比较明确，之前的代码混用了 die 和 dieUsed
+                dieUsed: needsCheck ? finalDie : "-", // 这里的 Key 改为 dieUsed 比较明确
                 stateLabel: state === 1 ? "优" : (state === -1 ? "劣" : "平"),
                 feintState: states.feintState,
                 ignoreBlock: states.ignoreBlock,
@@ -1106,7 +1106,7 @@ export class ChatCardManager {
             // A. 准备基础参数
             const res = hitResults[uuid];
             const isHit = res ? res.isHit : false;
-            const die = res ? res.die : 0;
+            const die = res ? res.dieUsed : 0;
 
             const ignoreBlock = res.ignoreBlock || false;
             const ignoreDefense = res.ignoreDefense || false;
@@ -1119,13 +1119,21 @@ export class ChatCardManager {
             const damageType = flags.damageType;
 
             if (["waigong", "neigong"].includes(damageType)) {
-                // 阈值 (例如 18，代表 18,19,20 都是暴击)
-                const critThreshold = (damageType === "neigong")
+                // 1. 获取基础阈值 (面板值)
+                // 此时 Actor 数据类里的 prepareDerivedData 已经去掉了士气被动，所以这里取到的是纯面板
+                const baseThreshold = (damageType === "neigong")
                     ? attacker.system.combat.critNeigongTotal
                     : attacker.system.combat.critWaigongTotal;
 
-                // 命中 且 骰子 >= 阈值
-                if (isHit && die >= critThreshold) {
+                // 2. 获取本次消耗的士气
+                const moraleUsed = flags.costConsumed?.morale || 0;
+
+                // 3. 计算动态阈值 (每10点士气 -1 阈值)
+                const moraleMod = Math.floor(moraleUsed / 10);
+                const finalThreshold = Math.max(0, baseThreshold - moraleMod);
+
+                // 4. 判定 (命中 且 骰子 >= 动态阈值)
+                if (isHit && die >= finalThreshold) {
                     isCrit = true;
                 }
             }
@@ -1303,29 +1311,6 @@ export class ChatCardManager {
         };
 
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
-
-        // C. 士气清空
-        // 1. flags.moveType !== 'basic' (普通武学招式)
-        // 2. flags.moveId === 'opportunity' (趁虚而入，虽然它的 type 可能是 basic，但 ID 特殊)
-        
-        const isBasicAttack = flags.moveType === "basic";
-        const isOpportunity = flags.moveId === "opportunity";
-        const shouldResetMorale = (!isBasicAttack) || isOpportunity;
-
-        if (shouldResetMorale) {
-            const currentMorale = attacker.system.resources.morale?.value || 0;
-            if (currentMorale > 0) {
-                // 执行更新
-                await attacker.update({ "system.resources.morale.value": 0 });
-                
-                // 给攻击者飘个字提示士气耗尽
-                if (attacker.token?.object) {
-                    canvas.interface.createScrollingText(attacker.token.object.center, "士气耗尽", {
-                        direction: 1, fontSize: 24, fill: "#cccccc", stroke: "#000000", strokeThickness: 2
-                    });
-                }
-            }
-        }
     }
 
     /**
@@ -1592,18 +1577,6 @@ export class ChatCardManager {
             isManual: true
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
-
-        // 士气清空逻辑 (复用相同逻辑)
-        const isBasicAttack = flags.moveType === "basic";
-        const isOpportunity = flags.moveId === "opportunity";
-        const shouldResetMorale = (!isBasicAttack) || isOpportunity;
-
-        if (shouldResetMorale) {
-            const currentMorale = attacker.system.resources.morale?.value || 0;
-            if (currentMorale > 0) {
-                await attacker.update({ "system.resources.morale.value": 0 });
-            }
-        }
     }
 
     /**
@@ -2039,6 +2012,7 @@ export class ChatCardManager {
                         ${cost.mp ? `<li>内力: +${cost.mp}</li>` : ""}
                         ${cost.rage ? `<li>怒气: +${cost.rage}</li>` : ""}
                         ${cost.hp ? `<li>气血: +${cost.hp}</li>` : ""}
+                        ${cost.morale ? `<li>士气: +${cost.morale}</li>` : ""}
                       </ul>`,
             ok: { label: "返还" }
         });
@@ -2058,6 +2032,9 @@ export class ChatCardManager {
         }
         if (cost.hp) {
             updates["system.resources.hp.value"] = res.hp.value + cost.hp;
+        }
+        if (cost.morale) {
+            updates["system.resources.morale.value"] = res.morale.value + cost.morale;
         }
 
         // 提交更新

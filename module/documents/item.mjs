@@ -1743,7 +1743,7 @@ export class XJZLItem extends Item {
             isHit: isHit,
             stateLabel: outcomeLabel,
             dodge: dodge,
-            die: finalDie, //显示用的哪个骰子
+            dieUsed: finalDie, //显示用的哪个骰子
             feintState: ctx.feintState, //对每个目标的虚招优劣势 
             ignoreBlock: ctx.ignoreBlock,
             ignoreDefense: ctx.ignoreDefense,
@@ -1763,7 +1763,7 @@ export class XJZLItem extends Item {
             isHit: true, // 默认必中
             stateLabel: "-",
             dodge: "-",
-            die: "-",
+            dieUsed: "-",
             feintState: ctx.feintState
           };
         });
@@ -1864,7 +1864,7 @@ export class XJZLItem extends Item {
                 stateLabel: res.stateLabel, // "优", "劣", "平"
                 isHit: res.isHit,           // 是否命中
                 total: res.total,           // 最终数值
-                dieUsed: res.die,           // 用的哪个骰子
+                dieUsed: res.dieUsed,           // 用的哪个骰子
                 feintState: res.feintState,
                 // 保存穿透标志到数据库
                 ignoreBlock: res.ignoreBlock,
