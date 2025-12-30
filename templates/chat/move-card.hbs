@@ -165,6 +165,10 @@
 
         {{!-- 5. 按钮组 --}}
         {{#unless isStance}}
+
+        {{!-- [NEW] 检查是否由脚本自动处理了 --}}
+        {{#unless autoApplied}}
+
         <div class="card-buttons">
             {{#if isFeint}}
             {{#if showFeintBtn}}
@@ -179,26 +183,42 @@
             {{/if}}
             {{/if}}
 
-            {{#if (gt calc.damage 0)}}
-            {{#if isHeal}}
+            {{!-- [MODIFIED] 按钮显示逻辑重构 --}}
+
+            {{!-- 优先级 1: Buff (气招) --}}
+            {{!-- 只要是 Buff 模式，无论有没有数值，都是应用效果 --}}
+            {{#if isBuff}}
+            <button data-action="applyHeal" class="btn-effect">
+                <i class="fas fa-magic"></i> {{localize "XJZL.UI.Chat.MoveCard.ApplyEffect"}}
+            </button>
+
+            {{!-- 优先级 2: Heal (治疗) --}}
+            {{else if isHeal}}
             <button data-action="applyHeal" class="btn-heal"
                 title="{{localize 'XJZL.UI.Chat.MoveCard.ApplyHealTitle'}}">
                 <i class="fas fa-heart"></i> {{localize "XJZL.UI.Chat.MoveCard.ApplyHeal"}}
             </button>
+
+            {{!-- 优先级 3: Attack (攻击) --}}
             {{else}}
+            {{!-- 只有攻击才检查数值是否大于0 --}}
+            {{#if (gt calc.damage 0)}}
             <button data-action="applyDamage" class="btn-damage"
                 title="{{localize 'XJZL.UI.Chat.MoveCard.ApplyDamageTitle'}}">
                 <i class="fas fa-tint"></i> {{localize "XJZL.UI.Chat.MoveCard.ApplyDamage"}}
             </button>
             {{/if}}
-            {{else}}
-            {{#if (or isHeal isBuff)}}
-            <button data-action="applyHeal" class="btn-effect">
-                <i class="fas fa-magic"></i> {{localize "XJZL.UI.Chat.MoveCard.ApplyEffect"}}
-            </button>
-            {{/if}}
             {{/if}}
         </div>
+
+        {{!-- 如果自动应用，显示提示 --}}
+        {{else}}
+        <div
+            style="text-align:center; padding:10px; color:#27ae60; font-style:italic; background:rgba(0,0,0,0.02); border-radius:4px;">
+            <i class="fas fa-check-circle"></i> {{localize "XJZL.UI.Chat.MoveCard.AutoAppliedHint" default="效果已触发"}}
+        </div>
+        {{/unless}}
+
         {{/unless}}
         {{!-- 撤回消耗按钮 --}}
         {{!-- 只有当产生过消耗 (mp/hp/rage > 0) 时才显示此按钮 --}}

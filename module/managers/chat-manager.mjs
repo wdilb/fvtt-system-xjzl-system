@@ -1779,6 +1779,9 @@ export class ChatCardManager {
         const baseAmount = flags.damage || 0;
         const move = item.system.moves.find(m => m.id === flags.moveId);
 
+        // 检查动作类型
+        const isBuffType = flags.actionType === "buff";
+
         // 2. 循环处理目标
         const summaryData = [];
 
@@ -1790,8 +1793,8 @@ export class ChatCardManager {
             let finalRealHeal = 0; // 实际回血量
             let isHealAction = false;
 
-            // A. 执行治疗 (仅当数值 > 0 时)
-            if (baseAmount > 0) {
+            // A. 执行治疗 (仅当数值 > 0 时) 且 不是纯 Buff 类型时，才执行回血
+            if (baseAmount > 0 && !isBuffType) {
                 isHealAction = true;
                 // 默认治疗类型为 HP，除非我们未来扩展，其他暂时用脚本来处理
                 // 调用 Actor 的 applyHealing (会处理飘字和数据库更新)
@@ -1803,6 +1806,11 @@ export class ChatCardManager {
 
                 // 获取实际加了多少
                 finalRealHeal = result.actualHeal;
+            }
+            else if (isBuffType && baseAmount > 0) {
+                // 如果是 Buff 且有数值，我们视作“强度”，虽然不回血，但我们要把数值传下去
+                // 这里 finalRealHeal 保持 0，代表“没有恢复生命”，但 baseAmount 依然存在
+                // 这样可以在脚本里检查 baseAmount > 0，来判断是否有 Buff 作用
             }
 
             // B. 记录结果
@@ -1824,9 +1832,10 @@ export class ChatCardManager {
                 move: move,
 
                 // 2. 行为标识
-                type: "heal",         // 明确告知脚本这是治疗
-                isHeal: true,         // 便捷布尔值
+                type: isBuffType ? "buff" : "heal", // 更精准的类型
+                isHeal: !isBuffType,   
                 isAttack: false,      // 明确不是攻击
+                isBuff: isBuffType, // 方便脚本判断
 
                 // 3. 战斗状态 (Polyfill)
                 // 治疗/Buff 视为“必中”、“无暴击”、“无破防”
@@ -1840,7 +1849,7 @@ export class ChatCardManager {
                 // 4. 数值结果
                 // 提供多套语义，方便脚本取用
                 baseAmount: baseAmount,     // 原始面板
-                finalAmount: finalRealHeal, // 传给脚本的是实际生效值
+                finalAmount: isBuffType ? baseAmount : finalRealHeal, // 如果是Buff，finalAmount=强度；如果是奶，finalAmount=实际回血
                 healAmount: finalRealHeal,   // 语义化名称
 
                 // 兼容性字段：攻击脚本通常找 hpLost，这里显式给 0，防止 undefined
@@ -1849,7 +1858,7 @@ export class ChatCardManager {
                 mpLost: 0,
 
                 // 5. 额外标记
-                isBuffOnly: (baseAmount === 0)
+                isBuffOnly: isBuffType || (baseAmount === 0)
             };
 
             //  D.无论有没有数值，都执行 HIT 脚本
@@ -1867,8 +1876,8 @@ export class ChatCardManager {
             item: item,
             move: move,
 
-            type: "heal",
-            isHeal: true,
+            type: isBuffType ? "buff" : "heal",
+            isHeal: !isBuffType,
             totalHealAmount: summaryData.reduce((acc, cur) => acc + cur.amount, 0) // 方便统计总奶量
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);

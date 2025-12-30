@@ -1459,7 +1459,8 @@ export class XJZLItem extends Item {
           level: s.attackLevel || 0, // 使用数值计数器，不再使用布尔值的flags,初始值继承自 Actor
           feintLevel: s.feintLevel || 0, // 虚招自身等级
           abort: false,       // 脚本设为 true 可阻断攻击
-          abortReason: ""     // 阻断原因
+          abortReason: "",     // 阻断原因
+          autoApplied: false // 是否已经完成流程的标记
         }
       };
       // 现在脚本里：
@@ -1790,6 +1791,10 @@ export class XJZLItem extends Item {
         }
       }
 
+      // 检查是否自动应用
+      // 如果脚本里写了 args.flags.autoApplied = true，这里就能读到
+      const isAutoApplied = attackContext.flags.autoApplied || false;
+
       // 生成聊天卡片 (Chat Card)
       const templateData = {
         actor: actor,       // 施法者
@@ -1807,7 +1812,8 @@ export class XJZLItem extends Item {
         displayTotal: displayTotal,
         targetsResults: targetsResults,
         hasTargets: Object.keys(targetsResults).length > 0,
-        showFeintBtn: showFeintBtn
+        showFeintBtn: showFeintBtn,
+        autoApplied: isAutoApplied
       };
 
       const content = await renderTemplate(
