@@ -1377,6 +1377,7 @@ export class XJZLItem extends Item {
 
       //扣除资源
       const resourceUpdates = {};
+      let newMp = actor.system.resources.mp.value - finalCost.mp; // 暂存新值，稍后统一处理濒死
       if (finalCost.mp > 0) resourceUpdates["system.resources.mp.value"] = actor.system.resources.mp.value - finalCost.mp;
       if (finalCost.rage > 0) resourceUpdates["system.resources.rage.value"] = actor.system.resources.rage.value - finalCost.rage;
       if (finalCost.hp > 0) resourceUpdates["system.resources.hp.value"] = actor.system.resources.hp.value - finalCost.hp;
