@@ -3,7 +3,7 @@
  */
 import { XJZL } from "../config.mjs";
 // 引入工具函数
-import { localizeConfig, rollDisabilityTable, promptDisabilityQuery } from "../utils/utils.mjs";
+import { localizeConfig, rollDisabilityTable, promptDisabilityQuery, getModifierChoices } from "../utils/utils.mjs";
 // 引入卡片管理器 (用于复用死检的逻辑)
 import { ChatCardManager } from "../managers/chat-manager.mjs";
 import { XJZLAuditLog } from "../applications/audit-log.mjs";
@@ -240,7 +240,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.standardSkillGroups = allSkillGroups.filter(g => g.key !== 'wuxing');
 
         // [编辑器] 获取属性调整选项 (用于 Active Effects 编辑弹窗)
-        context.groupedModifierOptions = this._getGroupedModifierOptions();
+        context.groupedModifierOptions = getModifierChoices();
 
         // =====================================================
         // ✦ 5. 战斗核心数据 (Combat & Martial Arts) - [修复与增强版]
@@ -1261,87 +1261,6 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 3. 手动提交更新
         // 这会绕过 Form 的全量验证，直接点对点更新数据
         await this.document.update({ [field]: value });
-    }
-
-    /**
-     * 生成分组的属性选择列表 (支持 OptGroup)
-     * 返回结构: { "七维属性": { "key": "Label" }, "战斗属性": { ... } }
-     */
-    _getGroupedModifierOptions() {
-        const groups = {};
-
-        // 辅助函数: 添加到指定分组
-        const add = (groupName, key, label) => {
-            if (!groups[groupName]) groups[groupName] = {};
-            groups[groupName][key] = label;
-        };
-
-        // 1. 七维属性 (Stats)
-        const groupStats = game.i18n.localize("XJZL.Stats.Label");
-        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.attributes)) {
-            add(groupStats, `stats.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
-        }
-
-        // 2. 战斗属性 (Combat)
-        const groupCombat = game.i18n.localize("XJZL.Combat.Label");
-        const combatInputs = {
-            "speed": "XJZL.Combat.Speed", "dodge": "XJZL.Combat.Dodge",
-            "block": "XJZL.Combat.Block", "kanpo": "XJZL.Combat.Kanpo",
-            "initiative": "XJZL.Combat.Initiative", "xuzhao": "XJZL.Combat.XuZhao",
-            "def_waigong": "XJZL.Combat.DefWaigong", "def_neigong": "XJZL.Combat.DefNeigong",
-            "hit_waigong": "XJZL.Combat.HitWaigong", "hit_neigong": "XJZL.Combat.HitNeigong",
-            "crit_waigong": "XJZL.Combat.CritWaigong", "crit_neigong": "XJZL.Combat.CritNeigong"
-        };
-        for (const [k, labelKey] of Object.entries(combatInputs)) {
-            add(groupCombat, `combat.${k}`, `${game.i18n.localize(labelKey)} (Base/Mod)`);
-        }
-
-        // 武器等级 (Weapon Ranks .mod)
-        // 遍历 CONFIG.XJZL.weaponTypes
-        const groupWeaponRank = game.i18n.localize("XJZL.Combat.WeaponRanks");
-        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.weaponTypes)) {
-            // 排除 none
-            if (k === 'none') continue;
-            add(groupWeaponRank, `combat.weaponRanks.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
-        }
-
-        // 3. 伤害/抗性 (Dmg/Res)
-        const groupDmg = "伤害与抗性"; // 也可以 localize
-        // 伤害
-        add(groupDmg, "combat.damages.global.mod", "全局伤害 (Mod)");
-        add(groupDmg, "combat.damages.skill.mod", "招式伤害 (Mod)");
-        add(groupDmg, "combat.damages.weapon.mod", "兵器伤害 (Mod)");
-        for (const k of ["yang", "yin", "gang", "rou", "taiji"]) {
-            add(groupDmg, `combat.damages.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Dmg." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);
-        }
-        // 抗性
-        for (const k of ["poison", "bleed", "fire", "mental", "liushi"]) {
-            add(groupDmg, `combat.resistances.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Res." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);
-        }
-
-        // 4. 技能 (Skills)
-        const groupSkills = game.i18n.localize("XJZL.Skills.Label");
-        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.skills)) {
-            add(groupSkills, `skills.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
-        }
-
-        // 5. 技艺 (Arts)
-        // 允许修改“等级”和“检定加值”
-        const groupArts = game.i18n.localize("XJZL.Arts.Label");
-        for (const [k, labelKey] of Object.entries(CONFIG.XJZL.arts)) {
-            const label = game.i18n.localize(labelKey);
-            // 修改等级 (arts.duanzao.mod)
-            add(groupArts, `arts.${k}.mod`, `${label} (等级 Mod)`);
-            // 修改检定 (arts.duanzao.checkMod)
-            add(groupArts, `arts.${k}.checkMod`, `${label} (检定 Mod)`);
-        }
-
-        // 6. 资源上限 (Resources)
-        const groupRes = game.i18n.localize("XJZL.Resources.Label");
-        add(groupRes, "resources.hp.bonus", `${game.i18n.localize("XJZL.Resources.HP")} (Bonus)`);
-        add(groupRes, "resources.mp.bonus", `${game.i18n.localize("XJZL.Resources.MP")} (Bonus)`);
-
-        return groups;
     }
 
     /* -------------------------------------------- */

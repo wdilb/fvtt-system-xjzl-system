@@ -5,6 +5,7 @@
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 import { TRIGGER_CHOICES } from "../data/common.mjs";
+import { getModifierChoices } from "../utils/utils.mjs";
 
 export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
@@ -104,6 +105,8 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
         // 2. 五行 Class: element-taiji, element-yin, element-yang
         context.elementClass = `element-${this.document.system.element || "taiji"}`;
+
+        context.modifierChoices = getModifierChoices();
 
         return context;
     }

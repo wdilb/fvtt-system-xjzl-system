@@ -114,3 +114,104 @@ export async function promptDisabilityQuery() {
     rejectClose: false
   });
 }
+
+// utils/utils.mjs
+
+/**
+ * 获取所有可修正属性的列表 (用于 Actor 自定义修正 和 Item 内功特效)
+ * 返回结构: { "分组名": { "key": "Label" }, ... }
+ */
+/**
+ * 获取所有可修正属性的列表 (用于 Actor 自定义修正 和 Item 内功特效)
+ * 返回结构: { "分组名": { "key": "Label" }, ... }
+ */
+export function getModifierChoices() {
+  const groups = {};
+
+  // 辅助: 添加到指定分组
+  const add = (groupName, key, label) => {
+    if (!groups[groupName]) groups[groupName] = {};
+    groups[groupName][key] = label;
+  };
+
+  // 1. 七维属性 (Stats)
+  const groupStats = game.i18n.localize("XJZL.Stats.Label");
+  for (const [k, labelKey] of Object.entries(CONFIG.XJZL.attributes)) {
+    add(groupStats, `stats.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+  }
+
+  // 2. 战斗属性 (Combat Base)
+  const groupCombat = game.i18n.localize("XJZL.Combat.Label");
+  const combatInputs = {
+    "speed": "XJZL.Combat.Speed", "dodge": "XJZL.Combat.Dodge",
+    "block": "XJZL.Combat.Block", "kanpo": "XJZL.Combat.Kanpo",
+    "initiative": "XJZL.Combat.Initiative", "xuzhao": "XJZL.Combat.XuZhao",
+    "def_waigong": "XJZL.Combat.DefWaigong", "def_neigong": "XJZL.Combat.DefNeigong",
+    "hit_waigong": "XJZL.Combat.HitWaigong", "hit_neigong": "XJZL.Combat.HitNeigong",
+    "crit_waigong": "XJZL.Combat.CritWaigong", "crit_neigong": "XJZL.Combat.CritNeigong"
+  };
+  for (const [k, labelKey] of Object.entries(combatInputs)) {
+    add(groupCombat, `combat.${k}`, `${game.i18n.localize(labelKey)} (Base/Mod)`);
+  }
+
+  // 3. 兵器造诣 (Weapon Ranks)
+  const groupWeaponRank = game.i18n.localize("XJZL.Combat.WeaponRanks");
+  for (const [k, labelKey] of Object.entries(CONFIG.XJZL.weaponTypes)) {
+    if (k === 'none') continue;
+    add(groupWeaponRank, `combat.weaponRanks.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+  }
+
+  // 4. 伤害加成 (Damages)
+  const groupDmg = "伤害加成";
+  // 基础类型
+  add(groupDmg, "combat.damages.global.mod", "全局伤害 (Mod)");
+  add(groupDmg, "combat.damages.weapon.mod", "武器伤害 (Mod)");
+  add(groupDmg, "combat.damages.skill.mod", "招式伤害 (Mod)");
+  add(groupDmg, "combat.damages.normal.mod", "普攻伤害 (Mod)"); // [补全]
+  // 五行类型
+  for (const k of ["yang", "yin", "gang", "rou", "taiji"]) {
+    add(groupDmg, `combat.damages.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Dmg." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);
+  }
+
+  // 5. 抗性修正 (Resistances)
+  const groupResist = "抗性修正";
+  // 基础类型
+  add(groupResist, "combat.resistances.global.mod", "全局抗性 (Mod)"); // [补全]
+  add(groupResist, "combat.resistances.skill.mod", "招式抗性 (Mod)"); // [补全]
+  // 特殊类型
+  for (const k of ["poison", "bleed", "fire", "mental", "liushi"]) {
+    add(groupResist, `combat.resistances.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Res." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);
+  }
+
+  // 6. 消耗减少 (Costs) - [这次主要补全的部分]
+  const groupCost = "消耗减少"; // game.i18n.localize("XJZL.Combat.ReduceCost")
+  add(groupCost, "combat.costs.neili.mod", "内力消耗减少 (Mod)");
+  add(groupCost, "combat.costs.rage.mod", "怒气消耗减少 (Mod)");
+
+  // 7. 技能 (Skills)
+  const groupSkills = game.i18n.localize("XJZL.Skills.Label");
+  // 确保 CONFIG.XJZL.skills 存在
+  if (CONFIG.XJZL.skills) {
+    for (const [k, labelKey] of Object.entries(CONFIG.XJZL.skills)) {
+      add(groupSkills, `skills.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+    }
+  }
+
+  // 8. 技艺 (Arts)
+  const groupArts = game.i18n.localize("XJZL.Arts.Label");
+  // 确保 CONFIG.XJZL.arts 存在
+  if (CONFIG.XJZL.arts) {
+    for (const [k, labelKey] of Object.entries(CONFIG.XJZL.arts)) {
+      const label = game.i18n.localize(labelKey);
+      add(groupArts, `arts.${k}.mod`, `${label} (等级 Mod)`);
+      add(groupArts, `arts.${k}.checkMod`, `${label} (检定 Mod)`);
+    }
+  }
+
+  // 9. 资源上限 (Resources)
+  const groupRes = game.i18n.localize("XJZL.Resources.Label");
+  add(groupRes, "resources.hp.bonus", `${game.i18n.localize("XJZL.Resources.HP")} (Bonus)`);
+  add(groupRes, "resources.mp.bonus", `${game.i18n.localize("XJZL.Resources.MP")} (Bonus)`);
+
+  return groups;
+}
