@@ -938,9 +938,10 @@ export class XJZLItem extends Item {
   /**
    * 计算招式的详细数值 (预览/结算通用)
    * @param {String} moveId - 招式 ID
-   * @returns {Object|null} 计算结果 { damage, feint, breakdown, cost, ... }
+   * @param {Object} options - [NEW] 额外配置
+   * @param {Number} options.overrideMorale - [NEW] 强制指定使用的士气值(用于Roll时传递已消耗的值)
    */
-  calculateMoveDamage(moveId) {
+  calculateMoveDamage(moveId, options = {}) {
     // 1. 基础校验
     if (this.type !== "wuxue") return null;
     const actor = this.actor;
@@ -1027,6 +1028,23 @@ export class XJZLItem extends Item {
       }
     }
 
+    // 士气增伤逻辑
+    // 逻辑：如果 options 里传了 overrideMorale，就用传进来的(Roll阶段)
+    // 否则读取 Actor 当前的士气(Preview阶段)
+    let moraleBonus = 0;
+    // 只有 武学(wuxue) 且 非普攻(basic) 非气招(qi) 非架招(stance) 才享受
+    // 注意：趁虚而入虽然也是 basic 类型，但它是通过 rollBasicAttack 调用的，不走这里，所以这里不用管
+    const isExcluded = ["basic", "qi", "stance"].includes(move.type);
+
+    if (!isExcluded && actor.system.resources.morale) {
+      if (options.overrideMorale !== undefined) {
+        moraleBonus = options.overrideMorale;
+      } else {
+        moraleBonus = actor.system.resources.morale.value || 0;
+      }
+      flatBonus += moraleBonus;
+    }
+
     // --- F. 初步汇总 (Pre-Script) ---
     let preScriptDmg = Math.floor(moveBaseDmg + weaponDmg + attrBonus + flatBonus + weaponDmgBonus);
     let totalDmg = preScriptDmg;
@@ -1097,6 +1115,9 @@ export class XJZLItem extends Item {
     breakdownText += `+ 武器伤害: ${weaponDmg}\n`;
     breakdownText += `+ 武器等级增伤: ${weaponDmgBonus}\n`;
     breakdownText += `+ 属性增伤: ${Math.floor(attrBonus)}\n`;
+    if (moraleBonus > 0) {
+      breakdownText += `+ 士气增伤: ${moraleBonus}\n`;
+    }
     breakdownText += `+ 其他增伤: ${flatBonus}`;
 
     if (scriptDmgBonus !== 0) {
@@ -1326,7 +1347,7 @@ export class XJZLItem extends Item {
       const targets = options.targets || Array.from(game.user.targets);
 
       // === 玩家配置弹窗 (Dialog) ===
-      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0 };
+      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0, isFree: false, isDesperate: false };
 
       // 架招不需要弹窗，Buff类气招如果没选目标也不弹窗
       // 但如果是 heal/attack 类气招，即使没选目标也可能需要弹窗调数值
@@ -1372,6 +1393,15 @@ export class XJZLItem extends Item {
         return;
       }
 
+      // 士气消耗计算
+      // 只要不是 普攻/气招/架招，且没有开启无消耗，就全额消耗士气
+      let moraleSpent = 0;
+      const isExcludedMorale = ["basic", "qi", "stance"].includes(move.type);
+
+      if (!isExcludedMorale && !config.isFree) {
+        moraleSpent = actor.system.resources.morale.value || 0;
+      }
+
       // 变量：用于存储濒死一击额外消耗的内力（即增加的伤害）
       let desperateBonus = 0;
 
@@ -1390,6 +1420,11 @@ export class XJZLItem extends Item {
         resourceUpdates["system.resources.mp.value"] = 0; // 强制归零
       }
 
+      // 应用士气清空
+      if (moraleSpent > 0) {
+        resourceUpdates["system.resources.morale.value"] = 0;
+      }
+
       if (!foundry.utils.isEmpty(resourceUpdates)) {
         await actor.update(resourceUpdates);
       }
@@ -1406,6 +1441,7 @@ export class XJZLItem extends Item {
         mp: finalCost.mp + desperateBonus, // 核心：如果是濒死一击，这里存的是 总消耗
         hp: finalCost.hp,
         rage: finalCost.rage,
+        morale: moraleSpent,  //记录一下士气用于撤回
         desperateBonus: desperateBonus // 额外记录一下，虽然撤回时主要是看 mp，但留个记录也好
       };
 
@@ -1495,7 +1531,8 @@ export class XJZLItem extends Item {
       // 此时 effectiveMode 必定是 attack 或 heal
       // calculateMoveDamage 负责算出数值 (damage)
       // 直接调用我们之前封装好的方法，保证和角色卡预览一致
-      const calcResult = this.calculateMoveDamage(moveId);
+      // 传入 overrideMorale，确保计算使用刚才消耗掉的值，而不是 0
+      const calcResult = this.calculateMoveDamage(moveId, { overrideMorale: moraleSpent });
       if (!calcResult) return ui.notifications.error("数值计算失败。");
 
       // 应用手动修正

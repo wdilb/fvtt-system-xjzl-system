@@ -1337,7 +1337,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.initiativeTotal = Math.floor((S.shenfa / 10) + (combat.initiative || 0) + bonuses.initiative);
 
     // 士气影响暴击
-    const moraleCritMod = Math.floor((resources.morale.value || 0) / 10);
+    // const moraleCritMod = Math.floor((resources.morale.value || 0) / 10);
+    // 士气不影响全局暴击，不在这里计算了
 
     // 攻防面板
     combat.defWaigongTotal = Math.floor(S.tipo / 5 + (combat.def_waigong || 0) + bonuses.defWaigong);
@@ -1362,9 +1363,10 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.costs.rage.total = (combat.costs.rage.value || 0) + (combat.costs.rage.mod || 0);
 
     // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
+    // 士气不影响全局暴击，不在这里计算了
     // 最小值限制为 0
-    combat.critWaigongTotal = Math.max(0, 20 - Math.floor(S.liliang / 20) + (combat.crit_waigong || 0) + bonuses.critWaigong - moraleCritMod);
-    combat.critNeigongTotal = Math.max(0, 20 - Math.floor(S.qigan / 20) + (combat.crit_neigong || 0) + bonuses.critNeigong - moraleCritMod);
+    combat.critWaigongTotal = Math.max(0, 20 - Math.floor(S.liliang / 20) + (combat.crit_waigong || 0) + bonuses.critWaigong);
+    combat.critNeigongTotal = Math.max(0, 20 - Math.floor(S.qigan / 20) + (combat.crit_neigong || 0) + bonuses.critNeigong);
   }
 
   /**

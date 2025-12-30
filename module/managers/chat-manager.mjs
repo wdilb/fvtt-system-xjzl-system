@@ -1303,6 +1303,29 @@ export class ChatCardManager {
         };
 
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
+
+        // C. 士气清空
+        // 1. flags.moveType !== 'basic' (普通武学招式)
+        // 2. flags.moveId === 'opportunity' (趁虚而入，虽然它的 type 可能是 basic，但 ID 特殊)
+        
+        const isBasicAttack = flags.moveType === "basic";
+        const isOpportunity = flags.moveId === "opportunity";
+        const shouldResetMorale = (!isBasicAttack) || isOpportunity;
+
+        if (shouldResetMorale) {
+            const currentMorale = attacker.system.resources.morale?.value || 0;
+            if (currentMorale > 0) {
+                // 执行更新
+                await attacker.update({ "system.resources.morale.value": 0 });
+                
+                // 给攻击者飘个字提示士气耗尽
+                if (attacker.token?.object) {
+                    canvas.interface.createScrollingText(attacker.token.object.center, "士气耗尽", {
+                        direction: 1, fontSize: 24, fill: "#cccccc", stroke: "#000000", strokeThickness: 2
+                    });
+                }
+            }
+        }
     }
 
     /**
@@ -1569,6 +1592,18 @@ export class ChatCardManager {
             isManual: true
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
+
+        // 士气清空逻辑 (复用相同逻辑)
+        const isBasicAttack = flags.moveType === "basic";
+        const isOpportunity = flags.moveId === "opportunity";
+        const shouldResetMorale = (!isBasicAttack) || isOpportunity;
+
+        if (shouldResetMorale) {
+            const currentMorale = attacker.system.resources.morale?.value || 0;
+            if (currentMorale > 0) {
+                await attacker.update({ "system.resources.morale.value": 0 });
+            }
+        }
     }
 
     /**

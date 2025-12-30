@@ -1713,6 +1713,26 @@ export class XJZLActor extends Actor {
       description: isOpportunity ? "发起一次趁虚而入。" : "发起一次基础攻击。"
     };
 
+    // 资源处理 (趁虚而入特供)
+    const resourceUpdates = {};
+    let moraleSpent = 0;
+
+    // 只有趁虚而入才消耗士气
+    if (isOpportunity) {
+      moraleSpent = this.system.resources.morale.value || 0;
+      if (moraleSpent > 0) {
+        resourceUpdates["system.resources.morale.value"] = 0;
+        // 执行扣除
+        await this.update(resourceUpdates);
+      }
+    }
+
+    // 构造消耗记录对象 (普攻无蓝耗，但有士气耗)
+    const costConsumed = {
+      mp: 0, hp: 0, rage: 0,
+      morale: moraleSpent
+    };
+
     // =====================================================
     // 4. 触发 "出招" 回复 (Regen On Attack)
     // =====================================================
@@ -1744,7 +1764,8 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 6. 伤害计算
     // =====================================================
-    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode);
+    // 我们需要把 moraleSpent 传给计算函数
+    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent);
 
     // =====================================================
     // 7. 目标命中检定 (Hit Check)
@@ -1915,6 +1936,7 @@ export class XJZLActor extends Actor {
           moveId: isOpportunity ? "opportunity" : "basic", // 区分 ID
           moveType: "basic",
 
+          costConsumed: costConsumed, // 记录消耗
           damage: calcResult.damage,
           feint: 0,
           calc: calcResult,
@@ -2054,8 +2076,9 @@ export class XJZLActor extends Actor {
   /**
    * [内部] 计算普攻伤害
    * 公式：武器伤害 + 武器等级加成 + 属性加成(无) + 通用/类型加成
+   * 增加 moraleSpent 参数
    */
-  _calculateBasicAttackDamage(virtualMove, baseDamage, config, mode) {
+  _calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent = 0) {
     const sys = this.system;
     const isOpportunity = mode === "opportunity";
     // 1. 武器基础伤害
@@ -2084,6 +2107,8 @@ export class XJZLActor extends Actor {
       flatBonus += (sys.combat.damages.weapon?.total || 0); // 武器类伤害加成
       if (isOpportunity) {
         flatBonus += (sys.combat.damages.skill?.total || 0); //趁虚而入还能享受到招式伤害加成
+        // 使用传入的已消耗士气，而不是读取 system
+        flatBonus += moraleSpent;
       }
       //应该是没有其他的伤害加成了
     }
@@ -2113,7 +2138,12 @@ export class XJZLActor extends Actor {
     let breakdownText = `武器基础: ${weaponDmg}\n`;
     breakdownText += `+ 武器等级: ${rankBonus}\n`;
     breakdownText += `+ 面板增伤: ${flatBonus}`;
-    if (isOpportunity) breakdownText += ` (含招式加成)`; // 提示文本
+    if (isOpportunity) {
+      breakdownText += ` (含招式加成)`; // 提示文本
+      if (sys.resources.morale?.value > 0) {
+        breakdownText += ` (含士气 ${sys.resources.morale.value})`;
+      }
+    }
 
     const scriptBonus = Math.floor(calcOutput.damage) - preScriptDmg;
     if (scriptBonus !== 0) {
@@ -2121,6 +2151,9 @@ export class XJZLActor extends Actor {
     }
     if (config.bonusDamage !== 0) {
       breakdownText += `\n+ 手动修正: ${config.bonusDamage}`;
+    }
+    if (isOpportunity && moraleSpent > 0) {
+      breakdownText += ` (含士气 ${moraleSpent})`;
     }
 
     return {
