@@ -54,6 +54,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             togglePin: XJZLCharacterSheet.prototype._onTogglePin, //标记常用武学
             manageXP: XJZLCharacterSheet.prototype._onManageXP,  //管理修为
             viewHistory: XJZLCharacterSheet.prototype._onViewHistory, //查看修为日志
+            // 修炼物品专用删除（带返还逻辑）
+            deleteCultivationItem: XJZLCharacterSheet.prototype._onDeleteCultivationItem,
 
             // --- 其他 ---
             //删除状态
@@ -2326,5 +2328,107 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         event.preventDefault();
         this._isSorting = !this._isSorting;
         this.render(); // 重绘界面以应用 draggable 属性
+    }
+
+    /**
+     * 删除修炼物品 (内功/武学/技艺书) 并自动返还投入的修为
+     */
+    async _onDeleteCultivationItem(event, target) {
+        event.preventDefault();
+        const itemId = target.dataset.itemId;
+        const item = this.document.items.get(itemId);
+        if (!item) return;
+
+        // 1. 计算待返还的修为统计 (总额与分池)
+        let totalInvested = 0;
+        let refundBreakdown = { general: 0, specific: 0 };
+        let poolKey = "general"; // 默认只返还通用，特定类型会覆盖
+
+        // 根据物品类型提取数据
+        if (item.type === "neigong") {
+            // --- 内功 ---
+            totalInvested = item.system.xpInvested || 0;
+            // 获取记录在 item 上的投入来源 (如果有的话)，否则全算通用或按比例估算
+            const bd = item.system.sourceBreakdown || { general: totalInvested, specific: 0 };
+            refundBreakdown = { general: bd.general, specific: bd.specific };
+            poolKey = "neigong"; // 对应 system.cultivation.neigong
+
+        } else if (item.type === "wuxue") {
+            // --- 武学 (特殊：需要累加所有招式) ---
+            poolKey = "wuxue"; // 对应 system.cultivation.wuxue
+            const moves = item.system.moves || [];
+            
+            for (const move of moves) {
+                const moveInvested = move.xpInvested || 0;
+                if (moveInvested > 0) {
+                    totalInvested += moveInvested;
+                    // 累加每个招式的来源
+                    const bd = move.sourceBreakdown || { general: moveInvested, specific: 0 };
+                    refundBreakdown.general += (bd.general || 0);
+                    refundBreakdown.specific += (bd.specific || 0);
+                }
+            }
+
+        } else if (item.type === "art_book") {
+            // --- 技艺书 ---
+            totalInvested = item.system.xpInvested || 0;
+            const bd = item.system.sourceBreakdown || { general: totalInvested, specific: 0 };
+            refundBreakdown = { general: bd.general, specific: bd.specific };
+            poolKey = "arts"; // 对应 system.cultivation.arts
+        }
+
+        // 2. 构建确认弹窗内容
+        let content = `<div style="margin-bottom:10px;">确定要废弃并删除 <b>${item.name}</b> 吗？</div>`;
+
+        if (totalInvested > 0) {
+            content += `
+            <div style="background:rgba(255,255,255,0.1); padding:10px; border-radius:4px; border:1px solid #555;">
+                <div style="font-weight:bold; color:#ff4444; margin-bottom:5px;"><i class="fas fa-exclamation-triangle"></i> 散功警示</div>
+                <div style="font-size:0.9em; color:#ccc; margin-bottom:8px;">
+                    删除该条目将导致所有进度丢失，但已投入的修为将返还至丹田。
+                </div>
+                <ul style="list-style:none; padding:0; margin:0; font-family:Consolas;">
+                    <li><i class="fas fa-undo"></i> 返还通用修为: <span style="color:#fff;">${refundBreakdown.general}</span></li>
+                    <li><i class="fas fa-undo"></i> 返还专属修为: <span style="color:var(--xjzl-gold);">${refundBreakdown.specific}</span></li>
+                </ul>
+            </div>`;
+        } else {
+            content += `<div style="font-size:0.9em; color:#aaa;">该条目尚未投入修为，删除后不可恢复。</div>`;
+        }
+
+        // 3. 弹窗确认
+        const confirm = await foundry.applications.api.DialogV2.confirm({
+            window: { title: `废弃: ${item.name}`, icon: "fas fa-trash" },
+            content: content,
+            rejectClose: false,
+            ok: { label: "废弃并返还", icon: "fas fa-trash" }
+        });
+
+        if (!confirm) return;
+
+        // 4. 执行逻辑：更新 Actor 修为池 -> 删除物品
+        if (totalInvested > 0) {
+            // 获取当前 Actor 的修为数据
+            const cult = foundry.utils.deepClone(this.document.system.cultivation);
+            
+            // 加回通用池
+            cult.general = (cult.general || 0) + refundBreakdown.general;
+            
+            // 加回专属池 (如果有)
+            if (poolKey && refundBreakdown.specific > 0) {
+                cult[poolKey] = (cult[poolKey] || 0) + refundBreakdown.specific;
+            }
+
+            
+            // 更新 Actor
+            await this.document.update({ "system.cultivation": cult });
+            
+            ui.notifications.info(`已删除 ${item.name}，返还修为: ${totalInvested}`);
+        } else {
+            ui.notifications.info(`已删除 ${item.name}`);
+        }
+
+        // 最后删除物品
+        await item.delete();
     }
 }
