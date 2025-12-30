@@ -1222,7 +1222,7 @@ export class XJZLItem extends Item {
           const getVal = (name) => {
             const el = root.querySelector(`[name="${name}"]`);
             if (!el) return 0;
-            if (el.type === "checkbox") return el.checked ? "on" : null;
+            if (el.type === "checkbox") return el.checked;
             return el.value;
           };
 
@@ -1230,9 +1230,11 @@ export class XJZLItem extends Item {
             bonusAttack: parseInt(getVal("bonusAttack")) || 0,
             bonusFeint: parseInt(getVal("bonusFeint")) || 0,
             bonusDamage: parseInt(getVal("bonusDamage")) || 0,
-            canCrit: getVal("canCrit") === "on",
+            canCrit: getVal("canCrit") !== false,
             manualAttackLevel: parseInt(getVal("manualAttackLevel")) || 0,
-            manualFeintLevel: parseInt(getVal("manualFeintLevel")) || 0
+            manualFeintLevel: parseInt(getVal("manualFeintLevel")) || 0,
+            isFree: getVal("isFree") === true,
+            isDesperate: getVal("isDesperate") === true
           };
         }
       }],
@@ -1346,11 +1348,15 @@ export class XJZLItem extends Item {
       const costs = move.currentCost; // { mp: 10, rage: 0, hp: 0 }
       const costReductions = actor.system.combat.costs; // { mp: {total: 5}, rage: ... }
 
-      const finalCost = {
+      let finalCost = {
         mp: Math.max(0, costs.mp - (costReductions?.mp?.total || 0)),
         rage: Math.max(0, costs.rage - (costReductions?.rage?.total || 0)),
         hp: costs.hp // 气血通常不享受减耗
       };
+
+      if (config.isFree) {
+          finalCost = { mp: 0, rage: 0, hp: 0 };
+      }
 
       // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
       if (actor.system.resources.mp.value < finalCost.mp) {
@@ -1366,11 +1372,22 @@ export class XJZLItem extends Item {
         return;
       }
 
+      // 变量：用于存储濒死一击额外消耗的内力（即增加的伤害）
+      let desperateBonus = 0;
+
       //扣除资源
       const resourceUpdates = {};
       if (finalCost.mp > 0) resourceUpdates["system.resources.mp.value"] = actor.system.resources.mp.value - finalCost.mp;
       if (finalCost.rage > 0) resourceUpdates["system.resources.rage.value"] = actor.system.resources.rage.value - finalCost.rage;
       if (finalCost.hp > 0) resourceUpdates["system.resources.hp.value"] = actor.system.resources.hp.value - finalCost.hp;
+
+      // 濒死一击处理
+      // 只有在内力足够支付基础消耗后，才执行濒死逻辑
+      // 逻辑：当前剩余内力 (newMp) 全部清空，清空量 = 伤害加值
+      if (config.isDesperate && newMp > 0) {
+          desperateBonus = newMp; // 记录这一刀抽了多少蓝
+          resourceUpdates["system.resources.mp.value"] = 0; // 强制归零
+      }
 
       if (!foundry.utils.isEmpty(resourceUpdates)) {
         await actor.update(resourceUpdates);
@@ -1473,6 +1490,13 @@ export class XJZLItem extends Item {
       // 应用手动修正
       calcResult.damage += config.bonusDamage;
       calcResult.feint += config.bonusFeint;
+
+      // 追加濒死一击伤害
+      if (desperateBonus > 0) {
+          calcResult.damage += desperateBonus;
+          // 在 breakdown 中显示，方便玩家查看伤害来源
+          calcResult.breakdown += `\n+ 濒死一击: ${desperateBonus}`;
+      }
 
       // =====================================================
       // 6. 目标状态预计算 (Target Pre-Calculation)
