@@ -1355,7 +1355,7 @@ export class XJZLItem extends Item {
       };
 
       if (config.isFree) {
-          finalCost = { mp: 0, rage: 0, hp: 0 };
+        finalCost = { mp: 0, rage: 0, hp: 0 };
       }
 
       // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
@@ -1386,8 +1386,8 @@ export class XJZLItem extends Item {
       // 只有在内力足够支付基础消耗后，才执行濒死逻辑
       // 逻辑：当前剩余内力 (newMp) 全部清空，清空量 = 伤害加值
       if (config.isDesperate && newMp > 0) {
-          desperateBonus = newMp; // 记录这一刀抽了多少蓝
-          resourceUpdates["system.resources.mp.value"] = 0; // 强制归零
+        desperateBonus = newMp; // 记录这一刀抽了多少蓝
+        resourceUpdates["system.resources.mp.value"] = 0; // 强制归零
       }
 
       if (!foundry.utils.isEmpty(resourceUpdates)) {
@@ -1399,6 +1399,15 @@ export class XJZLItem extends Item {
       // =====================================================
       // 这里的时机：资源已扣除，ATTACK 脚本尚未执行。
       await actor.processRegen("Attack");
+
+      // 构建一个对象，记录本次实际扣掉的数值，供撤回使用
+      // 这里的逻辑包含：基础消耗 + 濒死消耗
+      const costConsumed = {
+        mp: finalCost.mp + desperateBonus, // 核心：如果是濒死一击，这里存的是 总消耗
+        hp: finalCost.hp,
+        rage: finalCost.rage,
+        desperateBonus: desperateBonus // 额外记录一下，虽然撤回时主要是看 mp，但留个记录也好
+      };
 
       // =====================================================
       // 4. 执行 ATTACK (Pre-Roll) 脚本
@@ -1471,7 +1480,8 @@ export class XJZLItem extends Item {
               actionType: "buff",
               moveType: "stance",
               itemId: this.id,
-              moveId: move.id
+              moveId: move.id,
+              costConsumed: costConsumed // 架招也要记录消耗
             }
           }
         });
@@ -1494,9 +1504,9 @@ export class XJZLItem extends Item {
 
       // 追加濒死一击伤害
       if (desperateBonus > 0) {
-          calcResult.damage += desperateBonus;
-          // 在 breakdown 中显示，方便玩家查看伤害来源
-          calcResult.breakdown += `\n+ 濒死一击: ${desperateBonus}`;
+        calcResult.damage += desperateBonus;
+        // 在 breakdown 中显示，方便玩家查看伤害来源
+        calcResult.breakdown += `\n+ 濒死一击: ${desperateBonus}`;
       }
 
       // =====================================================
@@ -1784,6 +1794,7 @@ export class XJZLItem extends Item {
             itemId: this.id,           // 武学 Item ID
             moveId: move.id,           // 招式 ID
             moveType: move.type,       // 招式类型
+            costConsumed: costConsumed,// 记录消耗
 
             // 2. 数值结果
             damage: calcResult.damage, // 最终伤害值 (整数)

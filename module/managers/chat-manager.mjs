@@ -52,6 +52,12 @@ export class ChatCardManager {
         const action = button.dataset.action;
         const flags = message.flags["xjzl-system"] || {};
 
+        // 优先拦截撤回请求
+        if (action === "refundCost") {
+            await ChatCardManager._onRefundCost(message);
+            return;
+        }
+
         // 0. 特殊处理：撤销伤害不需要选中任何目标，也不需要攻击者（只需要数据回滚）
         if (action === "undoDamage") {
             await ChatCardManager._undoDamage(message);
@@ -1376,7 +1382,7 @@ export class ChatCardManager {
         // =====================================================
         // C. 移除状态 (可以不用，因为已经在回血里处理了，所以删掉了)
         // =====================================================
-        
+
 
         // 4. 更新卡片状态
         // const content = message.content.replace(
@@ -1963,6 +1969,96 @@ export class ChatCardManager {
             await actor.toggleStatusEffect("dead", { active: false });
 
             // 这里暂不移除 dying，只移除 dead，让玩家处于濒死(HP=1)状态比较合理
+        }
+    }
+
+    /**
+     * 动作: 撤回出招消耗 (Refund Cost)
+     * 针对误操作，返还 MP/HP/Rage
+     */
+    static async _onRefundCost(message) {
+        const flags = message.flags["xjzl-system"] || {};
+
+        // 1. 检查是否已撤回
+        if (flags.isCostRefunded) {
+            return ui.notifications.warn("该次出招的消耗已撤回。");
+        }
+
+        // 2. 获取消耗数据
+        const cost = flags.costConsumed;
+        if (!cost) return ui.notifications.warn("无法读取消耗数据，记录已丢失。");
+
+        // 3. 获取 Actor
+        const speaker = message.speaker;
+        let actor = null;
+        if (speaker.token) actor = game.actors.tokens[speaker.token];
+        if (!actor) actor = game.actors.get(speaker.actor);
+
+        if (!actor) return ui.notifications.error("找不到该角色，无法返还资源。");
+
+        // 4. 确认弹窗 (防止误触)
+        const confirm = await foundry.applications.api.DialogV2.confirm({
+            window: { title: "撤回消耗", icon: "fas fa-undo" },
+            content: `<p>确定要返还出招消耗吗？</p>
+                      <ul style="color:#555;">
+                        ${cost.mp ? `<li>内力: +${cost.mp}</li>` : ""}
+                        ${cost.rage ? `<li>怒气: +${cost.rage}</li>` : ""}
+                        ${cost.hp ? `<li>气血: +${cost.hp}</li>` : ""}
+                      </ul>`,
+            ok: { label: "返还" }
+        });
+        if (!confirm) return;
+
+        // 5. 执行返还
+        const updates = {};
+        const res = actor.system.resources;
+
+        if (cost.mp) {
+            // 简单相加，允许溢出（防止因为濒死一击导致上限判断问题），会被 Actor 的 _preUpdate 截断
+            // 濒死一击的消耗可能很大，直接加回去即可
+            updates["system.resources.mp.value"] = res.mp.value + cost.mp;
+        }
+        if (cost.rage) {
+            updates["system.resources.rage.value"] = res.rage.value + cost.rage;
+        }
+        if (cost.hp) {
+            updates["system.resources.hp.value"] = res.hp.value + cost.hp;
+        }
+
+        // 提交更新
+        if (!foundry.utils.isEmpty(updates)) {
+            await actor.update(updates);
+            ui.notifications.info(`${actor.name} 的出招消耗已返还（特殊的buff与执行的脚本无法回退）。`);
+        }
+
+        // ==========================================================
+        // 特殊处理：如果是架招，撤回消耗通常意味着也要关闭架招状态
+        // ==========================================================
+        if (flags.moveType === "stance") {
+            // 检查当前架招是否正是这个物品
+            if (actor.system.martial.stanceActive && actor.system.martial.stanceItemId === flags.itemId) {
+                await actor.stopStance(); // 调用 Actor 里现成的停止架招方法
+                ui.notifications.info("关联的架招状态已自动解除。");
+            }
+        }
+
+        // 6. 更新 UI (禁用按钮)
+        const div = document.createElement("div");
+        div.innerHTML = message.content;
+        const btn = div.querySelector('button[data-action="refundCost"]');
+
+        if (btn) {
+            // 替换为提示文本
+            const replacement = document.createElement("div");
+            replacement.style.cssText = "text-align:center; color:#888; font-size:0.85em; margin-top:5px; padding:4px; background:#f3f3f3; border-radius:4px;";
+            replacement.innerHTML = '<i class="fas fa-check"></i> 消耗已返还';
+
+            btn.parentNode.replaceWith(replacement);
+
+            await message.update({
+                content: div.innerHTML,
+                "flags.xjzl-system.isCostRefunded": true
+            });
         }
     }
 }
