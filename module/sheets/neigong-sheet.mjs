@@ -6,6 +6,7 @@ const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 import { TRIGGER_CHOICES } from "../data/common.mjs";
 import { getModifierChoices } from "../utils/utils.mjs";
+import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 
 export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
@@ -35,6 +36,8 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             toggleEffect: XJZLNeigongSheet.prototype._onToggleEffect,
             // 修改图片
             editImage: XJZLNeigongSheet.prototype._onEditImage,
+            // 打开修正选择器
+            openModifierPicker: XJZLNeigongSheet.prototype._onOpenModifierPicker
         }
     };
 
@@ -106,7 +109,25 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 2. 五行 Class: element-taiji, element-yin, element-yang
         context.elementClass = `element-${this.document.system.element || "taiji"}`;
 
-        context.modifierChoices = getModifierChoices();
+        // 1. 获取原始的分组数据
+        const groupedChoices = getModifierChoices();
+        context.modifierChoices = groupedChoices;
+
+        // 2. 扁平化数据，用于“Key -> Label”的快速查找
+        // 这样在 HBS 里我们就能显示 "力量 (Mod)" 而不是 "stats.liliang.mod"
+        const flatModifiers = {};
+        for (const group of Object.values(groupedChoices)) {
+            Object.assign(flatModifiers, group);
+        }
+
+        // 3. 将扁平映射挂载到 context，或者直接处理当前的数据
+        // 既然我们是在遍历 system.masteryChanges，我们在那里注入 label 比较方便
+        if (context.system.masteryChanges) {
+            context.system.masteryChanges.forEach(change => {
+                // 如果字典里有这个 key，就用字典的 label，否则显示 key 本身
+                change.displayLabel = flatModifiers[change.key] || change.key || "请选择...";
+            });
+        }
 
         return context;
     }
@@ -137,6 +158,54 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     /* -------------------------------------------- */
     /*  Action Handlers (动作处理)                  */
     /* -------------------------------------------- */
+
+    /**
+     * 打开属性选择器 (内功卡)
+     */
+    async _onOpenModifierPicker(event, target) {
+        event.preventDefault();
+
+        const index = Number(target.dataset.index);
+
+        // 1. 从 DOM 抓取当前可能未保存的数值 (防回滚)
+        const row = target.closest(".mastery-grid-row");
+        const valInput = row.querySelector(`input[name="system.masteryChanges.${index}.value"]`);
+        const lblInput = row.querySelector(`input[name="system.masteryChanges.${index}.label"]`);
+
+        // 获取当前文档中的旧值作为兜底
+        const currentEntry = this.document.system.masteryChanges[index] || {};
+
+        // 优先取输入框的实时值
+        const currentValue = valInput ? Number(valInput.value) : (currentEntry.value || 0);
+        const currentLabel = lblInput ? lblInput.value : (currentEntry.label || "");
+
+        // 2. 打开选择器
+        new XJZLModifierPicker({
+            choices: getModifierChoices(),
+            selected: currentEntry.key,
+            callback: async (newKey) => {
+
+                // A. 深拷贝数组 (切断引用)
+                // 这里的数组通常很小(也就几条到十几条)，深拷贝瞬间完成
+                const newChanges = foundry.utils.deepClone(this.document.system.masteryChanges);
+
+                // B. 修改目标项
+                if (newChanges[index]) {
+                    newChanges[index].key = newKey;
+                    newChanges[index].value = currentValue;
+                    newChanges[index].label = currentLabel;
+                } else {
+                    // 如果万一这个索引不存在(极罕见)，补上它
+                    newChanges[index] = { key: newKey, value: currentValue, label: currentLabel };
+                }
+
+                // C. 写回整个数组
+                await this.document.update({
+                    "system.masteryChanges": newChanges
+                });
+            }
+        }).render(true);
+    }
 
     /**
      * 动作: 添加一行圆满修正

@@ -7,6 +7,7 @@ import { localizeConfig, rollDisabilityTable, promptDisabilityQuery, getModifier
 // 引入卡片管理器 (用于复用死检的逻辑)
 import { ChatCardManager } from "../managers/chat-manager.mjs";
 import { XJZLAuditLog } from "../applications/audit-log.mjs";
+import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -76,6 +77,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             deleteGroup: XJZLCharacterSheet.prototype._onAction,
             addChange: XJZLCharacterSheet.prototype._onAction,
             deleteChange: XJZLCharacterSheet.prototype._onAction,
+            openModifierPicker: XJZLCharacterSheet.prototype._onOpenModifierPicker,
             //处理关系
             addRelation: XJZLCharacterSheet.prototype._onAction,
             deleteRelation: XJZLCharacterSheet.prototype._onAction,
@@ -239,8 +241,29 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.wuxingGroup = allSkillGroups.find(g => g.key === 'wuxing');
         context.standardSkillGroups = allSkillGroups.filter(g => g.key !== 'wuxing');
 
+        // =====================================================
         // [编辑器] 获取属性调整选项 (用于 Active Effects 编辑弹窗)
-        context.groupedModifierOptions = getModifierChoices();
+        // -----------------------------------------------------
+        const modifierChoices = getModifierChoices();
+
+        // A. 扁平化数据 (用于 Key -> Label 翻译)
+        const flatModifiers = {};
+        for (const group of Object.values(modifierChoices)) {
+            Object.assign(flatModifiers, group);
+        }
+
+        // B. 遍历 customModifiers，注入 displayLabel
+        // 结构：system.customModifiers (Array) -> group -> changes (Array) -> { key, value }
+        if (context.system.customModifiers) {
+            context.system.customModifiers.forEach(group => {
+                if (group.changes) {
+                    group.changes.forEach(change => {
+                        // 如果字典里有，就显示中文；否则显示原始 Key
+                        change.displayLabel = flatModifiers[change.key] || change.key || "请选择属性...";
+                    });
+                }
+            });
+        }
 
         // =====================================================
         // ✦ 5. 战斗核心数据 (Combat & Martial Arts) - [修复与增强版]
@@ -2276,7 +2299,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // --- 武学 (特殊：需要累加所有招式) ---
             poolKey = "wuxue"; // 对应 system.cultivation.wuxue
             const moves = item.system.moves || [];
-            
+
             for (const move of moves) {
                 const moveInvested = move.xpInvested || 0;
                 if (moveInvested > 0) {
@@ -2329,19 +2352,19 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         if (totalInvested > 0) {
             // 获取当前 Actor 的修为数据
             const cult = foundry.utils.deepClone(this.document.system.cultivation);
-            
+
             // 加回通用池
             cult.general = (cult.general || 0) + refundBreakdown.general;
-            
+
             // 加回专属池 (如果有)
             if (poolKey && refundBreakdown.specific > 0) {
                 cult[poolKey] = (cult[poolKey] || 0) + refundBreakdown.specific;
             }
 
-            
+
             // 更新 Actor
             await this.document.update({ "system.cultivation": cult });
-            
+
             ui.notifications.info(`已删除 ${item.name}，返还修为: ${totalInvested}`);
         } else {
             ui.notifications.info(`已删除 ${item.name}`);
@@ -2349,5 +2372,51 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
         // 最后删除物品
         await item.delete();
+    }
+
+    /**
+     * 打开属性选择器
+     */
+    async _onOpenModifierPicker(event, target) {
+        event.preventDefault();
+
+        // 1. 获取索引
+        const groupIndex = Number(target.dataset.groupIndex);
+        const changeIndex = Number(target.dataset.changeIndex);
+
+        // 2. 从 DOM 抓取当前可能未保存的数值 (防数据回滚逻辑)
+        const row = target.closest(".change-row");
+        // 注意：这里要对应你在 HBS 里写的 name
+        const valInput = row.querySelector(`input[name="system.customModifiers.${groupIndex}.changes.${changeIndex}.value"]`);
+
+        // 优先取输入框的实时值，取不到则回退到文档已有值
+        // 注意：这里需要做一个深拷贝或者直接读取文档，防止引用问题
+        const currentDocValue = this.document.system.customModifiers[groupIndex].changes[changeIndex].value;
+        const currentValue = valInput ? Number(valInput.value) : (currentDocValue || 0);
+
+        // 3. 打开选择器
+        new XJZLModifierPicker({
+            choices: getModifierChoices(), // 确保你的工具函数引入了
+            selected: this.document.system.customModifiers[groupIndex].changes[changeIndex].key,
+            callback: async (newKey) => {
+
+                // 1. 深拷贝整个 customModifiers 数组
+                // 这样我们就在操作一个普通的 JS 对象，没有任何 DataModel 的束缚
+                const newModifiers = foundry.utils.deepClone(this.document.system.customModifiers);
+
+                // 2. 修改目标项
+                // 确保路径存在 (防卫性编程)
+                if (newModifiers[groupIndex] && newModifiers[groupIndex].changes[changeIndex]) {
+                    newModifiers[groupIndex].changes[changeIndex].key = newKey;
+                    newModifiers[groupIndex].changes[changeIndex].value = currentValue;
+                }
+
+                // 3. 将整个数组写回
+                // 这会覆盖旧数组，Foundry 会完美处理整个数组的验证，不会报 undefined
+                await this.document.update({
+                    "system.customModifiers": newModifiers
+                });
+            }
+        }).render(true);
     }
 }
