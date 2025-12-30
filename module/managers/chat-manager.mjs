@@ -1174,20 +1174,58 @@ export class ChatCardManager {
                     });
                 }
             }
+            // =====================================================
+            // 执行 PRE_DAMAGE 脚本 (Pre-Application Hook)
+            // =====================================================
+            // 此时：isHit, isCrit, isBroken 都已确定。
+            // 目标：允许修改传给 applyDamage 的参数 (类型、穿透、数值)。
+
+            // 1. 构建可变的伤害配置对象
+            const damageConfig = {
+                amount: flags.damage,           // 数值
+                type: flags.damageType,         // 类型
+                ignoreBlock: ignoreBlock,       // 无视格挡
+                ignoreDefense: ignoreDefense,   // 无视防御
+                ignoreStance: ignoreStance,     // 无视架招
+                applyCritDamage: flags.canCrit  // 是否应用暴击倍率
+            };
+
+            // 2. 只有命中了才跑这个脚本 (未命中不需要改伤害类型)
+            if (isHit) {
+                const preDamageContext = {
+                    attacker: attacker,
+                    target: targetActor,
+                    item: item,
+                    move: move,
+
+                    // 状态 (只读)
+                    outcome: {
+                        isHit: true,
+                        isCrit: isCrit,
+                        isBroken: isBroken
+                    },
+
+                    // 配置 (可写)
+                    config: damageConfig
+                };
+
+                // 执行脚本
+                await attacker.runScripts(SCRIPT_TRIGGERS.PRE_DAMAGE, preDamageContext, move);
+            }
             // 判断是否是招式
             const isSkillDamage = move.type !== "basic";
             // C. 调用 Actor 伤害处理
             const damageResult = await targetActor.applyDamage({
-                amount: flags.damage,      // 面板伤害
-                type: flags.damageType,    // 伤害类型
+                amount: damageConfig.amount,     // 面板伤害
+                type: damageConfig.type,    // 伤害类型
                 attacker: attacker,        // 攻击者
                 isHit: isHit,              // 命中状态
                 isCrit: isCrit,            // 暴击状态 (用于触发特效)
-                applyCritDamage: flags.canCrit, // 配置: 是否应用暴击伤害倍率 (用于计算数值)
+                applyCritDamage: damageConfig.applyCritDamage, // 配置: 是否应用暴击伤害倍率 (用于计算数值)
                 isBroken: isBroken,        // 破防状态
-                ignoreBlock: ignoreBlock,    //无视格挡
-                ignoreDefense: ignoreDefense, //无视内外功防御
-                ignoreStance: ignoreStance,  //无视架招
+                ignoreBlock: damageConfig.ignoreBlock,    //无视格挡
+                ignoreDefense: damageConfig.ignoreDefense, //无视内外功防御
+                ignoreStance: damageConfig.ignoreStance,  //无视架招
                 isSkill: isSkillDamage
             });
 
@@ -1468,21 +1506,49 @@ export class ChatCardManager {
             // “是否命中（默认命中）”，之所以需要配置这个，是为了触发可能存在的未命中特效
             const isHit = config.forceHit;
 
+            // 构造初始配置 (来源于 GM 弹窗)
+            const damageConfig = {
+                amount: finalBaseDamage,
+                type: flags.damageType,
+                ignoreBlock: config.ignoreBlock,
+                ignoreDefense: config.ignoreDefense,
+                ignoreStance: config.ignoreStance,
+                applyCritDamage: config.applyCritDamage
+            };
+
+            // 执行 PRE_DAMAGE 脚本
+            if (isHit) {
+                const preDamageContext = {
+                    attacker: attacker,
+                    target: targetActor,
+                    item: item,
+                    move: move,
+                    outcome: {
+                        isHit: true,
+                        isCrit: config.isCrit,
+                        isBroken: config.isBroken
+                    },
+                    config: damageConfig,
+                    isManual: true
+                };
+                await attacker.runScripts(SCRIPT_TRIGGERS.PRE_DAMAGE, preDamageContext, move);
+            }
+
             // 判断是否为招式
             const isSkillDamage = move.type !== "basic";
 
             // 调用 Actor 伤害接口
             const damageResult = await targetActor.applyDamage({
-                amount: finalBaseDamage,
-                type: flags.damageType,    // 沿用招式类型
+                amount: damageConfig.amount,
+                type: damageConfig.type,    // 沿用招式类型
                 attacker: attacker,
                 isHit: isHit,
                 isCrit: config.isCrit,     // 强制暴击状态
-                applyCritDamage: config.applyCritDamage, // 是否计算双倍
+                applyCritDamage: damageConfig.applyCritDamage, // 是否计算双倍
                 isBroken: config.isBroken, // 强制破防
-                ignoreBlock: config.ignoreBlock,
-                ignoreDefense: config.ignoreDefense,
-                ignoreStance: config.ignoreStance,
+                ignoreBlock: damageConfig.ignoreBlock,
+                ignoreDefense: damageConfig.ignoreDefense,
+                ignoreStance: damageConfig.ignoreStance,
                 isSkill: isSkillDamage
             });
 
@@ -1833,7 +1899,7 @@ export class ChatCardManager {
 
                 // 2. 行为标识
                 type: isBuffType ? "buff" : "heal", // 更精准的类型
-                isHeal: !isBuffType,   
+                isHeal: !isBuffType,
                 isAttack: false,      // 明确不是攻击
                 isBuff: isBuffType, // 方便脚本判断
 
