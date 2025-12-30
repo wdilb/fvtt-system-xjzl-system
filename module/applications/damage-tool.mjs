@@ -150,6 +150,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         ignoreStance: config.ignoreStance,
         isSkill: config.isSkill
       });
+      console.log(result);
 
       // 2. 准备聊天卡片数据 (复用 damage-card.hbs)
       // 获取 Token 图片用于显示，如果没有 Token 则用 Actor 头像
@@ -166,8 +167,9 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         isDead: result.isDead,
         isDying: result.isDying,
         rageGained: result.rageGained,
-        isCrit: result.isCrit
+        isCrit: config.isCrit
       };
+      console.log(templateData);
 
       const content = await renderTemplate(
         "systems/xjzl-system/templates/chat/damage-card.hbs",
