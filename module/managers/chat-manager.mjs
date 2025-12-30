@@ -1205,7 +1205,8 @@ export class ChatCardManager {
                     isDead: damageResult.isDead,
                     isDying: damageResult.isDying,
                     rageGained: damageResult.rageGained, // 防御者是否回怒
-                    isUndone: false
+                    isUndone: false,
+                    isCrit: isCrit      // 把是否暴击传入模板
                 };
 
                 const content = await renderTemplate(
@@ -1498,7 +1499,8 @@ export class ChatCardManager {
                     isDead: damageResult.isDead,
                     isDying: damageResult.isDying,
                     rageGained: damageResult.rageGained,
-                    isUndone: false
+                    isUndone: false,
+                    isCrit: config.isCrit
                 };
 
                 const content = await renderTemplate(

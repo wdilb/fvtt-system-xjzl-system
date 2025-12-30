@@ -165,7 +165,8 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         mpLost: result.mpLost,
         isDead: result.isDead,
         isDying: result.isDying,
-        rageGained: result.rageGained
+        rageGained: result.rageGained,
+        isCrit: result.isCrit
       };
 
       const content = await renderTemplate(
