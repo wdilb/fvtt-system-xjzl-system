@@ -421,6 +421,8 @@ await Macros.requestSave({
 
 ---
 
+> **🎨 素材声明**：系统内包含的所有图像素材均由 AI 生成。
+
 ## 📄 协议 (License)
 
 本项目采用 [MIT License](LICENSE) 开源。
