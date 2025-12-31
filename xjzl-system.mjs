@@ -49,7 +49,7 @@ import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包�
 // 导入配置
 import { XJZL } from "./module/config.mjs";
 
-import { XJZLPause } from "./module/pause.js"; 
+import { XJZLPause } from "./module/pause.js";
 
 /* -------------------------------------------- */
 /*  Init Hook (初始化钩子)                       */
@@ -63,7 +63,7 @@ Hooks.once("init", async function () {
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
-  
+
   // 3. 打印一下确认替换是否成功
   console.log("XJZL | 暂停类替换完成：", CONFIG.ui.pause);
 
@@ -295,6 +295,89 @@ Hooks.once("ready", async function () {
 /* -------------------------------------------- */
 /*  Hooks: Active Effect Config (New Tab Style) */
 /* -------------------------------------------- */
+
+Hooks.on("canvasReady", () => {
+  const grid = canvas.grid;
+
+  // 这里的检查在 V13 有时需要更宽松，或者直接 try-catch，但一般这样没问题
+  if (!grid || !grid.isSquare) return;
+
+  const originalMeasurePath = grid.measurePath;
+
+  // 覆盖 measurePath
+  grid.measurePath = function (waypoints, options = {}) {
+    // 1. 调用原版逻辑，获取基础的 segments 结构
+    const result = originalMeasurePath.call(this, waypoints, options);
+
+    if (!result || !result.segments || result.segments.length === 0) return result;
+
+    const d = canvas.dimensions;
+
+    let globalDiagonalCount = 0;
+    let runningTotal = 0;
+
+    // 2. 遍历每一段路径 (Segment)
+    // 注意：segments.length 应该等于 waypoints.length - 1
+    for (let i = 0; i < result.segments.length; i++) {
+      const s = result.segments[i];
+
+      // 不读 s.ray，直接通过 waypoints 算坐标差
+      const p0 = waypoints[i];     // 起点
+      const p1 = waypoints[i + 1];   // 终点 (如果报错，说明 waypoints 没传对，但通常都有)
+
+      if (!p0 || !p1) continue; // 容错
+
+      // 计算像素差值
+      const dxPixels = p1.x - p0.x;
+      const dyPixels = p1.y - p0.y;
+
+      // 转换为格子数
+      const nx = Math.round(Math.abs(dxPixels) / d.size);
+      const ny = Math.round(Math.abs(dyPixels) / d.size);
+
+      // 斜步数 (短边) & 直步数 (长边 - 短边)
+      const diagonalSteps = Math.min(nx, ny);
+      const straightSteps = Math.abs(ny - nx);
+
+      // 开始计费
+      let segGridCost = straightSteps; // 直线部分直接加
+
+      // 斜线部分：执行 1-2-2-2 规则
+      for (let j = 0; j < diagonalSteps; j++) {
+        if (globalDiagonalCount === 0) {
+          segGridCost += 1; // 第一次：1
+        } else {
+          segGridCost += 2; // 之后：2
+        }
+        globalDiagonalCount++;
+      }
+
+      // 计算本段的实际距离
+      const segDistance = segGridCost * d.distance;
+
+      // 修改结果对象上的数值
+      s.distance = segDistance;
+
+      // V13 可能还需要修改 cost 属性 (用于寻路计算)
+      if (typeof s.cost !== "undefined") {
+        s.cost = segGridCost; // 或者其他权重的计算，这里主要影响显示
+      }
+
+      // 累加总距离
+      runningTotal += segDistance;
+
+      // 修改显示的文本 (Ruler 上的数字)
+      // 确保 label 存在才修改，V13 Ruler 依赖这个
+      s.label = String(segDistance);
+    }
+
+    // 更新总结果
+    result.distance = runningTotal;
+    if (typeof result.totalDistance !== "undefined") result.totalDistance = runningTotal;
+
+    return result;
+  };
+});
 
 Hooks.on("renderActiveEffectConfig", (app, html, data) => {
   // 1. 获取原生 DOM
