@@ -5,7 +5,7 @@
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 import { TRIGGER_CHOICES } from "../data/common.mjs";
-import { getModifierChoices } from "../utils/utils.mjs";
+import { getModifierChoices, localizeConfig  } from "../utils/utils.mjs";
 import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 
 export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
@@ -81,6 +81,8 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         for (const [key, labelKey] of Object.entries(TRIGGER_CHOICES)) {
             context.scriptTriggerChoices[key] = game.i18n.localize(labelKey);
         }
+
+        context.sects = localizeConfig(CONFIG.XJZL.sects);
 
         // 2. 内功阶段配置
         if (this.document.type === "neigong") {
