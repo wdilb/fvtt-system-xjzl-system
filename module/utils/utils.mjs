@@ -115,12 +115,6 @@ export async function promptDisabilityQuery() {
   });
 }
 
-// utils/utils.mjs
-
-/**
- * 获取所有可修正属性的列表 (用于 Actor 自定义修正 和 Item 内功特效)
- * 返回结构: { "分组名": { "key": "Label" }, ... }
- */
 /**
  * 获取所有可修正属性的列表 (用于 Actor 自定义修正 和 Item 内功特效)
  * 返回结构: { "分组名": { "key": "Label" }, ... }
