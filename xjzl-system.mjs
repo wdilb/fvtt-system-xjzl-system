@@ -49,6 +49,8 @@ import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包�
 // 导入配置
 import { XJZL } from "./module/config.mjs";
 
+import { XJZLPause } from "./module/pause.js"; 
+
 /* -------------------------------------------- */
 /*  Init Hook (初始化钩子)                       */
 /* -------------------------------------------- */
@@ -58,6 +60,12 @@ Hooks.once("init", async function () {
 
   // 1. 将自定义配置挂载到全局 CONFIG
   CONFIG.XJZL = XJZL;
+
+  // 替换系统的暂停类
+  CONFIG.ui.pause = XJZLPause;
+  
+  // 3. 打印一下确认替换是否成功
+  console.log("XJZL | 暂停类替换完成：", CONFIG.ui.pause);
 
   // 替换系统核心的状态效果列表
   CONFIG.statusEffects = CONFIG.XJZL.statusEffects;
@@ -908,6 +916,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/effect-selection.hbs", //特效选择
     "systems/xjzl-system/templates/apps/attribute-test-config.hbs", //属性检定设置窗口
     "systems/xjzl-system/templates/apps/modifier-picker.hbs", //属性修正选择器
+    //
+    "systems/xjzl-system/templates/system/pause.hbs",
   ];
   // 严格 V13 写法：使用命名空间
   return foundry.applications.handlebars.loadTemplates(templatePaths);
