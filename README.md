@@ -189,8 +189,8 @@ await Macros.requestSave({
 *   **用途**: 修改 `args.output.damage` (基础伤害/治疗量) 或 `feint` (虚招值)。
 *   **代码示例**:
     ```javascript
-    // 每100内功修为提供 1 点额外伤害
-    const extra = Math.floor(S.cultivation.neigong / 100);
+    // 每100内力修为提供 1 点额外伤害
+    const extra = Math.floor(S.resources.mp.value / 100);
     args.output.damage += extra;
     args.output.bonusDesc.push(`修为加持(+${extra})`);
     ```
@@ -233,7 +233,7 @@ await Macros.requestSave({
     }
     ```
 
-#### 🌪️ `preDamage` (伤害结算前)
+#### 🌪️ `preDamage` (伤害结算前) - ****
 *   **时机**: 命中、暴击、击破状态已确定，但在调用防御者减伤逻辑(`applyDamage`)之前。
 *   **args 内容**:
     *   `outcome`: `{ isHit, isCrit, isBroken }` (**只读**，本次判定的结果)。
@@ -251,7 +251,7 @@ await Macros.requestSave({
     }
     ```
 
-#### 🩸 `hit` (结算/应用)
+#### 🩸 `hit` (结算/应用) - **[核心更新]**
 *   **时机**: 点击“应用伤害”、“应用治疗”或“应用效果”后，对**每个目标**运行。
 *   **args 内容 (通用)**:
     *   `target`: 目标角色 Actor。
@@ -264,7 +264,7 @@ await Macros.requestSave({
     *   `damageResult`: 完整的伤害结算对象。
 *   **args 内容 (治疗/Buff 特有)**:
     *   `baseAmount`: 面板数值 (治疗量或强度)。
-    *   **`finalAmount`**: 
+    *   **[变更] `finalAmount`**: 
         *   若 `type === 'heal'`: 实际应用到 HP 上的回复量。
         *   若 `type === 'buff'`: 等于 `baseAmount` (视为强度 Potency)，**不会**自动加血，脚本可根据此数值决定护盾厚度等。
 *   **用途**: **最常用**。施加 Buff/Debuff、吸血、额外回复内力。
@@ -307,6 +307,9 @@ await Macros.requestSave({
 
     // 2. 减伤 50%
     args.output.damage = Math.floor(args.damage * 0.5);
+    
+    // 3. 反伤
+    // (需手动构造伤害数据回敬 attacker，此处略)
     ```
 
 #### 💀 `dying` / `death` (濒死/死亡)
@@ -342,6 +345,33 @@ await Macros.requestSave({
 *   `level` (Number, 可选): 赋予目标的优劣势 (正数优, 负数劣)。
 *   `onFail` (Object, 可选): 失败时应用的 Active Effect 数据。
 
+**完整示例 (写在 HIT 脚本中)**:
+```javascript
+// 定义晕眩 Debuff (使用新的原子化 flag)
+const debuff = {
+    name: "点穴 (晕眩)",
+    icon: "icons/svg/daze.svg",
+    duration: { rounds: 1 },
+    // 晕眩=定身(stun) + 禁足(SpeedZero/DodgeZero) + 破绽(GrantAttack)
+    changes: [
+        { key: "flags.xjzl-system.stun", mode: 5, value: "true" },
+        { key: "flags.xjzl-system.forceSpeedZero", mode: 5, value: "true" },
+        { key: "flags.xjzl-system.forceDodgeZero", mode: 5, value: "true" }
+    ]
+};
+
+// 发起判定：内息 DC 15
+await Macros.requestSave({
+    target: args.target,
+    attacker: actor,
+    type: "neixi",
+    dc: 15,
+    label: "点穴劲力",
+    level: -1,     // 哪怕对方属性高，这次判定也强制劣势
+    onFail: debuff // 失败自动挂晕眩
+});
+```
+
 ### 3.2 `Macros.checkStance(actor, args)`
 **功能**: 检查当前是否满足触发架招特效的所有硬性条件。
 **检查项**: 架招开启 + 命中 + 内外功类型 + 未被无视架招。
@@ -354,59 +384,409 @@ await Macros.requestSave({
 在 **Active Effect** 或 **Passive 脚本** 中，你可以通过以下路径修改属性。
 **通用前缀**: `system.` (在 AE 中使用) 或 `S.` (在脚本中使用)。
 
-*   **七维属性**: `stats.[key].mod` (`liliang`, `shenfa`...)
-*   **战斗属性**: `combat.[key]` (`speed`, `block`, `hit_waigong`, `def_neigong`...)
-*   **伤害修正**: `combat.damages.[key].mod` (`global`, `skill`, `weapon`...)
-*   **抗性修正**: `combat.resistances.[key].mod` (`global`, `poison`, `mental`...)
-*   **技能等级**: `skills.[key].mod` (`qinggong`, `liaoshang`...)
+### A. 七维属性 (Stats)
+*   **修改方式**: 针对 `.mod` 进行 `ADD` (加减)。
+*   **路径**: `stats.[key].mod`
+*   **Key 列表**: `liliang`, `shenfa`, `neixi`, `tipo`, `qigan`, `shencai`, `wuxing`
+
+### B. 战斗属性 (Combat)
+*   **修改方式**: 直接修改属性本身，`ADD` (加减)。
+*   **路径**: `combat.[key]`
+*   **Key 列表**:
+    *   `block` (格挡), `kanpo` (看破), `xuzhao` (虚招加值)
+    *   `speed` (速度), `dodge` (闪避), `initiative` (先攻)
+    *   `hit_waigong`, `hit_neigong` (命中)
+    *   `def_waigong`, `def_neigong` (防御)
+    *   `crit_waigong`, `crit_neigong` (暴击, 越低越好)
+
+### C. 伤害与抗性 (Damages & Resistances)
+*   **修改方式**: 针对 `.mod` 进行 `ADD`。
+*   **路径**: `combat.[category].[key].mod`
+*   **Damages (category=damages)**:
+    *   `global` (全局), `weapon` (兵器)
+    *   `skill` (招式) **[常用]**
+    *   `yang`, `yin`, `gang`, `rou`, `taiji` (五行)
+*   **Resistances (category=resistances)**:
+    *   `global` (全局), `skill` (招式抗性)
+    *   `poison` (毒), `bleed` (血), `fire` (火), `mental` (神), `liushi` (流)
+
+### D. 资源上限与减耗
+*   **HP/MP 上限**: `resources.hp.bonus`, `resources.mp.bonus` (注意是 bonus)
+*   **消耗减少**: `combat.costs.neili.mod` (内力减耗), `combat.costs.rage.mod` (怒气减耗)
+
+### E. 技能 (Skills)
+*   **修改方式**: 针对 `.mod` 进行 `ADD`。
+*   **路径**: `skills.[key].mod`
+*   **常用 Key**: `qinggong` (轻功), `qiaoshou` (巧手), `liaoshang` (疗伤), `dianxue` (点穴) ... (参见技能列表)
 
 ---
 
 ## 🚩 5. 状态标志 (Flags) 速查
 
 在 **Active Effect** 中，Key 为 `flags.xjzl-system.[FlagName]`。
+在 **脚本** 中，通过 `actor.xjzlStatuses.[FlagName]` 读取，或直接修改 Flag。
 
 ### A. 自动化回复 (数值型, ADD)
-*   `regenHpTurnStart` / `regenMpTurnStart` / `regenRageTurnStart` (回合开始)
-*   `regenHpAttack` / `regenMpAttack` (出招时)
+> **功能**: 在特定时机自动回/扣资源。正数=回复，负数=消耗。
+
+| Key | 说明 | Key | 说明 | Key | 说明 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `regenHpTurnStart` | 回合开始回血 | `regenHpTurnEnd` | 回合结束回血 | `regenHpAttack` | 出招时回血 |
+| `regenMpTurnStart` | 回合开始回内 | `regenMpTurnEnd` | 回合结束回内 | `regenMpAttack` | 出招时回内 |
+| `regenRageTurnStart`| 回合开始回怒 | `regenRageTurnEnd`| 回合结束回怒 | `regenRageAttack`| 出招时回怒 |
 
 ### B. 检定修正 (数值型, ADD)
-*   `globalCheckLevel` (全局检定优劣)
-*   `[key]CheckLevel` (特定属性检定，如 `liliangCheckLevel`)
+> **功能**: 影响 `rollAttributeTest` (判定/检定) 的骰子。正数=优势(kh)，负数=劣势(kl)。
+
+*   **全局**: `globalCheckLevel` (影响所有检定)
+*   **属性**: `liliangCheckLevel`, `shenfaCheckLevel`, `neixiCheckLevel` ... (对应七维)
+*   **技能**: `qiaoshouCheckLevel`, `qinggongCheckLevel` ... (对应所有技能 Key + CheckLevel)
 
 ### C. 战斗博弈 (数值型, ADD)
-*   `attackLevel` (自身命中) / `grantAttackLevel` (被命中)
-*   `feintLevel` (虚招) / `defendFeintLevel` (被虚招)
+> **功能**: 影响战斗中的命中与虚招对抗。
+
+| Key | 作用方 | 含义 |
+| :--- | :--- | :--- |
+| **`attackLevel`** | 自身 | 我攻击时的命中优劣势。 |
+| **`grantAttackLevel`** | 目标 | 别人攻击我时的命中优劣势 (如：空门大开+1)。 |
+| **`feintLevel`** | 自身 | 我施展虚招(攻) 或 进行看破(守) 时的优劣势。 |
+| **`defendFeintLevel`** | 目标 | 别人对我施展虚招时的优劣势 (如：心神不宁+1)。 |
 
 ### D. 行为穿透 (布尔型, OVERRIDE)
-*   `ignoreBlock` / `ignoreDefense` / `ignoreStance` / `ignoreArmorEffects`
+> **功能**: 通常由攻击者持有，用于无视目标的防御手段。设为 `true` 生效。
 
-### E. 封锁与控制 (布尔型, OVERRIDE)
-*   `stun` (晕眩), `silence` (封穴), `forceUnarmed` (缴械)
-*   `blockShiZhao`, `blockXuZhao`, `blockQiZhao`, `blockCounter`, `blockStance`
+| Key | 说明 |
+| :--- | :--- |
+| `ignoreBlock` | **无视格挡**。目标的格挡值归零。 |
+| `ignoreDefense` | **无视防御**。目标的内/外功防御归零 (真实伤害)。 |
+| `ignoreStance` | **无视架招**。目标的格挡值中扣除架招部分，且**不会触发**架招的 `DAMAGED` 特效。 |
+| `ignoreArmorEffects` | **无视防具 (破衣)**。目标防具的被动属性和脚本全部失效。 |
+
+### E. 行为与数值封锁 (布尔型, OVERRIDE)
+> **功能**: 强控状态或数值置零。设为 `true` 生效。
+
+| Key | 说明 |
+| :--- | :--- |
+| `stun` | **晕眩/定身**。无法行动，解除架招。 |
+| `silence` | **封穴**。无法施展招式。 |
+| `forceUnarmed` | **缴械**。只能使用徒手招式。 |
+| `brokenDefense` | **破甲**。外功防御力强行置零。 |
+| `forceSpeedZero` | **禁足/速度归零**。移动速度强行置零。 |
+| `forceDodgeZero` | **闪避归零**。闪避值强行置零。 |
+| `blockShiZhao`... | **封招系列**。禁止施展实招/虚招/气招/反击/绝招。 |
+| `noRecoverHP`... | **禁疗系列**。禁止气血/内力/怒气回复。 |
+
+### F. 特殊状态与数值修正
+> **功能**: 包含特殊机制开关或线性百分比修正。
+
+| Key | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `passiveBlock` | Bool | **被动格挡**。即使未开启架招，面板格挡值依然生效。 |
+| `bleedOnHit` | Number | **撕裂**。受到伤害时，额外流失 X 点气血。 |
+| `wuxueBleedOnHit`| Number | **旧疾**。仅受内外功伤害时，额外流失 X 点气血。 |
+| `unstable` | Bool | **下盘不稳**。最终移动速度减半 (Floor)。 |
+| `bloodLossLevel` | Number | **失血层数**。每层使最大气血上限降低 10% (线性叠加)。 |
 
 ---
 
-## 📝 6. 武学招式创建与脚本指南
+## 📝 6. 武学招式创建与脚本指南 (Wuxue & Scripts)
+
+随着 V13 版本的更新，招式系统引入了“行为分流”机制。本章将指导你如何创建复杂的辅助、治疗和控制类招式。
 
 ### 6.1 招式配置逻辑
-*   **默认/Buff**: 无检定，用于纯状态类气招。
-*   **治疗 (Heal)**: 无检定，自动回血。
-*   **攻击 (Attack)**: 内/外功需检定，精神/无视类型必中。
+
+对于 **气招 (Qi)**，你需要根据其具体效果选择 **“结算模式 (Action Type)”**：
+
+*   **默认/Buff (Default)**:
+    *   **用途**: 给自身或队友施加状态、无伤害的 Debuff。
+    *   **逻辑**: 无需命中检定。卡片显示**“应用效果”**。数值(`baseAmount`)作为**强度**传递给脚本，**不会**自动扣血/回血。
+    *   **目标**: 如果未选中目标，**默认对自己生效**。
+*   **治疗 (Heal)**:
+    *   **用途**: 回复气血 (HP)。
+    *   **逻辑**: 无需命中检定。点击“应用治疗”后自动回复面板数值。
+    *   **目标**: 如果未选中目标，**默认对自己生效**。
+*   **攻击 (Attack)**:
+    *   **用途**: 造成伤害（如音波功、精神攻击）。
+    *   **逻辑**: 只有伤害类型为 **外功/内功** 时才需要命中检定。**精神/无** 类型为必中。
+    *   **目标**: **必须**选中目标，否则报错。
+
+---
 
 ### 6.2 常见复杂招式脚本范例
 
-*(此处包含给目标施加Buff、治疗回蓝、精神伤害检定、自动化回血、随等级成长特效、武器淬毒、瞬发气招、特殊暴击等 8 个经典范例)*
+请将以下代码粘贴到招式的 **脚本 (Scripts)** 编辑器中，触发时机通常选择 **`hit`**。
+
+#### A. 给目标施加 Buff (如：提升移动速度)
+> **场景**: 气招 (Buff)，选中队友或自己，持续 3 回合。
+
+```javascript
+// 1. 定义 Active Effect 数据结构
+const effectData = {
+    name: "神行百变",
+    icon: "icons/svg/wing.svg", // 图标路径
+    origin: item.uuid,
+    duration: { rounds: 3 },    // 持续时间
+    description: "移动速度提升 3 点。",
+    changes: [
+        // 修改战斗属性：速度 +3
+        { key: "system.combat.speed.mod", mode: 2, value: 3 }
+    ]
+};
+
+// 2. 给目标创建特效
+// args.target 可能是选中的队友，也可能是施法者自己(隐式目标)
+await args.target.createEmbeddedDocuments("ActiveEffect", [effectData]);
+
+// 3. (可选) 飘字反馈
+if (args.target.token?.object) {
+    canvas.interface.createScrollingText(args.target.token.object.center, "神行", {
+        fill: "#00FF00", stroke: "#000000", strokeThickness: 4
+    });
+}
+```
+
+#### B. 治疗 + 回复内力 (如：提按端挤)
+> **场景**: 气招 (Heal)。面板设置 10 点治疗量 (自动回血)，脚本负责回内力。
+
+```javascript
+// args.finalAmount 是实际回复的气血量
+if (args.finalAmount > 0) {
+    // 额外回复 5 点内力
+    await args.target.applyHealing({ 
+        amount: 5, 
+        type: "mp", 
+        showScrolling: true 
+    });
+}
+```
+
+#### C. 精神伤害 + 定力检定 (如：醉里吴音)
+> **场景**: 气招 (Attack)，伤害类型选 `Mental`。
+> **逻辑**: 点击应用伤害时，先不扣血，而是发起检定。如果检定失败再扣血。
+
+```javascript
+// 1. 阻止默认的伤害应用 (如果是 Attack 模式)
+// 注意：对于精神伤害，通常建议面板填 0，完全由脚本控制扣血，或者面板填全额，脚本控制减半
+// 这里演示面板填 0，脚本全权负责
+
+// 2. 发起检定请求
+await Macros.requestSave({
+    target: args.target,
+    attacker: actor,
+    type: "dingli", // 定力检定
+    dc: 13,         // 难度
+    label: "抵抗靡靡之音",
+    
+    // 检定失败的回调：直接扣血
+    onFail: async () => {
+        // 造成 10 点伤害
+        await args.target.applyDamage({
+            amount: 10,
+            type: "mental", // 精神伤害
+            attacker: actor,
+            isHit: true,
+            ignoreDefense: true // 精神伤害无视防御
+        });
+        ui.notifications.info(`${args.target.name} 受到精神重创！`);
+    }
+});
+```
+
+#### D. 自动化回血 Buff (如：养血)
+> **场景**: 气招 (Buff)。给目标上一个状态，让他每回合结束自动回血。
+
+```javascript
+const effectData = {
+    name: "养血",
+    icon: "icons/magic/life/heart-cross-green.webp",
+    duration: { rounds: 3 },
+    changes: [
+        // 修改自动化 Flag: 回合结束回血 (regenHpTurnEnd)
+        // mode: 2 (ADD) 表示叠加
+        { key: "flags.xjzl-system.regenHpTurnEnd", mode: 2, value: 10 }
+    ]
+};
+
+await args.target.createEmbeddedDocuments("ActiveEffect", [effectData]);
+```
+
+#### E. 随等级成长的特效 (如：万龙馈影)
+> **场景**: 架招或攻击。给目标施加一个 Debuff（如蛇瘴），其**数值**和**最大层数**随着招式等级提升而增加。
+> **前置**: 在武学物品中先创建一个名为“蛇瘴”的特效作为**模板**（数值填基础值即可）。
+
+```javascript
+// 1. 获取特效模板
+// thisItem 指向当前武学，我们在其中查找名为 "蛇瘴" 的 AE
+const sourceEffect = thisItem.effects.getName("蛇瘴");
+if (!sourceEffect) return ui.notifications.warn("特效模板缺失");
+
+// 2. 克隆数据 (转为普通 Object)
+const effectData = sourceEffect.toObject();
+delete effectData._id;          // 清除 ID 以便创建新实例
+effectData.origin = thisItem.uuid; // 确保来源指向本武学
+
+// 3. 获取当前招式等级
+// args.move 包含了当前招式的运行时数据
+const lvl = Math.max(1, args.move.computedLevel || 1);
+
+// 4. 动态修改数据 (原生 JS 操作)
+
+// A. 修改最大层数 (基础3层，每级+1)
+// Manager 会自动处理层数升级逻辑
+const newMax = 3 + (lvl - 1) * 1;
+foundry.utils.setProperty(effectData, "flags.xjzl-system.maxStacks", newMax);
+
+// B. 修改流失数值 (基础5点，每级+5)
+// 找到控制流失的 change 条目 (假设是第一个，或者通过 key 查找)
+const change = effectData.changes.find(c => c.key === "flags.xjzl-system.regenHpTurnStart");
+if (change) {
+    // 注意：流失通常是负数
+    const val = -5 + (lvl - 1) * (-5);
+    change.value = String(val);
+}
+
+// 5. 应用特效
+// 调用 API 挂载到目标身上 (attacker 是触发架招的人)
+await game.xjzl.api.effects.addEffect(args.attacker, effectData);
+
+// 6. 飘字
+if (actor.token?.object) {
+    canvas.interface.createScrollingText(actor.token.object.center, "蛇瘴入体", { 
+        fill: "#8e44ad", stroke: "#000000", strokeThickness: 4 
+    });
+}
+```
+
+#### F. 进阶消耗品：武器淬毒 (虚拟物品法)
+> **场景**: 使用一瓶“鹤顶红”。你希望它不是立即生效，而是给你的武器“淬毒”。当你**下一次攻击命中**敌人时，触发敌人的体魄检定，失败则中毒。
+> **原理**: 消耗品本身无法监听 `HIT` (命中) 事件。我们需要在 `usageScript` 中，在角色身上动态创建一个**临时的虚拟物品**（如一个隐形的奇珍），由这个虚拟物品来承载 `HIT` 脚本。
+
+```javascript
+// 写在消耗品的 [使用脚本] 中
+
+// 1. 定义虚拟物品数据
+// 我们创建一个临时的"奇珍"装备到身上，作为毒药效果的容器
+const virtualItemData = {
+    name: "淬毒效果 (临时)",
+    type: "qizhen", // 借用奇珍类型
+    img: "icons/svg/poison.svg",
+    system: {
+        equipped: true, // 必须设为已装备，脚本才会生效
+        description: "攻击命中时触发剧毒判定。",
+        // --- 核心：在虚拟物品里嵌套定义脚本 ---
+        scripts: [
+            {
+                label: "毒发逻辑",
+                trigger: "hit", // 监听命中事件
+                active: true,
+                // 注意：这里的 script 是字符串形式的代码
+                script: `
+                    // --- 以下代码将在攻击命中时执行 ---
+                    
+                    // 1. 发起判定请求
+                    await Macros.requestSave({
+                        target: args.target,
+                        attacker: actor,
+                        type: "tipo", // 体魄检定
+                        dc: 15,       // 难度
+                        label: "抵抗剧毒",
+                        
+                        // 2. 失败回调：应用中毒状态
+                        onFail: async () => {
+                            const poisonEffect = {
+                                name: "剧毒攻心",
+                                icon: "icons/svg/skull.svg",
+                                duration: { rounds: 3 },
+                                changes: [
+                                    { key: "system.combat.speed", mode: 2, value: -2 }
+                                ]
+                            };
+                            await args.target.createEmbeddedDocuments("ActiveEffect", [poisonEffect]);
+                            ui.notifications.warn(args.target.name + " 中毒了！");
+                        }
+                    });
+
+                    // 3. (可选) 触发一次后销毁虚拟物品 (一次性毒药)
+                    // 如果不写这行，就是持续性淬毒
+                    await thisItem.delete();
+                `
+            }
+        ]
+    }
+};
+
+// 2. 将虚拟物品创建到角色身上
+await actor.createEmbeddedDocuments("Item", [virtualItemData]);
+ui.notifications.info("兵刃已淬毒！下一次攻击将触发特效。");
+```
+
+#### G. 瞬发型气招 (如：天魔解体)
+> **场景**: 气招 (Buff)。点击招式后，无需选择目标，立即执行脚本（如：扣血加攻）并隐藏聊天卡片上的按钮。
+> **原理**: 使用 `autoApplied` 标记接管 UI 流程。
+
+```javascript
+// 触发时机: ATTACK (出招前)
+
+// 1. 执行逻辑：扣除自身 30% 气血，获得攻击力 Buff
+const hpCost = Math.floor(S.resources.hp.max * 0.3);
+if (S.resources.hp.value <= hpCost) {
+    ui.notifications.warn("气血不足以施展天魔解体！");
+    args.flags.abort = true; // 阻断出招
+    return;
+}
+
+// 扣血
+await actor.applyDamage({ amount: hpCost, type: "true", isHit: true });
+
+// 上 Buff
+const buff = {
+    name: "天魔解体",
+    icon: "icons/svg/blood.svg",
+    changes: [{ key: "system.combat.damages.global.mod", mode: 2, value: 50 }]
+};
+await actor.createEmbeddedDocuments("ActiveEffect", [buff]);
+
+// 2. 关键：告诉系统“我已经处理完了”，隐藏卡片按钮
+args.flags.autoApplied = true;
+
+ui.notifications.info(`${actor.name} 施展了天魔解体！`);
+```
+
+#### H. 让特殊攻击暴击 (如：摄魂一击)
+> **场景**: 攻击 (Attack)。普通命中是外功伤害，外功伤害可以暴击，但如果**暴击**，则转化为**精神伤害**（特殊伤害不能暴击，这样就达成了暴击的特殊伤害）。
+> **触发时机**: `preDamage`
+
+```javascript
+// 检查只读状态：是否暴击
+if (args.outcome.isCrit) {
+    // 修改伤害配置
+    args.config.type = "mental";
+    
+    // 提示
+    ui.notifications.warn("摄魂一击触发暴击！转化为精神伤害！");
+}
+```
 
 ---
 
 ## 📝 7. 最佳实践
 
-1.  **数值修改规范**: 使用 `+=` 修改数值，避免覆盖。
-2.  **Item 引用**: 使用 `thisItem` 引用自身。
-3.  **判断逻辑**: 善用 `Macros` 助手函数。
-4.  **调试技巧**: 善用 `console.log(args)`。
-5.  **资源消耗**: 士气在 `hit` 阶段已被清空，请勿直接读取当前值。
+1.  **数值修改规范**:
+    *   在 `attack` / `check` 脚本中修改 `flags.level` 等数值时，**请使用 `+=`** (如 `args.flags.level += 1`)，以免覆盖其他特效。
+
+2.  **Item 引用**:
+    *   使用 `thisItem` 来引用脚本所属的物品（如“本剑”）。
+    *   使用 `item` (如果存在于 args) 来引用触发事件的物品（如“攻击者用的剑”）。
+
+3.  **判断逻辑**:
+    *   尽量使用 `Macros` 提供的助手函数（如 `checkStance`），避免手动写复杂的 `if` 判断，减少 Bug。
+
+4.  **调试技巧**:
+    *   善用 `console.log(args)` 在 F12 控制台查看当前上下文里到底有什么。
+    *   善用 `ui.notifications.info("...")` 来确认脚本是否执行到了某一行。
+
+5.  **资源消耗警告 (士气/内力)** 
+    *   **士气 (Morale)**: 现在系统采用“出招即消耗”机制。在运行 `hit` 脚本时，角色的士气值已被清空（转化为伤害加成）。若需知晓本次消耗了多少士气，请勿读取 `S.resources.morale.value`（它现在是0），而应根据业务逻辑自行判断，或等待系统未来提供历史快照。
 
 </details>
 
