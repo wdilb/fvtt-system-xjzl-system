@@ -7,10 +7,10 @@ export async function seedConsumables() {
     ui.notifications.info("XJZL | 正在读取消耗品数据...");
 
     // 1. 读取 JSON
-    let itemsData = [];
+    let consumablesData = [];
     try {
         const response = await fetch("systems/xjzl-system/data/consumables.json");
-        itemsData = await response.json();
+        consumablesData = await response.json();
     } catch (err) {
         return ui.notifications.error("无法加载 systems/xjzl-system/data/consumables.json，请检查文件是否存在。");
     }
@@ -51,51 +51,39 @@ export async function seedConsumables() {
 
     // 5. 构建 Item 数组
     const items = [];
-    // 用于简单的图片轮询
-    let imgCounter = 0;
+    for (const d of consumablesData) {
+        // 准备 AE 数据
+        const effects = d.effects ? d.effects.map(e => ({
+            name: e.name,
+            icon: e.icon,
+            transfer: e.transfer, // 消耗品通常为 false
+            changes: e.changes,
+            flags: e.flags,
+            description: e.description
+        })) : [];
 
-    for (const d of itemsData) {
-        // 图片逻辑：如果数据里有 icon 字段(我们在json里给部分物品加了)，就用它
-        // 否则使用默认逻辑
-        let img = d.effects && d.effects.length > 0 ? d.effects[0].icon : null;
-
-        if (!img) {
-            // 默认茶叶图片轮询
-            if (d.type === 'tea') {
-                const variant = (imgCounter % 2) + 1; // 1 或 2
-                img = `systems/xjzl-system/assets/icons/consumable/茶${variant}.png`;
-                imgCounter++;
-            } else {
-                // 其他类型的兜底
-                img = "icons/svg/item-bag.svg";
-            }
-        }
-
-        // 构造 Item 数据
-        const item = {
+        items.push({
             name: d.name,
-            type: "consumable",
-            img: img,
-            folder: folders[d.type] || folders['other'],
+            type: d.type,
+            img: d.img,
+            folder: folders[d.system.type] || folders['other'], // 归类到对应文件夹
             system: {
-                quantity: 1, // 默认为1
-                price: d.price || 0,
-                quality: d.quality || 0,
-                type: d.type,
-                description: d.description,
-                usageScript: d.usageScript,
-                automationNote: d.automationNote,
-                recovery: {} // 简单恢复留空，我们主要用 usageScript
+                quantity: d.system.quantity,
+                price: d.system.price,
+                quality: d.system.quality,
+                type: d.system.type,
+                description: d.system.description,
+                usageScript: d.system.usageScript,
+                automationNote: d.system.automationNote,
+                recovery: d.system.recovery || { hp: 0, mp: 0, rage: 0 } // 默认值
             },
-            effects: d.effects || []
-        };
-
-        items.push(item);
+            effects: effects
+        });
     }
 
     // 6. 批量写入
     if (items.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${items.length} 个消耗品...`);
+        console.log(`XJZL Seeder | 正在写入 ${items.length} 个物品...`);
         await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
     }
 
