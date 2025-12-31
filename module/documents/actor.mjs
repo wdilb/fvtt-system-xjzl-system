@@ -706,11 +706,14 @@ export class XJZLActor extends Actor {
         val = Math.floor(val / 10);
       }
       labelKey = CONFIG.XJZL.attributes[key];
+      // 读取属性专属的检定修正
+      extraBonus = sys.stats[key]?.checkMod || 0; 
       type = "stat";
     }
     else if (CONFIG.XJZL.skills[key]) {
       val = sys.skills[key]?.total || 0;
       labelKey = CONFIG.XJZL.skills[key];
+      extraBonus = sys.skills[key]?.checkMod || 0;
       type = "skill";
     }
     else if (CONFIG.XJZL.arts[key]) {

@@ -1,11 +1,13 @@
 /* module/utils/seeding/index.mjs */
 
 import { seedOrigins } from "./seed-origins.mjs";
+import { seedConsumables } from "./seed-consumables.mjs";
 // import { seedWuxue } from "./seed-wuxue.mjs"; // 未来扩展
 
 export const SeedingManager = {
     // 模块化导出
     origins: seedOrigins,
+    consumables: seedConsumables,
     // wuxue: seedWuxue,
 
     /**

@@ -404,7 +404,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       this.skills[sk] = {
         base: 0,  // 由属性计算得出 (在 derivedData)
         mod: 0,   // 由 Active Effects 填充
-        total: 0  // 最终值
+        total: 0,  // 最终值
+        checkMod: 0 // <---专门用于存储“检定修正”的 AE
       };
     }
 
@@ -417,6 +418,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       if (key === 'freePoints') continue;
       // 初始化 neigongBonus，防止后续计算 NaN
       stat.neigongBonus = 0;
+      stat.checkMod = 0; // <--- 属性检定专用修正
     }
 
     // 初始化衍生容器，防止访问 undefined
