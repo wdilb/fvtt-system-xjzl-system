@@ -154,7 +154,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       stats: { liliang: 0, shenfa: 0, tipo: 0, neixi: 0, shencai: 0 },
       effect: "",         // 常驻特效文本
       masteryEffect: "",   // 圆满特效文本
-      effects: [] // 初始化为空数组
+      scripts: [] // 初始化为空数组
     };
 
     if (stage > 0) {
@@ -167,7 +167,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
         this.current.stats = { ...stageConfig.stats };
         this.current.effect = stageConfig.effect;
         // 复制数组 (浅拷贝即可，因为里面的对象通常只读)
-        this.current.effects = stageConfig.effects || [];
+        this.current.scripts = stageConfig.scripts || []; 
       }
 
       // 如果圆满，激活圆满特效
