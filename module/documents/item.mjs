@@ -299,6 +299,11 @@ export class XJZLItem extends Item {
     const actor = this.actor;
     if (!actor) return ui.notifications.warn("该物品不在角色身上，无法装备。");;
 
+    const equipableTypes = ["weapon", "armor", "qizhen"];
+    if (!equipableTypes.includes(this.type)) {
+      return ui.notifications.warn("该类型的物品无法被装备。");
+    }
+
     const isEquipping = !this.system.equipped; // 目标状态
 
     // === 卸下逻辑 (简单) ===
