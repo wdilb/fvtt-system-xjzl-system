@@ -61,6 +61,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 1. 准备下拉菜单选项(使用工具函数)
         context.choices = {
             tiers: localizeConfig(XJZL.tiers),
+            sects: localizeConfig(XJZL.sects),
             // 招式专用Tier选项 (包含继承)
             moveTiers: {
                 "": "继承 (默认)", // 对应 null/undefined
