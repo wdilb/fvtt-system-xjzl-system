@@ -1118,7 +1118,7 @@ export class XJZLItem extends Item {
     if (moraleBonus > 0) {
       breakdownText += `+ 士气增伤: ${moraleBonus}\n`;
     }
-    breakdownText += `+ 其他增伤: ${flatBonus}`;
+    breakdownText += `+ 其他增伤: ${flatBonus - moraleBonus}\n`;
 
     if (scriptDmgBonus !== 0) {
       const sign = scriptDmgBonus > 0 ? "+" : "";
