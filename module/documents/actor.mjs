@@ -528,6 +528,31 @@ export class XJZLActor extends Actor {
       });
     }
 
+    // =====================================================
+    // 6. 遍历 Active Effects (AE Scripting)
+    // =====================================================
+    // 使用 appliedEffects 自动获得过滤后的列表 (已剔除禁用/未装备/过期)
+    // 如果没有 appliedEffects (旧版本)，使用 this.effects.filter(...)
+    const activeEffects = this.appliedEffects || this.effects.filter(e => !e.disabled && !e.isSuppressed);
+
+    for (const effect of activeEffects) {
+      // 使用我们在 XJZLActiveEffect 中定义的 getter 和 helper
+      // 预检查优化：如果这个特效压根没有这个时机的脚本，直接跳过
+      if (!effect.hasScript || !effect.hasScript(trigger)) continue;
+
+      const effectScripts = effect.scripts; // 获取数组
+
+      effectScripts.forEach(s => {
+        if (s.trigger === trigger && s.active !== false) {
+          scripts.push({
+            script: s.script,
+            label: s.label || effect.name,
+            source: effect // 源头指向 AE 文档
+          });
+        }
+      });
+    }
+
     return scripts;
   }
 
@@ -577,7 +602,22 @@ export class XJZLActor extends Actor {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
         // 主要用于类似装备上带的受击特效等没有传入 contextItem 的情况，可以找到触发的物品
-        sandbox.thisItem = entry.source;
+        let thisItem = null;
+        let thisEffect = null;
+
+        if (entry.source instanceof Item) {
+          // 情况A: 源头是物品
+          thisItem = entry.source;
+        }
+        else if (entry.source instanceof ActiveEffect) {
+          // 情况B: 源头是特效
+          thisEffect = entry.source;
+          // 兼容性指向：让 thisItem 也指向 AE，防止脚本报错
+          thisItem = entry.source;
+        }
+        sandbox.thisItem = thisItem;
+        sandbox.thisEffect = thisEffect;
+        sandbox.effect = thisEffect; // 别名
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -603,7 +643,22 @@ export class XJZLActor extends Actor {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
         // 主要用于类似装备上带的受击特效等没有传入 contextItem 的情况，可以找到触发的物品
-        sandbox.thisItem = entry.source;
+        let thisItem = null;
+        let thisEffect = null;
+
+        if (entry.source instanceof Item) {
+          // 情况A: 源头是物品
+          thisItem = entry.source;
+        }
+        else if (entry.source instanceof ActiveEffect) {
+          // 情况B: 源头是特效
+          thisEffect = entry.source;
+          // 兼容性指向：让 thisItem 也指向 AE，防止脚本报错
+          thisItem = entry.source;
+        }
+        sandbox.thisItem = thisItem;
+        sandbox.thisEffect = thisEffect;
+        sandbox.effect = thisEffect; // 别名
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
         // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);
@@ -707,7 +762,7 @@ export class XJZLActor extends Actor {
       }
       labelKey = CONFIG.XJZL.attributes[key];
       // 读取属性专属的检定修正
-      extraBonus = sys.stats[key]?.checkMod || 0; 
+      extraBonus = sys.stats[key]?.checkMod || 0;
       type = "stat";
     }
     else if (CONFIG.XJZL.skills[key]) {

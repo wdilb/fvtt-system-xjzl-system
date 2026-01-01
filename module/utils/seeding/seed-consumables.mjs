@@ -6,13 +6,41 @@ const PACK_NAME = "xjzl-system.consumables";
 export async function seedConsumables() {
     ui.notifications.info("XJZL | 正在读取消耗品数据...");
 
+    // 0. 定义分类和对应的中文标签
+    const types = ["medicine", "poison", "tea", "food", "wine", "other"];
+    const typeLabels = {
+        medicine: "药品",
+        poison: "毒药",
+        tea: "茶叶",
+        food: "佳肴",
+        wine: "美酒",
+        other: "其他"
+    };
+
     // 1. 读取 JSON
     let consumablesData = [];
-    try {
-        const response = await fetch("systems/xjzl-system/data/consumables.json");
-        consumablesData = await response.json();
-    } catch (err) {
-        return ui.notifications.error("无法加载 systems/xjzl-system/data/consumables.json，请检查文件是否存在。");
+    for (const t of types) {
+        try {
+            const filePath = `systems/xjzl-system/data/consumables/${t}.json`;
+            const response = await fetch(filePath);
+
+            if (!response.ok) {
+                console.warn(`XJZL Seeder | 跳过文件 ${filePath} (可能不存在)`);
+                continue;
+            }
+
+            const data = await response.json();
+            // 确保数据是数组
+            const dataArray = Array.isArray(data) ? data : [data];
+            console.log(`XJZL Seeder | 已加载 ${t}: ${dataArray.length} 条数据`);
+            consumablesData.push(...dataArray);
+        } catch (err) {
+            console.error(`XJZL Seeder | 加载 ${t}.json 出错:`, err);
+        }
+    }
+
+    if (consumablesData.length === 0) {
+        return ui.notifications.error("未找到任何有效数据，请检查 data/consumables/ 目录。");
     }
 
     // 2. 获取合集包
@@ -34,20 +62,11 @@ export async function seedConsumables() {
     // 4. 创建文件夹结构 (按类型)
     console.log("XJZL Seeder | 创建分类文件夹...");
     const folders = {};
-    const types = ["medicine", "poison", "tea", "food", "wine", "other"];
-    const typeLabels = {
-        medicine: "药品",
-        poison: "毒药",
-        tea: "茶叶",
-        food: "佳肴",
-        wine: "美酒",
-        other: "其他"
-    };
-
-    for (const t of types) {
-        const f = await Folder.create({ name: typeLabels[t] || t, type: "Item", pack: PACK_NAME }, { pack: PACK_NAME });
-        folders[t] = f.id;
-    }
+    const folderPromises = types.map(t =>
+        Folder.create({ name: typeLabels[t] || t, type: "Item", pack: PACK_NAME }, { pack: PACK_NAME })
+    );
+    const createdFolders = await Promise.all(folderPromises);
+    types.forEach((t, i) => folders[t] = createdFolders[i].id);
 
     // 5. 构建 Item 数组
     const items = [];
@@ -56,7 +75,7 @@ export async function seedConsumables() {
         const effects = d.effects ? d.effects.map(e => ({
             name: e.name,
             icon: e.icon,
-            transfer: e.transfer, // 消耗品通常为 false
+            transfer: e.transfer ?? false, // 消耗品通常为 false
             changes: e.changes,
             flags: e.flags,
             description: e.description

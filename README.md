@@ -132,7 +132,7 @@ await Macros.requestSave({
 <summary><strong>📚 点击展开：脚本引擎完整开发文档 (Script Engine API)</strong></summary>
 <br>
 
-# 📖 侠界之旅 (XJZL) - 脚本与特效开发指南
+# 📖 侠界之旅 (XJZL) - 脚本与特效开发指南 (v5.4)
 
 **适用对象**: 游戏主持人 (GM)、模组制作者、高阶玩家
 
@@ -143,7 +143,8 @@ await Macros.requestSave({
 ## 🏗️ 1. 核心概念与环境
 
 ### 1.1 哪里写脚本？
-在 **内功**、**武学招式**、**武器/装备** 的详情页中，点击 **“添加特效”**，并在编辑器中输入代码。
+*   **物品**: 在 **内功**、**武学招式**、**武器/装备** 的详情页中，点击 **“添加特效”**。
+*   **状态 (Active Effect)**: 在 **Active Effect** 的配置页中，现在也可以直接编写脚本。这使得状态可以独立于物品存在并执行逻辑（如中毒、持续回血）。
 
 ### 1.2 沙盒变量 (Global Context)
 系统为每一段脚本注入了以下全局变量，你可以直接使用：
@@ -153,7 +154,8 @@ await Macros.requestSave({
 | **`actor`** | `XJZLActor` | 当前**运行该脚本的角色**实例（施法者/佩戴者/被击者）。 |
 | **`system`** | `Object` | `actor.system` 的引用。核心数据源。 |
 | **`S`** | `Object` | `system` 的简写别名。例如 `S.stats.liliang.total`。 |
-| **`thisItem`** | `XJZLItem` | **当前脚本所属的物品**（如：正在生效的内功、护甲）。用于引用自身数据（如等级、图片）。 |
+| **`thisItem`** | `XJZLItem` \| `ActiveEffect` | **兼容性指针**。<br>1. 若脚本来自物品，指向该物品。<br>2. 若脚本来自 Active Effect，指向该特效本身 (为了防止旧脚本报错)。 |
+| **`thisEffect`** | `ActiveEffect` | **当前运行脚本的特效实例**。<br>仅当脚本挂载在 Active Effect 上时存在。推荐在处理特效自我销毁、层数修改时使用此变量。 |
 | **`move`** | `Object` | **当前正在施展的招式数据** (仅限招式相关脚本)。 |
 | **`args`** | `Object` | **上下文参数包**。包含当前事件的所有信息（如伤害值、命中结果、目标）。内容随触发时机变化。 |
 | **`Macros`** | `Class` | **系统工具箱**。包含 `requestSave` 等高级功能。 |
@@ -172,7 +174,7 @@ await Macros.requestSave({
 #### 🛡️ `passive` (被动常驻)
 *   **时机**: 角色数据初始化时 (`prepareDerivedData`)。
 *   **用途**: 修改属性修正值 (`.mod`)、开启状态开关。
-*   **生效前提**: 内功运行中、装备已穿戴、架招已开启。
+*   **生效前提**: 内功运行中、装备已穿戴、架招已开启、或 AE 处于激活状态。
 *   **代码示例**:
     ```javascript
     // 气血低于30%时，外功防御 +10
@@ -233,7 +235,7 @@ await Macros.requestSave({
     }
     ```
 
-#### 🌪️ `preDamage` (伤害结算前) - ****
+#### 🌪️ `preDamage` (伤害结算前)
 *   **时机**: 命中、暴击、击破状态已确定，但在调用防御者减伤逻辑(`applyDamage`)之前。
 *   **args 内容**:
     *   `outcome`: `{ isHit, isCrit, isBroken }` (**只读**，本次判定的结果)。
@@ -251,7 +253,7 @@ await Macros.requestSave({
     }
     ```
 
-#### 🩸 `hit` (结算/应用) - **[核心更新]**
+#### 🩸 `hit` (结算/应用)
 *   **时机**: 点击“应用伤害”、“应用治疗”或“应用效果”后，对**每个目标**运行。
 *   **args 内容 (通用)**:
     *   `target`: 目标角色 Actor。
@@ -657,67 +659,48 @@ if (actor.token?.object) {
 }
 ```
 
-#### F. 进阶消耗品：武器淬毒 (虚拟物品法)
+#### F. 进阶消耗品：武器淬毒 (Active Effect 脚本法)
 > **场景**: 使用一瓶“鹤顶红”。你希望它不是立即生效，而是给你的武器“淬毒”。当你**下一次攻击命中**敌人时，触发敌人的体魄检定，失败则中毒。
-> **原理**: 消耗品本身无法监听 `HIT` (命中) 事件。我们需要在 `usageScript` 中，在角色身上动态创建一个**临时的虚拟物品**（如一个隐形的奇珍），由这个虚拟物品来承载 `HIT` 脚本。
+> **原理**: 消耗品赋予自身一个名为“武器淬毒”的 Active Effect，该 AE 内部携带一个监听 `hit` (命中) 事件的脚本。
 
+**步骤 1: 消耗品配置**
+在消耗品的 Active Effects 页签中，创建一个名为“武器淬毒”的特效，设置 `transfer: false`。
+
+**步骤 2: 在该 AE 中编写脚本**
+*   **标签**: 毒发判定
+*   **时机**: `hit` (命中时)
+*   **代码**:
 ```javascript
-// 写在消耗品的 [使用脚本] 中
+// --- 本脚本挂载在 "武器淬毒" AE 上 ---
+// 只要此 AE 存在，每次攻击命中都会触发此脚本
 
-// 1. 定义虚拟物品数据
-// 我们创建一个临时的"奇珍"装备到身上，作为毒药效果的容器
-const virtualItemData = {
-    name: "淬毒效果 (临时)",
-    type: "qizhen", // 借用奇珍类型
-    img: "icons/svg/poison.svg",
-    system: {
-        equipped: true, // 必须设为已装备，脚本才会生效
-        description: "攻击命中时触发剧毒判定。",
-        // --- 核心：在虚拟物品里嵌套定义脚本 ---
-        scripts: [
-            {
-                label: "毒发逻辑",
-                trigger: "hit", // 监听命中事件
-                active: true,
-                // 注意：这里的 script 是字符串形式的代码
-                script: `
-                    // --- 以下代码将在攻击命中时执行 ---
-                    
-                    // 1. 发起判定请求
-                    await Macros.requestSave({
-                        target: args.target,
-                        attacker: actor,
-                        type: "tipo", // 体魄检定
-                        dc: 15,       // 难度
-                        label: "抵抗剧毒",
-                        
-                        // 2. 失败回调：应用中毒状态
-                        onFail: async () => {
-                            const poisonEffect = {
-                                name: "剧毒攻心",
-                                icon: "icons/svg/skull.svg",
-                                duration: { rounds: 3 },
-                                changes: [
-                                    { key: "system.combat.speed", mode: 2, value: -2 }
-                                ]
-                            };
-                            await args.target.createEmbeddedDocuments("ActiveEffect", [poisonEffect]);
-                            ui.notifications.warn(args.target.name + " 中毒了！");
-                        }
-                    });
-
-                    // 3. (可选) 触发一次后销毁虚拟物品 (一次性毒药)
-                    // 如果不写这行，就是持续性淬毒
-                    await thisItem.delete();
-                `
-            }
-        ]
+// 1. 发起判定请求
+await Macros.requestSave({
+    target: args.target,
+    attacker: actor,
+    type: "tipo", // 体魄检定
+    dc: 15,       // 难度
+    label: "抵抗剧毒",
+    
+    // 2. 失败回调：应用中毒状态
+    onFail: async () => {
+        const poisonEffect = {
+            name: "剧毒攻心",
+            icon: "icons/svg/skull.svg",
+            duration: { rounds: 3 },
+            changes: [
+                { key: "system.combat.speed", mode: 2, value: -2 }
+            ]
+        };
+        await args.target.createEmbeddedDocuments("ActiveEffect", [poisonEffect]);
+        ui.notifications.warn(args.target.name + " 中毒了！");
     }
-};
+});
 
-// 2. 将虚拟物品创建到角色身上
-await actor.createEmbeddedDocuments("Item", [virtualItemData]);
-ui.notifications.info("兵刃已淬毒！下一次攻击将触发特效。");
+// 3. (可选) 触发一次后销毁自身 (一次性毒药)
+// thisEffect 指向当前运行脚本的 Active Effect (即"武器淬毒")
+await thisEffect.delete();
+ui.notifications.info("毒药已耗尽。");
 ```
 
 #### G. 瞬发型气招 (如：天魔解体)
@@ -787,6 +770,9 @@ if (args.outcome.isCrit) {
 
 5.  **资源消耗警告 (士气/内力)** 
     *   **士气 (Morale)**: 现在系统采用“出招即消耗”机制。在运行 `hit` 脚本时，角色的士气值已被清空（转化为伤害加成）。若需知晓本次消耗了多少士气，请勿读取 `S.resources.morale.value`（它现在是0），而应根据业务逻辑自行判断，或等待系统未来提供历史快照。
+
+6.  **优先使用 Active Effect 脚本**:
+    *   对于赋予状态后产生的逻辑（如“每回合扣血”、“攻击附带效果”），请优先将脚本写在 Active Effect 中，而不是在物品脚本里创建“虚拟物品”来监听。这样当 Buff 消失时，逻辑也会自动停止，更加清洁高效。
 
 </details>
 

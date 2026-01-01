@@ -2,6 +2,7 @@
  * 扩展原生的 ActiveEffect 类
  * 核心职责：实现“基于装备状态的自动抑制”
  */
+import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 export class XJZLActiveEffect extends ActiveEffect {
 
   /**
@@ -41,6 +42,30 @@ export class XJZLActiveEffect extends ActiveEffect {
    */
   get isStackable() {
     return this.getFlag("xjzl-system", "stackable") || false;
+  }
+
+  /* -------------------------------------------- */
+  /*  脚本数据封装 (Script Helpers)         */
+  /* -------------------------------------------- */
+
+  /**
+   * 获取挂载在特效上的脚本数组
+   * 模拟 DataModel 的访问方式，直接返回数组
+   * 为了兼容性，这里的flags里封装的scripts的数据结构应该和我们通用的makeScriptEffectSchema里定义的相同
+   * @returns {Array} [{ label, trigger, script, active }]
+   */
+  get scripts() {
+    return this.getFlag("xjzl-system", "scripts") || [];
+  }
+
+  /**
+   * 检查是否拥有特定时机的脚本 (辅助优化性能)
+   * @param {String} trigger 
+   * @returns {Boolean}
+   */
+  hasScript(trigger) {
+    const scripts = this.scripts;
+    return scripts.some(s => s.trigger === trigger && s.active !== false);
   }
 
   /**
@@ -161,6 +186,12 @@ export class XJZLActiveEffect extends ActiveEffect {
     // 4. 初始化层数
     if (!flags.stacks) {
       updates["flags.xjzl-system.stacks"] = 1;
+    }
+
+    // 5. 初始化脚本结构
+    // 确保 flags.scripts 是一个数组，防止后续遍历报错
+    if (!flags.scripts) {
+      updates["flags.xjzl-system.scripts"] = [];
     }
 
     // 应用更新到 data 对象中 (因为还在 _preCreate，直接修改 source)
