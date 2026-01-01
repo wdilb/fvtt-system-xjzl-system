@@ -1141,6 +1141,18 @@ XJZL.statusEffects = [
     ]
   },
   {
+    id: "zuidao",
+    name: "XJZL.Status.Zuidao", // 醉倒
+    description: "XJZL.Status.ZuidaoDesc",
+    img: "icons/svg/alcohol.svg",
+    flags: { "xjzl-system": { slug: "zuidao", stackable: false } },
+    changes: [
+      // 移动速度减半：复用你系统中的 unstable 逻辑（或直接修改速度倍率）
+      { key: "flags.xjzl-system.unstable", mode: 5, value: "true" }, 
+      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
+    ]
+  },
+  {
     id: "dying",
     name: "XJZL.Status.Dying",  //濒死
     description: "XJZL.Status.DyingDesc",
