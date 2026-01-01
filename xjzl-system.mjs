@@ -916,6 +916,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/tab-inventory.hbs",
     "systems/xjzl-system/templates/actor/character/tab-bio.hbs",
     "systems/xjzl-system/templates/actor/character/tab-config.hbs",
+    "systems/xjzl-system/templates/actor/character/audit-log.hbs",
+    "systems/xjzl-system/templates/actor/character/manage-xp.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
 
@@ -963,7 +965,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/effect-selection.hbs", //特效选择
     "systems/xjzl-system/templates/apps/attribute-test-config.hbs", //属性检定设置窗口
     "systems/xjzl-system/templates/apps/modifier-picker.hbs", //属性修正选择器
-    //
+    //暂停按钮的界面
     "systems/xjzl-system/templates/system/pause.hbs",
   ];
   // 严格 V13 写法：使用命名空间
