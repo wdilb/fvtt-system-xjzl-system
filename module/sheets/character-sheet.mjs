@@ -1092,6 +1092,56 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             return book;
         });
 
+        /* -------------------------------------------- */
+        /*  11. 统一构建通用物品 Tooltip          */
+        /* -------------------------------------------- */
+        // 定义通用 Tooltip 构建函数 (保持与修炼界面风格一致)
+        const buildGeneralTooltip = (item) => {
+            let html = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
+
+            // 1. 标题
+            html += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${item.name}</div>`;
+
+            // 2. [核心修复] 自动化说明
+            if (item.system.automationNote) {
+                html += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px; margin:6px 0; font-size:11px; color:#aed6f1;'>
+                        <i class='fas fa-robot'></i> ${item.system.automationNote}
+                     </div>`;
+            }
+
+            // 3. 描述 (去除 HTML 标签以免破坏 Tooltip 结构，并限制长度)
+            if (item.system.description) {
+                let desc = item.system.description.replace(/<[^>]*>?/gm, ''); // 去除标签
+                desc = desc.replace(/"/g, '&quot;'); // 转义双引号
+                if (desc.length > 200) desc = desc.substring(0, 200) + "...";
+
+                html += `<div style='font-size:12px; color:#ccc; line-height:1.5;'>${desc}</div>`;
+            } else {
+                html += `<div style='font-size:12px; color:#999; font-style:italic;'>暂无描述</div>`;
+            }
+
+            // 4. 额外属性 (可选：如果是装备，显示简略属性)
+            if (item.type === "weapon" || item.type === "armor") {
+                // 举例：显示品质
+                const qualityLabel = game.i18n.localize(`XJZL.Qualities.${item.system.quality}`);
+                html += `<div style='margin-top:6px; pt:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#e67e22;'>${qualityLabel}</div>`;
+            }
+
+            html += `</div>`;
+            return html;
+        };
+
+        // 遍历所有需要在库存中显示的物品类型
+        const inventoryTypes = ["weapon", "armor", "qizhen", "consumable", "manual", "misc"];
+
+        inventoryTypes.forEach(type => {
+            const items = actor.itemTypes[type] || [];
+            items.forEach(item => {
+                // 将生成的 HTML 挂载到临时属性上
+                item.derivedTooltip = buildGeneralTooltip(item);
+            });
+        });
+
         // [特效计算] 调用父类或混入的方法准备 Active Effects 列表
         this._prepareEffects(context);
 
