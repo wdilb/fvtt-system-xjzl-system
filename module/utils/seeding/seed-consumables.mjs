@@ -7,14 +7,14 @@ export async function seedConsumables() {
     ui.notifications.info("XJZL | 正在读取消耗品数据...");
 
     // 0. 定义分类和对应的中文标签
-    const types = ["medicine", "poison", "tea", "food", "wine", "other"];
+    const types = ["medicine", "poison", "tea", "food", "wine"]; //, "other" 暂时没有other
     const typeLabels = {
         medicine: "药品",
         poison: "毒药",
         tea: "茶叶",
         food: "佳肴",
         wine: "美酒",
-        other: "其他"
+        // other: "其他"
     };
 
     // 1. 读取 JSON

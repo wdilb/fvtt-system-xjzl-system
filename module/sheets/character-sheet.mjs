@@ -141,7 +141,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         },
         inventory: {
             template: "systems/xjzl-system/templates/actor/character/tab-inventory.hbs",
-            scrollable: [""],
+            scrollable: [".inventory-list-container"],
             classes: ["xjzl-body"]
         },
         bio: {

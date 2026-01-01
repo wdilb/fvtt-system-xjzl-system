@@ -4,6 +4,8 @@ import { seedOrigins } from "./seed-origins.mjs";
 import { seedConsumables } from "./seed-consumables.mjs";
 // import { seedWuxue } from "./seed-wuxue.mjs"; // 未来扩展
 
+const { DialogV2 } = foundry.applications.api;
+
 export const SeedingManager = {
     // 模块化导出
     origins: seedOrigins,
@@ -13,12 +15,15 @@ export const SeedingManager = {
     /**
      * 一键生成所有 (全量重置)
      */
-    all: async function() {
-        const confirm = await Dialog.confirm({
-            title: "全量重置合集包",
-            content: "<p>这将清空并重新生成所有系统预设合集包。确定吗？</p>"
+    all: async function () {
+        // 使用 V13 的 DialogV2.confirm
+        const confirm = await DialogV2.confirm({
+            window: { title: "全量重置合集包" },
+            content: "<p>这将清空并重新生成所有系统预设合集包。确定吗？</p>",
+            rejectClose: false, // 允许点X关闭，返回 null/false
+            modal: true         // 模态窗口，背景变暗
         });
-        
+
         if (confirm) {
             await this.origins();
             await this.consumables();
