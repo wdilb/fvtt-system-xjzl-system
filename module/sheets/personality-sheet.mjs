@@ -12,7 +12,7 @@ export class XJZLPersonalitySheet extends HandlebarsApplicationMixin(ItemSheetV2
 
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "personality"],
+        classes: ["xjzl-window", "item", "personality", "theme-dark"],
         position: { width: 800, height: 600 }, // 宽一点适配三栏
         window: { resizable: true },
         form: {

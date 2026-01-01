@@ -8,7 +8,7 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "general"],
+        classes: ["xjzl-window", "item", "general", "theme-dark"],
         position: { width: 800, height: 600 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”

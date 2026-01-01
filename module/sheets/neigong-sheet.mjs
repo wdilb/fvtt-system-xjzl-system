@@ -12,7 +12,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
         // xjzl-window 触发 Grid 布局, item-neigong 用于特定样式
-        classes: ["xjzl-window", "item-neigong"],
+        classes: ["xjzl-window", "item-neigong", "theme-dark"],
         position: { width: 1000, height: 700 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”

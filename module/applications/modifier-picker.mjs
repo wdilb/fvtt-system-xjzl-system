@@ -5,7 +5,7 @@ export class XJZLModifierPicker extends HandlebarsApplicationMixin(ApplicationV2
     static DEFAULT_OPTIONS = {
         tag: "form",
         // 使用一个新的类名，不与 character sheet 混淆
-        classes: ["xjzl-picker-window"],
+        classes: ["xjzl-picker-window", "theme-dark"],
         position: { width: 400, height: 600 },
         window: {
             title: "选择属性修正",

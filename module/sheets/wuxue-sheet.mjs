@@ -11,7 +11,7 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "wuxue"],
+        classes: ["xjzl-window", "item", "wuxue", "theme-dark"],
         position: { width: 1050, height: 800 }, // 武学卡需要宽一点
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”

@@ -5,7 +5,7 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
     static DEFAULT_OPTIONS = {
         tag: "div",
         id: "xjzl-audit-log",
-        classes: ["xjzl-window", "xjzl-audit-window"], // 关键 CSS 类
+        classes: ["xjzl-window", "xjzl-audit-window", "theme-dark"], // 关键 CSS 类
         window: {
             title: "生平经历与审计",
             icon: "fas fa-history",

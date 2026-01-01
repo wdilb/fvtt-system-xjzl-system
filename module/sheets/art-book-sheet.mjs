@@ -8,7 +8,7 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "art-book"],
+        classes: ["xjzl-window", "item", "art-book", "theme-dark"],
         position: { width: 800, height: 700 },
         window: { resizable: true },
         form: {

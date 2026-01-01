@@ -6,6 +6,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     static DEFAULT_OPTIONS = {
         tag: "form",
         id: "xjzl-effect-picker",
+        classes: ["theme-dark"],
         window: {
             title: "智能状态选取器",
             icon: "fas fa-hand-sparkles",

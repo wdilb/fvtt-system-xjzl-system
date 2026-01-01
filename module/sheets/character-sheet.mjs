@@ -15,7 +15,7 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "actor", "character"],
+        classes: ["xjzl-window", "actor", "character", "theme-dark"],
         position: { width: 1100, height: 750 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
@@ -2055,48 +2055,61 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     async _onManageXP(event, target) {
         const cult = this.document.system.cultivation;
 
-        // 构建弹窗内容 - 使用 .xjzl-dialog-wrapper 和 flex 布局
+        // 构建弹窗内容
         const content = `
+        <style>
+            /* 强制修正：针对该弹窗下的 select 选项 */
+            .xjzl-dialog-wrapper select option {
+                background-color: #282828; /* 强制列表背景变黑 */
+                color: #ffffff;            /* 强制文字变白 */
+            }
+            /* 修正输入框占位符颜色，防止太暗看不清 */
+            .xjzl-dialog-wrapper input::placeholder {
+                color: #888;
+            }
+        </style>
+        
         <div class="xjzl-dialog-wrapper">
-            <p class="hint">
+            <p class="hint" style="margin-bottom: 10px; color: #ccc;">
                 <i class="fas fa-edit"></i> 
                 手动修改修为池余额并生成审计日志。
             </p>
             
             <form>
                 <!-- Row 1 -->
-                <div class="form-row">
-                    <div class="form-group">
+                <div class="form-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <div class="form-group" style="flex: 2;">
                         <label>目标池</label>
-                        <select name="poolKey">
+                        <!-- 这里的 select 会被上面的 style 样式命中 -->
+                        <select name="poolKey" style="background-color: #282828; color: #fff; border: 1px solid #555;">
                             <option value="general">通用修为 (当前: ${cult.general})</option>
                             <option value="neigong">内功修为 (当前: ${cult.neigong})</option>
                             <option value="wuxue">武学修为 (当前: ${cult.wuxue})</option>
                             <option value="arts">技艺修为 (当前: ${cult.arts})</option>
                         </select>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="flex: 1;">
                         <label>变动数值 (+/-)</label>
-                        <input type="number" name="amount" placeholder="例如: 100 或 -50" autofocus required />
+                        <input type="number" name="amount" placeholder="例如: 100" autofocus required style="background-color: #282828; color: #fff; border: 1px solid #555;" />
                     </div>
                 </div>
 
                 <!-- Row 2 -->
-                <div class="form-row">
-                    <div class="form-group">
+                <div class="form-row" style="display: flex; gap: 10px; margin-bottom: 10px;">
+                    <div class="form-group" style="flex: 1;">
                         <label>事件标题</label>
-                        <input type="text" name="title" value="手动调整" />
+                        <input type="text" name="title" value="手动调整" style="background-color: #282828; color: #fff; border: 1px solid #555;"/>
                     </div>
-                    <div class="form-group">
+                    <div class="form-group" style="flex: 1;">
                         <label>游戏时间 (可选)</label>
-                        <input type="text" name="gameDate" placeholder="例如: 乾元三年冬" />
+                        <input type="text" name="gameDate" placeholder="例如: 乾元三年冬" style="background-color: #282828; color: #fff; border: 1px solid #555;"/>
                     </div>
                 </div>
 
                 <!-- Row 3 -->
                 <div class="form-group">
                     <label>备注详情</label>
-                    <input type="text" name="reason" placeholder="例如: DM奖励，或 闭关十年..." />
+                    <input type="text" name="reason" placeholder="例如: DM奖励，或 闭关十年..." style="width: 100%; background-color: #282828; color: #fff; border: 1px solid #555;" />
                 </div>
             </form>
         </div>

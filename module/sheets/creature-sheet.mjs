@@ -8,7 +8,7 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "actor", "creature"],
+        classes: ["xjzl-window", "actor", "creature", "theme-dark"],
         position: { width: 600, height: 600 }, // 不需要太大
         window: { resizable: true },
         form: {

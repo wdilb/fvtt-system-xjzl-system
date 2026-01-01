@@ -4,7 +4,7 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 export class XJZLBackgroundSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        classes: ["xjzl-window", "item", "background"],
+        classes: ["xjzl-window", "item", "background", "theme-dark"],
         position: { width: 800, height: 600 },
         window: { resizable: true },
         form: { submitOnChange: true, closeOnSubmit: false },
