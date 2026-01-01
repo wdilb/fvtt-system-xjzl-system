@@ -54,7 +54,7 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
             return {
                 ...entry,
                 realTimeStr: dateObj.toLocaleString(),
-                gameDateDisplay: entry.gameDate || "现实时间",
+                gameDateDisplay: entry.gameDate || dateObj.toLocaleString(),
                 deltaClass: entry.delta.startsWith("-") ? "minus" : "plus",
                 cssClass: entry.importance > 0 ? "important" : "",
                 searchTerm: searchTerm,

@@ -153,7 +153,8 @@ export class XJZLItem extends Item {
       item: this,
       tags: tags,
       resultText: resultLines.join("，"),
-      scriptOutput: scriptOutput
+      scriptOutput: scriptOutput,
+      automationNote: config.automationNote
     };
 
     const content = await renderTemplate(
