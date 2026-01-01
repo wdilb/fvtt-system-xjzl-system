@@ -5,7 +5,7 @@
 const { ItemSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 import { TRIGGER_CHOICES } from "../data/common.mjs";
-import { getModifierChoices, localizeConfig  } from "../utils/utils.mjs";
+import { getModifierChoices, localizeConfig } from "../utils/utils.mjs";
 import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 
 export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
@@ -130,6 +130,16 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 change.displayLabel = flatModifiers[change.key] || change.key || "请选择...";
             });
         }
+
+        //富文本编辑器
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+            this.document.system.description,
+            {
+                secrets: this.document.isOwner,
+                async: true,
+                relativeTo: this.document
+            }
+        );
 
         return context;
     }

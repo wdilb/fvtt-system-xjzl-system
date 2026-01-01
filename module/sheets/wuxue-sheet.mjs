@@ -58,13 +58,18 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.system = this.document.system;
         context.tabs = this.tabGroups;
 
-        // 1. 准备下拉菜单选项(使用工具函数)
+        // 1. 侧边栏总纲描述 (异步解析)
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+            this.document.system.description,
+            { secrets: this.document.isOwner, async: true, relativeTo: this.document }
+        );
+
+        // 1. 准备下拉菜单选项
         context.choices = {
             tiers: localizeConfig(XJZL.tiers),
             sects: localizeConfig(XJZL.sects),
-            // 招式专用Tier选项 (包含继承)
             moveTiers: {
-                "": "继承 (默认)", // 对应 null/undefined
+                "": "继承 (默认)",
                 1: game.i18n.localize("XJZL.Tiers.1"),
                 2: game.i18n.localize("XJZL.Tiers.2"),
                 3: game.i18n.localize("XJZL.Tiers.3")
@@ -73,16 +78,15 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             moveTypes: localizeConfig(XJZL.moveTypes),
             elements: localizeConfig(XJZL.elements),
             actionTypes: {
-                default: "默认", // 或者使用 game.i18n.localize("XJZL.ActionType.default")
-                heal: "治疗",   // game.i18n.localize("XJZL.ActionType.heal")
-                attack: "攻击"  // game.i18n.localize("XJZL.ActionType.attack")
+                default: "默认",
+                heal: "治疗",
+                attack: "攻击"
             },
             attributes: localizeConfig(XJZL.attributes),
             weaponTypes: localizeConfig(XJZL.weaponTypes),
             damageTypes: localizeConfig(XJZL.damageTypes),
             triggers: localizeConfig(XJZL.effectTriggers),
             targets: localizeConfig(XJZL.effectTargets),
-
             progressionModes: {
                 standard: game.i18n.localize("XJZL.Wuxue.Progression.ModeList.standard"),
                 custom: game.i18n.localize("XJZL.Wuxue.Progression.ModeList.custom")
@@ -103,9 +107,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             context.scriptTriggerChoices[key] = game.i18n.localize(labelKey);
         }
 
-        // 2. 准备特效列表 (用于 Effects Tab)
-        // 区分：被动(Temporary=false) 和 临时/触发(Temporary=true/transfer=false)
-        // 这里简单地全部列出
+        // 2. 准备特效列表
         context.effects = this.document.effects.map(e => {
             return {
                 id: e.id,
@@ -113,58 +115,61 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 img: e.img,
                 disabled: e.disabled,
                 description: e.description,
-                isSuppressed: e.isSuppressed // V11+ 特性
+                isSuppressed: e.isSuppressed
             };
         });
-        // 3. 为每个招式单独准备消耗表的配置
-        // 我们不再使用全局 context.maxMoveLevels，而是把它注入到每个 move 对象里
-        context.system.moves.forEach(move => {
-            let levels = [];
-            let labels = [];
-            // 注入 CSS 类名，用于招式卡片变色
-            // type-real, type-feint, type-stance, type-qi
-            move._uiClass = `type-${move.type || 'real'}`;
 
-            // 判断模式
-            const mode = move.progression?.mode || "standard";
+        // 3. 准备招式列表 (使用 Promise.all 并行处理)
+        if (context.system.moves && context.system.moves.length > 0) {
 
-            if (mode === "custom") {
-                // 自定义模式：根据 threshold 数量决定
-                // 如果是空数组或未填，默认显示 1 列
-                const count = Math.max(1, move.progression?.customThresholds?.length || 1);
-                for (let i = 0; i < count; i++) {
-                    levels.push(i);
-                    labels.push(`L${i + 1}`); // L1, L2...
+            // 将原来的 forEach 替换为 map + async，并用 Promise.all 等待所有解析完成
+            // 这是一个并行操作，不会因为招式多而阻塞
+            await Promise.all(context.system.moves.map(async (move) => {
+
+                // 2. 解析每个招式的描述
+                // 这里需要处理 description 可能为 null 的情况
+                move.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+                    move.description || "",
+                    { secrets: this.document.isOwner, async: true, relativeTo: this.document }
+                );
+
+                // --- 以下是原本的同步逻辑，直接搬进来即可 ---
+
+                let levels = [];
+                let labels = [];
+                // 注入 CSS 类名
+                move._uiClass = `type-${move.type || 'real'}`;
+
+                // 判断模式
+                const mode = move.progression?.mode || "standard";
+
+                if (mode === "custom") {
+                    const count = Math.max(1, move.progression?.customThresholds?.length || 1);
+                    for (let i = 0; i < count; i++) {
+                        levels.push(i);
+                        labels.push(`L${i + 1}`);
+                    }
+                } else {
+                    const moveTier = move.computedTier ?? (move.tier ?? (context.system.tier || 1));
+                    const count = (moveTier === 3) ? 4 : 3;
+                    const tierLabels = (moveTier === 3)
+                        ? ["领悟", "掌握", "精通", "合一"]
+                        : ["领悟", "掌握", "精通"];
+
+                    for (let i = 0; i < count; i++) {
+                        levels.push(i);
+                        labels.push(tierLabels[i]);
+                    }
+                    move._uiTier = moveTier;
                 }
-            } else {
-                // 标准模式
-                // 使用招式自身的 computedTier (如果DataModel里没存，这里就现场算)
-                // 逻辑：招式Tier > 书本Tier > 默认1
-                // DataModel 的 prepareDerivedData 运行时机可能早于 Sheet 渲染，所以 move.computedTier 应该是存在的
-                // 如果不存在，做一个安全回退
-                const moveTier = move.computedTier ?? (move.tier ?? (context.system.tier || 1));
-                
-                const count = (moveTier === 3) ? 4 : 3; // 天=4, 其他=3
-                const tierLabels = (moveTier === 3)
-                    ? ["领悟", "掌握", "精通", "合一"]
-                    : ["领悟", "掌握", "精通"];
 
-                for (let i = 0; i < count; i++) {
-                    levels.push(i);
-                    labels.push(tierLabels[i]);
-                }
-                
-                // 注入一个标记，告诉模板这一招实际上是按什么品阶算的
-                // 方便前端加个提示 "继承(天)" 之类的
-                move._uiTier = moveTier; 
-            }
+                move._ui = {
+                    costLevels: levels,
+                    costLabels: labels
+                };
+            }));
+        }
 
-            // 注入到 move 临时对象供 HBS 使用
-            move._ui = {
-                costLevels: levels, // [0, 1, 2]
-                costLabels: labels  // ["领悟", "掌握"...]
-            };
-        });
         return context;
     }
 
@@ -224,7 +229,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         const tierMap = { 1: "ren", 2: "di", 3: "tian" };
         const val = this.document.system.tier;
         const targetClass = tierMap[val] || "ren";
-        
+
         this.element.classList.add(`rank-${targetClass}`);
     }
 
@@ -271,7 +276,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             img: "icons/svg/sword.svg",
             type: "real",
             // 明确初始化 tier 为 null (继承)
-            tier: null, 
+            tier: null,
             costs: { mp: [], rage: [], hp: [] },
             applyEffects: [],
             calculation: { scalings: [] }

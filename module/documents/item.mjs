@@ -1988,7 +1988,7 @@ export class XJZLItem extends Item {
 
       case "neigong":
         // 五行
-        if (system.element) addProp(game.i18n.localize("XJZL.Neigong.Element"), game.i18n.localize(`XJZL.Elements.${system.element.charAt(0).toUpperCase() + system.element.slice(1)}`));
+        if (system.element) addProp(game.i18n.localize("XJZL.Neigong.Element"), game.i18n.localize(`XJZL.Neigong.Elements.${system.element.charAt(0).toUpperCase() + system.element.slice(1)}`));
         if (system.active) templateData.subtitle = "运行中";
 
         // 境界

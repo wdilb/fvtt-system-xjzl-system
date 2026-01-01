@@ -80,6 +80,17 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
                 context.acupointLabel = game.i18n.localize("XJZL.Equipment.NotInlaid");
             }
         }
+
+        // 富文本增强 (放在 return 之前)
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+            this.document.system.description,
+            {
+                secrets: this.document.isOwner,
+                async: true,
+                relativeTo: this.document
+            }
+        );
+
         return context;
     }
 

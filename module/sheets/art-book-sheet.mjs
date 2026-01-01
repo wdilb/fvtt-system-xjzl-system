@@ -39,6 +39,12 @@ export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 虽然这里只有一个页面，但保持结构一致性是个好习惯
         context.tabs = { primary: "details" };
 
+        // 顶部总纲描述 (异步解析)
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+            this.document.system.description,
+            { secrets: this.document.isOwner, async: true, relativeTo: this.document }
+        );
+
         // 准备下拉菜单
         context.choices = {
             arts: localizeConfig(XJZL.arts)
@@ -47,6 +53,17 @@ export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 可以在这里计算一些预览数据，例如总计需要多少修为
         context.totalCost = context.system.chapters.reduce((sum, c) => sum + (c.cost || 0), 0);
         context.totalLevelReward = context.system.chapters.reduce((sum, c) => sum + (c.reward?.level || 0), 0);
+
+        // 篇章描述列表 (使用 Promise.all 并行解析)
+        if (context.system.chapters && context.system.chapters.length > 0) {
+            await Promise.all(context.system.chapters.map(async (chapter) => {
+                // 解析每个章节的描述
+                chapter.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+                    chapter.description || "",
+                    { secrets: this.document.isOwner, async: true, relativeTo: this.document }
+                );
+            }));
+        }
 
         return context;
     }
