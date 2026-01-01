@@ -1144,7 +1144,7 @@ XJZL.statusEffects = [
     id: "zuidao",
     name: "XJZL.Status.Zuidao", // 醉倒
     description: "XJZL.Status.ZuidaoDesc",
-    img: "icons/svg/alcohol.svg",
+    img: "icons/svg/daze.svg",
     flags: { "xjzl-system": { slug: "zuidao", stackable: false } },
     changes: [
       // 移动速度减半：复用你系统中的 unstable 逻辑（或直接修改速度倍率）

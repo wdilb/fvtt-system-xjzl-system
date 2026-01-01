@@ -1097,34 +1097,44 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         /* -------------------------------------------- */
         // 定义通用 Tooltip 构建函数 (保持与修炼界面风格一致)
         const buildGeneralTooltip = (item) => {
+            // 1. 父容器：移除全局的 white-space，回归正常布局
             let html = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
 
-            // 1. 标题
+            // 2. 标题
             html += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${item.name}</div>`;
 
-            // 2. [核心修复] 自动化说明
+            // 3. 自动化说明
+            // 修改点：使用 display:flex 保证对齐；去掉代码中的换行，防止产生额外空隙
             if (item.system.automationNote) {
-                html += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px; margin:6px 0; font-size:11px; color:#aed6f1;'>
-                        <i class='fas fa-robot'></i> ${item.system.automationNote}
-                     </div>`;
+                html += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px 6px; margin:6px 0; font-size:11px; color:#aed6f1; display:flex; align-items:center; line-height:1.2;'>
+                    <i class='fas fa-robot' style='margin-right:4px;'></i><span>${item.system.automationNote}</span>
+                 </div>`;
             }
 
-            // 3. 描述 (去除 HTML 标签以免破坏 Tooltip 结构，并限制长度)
+            // 4. 描述
             if (item.system.description) {
-                let desc = item.system.description.replace(/<[^>]*>?/gm, ''); // 去除标签
-                desc = desc.replace(/"/g, '&quot;'); // 转义双引号
+                let desc = item.system.description;
+
+                // 数据清洗逻辑
+                desc = desc.replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<\/p>/gi, '\n\n')
+                    .replace(/<\/div>/gi, '\n')
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/"/g, '&quot;')
+                    .trim();
+
                 if (desc.length > 200) desc = desc.substring(0, 200) + "...";
 
-                html += `<div style='font-size:12px; color:#ccc; line-height:1.5;'>${desc}</div>`;
+                // 修改点：只在这里添加 white-space: pre-wrap，互不干扰
+                html += `<div style='font-size:12px; color:#ccc; line-height:1.5; white-space: pre-wrap;'>${desc}</div>`;
             } else {
                 html += `<div style='font-size:12px; color:#999; font-style:italic;'>暂无描述</div>`;
             }
 
-            // 4. 额外属性 (可选：如果是装备，显示简略属性)
+            // 5. 额外属性
             if (item.type === "weapon" || item.type === "armor") {
-                // 举例：显示品质
                 const qualityLabel = game.i18n.localize(`XJZL.Qualities.${item.system.quality}`);
-                html += `<div style='margin-top:6px; pt:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#e67e22;'>${qualityLabel}</div>`;
+                html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#e67e22;'>${qualityLabel}</div>`;
             }
 
             html += `</div>`;
