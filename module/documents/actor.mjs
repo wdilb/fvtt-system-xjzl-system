@@ -2168,6 +2168,13 @@ export class XJZLActor extends Actor {
         // 使用传入的已消耗士气，而不是读取 system
         flatBonus += moraleSpent;
       }
+      //新增了内功伤害和外功伤害的加成
+      if (virtualMove.damageType && virtualMove.damageType === "neigong") {
+        flatBonus += (sys.combat.damages.neigong?.total || 0);
+      }
+      if (virtualMove.damageType && virtualMove.damageType === "waigong") {
+        flatBonus += (sys.combat.damages.waigong?.total || 0);
+      }
       //应该是没有其他的伤害加成了
     }
 

@@ -190,7 +190,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           yin: makeModField(0, "XJZL.Combat.Dmg.Yin"),    // 阴属性伤害加成
           gang: makeModField(0, "XJZL.Combat.Dmg.Gang"),   // 刚属性伤害加成
           rou: makeModField(0, "XJZL.Combat.Dmg.Rou"),    // 柔属性伤害加成
-          taiji: makeModField(0, "XJZL.Combat.Dmg.Taiji")   // 太极伤害加成
+          taiji: makeModField(0, "XJZL.Combat.Dmg.Taiji"),   // 太极伤害加成
+          neigong: makeModField(0, "XJZL.Combat.Dmg.Neigong"),    // 内功伤害加成
+          waigong: makeModField(0, "XJZL.Combat.Dmg.Waigong"),   // 外功伤害加成
         }, { label: "XJZL.Combat.Damages" }),
 
         // 5. 抗性 (Resistances)
@@ -1237,7 +1239,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     dmg.rou.total = (dmg.rou.value || 0) + (dmg.rou.mod || 0) + bonuses.rou;
 
     // 其他类型 (太极和平A伤害，目前没有经脉加成)
-    for (const k of ["taiji", "normal"]) {
+    for (const k of ["taiji", "normal", "neigong", "waigong"]) {
       dmg[k].total = (dmg[k].value || 0) + (dmg[k].mod || 0);
     }
 

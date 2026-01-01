@@ -1017,6 +1017,13 @@ export class XJZLItem extends Item {
       if (move.element && move.element !== "none") {
         flatBonus += (actor.system.combat.damages[move.element]?.total || 0);
       }
+      //新增了内功伤害和外功伤害的加成
+      if(move.damageType && move.damageType === "neigong"){
+        flatBonus += (actor.system.combat.damages.neigong?.total || 0);
+      }
+      if(move.damageType && move.damageType === "waigong"){
+        flatBonus += (actor.system.combat.damages.waigong?.total || 0);
+      }
     }
 
     // 武器等级增伤 (只有在武器匹配时生效)
