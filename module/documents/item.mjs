@@ -1,5 +1,6 @@
 import { XJZL } from "../config.mjs";
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
+import { XJZLMacros } from "../utils/macros.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 
@@ -133,9 +134,12 @@ export class XJZLItem extends Item {
       try {
         // 使用 AsyncFunction 构造器(异步支持)
         const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
-        const fn = new AsyncFunction("actor", "item", "game", "ui", config.usageScript);
+        // 参数名列表
+        const argNames = ["actor", "item", "game", "ui", "Macros"]; 
+        // 实例化
+        const fn = new AsyncFunction(...argNames, config.usageScript);
         // 执行并等待
-        const result = await fn(actor, this, game, ui);
+        const result = await fn(actor, this, game, ui, XJZLMacros);
         if (typeof result === "string") scriptOutput = result;// 允许脚本返回文本用于显示
         tags.push("特殊效果");
       } catch (err) {
