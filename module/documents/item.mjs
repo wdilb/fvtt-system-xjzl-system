@@ -135,7 +135,7 @@ export class XJZLItem extends Item {
         // 使用 AsyncFunction 构造器(异步支持)
         const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
         // 参数名列表
-        const argNames = ["actor", "item", "game", "ui", "Macros"]; 
+        const argNames = ["actor", "item", "game", "ui", "Macros"];
         // 实例化
         const fn = new AsyncFunction(...argNames, config.usageScript);
         // 执行并等待
@@ -976,12 +976,7 @@ export class XJZLItem extends Item {
     let weaponDmg = 0;
     let isWeaponMatch = false; // 标记：是否满足武器条件
 
-    // 1. 如果招式是徒手，默认满足
-    if (move.weaponType === 'unarmed') {
-      isWeaponMatch = true;
-    }
-    // 2. 否则查找已装备且类型匹配的武器
-    else if (actor.itemTypes.weapon && move.weaponType && move.weaponType !== 'none') {
+    if (actor.itemTypes.weapon && move.weaponType && move.weaponType !== 'none') {
       const weapon = actor.itemTypes.weapon.find(w =>
         w.system.equipped === true &&
         w.system.type === move.weaponType
@@ -1023,10 +1018,10 @@ export class XJZLItem extends Item {
         flatBonus += (actor.system.combat.damages[move.element]?.total || 0);
       }
       //新增了内功伤害和外功伤害的加成
-      if(move.damageType && move.damageType === "neigong"){
+      if (move.damageType && move.damageType === "neigong") {
         flatBonus += (actor.system.combat.damages.neigong?.total || 0);
       }
-      if(move.damageType && move.damageType === "waigong"){
+      if (move.damageType && move.damageType === "waigong") {
         flatBonus += (actor.system.combat.damages.waigong?.total || 0);
       }
     }
