@@ -64,9 +64,6 @@ Hooks.once("init", async function () {
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
 
-  // 3. 打印一下确认替换是否成功
-  console.log("XJZL | 暂停类替换完成：", CONFIG.ui.pause);
-
   // 替换系统核心的状态效果列表
   CONFIG.statusEffects = CONFIG.XJZL.statusEffects;
 
