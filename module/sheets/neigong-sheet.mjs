@@ -46,7 +46,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
        注意：Header 对应侧栏，Tabs 对应右侧书脊，其余对应中间内容。
     */
     static PARTS = {
-        header: { template: "systems/xjzl-system/templates/item/neigong/header.hbs" },
+        header: { template: "systems/xjzl-system/templates/item/neigong/header.hbs", scrollable: [".xjzl-sidebar__content"] },
         tabs: { template: "systems/xjzl-system/templates/item/neigong/tabs.hbs" },
         config: { template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs", scrollable: [""] },
         effects: { template: "systems/xjzl-system/templates/item/neigong/tab-effects.hbs", scrollable: [""] }

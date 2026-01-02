@@ -1992,13 +1992,20 @@ export class XJZLItem extends Item {
         if (system.element) addProp(game.i18n.localize("XJZL.Neigong.Element"), game.i18n.localize(`XJZL.Neigong.Elements.${system.element.charAt(0).toUpperCase() + system.element.slice(1)}`));
         if (system.active) templateData.subtitle = "运行中";
 
+        // === 修炼需求 ===
+        if (system.requirement) {
+          // 去除可能存在的 HTML 标签，保证在属性栏显示整洁
+          const req = system.requirement.replace(/<[^>]+>/g, '').trim();
+          addProp(game.i18n.localize("XJZL.Neigong.Requirement"), req);
+        }
+
         // 境界
         if (system.progressData) {
           const stageLabels = ["未入门", "领悟", "小成", "圆满"];
           addProp("境界", stageLabels[this.system.stage || 0]);
         }
 
-        // [NEW] 构建阶段特效详情 (Custom Content)
+        // 构建阶段特效详情 (Custom Content)
         // 将三个阶段的特效拼成一个可折叠的列表
         let stagesHtml = "";
         const stageNames = ["领悟", "小成", "圆满"];
@@ -2006,21 +2013,26 @@ export class XJZLItem extends Item {
 
         stageKeys.forEach((key, index) => {
           const cfg = system.config[key];
+          // 优先读取 description (新字段)，兼容 effect (旧字段) ===
+          const desc = cfg?.description || cfg?.effect;
+
           // 只有当有特效描述时才显示
-          if (cfg && cfg.effect) {
+          if (desc) {
             // 检查是否已达到该境界 (用于高亮)
             const isUnlocked = (this.system.stage || 0) >= (index + 1);
             const color = isUnlocked ? "#2c3e50" : "#95a5a6";
             const icon = isUnlocked ? "fa-check-circle" : "fa-lock";
             const titleWeight = isUnlocked ? "bold" : "normal";
+            // === 已解锁的境界默认展开 (open) ===
+            const isOpen = isUnlocked ? "open" : "";
 
             stagesHtml += `
-                    <details style="margin-top: 4px; border: 1px solid #eee; border-radius: 4px; padding: 4px;">
+                    <details style="margin-top: 4px; border: 1px solid #eee; border-radius: 4px; padding: 4px;" ${isOpen}>
                         <summary style="cursor:pointer; color:${color}; font-weight:${titleWeight}; font-size:0.9em;">
                             <i class="fas ${icon}" style="width:16px;"></i> 第${index + 1}重 - ${stageNames[index]}
                         </summary>
                         <div style="margin-top:4px; padding-left:20px; font-size:0.85em; color:#555;">
-                            ${cfg.effect}
+                            ${desc}
                         </div>
                     </details>`;
           }
@@ -2122,6 +2134,13 @@ export class XJZLItem extends Item {
 
     // 距离与范围
     if (move.range) addProp("距离", move.range);
+
+    // === 需求 ===
+    if (move.requirements) {
+      // 去除 HTML 标签，只显示纯文本
+      const req = move.requirements.replace(/<[^>]+>/g, '').trim();
+      addProp("需求", req);
+    }
 
     // 4. 渲染模板
     const content = await renderTemplate("systems/xjzl-system/templates/chat/item-info.hbs", {

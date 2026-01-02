@@ -75,9 +75,15 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
       // --- 3. 描述与显示 ---
       description: new fields.HTMLField(),
-      range: new fields.StringField({ initial: "2米", label: "XJZL.Wuxue.Moves.Range" }),
+      range: new fields.StringField({ initial: "1米", label: "XJZL.Wuxue.Moves.Range" }),
       targetInfo: new fields.StringField({ initial: "单体", label: "XJZL.Wuxue.Moves.Target" }),
       actionCost: new fields.StringField({ initial: "主要动作", label: "XJZL.Wuxue.Moves.ActionCost" }),
+      // === 招式学习需求 ===
+      requirements: new fields.HTMLField({ 
+        initial: "", 
+        required: false,
+        label: "XJZL.Wuxue.Moves.Requirements" 
+      }),
 
       // 自动化说明 (Automation Note)
       // 用于告知玩家/GM：本武学的哪些特效已自动化，哪些需要手动修正

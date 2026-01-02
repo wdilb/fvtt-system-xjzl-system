@@ -26,6 +26,8 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       }),
       // 该阶段的特效描述 (HTML富文本)
       effect: new fields.HTMLField({ label: "XJZL.Neigong.EffectConfig" }),
+      // === 阶段效果描述 (纯显示用) ===
+      description: new fields.HTMLField({ label: "XJZL.Neigong.StageDescription" }),
 
       // 修炼消耗系数 (1 = 原价, 0.8 = 8折)
       // 放在这里意味着每一层(stage1/2/3)都可以单独配置打折力度
@@ -52,6 +54,9 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       // 内功属性: yin, yang, taiji
       element: new fields.StringField({ required: true, initial: "taiji", choices: ["yin", "yang", "taiji"], label: "XJZL.Neigong.Element" }),
       sect: new fields.StringField({ label: "XJZL.Wuxue.Sect" }),
+      // === 炼需求 (显示用) ===
+      requirement: new fields.HTMLField({ label: "XJZL.Neigong.Requirement" }),
+
       // 内功总体描述
       description: new fields.HTMLField({ label: "XJZL.Info.Description" }),
 
@@ -153,6 +158,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     this.current = {
       stats: { liliang: 0, shenfa: 0, tipo: 0, neixi: 0, shencai: 0 },
       effect: "",         // 常驻特效文本
+      description: "",    // 特效描述文本
       masteryEffect: "",   // 圆满特效文本
       scripts: [] // 初始化为空数组
     };
@@ -166,6 +172,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       if (stageConfig) {
         this.current.stats = { ...stageConfig.stats };
         this.current.effect = stageConfig.effect;
+        this.current.description = stageConfig.description; 
         // 复制数组 (浅拷贝即可，因为里面的对象通常只读)
         this.current.scripts = stageConfig.scripts || []; 
       }

@@ -275,7 +275,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 获取内功列表
         let neigongs = actor.itemTypes.neigong || [];
 
-        // [新增] 排序逻辑：运行中的排在最前 > 品阶高 > 品阶低
+        // 排序逻辑：运行中的排在最前 > 品阶高 > 品阶低
         neigongs.sort((a, b) => {
             // 优先检查运行状态 (active = true 排前)
             if (a.system.active !== b.system.active) {
@@ -290,7 +290,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.neigongs.forEach(item => {
             item.isRunning = item.system.active;
 
-            // === [核心修复] 分阶段进度计算 ===
+            // === 分阶段进度计算 ===
             const system = item.system;
             const tier = system.tier;
             const config = system.config;
@@ -336,13 +336,22 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 return v >= max ? "#2ecc71" : (v > 0 ? "#f1c40f" : "#999");
             };
 
-            let html = `<div style='text-align:left; min-width:160px; font-family:var(--font-serif);'>`;
+            let html = `<div style='text-align:left; min-width:180px; max-width:250px; font-family:var(--font-serif);'>`;
 
             // 标题栏：总进度
             html += `<div style='border-bottom:1px solid rgba(255,255,255,0.2); margin-bottom:6px; padding-bottom:4px; font-weight:bold; color:#fff; display:flex; justify-content:space-between;'>
                         <span>${item.name}</span>
                         <span style='font-family:Consolas; color:var(--c-highlight);'>${system.xpInvested} / ${system.progressData.absoluteMax}</span>
                      </div>`;
+
+            // --- 修炼需求 ---
+            if (system.requirement) {
+                const reqText = system.requirement.replace(/\n/g, " ").replace(/"/g, '&quot;');
+                html += `<div style='color:#ff6b6b; font-size:11px; margin-bottom:8px; display:flex; align-items:flex-start; line-height:1.4;'>
+                    <i class='fas fa-exclamation-circle' style='margin-top:2px; margin-right:4px; flex-shrink:0;'></i>
+                    <span>${reqText}</span>
+                </div>`;
+            }
 
             // 阶段1：领悟
             html += `<div style='display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px;'>
@@ -362,15 +371,42 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         <span style='font-family:Consolas; color:${getCol(v3, c3)}'>${v3} / ${c3}</span>
                      </div>`;
 
+            // --- 当前境界特效描述 ---
+            const currentStage = Math.max(1, system.stage || 0);
+            const stageKey = `stage${currentStage}`;
+            const stageConfig = config[stageKey];
+
+            const stageLabels = { 1: "领悟", 2: "小成", 3: "圆满" };
+            const stageLabel = stageLabels[currentStage] || "境界";
+
+            if (stageConfig && stageConfig.description) {
+                // 转义双引号
+                const descHtml = stageConfig.description.replace(/\n/g, "<br>").replace(/"/g, '&quot;');
+
+                html += `<div style='margin-top:8px; background:rgba(255,255,255,0.05); padding:6px; border-radius:4px; border-left:2px solid var(--c-highlight);'>
+                    <div style='font-weight:bold; color:var(--c-highlight); font-size:11px; margin-bottom:2px;'>
+                        ${stageLabel}特效
+                    </div>
+                    <div style='color:#ddd; font-size:11px; line-height:1.4;'>
+                        ${descHtml}
+                    </div>
+                 </div>`;
+            }
+
             // 插入自动化说明
             if (system.automationNote) {
+                const autoNote = system.automationNote.replace(/"/g, '&quot;');
                 html += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px; margin:6px 0; font-size:11px; color:#aed6f1;'>
-                                    <i class='fas fa-robot'></i> ${system.automationNote}
+                                    <i class='fas fa-robot'></i> ${autoNote}
                                 </div>`;
             }
 
             if (system.description) {
-                html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#888;'>${system.description}</div>`;
+                // 转义双引号
+                let plainDesc = system.description.replace(/<[^>]+>/g, '').replace(/"/g, '&quot;');
+                if (plainDesc.length > 50) plainDesc = plainDesc.substring(0, 50) + "...";
+
+                html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#888;'>${plainDesc}</div>`;
             }
 
             html += `</div>`;
@@ -485,6 +521,15 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                                     <span>${move.name}</span>
                                     <span style='font-size:11px; color:#aaa; border:1px solid #555; padding:0 4px; border-radius:4px;'>${typeLabel}</span>
                                  </div>`;
+                // === 修炼需求 (显示在标题下方) ===
+                if (move.requirements) {
+                    // 转义双引号，防止 HTML 结构崩坏
+                    const reqText = move.requirements.replace(/\n/g, " ").replace(/"/g, '&quot;');
+                    tooltipHTML += `<div style='color:#ff6b6b; font-size:11px; margin-bottom:8px; display:flex; align-items:flex-start; line-height:1.4;'>
+                        <i class='fas fa-exclamation-circle' style='margin-top:2px; margin-right:4px; flex-shrink:0;'></i>
+                        <span>${reqText}</span>
+                    </div>`;
+                }
 
                 // === 特殊逻辑：视为境界 (Mapped Stage) ===
                 if (move.progression.mappedStage && move.progression.mappedStage !== 0 && move.progression.mappedStage !== 5) {
@@ -779,7 +824,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                             type: move.type, // 用于染色
                             isUltimate: move.isUltimate, // 用于绝招特效
                             computedLevel: move.computedLevel, // 等级
-
+                            range: move.range, //距离
+                            
                             // --- 衍生数据 (来自 wuxue 循环的预计算) ---
                             derived: move.derived,
                             tooltip: move.tooltip,
