@@ -1227,8 +1227,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     // Total = Value(基础) + Mod(AE)
     dmg.global.total = (dmg.global.value || 0) + (dmg.global.mod || 0);
 
-    // Weapon Damage Total 在这里主要作为面板参考值 (取最大值 + 修正)
-    dmg.weapon.total = maxGenericDmgBonus + (dmg.weapon.mod || 0);
+    // Weapon Damage Total 仅修正，默认0
+    dmg.weapon.total = dmg.weapon.mod || 0;
 
     // 公式: Value + Mod(AE) + Bonus(Jingmai)
 

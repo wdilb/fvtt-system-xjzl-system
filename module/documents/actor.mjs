@@ -2202,7 +2202,7 @@ export class XJZLActor extends Actor {
     // 6. 生成 Breakdown
     let breakdownText = `武器基础: ${weaponDmg}\n`;
     breakdownText += `+ 武器等级: ${rankBonus}\n`;
-    breakdownText += `+ 面板增伤: ${flatBonus}`;
+    breakdownText += `+ 其他增伤: ${flatBonus}`;
     if (isOpportunity) {
       breakdownText += ` (含招式加成)`; // 提示文本
       if (sys.resources.morale?.value > 0) {
