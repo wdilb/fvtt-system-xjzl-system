@@ -87,6 +87,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             rollDisability: XJZLCharacterSheet.prototype._onRollDisability,
             rollDeathSave: XJZLCharacterSheet.prototype._onRollDeathSave,
             queryDisability: XJZLCharacterSheet.prototype._onQueryDisability,
+            //休息
+            "shortRest": XJZLCharacterSheet.prototype._onShortRest,
+            "longRest": XJZLCharacterSheet.prototype._onLongRest,
 
             //普通攻击
             rollBasicAttack: XJZLCharacterSheet.prototype._onRollBasicAttack,
@@ -2401,5 +2404,36 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 });
             }
         }).render(true);
+    }
+
+    /**
+ * 处理小憩按钮点击
+ * @param {Event} event 
+ */
+    async _onShortRest(event) {
+        event.preventDefault();
+        // 直接调用 Actor 的逻辑
+        await this.actor.shortRest();
+    }
+
+    /**
+     * 处理休整按钮点击
+     *包含确认弹窗逻辑
+     * @param {Event} event 
+     */
+    async _onLongRest(event) {
+        event.preventDefault();
+
+        // 弹出确认框，防止手滑
+        Dialog.confirm({
+            title: "确认休整",
+            content: `
+            <p>休整将花费 <strong>四个时辰（8小时）</strong>。</p>
+            <p>这将回复满气血与内力，重置小憩次数。</p>
+            <p>确定要进行吗？</p>
+        `,
+            yes: () => this.actor.longRest(),
+            defaultYes: false
+        });
     }
 }

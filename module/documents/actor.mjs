@@ -2384,4 +2384,154 @@ export class XJZLActor extends Actor {
     await this.update(updateData);
     ui.notifications.info(`修为已更新: ${poolKey} ${amount > 0 ? '+' : ''}${amount}`);
   }
+
+  /**
+   * 执行小憩 (Short Rest)
+   */
+  async shortRest() {
+    const res = this.system.resources;
+
+    // 1. 检查次数
+    if (res.rest.value <= 0) {
+      ui.notifications.warn("今日小憩次数已用尽，请进行休整。");
+      return;
+    }
+
+    // 先计算好数值，防止模板里出现 undefined
+    const newRestValue = res.rest.value - 1;
+    const maxRestValue = res.rest.max;
+
+    // 2. 准备更新数据
+    const updates = {
+      "system.resources.mp.value": res.mp.max,      // 回满内力
+      "system.resources.rage.value": 0,             // 清空怒气
+      "system.resources.huti": 0,                   // 清空护体
+      "system.resources.rest.value": newRestValue   // 扣除次数
+    };
+
+    // 3. 执行更新
+    await this.update(updates);
+
+    // 4. 发送聊天卡片
+    const content = `
+      <div class="xjzl-chat-card item-card">
+        
+        <header class="card-header" style="border-left: 4px solid var(--c-cinnabar);">
+            <img src="${this.img}" style="border:none;" />
+            <div>
+                <h3 style="color: var(--c-cinnabar);">小憩 </h3>
+                <div style="font-size: 0.8em; color: #555;">
+                    <span style="background: #555; color: #fff; padding: 0 4px; border-radius: 2px;">休息</span>
+                    耗时：半个时辰 (1小时)
+                </div>
+            </div>
+        </header>
+
+        <div class="card-content-wrapper">
+            <div class="card-description" style="font-style: italic; color: #666; margin-bottom: 8px;">
+                你聚精会神，搬运内功，顿觉神清气爽。
+            </div>
+
+            <div class="card-tags" style="margin-bottom: 5px;">
+                <span style="background: rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.1);">
+                    <strong>内力:</strong> 已回满
+                </span>
+                <span style="background: rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.1);">
+                    <strong>怒气:</strong> 清零
+                </span>
+            </div>
+
+            <div style="margin: 5px 0; padding: 4px; background: #fdf6e3; border: 1px solid #d6d6d6; border-radius: 3px; font-size: 0.9em; text-align: center;">
+                 剩余次数: <b>${newRestValue}</b> / ${maxRestValue}
+            </div>
+
+            <div style="margin-top: 8px; border-top: 1px dashed #ccc; padding-top: 5px; font-size: 0.85em; color: #2c3e50;">
+                <div style="margin-bottom: 3px;">
+                    <i class="fas fa-exclamation-circle"></i> <b>可选行动:</b>
+                </div>
+                <ul style="margin: 0; padding-left: 20px; color: #555;">
+                    <li>进行一次 <strong>[疗伤]</strong> 检定以回复气血。</li>
+                    <li>尝试一次 <strong>[打通经脉]</strong>。</li>
+                </ul>
+            </div>
+        </div>
+      </div>
+    `;
+
+    ChatMessage.create({
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: content,
+      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+    });
+  }
+
+  /**
+   * 执行休整 (Long Rest)
+   */
+  async longRest() {
+    const res = this.system.resources;
+
+    // 1. 准备更新数据
+    const updates = {
+      "system.resources.hp.value": res.hp.max,    // 回满气血
+      "system.resources.mp.value": res.mp.max,    // 回满内力
+      "system.resources.rage.value": 0,           // 清空怒气
+      "system.resources.huti": 0,                 // 清空护体
+      "system.resources.rest.value": res.rest.max // 重置小憩次数
+    };
+
+    // 2. 执行更新
+    await this.update(updates);
+
+    // 3. 发送聊天卡片 (蓝色主题，区分于小憩)
+    const content = `
+      <div class="xjzl-chat-card item-card">
+        
+        <header class="card-header" style="border-left: 4px solid #2a506f;">
+            <img src="${this.img}" style="border:none;" />
+            <div>
+                <h3 style="color: #2a506f;">休整</h3>
+                <div style="font-size: 0.8em; color: #555;">
+                    <span style="background: #2a506f; color: #fff; padding: 0 4px; border-radius: 2px;">睡眠</span>
+                    耗时：四个时辰 (8小时)
+                </div>
+            </div>
+        </header>
+
+        <div class="card-content-wrapper">
+            <div class="card-description" style="font-style: italic; color: #666; margin-bottom: 8px;">
+                经过长时间的休息、进食与练功，你的状态已恢复巅峰。
+            </div>
+
+            <div class="card-tags" style="margin-bottom: 5px;">
+                <span style="background: rgba(42, 80, 111, 0.1); border: 1px solid rgba(42, 80, 111, 0.2);">
+                    <strong>气血/内力:</strong> 回满
+                </span>
+                <span style="background: rgba(42, 80, 111, 0.1); border: 1px solid rgba(42, 80, 111, 0.2);">
+                    <strong>小憩次数:</strong> 重置
+                </span>
+            </div>
+
+            <div style="margin-top: 8px; border-top: 1px dashed #aaa; padding-top: 5px; font-size: 0.85em; color: #2c3e50;">
+                <div style="margin-bottom: 3px;">
+                    <i class="fas fa-book-reader"></i> <b>休整期活动:</b>
+                </div>
+                <ul style="margin: 0; padding-left: 20px; color: #555;">
+                    <li>打开界面 <strong>[分配修为]</strong> 提升武学。</li>
+                    <li><strong>[研读]</strong> 技艺书籍。</li>
+                    <li>尝试 <strong>[打通经脉]</strong>。</li>
+                </ul>
+            </div>
+        </div>
+      </div>
+    `;
+
+    ChatMessage.create({
+      user: game.user.id,
+      speaker: ChatMessage.getSpeaker({ actor: this }),
+      content: content,
+      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+    });
+  }
 }

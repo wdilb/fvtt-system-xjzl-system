@@ -128,6 +128,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         hp: makeResourceField(10, 10, "XJZL.Resources.HP"),    // 气血 (Health)
         mp: makeResourceField(0, 0, "XJZL.Resources.MP"),      // 内力 (Mana/Qi)
         rage: makeResourceField(0, 10, "XJZL.Resources.Rage"), // 怒气 (Rage) - 初始0, 上限10
+        // 休息资源 (小憩次数)
+        // value: 当前剩余次数, max: 每日最大次数 (默认2)
+        rest: new fields.SchemaField({
+          value: new fields.NumberField({ required: true, integer: true, initial: 2, min: 0, label: "XJZL.Resources.RestValue" }),
+          max: new fields.NumberField({ required: true, integer: true, initial: 2, min: 0, label: "XJZL.Resources.RestMax" })
+        }),
 
         // 银两：只存余额。
         // 交易记录存储在 history 中，通过 type="item" 或 "resource" 区分
