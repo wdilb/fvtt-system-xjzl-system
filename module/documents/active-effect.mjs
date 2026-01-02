@@ -52,10 +52,22 @@ export class XJZLActiveEffect extends ActiveEffect {
    * 获取挂载在特效上的脚本数组
    * 模拟 DataModel 的访问方式，直接返回数组
    * 为了兼容性，这里的flags里封装的scripts的数据结构应该和我们通用的makeScriptEffectSchema里定义的相同
+   * 如果数据库里存的是伪数组对象 {"0":...}，自动转为数组返回
    * @returns {Array} [{ label, trigger, script, active }]
    */
   get scripts() {
-    return this.getFlag("xjzl-system", "scripts") || [];
+    const raw = this.getFlag("xjzl-system", "scripts");
+
+    // 1. 空值处理
+    if (!raw) return [];
+
+    // 2. 兼容性修复：如果是对象但不是数组，说明数据脏了，兼容性读取
+    if (typeof raw === "object" && !Array.isArray(raw)) {
+      return Object.values(raw);
+    }
+
+    // 3. 正常数组
+    return raw;
   }
 
   /**
@@ -196,6 +208,32 @@ export class XJZLActiveEffect extends ActiveEffect {
 
     // 应用更新到 data 对象中 (因为还在 _preCreate，直接修改 source)
     this.updateSource(updates);
+  }
+
+  /**
+   * 在更新写入数据库之前触发
+   * 因为FVTT 自带的AE的提交会把数组转换为对象，为了保持和我们数据文件的一致，这里把他转换回数组
+   * 拦截所有来源的更新（包括标准提交按钮、API调用），确保 scripts 是数组
+   */
+  async _preUpdate(changed, options, user) {
+    await super._preUpdate(changed, options, user);
+
+    // 1. 检查是否有针对我们系统的 flags 更新
+    const xjzlFlags = changed.flags?.["xjzl-system"];
+
+    // 2. 只有当更新包含 scripts 字段时才介入
+    if (xjzlFlags && "scripts" in xjzlFlags) {
+
+      const incomingScripts = xjzlFlags.scripts;
+      console.log("XJZL DEBUG | _preUpdate Check Scripts:", incomingScripts);
+
+      // 3. 检测伪数组对象 (例如 {"0": {...}, "1": {...}})
+      if (typeof incomingScripts === "object" && !Array.isArray(incomingScripts)) {
+        // 4. 强制修正为数组
+        // Object.values 会按照索引顺序提取值，生成纯净数组
+        xjzlFlags.scripts = Object.values(incomingScripts);
+      }
+    }
   }
 
   /**

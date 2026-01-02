@@ -35,6 +35,7 @@ import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 import { XJZLArtBookSheet } from "./module/sheets/art-book-sheet.mjs";
 import { XJZLPersonalitySheet } from "./module/sheets/personality-sheet.mjs";
 import { XJZLBackgroundSheet } from "./module/sheets/background-sheet.mjs";
+import {XJZLActiveEffectConfig} from "./module/sheets/active-effect-config.mjs";
 
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
@@ -143,6 +144,15 @@ Hooks.once("init", async function () {
   };
 
   console.log("XJZL | 已成功应用自定义距离移动计算 (SquareGrid Prototype)。");
+
+  // 注销默认表单
+  foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", "ActiveEffectConfig");
+
+  // 注册我们的表单
+  foundry.applications.apps.DocumentSheetConfig.registerSheet(ActiveEffect, "xjzl-system", XJZLActiveEffectConfig, {
+    makeDefault: true,
+    label: "XJZL Active Effect Config"
+  });
 
   // 替换系统核心的状态效果列表
   CONFIG.statusEffects = CONFIG.XJZL.statusEffects;
@@ -367,184 +377,6 @@ Hooks.once("ready", async function () {
     game.xjzl.seed = SeedingManager;
   }
   console.log("侠界之旅系统 - 准备就绪");
-});
-
-/* -------------------------------------------- */
-/*  Hooks: Active Effect Config (New Tab Style) */
-/* -------------------------------------------- */
-
-Hooks.on("renderActiveEffectConfig", (app, html, data) => {
-  // 1. 获取原生 DOM
-  const el = html instanceof HTMLElement ? html : html[0];
-
-  // =====================================================
-  // 0. 清理旧数据 (Clean Up)
-  // =====================================================
-  // 不要直接 return，而是先尝试移除可能残留的旧元素
-  // 这解决了“重复堆叠”问题，同时也解决了“误判导致不显示”的问题
-  const oldNav = el.querySelector('a[data-tab="xjzl-config"]');
-  if (oldNav) oldNav.remove();
-
-  const oldContent = el.querySelector('section[data-tab="xjzl-config"]');
-  if (oldContent) oldContent.remove();
-
-  // =====================================================
-  // 2. 获取数据
-  // =====================================================
-  const effect = app.document;
-  // 确保 flags 对象存在
-  const flags = effect.flags["xjzl-system"] || {};
-
-  const slug = flags.slug || "";
-  const isStackable = !!flags.stackable;
-
-  // 数值清洗：防止 "0,0" 报错
-  let maxStacks = flags.maxStacks;
-  if (!Number.isFinite(maxStacks)) {
-    maxStacks = parseInt(maxStacks);
-    if (isNaN(maxStacks)) maxStacks = 0;
-  }
-
-  let autoSlug = "auto-generated-slug";
-  // 兼容性写法，防止 V13/V12 API 差异
-  if (effect.name) {
-    autoSlug = typeof effect.name.slugify === 'function' ? effect.name.slugify() : effect.name;
-  }
-
-  // =====================================================
-  // 3. 注入导航栏 (Inject Nav)
-  // =====================================================
-  const nav = el.querySelector('nav.tabs');
-
-  if (nav) {
-    const navItem = document.createElement("a");
-    navItem.className = "item";
-    navItem.dataset.action = "tab";
-    navItem.dataset.group = "sheet"; // 关键：组名必须匹配
-    navItem.dataset.tab = "xjzl-config";
-    navItem.innerHTML = `<i class="fas fa-dragon"></i> <span>侠界配置</span>`;
-
-    nav.appendChild(navItem);
-  }
-
-  // =====================================================
-  // 4. 注入标签页内容 (Inject Content)
-  // =====================================================
-  const tabContent = document.createElement("section");
-  tabContent.className = "tab";
-  tabContent.dataset.tab = "xjzl-config";
-  tabContent.dataset.group = "sheet";
-
-  tabContent.innerHTML = `
-    <div style="padding: 10px;">
-        <h3 class="form-header"><i class="fas fa-cogs"></i> 高级规则配置</h3>
-        <p class="notes" style="margin-bottom: 10px;">配置该特效在侠界系统中的自动化行为。</p>
-
-        <fieldset style="border: 1px solid #7a7971; border-radius: 5px; padding: 10px; margin-bottom: 10px;">
-            <legend>叠层逻辑 (Stacking)</legend>
-            
-            <div class="form-group">
-                <label>唯一标识 (Slug)</label>
-                <div class="form-fields">
-                    <input type="text" name="flags.xjzl-system.slug" value="${slug}" placeholder="${autoSlug}">
-                </div>
-                <p class="notes">用于识别同类效果。留空则自动生成。</p>
-            </div>
-
-            <div class="form-group">
-                <label>可堆叠 (Stackable)</label>
-                <div class="form-fields">
-                    <input type="checkbox" name="flags.xjzl-system.stackable" ${isStackable ? "checked" : ""}>
-                </div>
-                <p class="notes">允许重复应用以增加层数。</p>
-            </div>
-            
-            <div class="form-group">
-                <label>最大层数 (Max Stacks)</label>
-                <div class="form-fields">
-                    <input type="number" 
-                           name="flags.xjzl-system.maxStacks" 
-                           value="${maxStacks}" 
-                           placeholder="0"
-                           min="0" step="1">
-                </div>
-                <p class="notes">0 表示无上限。</p>
-            </div>
-        </fieldset>
-    </div>
-  `;
-
-  // 插入位置逻辑：尝试插在最后一个 .tab 后面，如果找不到则插在 form 最后
-  // 这能保证它和原生的 Details/Duration/Effects 处于同一层级
-  const tabs = el.querySelectorAll('section.tab');
-  if (tabs.length > 0) {
-    const lastTab = tabs[tabs.length - 1];
-    lastTab.after(tabContent);
-  } else {
-    const form = el.querySelector('form');
-    if (form) form.appendChild(tabContent);
-  }
-
-  // =====================================================
-  // 5. 调整窗口与激活 Tab
-  // =====================================================
-  app.setPosition({ height: "auto" });
-
-  // 如果用户当前正停留在我们的 Tab 上 (通过判断 active class)，刷新后需要重新激活显示
-  // (Foundry 有时会重置 Tab 状态，这一步是保险)
-  if (nav && nav.querySelector('.item.active[data-tab="xjzl-config"]')) {
-    tabContent.classList.add("active");
-  }
-
-  // =====================================================
-  // 6. 属性 Key 自动补全 (Flag 优先版)
-  // =====================================================
-  const listId = `xjzl-status-list-${app.document.id || foundry.utils.randomID()}`;
-
-  if (!el.querySelector(`#${listId}`)) {
-    const datalist = document.createElement("datalist");
-    datalist.id = listId;
-
-    let optionsHtml = "";
-
-    // 1. 优先加载系统配置的状态 Flags (核心需求)
-    const statusFlags = CONFIG.XJZL?.statusFlags || {};
-    for (const [key, label] of Object.entries(statusFlags)) {
-      // value = flags.xjzl-system.poison
-      optionsHtml += `<option value="flags.xjzl-system.${key}">${game.i18n.localize(label)}</option>`;
-    }
-
-    // 2. 常用属性补充 (可选)
-    const commonStats = [
-      { val: "system.resources.hp.value", label: "气血 (HP)" },
-      { val: "system.resources.mp.value", label: "内力 (MP)" }
-    ];
-    optionsHtml += commonStats.map(o => `<option value="${o.val}">${o.label}</option>`).join("");
-
-    datalist.innerHTML = optionsHtml;
-    el.appendChild(datalist);
-  }
-
-  // 事件委托：监听动态生成的 Key 输入框
-  // 只有当这个 App 实例还没有绑定过我们的监听器时，才绑定
-  if (!app._hasXJZLListener) {
-    el.addEventListener("focusin", (event) => {
-      const target = event.target;
-      if (target.tagName === "INPUT" && target.name && target.name.endsWith("key")) {
-        if (!target.hasAttribute("list")) {
-          target.setAttribute("list", listId);
-          target.setAttribute("placeholder", "flags...");
-        }
-      }
-    });
-    // 打个标记，下次重绘就不再绑了
-    app._hasXJZLListener = true;
-  }
-
-  // 初始化现有输入框
-  el.querySelectorAll('input[name*="key"]').forEach(input => {
-    input.setAttribute("list", listId);
-  });
 });
 
 //  在 getSceneControlButtons 阶段注入按钮
