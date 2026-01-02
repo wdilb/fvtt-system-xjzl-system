@@ -2,6 +2,7 @@
 
 import { seedOrigins } from "./seed-origins.mjs";
 import { seedConsumables } from "./seed-consumables.mjs";
+import { seedArtBooks } from "./seed-artbooks.mjs";
 // import { seedWuxue } from "./seed-wuxue.mjs"; // 未来扩展
 
 const { DialogV2 } = foundry.applications.api;
@@ -10,6 +11,7 @@ export const SeedingManager = {
     // 模块化导出
     origins: seedOrigins,
     consumables: seedConsumables,
+    artbooks: seedArtBooks,
     // wuxue: seedWuxue,
 
     /**
@@ -27,6 +29,7 @@ export const SeedingManager = {
         if (confirm) {
             await this.origins();
             await this.consumables();
+            await this.artbooks();
             // await this.wuxue();
             ui.notifications.info("XJZL | 全量种子数据生成完成。");
         }
