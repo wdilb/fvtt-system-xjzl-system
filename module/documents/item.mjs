@@ -1014,7 +1014,7 @@ export class XJZLItem extends Item {
     if (actor.system.combat?.damages) {
       flatBonus += (actor.system.combat.damages.global?.total || 0);
       flatBonus += (actor.system.combat.damages.skill?.total || 0);
-      flatBonus += (sys.combat.damages.weapon?.total || 0); // 武器类伤害加成
+      flatBonus += (actor.system.combat.damages.weapon?.total || 0); // 武器类伤害加成
       if (move.element && move.element !== "none") {
         flatBonus += (actor.system.combat.damages[move.element]?.total || 0);
       }
