@@ -133,11 +133,12 @@ export function getModifierChoices() {
   add(groupRes, "resources.hp.bonus", `${game.i18n.localize("XJZL.Resources.HP")} (Bonus)`);
   add(groupRes, "resources.mp.bonus", `${game.i18n.localize("XJZL.Resources.MP")} (Bonus)`);
 
-  // 1. 七维属性 (Stats)
+  // 1. 七维属性 (Stats)和自由属性
   const groupStats = game.i18n.localize("XJZL.Stats.Label");
   for (const [k, labelKey] of Object.entries(CONFIG.XJZL.attributes)) {
     add(groupStats, `stats.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
   }
+  add(groupStats, `stats.freePoints.mod`, `自由属性点 (Mod)`);
 
   // 2. 战斗属性 (Combat Base)
   const groupCombat = game.i18n.localize("XJZL.Combat.Label");
