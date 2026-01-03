@@ -2162,7 +2162,14 @@ export class XJZLActor extends Actor {
     if (sys.combat?.damages) {
       flatBonus += (sys.combat.damages.global?.total || 0); // 全局加成
       flatBonus += (sys.combat.damages.normal?.total || 0); // 专门针对普攻的加成
-      flatBonus += (sys.combat.damages.weapon?.total || 0); // 武器类伤害加成
+      // 只有当拿着兵器时才生效
+      if (wType && wType !== 'none') {
+        flatBonus += (sys.combat.damages.weapon?.total || 0); // 武器类伤害加成
+      }
+      // 特定武器类型伤害 (Specific Weapon Type Bonus)
+      if (wType && dmg.weaponTypes) {
+        flatBonus += (sys.combat.damages.weaponTypes[wType]?.total || 0);
+      }
       if (isOpportunity) {
         flatBonus += (sys.combat.damages.skill?.total || 0); //趁虚而入还能享受到招式伤害加成
         // 使用传入的已消耗士气，而不是读取 system

@@ -682,10 +682,10 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             kanpo: { val: system.combat.kanpoTotal, tooltip: buildBreakdown("看破", system.combat.kanpoTotal, system.combat.kanpo) },
             xuzhao: { val: system.combat.xuzhaoTotal, tooltip: buildBreakdown("虚招", system.combat.xuzhaoTotal, system.combat.xuzhao) },
 
-            // 3. 武器等级 (Weapon Ranks) - [新增]
+            // 3. 武器等级 (Weapon Ranks)
             weaponRanks: [],
 
-            // 4. 详情 (Details) - [修复]
+            // 4. 详情 (Details)
             resistances: {}, // 稍后填充
             damages: {}      // 稍后填充
         };
@@ -787,12 +787,34 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // --- 填充伤害 (Damages) ---
+        // 1. 遍历常规伤害 (排除 weaponTypes 容器)
         for (const [key, stat] of Object.entries(system.combat.damages)) {
+            // 跳过 weaponTypes 容器，否则会显示出一行奇怪的数据
+            if (key === 'weaponTypes') continue;
+
             const labelKey = dmgSchema[key]?.label || key;
             context.combatStats.damages[key] = {
                 label: game.i18n.localize(labelKey),
                 total: stat.total
             };
+        }
+
+        // 2. 遍历特定武器类型伤害 (只显示不为0的，避免列表过长)
+        // 获取 weaponTypes 的 Schema 定义以便查找 label
+        const weaponTypesSchema = dmgSchema.weaponTypes?.fields || {};
+
+        if (system.combat.damages.weaponTypes) {
+            for (const [subKey, subStat] of Object.entries(system.combat.damages.weaponTypes)) {
+                // 过滤：只有当数值不为 0 时才显示
+                if (subStat.total !== 0) {
+                    const capKey = subKey.charAt(0).toUpperCase() + subKey.slice(1);
+                    const labelKey = `XJZL.Combat.Rank.${capKey}`;
+                    context.combatStats.damages[subKey] = {
+                        label: game.i18n.localize(labelKey) + '伤害',
+                        total: subStat.total
+                    };
+                }
+            }
         }
 
         // 常用招式 (Pinned Moves)
@@ -825,7 +847,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                             isUltimate: move.isUltimate, // 用于绝招特效
                             computedLevel: move.computedLevel, // 等级
                             range: move.range, //距离
-                            
+
                             // --- 衍生数据 (来自 wuxue 循环的预计算) ---
                             derived: move.derived,
                             tooltip: move.tooltip,

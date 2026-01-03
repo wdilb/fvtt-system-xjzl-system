@@ -68,6 +68,18 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       artsSchema[artKey] = makeArtSchema();
     }
 
+    const specificWeaponDmgSchema = {};
+    const weaponKeys = Object.keys(CONFIG.XJZL?.weaponTypes || {});
+    // 把none从武器里剔除，我们用不到none这个key
+    for (const key of weaponKeys) {
+      if (key === 'none') continue; // 跳过 none
+      // 自动生成 Label，例如 "XJZL.Combat.Rank.Sword" -> "XJZL.Combat.Dmg.Sword"
+      // 或者你也可以直接用 Config 里的 label，看你想怎么翻译
+      // 这里我假设你想用一个新的 Key "XJZL.Combat.Dmg.Sword"
+      const labelKey = `XJZL.Combat.Dmg.${key.charAt(0).toUpperCase() + key.slice(1)}`;
+      specificWeaponDmgSchema[key] = makeModField(0, labelKey);
+    }
+
     return {
       // === A. 基础档案 (Info) ===
       // 记录角色的身份、外貌等 Roleplay 信息
@@ -190,6 +202,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         damages: new fields.SchemaField({
           global: makeModField(0, "XJZL.Combat.Dmg.Global"), // 全局伤害加成
           weapon: makeModField(0, "XJZL.Combat.Dmg.Weapon"), // 武器伤害加成
+          weaponTypes: new fields.SchemaField(specificWeaponDmgSchema, { label: "XJZL.Combat.Dmg.WeaponTypes" }), //武器类型增伤
           normal: makeModField(0, "XJZL.Combat.Dmg.Normal"), // 普通攻击伤害加成
           skill: makeModField(0, "XJZL.Combat.Dmg.Skill"),  // 招式伤害加成
           yang: makeModField(0, "XJZL.Combat.Dmg.Yang"),  // 阳属性伤害加成
@@ -1235,6 +1248,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // Weapon Damage Total 仅修正，默认0
     dmg.weapon.total = dmg.weapon.mod || 0;
+    // === 计算特定武器类型的增伤  ===
+    // 遍历 weaponTypes 下的所有字段
+    if (dmg.weaponTypes) {
+      for (const [typeKey, typeData] of Object.entries(dmg.weaponTypes)) {
+        // 计算 Total = Value (天赋/基础) + Mod (AE/装备)
+        typeData.total = (typeData.value || 0) + (typeData.mod || 0);
+      }
+    }
 
     // 公式: Value + Mod(AE) + Bonus(Jingmai)
 

@@ -165,11 +165,19 @@ export function getModifierChoices() {
   const groupDmg = "伤害加成";
   // 基础类型
   add(groupDmg, "combat.damages.global.mod", "全局伤害 (Mod)");
-  add(groupDmg, "combat.damages.weapon.mod", "武器伤害 (Mod)");
+  add(groupDmg, "combat.damages.weapon.mod", "通用武器伤害 (Mod)");
+  // 特定武器类型伤害 (Sword, Blade, etc.)
+  // 遍历配置中的武器类型，生成 combat.damages.weaponTypes.sword.mod 等
+  for (const [k, labelKey] of Object.entries(CONFIG.XJZL.weaponTypes)) {
+    if (k === 'none') continue;
+    // labelKey 对应如 "XJZL.Combat.Rank.Sword" (翻译为 "剑")
+    // 最终显示为: "剑伤害 (Mod)"
+    add(groupDmg, `combat.damages.weaponTypes.${k}.mod`, `${game.i18n.localize(labelKey)}伤害 (Mod)`);
+  }
   add(groupDmg, "combat.damages.skill.mod", "招式伤害 (Mod)");
   add(groupDmg, "combat.damages.normal.mod", "普攻伤害 (Mod)");
-  add(groupDmg, "combat.damages.neigong.mod", "内功伤害 (Mod)"); 
-  add(groupDmg, "combat.damages.waigong.mod", "外功伤害 (Mod)"); 
+  add(groupDmg, "combat.damages.neigong.mod", "内功伤害 (Mod)");
+  add(groupDmg, "combat.damages.waigong.mod", "外功伤害 (Mod)");
   // 五行类型
   for (const k of ["yang", "yin", "gang", "rou", "taiji"]) {
     add(groupDmg, `combat.damages.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Dmg." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);

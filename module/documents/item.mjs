@@ -1014,7 +1014,14 @@ export class XJZLItem extends Item {
     if (actor.system.combat?.damages) {
       flatBonus += (actor.system.combat.damages.global?.total || 0);
       flatBonus += (actor.system.combat.damages.skill?.total || 0);
-      flatBonus += (actor.system.combat.damages.weapon?.total || 0); // 武器类伤害加成
+      if (move.weaponType && move.weaponType !== 'none') {
+        flatBonus += (actor.system.combat.damages.weapon?.total || 0); // 武器类伤害加成
+      }
+      // 特定武器类型伤害修正
+      if (move.weaponType && actor.system.combat.damages.weaponTypes) {
+        const typeBonus = actor.system.combat.damages.weaponTypes[move.weaponType]?.total || 0;
+        flatBonus += typeBonus;
+      }
       if (move.element && move.element !== "none") {
         flatBonus += (actor.system.combat.damages[move.element]?.total || 0);
       }
