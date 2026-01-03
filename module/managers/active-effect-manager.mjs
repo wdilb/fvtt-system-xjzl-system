@@ -5,16 +5,44 @@ export class ActiveEffectManager {
     /**
      * 核心方法：向 Actor 添加或叠加特效
      * @param {Actor} actor - 目标角色
-     * @param {Object} effectData - 特效源数据 (普通 Object)
+     * @param {Object} effectDataOrId - 特效源数据 (普通 Object或者系统状态 ID)
      * @returns {Promise<ActiveEffect|undefined>} 返回更新或创建的特效文档
      */
-    static async addEffect(actor, sourceEffectData) {
-        if (!actor || !sourceEffectData) return;
+    static async addEffect(actor, effectDataOrId) {
+        if (!actor || !effectDataOrId) return;
 
-        // 如果外部已经克隆过了，这里再克隆一次开销很小；
-        // 但如果外部忘了克隆（比如直接传了 CONFIG 对象），这一行能救命。
-        const effectData = foundry.utils.deepClone(sourceEffectData);
+        let effectData;
+        // =====================================================
+        // 0. 数据源解析与规范化 (Normalization)
+        // =====================================================
 
+        // 情况 A: 传入的是字符串 ID (如 "qixu", "stun")
+        if (typeof effectDataOrId === "string") {
+            // 1. 尝试从系统状态列表查找
+            const statusData = CONFIG.statusEffects.find(e => e.id === effectDataOrId);
+
+            if (!statusData) {
+                console.warn(`XJZL ActiveEffectManager | 未找到系统状态 ID: ${effectDataOrId}`);
+                return;
+            }
+            // 2. 克隆数据，防止修改 CONFIG
+            effectData = foundry.utils.deepClone(statusData);
+
+            // 3. 补全 statuses 数组 (V11+ 标准)
+            // 确保系统能通过 actor.statuses.has("qixu") 检测到它
+            if (!effectData.statuses) effectData.statuses = [statusData.id];
+        }
+        // 情况 B: 传入的是对象 (Object)
+        else if (typeof effectDataOrId === "object") {
+            // 如果外部已经克隆过了，这里再克隆一次开销很小；
+            // 但如果外部忘了克隆（比如直接传了 CONFIG 对象），这一行能救命。
+            effectData = foundry.utils.deepClone(effectDataOrId);
+        }
+        else {
+            return; // 无效输入
+        }
+
+        if (!effectData) return;
         // game.i18n.localize 的特性是：如果找到了 key 就翻译，找不到就返回原字符串。
         // 所以即使外部已经翻译过了（传进来的是中文），再 localize 一次通常也只是返回中文本身，没有副作用。
         if (effectData.name) {
@@ -67,12 +95,12 @@ export class ActiveEffectManager {
 
             // 判断一下传入的AE的最大层数是否比已经在身上的大，如果是，更新它（有那种升级武学加叠层上限的情况，虽然这极其罕见）
             const incomingMax = foundry.utils.getProperty(effectData, "flags.xjzl-system.maxStacks");
-            
+
             if (Number.isFinite(incomingMax) && incomingMax > maxStacks) {
                 // 写入数据库更新队列
                 updateData["flags.xjzl-system.maxStacks"] = incomingMax;
                 // 更新内存变量，确保本次就能叠加上去
-                maxStacks = incomingMax; 
+                maxStacks = incomingMax;
             }
 
             // =======================================================
