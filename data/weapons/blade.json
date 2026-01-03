@@ -1,0 +1,5182 @@
+[
+    {
+        "name": "圆月弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 45,
+            "block": 20,
+            "description": "舍神弃佛，离经叛道。刀长三尺，重二斤七两，乃千年寒山冥铁所铸，吹毛断发，乃魔门镇门之宝。<br>效果：刀芒妖诡，此刀日久能使持刀人心性变得嗜血疯魔，装备后，你在每月末获得100点恶行值。<br>·你出招对方无法闪避，且必定造成暴击。",
+            "automationNote": "部分自动化：每月获得恶行值需手动记录。必暴击已实现（阈值修正）。无法闪避需手动处理。",
+            "scripts": [
+                {
+                    "label": "圆月弯刀-必暴击",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// 降低暴击阈值到 0，确保必定暴击\nargs.flags.critThresholdMod += 20;"
+                }
+            ]
+        }
+    },
+    {
+        "name": "蒙古金刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 6000,
+            "damage": 22,
+            "block": 10,
+            "description": "蒙古人所用，花纹精美，填烧珐琅，镶嵌宝石，极度锋利，亦是权力象征。<br>效果：在马上攻击时，暴击骰-5。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "芙蓉刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 3000,
+            "damage": 18,
+            "block": 12,
+            "description": "轻薄锋利的弯刀，精美好看，适合女子使用。<br>效果：看破虚招后，可以不施展反击而是消耗反应动作施展实招攻击目标。（不会压制虚招）",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "柳叶刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 500,
+            "damage": 12,
+            "block": 5,
+            "description": "刀似柳叶弧度大，刀尖部宽轻而脆，极为锋利。<br>效果：攻击处于“流血”、“血流不止”的目标时，使其额外受到10点气血流失。",
+            "automationNote": "完全自动化：命中时检测目标状态并应用额外伤害。",
+            "scripts": [
+                {
+                    "label": "柳叶刀-撕裂追击",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "const target = args.target;\n// 检查流血相关状态 (bleed_stack 是系统流血 slug，sielie 是撕裂，bloodloss 是失血)\nconst hasBleed = target.effects.some(e => \n    ['bleed_stack', 'sielie', 'bloodloss'].includes(e.getFlag('xjzl-system', 'slug'))\n);\n\nif (hasBleed) {\n    await target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`${thisItem.name} 对流血目标造成额外流失伤害！`);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "绣春刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 600,
+            "damage": 15,
+            "block": 5,
+            "description": "镔铁锻造而成，形制各异，握柄处统一刻有七道引流沟槽，防止血溅太多影响持握。<br>效果：你消耗反应动作施展的武学，内力消耗-5",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "混世斧",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 2500,
+            "damage": 25,
+            "block": 1,
+            "description": "使用寒铁铸成的大斧，威力非凡。<br>效果：当你在一回合出招三次之后，获得一层“蓄劲”，持续到战斗结束。<br>蓄劲：每层使暴击骰-1",
+            "automationNote": "完全自动化：通过 Flags 计数，回合开始重置。",
+            "scripts": [
+                {
+                    "label": "混世斧-连击蓄劲",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// 1. 读取当前回合计数\nlet count = actor.getFlag('xjzl-system', 'weapon_hunshifu_count') || 0;\ncount += 1;\nawait actor.setFlag('xjzl-system', 'weapon_hunshifu_count', count);\n\n// 2. 判断是否第三次\nif (count === 3) {\n    await game.xjzl.api.effects.addEffect(actor, 'xujin');\n    ui.notifications.info('混世斧：已出招三次，获得蓄劲！');\n}"
+                },
+                {
+                    "label": "混世斧-计数重置",
+                    "trigger": "turnStart",
+                    "active": true,
+                    "script": "await actor.setFlag('xjzl-system', 'weapon_hunshifu_count', 0);"
+                }
+            ]
+        }
+    },
+    {
+        "name": "魔影双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 700,
+            "damage": 14,
+            "block": 6,
+            "description": "刀身狭长，纹理错综复杂，宛如狰狞扭曲的血管。<br>效果：使用该武器出招吸血后，获得一层“蓄劲”，至多三层，持续到战斗脱离。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "魔影刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 700,
+            "damage": 14,
+            "block": 6,
+            "description": "刀身狭长，纹理错综复杂，泛着幽冷的乌光。<br>效果：使用该武器出招暴击后，获得一层“蓄劲”，至多三层，持续到战斗脱离。",
+            "automationNote": "完全自动化：命中后检测暴击状态。",
+            "scripts": [
+                {
+                    "label": "魔影刀-暴击蓄劲",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isCrit) {\n    await game.xjzl.api.effects.addEffect(actor, 'xujin');\n    ui.notifications.info('魔影刀：暴击触发蓄劲！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "军备兵器-刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 1,
+            "price": 20,
+            "damage": 5,
+            "block": 2,
+            "description": "大明士卒所用军械均由工部铁匠特制，受朝廷管辖，无法在江湖上流通。<br>军备：武器带有锯齿血槽，命中后额外造成 10 气血流失。",
+            "automationNote": "完全自动化：命中后造成流失伤害。",
+            "scripts": [
+                {
+                    "label": "军备-血槽",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "铁镐",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 0,
+            "price": 10,
+            "damage": 3,
+            "block": 1,
+            "description": "两头尖，可铲土凿物，功能多用，十分坚固。<br>铁制生活工具，可以挖土，每点[角力]每个时辰可以挖一立方米的土。",
+            "automationNote": "需手动：非战斗功能。"
+        }
+    },
+    {
+        "name": "蒙古弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 5,
+            "description": "刀刃弯的部分长长伸出，靠近刀柄的部分笔直，光靠马匹的冲击甚至就能将敌人的头割下。<br>在马上攻击时武器伤害+5。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "庖丁菜刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 5,
+            "description": "最朴实无华的刀，却是最完美的刀。<br>效果：武器伤害提升等同于你[烹饪]等级的数值。",
+            "automationNote": "完全自动化：Calculation 阶段修正伤害。",
+            "scripts": [
+                {
+                    "label": "庖丁解牛",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "const cooking = S.arts?.pengren?.total || 0;\nif (cooking > 0) {\n    args.output.damage += cooking;\n    args.output.bonusDesc.push(`烹饪加持(+${cooking})`);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "铁太刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 6,
+            "block": 2,
+            "description": "具有较大弯曲度的刀具，精铁所制。",
+            "automationNote": "无特效。"
+        }
+    },
+    {
+        "name": "气刃（深秋枫桦戒）",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 0,
+            "damage": 20,
+            "block": 20,
+            "description": "枫桦院特殊功法凝聚而成的兵器。<br>装备后，速度+2。",
+            "automationNote": "完全自动化：AE 修正属性。"
+        },
+        "effects": [
+            {
+                "name": "气刃加速",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "气刃（清秋枫桦戒）",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 0,
+            "damage": 10,
+            "block": 10,
+            "description": "枫桦院特殊功法凝聚而成的兵器。<br>装备后，速度+2。",
+            "automationNote": "完全自动化：AE 修正属性。"
+        },
+        "effects": [
+            {
+                "name": "气刃加速",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "气刃（枫桦戒）",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 0,
+            "damage": 5,
+            "block": 5,
+            "description": "枫桦院特殊功法凝聚而成的兵器。<br>装备后，速度+2。",
+            "automationNote": "完全自动化：AE 修正属性。"
+        },
+        "effects": [
+            {
+                "name": "气刃加速",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "神风刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 500,
+            "damage": 10,
+            "block": 3,
+            "description": "以特殊手法锻造之刀，薄如蝉翼，刀气蓬勃。<br>效果：自身处于‘大风’天气时，武器伤害+5。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "军备刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "",
+            "quality": 1,
+            "price": 20,
+            "damage": 5,
+            "block": 2,
+            "description": "大明士卒所用军械均由工部铁匠特制，受朝廷管辖，无法在江湖上流通。<br>军备：武器带有锯齿血槽，命中后额外造成 10 气血流失。",
+            "automationNote": "完全自动化：命中后造成流失伤害。",
+            "scripts": [
+                {
+                    "label": "军备-血槽",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "鸣沙刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 280,
+            "damage": 12,
+            "block": 5,
+            "description": "细长弯刀，刀身有孔，挥舞起声。<br>此武器攻击处于目盲的目标招式伤害+10。",
+            "automationNote": "完全自动化：命中后检测目标状态并造成额外伤害。",
+            "scripts": [
+                {
+                    "label": "鸣沙-听声辨位",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target.statuses.has('blind')) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'waigong',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: false\n    });\n    ui.notifications.info('鸣沙刀：对目盲目标造成额外伤害！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "镰刀（单刀）",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "description": "农耕工具，用于收割作物，灵活锋利。<br>效果：武器伤害提升等同于[农事]等级的数值。",
+            "automationNote": "完全自动化：Calculation 阶段修正伤害。",
+            "scripts": [
+                {
+                    "label": "农事娴熟",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "const farm = S.arts?.nongshi?.total || 0;\nif (farm > 0) {\n    args.output.damage += farm;\n    args.output.bonusDesc.push(`农事加持(+${farm})`);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "食神金刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 18888,
+            "damage": 20,
+            "block": 10,
+            "description": "纯金制的菜刀，象征厨艺高超。<br>效果：携带后，你的[烹饪]等级提高一级。",
+            "automationNote": "完全自动化：AE 修正技艺等级。"
+        },
+        "effects": [
+            {
+                "name": "食神加持",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.arts.pengren.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "镔铁菜刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 1,
+            "price": 80,
+            "damage": 6,
+            "block": 2,
+            "description": "厨师切肉所用的菜刀，沉重而锋利。<br>你的[烹饪]检定，结果+1。",
+            "automationNote": "完全自动化：AE 修正技艺检定值。"
+        },
+        "effects": [
+            {
+                "name": "得心应手",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.arts.pengren.checkMod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "剥皮刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 1,
+            "price": 30,
+            "damage": 4,
+            "block": 2,
+            "description": "锋利尖锐，方便分离动物皮肉的刀具。<br>效果：出售猎物时候，每只野兽额外获利1两。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "蚩尤古刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 50,
+            "block": 20,
+            "description": "蚩尤所铸造的长刀，号称“苗刀之祖”，刀长八尺，重逾百斤，能吸活人鲜血，横扫八荒。<br>每将一个目标打入濒死后，回复等同于自身气血最大值10%的气血。",
+            "automationNote": "完全自动化：Hit 阶段检测造成濒死状态并回血。",
+            "scripts": [
+                {
+                    "label": "蚩尤-嗜血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.damageResult && args.damageResult.isDying) {\n    const healAmount = Math.floor(actor.system.resources.hp.max * 0.1);\n    await actor.applyHealing({ amount: healAmount, type: 'hp' });\n    ui.notifications.info('蚩尤古刀：饮血回春！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "三尖两刃刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 35,
+            "block": 15,
+            "description": "又称“二郎刀”，长至头顶，三叉刀形，刀身两面有刃，范围极大，锋利无比。<br>招式施展距离+2，当招式命中目标时，为其添加一层“流血”，持续到战斗脱离。",
+            "automationNote": "距离需手动，流血命中自动添加。",
+            "scripts": [
+                {
+                    "label": "三尖-撕裂",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'bleed_stack');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "青龙偃月刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 10000,
+            "damage": 20,
+            "block": 10,
+            "description": "传闻铸造时恰逢皓月当空，突然炉火绽放出耀眼光芒，刀光斩杀苍天青龙，嗜龙血回炉而成。又称“关刀”，重八十二斤。<br>进入战斗后，以该武器施展的第一招必定暴击，且招式伤害+10点。",
+            "automationNote": "部分自动化：首刀必爆已实现。战斗状态重置需手动清理 Flag。",
+            "scripts": [
+                {
+                    "label": "青龙-首刀必爆",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "const used = actor.getFlag('xjzl-system', 'weapon_qinglong_used');\nif (!used) {\n    args.flags.critThresholdMod += 20;\n    // 设置临时标记供 calc 脚本使用\n    actor.tempQinglongActive = true;\n    // 标记已使用\n    await actor.setFlag('xjzl-system', 'weapon_qinglong_used', true);\n    ui.notifications.warn('青龙偃月刀：拖刀计触发！');\n}"
+                },
+                {
+                    "label": "青龙-首刀增伤",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "if (actor.tempQinglongActive) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push('青龙首刀(+10)');\n    // 清理临时标记\n    delete actor.tempQinglongActive;\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "妖刀村正",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 7400,
+            "damage": 30,
+            "block": 15,
+            "description": "倭人邪刀，装饰华丽，锋利无比，被斥之为“不吉”之象征，持刀者都被处极刑。<br>装备后，你的范围攻击招式将会强制选中你方范围内的队友，对友方也造成伤害。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "镀金苗刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 3200,
+            "damage": 22,
+            "block": 8,
+            "description": "刀身修长如禾苗，而得名。辗转连击、疾速凌厉。<br>命中无架招的敌人时，使其流失10点气血。",
+            "automationNote": "完全自动化：检测目标架招状态。",
+            "scripts": [
+                {
+                    "label": "苗刀-破势",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info('镀金苗刀：趁虚而入！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "备前野太刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 1200,
+            "damage": 14,
+            "block": 5,
+            "description": "倭人所用，刀身刀柄奇长，必须背在背上。<br>招式施展距离+1。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "陌刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 16,
+            "block": 6,
+            "description": "长柄大刀，两面刃刀，通长一丈，需巨力挥舞。<br>普通攻击可攻击周围1米所有敌人。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "开山斧",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 45,
+            "block": 20,
+            "description": "威力巨大，一斧下去，地动山摇，有劈山之能。<br>当你将人打入濒死时，目标必定失去左手、右手、左脚、右脚中的一肢（D4决定）。若无四肢，则直接砍其头颅，令其当场死亡。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "刑天斧",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 4,
+            "price": 23000,
+            "damage": 25,
+            "block": 10,
+            "description": "干戚之舞，猛志常在，挥舞时生死不顾。<br>你在气血值归0后，你可以在濒死状态下继续行动，在每个你的回合结束时流失2点怒气，在此期间若是你的怒气值归0，则你的内力值立刻归0，并进行一次死亡检定。",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "蘸金宣花斧",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 10000,
+            "damage": 15,
+            "block": 5,
+            "description": "斧刃镀蘸金水，威武壮观，阔大如扇，斧阔五寸，柄长九尺，三国徐晃所用，大开大合，赫赫有名。<br>命中无架招敌人后为其添加“禁疗”，持续一回合。",
+            "automationNote": "完全自动化：检测架招，应用禁疗。",
+            "scripts": [
+                {
+                    "label": "宣花斧-断脉",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'jinliao');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n    ui.notifications.info('蘸金宣花斧：施加禁疗！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "月牙钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 8000,
+            "damage": 22,
+            "block": 12,
+            "description": "一头为钺，一头为月牙刃，又称月牙铲。挥舞时潇洒大方，排山倒海，专砍下盘。<br>你可以花费主要动作进行普通攻击，击敌的同时铲地捧沙，使目标陷入“目盲”一回合。<br>·该武器需要双手持握。",
+            "automationNote": "完全自动化：检测普攻，应用目盲。",
+            "scripts": [
+                {
+                    "label": "月牙-捧沙",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.move.type === 'basic') {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'blind');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n    ui.notifications.info('月牙钺：扬沙迷眼！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "凤头鱼尾斧",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 2000,
+            "damage": 12,
+            "block": 5,
+            "description": "斧头长八寸，刃阔五寸。一侧弧形如凤，一侧形似鱼尾而得名。<br>你击破敌人架招时，为其添加一层“流血”，持续到战斗脱离。",
+            "automationNote": "完全自动化：检测击破状态。",
+            "scripts": [
+                {
+                    "label": "凤头斧-破架",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.damageResult && args.damageResult.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, 'bleed_stack');\n    ui.notifications.info('凤头鱼尾斧：击破架招，造成流血！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "车轮板斧",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 1000,
+            "damage": 15,
+            "block": 5,
+            "description": "斧头直径一米、大如车轮而得名，及其沉重，可重达百余斤，非猛士无法使用。<br>普通攻击可攻击周围1米范围内所有敌人。<br>·该武器需要双手持握。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "仁王刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 30,
+            "block": 15,
+            "description": "塞外名刀，据说源起佛门，非仁善之人不能驾驭。<br>仅标签为[侠]之人可以使用。<br>当你造成外功伤害后，内功伤害的招式不会对你造成暴击，持续一回合；<br>当你造成内功伤害后，外功伤害的招式不会对你造成暴击，持续一回合。",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "锟铻双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 15000,
+            "damage": 25,
+            "block": 10,
+            "description": "割玉须用锟铻刀，刀身色赤如火，切玉如切泥。<br>施展反击成功后，还会给对方添加“封招”效果，持续一回合。",
+            "automationNote": "完全自动化：检测反击类型，施加封招。",
+            "scripts": [
+                {
+                    "label": "锟铻-封喉",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.move.type === 'counter') {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n    ui.notifications.info('锟铻双刀：反击封招！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "龙鳞双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 9000,
+            "damage": 30,
+            "block": 5,
+            "description": "长三尺二寸，状如龙文。<br>出招若未造成暴击，可以将其击倒。",
+            "automationNote": "完全自动化：未暴击时自动施加倒地。",
+            "scripts": [
+                {
+                    "label": "龙鳞-横扫",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && !args.isCrit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'prone');\n    ui.notifications.info('龙鳞双刀：横扫击倒！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "玄墨双极刃",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 3500,
+            "damage": 20,
+            "block": 10,
+            "description": "通体漆黑的双刀，刃上有用朱砂染色细纹，黑夜中使用只能看到舞动的红线。<br>攻击陷入“目盲”的角色时，虚招值+3。",
+            "automationNote": "需手动：系统目前仅支持虚招等级（优劣势）修正，不支持数值直接修正。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "吸魂邪刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 1200,
+            "damage": 15,
+            "block": 5,
+            "description": "刀镌鬼脸，邪异莫测。<br>仅标签为[恶][邪]之人可以使用。<br>当你使用此刀杀死一个人时，你的内力上限+1，至多增加100点。当你失去吸魂邪刀（离开身体5米外）时，此增益效果清零。",
+            "automationNote": "完全自动化：击杀增加内力上限（Bonus）。",
+            "scripts": [
+                {
+                    "label": "吸魂",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.damageResult && args.damageResult.isDead) {\n    const currentBonus = S.resources.mp.bonus || 0;\n    if (currentBonus < 100) {\n        await actor.update({'system.resources.mp.bonus': currentBonus + 1});\n        ui.notifications.info('吸魂邪刀：吞噬生魂！');\n    }\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "风云双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 1000,
+            "damage": 14,
+            "block": 5,
+            "description": "刀刃微旋，轻盈无比。<br>施展招式时，可以选择消耗5内力在自身周围1米卷起‘旋风’，持续一回合。<br>旋风：在该区域内，风云双刀格挡值+5。<br>·旋风形成在原地，不会跟随你移动，你只能拥有一个旋风，如果你卷出新的旋风，之前的消失。",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "鸿鸣刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 40,
+            "block": 25,
+            "description": "上古轩辕黄帝打造，刀意太强，足以反噬持刀者。黄帝欲以轩辕剑毁之，不料刀在手中化为一只云鹊，变成一股赤色消失在云际之中。<br>你的[刀]等级达到10方能装备此刀，否则装备后，自身持续陷入走火入魔。<br>·当你击中无架招的敌人时，使其陷入“封招”，持续一回合。",
+            "automationNote": "走火入魔请手动；Hit 检测架招施加封招。",
+            "scripts": [
+                {
+                    "label": "鸿鸣-鸣泣",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "雪隐刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 30,
+            "block": 18,
+            "description": "你格挡成功后，为自身叠加一层“霜冻”效果，持续到战斗脱离。<br>霜冻：叠加三层后，持刀者自身冻结一回合，失去所有动作，亦无法被选为攻击目标。",
+            "automationNote": "需手动：系统无法自动判定“格挡成功”。"
+        }
+    },
+    {
+        "name": "化血神刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 35,
+            "block": 20,
+            "description": "饮万人鲜血而铸邪刀，挥舞时可污染兵器。<br>击中格挡中的敌人时，为敌方武器添加“血染”，持续三回合。击中无架招的敌人时，为敌方上衣添加“血染”，持续三回合。<br>“血染”：该装备失去特效。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "弑龙宝刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 40,
+            "block": 20,
+            "description": "当你受到暗器攻击时，你可以消耗反应动作挥舞宝刀，将这些暗器全部吸附到刀面，从而不受伤害。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "紫电雷刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 4,
+            "price": 1000000,
+            "damage": 35,
+            "block": 15,
+            "description": "刀身修长，莹莹紫意，刀势如狂雷震九霄，撕天裂地。<br>当你击中无架招的敌人时，可以消耗次要动作再使用同一招式攻击一次，但不会造成暴击。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "割鹿神刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 4,
+            "price": 30000,
+            "damage": 20,
+            "block": 10,
+            "description": "秦失其鹿，天下共逐，唯胜者得鹿而割之。战国时徐鲁子铸成，刀光如虹，刀锋晶莹，滴血不沾。<br>唯有侠义值500以上方能拔出并装备此刀。<br>·此刀暴击时，若目标使用金品及以下的武器格挡，则为其添加“缴械”，持续一回合。",
+            "automationNote": "完全自动化：暴击触发缴械（简化为不判断目标武器品质，因为难以获取防御武器信息）。",
+            "scripts": [
+                {
+                    "label": "割鹿-卸甲",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isCrit) {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'jiaoxie');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n    ui.notifications.info('割鹿神刀：斩断兵刃！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "永灵刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 4,
+            "price": 25000,
+            "damage": 30,
+            "block": 15,
+            "description": "传说中的八件厨具之一，外形与普通菜刀无异，刀柄为龙形刀柄，有令素材恢复新鲜的功能。<br>使用此刀制造的佳肴食物，减少50%耗材。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "烈阳刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 18000,
+            "damage": 20,
+            "block": 10,
+            "description": "以火山赤精铁锻造，出招时华光大盛，灼烈如阳。<br>施展阳属性招式时，武器伤害+25。",
+            "automationNote": "完全自动化：AE 修正阳属性伤害。"
+        },
+        "effects": [
+            {
+                "name": "烈阳之力",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.yang.mod",
+                        "mode": 2,
+                        "value": "25"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "七星宝刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 17000,
+            "damage": 20,
+            "block": 10,
+            "description": "刀长尺余，七宝嵌饰，极其锋利，却未杀一人。<br>当你陷入濒死，可不消耗速度朝任意方向移动7米，然后在该回合末回复10气血。<br>·该效果一天生效一次。",
+            "automationNote": "部分自动化：濒死回血逻辑已实现，移动需手动。",
+            "scripts": [
+                {
+                    "label": "七星-续命",
+                    "trigger": "dying",
+                    "active": true,
+                    "script": "const used = actor.getFlag('xjzl-system', 'weapon_qixing_daily');\nif (!used) {\n    await actor.applyHealing({ amount: 10, type: 'hp' });\n    await actor.setFlag('xjzl-system', 'weapon_qixing_daily', true);\n    ui.notifications.info('七星宝刀：护主续命！');\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "阿难刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 14000,
+            "damage": 20,
+            "block": 10,
+            "description": "阿难刀，无往生，不杀人，只渡人。<br>使用此刀施展刀法，每次出招获得一层“戒律”，可叠加，持续到战斗结束。<br>叠加5层后可消耗所有戒律在下面选择一项：<br>1.获得3点怒气；2.回复50点气血；3.回复30点内力。",
+            "automationNote": "部分自动化：自动叠加层数。满层消耗需玩家手动删除Buff并调整资源。",
+            "scripts": [
+                {
+                    "label": "阿难-戒律",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "const effect = thisItem.effects.getName('戒律');\nif (effect) {\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "戒律",
+                "icon": "icons/svg/book.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "anan_jielu",
+                        "stackable": true,
+                        "maxStacks": 5
+                    }
+                },
+                "description": "叠加5层后可消耗所有层数：获得3点怒气 或 回复50点气血 或 回复30点内力。"
+            }
+        ]
+    },
+    {
+        "name": "大夏龙雀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 12000,
+            "damage": 25,
+            "block": 10,
+            "description": "夏朝帝挚所造之刃，装具华丽，制作极巧，环内雕饰龙雀，下为大环，以缠龙为之，其首鸟形。<br>命中敌人后，回复实际造成伤害（扣除防御格挡）10%的气血。",
+            "automationNote": "完全自动化：Hit 阶段计算吸血。",
+            "scripts": [
+                {
+                    "label": "龙雀-吸血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.damageResult) {\n    const dmg = args.damageResult.finalDamage || 0;\n    if (dmg > 0) {\n        const heal = Math.floor(dmg * 0.1);\n        await actor.applyHealing({ amount: heal, type: 'hp' });\n    }\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "古锭刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 10000,
+            "damage": 18,
+            "block": 12,
+            "description": "裹赤帻，跨花鬃马，横古锭刀。三国东吴家传宝刀，刀身细长轻薄，极为锋利。<br>命中敌人时，若敌人双手未持握武器，招式伤害+20。",
+            "automationNote": "完全自动化：Hit 阶段检测目标装备。",
+            "scripts": [
+                {
+                    "label": "古锭-欺弱",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    const hasWeapon = args.target.items.some(i => i.type === 'weapon' && i.system.equipped);\n    if (!hasWeapon) {\n        await args.target.applyDamage({\n            amount: 20,\n            type: 'waigong',\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: false\n        });\n        ui.notifications.info('古锭刀：手无寸铁者斩！');\n    }\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "玄铁菜刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 9500,
+            "damage": 20,
+            "block": 10,
+            "description": "皇帝御赐宝刀，奉旨下厨。<br>·每次攻击时，投掷命中的D20若为单数，触发“旺德福”效果，攻击必定暴击。若为双数，触发“泰瑞宝”效果，攻击必然命中。",
+            "automationNote": "需手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "澜沧刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 8000,
+            "damage": 18,
+            "block": 12,
+            "description": "沧意冷冽，大波为澜，滔滔不绝。<br>施展刀法获得一层“刀意”，最多叠加三层，持续到战斗脱离。<br>刀意：每层使刀法伤害+10，持续到你更换其他武器的武学套路。",
+            "automationNote": "自动叠加层数，取消BUFF请手动。",
+            "scripts": [
+                {
+                    "label": "澜沧-刀意",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "const effect = thisItem.effects.getName('刀意');\nif (effect) {\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "刀意",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lancang_intent",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.weaponTypes.blade.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "龙牙刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 7000,
+            "damage": 25,
+            "block": 5,
+            "description": "夏末君王桀所铸造之邪刀，以活体生祭锻造，加入大量恶毒之物，后被毁成碎片。北宋时一名铁匠发现了此刀碎片，重铸龙牙，刀出则腥风血雨。<br>每有1点杀孽该武器伤害+1（至多+20）。<br>·若你装备此刀时杀戮值为0，你陷入走火入魔。",
+            "automationNote": "走火入魔请手动，伤害已自动。",
+            "scripts": [
+                {
+                    "label": "龙牙-杀虐",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "const bonus = Math.min(20, S.resources.shanie.value || 0);\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`杀孽加持(+${bonus})`);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "掌福天刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 6666,
+            "damage": 20,
+            "block": 10,
+            "description": "福如东海，寿比南山。<br>你每有下面条件中的一项，此刀伤害+5，格挡+5；<br>1.身上有显眼“福”字；<br>2.体重超过200斤；<br>3.年龄大于40。",
+            "automationNote": "部分自动化：仅检测年龄和体重。",
+            "scripts": [
+                {
+                    "label": "掌福-福气",
+                    "trigger": "passive",
+                    "active": true,
+                    "script": "let stacks = 0;\n// 检测年龄\nif (S.info.age > 40) stacks++;\n// 检测体重 (字符串解析)\nconst weight = parseInt(S.info.weight) || 0;\nif (weight > 200) stacks++;\n\nif (stacks > 0) {\n    S.combat.damages.weapon.mod += (stacks * 5);\n    S.combat.block += (stacks * 5);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "红袖刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 6000,
+            "damage": 24,
+            "block": 12,
+            "description": "锋透明，刀身绯红，刀光荡漾可映出一片红霞。刀弯处如绝代佳人的纤腰，千般风情，万种凄美。<br>在日光照耀下，莹莹泛红，煞是好看。佩戴此刀，神采+5。",
+            "automationNote": "完全自动化：AE 修正神采。"
+        },
+        "effects": [
+            {
+                "name": "红袖添香",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.stats.shencai.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鱼骨刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 4300,
+            "damage": 25,
+            "block": 10,
+            "description": "挥舞灵巧，犹如游鱼，但又邪气冷然，锋利无比。<br>造成伤害后，给对方添加一层“骨刺”。骨刺叠加三层后，使其禁足一回合。",
+            "automationNote": "完全自动化：叠加层数，满3层自动转化为禁足。",
+            "scripts": [
+                {
+                    "label": "鱼骨-刺骨",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    const existing = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yugu_spine');\n    const currentStacks = existing ? (existing.getFlag('xjzl-system', 'stacks') || 1) : 0;\n    \n    if (currentStacks >= 2) { // 本次加完就是3层\n        if (existing) await existing.delete();\n        const rootEffect = CONFIG.statusEffects.find(e => e.id === 'root');\n        const data = foundry.utils.deepClone(rootEffect);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info('鱼骨刀：骨刺爆发，禁足！');\n    } else {\n        const aeData = {\n            name: '骨刺',\n            icon: 'icons/svg/bones.svg',\n            flags: { 'xjzl-system': { slug: 'yugu_spine', stackable: true, maxStacks: 3 } }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, aeData);\n    }\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "新亭侯",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 3000,
+            "damage": 20,
+            "block": 10,
+            "description": "邪气之刀，用之不慎，极易克死主人。<br>装备后，你的残疾检定具有劣势。<br>·若你的性格为鲁莽，武器招式伤害+10点。",
+            "automationNote": "完全自动化：检测性格修正伤害。",
+            "scripts": [
+                {
+                    "label": "新亭侯-鲁莽",
+                    "trigger": "passive",
+                    "active": true,
+                    "script": "if (S.info.personality.includes('鲁莽')) {\n    S.combat.damages.weapon.mod += 10;\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "翻云刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 2000,
+            "damage": 16,
+            "block": 7,
+            "description": "翻云覆雨，极于情，极于刀。<br>使用此刀施展刀法绝招时，给对手添加“错骨”状态，持续一回合。",
+            "automationNote": "完全自动化：检测绝招类型。",
+            "scripts": [
+                {
+                    "label": "翻云-错骨",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.move.isUltimate) {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'cuogu');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "天之伤",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 1500,
+            "damage": 14,
+            "block": 6,
+            "description": "伐逆苍天，留我印痕。<br>击中有架招的敌人时，进行一次[角力]对抗，获胜则击退敌人1米。",
+            "automationNote": "部分自动化：自动发起对抗，击退需手动。",
+            "scripts": [
+                {
+                    "label": "天之伤-震退",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target.system.martial?.stanceActive) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: 'jiaoli',\n        dc: S.stats.liliang.total / 10 + 10,\n        label: '天之伤对抗',\n        onFail: async () => { ui.notifications.info('天之伤：对抗胜利，请手动击退目标！'); }\n    });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "寒月刃",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 1100,
+            "damage": 13,
+            "block": 6,
+            "description": "战国徐夫人以奇寒陨铁打造，通体光滑晶莹，在皓月之下更显魅力四射，且型似新月，寒气逼人。<br>在夜间出鞘，武器伤害+13。",
+            "automationNote": "需手动。"
+        }
+    },
+    {
+        "name": "孔德刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 600,
+            "damage": 15,
+            "block": 5,
+            "description": "孔德之容，惟道是从，道之为物，惟恍惟惚。<br>若你标签为恶，使用该武器出招具有劣势。",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "斩马刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 5,
+            "description": "锋利的步战用刀，长七尺，刃长三尺。<br>击破架招时，使目标陷入下盘不稳一回合。",
+            "automationNote": "完全自动化：检测击破。",
+            "scripts": [
+                {
+                    "label": "斩马-断腿",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.damageResult && args.damageResult.isBroken) {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "雁翎刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 6,
+            "description": "腰横秋水雁翎刀，其形如大雁的翎毛而得名。<br>用【趁虚而入】攻击，招式伤害+5。",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "雁翎-趁虚",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "if (args.move.id === 'opportunity-attack') {\n    args.output.damage += 5;\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "回火环首刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 280,
+            "damage": 10,
+            "block": 5,
+            "description": "<p>刀柄端带金属环，纤长挺直，带有内弧。</p><hr><p><strong>效果：</strong>装备后，暴击骰-1。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "回火环首刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "无痕横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 20000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><hr><p><strong>效果：</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "无痕横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 15000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><hr><p><strong>效果：</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "鸿灵横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.blade.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 13000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><hr><p><strong>效果：</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "万刃横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.weapon.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 10000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><hr><p><strong>效果：</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "守心横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 9000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><hr><p><strong>效果：</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "真刚横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 7000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><hr><p><strong>效果：</strong>装备后，即便被击破架招，该武器格挡值依旧生效。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "真刚横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 6000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><hr><p><strong>效果：</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "霜月寒气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    // 下盘不稳是系统状态 (unstable)\n    // 创建一个 override 的效果数据以指定持续时间\n    const effectData = {\n        id: \"unstable\",\n        duration: { rounds: 2 }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "魅影横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 5000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><hr><p><strong>效果：</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "魅影横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 3,
+            "price": 4000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><hr><p><strong>效果：</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "业火横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 2000,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>破釜沉舟，不胜不还。</p><hr><p><strong>效果：</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "破釜沉舟",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    // 额外造成20点流失伤害\n    await args.target.applyDamage({\n        amount: 20,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`${actor.name} 破釜沉舟，造成额外流失伤害！`);\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 1600,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><hr><p><strong>效果：</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "蟠龙触杀",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "龙泉横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 1500,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><hr><p><strong>效果：</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "龙泉横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 1300,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "铸血横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 1200,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "嗜血回复",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"hp\" });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "翻腾横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 800,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>怒意狂表，气勋上涌。</p><hr><p><strong>效果：</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "鱼肠横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 700,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><hr><p><strong>效果：</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "鱼肠横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 500,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><hr><p><strong>效果：</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "刹绝横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><hr><p><strong>效果：</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "逐鹿横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><hr><p><strong>效果：</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "百炼横刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 1,
+            "price": 200,
+            "damage": 7,
+            "block": 3,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "精铁横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "精铜横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铁横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铜横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "烂铁横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "破铜横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "石横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "木横刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "横刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "无痕弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 20000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><hr><p><strong>效果：</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "无痕弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 15000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><hr><p><strong>效果：</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "鸿灵弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.blade.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 13000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><hr><p><strong>效果：</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "万刃弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.weapon.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 10000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><hr><p><strong>效果：</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "守心弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 9000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><hr><p><strong>效果：</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "真刚弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 7000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><hr><p><strong>效果：</strong>装备后，即便被击破架招，该武器格挡值依旧生效。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "真刚弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 6000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><hr><p><strong>效果：</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "霜月寒气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    const effectData = {\n        id: \"unstable\",\n        duration: { rounds: 2 }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "魅影弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 5000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><hr><p><strong>效果：</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "魅影弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 3,
+            "price": 4000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><hr><p><strong>效果：</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "业火弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 2000,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>破釜沉舟，不胜不还。</p><hr><p><strong>效果：</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "破釜沉舟",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`${actor.name} 破釜沉舟，造成额外流失伤害！`);\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 1600,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><hr><p><strong>效果：</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "蟠龙触杀",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "龙泉弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 1500,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><hr><p><strong>效果：</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "龙泉弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 1300,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "铸血弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 1200,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "嗜血回复",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"hp\" });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "翻腾弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 800,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>怒意狂表，气勋上涌。</p><hr><p><strong>效果：</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "鱼肠弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 700,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><hr><p><strong>效果：</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "鱼肠弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 500,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><hr><p><strong>效果：</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "刹绝弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><hr><p><strong>效果：</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "逐鹿弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 5,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><hr><p><strong>效果：</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "百炼弯刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 1,
+            "price": 200,
+            "damage": 7,
+            "block": 3,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "精铁弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "精铜弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铁弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铜弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "烂铁弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "破铜弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "石弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "木弯刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "弯刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p><hr><p><strong>效果：</strong>无</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "无痕斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 20000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><hr><p><strong>效果：</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "无痕斧钺",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 15000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><hr><p><strong>效果：</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "鸿灵斧钺",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.blade.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 13000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><hr><p><strong>效果：</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "万刃斧钺",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.weapon.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 10000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><hr><p><strong>效果：</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "守心斧钺",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 9000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><hr><p><strong>效果：</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "真刚斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 7000,
+            "damage": 20,
+            "block": 10,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><hr><p><strong>效果：</strong>装备后，即便被击破架招，该武器格挡值依旧生效。</p>",
+            "automationNote": "完全自动化",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "真刚斧钺",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 6000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><p><strong>【效果】</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "霜月特效",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "魅影斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 5000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><p><strong>【效果】</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "魅影身法",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 3,
+            "price": 4000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><p><strong>【效果】</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "业火",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 2000,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>破釜沉舟，不胜不还。</p><p><strong>【效果】</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化：命中惩罚由AE处理，流失伤害由脚本触发。",
+            "scripts": [
+                {
+                    "label": "破釜沉舟",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'bleed',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info('破釜沉舟：造成额外20点流失伤害！');\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 1600,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><p><strong>【效果】</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化：检测暴击并附加伤害。",
+            "scripts": [
+                {
+                    "label": "蟠龙触杀",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit && args.isCrit) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'bleed',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.warn('蟠龙触发：暴击附加10点流失！');\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "龙泉斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 1500,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><p><strong>【效果】</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化：被动减少内力消耗。"
+        },
+        "effects": [
+            {
+                "name": "龙泉护体",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 1300,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><p><strong>【效果】</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "铸血斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 1200,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><p><strong>【效果】</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化：命中后自动回血。",
+            "scripts": [
+                {
+                    "label": "嗜血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "翻腾斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 800,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>怒意狂表，气勋上涌。</p><p><strong>【效果】</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "鱼肠斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 700,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><p><strong>【效果】</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "鱼肠",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 500,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><p><strong>【效果】</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "刹绝",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><p><strong>【效果】</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "逐鹿",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><p><strong>【效果】</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "百炼",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 1,
+            "price": 200,
+            "damage": 7,
+            "block": 3,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "精铁斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "精铜斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铁斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铜斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "烂铁斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "破铜斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "石斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "木斧钺",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "斧钺",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "无痕双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 20000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><p><strong>【效果】</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "无痕",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 15000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><p><strong>【效果】</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化：增加刀法等级。"
+        },
+        "effects": [
+            {
+                "name": "鸿灵",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.blade.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 13000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><p><strong>【效果】</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化：伤害通过属性增加，流失通过自动化Flags实现。"
+        },
+        "effects": [
+            {
+                "name": "万刃自噬",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 10000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><p><strong>【效果】</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化：增加属性检定修正值。"
+        },
+        "effects": [
+            {
+                "name": "守心",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 9000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><p><strong>【效果】</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化：命中后自动回内。",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "真刚双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 7000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><p><strong>【效果】</strong>装备后，即便被击破架招，该武器格按值依旧生效。</p>",
+            "automationNote": "完全自动化：开启被动格挡。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "真刚双刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 6000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><p><strong>【效果】</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "霜月特效",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "魅影双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 5000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><p><strong>【效果】</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "魅影身法",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 3,
+            "price": 4000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><p><strong>【效果】</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "业火",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 2000,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>破釜沉舟，不胜不还。</p><p><strong>【效果】</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化：命中惩罚AE，额外伤害脚本。",
+            "scripts": [
+                {
+                    "label": "破釜沉舟",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'bleed',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info('破釜沉舟：造成额外20点流失伤害！');\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 1600,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><p><strong>【效果】</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化：暴击触发脚本。",
+            "scripts": [
+                {
+                    "label": "蟠龙触杀",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit && args.isCrit) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'bleed',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.warn('蟠龙触发：暴击附加10点流失！');\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "龙泉双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 1500,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><p><strong>【效果】</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化：被动减耗。"
+        },
+        "effects": [
+            {
+                "name": "龙泉护体",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 1300,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><p><strong>【效果】</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "铸血双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 1200,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><p><strong>【效果】</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化：命中回血。",
+            "scripts": [
+                {
+                    "label": "嗜血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "翻腾双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 800,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>怒意狂表，气勋上涌。</p><p><strong>【效果】</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "鱼肠双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 700,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><p><strong>【效果】</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "鱼肠",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 500,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><p><strong>【效果】</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "刹绝",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><p><strong>【效果】</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "逐鹿",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><p><strong>【效果】</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "百炼",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 1,
+            "price": 200,
+            "damage": 7,
+            "block": 3,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "精铁双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "精铜双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铁双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铜双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "烂铁双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "破铜双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "石双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "木双刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "双刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "无痕刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 20000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><p><strong>【效果】</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "无痕",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 15000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><p><strong>【效果】</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "鸿灵",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.blade.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 13000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><p><strong>【效果】</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化：属性修正与流失Flags。"
+        },
+        "effects": [
+            {
+                "name": "万刃自噬",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 10000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><p><strong>【效果】</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化：增加属性检定修正值。"
+        },
+        "effects": [
+            {
+                "name": "守心",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 9000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><p><strong>【效果】</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化：命中回内脚本。",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "真刚刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 7000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><p><strong>【效果】</strong>装备后，即便被击破架招，该武器格按值依旧生效。</p>",
+            "automationNote": "完全自动化：开启被动格挡。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "真刚刀",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 6000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><p><strong>【效果】</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "霜月特效",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "魅影刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 5000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><p><strong>【效果】</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "魅影身法",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 3,
+            "price": 4000,
+            "damage": 20,
+            "block": 10,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><p><strong>【效果】</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "业火",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 2000,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>破釜沉舟，不胜不还。</p><p><strong>【效果】</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化：AE减命中，脚本造成流失。",
+            "scripts": [
+                {
+                    "label": "破釜沉舟",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'bleed',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info('破釜沉舟：造成额外20点流失伤害！');\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 1600,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><p><strong>【效果】</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化：暴击触发脚本。",
+            "scripts": [
+                {
+                    "label": "蟠龙触杀",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit && args.isCrit) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'bleed',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.warn('蟠龙触发：暴击附加10点流失！');\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "龙泉刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 1500,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><p><strong>【效果】</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化：被动减耗。"
+        },
+        "effects": [
+            {
+                "name": "龙泉护体",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 1300,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><p><strong>【效果】</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "铸血刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 1200,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><p><strong>【效果】</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化：命中回血。",
+            "scripts": [
+                {
+                    "label": "嗜血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.type === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "翻腾刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 800,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>怒意狂表，气勋上涌。</p><p><strong>【效果】</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动。",
+            "scripts": []
+        },
+        "effects": []
+    },
+    {
+        "name": "鱼肠刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 700,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><p><strong>【效果】</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "鱼肠",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 500,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><p><strong>【效果】</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "刹绝",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><p><strong>【效果】</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "逐鹿",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 5,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><p><strong>【效果】</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化：被动属性修正。"
+        },
+        "effects": [
+            {
+                "name": "百炼",
+                "icon": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 1,
+            "price": 200,
+            "damage": 7,
+            "block": 3,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "精铁刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "精铜刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 2,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铁刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "粗铜刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "烂铁刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀3.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "破铜刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀4.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 1,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "石刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀1.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    },
+    {
+        "name": "木刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/刀2.png",
+        "system": {
+            "type": "blade",
+            "subtype": "单刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无特效。"
+        },
+        "effects": []
+    }
+]
