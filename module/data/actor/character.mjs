@@ -1309,22 +1309,35 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // 计算最终格挡总值 (Total Block)
     // ------------------------------------
-    // 基础格挡 = 属性衍生(通常为0) + 装备/Buff修正 + 经脉修正
+    // 基础格挡 = 属性衍生(通常为0) + 装备/Buff修正 + 经脉修正 + 武器提供的格挡值
     // 注意：bonuses.block 包含了经脉和AE的加值
     const baseBlock = (combat.block || 0) + bonuses.block;
 
     // 新增一个字段用来记录架招的格挡值，这个字段不需要定义在 schema 里，直接挂在 combat 内存对象上即可
     combat.stanceBlockValue = 0;
 
+    let equipmentBlock = 0;
+    if (actor) {
+      // 遍历所有 weapon 物品
+      const weapons = actor.itemTypes.weapon || [];
+
+      for (const w of weapons) {
+        // 只有已装备 (equipped) 的武器才提供格挡
+        if (w.system.equipped) {
+          equipmentBlock += (w.system.block || 0);
+        }
+      }
+    }
+
     if (isStanceActive) {
       // 情况 1: 架招开启
       // Total = 基础(含装备/经脉) + 架招本体强度
-      combat.blockTotal = baseBlock + stanceBlockValue;
+      combat.blockTotal = baseBlock + stanceBlockValue + + equipmentBlock;
       combat.stanceBlockValue = stanceBlockValue;
     } else if (hasPassiveBlock) {
       // 情况 2: 架招关闭，但有“被动格挡”特效 (如密宗瑜伽内功)
       // Total = 基础(含装备/经脉)
-      combat.blockTotal = baseBlock;
+      combat.blockTotal = baseBlock + equipmentBlock;
     } else {
       // 情况 3: 架招关闭，且无特殊特效
       // Total = 0 (所有格挡失效)
