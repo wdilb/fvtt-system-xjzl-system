@@ -416,7 +416,9 @@ XJZL.hobbies = {
     "weapon": "XJZL.Hobbies.Weapon", // 喜好兵器
     "clothes": "XJZL.Hobbies.Clothes", // 喜好华服
     "jewelry": "XJZL.Hobbies.Jewelry", // 喜好首饰
-    "manual": "XJZL.Hobbies.Manual",   // 喜好秘籍
+    "wxManual": "XJZL.Hobbies.WxManual",   // 喜好秘籍
+    "ngManual": "XJZL.Hobbies.NgManual",   // 喜好秘籍
+    "jyManual": "XJZL.Hobbies.JyManual",   // 喜好秘籍
     "qizhen": "XJZL.Hobbies.Qizhen",   // 喜好奇珍
     "food": "XJZL.Hobbies.Food",       // 喜好美食
     "pills": "XJZL.Hobbies.Pills",     // 喜好丹药
