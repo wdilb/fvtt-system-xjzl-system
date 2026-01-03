@@ -167,102 +167,124 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     async _prepareContext(options) {
         // =====================================================
+        // ✦ 0. 内部辅助函数定义 (Local Helpers)
+        // -----------------------------------------------------
+        // 定义在最前面，供后续所有模块复用，确保风格统一
+
+        /**
+         * 文本清洗器：将富文本转为适合 Tooltip 显示的纯文本
+         * 保留换行，去除标签，转义引号
+         */
+        const cleanRichText = (text) => {
+            if (!text) return "";
+            return text
+                .replace(/<br\s*\/?>/gi, '\n') // 换行转 \n
+                .replace(/<\/(p|div|h[1-6]|li|ul|ol)>/gi, '\n') 
+                .replace(/<[^>]+>/g, '')       // 删掉剩余所有标签
+                .replace(/&nbsp;/g, ' ')       // 修复空格
+                .replace(/"/g, '&quot;')       // 修复双引号
+                .replace(/'/g, '&apos;')       // 修复单引号
+                .trim();
+        };
+
+        /**
+         * 构建自动化说明的 HTML 片段 (蓝色框)
+         */
+        const buildAutomationHTML = (note) => {
+            if (!note) return "";
+            // 使用 cleanRichText 处理内容，防止双引号破坏 HTML 结构
+            // 样式：Flex布局，左对齐，强制 normal 换行覆盖外层的 pre-wrap
+            return `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px 6px; margin:6px 0; font-size:11px; color:#aed6f1; display:flex; align-items:center; white-space:normal; line-height:1.2;'>
+                        <i class='fas fa-robot' style='margin-right:4px;'></i><span>${note.replace(/"/g, '&quot;')}</span>
+                    </div>`;
+        };
+
+        /**
+         * 构建普通描述的 HTML 片段 (灰色文字)
+         */
+        const buildDescriptionHTML = (description, maxLength = 0) => {
+            if (!description) return "";
+            let text = cleanRichText(description);
+            if (maxLength > 0 && text.length > maxLength) {
+                text = text.substring(0, maxLength) + "...";
+            }
+            // 样式：pre-wrap 保留 cleanRichText 生成的换行符
+            return `<div style='font-size:11px; color:#ccc; line-height:1.4; white-space: pre-wrap;'>${text}</div>`;
+        };
+
+        // =====================================================
         // ✦ 1. 核心上下文初始化 (Core Initialization)
         // -----------------------------------------------------
-        // 获取基础上下文，准备 actor 和 system 的简写引用
         const context = await super._prepareContext(options);
         const actor = this.document;
         const system = actor.system;
 
-        context.system = system;     // 方便 Handlebars 中直接使用 system.xxx
-        context.tabs = this.tabGroups; // 标签页配置
+        context.system = system;
+        context.tabs = this.tabGroups;
 
         // =====================================================
         // ✦ 2. 表单下拉选项配置 (Form Choices & Config)
         // -----------------------------------------------------
-        // 这里集中处理所有 <select> 标签需要的枚举数据
-        // localizeConfig 会将 key 转换为翻译后的文本
         context.choices = {
-            // [基础信息页] 性别选择
             genders: localizeConfig(XJZL.genders),
-
-            // [基础信息页] 门派选择
             sects: localizeConfig(XJZL.sects),
-
-            // [基础信息页] 处世态度
             attitudes: localizeConfig(XJZL.attitudes),
-
-            // [基础信息页] 嗜好列表
             hobbies: localizeConfig(XJZL.hobbies)
         };
 
         // =====================================================
         // ✦ 3. 角色状态与基础信息 (Status & Bio)
         // -----------------------------------------------------
-        // [UI显示] 计算资源百分比，主要用于前端 CSS 的 width: xx% 进度条
         context.percents = {
             hp: system.resources.hp.max ? Math.min(100, (system.resources.hp.value / system.resources.hp.max) * 100) : 0,
-            // 护体百分比：基于气血上限计算，最大不超过 100%
             huti: system.resources.hp.max ? Math.min(100, (system.resources.huti / system.resources.hp.max) * 100) : 0,
             mp: system.resources.mp.max ? Math.min(100, (system.resources.mp.value / system.resources.mp.max) * 100) : 0,
-            rage: (system.resources.rage.value / 10) * 100 // 怒气上限固定为 10
+            rage: (system.resources.rage.value / 10) * 100
         };
 
-        // [单例物品] 获取背景和性格物品，用于在首页显示详情
         context.backgroundItem = actor.itemTypes.background?.[0] || null;
         context.personalityItem = actor.itemTypes.personality?.[0] || null;
 
-        // [嗜好槽位] 构造固定长度为3的数组，确保界面上始终显示3个下拉框
-        // 逻辑：读取现有嗜好 -> 填充空位 -> 映射为对象
         const currentHobbies = system.info.shihao || [];
         context.hobbySlots = [0, 1, 2].map(i => ({
             index: i,
-            value: currentHobbies[i] || "" // 如果该槽位没数据，则为空，显示“请选择”
+            value: currentHobbies[i] || ""
         }));
 
         // =====================================================
         // ✦ 4. 属性技能面板 (Attributes & Skills Tab)
         // -----------------------------------------------------
-        // [子标签页] 确保 cultivationSubTab 在合法范围内 (默认切回内功)
         if (!["neigong", "wuxue", "arts"].includes(this._cultivationSubTab)) {
             this._cultivationSubTab = "neigong";
         }
         context.cultivationSubTab = this._cultivationSubTab;
 
-        // [技能分组] 定义属性与对应技能的映射关系
-        // 用于在模板中通过 {{#each}} 循环渲染七大属性块
         const allSkillGroups = [
-            { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] }, // 悟性
-            { key: "liliang", label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] }, // 力量
-            { key: "shenfa", label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] }, // 身法
-            { key: "tipo", label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] }, // 体魄
-            { key: "neixi", label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] }, // 内息
-            { key: "qigan", label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] }, // 气感
-            { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }  // 神采
+            { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] },
+            { key: "liliang", label: "XJZL.Stats.Liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
+            { key: "shenfa", label: "XJZL.Stats.Shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
+            { key: "tipo", label: "XJZL.Stats.Tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] },
+            { key: "neixi", label: "XJZL.Stats.Neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
+            { key: "qigan", label: "XJZL.Stats.Qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
+            { key: "shencai", label: "XJZL.Stats.Shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
         ];
 
-        // 将“悟性”单独提取（可能 UI 布局特殊），其余作为标准组
         context.wuxingGroup = allSkillGroups.find(g => g.key === 'wuxing');
         context.standardSkillGroups = allSkillGroups.filter(g => g.key !== 'wuxing');
 
         // =====================================================
-        // [编辑器] 获取属性调整选项 (用于 Active Effects 编辑弹窗)
+        // [编辑器] 获取属性调整选项
         // -----------------------------------------------------
         const modifierChoices = getModifierChoices();
-
-        // A. 扁平化数据 (用于 Key -> Label 翻译)
         const flatModifiers = {};
         for (const group of Object.values(modifierChoices)) {
             Object.assign(flatModifiers, group);
         }
 
-        // B. 遍历 customModifiers，注入 displayLabel
-        // 结构：system.customModifiers (Array) -> group -> changes (Array) -> { key, value }
         if (context.system.customModifiers) {
             context.system.customModifiers.forEach(group => {
                 if (group.changes) {
                     group.changes.forEach(change => {
-                        // 如果字典里有，就显示中文；否则显示原始 Key
                         change.displayLabel = flatModifiers[change.key] || change.key || "请选择属性...";
                     });
                 }
@@ -270,162 +292,135 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // =====================================================
-        // ✦ 5. 战斗核心数据 (Combat & Martial Arts) - [修复与增强版]
+        // ✦ 5. 战斗核心数据 (Combat & Martial Arts)
         // -----------------------------------------------------
-        // 获取内功列表
-        let neigongs = actor.itemTypes.neigong || [];
 
-        // 排序逻辑：运行中的排在最前 > 品阶高 > 品阶低
+        // --- 内功列表处理 ---
+        let neigongs = actor.itemTypes.neigong || [];
         neigongs.sort((a, b) => {
-            // 优先检查运行状态 (active = true 排前)
-            if (a.system.active !== b.system.active) {
-                return a.system.active ? -1 : 1;
-            }
-            // 其次按品阶 (Tier 3 > 2 > 1)
+            if (a.system.active !== b.system.active) return a.system.active ? -1 : 1;
             return b.system.tier - a.system.tier;
         });
 
-        // 挂载并处理内功数据
         context.neigongs = neigongs;
         context.neigongs.forEach(item => {
             item.isRunning = item.system.active;
 
             // === 分阶段进度计算 ===
-            const system = item.system;
-            const tier = system.tier;
-            const config = system.config;
+            const sys = item.system;
+            const tier = sys.tier;
+            const config = sys.config;
 
-            // 1. 获取各阶段折扣系数 (默认为 1)
             const r1 = config.stage1?.xpCostRatio ?? 1;
             const r2 = config.stage2?.xpCostRatio ?? 1;
             const r3 = config.stage3?.xpCostRatio ?? 1;
 
-            // 2. 定义【增量】门槛 (即每一级单独修满需要多少)
-            // 规则：
-            // 人级(1): 领悟0 / 小成1000 / 圆满2000 (总3000)
-            // 地级(2): 领悟1000 / 小成3000 / 圆满6000 (总10000)
-            // 天级(3): 领悟2000 / 小成10000 / 圆满18000 (总30000)
             let baseCosts = [0, 0, 0];
             if (tier === 1) baseCosts = [0, 1000, 2000];
             else if (tier === 2) baseCosts = [1000, 3000, 6000];
             else if (tier === 3) baseCosts = [2000, 10000, 18000];
 
-            // 3. 应用折扣，计算实际需求 (Cap)
-            const c1 = Math.floor(baseCosts[0] * r1); // 领悟需求
-            const c2 = Math.floor(baseCosts[1] * r2); // 小成需求
-            const c3 = Math.floor(baseCosts[2] * r3); // 圆满需求
+            const c1 = Math.floor(baseCosts[0] * r1);
+            const c2 = Math.floor(baseCosts[1] * r2);
+            const c3 = Math.floor(baseCosts[2] * r3);
 
-            // 4. 分配已投入的修为 (像倒水一样填满杯子)
-            let remaining = system.xpInvested;
-
-            // 杯子1 (领悟)
-            const v1 = Math.min(remaining, c1);
-            remaining = Math.max(0, remaining - c1);
-
-            // 杯子2 (小成)
-            const v2 = Math.min(remaining, c2);
-            remaining = Math.max(0, remaining - c2);
-
-            // 杯子3 (圆满)
+            let remaining = sys.xpInvested;
+            const v1 = Math.min(remaining, c1); remaining = Math.max(0, remaining - c1);
+            const v2 = Math.min(remaining, c2); remaining = Math.max(0, remaining - c2);
             const v3 = Math.min(remaining, c3);
 
-            // 5. 构建 Tooltip HTML
-            // 辅助函数: 进度颜色 (满=绿, 有=黄, 空=灰)
             const getCol = (v, max) => {
-                if (max === 0) return "#2ecc71"; // 0/0 算完成
+                if (max === 0) return "#2ecc71";
                 return v >= max ? "#2ecc71" : (v > 0 ? "#f1c40f" : "#999");
             };
 
+            // --- 构建 Tooltip HTML ---
             let html = `<div style='text-align:left; min-width:180px; max-width:250px; font-family:var(--font-serif);'>`;
 
-            // 标题栏：总进度
             html += `<div style='border-bottom:1px solid rgba(255,255,255,0.2); margin-bottom:6px; padding-bottom:4px; font-weight:bold; color:#fff; display:flex; justify-content:space-between;'>
                         <span>${item.name}</span>
-                        <span style='font-family:Consolas; color:var(--c-highlight);'>${system.xpInvested} / ${system.progressData.absoluteMax}</span>
+                        <span style='font-family:Consolas; color:var(--c-highlight);'>${sys.xpInvested} / ${sys.progressData.absoluteMax}</span>
                      </div>`;
 
-            // --- 修炼需求 ---
-            if (system.requirement) {
-                const reqText = system.requirement.replace(/\n/g, " ").replace(/"/g, '&quot;');
+            if (sys.requirement) {
                 html += `<div style='color:#ff6b6b; font-size:11px; margin-bottom:8px; display:flex; align-items:flex-start; line-height:1.4;'>
                     <i class='fas fa-exclamation-circle' style='margin-top:2px; margin-right:4px; flex-shrink:0;'></i>
-                    <span>${reqText}</span>
+                    <span>${cleanRichText(sys.requirement)}</span>
                 </div>`;
             }
 
-            // 阶段1：领悟
+            // 进度显示
             html += `<div style='display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px;'>
-                        <span style='color:#ccc'>领悟:</span>
-                        <span style='font-family:Consolas; color:${getCol(v1, c1)}'>${v1} / ${c1}</span>
+                        <span style='color:#ccc'>领悟:</span> <span style='font-family:Consolas; color:${getCol(v1, c1)}'>${v1} / ${c1}</span>
                      </div>`;
-
-            // 阶段2：小成
             html += `<div style='display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px;'>
-                        <span style='color:#ccc'>小成:</span>
-                        <span style='font-family:Consolas; color:${getCol(v2, c2)}'>${v2} / ${c2}</span>
+                        <span style='color:#ccc'>小成:</span> <span style='font-family:Consolas; color:${getCol(v2, c2)}'>${v2} / ${c2}</span>
                      </div>`;
-
-            // 阶段3：圆满
             html += `<div style='display:flex; justify-content:space-between; font-size:12px;'>
-                        <span style='color:#ccc'>圆满:</span>
-                        <span style='font-family:Consolas; color:${getCol(v3, c3)}'>${v3} / ${c3}</span>
+                        <span style='color:#ccc'>圆满:</span> <span style='font-family:Consolas; color:${getCol(v3, c3)}'>${v3} / ${c3}</span>
                      </div>`;
 
-            // --- 当前境界特效描述 ---
-            const currentStage = Math.max(1, system.stage || 0);
-            const stageKey = `stage${currentStage}`;
-            const stageConfig = config[stageKey];
-
+            // 境界特效
+            const currentStage = Math.max(1, sys.stage || 0);
+            const stageConfig = config[`stage${currentStage}`];
             const stageLabels = { 1: "领悟", 2: "小成", 3: "圆满" };
-            const stageLabel = stageLabels[currentStage] || "境界";
 
             if (stageConfig && stageConfig.description) {
-                // 转义双引号
-                const descHtml = stageConfig.description.replace(/\n/g, "<br>").replace(/"/g, '&quot;');
-
                 html += `<div style='margin-top:8px; background:rgba(255,255,255,0.05); padding:6px; border-radius:4px; border-left:2px solid var(--c-highlight);'>
                     <div style='font-weight:bold; color:var(--c-highlight); font-size:11px; margin-bottom:2px;'>
-                        ${stageLabel}特效
+                        ${stageLabels[currentStage] || "境界"}特效
                     </div>
                     <div style='color:#ddd; font-size:11px; line-height:1.4;'>
-                        ${descHtml}
+                        ${cleanRichText(stageConfig.description)}
                     </div>
                  </div>`;
             }
 
-            // 插入自动化说明
-            if (system.automationNote) {
-                const autoNote = system.automationNote.replace(/"/g, '&quot;');
-                html += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px; margin:6px 0; font-size:11px; color:#aed6f1;'>
-                                    <i class='fas fa-robot'></i> ${autoNote}
-                                </div>`;
+            // 自动化说明 (使用辅助函数)
+            if (sys.automationNote) {
+                html += buildAutomationHTML(sys.automationNote);
             }
 
-            if (system.description) {
-                // 转义双引号
-                let plainDesc = system.description.replace(/<[^>]+>/g, '').replace(/"/g, '&quot;');
-                if (plainDesc.length > 50) plainDesc = plainDesc.substring(0, 50) + "...";
-
-                html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#888;'>${plainDesc}</div>`;
+            // 描述 (使用辅助函数)
+            if (sys.description) {
+                html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1);'>
+                            ${buildDescriptionHTML(sys.description, 50)}
+                         </div>`;
             }
 
             html += `</div>`;
-
             item.xpTooltip = html;
         });
 
-        // [当前运行内功] 用于顶部状态栏显示名称与简述
-        context.activeNeigongName = "";
-        context.activeNeigongDesc = "";
+        // =====================================================
+        // [当前运行内功] 状态处理 (使用 cleanRichText)
+        // =====================================================
+        context.activeNeigong = null;
         if (system.martial.active_neigong) {
             const ng = actor.items.get(system.martial.active_neigong);
             if (ng) {
-                context.activeNeigongName = ng.name;
-                context.activeNeigongDesc = ng.system.description || "";
+                const currentStage = Math.max(1, ng.system.stage || 0);
+                const stageConfig = ng.system.config[`stage${currentStage}`];
+                const stageLabels = { 1: "领悟", 2: "小成", 3: "圆满" };
+
+                const effectText = cleanRichText(stageConfig?.description || "");
+                const loreText = cleanRichText(ng.system.description || "");
+
+                context.activeNeigong = {
+                    name: ng.name,
+                    id: ng.id,
+                    stageLabel: stageLabels[currentStage] || "境界",
+                    effect: effectText,
+                    description: loreText,
+                    hasEffect: !!effectText,
+                    automationNote: ng.system.automationNote
+                };
             }
         }
 
-        // [架招] 获取当前激活的架招 (Stance) 及其自动化描述
+        // =====================================================
+        // [架招] 状态处理 (使用 cleanRichText)
+        // =====================================================
         context.activeStance = null;
         const martial = system.martial;
         if (martial.stanceActive && martial.stanceItemId && martial.stance) {
@@ -434,144 +429,95 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             if (move) {
                 context.activeStance = {
                     name: move.name,
-                    description: move.description,
+                    description: cleanRichText(move.description),
                     automationNote: move.automationNote
                 };
             }
         }
 
-        // [外功/武学] 预计算招式伤害 (Pre-calculation)
-        // 1. 先获取常用列表 Set (用于快速查找)
+        // =====================================================
+        // [外功/武学] 预计算招式伤害
+        // =====================================================
         const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
-        // pinnedList 格式 ["ItemID.MoveID", ...]
         const pinnedSet = new Set(pinnedList);
 
-        // 2. 预处理武学与招式
-        // 先获取，然后按 sort 字段排序 (a.sort - b.sort)
         let wuxueItems = actor.itemTypes.wuxue || [];
         wuxueItems.sort((a, b) => (a.sort || 0) - (b.sort || 0));
         context.wuxues = wuxueItems;
+
         for (const wuxue of context.wuxues) {
             const moves = wuxue.system.moves || [];
 
-            // 遍历每个招式
             moves.forEach(move => {
-                // --- 1. 基础计算 ---
+                // 1. 基础计算
                 const result = wuxue.calculateMoveDamage(move.id);
-                // 确保 derived 对象存在，即使计算失败
-                move.derived = result || {
-                    damage: 0,
-                    breakdown: "无数据",
-                    cost: { mp: 0, rage: 0, hp: 0 },
-                    isWeaponMatch: true
-                };
+                move.derived = result || { damage: 0, breakdown: "无数据", cost: { mp: 0, rage: 0, hp: 0 }, isWeaponMatch: true };
 
-                // 注入 isPinned 状态
                 const refKey = `${wuxue.id}.${move.id}`;
                 move.isPinned = pinnedSet.has(refKey);
 
-                // --- 2. 进度分级计算 ---
-                // --- 2. 进度分级计算 (核心重写) ---
-                const tier = move.computedTier; // 1, 2, 3
+                // 2. 进度分级计算
+                const tier = move.computedTier;
                 const ratio = move.xpCostRatio ?? 1;
 
-                // 复刻 DataModel 的门槛逻辑
                 let rawThresholds = [];
                 let labels = [];
 
-                // 判断分类 (轻功/阵法只有一级，普通武学有多级)
                 if (wuxue.system.category === "qinggong" || wuxue.system.category === "zhenfa") {
                     if (tier === 1) rawThresholds = [1000];
                     else if (tier === 2) rawThresholds = [3000];
                     else rawThresholds = [6000];
                     labels = ["习得"];
                 } else {
-                    // 常规武学
-                    if (tier === 1) {
-                        rawThresholds = [0, 500, 1000];
-                        labels = ["领悟", "掌握", "精通"];
-                    } else if (tier === 2) {
-                        rawThresholds = [500, 1500, 3000];
-                        labels = ["领悟", "掌握", "精通"];
-                    } else { // Tier 3
-                        rawThresholds = [1000, 3000, 6000, 10000];
-                        labels = ["领悟", "掌握", "精通", "合一"];
-                    }
+                    if (tier === 1) { rawThresholds = [0, 500, 1000]; labels = ["领悟", "掌握", "精通"]; }
+                    else if (tier === 2) { rawThresholds = [500, 1500, 3000]; labels = ["领悟", "掌握", "精通"]; }
+                    else { rawThresholds = [1000, 3000, 6000, 10000]; labels = ["领悟", "掌握", "精通", "合一"]; }
                 }
 
-                // 应用折扣并取整
                 const thresholds = rawThresholds.map(t => Math.floor(t * ratio));
                 const xp = move.xpInvested;
-
-                // 取数组最后一个值作为“毕业”所需的总 XP
                 const absoluteMax = thresholds.length > 0 ? thresholds[thresholds.length - 1] : 0;
 
-                // 确保 progress 对象存在 (DataModel 通常有，但防卫性编程更好)
                 if (!move.progress) move.progress = {};
-
-                // 挂载数值供 HBS 使用: {{move.progress.currentMax}}
                 move.progress.currentMax = absoluteMax;
 
-                // --- 3. 构建招式主 Tooltip ---
-                let tooltipHTML = `<div style='text-align:left; min-width:180px; font-family:var(--font-serif);'>`;
+                // 3. 构建招式 Tooltip
+                // 注意：这里应用了 white-space: pre-wrap 和 max-width
+                let tooltipHTML = `<div style='text-align:left; min-width:180px; max-width:300px; white-space: pre-wrap; font-family:var(--font-serif);'>`;
 
-                // 标题
                 const typeLabel = game.i18n.localize(`XJZL.Wuxue.Type.${move.type}`);
                 tooltipHTML += `<div style='border-bottom:1px solid rgba(255,255,255,0.2); margin-bottom:6px; padding-bottom:4px; font-weight:bold; color:#fff; display:flex; justify-content:space-between;'>
                                     <span>${move.name}</span>
                                     <span style='font-size:11px; color:#aaa; border:1px solid #555; padding:0 4px; border-radius:4px;'>${typeLabel}</span>
                                  </div>`;
-                // === 修炼需求 (显示在标题下方) ===
+
                 if (move.requirements) {
-                    // 转义双引号，防止 HTML 结构崩坏
-                    const reqText = move.requirements.replace(/\n/g, " ").replace(/"/g, '&quot;');
                     tooltipHTML += `<div style='color:#ff6b6b; font-size:11px; margin-bottom:8px; display:flex; align-items:flex-start; line-height:1.4;'>
                         <i class='fas fa-exclamation-circle' style='margin-top:2px; margin-right:4px; flex-shrink:0;'></i>
-                        <span>${reqText}</span>
+                        <span>${cleanRichText(move.requirements)}</span>
                     </div>`;
                 }
 
-                // === 特殊逻辑：视为境界 (Mapped Stage) ===
                 if (move.progression.mappedStage && move.progression.mappedStage !== 0 && move.progression.mappedStage !== 5) {
-                    // 如果有强制映射 (例如：虽然XP是0，但视为精通)
-                    // mappedStage: 1=领悟, 2=掌握, 3=精通, 4=合一
                     const stageNames = ["", "领悟", "掌握", "精通", "合一"];
-                    const mappedName = stageNames[move.progression.mappedStage] || "未知";
-
                     tooltipHTML += `<div style='margin-bottom:8px; padding:6px; background:rgba(255,215,0,0.1); border:1px solid #ffd700; border-radius:4px; text-align:center;'>
                                         <div style='color:#ffd700; font-weight:bold;'>境界锁定</div>
-                                        <div style='font-size:12px; color:#fff;'>视为：${mappedName}</div>
+                                        <div style='font-size:12px; color:#fff;'>视为：${stageNames[move.progression.mappedStage] || "未知"}</div>
                                     </div>`;
                 } else {
-                    // === 正常逻辑：显示分段进度 ===
-                    // 遍历每一级，计算该级的 进度/上限
-                    // 逻辑：该级的进度 = min( 该级上限, max(0, 总XP - 上一级门槛) )
-                    // 该级上限 (Delta) = 本级门槛 - 上一级门槛
-
                     for (let i = 0; i < thresholds.length; i++) {
-                        const label = labels[i];
-                        const currentT = thresholds[i]; // 当前级累积门槛
-                        const prevT = i > 0 ? thresholds[i - 1] : 0; // 上一级累积门槛
+                        const currentT = thresholds[i];
+                        const prevT = i > 0 ? thresholds[i - 1] : 0;
+                        const segmentMax = currentT - prevT;
+                        let segmentVal = (segmentMax === 0) ? ((xp >= currentT) ? 0 : 0) : Math.max(0, Math.min(segmentMax, xp - prevT));
 
-                        const segmentMax = currentT - prevT; // 本段需要多少XP
-
-                        // 计算本段填了多少
-                        // 如果 segmentMax 是 0 (例如人级领悟是0)，则只要入门就算满
-                        let segmentVal = 0;
-                        if (segmentMax === 0) {
-                            segmentVal = (xp >= currentT) ? 0 : 0; // 0/0 显示
-                        } else {
-                            segmentVal = Math.max(0, Math.min(segmentMax, xp - prevT));
-                        }
-
-                        // 颜色逻辑
-                        let color = "#999"; // 未达成
-                        if (segmentMax === 0) color = "#2ecc71"; // 自动达成
-                        else if (segmentVal >= segmentMax) color = "#2ecc71"; // 已满
-                        else if (segmentVal > 0) color = "#f1c40f"; // 进行中
+                        let color = "#999";
+                        if (segmentMax === 0) color = "#2ecc71";
+                        else if (segmentVal >= segmentMax) color = "#2ecc71";
+                        else if (segmentVal > 0) color = "#f1c40f";
 
                         tooltipHTML += `<div style='display:flex; justify-content:space-between; margin-bottom:3px; font-size:12px;'>
-                                            <span style='color:#ccc'>${label}:</span>
+                                            <span style='color:#ccc'>${labels[i]}:</span>
                                             <span style='font-family:Consolas; color:${color}'>${segmentVal} / ${segmentMax}</span>
                                         </div>`;
                     }
@@ -579,68 +525,56 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
                 tooltipHTML += `<div style='font-size:11px; color:#aaa; margin-top:6px; padding-top:4px; border-top:1px dashed #555;'>总投入: ${move.xpInvested}</div>`;
 
-                // 自动化说明
+                // 自动化说明 (使用辅助函数)
                 if (move.automationNote) {
-                    tooltipHTML += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px; margin:6px 0; font-size:11px; color:#aed6f1;'>
-                                        <i class='fas fa-robot'></i> ${move.automationNote}
-                                    </div>`;
+                    tooltipHTML += buildAutomationHTML(move.automationNote);
                 }
 
-                // 描述
+                // 描述 (使用辅助函数)
                 if (move.description) {
                     tooltipHTML += `<hr style='border:0; border-top:1px dashed rgba(255,255,255,0.1); margin:4px 0;'>`;
-
-                    // 1. 去除 HTML 标签 (将富文本转为纯文本)
-                    let descText = move.description.replace(/<[^>]*>?/gm, '');
-
-                    // 2. 转义双引号，防止截断 data-tooltip 属性
-                    descText = descText.replace(/"/g, '&quot;');
-
-                    // 3. 截取长度 (可选，防止太长刷屏，设为 200 字)
-                    if (descText.length > 200) descText = descText.substring(0, 200) + "...";
-
-                    tooltipHTML += `<div style='font-size:11px; color:#ccc; line-height:1.4;'>${descText}</div>`;
+                    tooltipHTML += buildDescriptionHTML(move.description);
                 }
 
                 tooltipHTML += `</div>`;
                 move.tooltip = tooltipHTML;
 
-                // Breakdown Tooltip
                 if (move.derived.damage) {
                     const bdHtml = move.derived.breakdown.replace(/\n/g, "<br>");
                     move.derived.breakdownTooltip = `<div style='text-align:left; font-family:Consolas; font-size:11px;'>${bdHtml}</div>`;
                 }
             });
 
-            // --- 5. 构建武学本体 Tooltip (书本描述) ---
-            let bookTooltip = `<div style='text-align:left; max-width:250px;'>`;
-            bookTooltip += `<div style='font-weight:bold; margin-bottom:5px; color:#fff;'>${wuxue.name}</div>`;
+            // --- 5. 构建武学书本 Tooltip ---
+            let bookTooltip = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
+            bookTooltip += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${wuxue.name}</div>`;
+
             if (wuxue.system.description) {
-                bookTooltip += `<div style='font-size:11px; color:#ccc;'>${wuxue.system.description}</div>`;
+                // 使用 buildDescriptionHTML，它包含了 white-space: pre-wrap
+                bookTooltip += buildDescriptionHTML(wuxue.system.description);
             }
-            // 也可以加上悟性要求等
+
             if (wuxue.system.requirements) {
-                bookTooltip += `<hr style='border-color:#555;'><div style='font-size:10px; color:#e74c3c;'>${wuxue.system.requirements}</div>`;
+                // 需求描述也建议清洗一下
+                bookTooltip += `<hr style='border-color:#555;'><div style='font-size:10px; color:#e74c3c;'>${cleanRichText(wuxue.system.requirements)}</div>`;
             }
             bookTooltip += `</div>`;
             wuxue.tooltip = bookTooltip;
         }
 
-        // [Helper] 动态构建 Tooltip (Base + Mod + Total) - [新增]
-        // 解决只显示 Total 的问题，通过反向计算显示来源
+        // =====================================================
+        // [Helper] 动态构建战斗属性 Breakdown Tooltip
+        // =====================================================
         const buildBreakdown = (label, total, mod, extra = "") => {
             const safeMod = mod || 0;
             const base = total - safeMod;
-
-            // 样式优化：黑色半透背景，高对比度文字
             return `
             <div style="text-align:left; min-width:150px; font-family:var(--font-serif);">
                 <div style="border-bottom:1px solid rgba(255,255,255,0.2); margin-bottom:6px; padding-bottom:2px; font-weight:bold; font-size:14px; color:#fff;">
                     ${label} <span style="float:right; color:var(--c-highlight); font-family:Consolas;">${total}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; line-height:1.6;">
-                    <span>基础能力:</span> 
-                    <span style="font-family:Consolas;">${base}</span>
+                    <span>基础能力:</span> <span style="font-family:Consolas;">${base}</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; font-size:12px; color:#ccc; line-height:1.6;">
                     <span>装备/状态:</span> 
@@ -652,68 +586,38 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             </div>`;
         };
 
-        // 构建 combatStats 对象供模板使用 - [完全重构]
+        // 构建 combatStats
         context.combatStats = {
-            // 1. 属性 (Attributes) - 重组为左右两翼
-            attributesLeft: [],  // 力、身、体
-            attributesRight: [], // 内、气、神
-            wuxing: null,        // 悟性 (居中)
-
-            // 2. 仪表盘核心 (Cockpit) - 绑定 buildBreakdown 生成的 Tooltip
+            attributesLeft: [], attributesRight: [], wuxing: null,
             hitWaigong: { val: system.combat.hitWaigongTotal, tooltip: buildBreakdown("外功命中", system.combat.hitWaigongTotal, system.combat.hit_waigong) },
             critWaigong: { val: system.combat.critWaigongTotal, tooltip: buildBreakdown("外功暴击", system.combat.critWaigongTotal, system.combat.crit_waigong, "<div style='color:#e74c3c; font-size:10px;'>*越低越容易暴击</div>") },
-
             hitNeigong: { val: system.combat.hitNeigongTotal, tooltip: buildBreakdown("内功命中", system.combat.hitNeigongTotal, system.combat.hit_neigong) },
             critNeigong: { val: system.combat.critNeigongTotal, tooltip: buildBreakdown("内功暴击", system.combat.critNeigongTotal, system.combat.crit_neigong, "<div style='color:#e74c3c; font-size:10px;'>*越低越容易暴击</div>") },
-
             defWaigong: { val: system.combat.defWaigongTotal, tooltip: buildBreakdown("外功防御", system.combat.defWaigongTotal, system.combat.def_waigong) },
             defNeigong: { val: system.combat.defNeigongTotal, tooltip: buildBreakdown("内功防御", system.combat.defNeigongTotal, system.combat.def_neigong) },
-
-            // 特殊处理格挡 (含架招额外加成)
-            block: {
-                val: system.combat.blockTotal,
-                tooltip: buildBreakdown("格挡值", system.combat.blockTotal, (system.combat.block || 0), system.combat.stanceBlockValue ? `<div style='color:#f1c40f'>架招加成: +${system.combat.stanceBlockValue}</div>` : "")
-            },
-
+            block: { val: system.combat.blockTotal, tooltip: buildBreakdown("格挡值", system.combat.blockTotal, (system.combat.block || 0), system.combat.stanceBlockValue ? `<div style='color:#f1c40f'>架招加成: +${system.combat.stanceBlockValue}</div>` : "") },
             speed: { val: system.combat.speedTotal, tooltip: buildBreakdown("移动速度", system.combat.speedTotal, system.combat.speed) },
             initiative: { val: system.combat.initiativeTotal, tooltip: buildBreakdown("先攻值", system.combat.initiativeTotal, system.combat.initiative) },
             dodge: { val: system.combat.dodgeTotal, tooltip: buildBreakdown("闪避值", system.combat.dodgeTotal, system.combat.dodge) },
-
             kanpo: { val: system.combat.kanpoTotal, tooltip: buildBreakdown("看破", system.combat.kanpoTotal, system.combat.kanpo) },
             xuzhao: { val: system.combat.xuzhaoTotal, tooltip: buildBreakdown("虚招", system.combat.xuzhaoTotal, system.combat.xuzhao) },
-
-            // 3. 武器等级 (Weapon Ranks)
-            weaponRanks: [],
-
-            // 4. 详情 (Details)
-            resistances: {}, // 稍后填充
-            damages: {}      // 稍后填充
+            weaponRanks: [], resistances: {}, damages: {}
         };
 
-        // 正确获取 Schema 中的 Label，避免 undefined 错误
-        const statsSchema = system.schema.fields.stats.fields;
-        const resSchema = system.schema.fields.combat.fields.resistances.fields;
-        const dmgSchema = system.schema.fields.combat.fields.damages.fields;
-
         // --- 填充属性与悟性 (Attributes) ---
-        // 定义显示顺序：左翼(力身体) -> 悟性 -> 右翼(内气神)
+        const statsSchema = system.schema.fields.stats.fields;
         const attrKeys = ["liliang", "shenfa", "tipo", "wuxing", "neixi", "qigan", "shencai"];
 
         attrKeys.forEach((key, index) => {
             const stat = system.stats[key];
             const labelKey = statsSchema[key]?.label || `XJZL.Stats.${key}`;
             const label = game.i18n.localize(labelKey).charAt(0);
-
-            // 基础变量
             const base = stat.value ?? 0;
             const mod = stat.mod ?? 0;
             let tooltip = "";
 
-            // 针对悟性的特殊 Tooltip 构建
             if (key === "wuxing") {
-                // 读取境界/武学带来的加成 (在 prepareDerivedData 中计算并存入 cultivation.wuxingBonus)
                 const cultBonus = system.cultivation?.wuxingBonus || 0;
-
                 tooltip = `
                 <div style="text-align:left; min-width:140px;">
                     <strong style="border-bottom:1px solid #555; display:block; margin-bottom:4px;">${game.i18n.localize(labelKey)}: ${stat.total}</strong>
@@ -725,147 +629,74 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     <div style="font-size:10px; color:#999; margin-top:4px;">*悟性不可自由分配</div>
                 </div>`;
             } else {
-                // 其他属性的标准 Tooltip
                 const assigned = stat.assigned ? `<tr><td>分配:</td><td style="text-align:right">+${stat.assigned}</td></tr>` : "";
                 const neigongBonus = stat.neigongBonus ? `<tr><td>内功:</td><td style="text-align:right">+${stat.neigongBonus}</td></tr>` : "";
                 const identity = stat.identityBonus ? `<tr><td>身份:</td><td style="text-align:right">+${stat.identityBonus}</td></tr>` : "";
-
                 tooltip = `
                 <div style="text-align:left; min-width:120px;">
                     <strong style="border-bottom:1px solid #555; display:block; margin-bottom:4px;">${game.i18n.localize(labelKey)}: ${stat.total}</strong>
                     <table style="width:100%; font-size:11px; color:#ddd;">
                         <tr><td>基础:</td><td style="text-align:right">${base}</td></tr>
-                        ${assigned}
-                        ${neigongBonus}
-                        ${identity}
+                        ${assigned}${neigongBonus}${identity}
                         <tr><td>修正:</td><td style="text-align:right">${mod >= 0 ? '+' : ''}${mod}</td></tr>
                     </table>
                 </div>`;
             }
-
-            const data = {
-                key: key,
-                label: label,
-                total: stat.total,
-                assigned: stat.assigned,
-                tooltip: tooltip
-            };
-
-            if (key === "wuxing") {
-                context.combatStats.wuxing = data;
-            } else if (index < 3) {
-                context.combatStats.attributesLeft.push(data);
-            } else {
-                context.combatStats.attributesRight.push(data);
-            }
+            const data = { key: key, label: label, total: stat.total, assigned: stat.assigned, tooltip: tooltip };
+            if (key === "wuxing") context.combatStats.wuxing = data;
+            else if (index < 3) context.combatStats.attributesLeft.push(data);
+            else context.combatStats.attributesRight.push(data);
         });
 
-        // --- 填充武器等级 (Weapon Ranks) ---
-        // 使用汉字代替图标
-        const weaponChars = {
-            sword: "剑", blade: "刀", staff: "棍",
-            dagger: "匕", hidden: "暗", unarmed: "拳",
-            instrument: "乐", special: "奇"
-        };
-
+        // --- 填充武器等级, 抗性, 伤害 (保持逻辑不变) ---
+        const weaponChars = { sword: "剑", blade: "刀", staff: "棍", dagger: "匕", hidden: "暗", unarmed: "拳", instrument: "乐", special: "奇" };
         for (const [key, rankData] of Object.entries(system.combat.weaponRanks)) {
             context.combatStats.weaponRanks.push({
                 label: game.i18n.localize(`XJZL.Combat.Rank.${key.charAt(0).toUpperCase() + key.slice(1)}`),
                 val: rankData.total,
-                // 直接存单个汉字
                 char: weaponChars[key] || "武"
             });
         }
 
-        // --- 填充抗性 (Resistances) ---
+        const resSchema = system.schema.fields.combat.fields.resistances.fields;
         for (const [key, stat] of Object.entries(system.combat.resistances)) {
-            const labelKey = resSchema[key]?.label || key;
-            context.combatStats.resistances[key] = {
-                label: game.i18n.localize(labelKey),
-                total: stat.total
-            };
+            context.combatStats.resistances[key] = { label: game.i18n.localize(resSchema[key]?.label || key), total: stat.total };
         }
 
-        // --- 填充伤害 (Damages) ---
-        // 1. 遍历常规伤害 (排除 weaponTypes 容器)
+        const dmgSchema = system.schema.fields.combat.fields.damages.fields;
         for (const [key, stat] of Object.entries(system.combat.damages)) {
-            // 跳过 weaponTypes 容器，否则会显示出一行奇怪的数据
             if (key === 'weaponTypes') continue;
-
-            const labelKey = dmgSchema[key]?.label || key;
-            context.combatStats.damages[key] = {
-                label: game.i18n.localize(labelKey),
-                total: stat.total
-            };
+            context.combatStats.damages[key] = { label: game.i18n.localize(dmgSchema[key]?.label || key), total: stat.total };
         }
-
-        // 2. 遍历特定武器类型伤害 (只显示不为0的，避免列表过长)
-        // 获取 weaponTypes 的 Schema 定义以便查找 label
-        const weaponTypesSchema = dmgSchema.weaponTypes?.fields || {};
-
         if (system.combat.damages.weaponTypes) {
             for (const [subKey, subStat] of Object.entries(system.combat.damages.weaponTypes)) {
-                // 过滤：只有当数值不为 0 时才显示
                 if (subStat.total !== 0) {
                     const capKey = subKey.charAt(0).toUpperCase() + subKey.slice(1);
-                    const labelKey = `XJZL.Combat.Rank.${capKey}`;
-                    context.combatStats.damages[subKey] = {
-                        label: game.i18n.localize(labelKey) + '伤害',
-                        total: subStat.total
-                    };
+                    context.combatStats.damages[subKey] = { label: game.i18n.localize(`XJZL.Combat.Rank.${capKey}`) + '伤害', total: subStat.total };
                 }
             }
         }
 
-        // 常用招式 (Pinned Moves)
-        // 读取 Actor Flag: ["ItemUUID.MoveID", ...]
+        // --- 常用招式 (Pinned Moves) ---
         const pinnedRefs = actor.getFlag("xjzl-system", "pinnedMoves") || [];
         context.pinnedMoves = [];
-
         for (const ref of pinnedRefs) {
             try {
-                // 格式可能是 "ItemUUID.MoveID" 或 "ItemID.MoveID"
-                // 简单起见假设是 "ItemID.MoveID" 或者 split后取最后一部分
                 const parts = ref.split(".");
-                const moveId = parts.pop(); // 最后一部分是 moveId
-                const itemId = parts.pop(); // 倒数第二部分是 itemId (如果是UUID，这通常也是ID)
-
-                // 尝试获取物品
+                const moveId = parts.pop();
+                const itemId = parts.pop();
                 const item = actor.items.get(itemId);
-
                 if (item) {
-                    // 注意：这里的 move 对象已经被前面的 wuxue 循环处理过了
-                    // 带有 derived, tooltip, currentCost, isUltimate 等临时属性
                     const move = item.system.moves.find(m => m.id === moveId);
-
                     if (move) {
-                        // 构造扁平化数据对象供模板直接使用
                         context.pinnedMoves.push({
-                            // --- 基础数据 ---
-                            name: move.name,
-                            type: move.type, // 用于染色
-                            isUltimate: move.isUltimate, // 用于绝招特效
-                            computedLevel: move.computedLevel, // 等级
-                            range: move.range, //距离
-
-                            // --- 衍生数据 (来自 wuxue 循环的预计算) ---
-                            derived: move.derived,
-                            tooltip: move.tooltip,
-                            currentCost: move.currentCost,
-
-                            // --- 上下文数据 ---
-                            parentName: item.name,
-                            itemId: item.id,
-                            moveId: moveId,
-
-                            // --- 标记为已Pin (用于显示实心星星) ---
-                            isPinned: true
+                            name: move.name, type: move.type, isUltimate: move.isUltimate, computedLevel: move.computedLevel,
+                            range: move.range, derived: move.derived, tooltip: move.tooltip, currentCost: move.currentCost,
+                            parentName: item.name, itemId: item.id, moveId: moveId, isPinned: true
                         });
                     }
                 }
-            } catch (e) {
-                console.error("解析常用招式失败:", ref, e);
-            }
+            } catch (e) { console.error("解析常用招式失败:", ref, e); }
         }
 
         // =====================================================
@@ -873,85 +704,48 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // -----------------------------------------------------
         const allArts = [];
         const activeIdentities = system.activeIdentities || {};
-
-        // 遍历所有定义的技艺，合并数据
         for (const [key, labelKey] of Object.entries(XJZL.arts)) {
             const artData = system.arts[key];
             if (!artData) continue;
+            const artObj = { key: key, label: labelKey, total: artData.total || 0, identity: null };
 
-            const artObj = {
-                key: key,
-                label: labelKey,
-                total: artData.total || 0,
-                identity: null // 默认无身份
-            };
-
-            // [身份处理] 如果该技艺有激活的身份，生成徽章(Badge)和悬浮提示(Tooltip)
             const identityData = activeIdentities[key];
             if (identityData && identityData.highest) {
                 const capKey = key.charAt(0).toUpperCase() + key.slice(1);
                 const badgeTitle = game.i18n.localize(`XJZL.Identity.${capKey}.${identityData.highest.titleKey}`);
-
-                // 生成复杂的 HTML Tooltip，展示所有已获得的身份历史
-                const tooltipRows = identityData.all.map(id => {
-                    const title = game.i18n.localize(`XJZL.Identity.${capKey}.${id.titleKey}`);
-                    const desc = game.i18n.localize(`XJZL.Identity.${capKey}.${id.descKey}`);
-                    return `
+                const tooltipRows = identityData.all.map(id => `
                 <div style="margin-bottom: 8px;">
                     <div style="color:var(--c-highlight); font-weight:bold; font-size:1.1em;">
-                        <i class="fas fa-caret-right" style="font-size:0.8em;"></i> ${title} <span style="opacity:0.6; font-size:0.8em;">(Lv.${id.level})</span>
+                        <i class="fas fa-caret-right" style="font-size:0.8em;"></i> ${game.i18n.localize(`XJZL.Identity.${capKey}.${id.titleKey}`)} <span style="opacity:0.6; font-size:0.8em;">(Lv.${id.level})</span>
                     </div>
-                    <div style="padding-left: 10px; line-height: 1.4; color: #ddd; font-size: 0.9em;">${desc}</div>
-                </div>`;
-                }).join("<hr style='border-color:#444; margin: 4px 0;'>");
+                    <div style="padding-left: 10px; line-height: 1.4; color: #ddd; font-size: 0.9em;">${game.i18n.localize(`XJZL.Identity.${capKey}.${id.descKey}`)}</div>
+                </div>`).join("<hr style='border-color:#444; margin: 4px 0;'>");
 
                 artObj.identity = {
-                    title: badgeTitle, // 界面上只显示最高头衔
+                    title: badgeTitle,
                     tooltip: `<div style="text-align:left; max-width:400px; padding:2px;">${tooltipRows}</div>`,
                     level: identityData.highest.level
                 };
             }
             allArts.push(artObj);
         }
-
-        // [拆分列表] 界面上分为 "已入门(Learned)" 和 "未入门(Unlearned)" 两个区域
         context.learnedArts = allArts.filter(a => a.total > 0);
         context.unlearnedArts = allArts.filter(a => a.total === 0);
 
         // =====================================================
         // ✦ 7. 经脉可视化数据 (Jingmai Visualization)
         // -----------------------------------------------------
-        // A. [坐标定义] 背景图上穴位的绝对定位 (百分比)
         const MERIDIAN_COORDS = {
-            // --- 阴脉 (左侧身体 - 走势：肩 -> 臂 -> 肋 -> 腹 -> 膝 -> 足) ---
-            "hand_taiyin": { x: 36, y: 28 }, // [3阶] 少商：左肩高位，稍微靠内
-            "hand_jueyin": { x: 24, y: 40 }, // [2阶] 中冲：左臂外侧，拉开一点宽度
-            "hand_shaoyin": { x: 32, y: 52 }, // [1阶] 少冲：内收到左肋/侧腹，填补腹部左上空缺
-
-            "foot_taiyin": { x: 42, y: 66 }, // [3阶] 隐白：左腹股沟/大腿内侧，填补腹部左下空缺
-            "foot_jueyin": { x: 28, y: 78 }, // [2阶] 大敦：左膝外侧，再次向外拉开层次
-            "foot_shaoyin": { x: 38, y: 92 }, // [1阶] 涌泉：左足底，靠内
-
-            // --- 阳脉 (右侧身体 - 走势：眉 -> 肩 -> 胸 -> 腹 -> 胫 -> 踝) ---
-            "foot_taiyang": { x: 50, y: 19 }, // [眉心] 睛明：保持正中高位
-
-            "hand_taiyang": { x: 66, y: 32 }, // [3阶] 少泽：右肩，比左肩稍低，不对称
-            "hand_yangming": { x: 74, y: 46 }, // [2阶] 商阳：右臂远端，向外张开
-            "hand_shaoyang": { x: 60, y: 56 }, // [1阶] 关冲：内收到右侧腹部，填补腹部右侧空缺
-
-            "foot_yangming": { x: 54, y: 72 }, // [2阶] 厉兑：右腿内侧/丹田右下，紧贴中轴线
-            "foot_shaoyang": { x: 64, y: 86 }, // [1阶] 足窍阴：右脚踝，稍微向外
+            "hand_taiyin": { x: 36, y: 28 }, "hand_jueyin": { x: 24, y: 40 }, "hand_shaoyin": { x: 32, y: 52 },
+            "foot_taiyin": { x: 42, y: 66 }, "foot_jueyin": { x: 28, y: 78 }, "foot_shaoyin": { x: 38, y: 92 },
+            "foot_taiyang": { x: 50, y: 19 },
+            "hand_taiyang": { x: 66, y: 32 }, "hand_yangming": { x: 74, y: 46 }, "hand_shaoyang": { x: 60, y: 56 },
+            "foot_yangming": { x: 54, y: 72 }, "foot_shaoyang": { x: 64, y: 86 },
         };
-
-        // B. [装备检查] 获取已装备在特定穴位上的“奇珍”
         const equippedQizhenMap = {};
         (actor.itemTypes.qizhen || []).forEach(item => {
-            if (item.system.equipped && item.system.acupoint) {
-                equippedQizhenMap[item.system.acupoint] = item;
-            }
+            if (item.system.equipped && item.system.acupoint) equippedQizhenMap[item.system.acupoint] = item;
         });
-
-        // C. [构建列表] 生成正经十二脉的完整渲染数据
         const standardMeta = {
             "hand_shaoyin": { t: 1, type: "yin" }, "foot_shaoyin": { t: 1, type: "yin" },
             "hand_shaoyang": { t: 1, type: "yang" }, "foot_shaoyang": { t: 1, type: "yang" },
@@ -962,68 +756,40 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         };
 
         context.jingmaiStandardList = Object.entries(standardMeta).map(([key, meta]) => {
-            const isOpen = system.jingmai.standard[key]; // 穴位是否已打通
+            const isOpen = system.jingmai.standard[key];
             const coord = MERIDIAN_COORDS[key] || { x: 50, y: 50 };
             const equippedItem = equippedQizhenMap[key];
-
-            // 名称处理
             const fullName = game.i18n.localize(`XJZL.Jingmai.${key.charAt(0).toUpperCase() + key.slice(1)}`);
-            const match = fullName.match(/\(([^)]+)\)/);
-            const shortLabel = match ? match[1] : fullName;
+            const shortLabel = fullName.match(/\(([^)]+)\)/)?.[1] || fullName;
 
-            // Tooltip 构建: 包含经脉效果 + 奇珍装备信息
             let tooltip = `
             <div style='text-align:left; min-width:200px;'>
                 <div style='font-weight:bold; color:var(--c-highlight); font-size:14px;'>${fullName}</div>
-                <div style='font-size:10px; color:#ccc; margin-bottom:6px;'>
-                    ${game.i18n.localize(`XJZL.Jingmai.T${meta.t}`)} · ${meta.type === 'yin' ? '阴脉' : '阳脉'}
-                </div>
-                <div style='padding:4px; background:rgba(255,255,255,0.1); border-radius:4px;'>
-                    ${game.i18n.localize(`XJZL.Jingmai.Effects.${key.charAt(0).toUpperCase() + key.slice(1)}`)}
-                </div>
+                <div style='font-size:10px; color:#ccc; margin-bottom:6px;'>${game.i18n.localize(`XJZL.Jingmai.T${meta.t}`)} · ${meta.type === 'yin' ? '阴脉' : '阳脉'}</div>
+                <div style='padding:4px; background:rgba(255,255,255,0.1); border-radius:4px;'>${game.i18n.localize(`XJZL.Jingmai.Effects.${key.charAt(0).toUpperCase() + key.slice(1)}`)}</div>
             </div>`;
 
             if (equippedItem) {
-                tooltip += `
-            <hr style='border-color:#555; margin:8px 0;'>
-            <div style='color:#a2e8dd; font-weight:bold; margin-bottom:4px;'><i class='fas fa-gem'></i> ${equippedItem.name}</div>
-            <div style='font-size:11px; color:#aaa; line-height:1.4;'>${equippedItem.system.description || "暂无描述"}</div>`;
+                tooltip += `<hr style='border-color:#555; margin:8px 0;'>
+                <div style='color:#a2e8dd; font-weight:bold; margin-bottom:4px;'><i class='fas fa-gem'></i> ${equippedItem.name}</div>
+                <div style='font-size:11px; color:#aaa; line-height:1.4;'>${equippedItem.system.description || "暂无描述"}</div>`;
             }
 
-            return {
-                key,
-                label: shortLabel,
-                isActive: isOpen,
-                tooltip,
-                x: coord.x,
-                y: coord.y,
-                equippedItem,
-                type: meta.type,
-                // ▼▼▼ 补上这一行 ▼▼▼
-                tierLabel: `XJZL.Jingmai.T${meta.t}`
-            };
+            return { key, label: shortLabel, isActive: isOpen, tooltip, x: coord.x, y: coord.y, equippedItem, type: meta.type, tierLabel: `XJZL.Jingmai.T${meta.t}` };
         });
 
-        // D. [奇经八脉] 仅列表显示，无坐标
         const extraOrder = ["du", "ren", "chong", "dai", "yangwei", "yinwei", "yangqiao", "yinqiao"];
         context.jingmaiExtraList = extraOrder.map(key => {
             const capKey = key.charAt(0).toUpperCase() + key.slice(1);
             return {
-                key: key,
-                label: `XJZL.Jingmai.${capKey}`,
-                isActive: system.jingmai.extra[key],
-                tooltip: `
-                <div style='text-align:left; max-width:250px;'>
-                    <div style='margin-bottom:4px;'><b>条件:</b> ${game.i18n.localize(`XJZL.Jingmai.Conditions.${capKey}`)}</div>
-                    <div style='color:#ccc;'><b>效果:</b> ${game.i18n.localize(`XJZL.Jingmai.Effects.${capKey}`)}</div>
-                </div>`
+                key: key, label: `XJZL.Jingmai.${capKey}`, isActive: system.jingmai.extra[key],
+                tooltip: `<div style='text-align:left; max-width:250px;'><div style='margin-bottom:4px;'><b>条件:</b> ${game.i18n.localize(`XJZL.Jingmai.Conditions.${capKey}`)}</div><div style='color:#ccc;'><b>效果:</b> ${game.i18n.localize(`XJZL.Jingmai.Effects.${capKey}`)}</div></div>`
             };
         });
 
         // =====================================================
         // ✦ 8. 物品清单(Inventory)
         // -----------------------------------------------------
-        // 对物品按类型分类，方便模板通过 {{#each inventory}} 渲染多个 tab 或列表
         context.inventory = [
             { label: "TYPES.Item.weapon", type: "weapon", items: actor.itemTypes.weapon },
             { label: "TYPES.Item.armor", type: "armor", items: actor.itemTypes.armor },
@@ -1034,31 +800,15 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         ];
 
         // =====================================================
-        // ✦ 9. 装备架数据 (Equipment Rack - Visual Slots)
+        // ✦ 9. 装备架数据 (Equipment Rack)
         // -----------------------------------------------------
-        // [新增逻辑] 提取已装备的物品，填入对应的视觉槽位中
-        // 用于 tab-inventory.hbs 顶部的九宫格展示
-
-        const equipped = {
-            weapon: null,
-            head: null, top: null, bottom: null, shoes: null,
-            necklace: null, earring: null, hidden: null, //  之前忘了暗器，毫无存在感啊这东西
-            rings: [], // 数组，支持多戒
-            accessories: [] // 数组，支持多饰品
-        };
-
-        // 遍历所有物品，寻找已装备项 (equipped === true)
+        const equipped = { weapon: null, head: null, top: null, bottom: null, shoes: null, necklace: null, earring: null, hidden: null, rings: [], accessories: [] };
         if (actor.items) {
             for (const item of actor.items) {
-                if (!item.system.equipped) continue; // 跳过未装备
-
+                if (!item.system.equipped) continue;
                 const type = item.type;
-                const armorType = item.system.type; // head, top, etc.
-
-                if (type === "weapon") {
-                    // 武器 (目前逻辑只取第一个，未来可扩展主副手)
-                    if (!equipped.weapon) equipped.weapon = item;
-                }
+                const armorType = item.system.type;
+                if (type === "weapon") { if (!equipped.weapon) equipped.weapon = item; }
                 else if (type === "armor") {
                     switch (armorType) {
                         case "head": equipped.head = item; break;
@@ -1068,142 +818,68 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         case "necklace": equipped.necklace = item; break;
                         case "earring": equipped.earring = item; break;
                         case "hidden": equipped.hidden = item; break;
-                        case "ring":
-                            // 戒指最多显示2个
-                            if (equipped.rings.length < 2) equipped.rings.push(item);
-                            break;
-                        case "accessory":
-                            // 饰品最多显示6个
-                            if (equipped.accessories.length < 6) equipped.accessories.push(item);
-                            break;
+                        case "ring": if (equipped.rings.length < 2) equipped.rings.push(item); break;
+                        case "accessory": if (equipped.accessories.length < 6) equipped.accessories.push(item); break;
                     }
                 }
             }
         }
-
-        // [填充空位] 确保数组长度固定，方便前端模板循环渲染空槽图标
-        // Ring 补齐到 2
-        for (let i = equipped.rings.length; i < 2; i++) equipped.rings.push(null);
-        // Accessory 补齐到 6
-        for (let i = equipped.accessories.length; i < 6; i++) equipped.accessories.push(null);
-
-        // 挂载到上下文
+        while (equipped.rings.length < 2) equipped.rings.push(null);
+        while (equipped.accessories.length < 6) equipped.accessories.push(null);
         context.equipped = equipped;
 
         // =====================================================
         // 动态背景 (根据性别)
         // =====================================================
         const gender = actor.system.info.gender;
-        // 默认为男版，如果是 female 则切换
-        context.dollBg = (gender === "female")
-            ? "systems/xjzl-system/assets/icons/character/zhanli-f.svg"
-            : "systems/xjzl-system/assets/icons/character/zhanli.svg";
+        context.dollBg = (gender === "female") ? "systems/xjzl-system/assets/icons/character/zhanli-f.svg" : "systems/xjzl-system/assets/icons/character/zhanli.svg";
 
         // =====================================================
-        // ✦ 10. 技艺书籍 (Art Books) - [增强版]
+        // ✦ 10. 技艺书籍 (Art Books)
         // -----------------------------------------------------
-        // 预处理：计算总XP上限 + 构建描述 Tooltip
         const rawArtBooks = actor.itemTypes.art_book || [];
         context.artBooks = rawArtBooks.map(book => {
-            // 1. 计算总消耗 (Max XP)
-            const maxXP = book.system.chapters.reduce((sum, c) => {
-                const cost = c.cost || 0;
-                const ratio = c.xpCostRatio ?? 1;
-                return sum + Math.floor(cost * ratio);
-            }, 0);
-
-            // [新增] 统计已完成章节数
-            // 数据模型已经在 prepareDerivedData 里给每个 chapter 算好了 progress.isCompleted
+            const maxXP = book.system.chapters.reduce((sum, c) => sum + Math.floor((c.cost || 0) * (c.xpCostRatio ?? 1)), 0);
             let completedCount = 0;
             if (book.system.chapters) {
-                for (const ch of book.system.chapters) {
-                    // 兼容性检查：确保 progress 对象存在
-                    if (ch.progress && ch.progress.isCompleted) {
-                        completedCount++;
-                    }
-                }
+                for (const ch of book.system.chapters) if (ch.progress && ch.progress.isCompleted) completedCount++;
             }
-
-            // 判断是否全书通读
             const totalChap = book.system.chapters.length;
             const isCompleted = (totalChap > 0 && completedCount >= totalChap);
-
-            // 2. 构建 Tooltip
-            let tooltip = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
-            tooltip += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${book.name}</div>`;
-
-            if (book.system.description) {
-                let desc = book.system.description.replace(/<[^>]*>?/gm, '');
-                if (desc.length > 150) desc = desc.substring(0, 150) + "...";
-                desc = desc.replace(/"/g, '&quot;');
-                tooltip += `<div style='font-size:12px; color:#ccc; line-height:1.5;'>${desc}</div>`;
-            } else {
-                tooltip += `<div style='font-size:12px; color:#999; font-style:italic;'>暂无描述</div>`;
-            }
-
-            // [核心修正] 进度显示逻辑
-            // 显示已完成章节数 / 总章节数
-            // 颜色：满级绿色，未满黄色
             const progressColor = isCompleted ? "#2ecc71" : "var(--c-highlight)";
             const progressText = isCompleted ? "已通读" : `完成: ${completedCount} / ${totalChap} 章`;
 
-            tooltip += `<div style='margin-top:8px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:11px; color:${progressColor};'>
-                            进度: ${progressText}
-                        </div>`;
+            // 构建 Tooltip
+            let tooltip = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
+            tooltip += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${book.name}</div>`;
+            if (book.system.description) tooltip += buildDescriptionHTML(book.system.description, 150);
+            else tooltip += `<div style='font-size:12px; color:#999; font-style:italic;'>暂无描述</div>`;
+            tooltip += `<div style='margin-top:8px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:11px; color:${progressColor};'>进度: ${progressText}</div></div>`;
 
-            tooltip += `</div>`;
-
-            // 挂载衍生数据
             book.derived = {
-                maxXP: maxXP,
-                tooltip: tooltip,
+                maxXP: maxXP, tooltip: tooltip,
                 percent: maxXP > 0 ? Math.min(100, (book.system.xpInvested / maxXP) * 100) : 0,
                 isCompleted: isCompleted
             };
-
             return book;
         });
 
         /* -------------------------------------------- */
         /*  11. 统一构建通用物品 Tooltip          */
         /* -------------------------------------------- */
-        // 定义通用 Tooltip 构建函数 (保持与修炼界面风格一致)
+        // 使用局部定义的 cleanRichText 和 buildAutomationHTML
         const buildGeneralTooltip = (item) => {
-            // 1. 父容器：移除全局的 white-space，回归正常布局
             let html = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
-
-            // 2. 标题
             html += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${item.name}</div>`;
 
-            // 3. 自动化说明
-            // 修改点：使用 display:flex 保证对齐；去掉代码中的换行，防止产生额外空隙
-            if (item.system.automationNote) {
-                html += `<div style='background:rgba(52, 152, 219, 0.2); border-left:3px solid #3498db; padding:4px 6px; margin:6px 0; font-size:11px; color:#aed6f1; display:flex; align-items:center; line-height:1.2;'>
-                    <i class='fas fa-robot' style='margin-right:4px;'></i><span>${item.system.automationNote}</span>
-                 </div>`;
-            }
+            if (item.system.automationNote) html += buildAutomationHTML(item.system.automationNote);
 
-            // 4. 描述
             if (item.system.description) {
-                let desc = item.system.description;
-
-                // 数据清洗逻辑
-                desc = desc.replace(/<br\s*\/?>/gi, '\n')
-                    .replace(/<\/p>/gi, '\n\n')
-                    .replace(/<\/div>/gi, '\n')
-                    .replace(/<[^>]+>/g, '')
-                    .replace(/"/g, '&quot;')
-                    .trim();
-
-                if (desc.length > 200) desc = desc.substring(0, 200) + "...";
-
-                // 修改点：只在这里添加 white-space: pre-wrap，互不干扰
-                html += `<div style='font-size:12px; color:#ccc; line-height:1.5; white-space: pre-wrap;'>${desc}</div>`;
+                html += buildDescriptionHTML(item.system.description, 200);
             } else {
                 html += `<div style='font-size:12px; color:#999; font-style:italic;'>暂无描述</div>`;
             }
 
-            // 5. 额外属性
             if (item.type === "weapon" || item.type === "armor") {
                 const qualityLabel = game.i18n.localize(`XJZL.Qualities.${item.system.quality}`);
                 html += `<div style='margin-top:6px; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1); font-size:10px; color:#e67e22;'>${qualityLabel}</div>`;
@@ -1213,21 +889,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             return html;
         };
 
-        // 遍历所有需要在库存中显示的物品类型
         const inventoryTypes = ["weapon", "armor", "qizhen", "consumable", "manual", "misc"];
-
         inventoryTypes.forEach(type => {
             const items = actor.itemTypes[type] || [];
-            items.forEach(item => {
-                // 将生成的 HTML 挂载到临时属性上
-                item.derivedTooltip = buildGeneralTooltip(item);
-            });
+            items.forEach(item => { item.derivedTooltip = buildGeneralTooltip(item); });
         });
 
-        // [特效计算] 调用父类或混入的方法准备 Active Effects 列表
+        // [特效计算]
         this._prepareEffects(context);
-
-        // 传递排序模式状态
         context.isSorting = this._isSorting || false;
 
         return context;
