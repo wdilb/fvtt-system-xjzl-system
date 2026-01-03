@@ -2136,7 +2136,7 @@ export class XJZLActor extends Actor {
         flatBonus += (sys.combat.damages.weapon?.total || 0); // 武器类伤害加成
       }
       // 特定武器类型伤害 (Specific Weapon Type Bonus)
-      if (wType && dmg.weaponTypes) {
+      if (wType && sys.combat.damages.weaponTypes) {
         flatBonus += (sys.combat.damages.weaponTypes[wType]?.total || 0);
       }
       if (isOpportunity) {
