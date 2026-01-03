@@ -79,7 +79,7 @@ export class XJZLMacros {
 
         // 3. 检查攻击有效性
         // A. 必须命中 (闪避不触发反震)
-        if (!args.isHit) return false;
+        if (args.outcome && args.outcome.isHit === false) return false;
 
         // B. 必须是能够被格挡的伤害类型 (内功/外功)
         // 流失、毒素、真实伤害通常不触发架招
@@ -87,7 +87,7 @@ export class XJZLMacros {
         if (!validTypes.includes(args.type)) return false;
 
         // C. 检查是否被“无视架招” (破招/虚招击破/特殊效果)
-        if (args.ignoreStance) return false;
+        if (args.config?.ignoreStance) return false;
 
         return true;
     }

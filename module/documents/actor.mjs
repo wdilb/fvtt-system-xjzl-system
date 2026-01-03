@@ -1013,9 +1013,9 @@ export class XJZLActor extends Actor {
 
   /**
    * [核心] 伤害结算处理函数
-   * 职责：计算减伤 -> 运行脚本 -> 扣除资源 -> 返回结果
+   * 流程：AVOIDED -> PRE_DEFENSE -> (计算暴击/防御) -> PRE_TAKE -> (扣血) -> DAMAGED
    * @param {Object} data - 伤害参数包
-   * @returns {Object} 结算结果 { finalDamage, hpLost, mpLost, isDead, ... }
+   * @returns {Object} 结算结果
    */
   async applyDamage(data) {
 
@@ -1046,16 +1046,10 @@ export class XJZLActor extends Actor {
       // 3. 伤害计算
       if (amount > protection) {
         if (mode === "strict") {
-          // A. 规则书模式：固定扣 1
-          tiliLost = 1;
+          tiliLost = 1; // A. 规则书模式：固定扣 1
         } else {
           // B. 倍率模式：根据伤害量计算
-          // 分母逻辑：取 防护值 和 设置阈值 中的较大者
-          // 解释：如果防护是 0 (凡兽)，不能除以 0，必须有一个基础分母 (如 10)
-          // 如果防护是 50 (神兽)，那么 60 伤害应该只扣 1 点，而不是 60/10=6 点
           const divisor = Math.max(protection, scalingBase);
-
-          // 向下取整，且至少扣 1 点 (因为已经大于防护了)
           tiliLost = Math.floor(amount / divisor);
           tiliLost = Math.max(1, tiliLost);
         }
@@ -1063,7 +1057,6 @@ export class XJZLActor extends Actor {
         // 执行扣除
         const current = this.system.resources.tili.value;
         if (current > 0) {
-          // 防止扣成负数
           const actualLost = Math.min(current, tiliLost);
           const newVal = current - actualLost;
 
@@ -1076,7 +1069,7 @@ export class XJZLActor extends Actor {
             });
           }
 
-          // 死亡检查 (野兽无濒死，直接死)
+          // 死亡检查
           if (newVal <= 0) {
             isDead = true;
             const hasDead = this.effects.some(e => e.statuses.has("dead"));
@@ -1094,52 +1087,52 @@ export class XJZLActor extends Actor {
         }
       }
 
-      // 返回结果
       return {
-        finalDamage: tiliLost, // 总伤害 (数值上等于体力损失)
-        tiliLost: tiliLost,    // 明确标记体力损失
-        hpLost: 0,             // 兼容填充
-        hutiLost: 0,           // 兼容填充
-        mpLost: 0,             // 兼容填充
-        isDead: isDead,
-        isDying: false
+        finalDamage: tiliLost, tiliLost: tiliLost, hpLost: 0, hutiLost: 0, mpLost: 0,
+        isDead: isDead, isDying: false
       };
     }
 
+    // =====================================================
+    // 1. 初始化与解构
+    // =====================================================
     const {
       amount,             // 原始伤害 (面板)
       type = "waigong",   // 伤害类型
       attacker = null,    // 攻击者 Actor
       isHit = true,       // 是否命中
-      isCrit = false,     // 是否暴击
-      applyCritDamage = true, // 是否应用暴击倍率
-      isBroken = false,   // 是否被破防
-      ignoreBlock = false,   // 强制无视格挡
-      ignoreDefense = false,  // 强制无视防御
-      ignoreStance = false,  // 强制无视架招
-      isSkill = true // false表示普通攻击
+      isBroken = false,   // 是否被破防 (状态，不可逆)
+      isSkill = true      // false表示普通攻击
     } = data;
 
-    // 0. 未命中直接返回
+    // [关键] 构建可配置对象 (Mutable Config)
+    // 这里的属性允许被 PRE_DEFENSE 脚本修改
+    const config = {
+      // 穿透规则
+      ignoreBlock: data.ignoreBlock || false,
+      ignoreDefense: data.ignoreDefense || false,
+      ignoreStance: data.ignoreStance || false,
+
+      // 暴击规则 (允许脚本修改暴击状态)
+      isCrit: data.isCrit || false,
+      applyCritDamage: data.applyCritDamage ?? true
+    };
+
+    // =====================================================
+    // 2. 闪避处理 (Trigger: AVOIDED)
+    // =====================================================
     if (!isHit) {
-      // 即使闪避也执行 DAMAGED 脚本 (用于触发"闪避后给敌人上Debuff"等)
-      // 构造一个基础上下文，跳过复杂的减伤计算
-      const missContext = {
-        baseDamage: amount,
-        damage: 0,
-        type: type,
+      const avoidContext = {
         attacker: attacker,
-        target: this, // 明确传入自己
-        isHit: false,
-        isCrit: false,
-        isBroken: isBroken,
-        ignoreBlock: ignoreBlock,
-        ignoreDefense: ignoreDefense,
-        ignoreStance: ignoreStance,
-        output: { damage: 0, abort: false }
+        target: this,
+        type: type,
+        baseDamage: amount,
+        isCrit: config.isCrit, // 虽然未命中，但把暴击意图传过去也无妨
+        outcome: { isHit: false, isBroken: isBroken } // 只读结果
       };
 
-      await this.runScripts(SCRIPT_TRIGGERS.DAMAGED, missContext);
+      await this.runScripts(SCRIPT_TRIGGERS.AVOIDED, avoidContext);
+
       // 飘字：闪避
       if (this.token?.object) {
         canvas.interface.createScrollingText(this.token.object.center, "闪避", {
@@ -1153,95 +1146,104 @@ export class XJZLActor extends Actor {
     const combat = sys.combat;
 
     // =====================================================
-    // 1. 计算理论伤害 (Pre-Mitigation)
+    // 3. 防御前置脚本 (Trigger: PRE_DEFENSE)
     // =====================================================
+    // 此时尚未计算暴击倍率，也未计算防御减伤
+    // 目的：修改 config (如：免疫暴击、强制无视防御、获得临时抗性)
+    const preDefContext = {
+      attacker: attacker,
+      target: this,
+      type: type,
+      baseDamage: amount, // 原始面板伤害
+
+      // 允许修改的配置 (包括 isCrit)
+      config: config
+    };
+
+    await this.runScripts(SCRIPT_TRIGGERS.PRE_DEFENSE, preDefContext);
+
+    // =====================================================
+    // 4. 计算理论伤害 (Calculation)
+    // =====================================================
+    // 注意：这里的暴击计算必须在 PRE_DEFENSE 之后
+    // 这样脚本里 config.isCrit = false 才能生效
     let calculatedDamage = amount;
 
-    // A. 暴击修正 (如果启用)
-    // 规则：暴击造成2倍伤害
-    if (isCrit && applyCritDamage) {
+    if (config.isCrit && config.applyCritDamage) {
       calculatedDamage = Math.floor(calculatedDamage * 2);
     }
 
     // =====================================================
-    // 2. 计算减伤 (Mitigation)
+    // 5. 计算减伤 (Mitigation)
     // 逻辑：伤害 - 防御 - 格挡 - 抗性
     // =====================================================
 
-    // B. 基础防御 (Defense)
+    // A. 基础防御 (Defense)
     let defenseVal = 0;
-    if (!ignoreDefense) {
+    if (!config.ignoreDefense) { // 使用 config 中的值
       if (type === "waigong") defenseVal = combat.defWaigongTotal || 0;
       else if (type === "neigong") defenseVal = combat.defNeigongTotal || 0;
     }
 
-    // C. 格挡 (Block)
-    // 如果强制无视(ignoreBlock)，则格挡无效， 不能用isBroken来判断，因为我们存在即使没有架招也生效格挡的特效（无敌的密宗瑜伽，哎)
+    // B. 格挡 (Block)
     let blockVal = 0;
-    if (!ignoreBlock) {
-      // 读取总格挡
+    if (!config.ignoreBlock) { // 使用 config 中的值
       let total = combat.blockTotal || 0;
-
-      // 2. 如果无视架招 (且没无视格挡)，则扣除架招部分
-      if (ignoreStance) {
-        // 安全读取 stanceBlockValue (我们在 DataModel 里刚加的)
+      // 无视架招处理：仅扣除架招加值，保留基础格挡
+      if (config.ignoreStance) {
         const stancePart = combat.stanceBlockValue || 0;
         total = Math.max(0, total - stancePart);
       }
-
       blockVal = total;
     }
 
-    // D. 抗性 (Resistance)
+    // C. 抗性 (Resistance)
     const resMap = sys.combat.resistances;
     const globalRes = resMap.global.total || 0;
-    // 招式抗性
-    // 只有当 isSkill 为 true 时才生效
     const skillRes = isSkill ? (resMap.skill?.total || 0) : 0;
     let specificRes = 0;
-    // 根据类型映射抗性
+
     switch (type) {
       case "bleed": specificRes = resMap.bleed.total; break;
       case "poison": specificRes = resMap.poison.total; break;
       case "fire": specificRes = resMap.fire.total; break;
       case "mental": specificRes = resMap.mental.total; break;
       case "liushi": specificRes = resMap.liushi.total; break;
-      // 内外功没有特定抗性字段
       default: specificRes = 0; break;
     }
-
     const totalRes = globalRes + specificRes + skillRes;
 
-    // E. 执行减法
-    // 公式：(伤害 - 防御 - 格挡 - 抗性)
+    // D. 执行减法
     let reducedDamage = calculatedDamage - defenseVal - blockVal - totalRes;
     reducedDamage = Math.max(1, reducedDamage); // 保底为1
 
     // =====================================================
-    // 3. 执行脚本 (Script: DAMAGED)
+    // 6. 受伤前置/护盾脚本 (Trigger: PRE_TAKE)
     // =====================================================
-    // 允许脚本在扣血前最后一次修改伤害 (例如：无敌盾、伤害吸收、反伤)
-    const damageContext = {
-      baseDamage: amount, //基础伤害也传过去
-      damage: reducedDamage, // 当前计算值
-      type: type,
+    // 此时已完成防御计算，准备扣血
+    // 目的：护盾(Shields)、完全免疫(Abort)、最终数值修正
+    const takeContext = {
       attacker: attacker,
-      isHit: isHit,
-      isCrit: isCrit,
+      target: this,
+      type: type,
+      baseDamage: amount,        // 原始面板
+      calcDamage: reducedDamage, // 减伤后理论值
+
+      isCrit: config.isCrit,     // 使用最终确定的暴击状态
       isBroken: isBroken,
-      ignoreBlock: ignoreBlock,
-      ignoreDefense: ignoreDefense,
-      ignoreStance: ignoreStance,
-      // 允许脚本修改的输出对象
+      config: config,            // 传入配置备查
+
+      // 允许修改的输出对象
       output: {
-        damage: reducedDamage,
-        abort: false // 脚本设为 true 可完全免疫
+        damage: reducedDamage, // 脚本修改这个值来做护盾
+        abort: false           // 脚本设为 true 可完全免疫
       }
     };
 
-    await this.runScripts(SCRIPT_TRIGGERS.DAMAGED, damageContext);
+    await this.runScripts(SCRIPT_TRIGGERS.PRE_TAKE, takeContext);
+
     // 脚本可能强行中止 (如无敌)
-    if (damageContext.output.abort) {
+    if (takeContext.output.abort) {
       if (this.token?.object) {
         canvas.interface.createScrollingText(this.token.object.center, "免疫", {
           fill: "#ffff00", stroke: "#000000", strokeThickness: 4
@@ -1251,60 +1253,46 @@ export class XJZLActor extends Actor {
     }
 
     // 获取脚本修改后的最终伤害
-    let finalDamage = Math.floor(damageContext.output.damage);
+    let finalDamage = Math.floor(takeContext.output.damage);
 
     // =====================================================
-    // 4. 资源扣除 (Deduction)
-    // 优先级：护体 -> 气血 -> (濒死) -> 内力
+    // 7. 资源扣除 (Deduction)
     // =====================================================
-    // 在任何计算和更新之前，拍摄当前血量的快照
-    // 用于后续判断是否是从“活”变“死”
+    // 拍摄快照
     const originalHP = sys.resources.hp.value;
-    // --- 计算流失伤害 (Liushi Damage) ---
-    // 逻辑：受伤时触发，受流失抗性抵消，随后进入通用扣除流程
-    let liushiDamage = 0;
-    // 只有常规伤害 > 0 (造成了实际伤害) 时才触发“受伤流失”
-    if (finalDamage > 0) {
-      // 1. 读取 Flags 
-      liushiDamage += (this.xjzlStatuses.bleedOnHit || 0);
 
+    // --- 计算流失伤害 ---
+    let liushiDamage = 0;
+    if (finalDamage > 0) {
+      liushiDamage += (this.xjzlStatuses.bleedOnHit || 0);
       if (["waigong", "neigong"].includes(type)) {
         liushiDamage += (this.xjzlStatuses.wuxueBleedOnHit || 0);
       }
-
-      // 2. 应用流失抗性
       if (liushiDamage > 0) {
         const liushiRes = sys.combat.resistances?.liushi?.total || 0;
         liushiDamage = Math.max(0, liushiDamage - liushiRes);
       }
     }
-    // 准备更新数据包 (Batch Update)
+
+    // 准备更新
     const updates = {};
-    // 获取当前资源快照 (用于连续计算)
     let currentHuti = sys.resources.huti ?? 0;
     let currentHP = sys.resources.hp.value;
     let currentMP = sys.resources.mp.value;
 
-    // 追踪损失量 (用于统计和更新)
-    // 我们把 常规损失 和 流失损失 分开统计，以便飘字区分
     let stdHutiLost = 0, stdHpLost = 0, stdMpLost = 0;
     let liuHutiLost = 0, liuHpLost = 0, liuMpLost = 0;
-    let isDying = false; // 是否进入濒死
-    let isDead = false;  // 是否彻底死亡
+    let isDying = false;
+    let isDead = false;
 
-    /**
-     * [内部辅助] 单次伤害扣除逻辑
-     * @param {number} dmg - 待扣除伤害值
-     * @param {number} ratio - 内力抵扣比率 (5:1 或 1:1)
-     * @returns {Object} { hutiLost, hpLost, mpLost } 本次扣除的具体数值
-     */
+    // 内部辅助：扣除逻辑
     const applyDeduction = (dmg, ratio) => {
-      let res = { h: 0, p: 0, m: 0 }; // 局部统计
+      let res = { h: 0, p: 0, m: 0 };
       if (dmg <= 0) return res;
 
       let remaining = dmg;
 
-      // A. 扣除护体真气 (Huti)
+      // A. 扣护体
       if (currentHuti > 0 && remaining > 0) {
         const hTake = Math.min(currentHuti, remaining);
         currentHuti -= hTake;
@@ -1312,24 +1300,22 @@ export class XJZLActor extends Actor {
         remaining -= hTake;
       }
 
-      // B. 扣除气血 (HP)
+      // B. 扣气血
       if (remaining > 0) {
         if (currentHP > remaining) {
-          // 够扣，还没死
           currentHP -= remaining;
           res.p += remaining;
           remaining = 0;
         } else {
-          // 不够扣，触发濒死
           const hpTake = currentHP;
-          currentHP = 0; // 血归零
+          currentHP = 0;
           res.p += hpTake;
           remaining -= hpTake;
-          isDying = true; // 只要血归零，就算濒死
+          isDying = true;
         }
       }
 
-      // C. 扣内力 (濒死溢出)
+      // C. 扣内力
       if (remaining > 0) {
         const mpDamage = Math.ceil(remaining / ratio);
         const mpTake = Math.min(currentMP, mpDamage);
@@ -1337,79 +1323,59 @@ export class XJZLActor extends Actor {
         currentMP -= mpTake;
         res.m += mpTake;
 
-        // 如果还不够扣 -> 死亡
-        if (mpDamage > mpTake) {
-          isDead = true;
-        }
+        if (mpDamage > mpTake) isDead = true;
       }
       return res;
     }
-    // --- 第一轮：常规伤害 ---
-    // 内/外功 5:1，其他 1:1
+
+    // 第一轮：常规伤害 (内/外功 5:1抵扣，其他 1:1)
     const standardRatio = (type === "waigong" || type === "neigong") ? 5 : 1;
     const stdRes = applyDeduction(finalDamage, standardRatio);
     stdHutiLost = stdRes.h; stdHpLost = stdRes.p; stdMpLost = stdRes.m;
 
-    // --- 第二轮：流失伤害 ---
-    // 转扣内力永远是 1:1 (特殊伤害)
+    // 第二轮：流失伤害 (1:1)
     const liuRes = applyDeduction(liushiDamage, 1);
     liuHutiLost = liuRes.h; liuHpLost = liuRes.p; liuMpLost = liuRes.m;
 
-    // 汇总总损失 (用于更新数据库)
+    // 更新数据库
     const totalHutiLost = stdHutiLost + liuHutiLost;
     const totalHpLost = stdHpLost + liuHpLost;
     const totalMpLost = stdMpLost + liuMpLost;
 
-    // 生成数据库更新包
     if (totalHutiLost > 0) updates["system.resources.huti"] = currentHuti;
     if (totalHpLost > 0) updates["system.resources.hp.value"] = currentHP;
     if (totalMpLost > 0) updates["system.resources.mp.value"] = currentMP;
 
-    // 执行数据库更新
     if (!foundry.utils.isEmpty(updates)) {
       await this.update(updates);
     }
 
     // =====================================================
-    // 5. 状态触发脚本 (Triggers)
+    // 8. 状态触发 (Status Triggers)
     // =====================================================
-
-    // 准备上下文，允许脚本修改 prevent 标记来阻止状态结算
-    // 虽然 runScripts 会自动注入 actor: this，但显式传入 target 符合战斗脚本习惯
     const statusCtx = {
       attacker: attacker,
-      target: this,     // 传入自己，方便脚本操作 (如 this.update)
+      target: this,
       damage: finalDamage,
-      preventDying: false, // [输出参数] 脚本设为 true 可阻止濒死判定
-      preventDeath: false  // [输出参数] 脚本设为 true 可阻止死亡判定
+      preventDying: false,
+      preventDeath: false
     };
 
-    // [Pre-Check] 如果已经是尸体 (Dead)，通常不再触发濒死/死亡逻辑 (鞭尸不判定)
     const wasDead = this.effects.some(e => e.statuses.has("dead"));
-    // 只有在没死透的情况下才进行后续判定
+
     if (!wasDead) {
-      // A. 濒死触发
-      // 规则：进入濒死 OR 濒死时受击 -> 都要投残疾表
+      // A. 濒死判定
       const isHitWhileDying = (originalHP <= 0 && finalDamage > 0);
       if (isDying || isHitWhileDying) {
         await this.runScripts(SCRIPT_TRIGGERS.DYING, statusCtx);
 
-        // 检查脚本是否挽救了角色
         if (statusCtx.preventDying) {
-          isDying = false; // 取消濒死标记
-          // 注意：脚本里应该已经写了回血逻辑，否则血量还是0
+          isDying = false;
         } else {
-          // 把触发濒死的代码移到了这里，因为有可能有特效阻止濒死
-          // 1. 挂载濒死状态 (使用 config 中定义的 id: "dying")
-          // 检查防重
           const hasDying = this.effects.some(e => e.statuses.has("dying"));
-          if (!hasDying) {
-            await this.toggleStatusEffect("dying", { active: true });
-          }
+          if (!hasDying) await this.toggleStatusEffect("dying", { active: true });
 
-          // 2. 发送濒死通知卡 (提供投掷残疾表的按钮)
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: false });
-
           ChatMessage.create({
             user: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: this }),
@@ -1419,22 +1385,15 @@ export class XJZLActor extends Actor {
         }
       }
 
-      // B. 死亡触发
+      // B. 死亡判定
       if (isDead) {
         await this.runScripts(SCRIPT_TRIGGERS.DEATH, statusCtx);
 
-        // 检查脚本是否免死
         if (statusCtx.preventDeath) {
-          isDead = false; // 取消死亡标记
-          // 同样，脚本里需要负责把内力/血量拉回来
-        }
-        else {
-          // 这里不需要 check wasDead，因为最外层已经 check 过了
+          isDead = false;
+        } else {
           await this.toggleStatusEffect("dead", { overlay: true, active: true });
-
-          // 2. 发送死亡通知卡 (生死一念)
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: true });
-
           ChatMessage.create({
             user: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: this }),
@@ -1445,28 +1404,48 @@ export class XJZLActor extends Actor {
       }
     }
 
+    // =====================================================
+    // 9. 结算后/后效脚本 (Trigger: DAMAGED)
+    // =====================================================
+    // 目的：处理反伤、受击后特效。
+    const damagedContext = {
+      attacker: attacker,
+      target: this,
+      type: type,
 
+      finalDamage: finalDamage, // 理论应扣
+      hpLost: stdHpLost,        // 实际扣血
+      hutiLost: stdHutiLost,
+
+      config: config, // 把配置传进来，以便检查 ignoreStance
+      isBroken: isBroken, // 把破防状态传进来
+
+      isCrit: config.isCrit,    // 使用最终暴击状态
+      isDying: isDying,
+      isDead: isDead
+    };
+
+    await this.runScripts(SCRIPT_TRIGGERS.DAMAGED, damagedContext);
 
     // =====================================================
-    // 6. 视觉
+    // 10. 视觉与回怒 (Visuals & Rage)
     // =====================================================
 
     // A. 飘字
     if (this.token?.object) {
-      // 1. 常规伤害飘字
-      const stdTotal = stdHutiLost + stdHpLost; // 只显示常规部分的扣血+护体
+      const stdTotal = stdHutiLost + stdHpLost;
       if (stdTotal > 0) {
         let flavor = `-${stdTotal}`;
         let color = "#ff0000";
         let size = 32;
 
-        if (isCrit) {
+        if (config.isCrit) { // 使用最终暴击状态判断颜色
           flavor = `暴击! ${flavor}`;
           size = 48;
           color = "#ff4500";
         }
         if (stdHutiLost > 0 && stdHpLost === 0) {
-          color = "#00ffff"; // 纯护体扣除
+          color = "#00ffff";
           flavor = `护体 -${stdHutiLost}`;
         }
 
@@ -1476,23 +1455,13 @@ export class XJZLActor extends Actor {
         });
       }
 
-      // 2. 流失伤害飘字 (单独显示)
-      // 只有当真的产生了流失扣血(或扣护体)时才飘字
       const liuTotal = liuHutiLost + liuHpLost;
       if (liuTotal > 0) {
-        // 让流失字体稍微延后一点或颜色不同，深红色
         canvas.interface.createScrollingText(this.token.object.center, `流失 -${liuTotal}`, {
-          direction: 0, // 向下飘或者换个方向
-          fontSize: 28,
-          fill: "#8b0000", // 深红/暗红
-          stroke: "#ffffff",
-          strokeThickness: 2,
-          jitter: 0.25,
-          anchor: 1 // 稍微偏移一点位置防止完全重叠
+          direction: 0, fontSize: 28, fill: "#8b0000", stroke: "#ffffff", strokeThickness: 2, jitter: 0.25, anchor: 1
         });
       }
 
-      // 3. 无伤提示
       if (stdTotal === 0 && liuTotal === 0 && isHit) {
         canvas.interface.createScrollingText(this.token.object.center, "无伤", {
           fill: "#cccccc", stroke: "#000000", strokeThickness: 4
@@ -1500,29 +1469,28 @@ export class XJZLActor extends Actor {
       }
     }
 
-    // B. 被击回怒 (Defender Rage)
-    // 规则：受到 内/外功 伤害 +1 怒气
+    // B. 被击回怒
     let rageGained = false;
-    if (finalDamage > 0 && ["waigong", "neigong"].includes(type)) { //这里有一个细节，就是只要造成伤害就回怒了，即使被护体真气抵挡了，具体是不是这样后续可以再修改
+    if (finalDamage > 0 && ["waigong", "neigong"].includes(type)) {
       const currentRage = sys.resources.rage.value;
       const maxRage = sys.resources.rage.max;
-      // 检查是否被封穴/禁怒 (通过 Flags)
       const noRecover = this.xjzlStatuses?.noRecoverRage;
 
       if (currentRage < maxRage && !noRecover) {
         await this.update({ "system.resources.rage.value": currentRage + 1 });
-        rageGained = true; // 标记已回怒，用于回退怒气
+        rageGained = true;
       }
     }
 
     // =====================================================
-    // 6. 返回结果
+    // 11. 返回结果
     // =====================================================
     return {
-      finalDamage: finalDamage, // 实际总扣除 (HP+Huti)
+      finalDamage: finalDamage,
       hpLost: stdHpLost,
       hutiLost: stdHutiLost,
       mpLost: stdMpLost,
+      tiliLost: 0,
       isDying: isDying,
       isDead: isDead,
       rageGained: rageGained,

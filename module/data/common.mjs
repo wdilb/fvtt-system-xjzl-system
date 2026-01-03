@@ -14,7 +14,10 @@ export const SCRIPT_TRIGGERS = {
   HIT: "hit",               // [异步] 命中/结算后 (应用BUFF、扣血、副作用)
   HIT_ONCE: "hit_once",     // [异步] 命中/结算后 和上面的唯一区别是这个只执行一次，不管几个目标
   PRE_DAMAGE: "preDamage",  // [异步] 伤害结算前：命中/暴击已定，防御计算前，存在这种时点才能实现的脚本，比如我们亲爱的晓哥的关山里的命中之后转换为火焰伤害的武学
-  DAMAGED: "damaged",       // [异步] 防御者触发：受伤时
+  AVOIDED: "avoided",       // [异步] 未命中时触发 (替代原未命中运行DAMAGED的逻辑)
+  PRE_DEFENSE: "preDefense",// [异步] 计算防御/格挡前 (用于动态修改穿透、防御值)
+  PRE_TAKE: "preTake",      // [异步] 减伤后、扣血前 (原 DAMAGED 的位置，用于护盾)
+  DAMAGED: "damaged",       // [异步] 扣血后 (用于反伤、受击后效)
   DYING: "dying",           // [异步] 气血归零，进入濒死状态时触发
   DEATH: "death",           // [异步] 内力归零，角色彻底死亡时触发
   TURN_START: "turnStart",  // [异步] 回合开始
@@ -32,7 +35,10 @@ export const TRIGGER_CHOICES = {
   [SCRIPT_TRIGGERS.HIT]: "XJZL.Triggers.Hit",
   [SCRIPT_TRIGGERS.HIT_ONCE]: "XJZL.Triggers.HitOnce",
   [SCRIPT_TRIGGERS.PRE_DAMAGE]: "XJZL.Triggers.PreDamage",
-  [SCRIPT_TRIGGERS.DAMAGED]: "XJZL.Triggers.Damaged",
+  [SCRIPT_TRIGGERS.AVOIDED]: "XJZL.Triggers.Avoided",
+  [SCRIPT_TRIGGERS.PRE_DEFENSE]: "XJZL.Triggers.PreDefense",
+  [SCRIPT_TRIGGERS.PRE_TAKE]: "XJZL.Triggers.PreTake",
+  [SCRIPT_TRIGGERS.DAMAGED]: "XJZL.Triggers.Damaged", 
   [SCRIPT_TRIGGERS.DYING]: "XJZL.Triggers.Dying",
   [SCRIPT_TRIGGERS.DEATH]: "XJZL.Triggers.Death",
   [SCRIPT_TRIGGERS.TURN_START]: "XJZL.Triggers.TurnStart",
