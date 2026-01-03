@@ -458,19 +458,22 @@
     },
     {
         "name": "软猬头饰",
+        "type": "armor",
         "img": "systems/xjzl-system/assets/icons/armor/头饰1.png",
         "system": {
             "type": "head",
             "quality": 2,
             "price": 1500,
+            "quantity": 1,
+            "equipped": false,
             "description": "<p>满布倒刺钩，击于其上，必为其所伤。<br><strong>效果：</strong>外功防御+3<br>受1米内攻击反弹15毒素伤害。</p>",
-            "automationNote": "完全自动化：脚本自动检测Token距离，若在1米内则自动反伤。",
+            "automationNote": "完全自动化：自动检测距离并反伤。",
             "scripts": [
                 {
                     "label": "软猬反伤",
                     "trigger": "damaged",
                     "active": true,
-                    "script": "// 1. 基础校验：未命中或无攻击者来源则跳过\nif (!args.isHit || !args.attacker) return;\n\n// 2. 获取双方 Token (优先取 Canvas 上的对象，兼容性获取)\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\n\n// 如果任一方不在场景中，无法计算距离，跳过\nif (!t1 || !t2) return;\n\n// 3. 计算距离 (使用系统网格逻辑)\n// 根据您的 grid 逻辑，相邻(含斜向第一格)距离通常 <= 1\nconst dist = canvas.grid.measureDistance(t1, t2, {gridSpaces: true});\n\n// 4. 判定与执行\n// 假设场景 Grid Scale 设置正确 (1格=1米)，则判断 <= 1\nif (dist <= 1) {\n    // 视觉提示\n    if (actor.token?.object) {\n        canvas.interface.createScrollingText(actor.token.object.center, \"软猬反伤\", { fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4 });\n    }\n    \n    // 应用反伤\n    await args.attacker.applyDamage({\n        amount: 15,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreBlock: true // 毒反伤穿透格挡\n    });\n    ui.notifications.info(`${actor.name} 触发软猬反伤：给予 ${args.attacker.name} 15点毒素伤害。`);\n}"
+                    "script": "/**\n * 软猬系列通用反伤脚本\n */\nif (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (actor.isReceivingReflection) return;\n\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nlet inRange = false;\n\nif (t1 && t2) {\n    const measure = canvas.grid.measurePath([t1.center, t2.center]);\n    if (measure.distance <= 1.1) inRange = true;\n} else {\n    ui.notifications.warn(`${actor.name} 的 ${thisItem.name} 无法检测距离，请手动处理。`);\n}\n\nif (inRange) {\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({ \n            amount: 15, \n            type: \"poison\", \n            attacker: actor, \n            isHit: true, \n            ignoreDefense: true \n        });\n\n        const content = `\n            <div class=\"xjzl-chat-card item-card\">\n                <header class=\"card-header\" style=\"border-left: 4px solid #8e44ad;\">\n                    <img src=\"${thisItem.img}\" style=\"border:none;\" />\n                    <h3 style=\"color: #8e44ad;\">${thisItem.name}</h3>\n                </header>\n                <div class=\"card-content-wrapper\">\n                    <div style=\"font-weight:bold; color:#8b0000; margin-bottom:5px;\"><i class=\"fas fa-skull-crossbones\"></i> 反伤触发！</div>\n                    <div style=\"font-size:0.9em;\">距离检测: <b>近身</b></div>\n                    <div style=\"font-size:0.9em;\">反伤目标: <b>${args.attacker.name}</b></div>\n                    <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;\">\n                        已反弹 <span style=\"color:red; font-weight:bold;\">15</span> 点毒素伤害。\n                    </div>\n                </div>\n            </div>\n        `;\n\n        ChatMessage.create({\n            user: game.user.id,\n            speaker: ChatMessage.getSpeaker({ actor: actor }),\n            content: content\n        });\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}"
                 }
             ]
         },
@@ -479,6 +482,7 @@
                 "name": "软猬头饰",
                 "icon": "systems/xjzl-system/assets/icons/armor/头饰1.png",
                 "transfer": true,
+                "disabled": false,
                 "changes": [
                     {
                         "key": "system.combat.def_waigong",
