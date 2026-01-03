@@ -323,7 +323,8 @@ export class ChatCardManager {
                     grantFeintLevel: 0,  // 虚招修正
                     ignoreBlock: false,
                     ignoreDefense: false,
-                    ignoreStance: false
+                    ignoreStance: false,
+                    critThresholdMod: 0 // 允许 CHECK 脚本针对特定目标修改暴击阈值
                 }
             }; //换成优劣势计数
             const move = item.system.moves.find(m => m.id === flags.moveId);
@@ -371,7 +372,8 @@ export class ChatCardManager {
                 feintState: feintState,
                 ignoreBlock: finalIgnoreBlock,
                 ignoreDefense: finalIgnoreDefense,
-                ignoreStance: finalIgnoreStance
+                ignoreStance: finalIgnoreStance,
+                critThresholdMod: checkContext.flags.critThresholdMod || 0
             });
 
             // 关键判断：如果状态不平，且没有 D2，则需要补骰
@@ -557,7 +559,8 @@ export class ChatCardManager {
                 feintState: states.feintState,
                 ignoreBlock: states.ignoreBlock,
                 ignoreDefense: states.ignoreDefense,
-                ignoreStance: states.ignoreStance
+                ignoreStance: states.ignoreStance,
+                critThresholdMod: states.critThresholdMod || 0
             };
         }
 
@@ -1130,7 +1133,14 @@ export class ChatCardManager {
 
                 // 3. 计算动态阈值 (每10点士气 -1 阈值)
                 const moraleMod = Math.floor(moraleUsed / 10);
-                const finalThreshold = Math.max(0, baseThreshold - moraleMod);
+                
+                // 4. 修正1 (来自 ATTACK 脚本，存储在 message flags 中)
+                const globalScriptMod = flags.critThresholdMod || 0;
+
+                // 5. 修正2 (来自 CHECK 脚本，存储在 hitResults 中)
+                const targetScriptMod = res.critThresholdMod || 0;
+
+                const finalThreshold = Math.max(0, baseThreshold - moraleMod - globalScriptMod - targetScriptMod);
 
                 // 4. 判定 (命中 且 骰子 >= 动态阈值)
                 if (isHit && die >= finalThreshold) {

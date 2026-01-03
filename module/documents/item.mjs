@@ -1480,7 +1480,8 @@ export class XJZLItem extends Item {
           feintLevel: s.feintLevel || 0, // 虚招自身等级
           abort: false,       // 脚本设为 true 可阻断攻击
           abortReason: "",     // 阻断原因
-          autoApplied: false // 是否已经完成流程的标记
+          autoApplied: false, // 是否已经完成流程的标记
+          critThresholdMod: 0 // 允许脚本修改暴击阈值,正数表示更容易暴击 (例如 2 表示阈值降低 2 点)
         }
       };
       // 现在脚本里：
@@ -1600,7 +1601,8 @@ export class XJZLItem extends Item {
               grantFeintLevel: 0,  // 虚招修正
               ignoreBlock: false,
               ignoreDefense: false,
-              ignoreStance: false
+              ignoreStance: false,
+              critThresholdMod: 0 // 添加这个字段，让 CHECK 脚本可以修改
             }
           };
 
@@ -1643,7 +1645,8 @@ export class XJZLItem extends Item {
             // 这里还可以存一些中间值备查
             ignoreBlock: finalIgnoreBlock,
             ignoreDefense: finalIgnoreDefense,
-            ignoreStance: finalIgnoreStance
+            ignoreStance: finalIgnoreStance,
+            critThresholdMod: checkContext.flags.critThresholdMod || 0
           });
         }
       }
@@ -1866,6 +1869,7 @@ export class XJZLItem extends Item {
             damageType: damageType,    // 伤害类型 (waigong/neigong/...)
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
+            critThresholdMod: attackContext.flags.critThresholdMod || 0,
             contextLevel: {
               selfLevel: selfLevel,  // 存下 Roll 时的自身等级
               selfFeintLevel: selfFeintLevel //自身虚招等级
@@ -1895,7 +1899,8 @@ export class XJZLItem extends Item {
                 // 保存穿透标志到数据库
                 ignoreBlock: res.ignoreBlock,
                 ignoreDefense: res.ignoreDefense,
-                ignoreStance: res.ignoreStance
+                ignoreStance: res.ignoreStance,
+                critThresholdMod: res.critThresholdMod || 0
               };
               return acc;
             }, {})
