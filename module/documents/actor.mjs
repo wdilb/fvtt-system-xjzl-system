@@ -2126,6 +2126,7 @@ export class XJZLActor extends Actor {
     }
 
     // 3. 固定增伤 (Flat Bonuses)
+    const wType = virtualMove.weaponType;
     let flatBonus = 0;
     if (sys.combat?.damages) {
       flatBonus += (sys.combat.damages.global?.total || 0); // 全局加成
