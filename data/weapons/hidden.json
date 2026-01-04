@@ -1,0 +1,3756 @@
+[
+    {
+        "name": "【2025年共创】锁喉镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 800,
+            "damage": 1,
+            "block": 0,
+            "description": "本资源为模组《千斛担》专用，由浅蓝的孢子撰写。<br>虽名为镖，实际上更接近枷锁。两侧有齿，形似猎犬，直取敌人咽喉并立即形成锁扣，如咬住目标的巨狼。锁喉镖多用于擒拿罪犯。<br><strong>效果：</strong>命中后目标进行【角力】检定（难度15），失败则被锁喉镖锁住喉咙。目标无法发声，无法使用内力。目标可以用一个主要动作重新进行检定，成功则移除锁喉镖。锁喉镖持有者可以用钥匙解开锁喉镖，则可以重新获得此物。",
+            "automationNote": "半自动化：命中后自动发起检定，失败自动施加禁言与禁内力状态。回收与解锁逻辑需手动处理。",
+            "scripts": [
+                {
+                    "label": "锁喉判定",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (!args.isHit) return;\n\n// 1. 发起角力检定\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"jiaoli\",\n    dc: 15,\n    label: \"抵抗锁喉镖\",\n    onFail: async () => {\n        // 2. 失败应用状态 (禁言+禁内力)\n        // 使用系统通用的 silence (封穴/禁言) 和 qizhi (气滞/禁内力)\n        await game.xjzl.api.effects.addEffect(args.target, \"silence\");\n        await game.xjzl.api.effects.addEffect(args.target, \"qizhi\");\n        ui.notifications.warn(`${args.target.name} 被锁喉镖锁住！无法发声且无法使用内力！`);\n    }\n});"
+                }
+            ]
+        }
+    },
+    {
+        "name": "【2025年共创】佛怒糖莲",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 500,
+            "damage": 15,
+            "block": 0,
+            "description": "本资源为模组《隐龙群侠传》专用，由阿抽撰写。用毒药制成的莲花状糖丸<br><strong>效果：</strong>命中无招架目标后，为其添加一层“糖毒”，至多三层，持续一回合<br>糖毒：速度-1<br>·此暗器无法回收",
+            "automationNote": "完全自动化：命中且破防(造成伤害)后自动叠加糖毒状态。",
+            "scripts": [
+                {
+                    "label": "糖毒入体",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (!args.isHit) return;\n// 判定造成了实际伤害/破防\nif (args.damageResult && args.damageResult.finalDamage > 0) {\n    // 从物品特效中获取配置，杜绝硬编码\n    const sourceEffect = thisItem.effects.getName(\"糖毒\");\n    if (sourceEffect) {\n        await game.xjzl.api.effects.addEffect(args.target, sourceEffect.toObject());\n        ui.notifications.info(\"糖毒入体！\");\n    }\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "糖毒",
+                "icon": "icons/svg/biohazard.svg",
+                "transfer": false,
+                "duration": {
+                    "rounds": 1
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tangdu",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": -1
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "铁臂缚-玄",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "特殊暗器",
+            "quality": 2,
+            "price": 600,
+            "damage": 4,
+            "block": 0,
+            "description": "铁质护臂，暗藏一根钩锁，激发极快，防不胜防。<br><strong>效果：</strong>反应动作激发，对目标进行一次普通攻击，命中未招架目标时，使目标陷入“禁足”，持续一回合或目标消耗动作拔出钩锁。<br>（射出的钩锁需要一个主要动作才能收回护臂）",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "铁臂缚-青",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "特殊暗器",
+            "quality": 2,
+            "price": 600,
+            "damage": 12,
+            "block": 0,
+            "description": "铁质护臂，暗藏三只弩箭，多涂有剧毒。<br><strong>效果：</strong>次要动作激发，三只弩箭齐射，视为对目标进行三次普通攻击。",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "青玉麻将",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 600,
+            "damage": 12,
+            "block": 0,
+            "description": "用青色翠石镶嵌打磨的麻将牌，砸人很痛。<br><strong>效果：</strong>施展和麻将有关的武学套路的绝招命中对方时，对方行囊银两减少50两，你增加50两。",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "无痕飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 20000,
+            "damage": 20,
+            "block": 0,
+            "description": "剑过无痕，招落无声，此去经年。<br><strong>效果：</strong>装备后，虚招值+3。",
+            "automationNote": "完全自动化：装备后自动生效。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "无痕",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": 3
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 15000,
+            "damage": 20,
+            "block": 0,
+            "description": "此兵器挥之鸿鹄鸣渊，彻天际，响天涯。<br><strong>效果：</strong>装备后，你对应该武器的武器技能等级+1。",
+            "automationNote": "完全自动化：装备后暗器等级修正+1。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "鸿灵",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.hidden.mod",
+                        "mode": 2,
+                        "value": 1
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 13000,
+            "damage": 20,
+            "block": 0,
+            "description": "风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。<br><strong>效果：</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。",
+            "automationNote": "完全自动化：装备后获得增伤，并自动设置回合初流失Flags。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "万刃噬主",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": 25
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": -20
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": -20
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 10000,
+            "damage": 20,
+            "block": 0,
+            "description": "克己，慎独，守心，明性。以克人之心克己，以容己之心容人。<br><strong>效果：</strong>装备后，你在进行气感、魅力相关技能检定和对抗时,结果+2",
+            "automationNote": "完全自动化：装备后相关技能检定修正+2。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "守心",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.skills.dianxue.mod",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.skills.zhuizong.mod",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.skills.tancha.mod",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.skills.dongcha.mod",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.skills.jiaoyi.mod",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.skills.qiman.mod",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.skills.shuofu.mod",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.skills.dingli.mod",
+                        "mode": 2,
+                        "value": 2
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 9000,
+            "damage": 20,
+            "block": 0,
+            "description": "剑鸣铿锵清亮，剑韵激荡，无不侧目。<br><strong>效果：</strong>装备后，出招命中目标时，自身恢复5点内力。",
+            "automationNote": "完全自动化：命中后自动回复内力。",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "真刚飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 7000,
+            "damage": 20,
+            "block": 0,
+            "description": "使工人以白马白牛祀昆吾之种后,采金铸之成剑精。<br><strong>效果：</strong>装备后，即便被击破架招，该武器格按值依旧生效。",
+            "automationNote": "完全自动化：装备后赋予被动格挡能力。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "真刚",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 6000,
+            "damage": 20,
+            "block": 0,
+            "description": "以寒铁打造，阴寒无比，遇水结霜。<br><strong>效果：</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。",
+            "automationNote": "完全自动化：命中后自动施加状态。",
+            "scripts": [
+                {
+                    "label": "霜月寒气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    // 使用系统状态 unstable\n    await game.xjzl.api.effects.addEffect(args.target, {\n        id: \"unstable\",\n        duration: { rounds: 2 }\n    });\n    ui.notifications.info(\"霜月侵袭！\");\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "魅影飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 5000,
+            "damage": 20,
+            "block": 0,
+            "description": "魅影悄然，倩影惊鸿。<br><strong>效果：</strong>装备后，速度+2，闪避+5。",
+            "automationNote": "完全自动化：装备后属性提升。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "魅影",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": 2
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": 5
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 4000,
+            "damage": 20,
+            "block": 0,
+            "description": "业火灼身，狱莲重瓣，难耐怒意。<br><strong>效果：</strong>装备后，攻击额外造成10点伤害。",
+            "automationNote": "完全自动化：装备后全局伤害提升。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "业火",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+                "changes": [
+                    {
+                        "key": "system.combat.damages.global.mod",
+                        "mode": 2,
+                        "value": 10
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 2000,
+            "damage": 12,
+            "block": 0,
+            "description": "破釜沉舟，不胜不还。<br><strong>效果：</strong>装备后，命中降低10点，攻击额外造成20点伤害。",
+            "automationNote": "完全自动化：装备后属性修正。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "破釜沉舟",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": -10
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": -10
+                    },
+                    {
+                        "key": "system.combat.damages.global.mod",
+                        "mode": 2,
+                        "value": 20
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 1600,
+            "damage": 12,
+            "block": 0,
+            "description": "蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。<br><strong>效果：</strong>装备后，招式造成暴击时，额外造成10点伤害。",
+            "automationNote": "完全自动化：暴击时伤害自动增加。",
+            "scripts": [
+                {
+                    "label": "蟠龙暴击",
+                    "trigger": "preDamage",
+                    "active": true,
+                    "script": "if (args.outcome.isCrit) {\n    args.config.amount += 10;\n    ui.notifications.info(\"蟠龙飞刀触发暴击增伤！\");\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "龙泉飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 1500,
+            "damage": 12,
+            "block": 0,
+            "description": "红光紫气俱赫然，铸得宝剑名龙泉。<br><strong>效果：</strong>装备后，招式内力消耗-2(最低)。",
+            "automationNote": "完全自动化：装备后内力减耗。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "龙泉",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": -2
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 1300,
+            "damage": 12,
+            "block": 0,
+            "description": "天崩地裂，闷雷霹炸，声势骇人。<br><strong>效果：</strong>装备后，招式命中目标时,将其击退1米。",
+            "automationNote": "手动：请手动处理击退效果。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "铸血飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 1200,
+            "damage": 12,
+            "block": 0,
+            "description": "铸造时铁匠滴血淬火，以铸嗜血之兵。<br><strong>效果：</strong>装备后，招式命中目标时，还会使其流失5气血。",
+            "automationNote": "完全自动化：命中后自动流失目标气血。",
+            "scripts": [
+                {
+                    "label": "嗜血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await args.target.applyDamage({ amount: 5, type: \"true\", isHit: true });\n    ui.notifications.info(`${args.target.name} 被铸血飞刀撕裂伤口！`);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "翻腾飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 800,
+            "damage": 12,
+            "block": 0,
+            "description": "怒意狂表，气勋上涌。<br><strong>效果：</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。",
+            "automationNote": "手动：请手动监控未暴击次数。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "鱼肠飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 700,
+            "damage": 12,
+            "block": 0,
+            "description": "滴刃花纹毕露，宛如鱼肠一般。<br><strong>效果：</strong>装备后，招式额外造成5点伤害。",
+            "automationNote": "完全自动化：装备后伤害提升。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "鱼肠",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": 5
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 500,
+            "damage": 12,
+            "block": 0,
+            "description": "尘尘利利，斩尽杀绝，快速决绝。<br><strong>效果：</strong>装备后，普通攻击伤害提升10点。",
+            "automationNote": "完全自动化：装备后普攻伤害提升。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "刹绝",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": 10
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 400,
+            "damage": 12,
+            "block": 0,
+            "description": "群侠逐鹿,疾足者先得。<br><strong>效果：</strong>装备后，速度+1、先攻+1。",
+            "automationNote": "完全自动化：装备后属性提升。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "逐鹿",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": 1
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": 1
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 1,
+            "price": 200,
+            "damage": 7,
+            "block": 0,
+            "description": "用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "精铁飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 0,
+            "description": "将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "精铜飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 1,
+            "price": 100,
+            "damage": 5,
+            "block": 0,
+            "description": "将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "粗铁飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 0,
+            "description": "带有杂质的劣质白铁锻造而成。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "粗铜飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 0,
+            "price": 10,
+            "damage": 4,
+            "block": 0,
+            "description": "带有杂质的劣质青铜锻造而成。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "烂铁飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "破铜飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 0,
+            "price": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "石飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "description": "用岩石制作的武器，质量很差，难以伤人。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "木飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "description": "用桃木、乔木、竹子制作的武器，质量很差，难以伤人。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "手里剑",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 1,
+            "price": 100,
+            "damage": 6,
+            "block": 0,
+            "description": "东瀛对脱手暗器的统称，分为棒状手里剑和车剑。<br><strong>效果：</strong>无",
+            "scripts": []
+        }
+    },
+    {
+        "name": "百炼飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 0,
+            "description": "用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。<br><strong>效果：</strong>装备后，普通攻击，出招命中+5。",
+            "automationNote": "完全自动化：装备后普攻命中修正提升。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "百炼",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": 5
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": 5
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "流星镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 1,
+            "price": 100,
+            "damage": 10,
+            "block": 0,
+            "description": "尖如梭，薄如翼，射出极快。<br><strong>效果：</strong>使用流星镖时暴击骰-3。<br>·此暗器一枚一买，且无法回收。",
+            "automationNote": "完全自动化：出招时自动降低暴击阈值。",
+            "scripts": [
+                {
+                    "label": "流星追月",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "args.flags.critThresholdMod += 3;"
+                }
+            ]
+        }
+    },
+    {
+        "name": "五毒锥",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 3000,
+            "damage": 20,
+            "block": 0,
+            "description": "以毒液炼成，锋利无比的小剑，见血封喉。<br><strong>效果：</strong>特效：如果你装备五毒神剑，则《狂蛇锥法》套路和《狂蛇剑法》之间无需遵循武学切换规则。<br>·以该锥施展《狂蛇锥法》每次造成伤害时，都可获得一层“狂蛇”，持续到战斗脱离。<br>·此暗器一枚一买，而不是通常的一次性20枚，且可以回收。",
+            "automationNote": "半自动化：命中特定招式后自动叠加Buff。套装切换逻辑需手动。",
+            "scripts": [
+                {
+                    "label": "狂蛇累积",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (!args.isHit || !args.move) return;\n// 检查招式名称\nif (args.move.name.includes(\"狂蛇锥法\") && args.damageResult.finalDamage > 0) {\n    const sourceEffect = thisItem.effects.getName(\"狂蛇\");\n    if (sourceEffect) {\n        await game.xjzl.api.effects.addEffect(actor, sourceEffect.toObject());\n    }\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "狂蛇",
+                "icon": "icons/svg/biohazard.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuangshe",
+                        "stackable": true
+                    }
+                },
+                "changes": []
+            }
+        ]
+    },
+    {
+        "name": "血滴子",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "特殊暗器",
+            "quality": 4,
+            "price": 30000,
+            "damage": 30,
+            "block": 0,
+            "description": "极薄的暗钢圆环，布满锋利细小的尖刃，需用特制的鞣皮抓握，一旦飞出便会尖啸着在空中回旋。<br><strong>效果：</strong>特效：该暗器射出后，会飞回你手中。<br>·该暗器命中无架招目标时，为其添加一层“血滴”，持续到脱战。<br>血滴：受内外功伤害时每层使自己流失10气血。<br>·该暗器材质特殊而昂贵，是单独的一枚暗器，而不是20枚。",
+            "automationNote": "完全自动化：命中破防后自动叠加血滴状态（流血变种）。",
+            "scripts": [
+                {
+                    "label": "血滴子",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (!args.isHit) return;\nif (args.damageResult && args.damageResult.finalDamage > 0) {\n    const sourceEffect = thisItem.effects.getName(\"血滴\");\n    if (sourceEffect) {\n        await game.xjzl.api.effects.addEffect(args.target, sourceEffect.toObject());\n    }\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "血滴",
+                "icon": "icons/svg/blood.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xuedi",
+                        "stackable": true
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.wuxueBleedOnHit",
+                        "mode": 2,
+                        "value": 10
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "玲珑骰子",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 600,
+            "damage": 15,
+            "block": 0,
+            "description": "以骨制成，寓意相思入骨。内有乾坤，暗藏机关。<br><strong>效果：</strong>需要投掷一个D6的场合，可以消耗一粒该骰子，让此次D6的结果由你决定。<br>·此暗器一枚一买，而不是通常的一次性20枚，且无法回收。",
+            "automationNote": "手动：请手动处理改骰逻辑。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "锋针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 1,
+            "price": 60,
+            "damage": 0,
+            "block": 0,
+            "description": "无伤害，筩其身，锋其末，刃三隅，绵延持有。<br><strong>效果：</strong>用于施展《五脏针诀》。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "大针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 1,
+            "price": 60,
+            "damage": 0,
+            "block": 0,
+            "description": "无伤害，尖如梃，当为筵，其锋微圆，剧烈短暂<br><strong>效果：</strong>用于施展《五脏针诀》。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "药王针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 300,
+            "damage": 0,
+            "block": 0,
+            "description": "细针中空，浸润草药药液。<br><strong>效果：</strong>出招命中时，可为其回复或流失 5 气血。",
+            "automationNote": "半自动化：命中后弹窗选择回复还是流失气血。",
+            "scripts": [
+                {
+                    "label": "药王针效",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (!args.isHit) return;\nnew Dialog({\n    title: \"药王针\",\n    content: \"<p>选择效果：</p>\",\n    buttons: {\n        heal: {\n            label: \"回复5气血\",\n            callback: async () => await args.target.applyHealing({ amount: 5, type: \"hp\" })\n        },\n        harm: {\n            label: \"流失5气血\",\n            callback: async () => await args.target.applyDamage({ amount: 5, type: \"true\", isHit: true })\n        }\n    }\n}).render(true);"
+                }
+            ]
+        }
+    },
+    {
+        "name": "凤凰翎-红翎",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "特殊暗器",
+            "quality": 3,
+            "price": 10000,
+            "damage": 25,
+            "block": 0,
+            "description": "纯金铸成、闪闪发光的圆筒机括，上有两道枢纽，偏暗青或暗红的翎羽一丝丝塞入筒中，每根都蕴含恐怖威力。<br>注：该暗器材质特殊而昂贵，是单独的一根根暗器，而不是通常的一次性20枚。<br>·凤凰翎分为青翎和红翎两种，具有极佳的延展性和记忆性，却又锋利无匹，极难制造，无法被损坏，可以在战斗脱离后收回。<br><strong>效果：</strong>命中后阻塞其周身经脉内力运转，使其陷入缚身，持续一回合。",
+            "automationNote": "完全自动化：命中后自动施加缚身。",
+            "scripts": [
+                {
+                    "label": "红翎缚身",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, {\n        id: \"fushen\",\n        duration: { rounds: 1 }\n    });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "凤凰翎-青翎",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "特殊暗器",
+            "quality": 3,
+            "price": 10000,
+            "damage": 25,
+            "block": 0,
+            "description": "纯金铸成、闪闪发光的圆筒机括，上有两道枢纽，偏暗青或暗红的翎羽一丝丝塞入筒中，每根都蕴含恐怖威力。<br>注：该暗器材质特殊而昂贵，是单独的一根根暗器，而不是通常的一次性20枚。<br>·凤凰翎分为青翎和红翎两种，具有极佳的延展性和记忆性，却又锋利无匹，极难制造，无法被损坏，可以在战斗脱离后收回。<br><strong>效果：</strong>无视目标外功防御。",
+            "automationNote": "完全自动化：自动无视防御。",
+            "scripts": [
+                {
+                    "label": "青翎破甲",
+                    "trigger": "check",
+                    "active": true,
+                    "script": "args.flags.ignoreDefense = true;"
+                }
+            ]
+        }
+    },
+    {
+        "name": "蝎尾镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 1,
+            "price": 150,
+            "damage": 6,
+            "block": 0,
+            "description": "弯曲倒钩，毒砂融入打造，见血封喉。<br><strong>效果：</strong>命中目标后额外使其流失5点气血。",
+            "automationNote": "完全自动化：命中后自动流失气血。",
+            "scripts": [
+                {
+                    "label": "蝎毒",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await args.target.applyDamage({ amount: 5, type: \"true\", isHit: true });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "碎石子",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 0,
+            "price": 0,
+            "damage": 1,
+            "block": 0,
+            "description": "路边随处可见，什么形状都有<br><strong>效果：</strong>",
+            "scripts": []
+        }
+    },
+    {
+        "name": "五殃针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 0,
+            "description": "长不逾寸，细如牛毛。<br><strong>效果：</strong>降低命中目标的速度1点，持续三回合。",
+            "automationNote": "完全自动化：命中后自动施加减速Debuff。",
+            "scripts": [
+                {
+                    "label": "五殃减速",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    const sourceEffect = thisItem.effects.getName(\"五殃\");\n    if (sourceEffect) {\n        await game.xjzl.api.effects.addEffect(args.target, sourceEffect.toObject());\n    }\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "五殃",
+                "icon": "icons/svg/ice-aura.svg",
+                "transfer": false,
+                "duration": {
+                    "rounds": 3
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": -1
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "梅花毫针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 300,
+            "damage": 0,
+            "block": 0,
+            "description": "药师针灸所用，极为纤细，可附着内力调理身体。<br><strong>效果：</strong>施展不造成伤害的武学招式时不消耗内力。",
+            "automationNote": "请手动。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "七邪镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 7000,
+            "damage": 22,
+            "block": 0,
+            "description": "玄铁打造，直径两寸，七道边刃，锋利无比。<br><strong>效果：</strong>命中后给目标一层“七邪”，持续到脱战。七邪：每层使你暴击骰+1，叠加满七层后，流失自身怒气值*70点气血，然后移除所有七邪。",
+            "automationNote": "完全自动化：自动叠加层数、修正暴击阈值、满层爆发伤害。",
+            "scripts": [
+                {
+                    "label": "七邪",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    const sourceEffect = thisItem.effects.getName(\"七邪\");\n    if (sourceEffect) {\n        // 1. 添加/叠加特效\n        const effect = await game.xjzl.api.effects.addEffect(args.target, sourceEffect.toObject());\n\n        // 2. 检查层数是否爆炸\n        const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        if (stacks >= 7) {\n            // 爆发逻辑\n            const rage = args.target.system.resources.rage.value || 0;\n            const damage = rage * 70;\n            ui.notifications.warn(`${args.target.name} 七邪发作！受到 ${damage} 点爆发伤害！`);\n            \n            // 造成伤害\n            await args.target.applyDamage({ amount: damage, type: \"true\", isHit: true });\n            \n            // 移除特效\n            await effect.delete();\n        }\n    }\n}"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "七邪",
+                "icon": "icons/svg/skull.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qixie",
+                        "stackable": true,
+                        "maxStacks": 7
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "七邪监听",
+                "transfer": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qixie-passive"
+                    }
+                },
+                "scripts": [
+                    {
+                        "label": "七邪阈值",
+                        "trigger": "check",
+                        "active": true,
+                        "script": "// 仅当目标拥有七邪状态时生效\nconst qixie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qixie\");\nif (qixie) {\n    const stacks = qixie.getFlag(\"xjzl-system\", \"stacks\") || 0;\n    // 每层使暴击骰+1 (阈值降低，更容易暴击)\n    args.flags.critThresholdMod += stacks;\n}"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "寒光镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 3500,
+            "damage": 20,
+            "block": 0,
+            "description": "镖身锥形，尖利平扁，尾挂红绸，射时光芒刺眼。<br><strong>效果：</strong>命中目标后，使其“下盘不稳”一回合。",
+            "automationNote": "完全自动化：命中后施加状态。",
+            "scripts": [
+                {
+                    "label": "寒光",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, {\n        id: \"unstable\",\n        duration: { rounds: 1 }\n    });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "亮银飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 2000,
+            "damage": 15,
+            "block": 0,
+            "description": "三棱梭形，长四寸二分。<br><strong>效果：</strong>命中无架招目标后，为其添加一层“流血”，持续到战斗脱离。",
+            "automationNote": "完全自动化：命中破防后自动施加流血。",
+            "scripts": [
+                {
+                    "label": "流血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (!args.isHit) return;\nif (args.damageResult && args.damageResult.finalDamage > 0) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "血鸦镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 1500,
+            "damage": 14,
+            "block": 0,
+            "description": "纯钢厚重，双面血槽，触之飙血。<br><strong>效果：</strong>暴击时给目标添加“血流不止”，持续到战斗脱离。",
+            "automationNote": "完全自动化：暴击后自动施加流血。",
+            "scripts": [
+                {
+                    "label": "血鸦",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.isCrit) {\n    // 复用流血状态\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n    ui.notifications.info(\"血鸦镖造成重创，目标血流不止！\");\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "毒蛇镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 600,
+            "damage": 13,
+            "block": 0,
+            "description": "弯曲如小蛇，浸润毒液。<br><strong>效果：</strong>命中目标后造成额外10点毒素伤害。",
+            "automationNote": "完全自动化：命中后自动追加伤害。",
+            "scripts": [
+                {
+                    "label": "毒蛇",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await args.target.applyDamage({ amount: 10, type: \"poison\", isHit: true });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "鹤翼镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 0,
+            "description": "锐利飞镖，边缘带双刃，如鸟翅。<br><strong>效果：</strong>你对速度低于你的目标出招时暴击骰-2。",
+            "automationNote": "完全自动化：自动比对双方速度并修正暴击阈值。",
+            "scripts": [
+                {
+                    "label": "鹤翼追击",
+                    "trigger": "check",
+                    "active": true,
+                    "script": "const selfSpeed = actor.system.combat.speedTotal || 0;\nconst targetSpeed = args.target.system.combat.speedTotal || 0;\nif (targetSpeed < selfSpeed) {\n    // 暴击骰-2 意味着更难暴击？通常语境是“更容易”。\n    // 假设语境是 Threshold 降低 (更容易)，如 20 -> 18.\n    // 系统中 critThresholdMod 正数表示更容易。\n    args.flags.critThresholdMod += 2;\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "浮生断梦珠",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 15000,
+            "damage": 24,
+            "block": 0,
+            "description": "清梦幽醉，浮生阑珊。<br><strong>效果：</strong>击破架招时目标进行[韧性]检定（难度16），失败则陷入“昏迷”，持续一个时辰。",
+            "automationNote": "完全自动化：自动检测破招状态并请求检定。",
+            "scripts": [
+                {
+                    "label": "断梦",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "// 检测是否击破架招\nif (args.damageResult && args.damageResult.isBroken) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 16,\n        label: \"浮生断梦\",\n        onFail: async () => {\n            await game.xjzl.api.effects.addEffect(args.target, \"unconscious\"); // 昏迷\n            ui.notifications.info(`${args.target.name} 陷入昏迷！`);\n        }\n    });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "永昌子",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 5000,
+            "damage": 20,
+            "block": 0,
+            "description": "熔炼南红玛瑙、黄龙玉、墨翠等矿石，点丹而成，质坚色润、细腻如玉，棋中圣品。<br><strong>效果：</strong>若目标没有[棋术]等级，招式必定暴击。",
+            "automationNote": "完全自动化：检测目标棋术等级，若为0则大幅降低暴击阈值以强制暴击。",
+            "scripts": [
+                {
+                    "label": "棋圣",
+                    "trigger": "check",
+                    "active": true,
+                    "script": "// 获取目标棋术等级\nconst qishu = args.target.system.arts?.qishu?.total || 0;\nif (qishu <= 0) {\n    // 强制暴击：大幅降低阈值 (例如 +20，使得 20-20=0，任何骰值都暴击)\n    args.flags.critThresholdMod += 20;\n    // ui.notifications.info(\"对手不懂棋术，破绽百出！(必定暴击)\");\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "琉璃子",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 1200,
+            "damage": 14,
+            "block": 0,
+            "description": "隋代以琉璃制棋，棋子平底尖顶，通体绿色。<br><strong>效果：</strong>招式伤害、命中提升[棋术]等级的数值。",
+            "automationNote": "半自动化：伤害已自动计算。命中加值需在出招弹窗中手动调整（因Roll判定不可动态干预）。",
+            "scripts": [
+                {
+                    "label": "棋艺加持",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "const qishu = actor.system.arts.qishu?.total || 0;\nif (qishu > 0) {\n    args.output.damage += qishu;\n    args.output.bonusDesc.push(`棋术加持(+${qishu})`);\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "云萝骰子",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 600,
+            "damage": 13,
+            "block": 0,
+            "description": "六面骰子，刻云雾绕藤，含归隐之意。<br><strong>效果：</strong>命中目标后，自身可不消耗速度朝任意方向移动一米。",
+            "automationNote": "手动：请手动移动 Token。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "白陶子",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 0,
+            "description": "白色胎土做坯，上施或黑或白釉，底部刻花。<br><strong>效果：</strong>携带后，你进行对弈的[棋术]检定结果+1。",
+            "automationNote": "完全自动化：装备后棋术检定修正+1。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "白陶",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "changes": [
+                    {
+                        "key": "system.arts.qishu.checkMod",
+                        "mode": 2,
+                        "value": 1
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "无涯飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 9000,
+            "damage": 24,
+            "block": 0,
+            "description": "红尘滚滚涯茫茫，一生浮沉任风光。<br><strong>效果：</strong>击破架招时目标进行[定力]检定（难度17），失败则陷入“走火入魔”两回合。<br>·若目标杀孽大于10，则难度+5。",
+            "automationNote": "完全自动化：检测破招、判定杀孽动态DC、自动应用状态。",
+            "scripts": [
+                {
+                    "label": "无涯",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.damageResult && args.damageResult.isBroken) {\n    let dc = 17;\n    if (args.target.system.resources.shanie > 10) dc += 5;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"无涯心魔\",\n        onFail: async () => {\n            await game.xjzl.api.effects.addEffect(args.target, {\n                id: \"rage\",\n                duration: { rounds: 2 }\n            });\n        }\n    });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "灿金飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 3,
+            "price": 4000,
+            "damage": 20,
+            "block": 0,
+            "description": "纯金打造，一发金光耀目，华丽绝伦。<br><strong>效果：</strong>攻击被目标格挡时，为其添加“目盲”，持续一回合。",
+            "automationNote": "完全自动化：检测攻击类型及架招状态，若被格挡则自动致盲。",
+            "scripts": [
+                {
+                    "label": "灿金致盲",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "// 判定格挡：造成了外/内功伤害 AND 目标架招未被击破\nif ([\"waigong\", \"neigong\"].includes(args.damageType)) {\n    // 如果 isBroken 为 false，说明格挡成功/未破防\n    // 注意：damageResult.isBroken 为 true 时代表破招\n    if (!args.damageResult.isBroken) {\n         await game.xjzl.api.effects.addEffect(args.target, \"blind\");\n         ui.notifications.info(\"灿金飞刀：攻击被格挡，目标致盲！\");\n    }\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "啼血飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 2000,
+            "damage": 15,
+            "block": 0,
+            "description": "不胜凄断，杜鹃啼血，飞刀回旋出凄厉之声。<br><strong>效果：</strong>命中处于“流血”和“血流不止”的单位时，招式伤害+10。",
+            "automationNote": "完全自动化：Check阶段检测流血状态并赋予伤害加成。",
+            "scripts": [
+                {
+                    "label": "啼血",
+                    "trigger": "check",
+                    "active": true,
+                    "script": "// 检测目标是否有流血类特效 (slug匹配)\nconst hasBleed = args.target.effects.some(e => \n    e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\" || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"sielie\"\n);\nif (hasBleed) {\n    // 赋予10点额外伤害 (Flags需系统支持)\n    args.flags.bonusDamage = 10;\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "落霞飞刀",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞刀1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞刀",
+            "quality": 2,
+            "price": 300,
+            "damage": 12,
+            "block": 0,
+            "description": "赤铜锻造，刀背莹莹泛红。<br><strong>效果：</strong>击破架招后，为其添加一层“失准”，持续到战斗脱离。<br>失准：每层使你的命中-5。",
+            "automationNote": "完全自动化：检测破招并施加失准状态。",
+            "scripts": [
+                {
+                    "label": "落霞",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.damageResult && args.damageResult.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"shizhun\");\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "木神针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 4,
+            "price": 25000,
+            "damage": 30,
+            "block": 0,
+            "description": "使用不朽木制作的木质飞针，却比钢铁坚韧。<br><strong>效果：</strong>当你运转阴柔内功时，招式施展距离+5。",
+            "automationNote": "手动：请手动在施法时计算距离。",
+            "scripts": []
+        }
+    },
+    {
+        "name": "灭影针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 8000,
+            "damage": 22,
+            "block": 0,
+            "description": "此针射出无声无息，杀人消弭于无形。<br><strong>效果：</strong>造成暴击后，目标怒气-1。",
+            "automationNote": "完全自动化：暴击后自动扣除目标怒气。",
+            "scripts": [
+                {
+                    "label": "灭影",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.isCrit) {\n    const currentRage = args.target.system.resources.rage.value || 0;\n    if (currentRage > 0) {\n        await args.target.update({ \"system.resources.rage.value\": currentRage - 1 });\n        ui.notifications.info(`${args.target.name} 怒气受损 (-1)`);\n    }\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "夺魄针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 1300,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>两面极细，一旦入体，可使人经络不畅。</p><hr><p><strong>效果：</strong>命中目标后为其添加一层“笨拙”，持续到战斗脱离。<br>笨拙：每层使你的闪避-5。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "夺魄针-笨拙",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await game.xjzl.api.effects.addEffect(args.target, \"benzhuo\");"
+                }
+            ]
+        }
+    },
+    {
+        "name": "玉蜂针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 500,
+            "quantity": 1,
+            "damage": 13,
+            "block": 0,
+            "description": "<p>精钢制成，细小但重量不轻，以蜂毒炼过。</p><hr><p><strong>效果：</strong>命中后目标进行[韧性]检定（难度13），失败则获得一层“蜂毒”，持续到战斗脱离。<br>蜂毒：每层使你回合末受到5毒素伤害。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "玉蜂针-蜂毒判定",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "// 获取物品内的特效模板\nconst poisonEffect = thisItem.effects.getName(\"蜂毒\");\nif (!poisonEffect) return ui.notifications.warn(\"未找到蜂毒特效模板\");\n\n// 发起韧性检定 DC 13\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"renxing\",\n    dc: 13,\n    label: \"抵抗蜂毒\",\n    onFail: async () => {\n        // 判定失败，应用蜂毒\n        // 需要将模板转为对象，并设置为非传输(transfer=false)\n        const effectData = poisonEffect.toObject();\n        delete effectData._id;\n        effectData.disabled = false;\n        effectData.transfer = false;\n        effectData.origin = thisItem.uuid;\n        \n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n});"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "蜂毒",
+                "icon": "icons/svg/poison.svg",
+                "transfer": false,
+                "disabled": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "bee_poison",
+                        "stackable": true,
+                        "scripts": [
+                            {
+                                "label": "蜂毒伤害",
+                                "trigger": "turnEnd",
+                                "active": true,
+                                "script": "const stacks = thisEffect.stacks || 1;\nconst damage = 5 * stacks;\nawait actor.applyDamage({ amount: damage, type: \"poison\", isHit: true, ignoreDefense: true });"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "无痕弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 20000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><hr><p><strong>效果：</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "无痕弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 15000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><hr><p><strong>效果：</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "鸿灵弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.hidden.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 13000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><hr><p><strong>效果：</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "万刃弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 10000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><hr><p><strong>效果：</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化 (增加气感/神采的属性检定修正)"
+        },
+        "effects": [
+            {
+                "name": "守心弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 9000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><hr><p><strong>效果：</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "清韵回蓝",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await actor.applyHealing({ amount: 5, type: \"mp\" });"
+                }
+            ]
+        }
+    },
+    {
+        "name": "真刚弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 7000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><hr><p><strong>效果：</strong>装备后，即便被击破架招，该武器格按值依旧生效。</p>",
+            "automationNote": "完全自动化 (启用被动格挡)"
+        },
+        "effects": [
+            {
+                "name": "真刚弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 6000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><hr><p><strong>效果：</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "霜月-下盘不稳",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\neffectData.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                }
+            ]
+        }
+    },
+    {
+        "name": "魅影弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 5000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><hr><p><strong>效果：</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "魅影弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 3,
+            "price": 4000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><hr><p><strong>效果：</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "业火弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 2000,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>破釜沉舟，不胜不还。</p><hr><p><strong>效果：</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "破釜-额外流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await args.target.applyDamage({ amount: 20, type: \"liushi\", attacker: actor, isHit: true, ignoreDefense: true });"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 1600,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><hr><p><strong>效果：</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "蟠龙-暴击流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 10, type: \"liushi\", attacker: actor, isHit: true, ignoreDefense: true });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "龙泉弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 1500,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><hr><p><strong>效果：</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "龙泉弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 1300,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动移动 Token"
+        }
+    },
+    {
+        "name": "铸血弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 1200,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "铸血回血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await actor.applyHealing({ amount: 5, type: \"hp\" });"
+                }
+            ]
+        }
+    },
+    {
+        "name": "翻腾弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 800,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>怒意狂表，气勋上涌。</p><hr><p><strong>效果：</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动",
+            "scripts": []
+        }
+    },
+    {
+        "name": "鱼肠弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 700,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><hr><p><strong>效果：</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "鱼肠弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 500,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><hr><p><strong>效果：</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "刹绝弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 400,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><hr><p><strong>效果：</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "逐鹿弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 2,
+            "price": 300,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><hr><p><strong>效果：</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "百炼弹丸",
+                "icon": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 1,
+            "price": 200,
+            "quantity": 1,
+            "damage": 7,
+            "block": 0,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "精铁弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 1,
+            "price": 100,
+            "quantity": 1,
+            "damage": 5,
+            "block": 0,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "精铜弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 1,
+            "price": 100,
+            "quantity": 1,
+            "damage": 5,
+            "block": 0,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "粗铁弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 0,
+            "price": 10,
+            "quantity": 1,
+            "damage": 4,
+            "block": 0,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "粗铜弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 0,
+            "price": 10,
+            "quantity": 1,
+            "damage": 4,
+            "block": 0,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "烂铁弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 0,
+            "price": 1,
+            "quantity": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "破铜弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 0,
+            "price": 1,
+            "quantity": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "石弹丸",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 0,
+            "price": 0,
+            "quantity": 1,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "木",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/弹丸1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "弹丸",
+            "quality": 0,
+            "price": 0,
+            "quantity": 1,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "无痕针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 20000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><hr><p><strong>效果：</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "无痕针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 15000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><hr><p><strong>效果：</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "鸿灵针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.hidden.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 13000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><hr><p><strong>效果：</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "万刃针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 10000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><hr><p><strong>效果：</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化 (增加气感/神采的属性检定修正)"
+        },
+        "effects": [
+            {
+                "name": "守心针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 9000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><hr><p><strong>效果：</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "清韵回蓝",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await actor.applyHealing({ amount: 5, type: \"mp\" });"
+                }
+            ]
+        }
+    },
+    {
+        "name": "真刚针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 7000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><hr><p><strong>效果：</strong>装备后，即便被击破架招，该武器格按值依旧生效。</p>",
+            "automationNote": "完全自动化 (启用被动格挡)"
+        },
+        "effects": [
+            {
+                "name": "真刚针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 6000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><hr><p><strong>效果：</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "霜月-下盘不稳",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\neffectData.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                }
+            ]
+        }
+    },
+    {
+        "name": "魅影针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 5000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><hr><p><strong>效果：</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "魅影针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 3,
+            "price": 4000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><hr><p><strong>效果：</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "业火针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 2000,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>破釜沉舟，不胜不还。</p><hr><p><strong>效果：</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "破釜-额外流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await args.target.applyDamage({ amount: 20, type: \"liushi\", attacker: actor, isHit: true, ignoreDefense: true });"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 1600,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><hr><p><strong>效果：</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "蟠龙-暴击流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 10, type: \"liushi\", attacker: actor, isHit: true, ignoreDefense: true });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "龙泉针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 1500,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><hr><p><strong>效果：</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "龙泉针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 1300,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动移动 Token"
+        }
+    },
+    {
+        "name": "铸血针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 1200,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "铸血回血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await actor.applyHealing({ amount: 5, type: \"hp\" });"
+                }
+            ]
+        }
+    },
+    {
+        "name": "翻腾针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 800,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>怒意狂表，气勋上涌。</p><hr><p><strong>效果：</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动",
+            "scripts": []
+        }
+    },
+    {
+        "name": "鱼肠针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 700,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><hr><p><strong>效果：</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "鱼肠针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 500,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><hr><p><strong>效果：</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "刹绝针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 400,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><hr><p><strong>效果：</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "逐鹿针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 2,
+            "price": 300,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><hr><p><strong>效果：</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "百炼针",
+                "icon": "systems/xjzl-system/assets/icons/weapons/针1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 1,
+            "price": 200,
+            "quantity": 1,
+            "damage": 7,
+            "block": 0,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "精铁针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 1,
+            "price": 100,
+            "quantity": 1,
+            "damage": 5,
+            "block": 0,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "精铜针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 1,
+            "price": 100,
+            "quantity": 1,
+            "damage": 5,
+            "block": 0,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "粗铁针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 0,
+            "price": 10,
+            "quantity": 1,
+            "damage": 4,
+            "block": 0,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "粗铜针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 0,
+            "price": 10,
+            "quantity": 1,
+            "damage": 4,
+            "block": 0,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "烂铁针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 0,
+            "price": 1,
+            "quantity": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "破铜针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 0,
+            "price": 1,
+            "quantity": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "石针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 0,
+            "price": 0,
+            "quantity": 1,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "木针",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/针2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "针",
+            "quality": 0,
+            "price": 0,
+            "quantity": 1,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "无痕飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 20000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>剑过无痕，招落无声，此去经年。</p><hr><p><strong>效果：</strong>装备后，虚招值+3。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "无痕飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "鸿灵飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 15000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>此兵器挥之鸿鹄鸣渊，彻天际，响天涯。</p><hr><p><strong>效果：</strong>装备后，你对应该武器的武器技能等级+1。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "鸿灵飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.weaponRanks.hidden.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "万刃飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 13000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。</p><hr><p><strong>效果：</strong>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "万刃飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "25"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnStart",
+                        "mode": 2,
+                        "value": "-20"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "守心飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 10000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>克己，慎独，守心，明性。以克人之心克己，以容己之心容人。</p><hr><p><strong>效果：</strong>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2</p>",
+            "automationNote": "完全自动化 (增加气感/神采的属性检定修正)"
+        },
+        "effects": [
+            {
+                "name": "守心飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.stats.qigan.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.stats.shencai.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "清韵飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 9000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><hr><p><strong>效果：</strong>装备后，出招命中目标时，自身恢复5点内力。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "清韵回蓝",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await actor.applyHealing({ amount: 5, type: \"mp\" });"
+                }
+            ]
+        }
+    },
+    {
+        "name": "真刚飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 7000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>使工人以白马白牛祀昆吾之种后,采金铸之成剑精。</p><hr><p><strong>效果：</strong>装备后，即便被击破架招，该武器格按值依旧生效。</p>",
+            "automationNote": "完全自动化 (启用被动格挡)"
+        },
+        "effects": [
+            {
+                "name": "真刚飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.passiveBlock",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霜月飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 6000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><hr><p><strong>效果：</strong>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "霜月-下盘不稳",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\neffectData.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                }
+            ]
+        }
+    },
+    {
+        "name": "魅影飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 5000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>魅影悄然，倩影惊鸿。</p><hr><p><strong>效果：</strong>装备后，速度+2，闪避+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "魅影飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "业火飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 3,
+            "price": 4000,
+            "quantity": 1,
+            "damage": 20,
+            "block": 0,
+            "description": "<p>业火灼身，狱莲重瓣，难耐怒意。</p><hr><p><strong>效果：</strong>装备后，招式伤害+10。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "业火飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "破釜飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 2000,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>破釜沉舟，不胜不还。</p><hr><p><strong>效果：</strong>装备后，命中降低10点，攻击额外造成20点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "破釜-额外流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await args.target.applyDamage({ amount: 20, type: \"liushi\", attacker: actor, isHit: true, ignoreDefense: true });"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "破釜飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "蟠龙飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 1600,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><hr><p><strong>效果：</strong>装备后，招式造成暴击时，额外造成10点气血流失。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "蟠龙-暴击流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 10, type: \"liushi\", attacker: actor, isHit: true, ignoreDefense: true });\n}"
+                }
+            ]
+        }
+    },
+    {
+        "name": "龙泉飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 1500,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>红光紫气俱赫然，铸得宝剑名龙泉。</p><hr><p><strong>效果：</strong>装备后，招式内力消耗-2(最低0)。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "龙泉飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "崩雷飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 1300,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时,将其击退1米。</p>",
+            "automationNote": "请手动移动 Token"
+        }
+    },
+    {
+        "name": "铸血飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 1200,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><hr><p><strong>效果：</strong>装备后，招式命中目标时，自身回复5气血。</p>",
+            "automationNote": "完全自动化",
+            "scripts": [
+                {
+                    "label": "铸血回血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "await actor.applyHealing({ amount: 5, type: \"hp\" });"
+                }
+            ]
+        }
+    },
+    {
+        "name": "翻腾飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 800,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>怒意狂表，气勋上涌。</p><hr><p><strong>效果：</strong>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
+            "automationNote": "请手动",
+            "scripts": []
+        }
+    },
+    {
+        "name": "鱼肠飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 700,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>滴刃花纹毕露，宛如鱼肠一般。</p><hr><p><strong>效果：</strong>装备后，招式伤害+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "鱼肠飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "刹绝飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 500,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>尘尘利利，斩尽杀绝，快速决绝。</p><hr><p><strong>效果：</strong>装备后，普通攻击伤害提升10点。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "刹绝飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.damages.normal.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "逐鹿飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 400,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>群侠逐鹿,疾足者先得。</p><hr><p><strong>效果：</strong>装备后，速度+1、先攻+1。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "逐鹿飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百炼飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 2,
+            "price": 300,
+            "quantity": 1,
+            "damage": 12,
+            "block": 0,
+            "description": "<p>用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。</p><hr><p><strong>效果：</strong>装备后，命中+5。</p>",
+            "automationNote": "完全自动化"
+        },
+        "effects": [
+            {
+                "name": "百炼飞镖",
+                "icon": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "精钢飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 1,
+            "price": 200,
+            "quantity": 1,
+            "damage": 7,
+            "block": 0,
+            "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "精铁飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 1,
+            "price": 100,
+            "quantity": 1,
+            "damage": 5,
+            "block": 0,
+            "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "精铜飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 1,
+            "price": 100,
+            "quantity": 1,
+            "damage": 5,
+            "block": 0,
+            "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "粗铁飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 0,
+            "price": 10,
+            "quantity": 1,
+            "damage": 4,
+            "block": 0,
+            "description": "<p>带有杂质的劣质白铁锻造而成。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "粗铜飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 0,
+            "price": 10,
+            "quantity": 1,
+            "damage": 4,
+            "block": 0,
+            "description": "<p>带有杂质的劣质青铜锻造而成。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "烂铁飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 0,
+            "price": 1,
+            "quantity": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "破铜飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 0,
+            "price": 1,
+            "quantity": 1,
+            "damage": 3,
+            "block": 0,
+            "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "石飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖1.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 0,
+            "price": 0,
+            "quantity": 1,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用岩石制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无"
+        }
+    },
+    {
+        "name": "木飞镖",
+        "type": "weapon",
+        "img": "systems/xjzl-system/assets/icons/weapons/飞镖2.png",
+        "system": {
+            "type": "hidden",
+            "subtype": "飞镖",
+            "quality": 0,
+            "price": 0,
+            "quantity": 1,
+            "damage": 1,
+            "block": 0,
+            "description": "<p>用桃木、乔木、竹子制作的武器，质量很差，难以伤人。</p>",
+            "automationNote": "无"
+        }
+    }
+]
