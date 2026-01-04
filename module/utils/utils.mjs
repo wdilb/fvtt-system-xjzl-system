@@ -137,6 +137,8 @@ export function getModifierChoices() {
   const groupStats = game.i18n.localize("XJZL.Stats.Label");
   for (const [k, labelKey] of Object.entries(CONFIG.XJZL.attributes)) {
     add(groupStats, `stats.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+    // 检定加值修正 (如：力量检定 +2)
+    add(groupStats, `stats.${k}.checkMod`, `${game.i18n.localize(labelKey)} (检定 Mod)`);
   }
   add(groupStats, `stats.freePoints.mod`, `自由属性点 (Mod)`);
 
@@ -204,6 +206,8 @@ export function getModifierChoices() {
   if (CONFIG.XJZL.skills) {
     for (const [k, labelKey] of Object.entries(CONFIG.XJZL.skills)) {
       add(groupSkills, `skills.${k}.mod`, `${game.i18n.localize(labelKey)} (Mod)`);
+      // 技能检定修正 (用于 Roll D20 + checkMod)
+      add(groupSkills, `skills.${k}.checkMod`, `${game.i18n.localize(labelKey)} (检定 Mod)`);
     }
   }
 
