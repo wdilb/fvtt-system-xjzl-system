@@ -8,18 +8,12 @@
       "subtype": "长枪",
       "quality": 3,
       "price": 10000,
+      "quantity": 1,
       "damage": 22,
       "block": 10,
-      "description": "<p>玄铁打造，枪体乌黑，万军侯持此枪驰骋沙场，陷阵冲锋不留余地，势如破竹。</p><hr><p><strong>效果：</strong>持枪开启架招时，你免疫击倒与击飞。</p>",
-      "automationNote": "部分自动：检测到架招开启时，会尝试移除自身的击倒状态。但完全免疫击退需GM裁定。",
-      "scripts": [
-        {
-          "label": "舍身架招检测",
-          "trigger": "passive",
-          "active": true,
-          "script": "if (S.martial.stanceActive && S.martial.stanceItemId === thisItem.id) {\n    // 简易实现：如果当前开启了本武器的架招，尝试移除倒地状态\n    // 注意：完全免疫击飞/击倒通常需要Hook拦截，脚本引擎做不到“阻止状态添加”，只能“添加后立即移除”\n    if (actor.hasStatusEffect(\"prone\")) {\n        const effect = actor.effects.find(e => e.statuses.has(\"prone\"));\n        if (effect) effect.delete();\n    }\n}"
-        }
-      ]
+      "description": "<p>玄铁打造，枪体乌黑，万军侯持此枪驰骋沙场，陷阵冲锋不留余地，势如破竹。</p><p><strong>效果：</strong>持枪开启架招时，你免疫击倒与击飞。</p>",
+      "automationNote": "免疫请手动。",
+      "scripts": []
     }
   },
   {
@@ -31,16 +25,17 @@
       "subtype": "长枪",
       "quality": 1,
       "price": 20,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>大明士卒所用军械均由工部铁匠特制，受朝廷管辖，无法在江湖上流通。</p><hr><p><strong>效果：</strong>军备：武器带有锯齿血槽，命中后额外造成 10 气血流失。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>大明士卒所用军械均由工部铁匠特制，受朝廷管辖，无法在江湖上流通。</p><p><strong>效果：</strong>军备：武器带有锯齿血槽，命中后额外造成 10 气血流失。</p>",
+      "automationNote": "完全命中后自动扣除10点气血(无视护甲)。",
       "scripts": [
         {
-          "label": "军备血槽",
+          "label": "锯齿血槽",
           "trigger": "hit",
           "active": true,
-          "script": "if (args.isHit) {\n    // 造成 10 点流失 (真实伤害或专用流失逻辑)\n    // 这里使用 applyDamage，类型为 'true' 模拟流失\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"true\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ui.notifications.info(`${thisItem.name} 造成了锯齿流失伤害！`);\n}"
+          "script": "if (args.isHit) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"true\", // 真实伤害模拟流失\n        attacker: actor,\n        isHit: true,\n        ignoreBlock: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`${thisItem.name} 造成了 10 点气血流失！`);\n}"
         }
       ]
     }
@@ -54,16 +49,17 @@
       "subtype": "短棍",
       "quality": 0,
       "price": 1,
+      "quantity": 1,
       "damage": 1,
       "block": 0,
-      "description": "<p>浸了桐油，小雨时亦不受影响，至多可燃烧半个时辰，可在夜里照明周围10米的范围。</p><hr><p><strong>效果：</strong>普通攻击命中时，额外造成5点火焰伤害。</p>",
-      "automationNote": "完全自动化：普攻命中触发火焰伤害。",
+      "description": "<p>浸了桐油，小雨时亦不受影响，至多可燃烧半个时辰，可在夜里照明周围10米的范围。</p><p><strong>效果：</strong>普通攻击命中时，额外造成5点火焰伤害。</p>",
+      "automationNote": "部分普攻额外伤害已自动计算。照明效果请手动配置 Token 设置。",
       "scripts": [
         {
           "label": "火把灼烧",
-          "trigger": "hit",
+          "trigger": "calc",
           "active": true,
-          "script": "if (args.type === 'attack' && args.isHit && args.move.type === 'basic') {\n    await args.target.applyDamage({\n        amount: 5,\n        type: \"fire\",\n        attacker: actor,\n        isHit: true\n    });\n}"
+          "script": "if (args.move.type === 'basic') {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"火焰伤害(+5)\");\n}"
         }
       ]
     }
@@ -71,28 +67,29 @@
   {
     "name": "门神金锏",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
     "system": {
       "type": "staff",
       "subtype": "双棍",
       "quality": 3,
       "price": 10000,
+      "quantity": 1,
       "damage": 20,
       "block": 10,
-      "description": "<p>徐家家传之宝，上打君不正，下打臣不忠。</p><hr><p><strong>效果：</strong>若你标签为[侠]，暴击骰-2。<br>·若敌人标签为[恶]，武器伤害+10。</p>",
-      "automationNote": "完全自动化：自动检测双方侠义/恶行值。",
+      "description": "<p>徐家家传之宝，上打君不正，下打臣不忠。</p><p><strong>效果：</strong>若你标签为[侠]，暴击骰-2。<br>·若敌人标签为[恶]，武器伤害+10。</p>",
+      "automationNote": "完全需确保角色[侠义]/[恶行]属性已正确设置 (阈值50)。",
       "scripts": [
         {
-          "label": "门神威光(被动)",
+          "label": "侠义加持",
           "trigger": "passive",
           "active": true,
-          "script": "// 检查自身侠义: 侠义>=50 且 恶行<50\nif (S.social.xiayi >= 50 && S.social.exing < 50) {\n    S.combat.crit_waigong -= 2;\n}"
+          "script": "// 假设侠义 > 50 视为[侠]\nif (S.social.xiayi > 50) {\n    S.combat.crit_waigong -= 2;\n    S.combat.crit_neigong -= 2;\n}"
         },
         {
-          "label": "惩恶(命中)",
-          "trigger": "hit",
+          "label": "惩恶扬善",
+          "trigger": "preDamage",
           "active": true,
-          "script": "if (args.isHit && args.target) {\n    // 检查目标恶行: >= 100 视为[恶]\n    if (args.target.system.social?.exing >= 100) {\n        await args.target.applyDamage({\n            amount: 10,\n            type: \"waigong\", // 视为武器额外伤害\n            attacker: actor,\n            isHit: true\n        });\n        ui.notifications.info(\"惩恶！造成额外伤害！\");\n    }\n}"
+          "script": "// 假设恶行 > 50 视为[恶]\nif (args.target && args.target.system.social.exing > 50) {\n    args.config.amount += 10;\n    ui.notifications.info(\"惩恶扬善！伤害 +10\");\n}"
         }
       ]
     }
@@ -106,10 +103,11 @@
       "subtype": "长枪",
       "quality": 2,
       "price": 1200,
+      "quantity": 1,
       "damage": 15,
       "block": 8,
-      "description": "<p>混铁精钢打造，枪头以鎏金铸造。</p><hr><p><strong>效果：</strong>本回合移动超过5米，本回合招式伤害+5。</p>",
-      "automationNote": "请手动：系统无法自动检测移动距离。",
+      "description": "<p>混铁精钢打造，枪头以鎏金铸造。</p><p><strong>效果：</strong>本回合移动超过5米，本回合招式伤害+5。</p>",
+      "automationNote": "需手动。",
       "scripts": []
     }
   },
@@ -122,42 +120,45 @@
       "subtype": "短棍",
       "quality": 3,
       "price": 0,
+      "quantity": 1,
       "damage": 20,
       "block": 20,
-      "description": "<p>枫桦院特殊功法凝聚而成的兵器。</p>",
-      "automationNote": "无特殊效果",
+      "description": "<p>枫桦院特殊功法凝聚而成的兵器。</p><p><strong>效果：</strong></p>",
+      "automationNote": "无自动化逻辑。",
       "scripts": []
     }
   },
   {
     "name": "气枝（清秋枫桦戒）",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
     "system": {
       "type": "staff",
       "subtype": "短棍",
       "quality": 2,
       "price": 0,
+      "quantity": 1,
       "damage": 10,
       "block": 10,
-      "description": "<p>枫桦院特殊功法凝聚而成的兵器。</p>",
-      "automationNote": "无特殊效果",
+      "description": "<p>枫桦院特殊功法凝聚而成的兵器。</p><p><strong>效果：</strong></p>",
+      "automationNote": "无自动化逻辑。",
       "scripts": []
     }
   },
   {
     "name": "气枝（枫桦戒）",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
     "system": {
       "type": "staff",
       "subtype": "短棍",
       "quality": 2,
       "price": 0,
+      "quantity": 1,
       "damage": 5,
       "block": 5,
-      "description": "<p>枫桦院特殊功法凝聚而成的兵器。</p>",
-      "automationNote": "无特殊效果",
+      "description": "<p>枫桦院特殊功法凝聚而成的兵器。</p><p><strong>效果：</strong></p>",
+      "automationNote": "无自动化逻辑。",
       "scripts": []
     }
   },
@@ -170,42 +171,65 @@
       "subtype": "长棍",
       "quality": 2,
       "price": 230,
+      "quantity": 1,
       "damage": 12,
       "block": 5,
-      "description": "<p>精铁锡杖，下端有三栏龙头纹饰，极为精细，杖身中空，上面錾刻十二僧人立于莲花台之上。</p><hr><p><strong>效果：</strong>你的[佛法]检定结果+1</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "佛法加持",
-        "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
-        "transfer": true,
-        "changes": [
-          { "key": "system.arts.fofa.checkMod", "mode": 2, "value": "1" }
-        ]
-      }
-    ]
+      "description": "<p>精铁锡杖，下端有三栏龙头纹饰，极为精细，杖身中空，上面錾刻十二僧人立于莲花台之上。</p><p><strong>效果：</strong>效果：你的[佛法]检定结果+1</p>",
+      "automationNote": "完全装备后佛法检定自动+1。",
+      "scripts": [
+        {
+          "label": "佛法加持",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.arts.fofa.checkMod += 1;"
+        }
+      ]
+    }
+  },
+  {
+    "name": "军备枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 1,
+      "price": 20,
+      "quantity": 1,
+      "damage": 5,
+      "block": 2,
+      "description": "<p>大明士卒所用军械均由工部铁匠特制，受朝廷管辖，无法在江湖上流通。</p><p><strong>效果：</strong>军备：武器带有锯齿血槽，命中后额外造成 10 气血流失。</p>",
+      "automationNote": "完全命中后自动扣除10点气血。",
+      "scripts": [
+        {
+          "label": "军备流失",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.isHit) {\n    await args.target.applyDamage({ amount: 10, type: \"true\", isHit: true, ignoreDefense: true });\n}"
+        }
+      ]
+    }
   },
   {
     "name": "无当号旗",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
-      "subtype": "旗",
+      "subtype": "",
       "quality": 0,
       "price": 5,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>军职升至总旗后，可得号旗一面...</p><hr><p><strong>效果：</strong>每将一人打入濒死，回复 30 点气血。</p>",
-      "automationNote": "半自动化：请在将敌人打入濒死后，手动应用治疗。",
+      "description": "<p>军职升至总旗后，可得号旗一面，用于识别敌我，表明身份。总旗、百户为三角旗帜，千户四方旗。长杆挂幡，蓝底盘金龙纹，字为“明 将军”。<br>番号：拥有号旗后，可以为麾下部队取一个番号并将其绣在号旗上，作“明 将军-番号”。你和麾下部队可以获得对应番号带来的属性加成。<br>·你每年只能更换一次番号。</p><p><strong>效果：</strong>你可以手持此旗挥舞，也可以系于腰后，视野范围内的人都可以看到这面旗帜。不用时，可以卷旗捆好，当做[棍]使用。每将一人打入濒死，回复 30 点气血。</p>",
+      "automationNote": "完全自动",
       "scripts": [
         {
-          "label": "号旗回血(Hit)",
+          "label": "凯旋回血",
           "trigger": "hit",
           "active": true,
-          "script": "if (args.target && args.target.system.resources.hp.value <= 0) {\n    // 辅助判定：如果这一击正好打死了，提示回复\n    ui.notifications.info(\"无当号旗：若目标进入濒死，请手动应用 30 点治疗。\");\n}"
+          "script": "if (args.damageResult && args.damageResult.isDying) {\n    await actor.applyHealing({ amount: 30, type: \"hp\" });\n    ui.notifications.info(\"击敌濒死，士气大振，回复30气血！\");\n}"
         }
       ]
     }
@@ -213,146 +237,139 @@
   {
     "name": "龙骧号旗",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
-      "subtype": "旗",
+      "subtype": "",
       "quality": 0,
       "price": 5,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>...</p><hr><p><strong>效果：</strong>招式伤害+10，虚招值+1。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "龙骧号令",
-        "transfer": true,
-        "changes": [
-          { "key": "system.combat.damages.skill.mod", "mode": 2, "value": "10" },
-          { "key": "system.combat.xuzhao", "mode": 2, "value": "1" }
-        ]
-      }
-    ]
+      "description": "<p>军职升至总旗后，可得号旗一面，用于识别敌我，表明身份。总旗、百户为三角旗帜，千户四方旗。长杆挂幡，蓝底盘金龙纹，字为“明 将军”。<br>番号：拥有号旗后，可以为麾下部队取一个番号并将其绣在号旗上，作“明 将军-番号”。你和麾下部队可以获得对应番号带来的属性加成。<br>·你每年只能更换一次番号。</p><p><strong>效果：</strong>招式伤害+10，虚招值+1。</p>",
+      "automationNote": "完全装备即生效。",
+      "scripts": [
+        {
+          "label": "龙骧号令",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.combat.damages.global.mod += 10;\nS.combat.xuzhao += 1;"
+        }
+      ]
+    }
   },
   {
     "name": "武骧号旗",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
-      "subtype": "旗",
+      "subtype": "",
       "quality": 0,
       "price": 5,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>...</p><hr><p><strong>效果：</strong>招式伤害+5。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "武骧号令",
-        "transfer": true,
-        "changes": [
-          { "key": "system.combat.damages.skill.mod", "mode": 2, "value": "5" }
-        ]
-      }
-    ]
+      "description": "<p>军职升至总旗后，可得号旗一面，用于识别敌我，表明身份。总旗、百户为三角旗帜，千户四方旗。长杆挂幡，蓝底盘金龙纹，字为“明 将军”。<br>番号：拥有号旗后，可以为麾下部队取一个番号并将其绣在号旗上，作“明 将军-番号”。你和麾下部队可以获得对应番号带来的属性加成。<br>·你每年只能更换一次番号。</p><p><strong>效果：</strong>招式伤害+5。</p>",
+      "automationNote": "完全装备即生效。",
+      "scripts": [
+        {
+          "label": "武骧号令",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.combat.damages.global.mod += 5;"
+        }
+      ]
+    }
   },
   {
     "name": "玄甲号旗",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
-      "subtype": "旗",
+      "subtype": "",
       "quality": 0,
       "price": 5,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>...</p><hr><p><strong>效果：</strong>格挡值+5，看破值+1。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "玄甲号令",
-        "transfer": true,
-        "changes": [
-          { "key": "system.combat.block", "mode": 2, "value": "5" },
-          { "key": "system.combat.kanpo", "mode": 2, "value": "1" }
-        ]
-      }
-    ]
+      "description": "<p>军职升至总旗后，可得号旗一面，用于识别敌我，表明身份。总旗、百户为三角旗帜，千户四方旗。长杆挂幡，蓝底盘金龙纹，字为“明 将军”。<br>番号：拥有号旗后，可以为麾下部队取一个番号并将其绣在号旗上，作“明 将军-番号”。你和麾下部队可以获得对应番号带来的属性加成。<br>·你每年只能更换一次番号。</p><p><strong>效果：</strong>格挡值+5，看破值+1。</p>",
+      "automationNote": "完全装备即生效。",
+      "scripts": [
+        {
+          "label": "玄甲号令",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.combat.block += 5;\nS.combat.kanpo += 1;"
+        }
+      ]
+    }
   },
   {
     "name": "威远号旗",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
-      "subtype": "旗",
+      "subtype": "",
       "quality": 0,
       "price": 5,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>...</p><hr><p><strong>效果：</strong>弓、火器类武器攻击距离+2。</p>",
-      "automationNote": "请手动：系统暂不管理攻击距离。",
+      "description": "<p>军职升至总旗后，可得号旗一面，用于识别敌我，表明身份。总旗、百户为三角旗帜，千户四方旗。长杆挂幡，蓝底盘金龙纹，字为“明 将军”。<br>番号：拥有号旗后，可以为麾下部队取一个番号并将其绣在号旗上，作“明 将军-番号”。你和麾下部队可以获得对应番号带来的属性加成。<br>·你每年只能更换一次番号。</p><p><strong>效果：</strong>弓、火器类武器攻击距离+2。</p>",
+      "automationNote": "需手动。",
       "scripts": []
     }
   },
   {
     "name": "摧锋号旗",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
-      "subtype": "旗",
+      "subtype": "",
       "quality": 0,
       "price": 5,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>...</p><hr><p><strong>效果：</strong>刀、枪类武器的伤害+5。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "摧锋号令",
-        "transfer": true,
-        "changes": [
-          { "key": "system.combat.damages.weaponTypes.blade.mod", "mode": 2, "value": "5" },
-          { "key": "system.combat.damages.weaponTypes.staff.mod", "mode": 2, "value": "5" }
-        ]
-      }
-    ]
+      "description": "<p>军职升至总旗后，可得号旗一面，用于识别敌我，表明身份。总旗、百户为三角旗帜，千户四方旗。长杆挂幡，蓝底盘金龙纹，字为“明 将军”。<br>番号：拥有号旗后，可以为麾下部队取一个番号并将其绣在号旗上，作“明 将军-番号”。你和麾下部队可以获得对应番号带来的属性加成。<br>·你每年只能更换一次番号。</p><p><strong>效果：</strong>刀、枪类武器的伤害+5。</p>",
+      "automationNote": "完全已增加刀/枪类武器伤害。",
+      "scripts": [
+        {
+          "label": "摧锋号令",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.combat.damages.weaponTypes.blade.mod += 5;\nS.combat.damages.weaponTypes.staff.mod += 5;"
+        }
+      ]
+    }
   },
   {
     "name": "健锐号旗",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
-      "subtype": "旗",
+      "subtype": "",
       "quality": 0,
       "price": 5,
+      "quantity": 1,
       "damage": 5,
       "block": 2,
-      "description": "<p>...</p><hr><p><strong>效果：</strong>气血上限+20。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "健锐号令",
-        "transfer": true,
-        "changes": [
-          { "key": "system.resources.hp.bonus", "mode": 2, "value": "20" }
-        ]
-      }
-    ]
+      "description": "<p>军职升至总旗后，可得号旗一面，用于识别敌我，表明身份。总旗、百户为三角旗帜，千户四方旗。长杆挂幡，蓝底盘金龙纹，字为“明 将军”。<br>番号：拥有号旗后，可以为麾下部队取一个番号并将其绣在号旗上，作“明 将军-番号”。你和麾下部队可以获得对应番号带来的属性加成。<br>·你每年只能更换一次番号。</p><p><strong>效果：</strong>气血上限+20。</p>",
+      "automationNote": "完全装备即生效。",
+      "scripts": [
+        {
+          "label": "健锐号令",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.resources.hp.bonus += 20;"
+        }
+      ]
+    }
   },
   {
     "name": "连枷（棍）",
@@ -360,19 +377,20 @@
     "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
     "system": {
       "type": "staff",
-      "subtype": "农具",
+      "subtype": "",
       "quality": 0,
       "price": 1,
+      "quantity": 1,
       "damage": 3,
       "block": 1,
-      "description": "<p>农耕工具，长柄挂平排竹条，用于拍打作物脱粒。</p><hr><p><strong>效果：</strong>武器格挡值提升等同于[农事]等级的数值。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>农耕工具，长柄挂平排竹条，用于拍打作物脱粒。</p><p><strong>效果：</strong>伤害3 格挡1<br>效果：武器格挡值提升等同于[农事]等级的数值。</p>",
+      "automationNote": "完全根据农事等级增加格挡。",
       "scripts": [
         {
           "label": "农具格挡",
           "trigger": "passive",
           "active": true,
-          "script": "const nongshi = S.arts.nongshi?.total || 0;\nthisItem.system.block += nongshi;"
+          "script": "S.combat.block += (S.arts.nongshi.total || 0);"
         }
       ]
     }
@@ -380,52 +398,50 @@
   {
     "name": "锄头（棍）",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
     "system": {
       "type": "staff",
-      "subtype": "农具",
+      "subtype": "",
       "quality": 0,
       "price": 1,
+      "quantity": 1,
       "damage": 3,
       "block": 1,
-      "description": "<p>最常见的农耕工具，可以清理杂草杂物。</p><hr><p><strong>效果：</strong>你进行[农事]的检定结果+1。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "趁手农具",
-        "transfer": true,
-        "changes": [
-          { "key": "system.arts.nongshi.checkMod", "mode": 2, "value": "1" }
-        ]
-      }
-    ]
+      "description": "<p>最常见的农耕工具，可以清理杂草杂物。</p><p><strong>效果：</strong>伤害3 格挡1<br>效果：你进行[农事]的检定结果+1。</p>",
+      "automationNote": "完全农事检定+1。",
+      "scripts": [
+        {
+          "label": "得心应手",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.arts.nongshi.checkMod += 1;"
+        }
+      ]
+    }
   },
   {
     "name": "银杵臼",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
     "system": {
       "type": "staff",
       "subtype": "短棍",
       "quality": 2,
       "price": 300,
+      "quantity": 1,
       "damage": 10,
       "block": 4,
-      "description": "<p>舂捣药物的器皿，银质的杵头可以辨别有毒成分。</p><hr><p><strong>效果：</strong>你进行制药的[医术]检定结果+1。</p>",
-      "automationNote": "完全自动化：全局提升医术检定。",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "药杵",
-        "transfer": true,
-        "changes": [
-          { "key": "system.arts.yishu.checkMod", "mode": 2, "value": "1" }
-        ]
-      }
-    ]
+      "description": "<p>舂捣药物的器皿，银质的杵头可以辨别有毒成分。</p><p><strong>效果：</strong>效果：你进行制药的[医术]检定结果+1。</p>",
+      "automationNote": "完全医术检定+1。",
+      "scripts": [
+        {
+          "label": "药石精通",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.skills.yishu.checkMod += 1;"
+        }
+      ]
+    }
   },
   {
     "name": "水火囚龙棒",
@@ -436,16 +452,17 @@
       "subtype": "双棍",
       "quality": 4,
       "price": 1000000,
+      "quantity": 1,
       "damage": 35,
       "block": 20,
-      "description": "<p>龙蟠棍上，棒头有一龙头，头顶两支犄角，分为两把，双龙盘踞，刚猛无比，名扬四海。</p><hr><p><strong>效果：</strong>当你造成暴击时，可以选择一项效果：<br>阴:忽视对方外功防御；<br>阳:击飞目标1米。</p>",
-      "automationNote": "完全自动化：暴击时弹出对话框选择。",
+      "description": "<p>龙蟠棍上，棒头有一龙头，头顶两支犄角，分为两把，双龙盘踞，刚猛无比，名扬四海。</p><p><strong>效果：</strong>当你造成暴击时，可以选择一项效果：<br>阴:忽视对方外功防御；<br>阳:击飞目标1米。</p>",
+      "automationNote": "部分暴击时弹出对话框选择效果。选择“阴”自动无视防御；选择“阳”需手动处理击飞，但会飘字提示。",
       "scripts": [
         {
-          "label": "囚龙特效",
+          "label": "双龙之择",
           "trigger": "preDamage",
           "active": true,
-          "script": "if (args.outcome.isCrit) {\n    new Dialog({\n        title: \"水火囚龙棒 - 暴击特效\",\n        content: \"<p>请选择暴击触发效果：</p>\",\n        buttons: {\n            yin: {\n                label: \"阴 - 无视外防\",\n                callback: () => {\n                    args.config.ignoreDefense = true;\n                    ui.notifications.info(\"囚龙棒：无视防御触发！\");\n                }\n            },\n            yang: {\n                label: \"阳 - 击飞\",\n                callback: async () => {\n                    ui.notifications.info(\"囚龙棒：请手动击飞目标 1 米！\");\n                    // 可选：添加击飞状态\n                }\n            }\n        }\n    }).render(true);\n}"
+          "script": "/**\n * 水火囚龙棒暴击特效\n * Trigger: preDamage (伤害计算前)\n */\n// 检查是否暴击 (preDamage 阶段暴击状态已确定，在 args.outcome 中)\nif (args.outcome.isCrit) {\n    const choice = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"水火囚龙棒：暴击特效\" },\n        content: \"<p>双龙盘踞，刚猛无比！请选择暴击效果：</p>\",\n        buttons: [\n            { label: \"阴：无视外防\", action: \"yin\", icon: \"fas fa-ghost\" },\n            { label: \"阳：击飞1米\", action: \"yang\", icon: \"fas fa-sun\" }\n        ]\n    });\n    \n    if (choice === \"yin\") {\n        // 修改配置：无视防御\n        args.config.ignoreDefense = true;\n        ui.notifications.info(\"囚龙棒·阴：无视防御！\");\n    } else {\n        // 阳：提示手动击飞\n        ui.notifications.warn(`囚龙棒·阳：请将 ${args.target?.name || \"目标\"} 击飞 1 米！`);\n    }\n}"
         }
       ]
     }
@@ -453,38 +470,40 @@
   {
     "name": "瓦面金装锏",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
     "system": {
       "type": "staff",
       "subtype": "双棍",
       "quality": 3,
       "price": 8000,
+      "quantity": 1,
       "damage": 23,
       "block": 10,
-      "description": "<p>门神秦琼所用武器，采用熟铜锻造鎏金而成，重约120斤，乃家传之宝。</p><hr><p><strong>效果：</strong>你格挡成功时，可消耗反应动作施展虚招。</p>",
-      "automationNote": "请手动：格挡成功后请自行出招。",
+      "description": "<p>门神秦琼所用武器，采用熟铜锻造鎏金而成，重约120斤，乃家传之宝。</p><p><strong>效果：</strong>你格挡成功时，可消耗反应动作施展虚招。</p>",
+      "automationNote": "需手动。",
       "scripts": []
     }
   },
   {
     "name": "竹节精钢鞭",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
     "system": {
       "type": "staff",
       "subtype": "双棍",
       "quality": 3,
       "price": 6000,
+      "quantity": 1,
       "damage": 22,
       "block": 10,
-      "description": "<p>门神尉迟恭所用武器，形如竹节，直筒圆柱状。</p><hr><p><strong>效果：</strong>你每次出招攻击[恶][邪]之人时，虚招值+2，暴击骰-2。</p>",
-      "automationNote": "半自动化：出招时需检测目标恶行值。",
+      "description": "<p>门神尉迟恭所用武器，形如竹节，直筒圆柱状。</p><p><strong>效果：</strong>你每次出招攻击[恶][邪]之人时，虚招值+2，暴击骰-2。</p>",
+      "automationNote": "完全自动检测目标恶行值。",
       "scripts": [
         {
-          "label": "打神鞭",
+          "label": "除魔卫道",
           "trigger": "check",
           "active": true,
-          "script": "if (args.target.system.social?.exing >= 100) {\n    args.flags.grantFeintLevel += 2; // 虚招优势\n    // 暴击骰-2 (Crit Threshold Mod, 正数表示更容易)\n    args.flags.critThresholdMod += 2;\n    ui.notifications.info(\"打神鞭：对恶人特效触发！\");\n}"
+          "script": "// 假设恶行 > 50 为恶\nif (args.target.system.social.exing > 50) {\n    args.flags.grantFeintLevel += 2; // 守方被虚招+2(即攻方优势)\n    // 注意：这里是攻方触发，所以要修改 flags.critThresholdMod\n    args.flags.critThresholdMod += 2;\n}"
         }
       ]
     }
@@ -492,16 +511,17 @@
   {
     "name": "连珠棍",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
     "system": {
       "type": "staff",
       "subtype": "双棍",
       "quality": 3,
       "price": 3000,
+      "quantity": 1,
       "damage": 20,
       "block": 10,
-      "description": "<p>由一根长棍和两根短棍相互连接而成。棍头之间三个铁环扣连。</p><hr><p><strong>效果：</strong>以主要动作施展普通攻击时，可攻击两次。</p>",
-      "automationNote": "请手动：请手动操作两次普通攻击。",
+      "description": "<p>由一根长棍和两根短棍相互连接而成。棍头之间三个铁环扣连。</p><p><strong>效果：</strong>以主要动作施展普通攻击时，可攻击两次。</p>",
+      "automationNote": "需手动：请手动点击两次攻击按钮。",
       "scripts": []
     }
   },
@@ -514,16 +534,17 @@
       "subtype": "双棍",
       "quality": 2,
       "price": 2000,
+      "quantity": 1,
       "damage": 15,
       "block": 7,
-      "description": "<p>两条硬鞭各长三尺不到，鞭身铜制无刃，呈菱形状，挥舞凌厉。</p><hr><p><strong>效果：</strong>施展太极属性武学时，招式伤害+10。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>两条硬鞭各长三尺不到，鞭身铜制无刃，呈菱形状，挥舞凌厉。</p><p><strong>效果：</strong>施展太极属性武学时，招式伤害+10。</p>",
+      "automationNote": "完全自动检测招式属性。",
       "scripts": [
         {
-          "label": "两仪加持",
+          "label": "太极生威",
           "trigger": "calc",
           "active": true,
-          "script": "if (args.move.element === 'taiji') {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"两仪(+10)\");\n}"
+          "script": "if (args.move.element === 'taiji') {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"两仪鞭(+10)\");\n}"
         }
       ]
     }
@@ -537,10 +558,11 @@
       "subtype": "双棍",
       "quality": 2,
       "price": 700,
+      "quantity": 1,
       "damage": 14,
       "block": 5,
-      "description": "<p>拐柄以檀木枣木等硬质木料制成，每拐重八斤。牛角上有圆滑把手，横安棒槌，追打极狠。</p><hr><p><strong>效果：</strong>格挡1米内目标的攻击成功时，可消耗反应动作进行普通攻击，若暴击，还可将目标击倒。</p>",
-      "automationNote": "请手动：反击逻辑复杂，请手动执行。",
+      "description": "<p>拐柄以檀木枣木等硬质木料制成，每拐重八斤。牛角上有圆滑把手，横安棒槌，追打极狠。</p><p><strong>效果：</strong>格挡1米内目标的攻击成功时，可消耗反应动作进行普通攻击，若暴击，还可将目标击倒。</p>",
+      "automationNote": "需手动：请手动处理反应攻击和击倒。",
       "scripts": []
     }
   },
@@ -553,21 +575,20 @@
       "subtype": "双棍",
       "quality": 2,
       "price": 400,
+      "quantity": 1,
       "damage": 12,
       "block": 5,
-      "description": "<p>两条短棍，当中为铁链相连，做工精致。</p><hr><p><strong>效果：</strong>看破值+1。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "灵动",
-        "transfer": true,
-        "changes": [
-          { "key": "system.combat.kanpo", "mode": 2, "value": "1" }
-        ]
-      }
-    ]
+      "description": "<p>两条短棍，当中为铁链相连，做工精致。</p><p><strong>效果：</strong>看破值+1。</p>",
+      "automationNote": "完全装备即生效。",
+      "scripts": [
+        {
+          "label": "灵动",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.combat.kanpo += 1;"
+        }
+      ]
+    }
   },
   {
     "name": "霸王枪",
@@ -578,21 +599,42 @@
       "subtype": "长枪",
       "quality": 4,
       "price": 1000000,
+      "quantity": 1,
       "damage": 45,
       "block": 20,
-      "description": "<p>江湖上独一无二的一杆枪，长一丈三尺七寸三分，重七十三斤七两三钱。</p><hr><p><strong>效果：</strong>战斗中，敌人每次为你添加状态时，你便获得一层“霸王”，持续到战斗脱离。<br>霸王：每层增加内外功防御5点，招式伤害+5。</p>",
-      "automationNote": "请手动：系统无法自动监听“被添加状态”事件，请手动添加[霸王]层数。",
+      "description": "<p>江湖上独一无二的一杆枪，长一丈三尺七寸三分，重七十三斤七两三钱。</p><p><strong>效果：</strong>战斗中，敌人每次为你添加状态时，你便获得一层“霸王”，持续到战斗脱离。<br>霸王：每层增加内外功防御5点，招式伤害+5。</p>",
+      "automationNote": "需手动：请在触发时，手动添加物品内的[霸王]特效。",
       "scripts": []
     },
     "effects": [
       {
         "name": "霸王",
+        "icon": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
         "transfer": false,
-        "flags": { "xjzl-system": { "stackable": true, "maxStacks": 0 } },
+        "description": "每层增加内外功防御5点，招式伤害+5。",
+        "flags": {
+          "xjzl-system": {
+            "slug": "bawang",
+            "stackable": true,
+            "maxStacks": 0
+          }
+        },
         "changes": [
-          { "key": "system.combat.def_waigong", "mode": 2, "value": "5" },
-          { "key": "system.combat.def_neigong", "mode": 2, "value": "5" },
-          { "key": "system.combat.damages.skill.mod", "mode": 2, "value": "5" }
+          {
+            "key": "system.combat.def_waigong",
+            "mode": 2,
+            "value": "5"
+          },
+          {
+            "key": "system.combat.def_neigong",
+            "mode": 2,
+            "value": "5"
+          },
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": "5"
+          }
         ]
       }
     ]
@@ -606,64 +648,79 @@
       "subtype": "长枪",
       "quality": 4,
       "price": 1000000,
+      "quantity": 1,
       "damage": 40,
       "block": 18,
-      "description": "<p>戟杆精饰，顶端双耳锋刃作“井”，一旦施展开来，惊天动地。</p><hr><p><strong>效果：</strong>进战后，你获得“无双”，持续三回合。<br>无双：虚招对抗检定+4，且移动不受【趁虚而入】攻击，你每将一人打入濒死后，无双持续回合+1。</p>",
-      "automationNote": "半自动化：请在战斗开始时手动开启[无双]，击杀延长请手动调整。",
+      "description": "<p>戟杆精饰，顶端双耳锋刃作“井”，一旦施展开来，惊天动地。</p><p><strong>效果：</strong>进战后，你获得“无双”，持续三回合。<br>无双：虚招对抗检定+4，且移动不受【趁虚而入】攻击，你每将一人打入濒死后，无双持续回合+1。</p>",
+      "automationNote": "需手动：请在进战时手动激活“无双”Buff。濒死延长回合需手动调整 AE 持续时间。",
+      "effects": [
+        {
+          "name": "无双",
+          "icon": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+          "transfer": false,
+          "duration": {
+            "rounds": 3
+          },
+          "changes": [
+            {
+              "key": "flags.xjzl-system.feintLevel",
+              "mode": 2,
+              "value": "4"
+            }
+          ],
+          "description": "虚招对抗检定+4，免疫趁虚而入。"
+        }
+      ],
       "scripts": []
-    },
-    "effects": [
-      {
-        "name": "无双",
-        "transfer": false,
-        "duration": { "rounds": 3 },
-        "changes": [
-          { "key": "system.combat.xuzhao", "mode": 2, "value": "4" },
-          { "key": "flags.xjzl-system.feintLevel", "mode": 2, "value": "1" }
-        ]
-      }
-    ]
+    }
   },
   {
     "name": "沥泉神矛",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
     "system": {
       "type": "staff",
       "subtype": "长枪",
       "quality": 4,
       "price": 30000,
+      "quantity": 1,
       "damage": 35,
       "block": 15,
-      "description": "<p>岳飞所持神矛，沥泉山的蛇怪所化，枪头也就被传说是大蛇的舌芯化成，征战多年，杀敌无数。</p><hr><p><strong>效果：</strong>格挡成功时，使目标陷入“下盘不稳”状态，持续一回合。<br>·当你使用实招使目标倒地时，获得1点怒气。</p>",
-      "automationNote": "半自动化：格挡反击请手动添加[下盘不稳]；倒地回怒请手动。",
-      "scripts": []
+      "description": "<p>岳飞所持神矛，沥泉山的蛇怪所化，枪头也就被传说是大蛇的舌芯化成，征战多年，杀敌无数。</p><p><strong>效果：</strong>格挡成功时，使目标陷入“下盘不稳”状态，持续一回合。<br>·当你使用实招使目标倒地时，获得1点怒气。</p>",
+      "automationNote": "部分格挡成功并施加下盘不稳。获得怒气需手动。",
+      "scripts": [
+        {
+          "label": "沥泉反制",
+          "trigger": "preTake",
+          "active": true,
+          "script": "if (Macros.checkStance(actor, args)) {\n    await game.xjzl.api.effects.addEffect(args.attacker, \"unstable\");\n    ui.notifications.info(\"沥泉神矛：格挡成功！目标下盘不稳！\");\n}"
+        }
+      ]
     }
   },
   {
     "name": "蟠龙金枪",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
       "subtype": "长枪",
       "quality": 3,
       "price": 17000,
+      "quantity": 1,
       "damage": 23,
       "block": 13,
-      "description": "<p>辽国宝物，枪如龙身，枪纂龙尾，如飞龙在天。</p><hr><p><strong>效果：</strong>你的普通攻击可以反应动作对空施展。<br>·你的普通攻击伤害+10。</p>",
-      "automationNote": "完全自动化",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "金枪加持",
-        "transfer": true,
-        "changes": [
-          { "key": "system.combat.damages.normal.mod", "mode": 2, "value": "10" }
-        ]
-      }
-    ]
+      "description": "<p>辽国宝物，枪如龙身，枪纂龙尾，如飞龙在天。</p><p><strong>效果：</strong>你的普通攻击可以反应动作对空施展。<br>·你的普通攻击伤害+10。</p>",
+      "automationNote": "部分普攻伤害已增加。反应动作需手动。",
+      "scripts": [
+        {
+          "label": "飞龙在天",
+          "trigger": "calc",
+          "active": true,
+          "script": "if (args.move.type === 'basic') {\n    args.output.damage += 10;\n}"
+        }
+      ]
+    }
   },
   {
     "name": "龙胆涯角枪",
@@ -674,26 +731,28 @@
       "subtype": "长枪",
       "quality": 3,
       "price": 13000,
+      "quantity": 1,
       "damage": 25,
       "block": 15,
-      "description": "<p>少年银甲白袍，海角天涯无对。</p><hr><p><strong>效果：</strong>出招前可不消耗速度先朝任意方向突进3米，然后再根据招式施展距离选择目标攻击。</p>",
-      "automationNote": "请手动移动 Token。",
+      "description": "<p>少年银甲白袍，海角天涯无对。</p><p><strong>效果：</strong>出招前可不消耗速度先朝任意方向突进3米，然后再根据招式施展距离选择目标攻击。</p>",
+      "automationNote": "需手动：请在出招前手动移动 Token。",
       "scripts": []
     }
   },
   {
     "name": "夺命锁喉枪",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
     "system": {
       "type": "staff",
       "subtype": "长枪",
       "quality": 3,
       "price": 11000,
+      "quantity": 1,
       "damage": 20,
       "block": 10,
-      "description": "<p>追魂夺命，不死不休。</p><hr><p><strong>效果：</strong>出招命中无架招目标时若未暴击，可立即消耗次要动作，施展一个消耗主要动作的实招。</p>",
-      "automationNote": "请手动：请自行判断条件并操作连招。",
+      "description": "<p>追魂夺命，不死不休。</p><p><strong>效果：</strong>出招命中无架招目标时若未暴击，可立即消耗次要动作，施展一个消耗主要动作的实招。</p>",
+      "automationNote": "需手动：满足条件时请手动进行额外出招。",
       "scripts": []
     }
   },
@@ -706,16 +765,17 @@
       "subtype": "长枪",
       "quality": 3,
       "price": 10000,
+      "quantity": 1,
       "damage": 22,
       "block": 10,
-      "description": "<p>寒铁打造而成，长一丈一尺三，枪头为黑金虎头形，虎口吞刃，枪体镀金，铂金铸就，锋锐无比。</p><hr><p><strong>效果：</strong>出招暴击时，额外造成20点气血流失。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>寒铁打造而成，长一丈一尺三，枪头为黑金虎头形，虎口吞刃，枪体镀金，铂金铸就，锋锐无比。</p><p><strong>效果：</strong>出招暴击时，额外造成20点气血流失。</p>",
+      "automationNote": "完全暴击时自动扣除 20 点气血。",
       "scripts": [
         {
-          "label": "虎头流血",
+          "label": "虎啸吞刃",
           "trigger": "hit",
           "active": true,
-          "script": "if (args.isCrit) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: \"true\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"虎头湛金枪：暴击撕裂！流失 20 点气血。\");\n}"
+          "script": "if (args.isCrit && args.isHit) {\n    await args.target.applyDamage({ \n        amount: 20, \n        type: \"true\", \n        attacker: actor, \n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"虎头湛金枪：暴击撕裂，气血流失 20 点！\");\n}"
         }
       ]
     }
@@ -729,16 +789,17 @@
       "subtype": "长枪",
       "quality": 3,
       "price": 8000,
+      "quantity": 1,
       "damage": 22,
       "block": 12,
-      "description": "<p>一丈八寸，头长扁平，弯曲如蛇形，两面有刃，故称蛇矛。</p><hr><p><strong>效果：</strong>击破架招时，可消耗反应动作大吼，为周围5米范围内所有友方增加1点怒气。</p>",
-      "automationNote": "请手动：检测到击破时请手动为队友加怒。",
+      "description": "<p>一丈八寸，头长扁平，弯曲如蛇形，两面有刃，故称蛇矛。</p><p><strong>效果：</strong>击破架招时，可消耗反应动作大吼，为周围5米范围内所有友方增加1点怒气。</p>",
+      "automationNote": "部分检测击破架招并飘字提示，需手动为队友加怒气。",
       "scripts": [
         {
-          "label": "破招检测",
-          "trigger": "damaged",
+          "label": "燕人咆哮",
+          "trigger": "hit",
           "active": true,
-          "script": "if (args.isBroken) {\n    ui.notifications.info(\"丈八蛇矛：击破架招！请手动吼叫加怒。\");\n}"
+          "script": "if (args.damageResult && args.damageResult.isBroken) {\n    ui.notifications.warn(\"丈八蛇矛：击破架招！请消耗反应动作怒吼！\");\n}"
         }
       ]
     }
@@ -746,16 +807,17 @@
   {
     "name": "玲珑宝枪",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
     "system": {
       "type": "staff",
       "subtype": "长枪",
       "quality": 3,
       "price": 5000,
+      "quantity": 1,
       "damage": 20,
       "block": 10,
-      "description": "<p>用八种珍贵矿采宝物铸造，枪头好似玲珑宝塔，枪身有龙鳞云纹，威猛绝伦。</p><hr><p><strong>效果：</strong>自身每有一处产业武器伤害+5，至多+30。</p>",
-      "automationNote": "请手动：无法检测产业数量。",
+      "description": "<p>用八种珍贵矿采宝物铸造，枪头好似玲珑宝塔，枪身有龙鳞云纹，威猛绝伦。</p><p><strong>效果：</strong>自身每有一处产业武器伤害+5，至多+30。</p>",
+      "automationNote": "请手动添加伤害修正。",
       "scripts": []
     }
   },
@@ -768,32 +830,34 @@
       "subtype": "长枪",
       "quality": 3,
       "price": 3000,
+      "quantity": 1,
       "damage": 20,
       "block": 10,
-      "description": "<p>春秋赵鞅铸，散发幽幽青光，透出阵阵寒意。</p><hr><p><strong>效果：</strong>以该武器开启架招时，处于自身周围1米范围内的友方格挡值+10。</p>",
-      "automationNote": "请手动：光环效果建议使用 Token Attacher 或手动应用。",
+      "description": "<p>春秋赵鞅铸，散发幽幽青光，透出阵阵寒意。</p><p><strong>效果：</strong>以该武器开启架招时，处于自身周围1米范围内的友方格挡值+10。</p>",
+      "automationNote": "需手动：请手动检测范围并调整友方属性。",
       "scripts": []
     }
   },
   {
     "name": "断魂枪",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
     "system": {
       "type": "staff",
       "subtype": "长枪",
       "quality": 2,
       "price": 1500,
+      "quantity": 1,
       "damage": 14,
       "block": 5,
-      "description": "<p>枪头有一排倒刺，两条血槽，杀伤力极大，戳中者非死即伤。</p><hr><p><strong>效果：</strong>普通攻击额外使目标流失5点气血。<br>·若目标无架招，流失气血再+5。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>枪头有一排倒刺，两条血槽，杀伤力极大，戳中者非死即伤。</p><p><strong>效果：</strong>普通攻击额外使目标流失5点气血。<br>·若目标无架招，流失气血再+5。</p>",
+      "automationNote": "完全普攻命中时自动判定架招并扣血。",
       "scripts": [
         {
           "label": "断魂流血",
           "trigger": "hit",
           "active": true,
-          "script": "if (args.move.type === 'basic' && args.isHit) {\n    let amount = 5;\n    // 检查目标架招\n    if (!args.target.system.martial?.stanceActive) {\n        amount += 5;\n    }\n    await args.target.applyDamage({\n        amount: amount,\n        type: \"true\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`断魂枪：造成 ${amount} 点流失。`);\n}"
+          "script": "if (args.isHit && args.move.type === 'basic') {\n    let amt = 5;\n    if (args.target.system.martial.stanceActive !== true) {\n        amt += 5;\n    }\n    await args.target.applyDamage({\n        amount: amt,\n        type: \"true\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`断魂枪造成 ${amt} 点流失`);\n}"
         }
       ]
     }
@@ -801,22 +865,23 @@
   {
     "name": "月牙戟",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
     "system": {
       "type": "staff",
       "subtype": "长枪",
       "quality": 2,
       "price": 900,
+      "quantity": 1,
       "damage": 13,
       "block": 6,
-      "description": "<p>黑暗中会散发白色光芒，如月牙一般。</p><hr><p><strong>效果：</strong>攻击目标无架招时，将其击倒。</p>",
-      "automationNote": "半自动化：自动添加[倒地]状态。",
+      "description": "<p>黑暗中会散发白色光芒，如月牙一般。</p><p><strong>效果：</strong>攻击目标无架招时，将其击倒。</p>",
+      "automationNote": "完全命中无架招目标自动施加倒地(Prone)。",
       "scripts": [
         {
-          "label": "月牙击倒",
+          "label": "月牙横扫",
           "trigger": "hit",
           "active": true,
-          "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    ui.notifications.info(\"月牙戟：目标无架招，击倒！\");\n}"
+          "script": "if (args.isHit && args.target.system.martial.stanceActive !== true) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(\"月牙戟：目标无架招，击倒！\");\n}"
         }
       ]
     }
@@ -824,16 +889,17 @@
   {
     "name": "钩镰枪",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
     "system": {
       "type": "staff",
       "subtype": "长枪",
       "quality": 2,
       "price": 500,
+      "quantity": 1,
       "damage": 13,
       "block": 5,
-      "description": "<p>枪头尖锐，其下部有侧向突出之倒钩，钩尖内曲。</p><hr><p><strong>效果：</strong>击中无架招目标时，可将其朝任意方向拖拽一米。</p>",
-      "automationNote": "请手动移动 Token。",
+      "description": "<p>枪头尖锐，其下部有侧向突出之倒钩，钩尖内曲。</p><p><strong>效果：</strong>击中无架招目标时，可将其朝任意方向拖拽一米。</p>",
+      "automationNote": "需手动：系统无法自动处理强制位移，请手动移动 Token。",
       "scripts": []
     }
   },
@@ -846,10 +912,11 @@
       "subtype": "长枪",
       "quality": 2,
       "price": 300,
+      "quantity": 1,
       "damage": 12,
       "block": 5,
-      "description": "<p>七尺二寸，枪头八寸，扁平梭形。</p><hr><p><strong>效果：</strong>施展招式距离+1。</p>",
-      "automationNote": "请手动：判定距离时请自行 +1。",
+      "description": "<p>七尺二寸，枪头八寸，扁平梭形。</p><p><strong>效果：</strong>施展招式距离+1。</p>",
+      "automationNote": "需手动。",
       "scripts": []
     }
   },
@@ -862,16 +929,17 @@
       "subtype": "长棍",
       "quality": 4,
       "price": 1000000,
+      "quantity": 1,
       "damage": 40,
       "block": 20,
-      "description": "<p>“持此杖即持佛身，万行尽在其中。”<br>见此锡杖，光芒万丈。唐咸通年间敕造，通体金光闪烁，杖顶铸佛所在两重莲花台，仰莲流云束腰座，上托智慧珠，庄严华丽！</p><hr><p><strong>效果：</strong>携带后，你的[佛法]等级+1。<br>·若自身运转佛门内功，你的属性、技能、虚招对抗、残疾、死亡检定全部具有优势。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>“持此杖即持佛身，万行尽在其中。”<br>见此锡杖，光芒万丈。唐咸通年间敕造，通体金光闪烁，杖顶铸佛所在两重莲花台，仰莲流云束腰座，上托智慧珠，庄严华丽！</p><p><strong>效果：</strong>携带后，你的[佛法]等级+1。<br>·若自身运转佛门内功，你的属性、技能、虚招对抗、残疾、死亡检定全部具有优势。</p>",
+      "automationNote": "部分佛法等级已增加。其他请手动。",
       "scripts": [
         {
-          "label": "佛光普照(被动)",
+          "label": "佛法精进",
           "trigger": "passive",
           "active": true,
-          "script": "S.arts.fofa.mod += 1;\n\n// 检查内功门派\nconst neigongId = S.martial.active_neigong;\nif (neigongId) {\n    const neigong = actor.items.get(neigongId);\n    if (neigong && neigong.system.sect === 'buddhism') {\n        // 全局检定优势\n        actor.xjzlStatuses.globalCheckLevel += 1;\n        // 虚招对抗优势\n        actor.xjzlStatuses.feintLevel += 1;\n        // 被虚招优势\n        actor.xjzlStatuses.defendFeintLevel += 1;\n    }\n}"
+          "script": "S.arts.fofa.value += 1;"
         }
       ]
     }
@@ -879,38 +947,40 @@
   {
     "name": "鎏金盘龙棍",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
     "system": {
       "type": "staff",
       "subtype": "长棍",
       "quality": 4,
       "price": 1000000,
+      "quantity": 1,
       "damage": 35,
       "block": 20,
-      "description": "<p>宋太祖赵匡胤所使兵器，一长一短两截棍子以精钢环连接，劈出犹如鞭梢，横扫一片。</p><hr><p><strong>效果：</strong>你施展范围招式时，伤害提升20点。</p>",
-      "automationNote": "请手动：系统无法识别“范围招式”，请手动加伤。",
+      "description": "<p>宋太祖赵匡胤所使兵器，一长一短两截棍子以精钢环连接，劈出犹如鞭梢，横扫一片。</p><p><strong>效果：</strong>你施展范围招式时，伤害提升20点。</p>",
+      "automationNote": "需手动：系统未区分范围招式，请手动添加伤害。",
       "scripts": []
     }
   },
   {
     "name": "倒海翻江棍",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
     "system": {
       "type": "staff",
       "subtype": "长棍",
       "quality": 4,
       "price": 26000,
+      "quantity": 1,
       "damage": 30,
       "block": 15,
-      "description": "<p>棍舞四海，声势浩大，威力无匹。</p><hr><p><strong>效果：</strong>攻击时使敌人倒地，若击中倒地状态的敌人，将其击飞1米。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>棍舞四海，声势浩大，威力无匹。</p><p><strong>效果：</strong>攻击时使敌人倒地，若击中倒地状态的敌人，将其击飞1米。</p>",
+      "automationNote": "部分自动施加倒地。击飞需手动。",
       "scripts": [
         {
-          "label": "倒海翻江",
+          "label": "翻江倒海",
           "trigger": "hit",
           "active": true,
-          "script": "if (args.isHit) {\n    // 检查是否已倒地\n    const isProne = args.target.statuses.has(\"prone\");\n    \n    if (isProne) {\n        ui.notifications.info(\"倒海翻江：目标已倒地，将其击飞 1 米！\");\n    } else {\n        await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n        ui.notifications.info(\"倒海翻江：击倒目标！\");\n    }\n}"
+          "script": "if (args.isHit) {\n    if (args.target.statuses.has('prone')) {\n        ui.notifications.info(\"倒海翻江：目标已倒地，击飞1米！\");\n    } else {\n        await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    }\n}"
         }
       ]
     }
@@ -924,16 +994,17 @@
       "subtype": "长棍",
       "quality": 3,
       "price": 16000,
+      "quantity": 1,
       "damage": 24,
       "block": 14,
-      "description": "<p>双轮六环鎏金锡杖，地藏菩萨供奉，佛门神僧多持此杖，行走江湖。</p><hr><p><strong>效果：</strong>你施展人、地级长棍武学，伤害+10。<br>·若自身运转佛门内功，长棍武学伤害+10。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>双轮六环鎏金锡杖，地藏菩萨供奉，佛门神僧多持此杖，行走江湖。</p><p><strong>效果：</strong>你施展人、地级长棍武学，伤害+10。<br>·若自身运转佛门内功，长棍武学伤害+10。</p>",
+      "automationNote": "完全自动检测招式等级，并自动检测当前运行内功是否为[万佛寺]。",
       "scripts": [
         {
-          "label": "六环加持(Calc)",
+          "label": "锡杖神威",
           "trigger": "calc",
           "active": true,
-          "script": "const move = args.move;\n// 判断是否为长棍武学 (move.weaponType == 'staff') 且为 人/地级 (tier <= 2)\nif (move.weaponType === 'staff') {\n    // 条件1: 人/地级\n    if ((move.tier || 1) <= 2) {\n        args.output.damage += 10;\n    }\n    \n    // 条件2: 佛门内功\n    const neigongId = S.martial.active_neigong;\n    if (neigongId) {\n        const neigong = actor.items.get(neigongId);\n        if (neigong && neigong.system.sect === 'buddhism') {\n            args.output.damage += 10;\n        }\n    }\n}"
+          "script": "if (args.move.weaponType !== 'staff') return;\n\n// 1. 效果一：人/地级加成\nif (args.move.tier === 1 || args.move.tier === 2) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"锡杖(+10)\");\n}\n\n// 2. 效果二：万佛寺(佛门)内功加成\nconst ngId = S.martial.active_neigong;\nif (ngId) {\n    const ng = actor.items.get(ngId);\n    // 精准匹配万佛寺\n    if (ng && ng.system.sect === \"WanFoSi\") {\n        args.output.damage += 10;\n        args.output.bonusDesc.push(\"佛门共鸣(+10)\");\n    }\n}"
         }
       ]
     }
@@ -947,21 +1018,26 @@
       "subtype": "长棍",
       "quality": 3,
       "price": 10000,
+      "quantity": 1,
       "damage": 24,
       "block": 12,
-      "description": "<p>黑的锃亮，挥舞时越挥越快，快到看不见棍影。</p><hr><p><strong>效果：</strong>装备后，你的闪避+5。<br>·你闪避成功时，可不消耗动作进行一次普通攻击，且必定暴击。</p>",
-      "automationNote": "半自动化：反击时请手动添加[必定暴击]。",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "无影身法",
-        "transfer": true,
-        "changes": [
-          { "key": "system.combat.dodge", "mode": 2, "value": "5" }
-        ]
-      }
-    ]
+      "description": "<p>黑的锃亮，挥舞时越挥越快，快到看不见棍影。</p><p><strong>效果：</strong>装备后，你的闪避+5。<br>·你闪避成功时，可不消耗动作进行一次普通攻击，且必定暴击。</p>",
+      "automationNote": "部分闪避+5已自动。闪避反击请手动执行。",
+      "scripts": [
+        {
+          "label": "无影身法",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.combat.dodge += 5;"
+        },
+        {
+          "label": "无影反击提示",
+          "trigger": "avoided",
+          "active": true,
+          "script": "ui.notifications.info(\"无影棍：闪避成功！可立即进行一次必定暴击的普攻！\");"
+        }
+      ]
+    }
   },
   {
     "name": "七宝禅杖",
@@ -972,35 +1048,43 @@
       "subtype": "长棍",
       "quality": 3,
       "price": 7000,
+      "quantity": 1,
       "damage": 22,
       "block": 11,
-      "description": "<p>杖头依莲花形，取七宝意而七分，各段垂挂金环，实是佛家法器。</p><hr><p><strong>效果：</strong>装备后，你的[佛法]检定结果+1。<br>·你的[佛法]检定成功时，获得“禅心”，持续到战斗脱离。<br>禅心：当你运行佛门内功时，招式伤害+5。</p>",
-      "automationNote": "半自动化：请在佛法检定成功后手动添加[禅心]。",
-      "scripts": []
-    },
-    "effects": [
-      {
-        "name": "七宝加持",
-        "transfer": true,
-        "changes": [
-          { "key": "system.arts.fofa.checkMod", "mode": 2, "value": "1" }
-        ]
-      },
-      {
-        "name": "禅心",
-        "transfer": false,
-        "description": "运行佛门内功时，招式伤害+5",
-        "flags": { "xjzl-system": { "stackable": false } },
-        "scripts": [
-          {
-            "label": "禅心伤害",
-            "trigger": "calc",
-            "active": true,
-            "script": "const neigongId = S.martial.active_neigong;\nif (neigongId) {\n    const neigong = actor.items.get(neigongId);\n    if (neigong && neigong.system.sect === 'buddhism') {\n        args.output.damage += 5;\n    }\n}"
+      "description": "<p>杖头依莲花形，取七宝意而七分，各段垂挂金环，实是佛家法器。</p><p><strong>效果：</strong>装备后，你的[佛法]检定结果+1。<br>·你的[佛法]检定成功时，获得“禅心”，持续到战斗脱离。<br>禅心：当你运行佛门内功时，招式伤害+5。</p>",
+      "automationNote": "部分佛法检定+1自动。请在佛法检定成功后，手动将[禅心]状态拖给角色。[禅心]会自动检测万佛寺内功并加伤。",
+      "scripts": [
+        {
+          "label": "七宝加持",
+          "trigger": "passive",
+          "active": true,
+          "script": "S.arts.fofa.checkMod += 1;"
+        }
+      ],
+      "effects": [
+        {
+          "name": "禅心",
+          "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+          "transfer": false,
+          "description": "运行佛门内功时，招式伤害+5。",
+          "changes": [],
+          "flags": {
+            "xjzl-system": {
+              "slug": "chanxin",
+              "stackable": false,
+              "scripts": [
+                {
+                  "label": "禅心加伤",
+                  "trigger": "calc",
+                  "active": true,
+                  "script": "// 自动检测万佛寺内功\nconst ngId = S.martial.active_neigong;\nif (ngId) {\n    const ng = actor.items.get(ngId);\n    if (ng && ng.system.sect === \"WanFoSi\") {\n        args.output.damage += 5;\n        args.output.bonusDesc.push(\"禅心(+5)\");\n    }\n}"
+                }
+              ]
+            }
           }
-        ]
-      }
-    ]
+        }
+      ]
+    }
   },
   {
     "name": "祖师棍",
@@ -1011,16 +1095,17 @@
       "subtype": "长棍",
       "quality": 3,
       "price": 6600,
+      "quantity": 1,
       "damage": 22,
       "block": 10,
-      "description": "<p>棍长五尺，粗寸余。棍上端刻有蚩尤头像，傩祭所用，可辟邪除魔。</p><hr><p><strong>效果：</strong>命中[恶][邪]目标时，使其失去1怒气。</p>",
-      "automationNote": "完全自动化",
+      "description": "<p>棍长五尺，粗寸余。棍上端刻有蚩尤头像，傩祭所用，可辟邪除魔。</p><p><strong>效果：</strong>命中[恶][邪]目标时，使其失去1怒气。</p>",
+      "automationNote": "完全自动检测目标恶行值并扣除怒气。",
       "scripts": [
         {
-          "label": "辟邪",
+          "label": "辟邪除魔",
           "trigger": "hit",
           "active": true,
-          "script": "if (args.isHit && args.target.system.social?.exing >= 100) {\n    await args.target.applyHealing({ amount: -1, type: \"rage\" }); // applyHealing 支持负数作为扣除\n    ui.notifications.info(\"祖师棍：打散了恶人的怒气！\");\n}"
+          "script": "if (args.isHit && args.target.system.social.exing > 50) {\n    await args.target.update({ 'system.resources.rage.value': Math.max(0, args.target.system.resources.rage.value - 1) });\n    ui.notifications.info(\"祖师棍：打散了恶人的1点怒气！\");\n}"
         }
       ]
     }
@@ -1028,22 +1113,23 @@
   {
     "name": "伏虎棍",
     "type": "weapon",
-    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
     "system": {
       "type": "staff",
       "subtype": "长棍",
       "quality": 3,
       "price": 5000,
+      "quantity": 1,
       "damage": 21,
       "block": 10,
-      "description": "<p>于诸众生起平等心，常诵梵咒，莫令断绝。</p><hr><p><strong>效果：</strong>你造成阳、刚伤害时，与对方进行一次[角力]对抗，获胜则对方倒地。</p>",
-      "automationNote": "完全自动化：自动发起对抗，获胜自动击倒。",
+      "description": "<p>于诸众生起平等心，常诵梵咒，莫令断绝。</p><p><strong>效果：</strong>你造成阳、刚伤害时，与对方进行一次[角力]对抗，获胜则对方倒地。</p>",
+      "automationNote": "完全造成阳/刚伤害自动发起角力检定，失败自动倒地。",
       "scripts": [
         {
-          "label": "伏虎判定",
+          "label": "伏虎角力",
           "trigger": "hit",
           "active": true,
-          "script": "// 检测伤害类型：阳(yang) 或 刚(gang)\nconst type = args.move?.element;\nif (args.isHit && (type === 'yang' || type === 'gang')) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"jiaoli\",\n        dc: S.skills.jiaoli.total + 10, // 对抗 DC = 攻击者角力 + 10\n        label: \"伏虎棍对抗\",\n        onFail: async () => {\n            await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n            ui.notifications.info(\"伏虎棍：角力胜出，目标倒地！\");\n        }\n    });\n}"
+          "script": "if (args.isHit && ['yang', 'gang'].includes(args.move.element)) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"jiaoli\", // 角力检定\n        dc: 15, // 假设难度\n        label: \"伏虎角力\",\n        onFail: async () => {\n            await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n            ui.notifications.info(`${args.target.name} 角力失败，倒地！`);\n        }\n    });\n}"
         }
       ]
     }
@@ -1057,10 +1143,3390 @@
       "subtype": "长棍",
       "quality": 3,
       "price": 3000,
+      "quantity": 1,
       "damage": 20,
       "block": 10,
-      "description": "<p>玄铁棒，棍纹金鳞，熠熠生辉。</p><hr><p><strong>效果：</strong>进入战斗后，当自身气血首次低于50%时，获得2点怒气。</p>",
-      "automationNote": "请手动。",
+      "description": "<p>玄铁棒，棍纹金鳞，熠熠生辉。</p><p><strong>效果：</strong>进入战斗后，当自身气血首次低于50%时，获得2点怒气。</p>",
+      "automationNote": "需手动。",
+      "scripts": []
+    }
+  },
+  {
+    "name": "朝天棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 1800,
+      "quantity": 1,
+      "damage": 15,
+      "block": 7,
+      "description": "<p>一条极长、越到棍头越尖细的棍子。</p><p><strong>效果：</strong>此棍击飞目标时，招式伤害+10。</p>",
+      "automationNote": "需手动。",
+      "scripts": []
+    }
+  },
+  {
+    "name": "破千长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 1000,
+      "damage": 14,
+      "block": 6,
+      "description": "以勇为尊、能破千军。<br>效果：击破敌方架招时，招式伤害+10。",
+      "automationNote": "完全自动化 (PreTake检测)",
+      "scripts": [
+        {
+          "label": "破千长棍-击破增伤",
+          "trigger": "preTake",
+          "active": true,
+          "script": "if (args.isBroken) {\n    args.output.damage += 10;\n    ui.notifications.info(`${actor.name} 击破架招！伤害+10`);\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "乌铁狼牙棒",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 600,
+      "damage": 13,
+      "block": 5,
+      "description": "棒头为椭圆形锤状，锤面布满铁刺，形似狼牙。<br>效果：击破敌方架招时，为其添加一层“流血”，持续到战斗脱离。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "狼牙棒-击破流血",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.damageResult && args.damageResult.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n    ui.notifications.info(\"击破架招！施加流血\");\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "扫风棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 400,
+      "damage": 12,
+      "block": 5,
+      "description": "做工精良的长棍，舞起来虎虎生风，非常结实。<br>效果：施展招式距离+1。",
+      "automationNote": "请手动处理距离判定"
+    }
+  },
+  {
+    "name": "驱兽棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 300,
+      "damage": 12,
+      "block": 5,
+      "description": "哨棒，一头棒子，一头可吹，发出虎啸声。<br>效果：装备后，野兽攻击你时命中-5。",
+      "automationNote": "请手动调整判定结果 (需检测攻击者类型)"
+    }
+  },
+  {
+    "name": "天机棒",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 4,
+      "price": 1000000,
+      "damage": 30,
+      "block": 15,
+      "description": "天机老人所使用的武器，又称如意棒，看似寻常的钢铸细棍，渗入了大量稀世矿材，却暗藏玄机。<br>效果：格挡成功获得一层“天机”，至多5层，持续到战斗脱离。<br>天机：每层使你看破值+1。",
+      "automationNote": "完全自动化 (Damaged检测)",
+      "scripts": [
+        {
+          "label": "天机棒-格挡叠加",
+          "trigger": "damaged",
+          "active": true,
+          "script": "// 调用系统主手宏判断格挡/架招成功\nif (Macros.checkStance(actor, args)) {\n    const sourceEffect = thisItem.effects.getName(\"天机\");\n    if (sourceEffect) {\n         const effectData = sourceEffect.toObject();\n         delete effectData._id;\n         effectData.origin = thisItem.uuid;\n         await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+        }
+      ]
+    },
+    "effects": [
+      {
+        "name": "天机",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": false,
+        "disabled": false,
+        "description": "看破值+1",
+        "flags": {
+          "xjzl-system": {
+            "slug": "tianji",
+            "stackable": true,
+            "maxStacks": 5
+          }
+        },
+        "changes": [
+          {
+            "key": "system.combat.kanpo",
+            "mode": 2,
+            "value": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "打狗棒",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 4,
+      "price": 1000000,
+      "damage": 35,
+      "block": 15,
+      "description": "质地柔韧，棒身绿莹，为历任丐帮帮主的信物。<br>效果：施展打狗棒法时，武器伤害翻倍。<br>·每次为敌人添加“颤手”时，可多添加一层。",
+      "automationNote": "伤害翻倍已自动，颤手叠加请手动",
+      "scripts": [
+        {
+          "label": "打狗棒-伤害翻倍",
+          "trigger": "calc",
+          "active": true,
+          "script": "const validMoves = [\"碎齿脱爪\", \"丧门之犬\", \"野狗挡道\", \"关门打狗\"];\nif (validMoves.includes(args.move.name)) {\n    const extra = args.baseData.weapon;\n    args.output.damage += extra;\n    args.output.bonusDesc.push(\"打狗棒法翻倍\");\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "灵蛇杖",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 18000,
+      "damage": 22,
+      "block": 12,
+      "description": "通体黑亮，杖体中空，杖身双蛇缠绕。<br>效果：涂抹毒药可额外攻击一次，且韧性难度+2。",
+      "automationNote": "请手动处理 (涉及消耗品互动)"
+    }
+  },
+  {
+    "name": "秘穹短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 16000,
+      "damage": 23,
+      "block": 14,
+      "description": "天如薄幕，银光乍现，破九重天。<br>效果：当你被反击命中后，可以消耗反应动作施展一次实招。",
+      "automationNote": "请手动处理"
+    }
+  },
+  {
+    "name": "浑天棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 14500,
+      "damage": 23,
+      "block": 13,
+      "description": "浑天日夜转，中星异旦昏。<br>效果：开启架招期间，免疫“禁足”状态。",
+      "automationNote": "免疫请手动。",
+      "scripts": []
+    }
+  },
+  {
+    "name": "亢龙锏",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 10000,
+      "damage": 22,
+      "block": 10,
+      "description": "狄仁杰所用，无刃但内有机关，可废人兵刃。<br>效果：击破架招时，给对方添加“缴械”，持续一回合。<br>缴械：你无法施展徒手以外的武学。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "亢龙锏-击破缴械",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.damageResult && args.damageResult.isBroken) {\n    const effect = CONFIG.statusEffects.find(e => e.id === \"jiaoxie\");\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n    ui.notifications.info(\"击破架招！施加缴械\");\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "赤霄杖",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 9500,
+      "damage": 20,
+      "block": 12,
+      "description": "蜀水淬火，滇玉外琢，百鸟围图。<br>效果：开启架招期间，你施展气招不消耗内力。",
+      "automationNote": "完全自动化 (Attack检测)",
+      "scripts": [
+        {
+          "label": "赤霄杖-气招免耗",
+          "trigger": "attack",
+          "active": true,
+          "script": "if (S.martial.stanceActive && args.move.type === 'qi') {\n    args.move.currentCost.mp = 0;\n    ui.notifications.info(\"赤霄杖：气招内力消耗减免\");\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "天谴棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 6000,
+      "damage": 20,
+      "block": 10,
+      "description": "精钢玄铁混铸而成，霸气十足。<br>效果：若你的出招被目标闪避，为其添加一层“笨拙”，至多三层，持续到战斗脱离。<br>笨拙：每层使你的闪避-5。",
+      "automationNote": "完全自动化 (Hit检测未命中)",
+      "scripts": [
+        {
+          "label": "天谴棍-闪避笨拙",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (!args.isHit) {\n    const effectData = CONFIG.statusEffects.find(e => e.id === \"benzhuo\");\n    // 系统benzhuo默认stackable=true\n    const data = foundry.utils.deepClone(effectData);\n    foundry.utils.setProperty(data, \"flags.xjzl-system.maxStacks\", 3);\n    await game.xjzl.api.effects.addEffect(args.target, data);\n    ui.notifications.warn(`${args.target.name} 闪避了攻击，被施加笨拙！`);\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "打王金鞭",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 5500,
+      "damage": 20,
+      "block": 12,
+      "description": "殷商闻仲所持，象征公正廉洁，不畏权贵。<br>效果：攻击侠义值比你低的角色，暴击骰-5。",
+      "automationNote": "完全自动化 (Check检测)",
+      "scripts": [
+        {
+          "label": "打王金鞭-侠义暴击",
+          "trigger": "check",
+          "active": true,
+          "script": "const myXiayi = actor.system.social.xiayi || 0;\nconst targetXiayi = args.target.system.social.xiayi || 0;\nif (targetXiayi < myXiayi) {\n    // 正数表示阈值降低（更容易暴击）\n    args.flags.critThresholdMod += 5;\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "雷神鞭",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 4000,
+      "damage": 20,
+      "block": 10,
+      "description": "鞭身前细后粗，粗一寸，重三十斤，状如宝塔，打在盔甲上噼啪炸响，留下道道凹痕。<br>效果：暴击时，为目标添加“破甲”一回合。<br>破甲：你的外功防御归零。",
+      "automationNote": "完全自动化 (PreDamage检测)",
+      "scripts": [
+        {
+          "label": "雷神鞭-暴击破甲",
+          "trigger": "preDamage",
+          "active": true,
+          "script": "if (args.outcome.isCrit) {\n    const effect = CONFIG.statusEffects.find(e => e.id === \"pojia\");\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    // 这里的 target 需要通过 canvas 获取或者等待 Hit 阶段\n    // 但 preDamage 无法直接给 target 加状态 (因为还没到 hit 阶段)\n    // 变通：这里不加，改用 Hit 阶段加。PreDamage 也可以，但 target 不在 args 里\n    // 修正：使用 Hit 阶段\n}"
+        },
+        {
+          "label": "雷神鞭-应用破甲",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.isCrit) {\n    const effect = CONFIG.statusEffects.find(e => e.id === \"pojia\");\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "元金棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 1400,
+      "damage": 13,
+      "block": 7,
+      "description": "黄铜掺入真金练成，坚韧无比。<br>效果：攻击半空中的敌人时，将其击倒且为其添加“错骨”状态，持续一回合。",
+      "automationNote": "请手动"
+    }
+  },
+  {
+    "name": "十字银铁拐",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 800,
+      "damage": 13,
+      "block": 6,
+      "description": "硬木削成，护手包纯钢，柄如十字，有银钩。<br>效果：你命中无架招敌人时，可将其击倒。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "银铁拐-击倒",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(`${args.target.name} 无架招，被击倒！`);\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "水磨钢鞭",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 600,
+      "damage": 13,
+      "block": 5,
+      "description": "十三节硬鞭，长三尺不到，鞭尾有坚木或铁制柄，头尾皆可握，能两头使。<br>效果：击破架招时，将目标击飞1米。",
+      "automationNote": "请手动"
+    }
+  },
+  {
+    "name": "八棱凹面锏",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 600,
+      "damage": 12,
+      "block": 5,
+      "description": "八棱形铁杆制成而得名，锏身方形，内中有槽。<br>效果：格挡成功时可消耗反应动作施展普通攻击。",
+      "automationNote": "请手动"
+    }
+  },
+  {
+    "name": "哭丧棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 400,
+      "damage": 12,
+      "block": 5,
+      "description": "以藤条特制，韧性极佳，打人非常疼。<br>效果：命中无架招目标时，为其添加三回合“剧痛”。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "哭丧棍-剧痛",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (!args.target.system.martial.stanceActive) {\n    const effect = CONFIG.statusEffects.find(e => e.id === \"pain\");\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "混铁棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 300,
+      "damage": 12,
+      "block": 5,
+      "description": "千锤百打的坚硬短棍。<br>效果：攻击距离为1的目标，招式伤害+5。",
+      "automationNote": "完全自动化 (距离判断依靠token坐标)",
+      "scripts": [
+        {
+          "label": "混铁棍-近身增伤",
+          "trigger": "preDamage",
+          "active": true,
+          "script": "// 距离检测\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.target?.token?.object || args.target?.getActiveTokens()[0];\n\nif (t1 && t2) {\n    const measure = canvas.grid.measurePath([t1.center, t2.center]);\n    // 1.1 米兼容斜向\n    if (measure.distance <= 1.1) {\n        args.config.amount += 5;\n        ui.notifications.info(\"混铁棍：近身伤害+5\");\n    }\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "无痕双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 20000,
+      "damage": 20,
+      "block": 10,
+      "description": "剑过无痕，招落无声，此去经年。<br>效果：装备后，虚招值+3。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "无痕双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.xuzhao",
+            "mode": 2,
+            "value": 3
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "鸿灵双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 15000,
+      "damage": 20,
+      "block": 10,
+      "description": "此兵器挥之鸿鹄鸣渊，彻天际，响天涯。<br>效果：装备后，你对应该武器的武器技能等级+1。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "鸿灵双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.weaponRanks.staff.mod",
+            "mode": 2,
+            "value": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "万刃双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 13000,
+      "damage": 20,
+      "block": 10,
+      "description": "风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。<br>效果：装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。",
+      "automationNote": "完全自动化 (AE+脚本)",
+      "scripts": [
+        {
+          "label": "万刃双棍-流失",
+          "trigger": "turnStart",
+          "active": true,
+          "script": "if (game.combat) {\n    await actor.applyDamage({ amount: 20, type: 'true', isHit: true });\n    await actor.update({ \"system.resources.mp.value\": Math.max(0, S.resources.mp.value - 20) });\n    ui.notifications.warn(\"万刃双棍反噬：流失气血内力\");\n}"
+        }
+      ]
+    },
+    "effects": [
+      {
+        "name": "万刃双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": 25
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "守心双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 10000,
+      "damage": 20,
+      "block": 10,
+      "description": "克己，慎独，守心，明性。以克人之心克己，以容己之心容人。<br>效果：装备后，你在进行气感、神采相关技能检定和对抗时,结果+2",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "守心双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.stats.qigan.checkMod",
+            "mode": 2,
+            "value": 2
+          },
+          {
+            "key": "system.stats.shencai.checkMod",
+            "mode": 2,
+            "value": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "清韵双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 9000,
+      "damage": 20,
+      "block": 10,
+      "description": "剑鸣铿锵清亮，剑韵激荡，无不侧目。<br>效果：装备后，出招命中目标时，自身恢复5点内力。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "清韵双棍-回内",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"mp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "真刚双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 7000,
+      "damage": 20,
+      "block": 10,
+      "description": "使工人以白马白牛祀昆吾之种后,采金铸之成剑精。<br>效果：装备后，即便被击破架招，该武器格按值依旧生效。",
+      "automationNote": "完全自动化 (AE:被动格挡)"
+    },
+    "effects": [
+      {
+        "name": "真刚双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "flags.xjzl-system.passiveBlock",
+            "mode": 5,
+            "value": "true"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "霜月双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 6000,
+      "damage": 20,
+      "block": 10,
+      "description": "以寒铁打造，阴寒无比，遇水结霜。<br>效果：装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "霜月双棍-下盘不稳",
+          "trigger": "hit",
+          "active": true,
+          "script": "const effect = CONFIG.statusEffects.find(e => e.id === \"unstable\");\nconst data = foundry.utils.deepClone(effect);\ndata.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(args.target, data);"
+        }
+      ]
+    }
+  },
+  {
+    "name": "魅影双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 5000,
+      "damage": 20,
+      "block": 10,
+      "description": "魅影悄然，倩影惊鸿。<br>效果：装备后，速度+2，闪避+5。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "魅影双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": 2
+          },
+          {
+            "key": "system.combat.dodge",
+            "mode": 2,
+            "value": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "业火双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 3,
+      "price": 4000,
+      "damage": 20,
+      "block": 10,
+      "description": "业火灼身，狱莲重瓣，难耐怒意。<br>效果：装备后，招式伤害+10。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "业火双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": 10
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "破釜双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 2000,
+      "damage": 12,
+      "block": 5,
+      "description": "破釜沉舟，不胜不还。<br>效果：装备后，命中降低10点，攻击额外造成20点气血流失。",
+      "automationNote": "完全自动化 (AE+Hit检测)"
+    },
+    "effects": [
+      {
+        "name": "破釜双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": -10
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": -10
+          },
+          {
+            "key": "flags.xjzl-system.bleedOnHit",
+            "mode": 2,
+            "value": 20
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "蟠龙双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 1600,
+      "damage": 12,
+      "block": 5,
+      "description": "蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。<br>效果：装备后，招式造成暴击时，额外造成10点气血流失。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "蟠龙双棍-暴击流失",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });\n    ui.notifications.info(\"蟠龙双棍：暴击追加流失\");\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "龙泉双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 1500,
+      "damage": 12,
+      "block": 5,
+      "description": "红光紫气俱赫然，铸得宝剑名龙泉。<br>效果：装备后，招式内力消耗-2(最低0)。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "龙泉双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.costs.neili.mod",
+            "mode": 2,
+            "value": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "崩雷双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 1300,
+      "damage": 12,
+      "block": 5,
+      "description": "天崩地裂，闷雷霹炸，声势骇人。<br>效果：装备后，招式命中目标时,将其击退1米。",
+      "automationNote": "请手动 (击退请手动)"
+    }
+  },
+  {
+    "name": "铸血双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 1200,
+      "damage": 12,
+      "block": 5,
+      "description": "铸造时铁匠滴血淬火，以铸嗜血之兵。<br>效果：装备后，招式命中目标时，自身回复5气血。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "铸血双棍-吸血",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"hp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "翻腾双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 800,
+      "damage": 12,
+      "block": 5,
+      "description": "怒意狂表，气勋上涌。<br>效果：装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。",
+      "automationNote": "请手动"
+    }
+  },
+  {
+    "name": "鱼肠双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 700,
+      "damage": 12,
+      "block": 5,
+      "description": "滴刃花纹毕露，宛如鱼肠一般。<br>效果：装备后，招式伤害+5。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "鱼肠双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "刹绝双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 500,
+      "damage": 12,
+      "block": 5,
+      "description": "尘尘利利，斩尽杀绝，快速决绝。<br>效果：装备后，普通攻击伤害提升10点。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "刹绝双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.normal.mod",
+            "mode": 2,
+            "value": 10
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "逐鹿双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 400,
+      "damage": 12,
+      "block": 5,
+      "description": "群侠逐鹿,疾足者先得。<br>效果：装备后，速度+1、先攻+1。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "逐鹿双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": 1
+          },
+          {
+            "key": "system.combat.initiative",
+            "mode": 2,
+            "value": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "百炼双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 2,
+      "price": 300,
+      "damage": 12,
+      "block": 5,
+      "description": "用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。<br>效果：装备后，命中+5。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "百炼双棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": 5
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "精钢双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 1,
+      "price": 200,
+      "damage": 7,
+      "block": 3,
+      "description": "用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "精铁双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 1,
+      "price": 100,
+      "damage": 5,
+      "block": 2,
+      "description": "将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "精铜双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 1,
+      "price": 100,
+      "damage": 5,
+      "block": 2,
+      "description": "将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "粗铁双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 0,
+      "price": 10,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质白铁锻造而成。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "粗铜双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 0,
+      "price": 10,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质青铜锻造而成。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "烂铁双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 0,
+      "price": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "破铜双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 0,
+      "price": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "石双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 0,
+      "price": 0,
+      "damage": 1,
+      "block": 0,
+      "description": "用岩石制作的武器，质量很差，难以伤人。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "木双棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "双棍",
+      "quality": 0,
+      "price": 0,
+      "damage": 1,
+      "block": 0,
+      "description": "用桃木、乔木、竹子制作的武器，质量很差，难以伤人。<br>效果：无",
+      "automationNote": "无"
+    }
+  },
+  {
+    "name": "无痕长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 20000,
+      "damage": 20,
+      "block": 10,
+      "description": "剑过无痕，招落无声，此去经年。<br>效果：装备后，虚招值+3。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "无痕长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.xuzhao",
+            "mode": 2,
+            "value": 3
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "鸿灵长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 15000,
+      "damage": 20,
+      "block": 10,
+      "description": "此兵器挥之鸿鹄鸣渊，彻天际，响天涯。<br>效果：装备后，你对应该武器的武器技能等级+1。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "鸿灵长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.weaponRanks.staff.mod",
+            "mode": 2,
+            "value": 1
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "万刃长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 13000,
+      "damage": 20,
+      "block": 10,
+      "description": "风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。<br>效果：装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。",
+      "automationNote": "完全自动化 (AE+脚本)",
+      "scripts": [
+        {
+          "label": "万刃长枪-流失",
+          "trigger": "turnStart",
+          "active": true,
+          "script": "if (game.combat) {\n    await actor.applyDamage({ amount: 20, type: 'true', isHit: true });\n    await actor.update({ \"system.resources.mp.value\": Math.max(0, S.resources.mp.value - 20) });\n    ui.notifications.warn(\"万刃长枪反噬：流失气血内力\");\n}"
+        }
+      ]
+    },
+    "effects": [
+      {
+        "name": "万刃长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": 25
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "守心长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 10000,
+      "damage": 20,
+      "block": 10,
+      "description": "克己，慎独，守心，明性。以克人之心克己，以容己之心容人。<br>效果：装备后，你在进行气感、神采相关技能检定和对抗时,结果+2",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "守心长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.stats.qigan.checkMod",
+            "mode": 2,
+            "value": 2
+          },
+          {
+            "key": "system.stats.shencai.checkMod",
+            "mode": 2,
+            "value": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "清韵长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 9000,
+      "damage": 20,
+      "block": 10,
+      "description": "剑鸣铿锵清亮，剑韵激荡，无不侧目。<br>效果：装备后，出招命中目标时，自身恢复5点内力。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "清韵长枪-回内",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"mp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "真刚长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 7000,
+      "damage": 20,
+      "block": 10,
+      "description": "使工人以白马白牛祀昆吾之种后,采金铸之成剑精。<br>效果：装备后，即便被击破架招，该武器格按值依旧生效。",
+      "automationNote": "完全自动化 (AE:被动格挡)"
+    },
+    "effects": [
+      {
+        "name": "真刚长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "flags.xjzl-system.passiveBlock",
+            "mode": 5,
+            "value": "true"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "霜月长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 6000,
+      "damage": 20,
+      "block": 10,
+      "description": "以寒铁打造，阴寒无比，遇水结霜。<br>效果：装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "霜月长枪-下盘不稳",
+          "trigger": "hit",
+          "active": true,
+          "script": "const effect = CONFIG.statusEffects.find(e => e.id === \"unstable\");\nconst data = foundry.utils.deepClone(effect);\ndata.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(args.target, data);"
+        }
+      ]
+    }
+  },
+  {
+    "name": "魅影长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 5000,
+      "damage": 20,
+      "block": 10,
+      "description": "魅影悄然，倩影惊鸿。<br>效果：装备后，速度+2，闪避+5。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "魅影长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": 2
+          },
+          {
+            "key": "system.combat.dodge",
+            "mode": 2,
+            "value": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "业火长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 3,
+      "price": 4000,
+      "damage": 20,
+      "block": 10,
+      "description": "业火灼身，狱莲重瓣，难耐怒意。<br>效果：装备后，招式伤害+10。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "业火长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": 10
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "破釜长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 2000,
+      "damage": 12,
+      "block": 5,
+      "description": "破釜沉舟，不胜不还。<br>效果：装备后，命中降低10点，攻击额外造成20点气血流失。",
+      "automationNote": "完全自动化 (AE+Hit检测)"
+    },
+    "effects": [
+      {
+        "name": "破釜长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": -10
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": -10
+          },
+          {
+            "key": "flags.xjzl-system.bleedOnHit",
+            "mode": 2,
+            "value": 20
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "蟠龙长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 1600,
+      "damage": 12,
+      "block": 5,
+      "description": "蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。<br>效果：装备后，招式造成暴击时，额外造成10点气血流失。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "蟠龙长枪-暴击流失",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });\n    ui.notifications.info(\"蟠龙长枪：暴击追加流失\");\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "龙泉长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 1500,
+      "damage": 12,
+      "block": 5,
+      "description": "红光紫气俱赫然，铸得宝剑名龙泉。<br>效果：装备后，招式内力消耗-2(最低0)。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "龙泉长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.costs.neili.mod",
+            "mode": 2,
+            "value": 2
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "崩雷长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 1300,
+      "damage": 12,
+      "block": 5,
+      "description": "天崩地裂，闷雷霹炸，声势骇人。<br>效果：装备后，招式命中目标时,将其击退1米。",
+      "automationNote": "请手动 (击退请手动)"
+    }
+  },
+  {
+    "name": "铸血长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 1200,
+      "damage": 12,
+      "block": 5,
+      "description": "铸造时铁匠滴血淬火，以铸嗜血之兵。<br>效果：装备后，招式命中目标时，自身回复5气血。",
+      "automationNote": "完全自动化 (Hit检测)",
+      "scripts": [
+        {
+          "label": "铸血长枪-吸血",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"hp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "翻腾长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 800,
+      "damage": 12,
+      "block": 5,
+      "description": "怒意狂表，气勋上涌。<br>效果：装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。",
+      "automationNote": "请手动"
+    }
+  },
+  {
+    "name": "鱼肠长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 700,
+      "damage": 12,
+      "block": 5,
+      "description": "滴刃花纹毕露，宛如鱼肠一般。<br>效果：装备后，招式伤害+5。",
+      "automationNote": "完全自动化 (AE)"
+    },
+    "effects": [
+      {
+        "name": "鱼肠长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": 5
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "刹绝长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 500,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "尘尘利利，斩尽杀绝，快速决绝。<br><br><b>效果：</b>装备后，普通攻击伤害提升10点。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "刹绝长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.normal.mod",
+            "mode": 2,
+            "value": "10"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "逐鹿长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 400,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "群侠逐鹿,疾足者先得。<br><br><b>效果：</b>装备后，速度+1、先攻+1。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "逐鹿长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": "1"
+          },
+          {
+            "key": "system.combat.initiative",
+            "mode": 2,
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "百炼长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 2,
+      "price": 300,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。<br><br><b>效果：</b>装备后，命中+5。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "百炼长枪",
+        "icon": "systems/xjzl-system/assets/icons/weapons/高级枪1.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": "5"
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "精钢长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 1,
+      "price": 200,
+      "quantity": 1,
+      "damage": 7,
+      "block": 3,
+      "description": "用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "精铁长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 1,
+      "price": 100,
+      "quantity": 1,
+      "damage": 5,
+      "block": 2,
+      "description": "将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "精铜长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 1,
+      "price": 100,
+      "quantity": 1,
+      "damage": 5,
+      "block": 2,
+      "description": "将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "粗铁长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 0,
+      "price": 10,
+      "quantity": 1,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质白铁锻造而成。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "粗铜长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 0,
+      "price": 10,
+      "quantity": 1,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质青铜锻造而成。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "烂铁长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 0,
+      "price": 1,
+      "quantity": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "破铜长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 0,
+      "price": 1,
+      "quantity": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "石长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 0,
+      "price": 0,
+      "quantity": 1,
+      "damage": 1,
+      "block": 0,
+      "description": "用岩石制作的武器，质量很差，难以伤人。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "木长枪",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/枪2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长枪",
+      "quality": 0,
+      "price": 0,
+      "quantity": 1,
+      "damage": 1,
+      "block": 0,
+      "description": "用桃木、乔木、竹子制作的武器，质量很差，难以伤人。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "无痕长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 20000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "剑过无痕，招落无声，此去经年。<br><br><b>效果：</b>装备后，虚招值+3。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "无痕长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.xuzhao",
+            "mode": 2,
+            "value": "3"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "鸿灵长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 15000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "此兵器挥之鸿鹄鸣渊，彻天际，响天涯。<br><br><b>效果：</b>装备后，你对应该武器的武器技能等级+1。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "鸿灵长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.weaponRanks.staff.mod",
+            "mode": 2,
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "万刃长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 13000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。<br><br><b>效果：</b>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "万刃长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": "25"
+          },
+          {
+            "key": "flags.xjzl-system.regenHpTurnStart",
+            "mode": 2,
+            "value": "-20"
+          },
+          {
+            "key": "flags.xjzl-system.regenMpTurnStart",
+            "mode": 2,
+            "value": "-20"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "守心长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 10000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "克己，慎独，守心，明性。以克人之心克己，以容己之心容人。<br><br><b>效果：</b>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "守心长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.skills.dianxue.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.zhuizong.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.tancha.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.dongcha.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.jiaoyi.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.qiman.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.shuofu.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.dingli.checkMod",
+            "mode": 2,
+            "value": "2"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "清韵长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 9000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "剑鸣铿锵清亮，剑韵激荡，无不侧目。<br><br><b>效果：</b>装备后，出招命中目标时，自身恢复5点内力。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "清韵回气",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"mp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "真刚长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 7000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "使工人以白马白牛祀昆吾之种后,采金铸之成剑精。<br><br><b>效果：</b>装备后，即便被击破架招，该武器格按值依旧生效。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "真刚长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "flags.xjzl-system.passiveBlock",
+            "mode": 5,
+            "value": "true"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "霜月长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 6000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "以寒铁打造，阴寒无比，遇水结霜。<br><br><b>效果：</b>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "霜月特效",
+          "trigger": "hit",
+          "active": true,
+          "script": "// 获取系统预设的 unstable 状态\nconst baseEffect = CONFIG.statusEffects.find(e => e.id === \"unstable\");\nif (baseEffect) {\n    // 克隆并修改持续时间为 2 回合\n    const effectData = foundry.utils.deepClone(baseEffect);\n    effectData.duration = { rounds: 2 };\n    // 应用特效\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "魅影长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 5000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "魅影悄然，倩影惊鸿。<br><br><b>效果：</b>装备后，速度+2，闪避+5。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "魅影长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.combat.dodge",
+            "mode": 2,
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "业火长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 3,
+      "price": 4000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "业火灼身，狱莲重瓣，难耐怒意。<br><br><b>效果：</b>装备后，招式伤害+10。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "业火长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": "10"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "破釜长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 2000,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "破釜沉舟，不胜不还。<br><br><b>效果：</b>装备后，命中降低10点，攻击额外造成20点气血流失。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "破釜流失",
+          "trigger": "hit",
+          "active": true,
+          "script": "await args.target.applyDamage({ amount: 20, type: \"liushi\", isHit: true });"
+        }
+      ]
+    },
+    "effects": [
+      {
+        "name": "破釜长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": "-10"
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": "-10"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "蟠龙长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 1600,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。<br><br><b>效果：</b>装备后，招式造成暴击时，额外造成10点气血流失。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "蟠龙暴击流失",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 10, type: \"liushi\", isHit: true });\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "龙泉长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 1500,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "红光紫气俱赫然，铸得宝剑名龙泉。<br><br><b>效果：</b>装备后，招式内力消耗-2(最低0)。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "龙泉长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.costs.neili.mod",
+            "mode": 2,
+            "value": "2"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "崩雷长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 1300,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "天崩地裂，闷雷霹炸，声势骇人。<br><br><b>效果：</b>装备后，招式命中目标时,将其击退1米。",
+      "automationNote": "击退效果请手动处理。",
+      "scripts": []
+    }
+  },
+  {
+    "name": "铸血长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 1200,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "铸造时铁匠滴血淬火，以铸嗜血之兵。<br><br><b>效果：</b>装备后，招式命中目标时，自身回复5气血。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "铸血回血",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"hp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "翻腾长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 800,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "怒意狂表，气勋上涌。<br><br><b>效果：</b>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。",
+      "automationNote": "暴击计数请手动处理。",
+      "scripts": []
+    }
+  },
+  {
+    "name": "鱼肠长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 700,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "滴刃花纹毕露，宛如鱼肠一般。<br><br><b>效果：</b>装备后，招式伤害+5。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "鱼肠长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "刹绝长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 500,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "尘尘利利，斩尽杀绝，快速决绝。<br><br><b>效果：</b>装备后，普通攻击伤害提升10点。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "刹绝长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.normal.mod",
+            "mode": 2,
+            "value": "10"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "逐鹿长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 400,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "群侠逐鹿,疾足者先得。<br><br><b>效果：</b>装备后，速度+1、先攻+1。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "逐鹿长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": "1"
+          },
+          {
+            "key": "system.combat.initiative",
+            "mode": 2,
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "百炼长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 2,
+      "price": 300,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。<br><br><b>效果：</b>装备后，命中+5。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "百炼长棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/棍3.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": "5"
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "精钢长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 1,
+      "price": 200,
+      "quantity": 1,
+      "damage": 7,
+      "block": 3,
+      "description": "用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "精铁长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 1,
+      "price": 100,
+      "quantity": 1,
+      "damage": 5,
+      "block": 2,
+      "description": "将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "精铜长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 1,
+      "price": 100,
+      "quantity": 1,
+      "damage": 5,
+      "block": 2,
+      "description": "将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "粗铁长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 0,
+      "price": 10,
+      "quantity": 1,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质白铁锻造而成。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "粗铜长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 0,
+      "price": 10,
+      "quantity": 1,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质青铜锻造而成。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "烂铁长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 0,
+      "price": 1,
+      "quantity": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "破铜长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 0,
+      "price": 1,
+      "quantity": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "石长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 0,
+      "price": 0,
+      "quantity": 1,
+      "damage": 1,
+      "block": 0,
+      "description": "用岩石制作的武器，质量很差，难以伤人。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "木长棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "长棍",
+      "quality": 0,
+      "price": 0,
+      "quantity": 1,
+      "damage": 1,
+      "block": 0,
+      "description": "用桃木、乔木、竹子制作的武器，质量很差，难以伤人。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "无痕短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 20000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "剑过无痕，招落无声，此去经年。<br><br><b>效果：</b>装备后，虚招值+3。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "无痕短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.xuzhao",
+            "mode": 2,
+            "value": "3"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "鸿灵短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 15000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "此兵器挥之鸿鹄鸣渊，彻天际，响天涯。<br><br><b>效果：</b>装备后，你对应该武器的武器技能等级+1。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "鸿灵短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.weaponRanks.staff.mod",
+            "mode": 2,
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "万刃短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 13000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "风师雨将相矜夸，千刃万梨争就哗。血染尘土，千般利刃。<br><br><b>效果：</b>装备后，招式伤害+25，但战斗时每回合初流失20气血20内力。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "万刃短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": "25"
+          },
+          {
+            "key": "flags.xjzl-system.regenHpTurnStart",
+            "mode": 2,
+            "value": "-20"
+          },
+          {
+            "key": "flags.xjzl-system.regenMpTurnStart",
+            "mode": 2,
+            "value": "-20"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "守心短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 10000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "克己，慎独，守心，明性。以克人之心克己，以容己之心容人。<br><br><b>效果：</b>装备后，你在进行气感、神采相关技能检定和对抗时,结果+2",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "守心短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.skills.dianxue.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.zhuizong.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.tancha.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.dongcha.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.jiaoyi.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.qiman.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.shuofu.checkMod",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.skills.dingli.checkMod",
+            "mode": 2,
+            "value": "2"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "清韵短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 9000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "剑鸣铿锵清亮，剑韵激荡，无不侧目。<br><br><b>效果：</b>装备后，出招命中目标时，自身恢复5点内力。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "清韵回气",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"mp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "真刚短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 7000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "使工人以白马白牛祀昆吾之种后,采金铸之成剑精。<br><br><b>效果：</b>装备后，即便被击破架招，该武器格按值依旧生效。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "真刚短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "flags.xjzl-system.passiveBlock",
+            "mode": 5,
+            "value": "true"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "霜月短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 6000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "以寒铁打造，阴寒无比，遇水结霜。<br><br><b>效果：</b>装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "霜月特效",
+          "trigger": "hit",
+          "active": true,
+          "script": "// 获取系统预设的 unstable 状态\nconst baseEffect = CONFIG.statusEffects.find(e => e.id === \"unstable\");\nif (baseEffect) {\n    // 克隆并修改持续时间为 2 回合\n    const effectData = foundry.utils.deepClone(baseEffect);\n    effectData.duration = { rounds: 2 };\n    // 应用特效\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "魅影短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 5000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "魅影悄然，倩影惊鸿。<br><br><b>效果：</b>装备后，速度+2，闪避+5。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "魅影短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": "2"
+          },
+          {
+            "key": "system.combat.dodge",
+            "mode": 2,
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "业火短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 3,
+      "price": 4000,
+      "quantity": 1,
+      "damage": 20,
+      "block": 10,
+      "description": "业火灼身，狱莲重瓣，难耐怒意。<br><br><b>效果：</b>装备后，招式伤害+10。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "业火短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": "10"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "破釜短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 2000,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "破釜沉舟，不胜不还。<br><br><b>效果：</b>装备后，命中降低10点，攻击额外造成20点气血流失。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "破釜流失",
+          "trigger": "hit",
+          "active": true,
+          "script": "await args.target.applyDamage({ amount: 20, type: \"liushi\", isHit: true });"
+        }
+      ]
+    },
+    "effects": [
+      {
+        "name": "破釜短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": "-10"
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": "-10"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "蟠龙短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 1600,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。<br><br><b>效果：</b>装备后，招式造成暴击时，额外造成10点气血流失。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "蟠龙暴击流失",
+          "trigger": "hit",
+          "active": true,
+          "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 10, type: \"liushi\", isHit: true });\n}"
+        }
+      ]
+    }
+  },
+  {
+    "name": "龙泉短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 1500,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "红光紫气俱赫然，铸得宝剑名龙泉。<br><br><b>效果：</b>装备后，招式内力消耗-2(最低0)。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "龙泉短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.costs.neili.mod",
+            "mode": 2,
+            "value": "2"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "崩雷短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 1300,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "天崩地裂，闷雷霹炸，声势骇人。<br><br><b>效果：</b>装备后，招式命中目标时,将其击退1米。",
+      "automationNote": "击退效果请手动处理。",
+      "scripts": []
+    }
+  },
+  {
+    "name": "铸血短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 1200,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "铸造时铁匠滴血淬火，以铸嗜血之兵。<br><br><b>效果：</b>装备后，招式命中目标时，自身回复5气血。",
+      "automationNote": "完全自动化",
+      "scripts": [
+        {
+          "label": "铸血回血",
+          "trigger": "hit",
+          "active": true,
+          "script": "await actor.applyHealing({ amount: 5, type: \"hp\" });"
+        }
+      ]
+    }
+  },
+  {
+    "name": "翻腾短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 800,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "怒意狂表，气勋上涌。<br><br><b>效果：</b>装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。",
+      "automationNote": "暴击计数请手动处理。",
+      "scripts": []
+    }
+  },
+  {
+    "name": "鱼肠短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 700,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "滴刃花纹毕露，宛如鱼肠一般。<br><br><b>效果：</b>装备后，招式伤害+5。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "鱼肠短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.skill.mod",
+            "mode": 2,
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "刹绝短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 500,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "尘尘利利，斩尽杀绝，快速决绝。<br><br><b>效果：</b>装备后，普通攻击伤害提升10点。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "刹绝短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.damages.normal.mod",
+            "mode": 2,
+            "value": "10"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "逐鹿短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 400,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "群侠逐鹿,疾足者先得。<br><br><b>效果：</b>装备后，速度+1、先攻+1。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "逐鹿短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.speed",
+            "mode": 2,
+            "value": "1"
+          },
+          {
+            "key": "system.combat.initiative",
+            "mode": 2,
+            "value": "1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "百炼短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 2,
+      "price": 300,
+      "quantity": 1,
+      "damage": 12,
+      "block": 5,
+      "description": "用上好钢材折叠锻打百次，千锤百炼后锻造出的珍贵兵器。<br><br><b>效果：</b>装备后，命中+5。",
+      "automationNote": "完全自动化",
+      "scripts": []
+    },
+    "effects": [
+      {
+        "name": "百炼短棍",
+        "icon": "systems/xjzl-system/assets/icons/weapons/短棍2.png",
+        "transfer": true,
+        "disabled": false,
+        "changes": [
+          {
+            "key": "system.combat.hit_waigong",
+            "mode": 2,
+            "value": "5"
+          },
+          {
+            "key": "system.combat.hit_neigong",
+            "mode": 2,
+            "value": "5"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "精钢短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 1,
+      "price": 200,
+      "quantity": 1,
+      "damage": 7,
+      "block": 3,
+      "description": "用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "精铁短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 1,
+      "price": 100,
+      "quantity": 1,
+      "damage": 5,
+      "block": 2,
+      "description": "将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "精铜短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 1,
+      "price": 100,
+      "quantity": 1,
+      "damage": 5,
+      "block": 2,
+      "description": "将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "粗铁短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 0,
+      "price": 10,
+      "quantity": 1,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质白铁锻造而成。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "粗铜短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 0,
+      "price": 10,
+      "quantity": 1,
+      "damage": 4,
+      "block": 1,
+      "description": "带有杂质的劣质青铜锻造而成。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "烂铁短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 0,
+      "price": 1,
+      "quantity": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "破铜短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 0,
+      "price": 1,
+      "quantity": 1,
+      "damage": 3,
+      "block": 1,
+      "description": "农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "石短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 0,
+      "price": 0,
+      "quantity": 1,
+      "damage": 1,
+      "block": 0,
+      "description": "用岩石制作的武器，质量很差，难以伤人。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
+      "scripts": []
+    }
+  },
+  {
+    "name": "木短棍",
+    "type": "weapon",
+    "img": "systems/xjzl-system/assets/icons/weapons/短棍1.png",
+    "system": {
+      "type": "staff",
+      "subtype": "短棍",
+      "quality": 0,
+      "price": 0,
+      "quantity": 1,
+      "damage": 1,
+      "block": 0,
+      "description": "用桃木、乔木、竹子制作的武器，质量很差，难以伤人。<br><br><b>效果：</b>无",
+      "automationNote": "完全自动化",
       "scripts": []
     }
   }
