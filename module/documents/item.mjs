@@ -1151,7 +1151,7 @@ export class XJZLItem extends Item {
       feintBreakdown += ` ${sign} 特效加值 ${scriptFeintBonus}(仅生效计算阶段特效与被动特效，不代表最终结果)`;
     }
 
-    if (!isWeaponMatch && move.weaponType && move.weaponType !== 'none' && move.weaponType !== 'unarmed') {
+    if (!isWeaponMatch && move.weaponType && move.weaponType !== 'none') {
       breakdownText += `\n(⚠️ 未装备匹配武器)`;
       feintBreakdown += `\n(⚠️ 未装备匹配武器)`;
     }
