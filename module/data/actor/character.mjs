@@ -259,7 +259,11 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         attitude_shisu: new fields.StringField({ initial: "none", label: "XJZL.Social.AttitudeShisu" }),
 
         // 嗜好 (最多3个)
-        shihao: new fields.ArrayField(new fields.StringField(), { max: 3, label: "XJZL.Info.Hobbies" }),
+        shihao: new fields.ArrayField(new fields.StringField(), {
+          max: 3,
+          label: "XJZL.Info.Hobbies",
+          initial: ["", "", ""] // 初始化填充3个空位，避免后面出错
+        }),
 
         // 关系网 (NPC好感度)
         relations: new fields.ArrayField(new fields.SchemaField({

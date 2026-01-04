@@ -245,7 +245,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         context.backgroundItem = actor.itemTypes.background?.[0] || null;
         context.personalityItem = actor.itemTypes.personality?.[0] || null;
 
-        const currentHobbies = system.info.shihao || [];
+        const currentHobbies = system.social.shihao || [];
         context.hobbySlots = [0, 1, 2].map(i => ({
             index: i,
             value: currentHobbies[i] || ""
