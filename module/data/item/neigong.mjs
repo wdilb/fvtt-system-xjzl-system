@@ -25,7 +25,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
         shencai: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Neigong.BonusShencai" })
       }),
       // 该阶段的特效描述 (HTML富文本)
-      effect: new fields.HTMLField({ label: "XJZL.Neigong.EffectConfig" }),
+      // effect: new fields.HTMLField({ label: "XJZL.Neigong.EffectConfig" }),
       // === 阶段效果描述 (纯显示用) ===
       description: new fields.HTMLField({ label: "XJZL.Neigong.StageDescription" }),
 

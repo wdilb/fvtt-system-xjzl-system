@@ -1187,15 +1187,18 @@ export class XJZLActor extends Actor {
 
     // B. 格挡 (Block)
     let blockVal = 0;
-    if (!config.ignoreBlock) { // 使用 config 中的值
-      let total = combat.blockTotal || 0;
-      // 无视架招处理：仅扣除架招加值，保留基础格挡
-      if (config.ignoreStance) {
-        const stancePart = combat.stanceBlockValue || 0;
-        total = Math.max(0, total - stancePart);
+    if (type === "waigong" || type === "neigong") { //只有内外功才有格挡
+      if (!config.ignoreBlock) { // 使用 config 中的值
+        let total = combat.blockTotal || 0;
+        // 无视架招处理：仅扣除架招加值，保留基础格挡
+        if (config.ignoreStance) {
+          const stancePart = combat.stanceBlockValue || 0;
+          total = Math.max(0, total - stancePart);
+        }
+        blockVal = total;
       }
-      blockVal = total;
     }
+
 
     // C. 抗性 (Resistance)
     const resMap = sys.combat.resistances;
@@ -1415,7 +1418,7 @@ export class XJZLActor extends Actor {
 
       finalDamage: finalDamage, // 理论应扣
       hpLost: stdHpLost,        // 实际扣血
-      mpLost: stdMpLost, 
+      mpLost: stdMpLost,
       hutiLost: stdHutiLost,
 
       config: config, // 把配置传进来，以便检查 ignoreStance

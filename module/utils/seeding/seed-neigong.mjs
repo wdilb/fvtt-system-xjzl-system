@@ -111,7 +111,7 @@ export async function seedNeigong() {
         if (!stageData) return {};
         return {
             stats: stageData.stats || { liliang: 0, shenfa: 0, tipo: 0, neixi: 0, qigan: 0, shencai: 0 },
-            effect: stageData.effect || "",
+            // effect: stageData.effect || "",  忽略这个属性，完全没用
             description: stageData.description || "",
             xpCostRatio: stageData.xpCostRatio ?? 1,
             // 脚本处理：确保是数组对象结构
