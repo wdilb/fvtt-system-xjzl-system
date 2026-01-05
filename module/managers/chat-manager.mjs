@@ -321,8 +321,12 @@ export class ChatCardManager {
             hasNewTargets = true;
             // B. 现场计算优劣势 (跑 CHECK 脚本)
             // const checkContext = { target: targetActor, flags: { grantAdvantage: false, grantDisadvantage: false } };
+            const move = item.system.moves.find(m => m.id === flags.moveId);
             const checkContext = {
                 target: targetActor,
+                attacker: attacker,    // 攻击者 (脚本中既可以用 args.actor 也可以用 args.attacker)
+                item: item,            // 来源物品 (可能是实体Item，也可能是虚拟构造的Basic Attack对象)
+                move: move,            // 具体招式数据
                 flags: {
                     grantLevel: 0,
                     grantFeintLevel: 0,  // 虚招修正
@@ -334,7 +338,7 @@ export class ChatCardManager {
                     grantFeint: 0    // 针对此人的虚招修正
                 }
             }; //换成优劣势计数
-            const move = item.system.moves.find(m => m.id === flags.moveId);
+
             await attacker.runScripts(SCRIPT_TRIGGERS.CHECK, checkContext, move);
 
             // 合并逻辑 (Base OR Script)
@@ -669,7 +673,7 @@ export class ChatCardManager {
                 target: target, // 保留原始target对象以获取纹理
                 displayName: displayName,
                 feintState: res.feintState || 0,
-                finalFeintVal: targetFeintVal 
+                finalFeintVal: targetFeintVal
             });
         }
 

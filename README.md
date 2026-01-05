@@ -147,17 +147,21 @@ await Macros.requestSave({
 *   **状态 (Active Effect)**: 在 **Active Effect** 的配置页中，现在也可以直接编写脚本。这使得状态可以独立于物品存在并执行逻辑（如中毒、持续回血）。
 
 ### 1.2 沙盒变量 (Global Context)
-系统为每一段脚本注入了以下全局变量，你可以直接使用：
+系统为每一段脚本注入了以下全局变量，你可以直接使用。
+> **注意**: 所有的上下文参数既可以通过 `args.xxx` 访问，也可以作为直接变量访问（例如直接写 `target` 或 `flags`）。推荐优先使用 `args` 以避免命名冲突。
 
 | 变量名 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| **`actor`** | `XJZLActor` | 当前**运行该脚本的角色**实例（施法者/佩戴者/被击者）。 |
+| **`actor`** | `XJZLActor` | 当前**运行该脚本的角色**实例（通常是施法者/佩戴者，但在防御脚本中是防御者）。 |
 | **`system`** | `Object` | `actor.system` 的引用。核心数据源。 |
 | **`S`** | `Object` | `system` 的简写别名。例如 `S.stats.liliang.total`。 |
-| **`thisItem`** | `XJZLItem` \| `ActiveEffect` | **兼容性指针**。<br>1. 若脚本来自物品，指向该物品。<br>2. 若脚本来自 Active Effect，指向该特效本身 (为了防止旧脚本报错)。 |
-| **`thisEffect`** | `ActiveEffect` | **当前运行脚本的特效实例**。<br>仅当脚本挂载在 Active Effect 上时存在。推荐在处理特效自我销毁、层数修改时使用此变量。 |
+| **`thisItem`** | `XJZLItem` \| `ActiveEffect` | **脚本宿主指针**。<br>指向**这段脚本存放的地方**。如果脚本写在“金蛇剑”里，它就是金蛇剑；如果脚本写在“中毒”BUFF里，它就是中毒BUFF (ActiveEffect)。 |
+| **`thisEffect`** | `ActiveEffect` | **脚本宿主特效指针**。<br>仅当脚本挂载在 Active Effect 上时存在 (与 `thisItem` 指向相同)，也有简写别名 **`effect`**。 |
+| **`trigger`** | `String` | **当前触发时机**。<br>例如 `"attack"`, `"hit"`, `"check"`。允许你在一段代码中通过 `if (trigger === 'hit')` 处理多重逻辑。 |
+| **`console`** | `Console` | 浏览器的控制台对象，用于调试 (`console.log(args)`)。 |
+| **`item`** | `XJZLItem` | **动作来源物品**。<br>**注意与 `thisItem` 的区别**：<br>1. 当你挥剑攻击时，`item` 是这把剑。<br>2. 如果你身上的“中毒”BUFF在此时触发脚本，`thisItem` 是BUFF，而 `item` 依然是那把剑。 |
 | **`move`** | `Object` | **当前正在施展的招式数据** (仅限招式相关脚本)。 |
-| **`args`** | `Object` | **上下文参数包**。包含当前事件的所有信息（如伤害值、命中结果、目标）。内容随触发时机变化。 |
+| **`args`** | `Object` | **上下文参数包**。包含当前事件的所有信息（如伤害值、命中结果、目标）。内容随触发时机变化，详情见下文。 |
 | **`Macros`** | `Class` | **系统工具箱**。包含 `requestSave` 等高级功能。 |
 | **`game`, `ui`** | - | Foundry VTT 核心全局对象。 |
 
@@ -174,6 +178,7 @@ await Macros.requestSave({
 #### 🛡️ `passive` (被动常驻)
 *   **时机**: 角色数据初始化时 (`prepareDerivedData`)。
 *   **用途**: 修改属性修正值 (`.mod`)、开启状态开关。
+*   **args 内容**: `{}` (无特殊参数，主要操作 `actor` 和 `S`)。
 *   **生效前提**: 内功运行中、装备已穿戴、架招已开启、或 AE 处于激活状态。
 *   **代码示例**:
     ```javascript
@@ -187,7 +192,11 @@ await Macros.requestSave({
 
 #### 🧮 `calc` (数值计算)
 *   **时机**: 计算招式伤害或治疗面板时。
-*   **args 内容**: `{ move, baseData, output }`
+*   **args 内容**: 
+    *   `move`: 当前招式对象。
+    *   `item`: 当前招式所属的物品 (如武学书)。
+    *   `baseData`: `{ base, weapon, level, isWeaponMatch }` (只读，基础数值参考)。
+    *   `output`: `{ damage, feint, bonusDesc }` (**可修改**)。
 *   **用途**: 修改 `args.output.damage` (基础伤害/治疗量) 或 `feint` (虚招值)。
 *   **代码示例**:
     ```javascript
@@ -199,14 +208,21 @@ await Macros.requestSave({
 
 #### 🎯 `check` (检定修正/比对)
 *   **时机**: 掷骰前，针对**每一个目标**分别运行。
-*   **args 内容**: `{ target, flags }`
+*   **args 内容**: 
+    *   `target`: 目标角色 Actor。
+    *   `attacker`: 攻击者 Actor (通常等于 `actor`)。
+    *   `item`: 来源物品。
+    *   `move`: 招式数据。
+    *   `flags`: (**可修改**) 修正标记。
 *   **flags 可修改项**:
     *   `grantLevel`: **命中优劣势修正** (整数)。+1 表示给予攻击者优势，-1 表示劣势。决定投 1d20 还是 2d20。
     *   `grantFeintLevel`: **虚招优劣势修正** (整数)。
     *   `grantHit`: **命中数值修正** (整数)。直接加在最终命中结果上 (如 +5)。用于实现“对特定目标命中率提升”。
     *   `grantFeint`: **虚招数值修正** (整数)。直接加在虚招值上。
     *   `critThresholdMod`: **暴击阈值修正** (整数)。正数表示更容易暴击。例如 `+2` 表示 18 即可暴击。此修正仅对**当前目标**生效。
-    *   `ignoreBlock/Defense/Stance`: 是否对该目标穿透。
+    *   `ignoreBlock`: **无视格挡** (Boolean)。
+    *   `ignoreDefense`: **无视防御** (Boolean)。
+    *   `ignoreStance`: **无视架招** (Boolean)。
 *   **用途**: “若目标处于中毒状态，则本次攻击无视格挡，且命中修正 +5”。
 *   **代码示例**:
     ```javascript
@@ -224,7 +240,11 @@ await Macros.requestSave({
 
 #### ⚔️ `attack` (出招前)
 *   **时机**: 点击招式按钮，资源（含士气）扣除后，掷骰前。
-*   **args 内容**: `{ move, flags }`
+*   **args 内容**: 
+    *   `move`: 招式数据。
+    *   `item`: 来源物品。
+    *   `attacker`: 攻击者 Actor。
+    *   `flags`: (**可修改**) 全局修正标记。
 *   **flags 可修改项**: 
     *   `level`: **自身命中优劣势** (整数)。影响是否投 2d20。
     *   `feintLevel`: **自身虚招优劣势** (整数)。
@@ -232,7 +252,8 @@ await Macros.requestSave({
     *   `bonusFeint`: **自身虚招数值修正** (整数)。
     *   `critThresholdMod`: **全局暴击阈值修正**。此次出招对所有目标的暴击阈值修正。
     *   `abort`: 设为 `true` 可阻断出招。
-    *   `autoApplied`: 设为 `true` 可隐藏聊天卡片上的“应用”按钮。
+    *   `abortReason`: (String) 阻断时弹出的提示文本。
+    *   `autoApplied`: 设为 `true` 可隐藏聊天卡片上的“应用”按钮 (流程结束标记)。
 *   **用途**: 自身状态检查、消耗特殊资源、给予自身数值加成、接管后续流程。
 *   **代码示例**:
     ```javascript
@@ -246,6 +267,10 @@ await Macros.requestSave({
 #### 🌪️ `preDamage` (攻击者：伤害结算前)
 *   **时机**: 命中、暴击、击破状态已确定，由**攻击者**触发，在调用防御者逻辑之前。
 *   **args 内容**:
+    *   `attacker`: 攻击者 Actor。
+    *   `target`: 目标 Actor。
+    *   `item`, `move`: 来源物品与招式。
+    *   `isManual`: `Boolean`，是否为 Shift+点击 的手动应用模式。
     *   `outcome`: `{ isHit, isCrit, isBroken }` (**只读**，本次判定的结果)。
     *   `config`: `{ amount, type, ignoreBlock, ignoreDefense, ignoreStance, applyCritDamage }` (**可修改**，传入防御结算的参数)。
 *   **用途**: 攻击者视角修改攻击属性。如“暴击后转为精神伤害”、“命中后伤害类型改变”。
@@ -310,9 +335,12 @@ await Macros.requestSave({
     *   `finalDamage`: 理论结算伤害 (护盾抵消后的数值)。
     *   `hpLost`: **实际**扣除的气血。
     *   `hutiLost`: **实际**扣除的护体。
+    *   `mpLost`: **实际**扣除的内力 (新增)。
     *   `config`: `{ ignoreStance, isCrit ... }` (用于检查是否被无视架招等)。
     *   `isBroken`: `Boolean`，本次受击是否导致架招被破 (如金麟服判定)。
-    *   `isDead`: 角色是否已死亡。
+    *   `isDying`: `Boolean`，是否进入濒死状态。
+    *   `isDead`: `Boolean`，是否已死亡。
+    *   `attacker`: 攻击者实例。
 *   **用途**: **反伤 (Thorns)**、受击回怒、受击触发 Buff、濒死/死亡后的额外逻辑。
 *   **代码示例**:
     ```javascript
@@ -347,18 +375,28 @@ await Macros.requestSave({
 *   **时机**: 点击“应用伤害”、“应用治疗”或“应用效果”后，对**每个目标**运行。
 *   **args 内容 (通用)**:
     *   `target`: 目标角色 Actor。
+    *   `attacker`: 攻击者 Actor。
+    *   `item`, `move`: 来源物品与招式。
+    *   `isManual`: `Boolean`，是否手动应用。
     *   `type`: `"attack"`, `"heal"` 或 **`"buff"`** (用于区分脚本逻辑)。
-    *   `isHit`: 对于攻击是命中结果；对于治疗/Buff **恒为 true**。
-    *   `isCrit`: 是否暴击 (治疗目前恒为 false)。
-    *   ** `isBuff`**: Boolean，是否为辅助/气招类型。
+    *   `isHit`: 命中状态 (治疗/Buff 恒为 true)。
+    *   `isCrit`: 暴击状态 (治疗/Buff 恒为 false)。
+    *   `isBroken`: 是否击破架招。
+    *   ** `isBuff`**, **`isHeal`**, **`isAttack`**: 快捷布尔标记。
 *   **args 内容 (攻击特有)**:
-    *   `hpLost`, `hutiLost`: 实际造成的损失。
-    *   `damageResult`: 完整的伤害结算对象。
+    *   `baseDamage`: 面板伤害。
+    *   `finalDamage`: 实际造成的伤害 (被护盾抵消后)。
+    *   `hpLost`, `hutiLost`: **实际**导致目标扣除的气血/护体。
+    *   `mpLost`: **实际**导致目标扣除的内力。
+    *   `isDying`, `isDead`: 目标是否濒死或死亡。
+    *   `damageResult`: 完整的伤害结算对象 (包含上述所有字段)。
 *   **args 内容 (治疗/Buff 特有)**:
     *   `baseAmount`: 面板数值 (治疗量或强度)。
-    *   **[变更] `finalAmount`**: 
+    *   ** `finalAmount`**: 
         *   若 `type === 'heal'`: 实际应用到 HP 上的回复量。
         *   若 `type === 'buff'`: 等于 `baseAmount` (视为强度 Potency)，**不会**自动加血，脚本可根据此数值决定护盾厚度等。
+    *   `healAmount`: 实际治疗量 (同 finalAmount)。
+    *   `isBuffOnly`: 标识是否仅为Buff (无治疗数值)。
 *   **用途**: **最常用**。施加 Buff/Debuff、吸血、额外回复内力。
 *   **代码示例 (通用 Buff)**:
     ```javascript
@@ -377,7 +415,13 @@ await Macros.requestSave({
 
 #### 🩸 `hit_once` (攻击者：全局结算)
 *   **时机**: 所有目标处理完毕后，执行一次。
-*   **args 内容**: `{ targets: [], hitCount, totalHealAmount ... }`
+*   **args 内容**: 
+    *   `targets`: Array，包含每个目标的详细结算结果 (`summaryData`)。
+    *   `hitCount`: 命中的目标总数。
+    *   `baseDamage`: 原始面板伤害。
+    *   `totalHealAmount`: (仅治疗) 总治疗量。
+    *   `attacker`, `item`, `move`: 上下文对象。
+    *   `isManual`: 是否手动应用。
 *   **用途**: 群攻/群奶后的自身反馈。
 *   **代码示例**:
     ```javascript

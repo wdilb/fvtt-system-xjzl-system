@@ -1106,6 +1106,7 @@ export class XJZLItem extends Item {
     // 2. 准备上下文 (Context)
     const context = {
       move: move,
+      item: this,        //让脚本知道是用什么物品在算伤害
       // 传入基础数值供参考 (只读)
       baseData: {
         base: moveBaseDmg,
@@ -1473,6 +1474,8 @@ export class XJZLItem extends Item {
 
       const attackContext = {
         move: move,
+        item: this,      
+        attacker: actor, // 明确语义，方便 copy 脚本到其他地方
         // 使用数值计数器，不再使用布尔值的flags
         // 核心 Flags (供脚本修改)
         flags: {
@@ -1603,6 +1606,9 @@ export class XJZLItem extends Item {
           // 运行 CHECK 脚本
           const checkContext = {
             target: targetActor,
+            item: this,          // "我用什么打的他？"
+            attacker: actor,     // 保持 args.attacker 恒为攻击者
+            move: move,          // 招式数据
             flags: {
               grantLevel: 0,      // 攻击修正
               grantFeintLevel: 0,  // 虚招修正
