@@ -1760,6 +1760,26 @@ export class XJZLActor extends Actor {
     };
 
     // =====================================================
+    // 3.5 构建“虚拟物品”对象 (Virtual Item)
+    // 目的: 填充脚本上下文中的 args.item，防止脚本报错
+    // =====================================================
+    const virtualItem = {
+      id: "basic", // 固定 ID
+      uuid: "Virtual.BasicAttack", // 虚拟 UUID
+      name: "普通攻击",
+      type: "basic", // 特殊类型，方便脚本判断
+      img: virtualMove.img,
+      actor: this, // 链接回 Actor
+      system: {
+        description: "基础攻击动作",
+        moves: [virtualMove] // 包含招式
+      },
+      // 简单的 Mock 方法，防止脚本调用 getFlag 报错
+      getFlag: (scope, key) => null,
+      flags: {}
+    };
+
+    // =====================================================
     // 4. 触发 "出招" 回复 (Regen On Attack)
     // =====================================================
     if (isOpportunity) await this.processRegen("Attack");
@@ -1770,6 +1790,8 @@ export class XJZLActor extends Actor {
     // =====================================================
     const attackContext = {
       move: virtualMove,
+      item: virtualItem, // 注入虚拟物品
+      attacker: this,    // 明确 attacker
       flags: {
         level: s.attackLevel || 0,
         feintLevel: 0, // 普攻没有虚招
@@ -1791,7 +1813,7 @@ export class XJZLActor extends Actor {
     // 6. 伤害计算
     // =====================================================
     // 我们需要把 moraleSpent 传给计算函数
-    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent);
+    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
 
     // =====================================================
     // 7. 目标命中检定 (Hit Check)
@@ -1812,6 +1834,9 @@ export class XJZLActor extends Actor {
 
       const checkContext = {
         target: targetActor,
+        attacker: this,
+        item: virtualItem,
+        move: virtualMove,
         flags: {
           grantLevel: 0,
           ignoreBlock: false,
@@ -2104,7 +2129,7 @@ export class XJZLActor extends Actor {
    * 公式：武器伤害 + 武器等级加成 + 属性加成(无) + 通用/类型加成
    * 增加 moraleSpent 参数
    */
-  _calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent = 0) {
+  _calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent = 0, virtualItem = null) {
     const sys = this.system;
     const isOpportunity = mode === "opportunity";
     // 1. 武器基础伤害
@@ -2165,12 +2190,16 @@ export class XJZLActor extends Actor {
       bonusDesc: []
     };
 
-    // 同步执行
-    this.runScripts(SCRIPT_TRIGGERS.CALC, {
+    // 注入 item 到上下文
+    const calcContext = {
       move: virtualMove,
+      item: virtualItem,
       baseData: { base: weaponDmg, rank: rankBonus },
       output: calcOutput
-    }, virtualMove);
+    };
+
+    // 同步执行
+    this.runScripts(SCRIPT_TRIGGERS.CALC, calcContext, virtualMove);
 
     // 5. 应用手动修正
     let finalDamage = Math.floor(calcOutput.damage + config.bonusDamage);
