@@ -311,7 +311,7 @@ await Macros.requestSave({
 *   **参数 (`args`)**:
     *   `attacker`, `target`, `item`, `move`。
     *   `isManual` (Bool): 是否为手动应用模式 (Shift+点击)。
-    *   `outcome` (Object, **只读**): `{ isHit, isCrit, isBroken }`。
+    *   `outcome` (Object, **只读**): `{ isHit(是否命中), isCrit(是否暴击), isBroken(是否击破架招) }`。
     *   `config` (Object, **可修改**):
         *   `amount` (Number): 伤害数值。
         *   `type` (String): 伤害类型。
