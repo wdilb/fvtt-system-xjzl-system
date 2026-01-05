@@ -96,7 +96,41 @@
 
 > **提示**：正式的自动安装链接将在所有数据包制作完成后发布。
 ---
+## 📖 脚本引擎简述 (Scripting)
 
+本系统允许你在物品（内功、武学、装备）上绑定脚本。以下是一个简单的示例：
+
+**示例：攻击附带中毒效果**
+*触发时机：`hit` (命中后)*
+
+```javascript
+// 1. 发起体魄检定 (DC 15)
+await Macros.requestSave({
+    target: args.target,
+    attacker: actor,
+    type: "tipo", 
+    dc: 15,
+    label: "抵抗剧毒",
+    
+    // 2. 失败回调：应用中毒状态
+    onFail: async () => {
+        const poisonEffect = {
+            name: "剧毒攻心",
+            icon: "icons/svg/skull.svg",
+            duration: { rounds: 3 },
+            changes: [
+                { key: "system.combat.speed", mode: 2, value: -2 }
+            ]
+        };
+        await args.target.createEmbeddedDocuments("ActiveEffect", [poisonEffect]);
+        ui.notifications.warn(args.target.name + " 中毒了！");
+    }
+});
+```
+
+<details>
+<summary><strong>📚 点击展开：脚本引擎完整开发文档 (Script Engine API)</strong></summary>
+<br>
 # 📖 侠界之旅 (XJZL) - 脚本与特效开发指南 (v5.5)
 
 **适用对象**: 游戏主持人 (GM)、模组制作者、高阶玩家
