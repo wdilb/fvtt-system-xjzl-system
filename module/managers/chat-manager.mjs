@@ -254,6 +254,11 @@ export class ChatCardManager {
         // 提前计算公共加值 (修复 ReferenceError 的关键)
         const hitMod = (damageType === "waigong" ? attacker.system.combat.hitWaigongTotal : attacker.system.combat.hitNeigongTotal);
         const manualBonus = flags.attackBonus || 0;
+        const scriptGlobalHit = flags.scriptBonusHit || 0; // ATTACK 脚本修正
+        // 汇总：全局命中修正
+        const globalHitMod = hitMod + manualBonus + scriptGlobalHit;
+        // 获取基础虚招值 (已包含 ATTACK 脚本修正，因为 roll 里存的是 calcResult.feint)
+        const globalFeintBase = flags.feint || 0;
         // =====================================================
         // 1.5 安全获取骰子数据 (修正必中读取rolljson失败直接返回的问题)
         // =====================================================
@@ -324,7 +329,9 @@ export class ChatCardManager {
                     ignoreBlock: false,
                     ignoreDefense: false,
                     ignoreStance: false,
-                    critThresholdMod: 0 // 允许 CHECK 脚本针对特定目标修改暴击阈值
+                    critThresholdMod: 0, // 允许 CHECK 脚本针对特定目标修改暴击阈值
+                    grantHit: 0,      // 针对此人的命中修正
+                    grantFeint: 0    // 针对此人的虚招修正
                 }
             }; //换成优劣势计数
             const move = item.system.moves.find(m => m.id === flags.moveId);
@@ -373,7 +380,9 @@ export class ChatCardManager {
                 ignoreBlock: finalIgnoreBlock,
                 ignoreDefense: finalIgnoreDefense,
                 ignoreStance: finalIgnoreStance,
-                critThresholdMod: checkContext.flags.critThresholdMod || 0
+                critThresholdMod: checkContext.flags.critThresholdMod || 0,
+                grantHit: checkContext.flags.grantHit || 0,
+                grantFeint: checkContext.flags.grantFeint || 0,
             });
 
             // 关键判断：如果状态不平，且没有 D2，则需要补骰
@@ -446,7 +455,9 @@ export class ChatCardManager {
                     if (state === 1) { finalDie = Math.max(d1, d2); stateLabel = "优"; }
                     else if (state === -1) { finalDie = Math.min(d1, d2); stateLabel = "劣"; }
 
-                    const total = finalDie + hitMod + manualBonus;
+                    // 公式: 最终骰子 + 全局修正 + 目标修正
+                    const targetHitMod = states.grantHit || 0;
+                    const total = finalDie + globalHitMod + targetHitMod;
                     dodge = tActor.system.combat.dodgeTotal || 10;
                     displayTotal = total
 
@@ -531,6 +542,8 @@ export class ChatCardManager {
             let finalDie = d1;
             let isHit = true;
             let total = 0;
+            // 计算最终虚招值 (全局基础 + 目标修正)
+            const finalFeint = globalFeintBase + (states.grantFeint || 0);
             if (needsCheck) {
                 // 此时 d2 一定就位 (除非 state=0 或者用户取消了)
                 if (state === 1 && d2 !== null) finalDie = Math.max(d1, d2);
@@ -560,7 +573,8 @@ export class ChatCardManager {
                 ignoreBlock: states.ignoreBlock,
                 ignoreDefense: states.ignoreDefense,
                 ignoreStance: states.ignoreStance,
-                critThresholdMod: states.critThresholdMod || 0
+                critThresholdMod: states.critThresholdMod || 0,
+                finalFeint: finalFeint
             };
         }
 
@@ -599,7 +613,7 @@ export class ChatCardManager {
         // 如果返回 null，说明在补骰阶段玩家点击了取消，中断流程
         if (!hitResults) return;
 
-        const feintVal = flags.feint || 0;
+        // const feintVal = flags.feint || 0; //每个人可能有不同的虚招，不读取这里的全局值了
         const alreadyRequested = flags.feintRequestSent || [];
         // 临时存储预筛选出来的有效目标，避免直接循环时无法判断是否需要投骰子
         const validTargetsToRequest = [];
@@ -645,13 +659,17 @@ export class ChatCardManager {
                 needsTwoDice = true;
             }
 
+            // 每个目标可能存在不同的虚招值，如果 res 里没有 finalFeint，则降级使用全局 flags.feint
+            const targetFeintVal = (res.finalFeint !== undefined) ? res.finalFeint : (flags.feint || 0);
+
             // 存入待处理列表
             validTargetsToRequest.push({
                 uuid: uuid,
                 actor: targetActor,
                 target: target, // 保留原始target对象以获取纹理
                 displayName: displayName,
-                feintState: res.feintState || 0
+                feintState: res.feintState || 0,
+                finalFeintVal: targetFeintVal 
             });
         }
 
@@ -681,7 +699,7 @@ export class ChatCardManager {
 
             // 3. 遍历有效目标发送请求
             for (const tData of validTargetsToRequest) {
-                const { uuid, actor: targetActor, target, displayName, feintState } = tData;
+                const { uuid, actor: targetActor, target, displayName, feintState, finalFeintVal } = tData;
 
                 // 计算针对该目标的最终点数
                 let finalDie = d1;
@@ -695,7 +713,7 @@ export class ChatCardManager {
                     rollDisplay = `劣势(${d1}, ${d2}) ➔ <b>${finalDie}</b>`;
                 }
 
-                const attackTotal = finalDie + feintVal;
+                const attackTotal = finalDie + finalFeintVal;
 
                 // 获取头像
                 const imgPath = target.texture?.src || targetActor.img;
@@ -706,7 +724,7 @@ export class ChatCardManager {
                     targetName: displayName,
                     targetImg: imgPath,
                     rollTotal: rollDisplay,
-                    feintVal: feintVal,
+                    feintVal: finalFeintVal,
                     attackTotal: attackTotal,
                     targetUuid: uuid,
                     originMessageId: message.id
@@ -1133,7 +1151,7 @@ export class ChatCardManager {
 
                 // 3. 计算动态阈值 (每10点士气 -1 阈值)
                 const moraleMod = Math.floor(moraleUsed / 10);
-                
+
                 // 4. 修正1 (来自 ATTACK 脚本，存储在 message flags 中)
                 const globalScriptMod = flags.critThresholdMod || 0;
 

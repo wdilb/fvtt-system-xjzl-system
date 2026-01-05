@@ -1481,7 +1481,9 @@ export class XJZLItem extends Item {
           abort: false,       // 脚本设为 true 可阻断攻击
           abortReason: "",     // 阻断原因
           autoApplied: false, // 是否已经完成流程的标记
-          critThresholdMod: 0 // 允许脚本修改暴击阈值,正数表示更容易暴击 (例如 2 表示阈值降低 2 点)
+          critThresholdMod: 0, // 允许脚本修改暴击阈值,正数表示更容易暴击 (例如 2 表示阈值降低 2 点)
+          bonusHit: 0,    // 自身命中加值
+          bonusFeint: 0   // 自身虚招数值加值
         }
       };
       // 现在脚本里：
@@ -1497,6 +1499,10 @@ export class XJZLItem extends Item {
         if (attackContext.flags.abortReason) ui.notifications.warn(attackContext.flags.abortReason);
         return;
       }
+
+      // 提取 ATTACK 阶段产生的数值修正 (供后续使用)
+      const scriptBonusHit = attackContext.flags.bonusHit || 0;
+      const scriptBonusFeint = attackContext.flags.bonusFeint || 0;
 
       // =====================================================
       // 分流：架招 模式 (提前结束)
@@ -1559,7 +1565,8 @@ export class XJZLItem extends Item {
 
       // 应用手动修正
       calcResult.damage += config.bonusDamage;
-      calcResult.feint += config.bonusFeint;
+      // 虚招值 = 基础 + 手动配置 + 脚本修正
+      calcResult.feint += (config.bonusFeint + scriptBonusFeint);
 
       // 追加濒死一击伤害
       if (desperateBonus > 0) {
@@ -1602,7 +1609,9 @@ export class XJZLItem extends Item {
               ignoreBlock: false,
               ignoreDefense: false,
               ignoreStance: false,
-              critThresholdMod: 0 // 添加这个字段，让 CHECK 脚本可以修改
+              critThresholdMod: 0, // 添加这个字段，让 CHECK 脚本可以修改
+              grantHit: 0,    // 针对该目标的命中加值
+              grantFeint: 0   // 针对该目标的虚招数值加值
             }
           };
 
@@ -1623,7 +1632,6 @@ export class XJZLItem extends Item {
             const targetGrant = tStatus.grantAttackLevel || 0;
             const scriptGrant = checkContext.flags.grantLevel || 0;
             const totalAttackLevel = selfLevel + targetGrant + scriptGrant;
-
 
             if (totalAttackLevel > 0) attackState = 1;
             else if (totalAttackLevel < 0) attackState = -1;
@@ -1646,7 +1654,9 @@ export class XJZLItem extends Item {
             ignoreBlock: finalIgnoreBlock,
             ignoreDefense: finalIgnoreDefense,
             ignoreStance: finalIgnoreStance,
-            critThresholdMod: checkContext.flags.critThresholdMod || 0
+            critThresholdMod: checkContext.flags.critThresholdMod || 0,
+            grantHit: checkContext.flags.grantHit || 0,
+            grantFeint: checkContext.flags.grantFeint || 0
           });
         }
       }
@@ -1678,7 +1688,7 @@ export class XJZLItem extends Item {
       if (needsHitCheck) {
         // A. 确定检定加值
         let hitMod = (damageType === "waigong" ? actor.system.combat.hitWaigongTotal : actor.system.combat.hitNeigongTotal);
-        hitMod += config.bonusAttack; //玩家手动加值
+        hitMod += (config.bonusAttack + scriptBonusHit); //玩家手动加值和脚本加值
 
         // B. 确定优势/劣势 (Advantage/Disadvantage)
 
@@ -1735,15 +1745,17 @@ export class XJZLItem extends Item {
           // 修改为使用 t.document.uuid 作为 Key，而不是 t.id
           // t.id 只是由 ID 组成的字符串，而 uuid 包含场景信息，更安全
           const tokenUuid = t.document.uuid;
-          const ctx = targetContexts.get(tokenUuid) || { attackState: 0 };
+          const ctx = targetContexts.get(tokenUuid) || { attackState: 0, grantHit: 0, grantFeint: 0 };
           const state = ctx.attackState;
           let finalDie = d1;
           let outcomeLabel = "平";
           // 根据每个目标的最终状态，从 d1/d2 中选一个
           if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
           else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
-
-          const total = finalDie + hitMod;
+          // 最终命中值 = 骰子 + 基础修正 + 针对该目标的修正
+          const total = finalDie + hitMod + (ctx.grantHit || 0);
+          // 最终虚招值 = 全局虚招值 + 针对该目标的修正
+          const finalFeint = calcResult.feint + (ctx.grantFeint || 0);
 
           // 获取目标闪避
           // 这里只是预览命中，不做逻辑判定
@@ -1771,7 +1783,9 @@ export class XJZLItem extends Item {
             feintState: ctx.feintState, //对每个目标的虚招优劣势 
             ignoreBlock: ctx.ignoreBlock,
             ignoreDefense: ctx.ignoreDefense,
-            ignoreStance: ctx.ignoreStance
+            ignoreStance: ctx.ignoreStance,
+            critThresholdMod: ctx.critThresholdMod,
+            finalFeint: finalFeint
           };
         });
       }
@@ -1781,6 +1795,7 @@ export class XJZLItem extends Item {
         targets.forEach(t => {
           const tokenUuid = t.document.uuid;
           const ctx = targetContexts.get(tokenUuid) || { attackState: 0 };
+          const finalFeint = calcResult.feint + (ctx.grantFeint || 0);
           targetsResults[t.document.uuid] = {
             name: t.name,
             total: "-",
@@ -1788,7 +1803,12 @@ export class XJZLItem extends Item {
             stateLabel: "-",
             dodge: "-",
             dieUsed: "-",
-            feintState: ctx.feintState
+            feintState: ctx.feintState,
+            ignoreBlock: ctx.ignoreBlock,
+            ignoreDefense: ctx.ignoreDefense,
+            ignoreStance: ctx.ignoreStance,
+            critThresholdMod: ctx.critThresholdMod,
+            finalFeint: finalFeint
           };
         });
         if (effectiveMode === "heal") flavorText = "施展治疗";
@@ -1869,6 +1889,7 @@ export class XJZLItem extends Item {
             damageType: damageType,    // 伤害类型 (waigong/neigong/...)
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
+            scriptBonusHit: scriptBonusHit, // 保存 ATTACK 脚本算出的全局命中修正
             critThresholdMod: attackContext.flags.critThresholdMod || 0,
             contextLevel: {
               selfLevel: selfLevel,  // 存下 Roll 时的自身等级
@@ -1900,7 +1921,8 @@ export class XJZLItem extends Item {
                 ignoreBlock: res.ignoreBlock,
                 ignoreDefense: res.ignoreDefense,
                 ignoreStance: res.ignoreStance,
-                critThresholdMod: res.critThresholdMod || 0
+                critThresholdMod: res.critThresholdMod || 0,
+                finalFeint: finalFeint || 0
               };
               return acc;
             }, {})
