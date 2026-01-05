@@ -1928,7 +1928,7 @@ export class XJZLItem extends Item {
                 ignoreDefense: res.ignoreDefense,
                 ignoreStance: res.ignoreStance,
                 critThresholdMod: res.critThresholdMod || 0,
-                finalFeint: finalFeint || 0
+                finalFeint: res.finalFeint || 0
               };
               return acc;
             }, {})
