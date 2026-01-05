@@ -1415,6 +1415,7 @@ export class XJZLActor extends Actor {
 
       finalDamage: finalDamage, // 理论应扣
       hpLost: stdHpLost,        // 实际扣血
+      mpLost: stdMpLost, 
       hutiLost: stdHutiLost,
 
       config: config, // 把配置传进来，以便检查 ignoreStance
