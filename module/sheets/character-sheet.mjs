@@ -179,7 +179,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             if (!text) return "";
             return text
                 .replace(/<br\s*\/?>/gi, '\n') // 换行转 \n
-                .replace(/<\/(p|div|h[1-6]|li|ul|ol)>/gi, '\n') 
+                .replace(/<\/(p|div|h[1-6]|li|ul|ol)>/gi, '\n')
                 .replace(/<[^>]+>/g, '')       // 删掉剩余所有标签
                 .replace(/&nbsp;/g, ' ')       // 修复空格
                 .replace(/"/g, '&quot;')       // 修复双引号
@@ -658,21 +658,35 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             });
         }
 
-        const resSchema = system.schema.fields.combat.fields.resistances.fields;
         for (const [key, stat] of Object.entries(system.combat.resistances)) {
-            context.combatStats.resistances[key] = { label: game.i18n.localize(resSchema[key]?.label || key), total: stat.total };
-        }
+            const capKey = key.charAt(0).toUpperCase() + key.slice(1);
+            const labelKey = `XJZL.Combat.Res.${capKey}`;
 
-        const dmgSchema = system.schema.fields.combat.fields.damages.fields;
+            context.combatStats.resistances[key] = {
+                label: game.i18n.localize(labelKey),
+                total: stat.total
+            };
+        }
         for (const [key, stat] of Object.entries(system.combat.damages)) {
             if (key === 'weaponTypes') continue;
-            context.combatStats.damages[key] = { label: game.i18n.localize(dmgSchema[key]?.label || key), total: stat.total };
+
+            const capKey = key.charAt(0).toUpperCase() + key.slice(1);
+            const labelKey = `XJZL.Combat.Dmg.${capKey}`;
+
+            context.combatStats.damages[key] = {
+                label: game.i18n.localize(labelKey),
+                total: stat.total
+            };
         }
         if (system.combat.damages.weaponTypes) {
             for (const [subKey, subStat] of Object.entries(system.combat.damages.weaponTypes)) {
                 if (subStat.total !== 0) {
                     const capKey = subKey.charAt(0).toUpperCase() + subKey.slice(1);
-                    context.combatStats.damages[subKey] = { label: game.i18n.localize(`XJZL.Combat.Rank.${capKey}`) + '伤害', total: subStat.total };
+                    const baseLabel = game.i18n.localize(`XJZL.Combat.Rank.${capKey}`);
+                    context.combatStats.damages[subKey] = {
+                        label: baseLabel + '伤害',
+                        total: subStat.total
+                    };
                 }
             }
         }
