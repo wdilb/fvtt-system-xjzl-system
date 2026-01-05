@@ -650,14 +650,18 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
         // --- 填充武器等级, 抗性, 伤害 (保持逻辑不变) ---
         const weaponChars = { sword: "剑", blade: "刀", staff: "棍", dagger: "匕", hidden: "暗", unarmed: "拳", instrument: "乐", special: "奇" };
-        for (const [key, rankData] of Object.entries(system.combat.weaponRanks)) {
+        const orderedWeaponKeys = Object.keys(CONFIG.XJZL.weaponTypes || {});
+        for (const key of orderedWeaponKeys) {
+            if (key === 'none') continue;
+            const rankData = system.combat.weaponRanks[key];
+            if (!rankData) continue;
+
             context.combatStats.weaponRanks.push({
                 label: game.i18n.localize(`XJZL.Combat.Rank.${key.charAt(0).toUpperCase() + key.slice(1)}`),
                 val: rankData.total,
                 char: weaponChars[key] || "武"
             });
         }
-
         for (const [key, stat] of Object.entries(system.combat.resistances)) {
             const capKey = key.charAt(0).toUpperCase() + key.slice(1);
             const labelKey = `XJZL.Combat.Res.${capKey}`;
