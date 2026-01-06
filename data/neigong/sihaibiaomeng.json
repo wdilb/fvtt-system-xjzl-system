@@ -1,0 +1,776 @@
+[
+    {
+        "name": "《走四方》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 1,
+            "element": "taiji",
+            "description": "四海镖盟行镖歌诀，将走镖喊趟子时表明身份的歌诀编为内功心法口诀，一边行路，一边运气高歌，丹田气散四肢，使双肩轻便，健步如飞。",
+            "requirement": "悟性需求: 1",
+            "automationNote": "剩余速度需手动判断",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 4,
+                        "shenfa": 4,
+                        "tipo": 4,
+                        "neixi": 3,
+                        "qigan": 1,
+                        "shencai": 2
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 8,
+                        "shenfa": 8,
+                        "tipo": 8,
+                        "neixi": 6,
+                        "qigan": 2,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 12,
+                        "shenfa": 12,
+                        "tipo": 12,
+                        "neixi": 9,
+                        "qigan": 3,
+                        "shencai": 6
+                    },
+                    "description": "圆满运功特效：你回合结束时若未濒死且剩余速度为0，获得10点护体真气，持续到战斗脱离。\n修满特效：修满[永久]：气血+10，内力+10。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "走四方-回护体",
+                            "trigger": "turnEnd",
+                            "active": true,
+                            "script": "if (actor.system.resources.hp.value > 0) {\n    // 无法检测剩余速度，仅提示\n    ui.notifications.info(\"走四方: 若剩余速度为0，请手动添加10点护体。\");\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+10，内力+10。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 10
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "《凌云心经》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "element": "yin",
+            "description": "凌云镖局核心内功，取壮志凌云之意，故而得名。修至高深时，真气浩荡，攻守兼备。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "完全自动化",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 14,
+                        "shenfa": 12,
+                        "tipo": 10,
+                        "neixi": 5,
+                        "qigan": 4,
+                        "shencai": 3
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 28,
+                        "shenfa": 24,
+                        "tipo": 20,
+                        "neixi": 10,
+                        "qigan": 8,
+                        "shencai": 6
+                    },
+                    "description": "小成运功特效：出招后获得一层“凌云”，至多两层，持续到战斗脱离。\n凌云：每层使招式伤害+5。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "凌云心经-叠层",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"凌云\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    // 小成上限2层\n    const flag = effectData.flags[\"xjzl-system\"];\n    flag.maxStacks = 2;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 42,
+                        "shenfa": 36,
+                        "tipo": 30,
+                        "neixi": 15,
+                        "qigan": 12,
+                        "shencai": 9
+                    },
+                    "description": "圆满运功特效：出招后获得一层“凌云”，至多三层，持续到战斗脱离。\n凌云：每层使招式伤害+5。叠至三层后，还会获得30点护体真气，持续到战斗脱离。\n修满特效：修满[永久]：气血+40，内力+20。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "凌云心经-叠层",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"凌云\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    // 圆满上限3层\n    const flag = effectData.flags[\"xjzl-system\"];\n    flag.maxStacks = 3;\n    \n    const eff = await game.xjzl.api.effects.addEffect(actor, effectData);\n    \n    // 检查是否满层且未获得过护体 (单次战斗内)\n    if (eff && eff.getFlag(\"xjzl-system\", \"stacks\") === 3 && !actor.getFlag(\"xjzl-system\", \"neigong_lingyun_shield_granted\")) {\n        await actor.applyHealing({ type: 'huti', amount: 30 });\n        await actor.setFlag(\"xjzl-system\", \"neigong_lingyun_shield_granted\", true);\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "凌云",
+                "icon": "icons/svg/up.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lingyun",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "《徜游诀》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "element": "yang",
+            "description": "成都万通镖局核心内功。修炼时需寻名山大湖，日复一日观天地之变，只待一日豁然开朗。练至大成后腾挪轻盈，神采斐然。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "完全自动化",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 10,
+                        "shenfa": 12,
+                        "tipo": 10,
+                        "neixi": 8,
+                        "qigan": 4,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 20,
+                        "shenfa": 24,
+                        "tipo": 20,
+                        "neixi": 16,
+                        "qigan": 8,
+                        "shencai": 8
+                    },
+                    "description": "小成运功特效：\n招式伤害提升自身最大移动速度的数值。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "徜游诀-速度转伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const speed = actor.system.combat.speedTotal || 0;\nargs.output.damage += speed;\nargs.output.bonusDesc.push(`徜游诀 +${speed}`);"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 36,
+                        "tipo": 30,
+                        "neixi": 24,
+                        "qigan": 12,
+                        "shencai": 12
+                    },
+                    "description": "圆满运功特效：移动速度+5。\n招式伤害提升自身最大移动速度的数值。\n修满特效：修满[永久]：气血+30，内力+30，速度+1。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "徜游诀-速度",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "system.combat.speed += 5;"
+                        },
+                        {
+                            "label": "徜游诀-速度转伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const speed = actor.system.combat.speedTotal || 0;\nargs.output.damage += speed;\nargs.output.bonusDesc.push(`徜游诀 +${speed}`);"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+30，内力+30，速度+1。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 30
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 30
+                },
+                {
+                    "key": "system.combat.speed",
+                    "value": 1
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "《清波功》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "element": "yin",
+            "description": "镇远镖局核心内功，王家祖宗观江海后，悟出“清则无鱼，波则无萍”之道，清波功讲究循序渐进，平平稳稳，已得道家三分意味。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "完全自动化",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 14,
+                        "shenfa": 8,
+                        "tipo": 10,
+                        "neixi": 8,
+                        "qigan": 4,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 28,
+                        "shenfa": 16,
+                        "tipo": 20,
+                        "neixi": 18,
+                        "qigan": 8,
+                        "shencai": 6
+                    },
+                    "description": "小成运功特效：受伤后，下一次出招命中+3。\n造成伤害后，在该回合末回复5点气血。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "清波功-受击增益",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const source = thisItem.effects.getName(\"清波·反击\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改命中 +3\n        const change = effectData.changes.find(c => c.key === \"flags.xjzl-system.bonusHit\");\n        if (change) change.value = \"3\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        },
+                        {
+                            "label": "清波功-命中回血",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.finalDamage > 0) {\n    const source = thisItem.effects.getName(\"清波·回春\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改回血 +5\n        const change = effectData.changes.find(c => c.key === \"flags.xjzl-system.regenHpTurnEnd\");\n        if (change) change.value = \"5\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 42,
+                        "shenfa": 24,
+                        "tipo": 30,
+                        "neixi": 28,
+                        "qigan": 12,
+                        "shencai": 8
+                    },
+                    "description": "圆满运功特效：受伤后，下一次出招命中+5。\n造成伤害后，在该回合末回复10点气血。\n修满特效：修满[永久]：气血+40，内力+20。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "清波功-受击增益",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const source = thisItem.effects.getName(\"清波·反击\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改命中 +5\n        const change = effectData.changes.find(c => c.key === \"flags.xjzl-system.bonusHit\");\n        if (change) change.value = \"5\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        },
+                        {
+                            "label": "清波功-命中回血",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.finalDamage > 0) {\n    const source = thisItem.effects.getName(\"清波·回春\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改回血 +10\n        const change = effectData.changes.find(c => c.key === \"flags.xjzl-system.regenHpTurnEnd\");\n        if (change) change.value = \"10\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "清波·反击",
+                "icon": "icons/svg/target.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qingbo_hit"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.bonusHit",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ],
+                "scripts": [
+                    {
+                        "trigger": "hit_once",
+                        "script": "await thisEffect.delete()"
+                    }
+                ]
+            },
+            {
+                "name": "清波·回春",
+                "icon": "icons/svg/heal.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qingbo_heal"
+                    }
+                },
+                "duration": {
+                    "rounds": 1
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "《福威气功》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "element": "taiji",
+            "description": "临威镖局核心内功，胸养静气，而生贵气，讲究不怒不躁，先礼后兵。练至大成后，可不战而屈人，若是对方不识好歹，再叫他后悔不迭。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "侠义最高判定需GM协助；消耗侠义增伤需确认",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 12,
+                        "shenfa": 10,
+                        "tipo": 14,
+                        "neixi": 4,
+                        "qigan": 3,
+                        "shencai": 5
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 24,
+                        "shenfa": 20,
+                        "tipo": 28,
+                        "neixi": 8,
+                        "qigan": 6,
+                        "shencai": 10
+                    },
+                    "description": "小成运功特效：进战后第一个回合，若你是友方中侠义值最高者，不会被敌人选为攻击目标。",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 36,
+                        "shenfa": 30,
+                        "tipo": 42,
+                        "neixi": 12,
+                        "qigan": 9,
+                        "shencai": 15
+                    },
+                    "description": "圆满运功特效：进战后第一个回合，若你是友方中侠义值最高者，不会被敌人选为攻击目标。\n你可以选择消耗10点侠义值，使招式伤害+10。\n修满特效：修满[永久]：气血+40，内力+20。\n你每次获得侠义值时，额外获得10点。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "福威气功-侠义一击",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.system.social.xiayi >= 10) {\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"福威气功\", icon: \"icons/svg/justice.svg\" },\n        content: \"<p>是否消耗 10 点侠义值，使本次伤害 +10？</p>\",\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await actor.update({ \"system.social.xiayi\": actor.system.social.xiayi - 10 });\n        args.flags.bonusDamage = (args.flags.bonusDamage || 0) + 10;\n        ui.notifications.info(\"浩然正气！伤害+10\");\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20。\n你每次获得侠义值时，额外获得10点。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "《破元经》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "element": "yang",
+            "description": "以抗击蒙古得名的硬气功。行功简单，修炼却异常辛苦，练成后，一身铜皮铁骨，刀剑难伤。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "完全自动化",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 14,
+                        "shenfa": 8,
+                        "tipo": 14,
+                        "neixi": 6,
+                        "qigan": 3,
+                        "shencai": 3
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 28,
+                        "shenfa": 16,
+                        "tipo": 28,
+                        "neixi": 12,
+                        "qigan": 6,
+                        "shencai": 6
+                    },
+                    "description": "小成运功特效：内外功防御+5。进入战斗后获得40点护体真气，持续到战斗脱离。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "破元经-防御",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "system.combat.def_waigong += 5;\nsystem.combat.def_neigong += 5;"
+                        },
+                        {
+                            "label": "破元经-护体",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "await actor.applyHealing({ type: 'huti', amount: 40 });"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 42,
+                        "shenfa": 24,
+                        "tipo": 42,
+                        "neixi": 18,
+                        "qigan": 9,
+                        "shencai": 9
+                    },
+                    "description": "圆满运功特效：内外功防御+5。进入战斗后获得80点护体真气，持续到战斗脱离。\n修满特效：修满[永久]：气血+40，内力+20，体魄+5。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "破元经-防御",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "system.combat.def_waigong += 5;\nsystem.combat.def_neigong += 5;"
+                        },
+                        {
+                            "label": "破元经-护体",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "await actor.applyHealing({ type: 'huti', amount: 80 });"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20，体魄+5。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                },
+                {
+                    "key": "system.stats.tipo.mod",
+                    "value": 5
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "《地龙劲》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 3,
+            "element": "taiji",
+            "description": "董谦中年时所创独门内功，深谙行镖之人的“人前留一线，日后好相见”之道，所以此内功讲究“留有余力”。此功练至大成，收放自如，以守代攻。",
+            "requirement": "悟性需求: 11",
+            "automationNote": "完全自动化",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 22,
+                        "tipo": 26,
+                        "neixi": 12,
+                        "qigan": 16,
+                        "shencai": 14
+                    },
+                    "description": "领悟特效：出招获得一层“地龙”，至多三层，持续到战斗脱离。\n地龙：每层使你的内外功防御+5。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "地龙劲-叠层",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"地龙\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    // 动态修改数值 +5\n    const change1 = effectData.changes.find(c => c.key === \"system.combat.def_waigong\");\n    const change2 = effectData.changes.find(c => c.key === \"system.combat.def_neigong\");\n    if (change1) change1.value = \"5\";\n    if (change2) change2.value = \"5\";\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 60,
+                        "shenfa": 44,
+                        "tipo": 52,
+                        "neixi": 24,
+                        "qigan": 32,
+                        "shencai": 28
+                    },
+                    "description": "小成特效：出招获得一层“地龙”，至多三层，持续到战斗脱离。\n地龙：每层使你的内外功防御+10。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "地龙劲-叠层",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"地龙\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    // 动态修改数值 +10\n    const change1 = effectData.changes.find(c => c.key === \"system.combat.def_waigong\");\n    const change2 = effectData.changes.find(c => c.key === \"system.combat.def_neigong\");\n    if (change1) change1.value = \"10\";\n    if (change2) change2.value = \"10\";\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 90,
+                        "shenfa": 66,
+                        "tipo": 78,
+                        "neixi": 36,
+                        "qigan": 48,
+                        "shencai": 42
+                    },
+                    "description": "圆满特效：出招获得一层“地龙”，至多三层，持续到战斗脱离。\n地龙：每层使你的内外功防御+15。\n·当内功防御或外功防御中一项数值超过100时，你每次被命中后可以使攻击方流失30点气血。\n修满特效：修满[永久]：气血+80，内力+40。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "地龙劲-叠层",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"地龙\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    // 动态修改数值 +15\n    const change1 = effectData.changes.find(c => c.key === \"system.combat.def_waigong\");\n    const change2 = effectData.changes.find(c => c.key === \"system.combat.def_neigong\");\n    if (change1) change1.value = \"15\";\n    if (change2) change2.value = \"15\";\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        },
+                        {
+                            "label": "地龙劲-高防反震",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (args.attacker && (system.combat.defWaigongTotal > 100 || system.combat.defNeigongTotal > 100)) {\n    if (args.attacker.temp_isReflecting) return;\n    actor.temp_isReflecting = true;\n    try {\n        await args.attacker.applyDamage({\n            type: 'liushi',\n            amount: 30,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(\"地龙劲反震！\");\n    } finally {\n        delete actor.temp_isReflecting;\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+80，内力+40。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 80
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 40
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "地龙",
+                "icon": "icons/svg/mountain.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "dilong",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "《行天下》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/镖盟.png",
+        "system": {
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "element": "taiji",
+            "description": "天下风云出我辈，镖局弟子驰骋天下，只将刀枪夸，在快意江湖之余，感悟自身武道。大成后，管他道阻且长，破云凌霄，直上青冥。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "免疫下盘不稳需玩家手动",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 14,
+                        "shenfa": 11,
+                        "tipo": 10,
+                        "neixi": 6,
+                        "qigan": 3,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 28,
+                        "shenfa": 22,
+                        "tipo": 20,
+                        "neixi": 12,
+                        "qigan": 6,
+                        "shencai": 8
+                    },
+                    "description": "小成运功特效：你免疫下盘不稳。\n·你攻击“下盘不稳”的目标伤害+5。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "行天下-痛打落水狗",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.target.xjzlStatuses.unstable) {\n    args.config.amount += 5;\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 42,
+                        "shenfa": 33,
+                        "tipo": 30,
+                        "neixi": 18,
+                        "qigan": 9,
+                        "shencai": 12
+                    },
+                    "description": "圆满运功特效：你免疫下盘不稳。\n·你攻击“下盘不稳”的目标伤害+10。\n修满特效：修满[永久]：气血+40，内力+20，暴击骰-1。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "行天下-痛打落水狗",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.target.xjzlStatuses.unstable) {\n    args.config.amount += 10;\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20，暴击骰-1。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                },
+                {
+                    "key": "system.combat.crit_waigong",
+                    "value": -1
+                },
+                {
+                    "key": "system.combat.crit_neigong",
+                    "value": -1
+                }
+            ]
+        },
+        "effects": []
+    }
+]

@@ -1,0 +1,446 @@
+[
+    {
+        "name": "《巽震气功》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/神风.png",
+        "system": {
+            "sect": "shenfengbang",
+            "tier": 1,
+            "element": "taiji",
+            "description": "神风帮入门功法，巽震相交、风雷既济、肝胆相照，足筋气通，攻守兼备。",
+            "requirement": "悟性需求: 1",
+            "automationNote": "完全自动化",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 5,
+                        "shenfa": 3,
+                        "tipo": 3,
+                        "neixi": 4,
+                        "qigan": 1,
+                        "shencai": 2
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 11,
+                        "shenfa": 6,
+                        "tipo": 5,
+                        "neixi": 7,
+                        "qigan": 3,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 15,
+                        "shenfa": 9,
+                        "tipo": 8,
+                        "neixi": 10,
+                        "qigan": 6,
+                        "shencai": 6
+                    },
+                    "description": "圆满运功特效：进入战斗后，你的奇数次招式命中后为目标添加一层“巽真气”，偶数次招式命中后为目标添加一层“震真气”，都持续到战斗脱离。\n·当目标身上同时存在“巽真气”和“震真气”后，风雷真气交融爆炸，全部移除并给对方造成“巽真气”和“震真气”层数之和*10点气血流失。\n修满特效：修满[永久]：气血+10，内力+10，先攻+1。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "巽震气功-风雷真气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (game.combat) {\n    let counter = actor.getFlag(\"xjzl-system\", \"neigong_xunzhen_counter\") || 0;\n    counter += 1;\n    await actor.setFlag(\"xjzl-system\", \"neigong_xunzhen_counter\", counter);\n\n    const isOdd = (counter % 2 !== 0);\n    const effectName = isOdd ? \"巽真气\" : \"震真气\";\n    \n    const source = thisItem.effects.getName(effectName);\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n\n        const target = args.target;\n        const xun = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xun_zhenqi\");\n        const zhen = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhen_zhenqi\");\n\n        if (xun && zhen) {\n            const xunStacks = xun.getFlag(\"xjzl-system\", \"stacks\") || 1;\n            const zhenStacks = zhen.getFlag(\"xjzl-system\", \"stacks\") || 1;\n            const damage = (xunStacks + zhenStacks) * 10;\n\n            await target.applyDamage({\n                type: 'liushi',\n                amount: damage,\n                isHit: true,\n                ignoreDefense: true\n            });\n            ui.notifications.info(`风雷交融！对 ${target.name} 造成 ${damage} 点流失！`);\n\n            await game.xjzl.api.effects.removeEffect(target, \"xun_zhenqi\", xunStacks);\n            await game.xjzl.api.effects.removeEffect(target, \"zhen_zhenqi\", zhenStacks);\n        }\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+10，内力+10，先攻+1。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "system.combat.initiative",
+                    "value": 1
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "巽真气",
+                "icon": "icons/svg/wing.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xun_zhenqi",
+                        "stackable": true
+                    }
+                },
+                "description": "风雷真气之一"
+            },
+            {
+                "name": "震真气",
+                "icon": "icons/svg/lightning.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhen_zhenqi",
+                        "stackable": true
+                    }
+                },
+                "description": "风雷真气之二"
+            }
+        ]
+    },
+    {
+        "name": "《风玄劲》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/神风.png",
+        "system": {
+            "sect": "shenfengbang",
+            "tier": 2,
+            "element": "yin",
+            "description": "神风帮核心功法，五行入体，以木生风，自成循环，修炼至圆满可凭风借势，御空而行。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "大风区域内困难地形与远程伤害修正需手动",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 12,
+                        "shenfa": 12,
+                        "tipo": 7,
+                        "neixi": 6,
+                        "qigan": 6,
+                        "shencai": 5
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 24,
+                        "shenfa": 23,
+                        "tipo": 14,
+                        "neixi": 16,
+                        "qigan": 11,
+                        "shencai": 8
+                    },
+                    "description": "小成运功特效：你的先攻检定结果+3。\n你每次出招后，在周身3米范围形成‘大风’，持续一回合。大风：敌人视该区域为困难地形；\n敌方暗器、奇门-弓等投掷、射出远程物体的招式（包含投掷兵器等），在区域内或经过区域后，造成的内外功伤害降低10点；我方则提升10点。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "风玄劲-先攻",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "system.combat.initiative += 3;"
+                        },
+                        {
+                            "label": "风玄劲-大风",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"大风域\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 36,
+                        "shenfa": 32,
+                        "tipo": 21,
+                        "neixi": 28,
+                        "qigan": 16,
+                        "shencai": 11
+                    },
+                    "description": "圆满运功特效：你的先攻检定结果+3。\n你每次出招后，在周身3米范围形成‘大风’，持续两回合。\n大风：敌人视该区域为困难地形；\n敌方暗器、奇门-弓等投掷、射出远程物体的招式（包含投掷兵器等），在区域内或经过区域后，造成的内外功伤害降低10点；我方则提升10点。\n修满特效：修满[永久]：气血+40，内力+20，速度+1。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "风玄劲-先攻",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "system.combat.initiative += 3;"
+                        },
+                        {
+                            "label": "风玄劲-大风",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"大风域\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20，速度+1。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                },
+                {
+                    "key": "system.combat.speed",
+                    "value": 1
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "大风域",
+                "icon": "icons/svg/wing.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "dafeng"
+                    }
+                },
+                "description": "周身3米困难地形。远程伤害敌减10/我增10 (需手动计算)。",
+                "scripts": []
+            }
+        ]
+    },
+    {
+        "name": "《杀无道》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/神风.png",
+        "system": {
+            "sect": "shenfengbang",
+            "tier": 2,
+            "element": "taiji",
+            "description": "神风帮核心功法，取“杀无道以就有道”之意，主杀戮惩治纷乱，练至大成时，蓄气如暗渊，自身杀意凝结而不外露，一击必成。",
+            "requirement": "悟性需求: 4",
+            "automationNote": "杀戮值翻倍无法自动，仅提示",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 10,
+                        "shenfa": 14,
+                        "tipo": 9,
+                        "neixi": 6,
+                        "qigan": 5,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 20,
+                        "shenfa": 28,
+                        "tipo": 18,
+                        "neixi": 12,
+                        "qigan": 10,
+                        "shencai": 8
+                    },
+                    "description": "小成运功特效：将任意敌人打入濒死后，获得“杀机”，持续一周（重复获得持续时间不累加）。\n杀机：你的招式伤害+10，获得的杀戮值翻倍。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "杀无道-触发杀机",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isDying) {\n    const source = thisItem.effects.getName(\"杀机\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改数值 +10\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = \"10\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"触发杀机！\");\n    }\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 42,
+                        "tipo": 27,
+                        "neixi": 18,
+                        "qigan": 15,
+                        "shencai": 12
+                    },
+                    "description": "圆满运功特效：将任意敌人打入濒死后，获得“杀机”，持续一周（重复获得持续时间不累加）。\n杀机：你的招式伤害+20，获得的杀戮值翻倍。\n修满特效：修满[永久]：气血+40，内力+20，暴击骰-1。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "杀无道-触发杀机",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isDying) {\n    const source = thisItem.effects.getName(\"杀机\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改数值 +20\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = \"20\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"触发杀机！\");\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20，暴击骰-1。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                },
+                {
+                    "key": "system.combat.crit_waigong",
+                    "value": -1
+                },
+                {
+                    "key": "system.combat.crit_neigong",
+                    "value": -1
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "杀机",
+                "icon": "icons/svg/skull.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shaji"
+                    }
+                },
+                "description": "杀戮值获取翻倍 (需手动)。",
+                "duration": {
+                    "seconds": 604800
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "《神风诀》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/神风.png",
+        "system": {
+            "sect": "shenfengbang",
+            "tier": 3,
+            "element": "yin",
+            "description": "“广四海、游九洲，风远白云秋；立苍茫、骋远志，徜徉天地意。”神风帮立派之本，修至圆满后风随意转，进退自如，自在随心。",
+            "requirement": "悟性需求: 10",
+            "automationNote": "移动获得狂风需手动添加层数，消耗狂风需在出招时确认",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 25,
+                        "shenfa": 25,
+                        "tipo": 20,
+                        "neixi": 25,
+                        "qigan": 15,
+                        "shencai": 10
+                    },
+                    "description": "领悟运功特效：进战后，每移动一米获得一层“狂风”，最多5层，持续到战斗脱离。狂风：出招时可选择一次性将“狂风”全部消耗，每层使招式伤害+1。\n·一次性消耗十层及以上的“狂风”时，招式还会将目标击飞1米。\n·若你处于‘大风’中，领悟、小成、圆满时期的“狂风”可叠加层数上限+5。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "神风诀-消耗狂风",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await effect.delete();\n        args.move.tempWindBonus = stacks;\n        ui.notifications.info(`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`);\n        if (stacks >= 10) ui.notifications.info(\"触发击飞效果！\");\n    }\n}"
+                        },
+                        {
+                            "label": "神风诀-应用加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (args.move.tempWindBonus) {\n    args.output.damage += args.move.tempWindBonus;\n    args.output.bonusDesc.push(`狂风 +${args.move.tempWindBonus}`);\n}"
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 60,
+                        "shenfa": 55,
+                        "tipo": 40,
+                        "neixi": 40,
+                        "qigan": 30,
+                        "shencai": 15
+                    },
+                    "description": "小成运功特效：进战后，每移动一米获得一层“狂风”，最多10层，持续到战斗脱离。狂风：出招时可选择一次性将“狂风”全部消耗，每层使招式伤害+1。\n·一次性消耗十层及以上的“狂风”时，招式还会将目标击飞1米。\n·若你处于‘大风’中，领悟、小成、圆满时期的“狂风”可叠加层数上限+5。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "神风诀-消耗狂风",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await effect.delete();\n        args.move.tempWindBonus = stacks;\n        ui.notifications.info(`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`);\n        if (stacks >= 10) ui.notifications.info(\"触发击飞效果！\");\n    }\n}"
+                        },
+                        {
+                            "label": "神风诀-应用加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (args.move.tempWindBonus) {\n    args.output.damage += args.move.tempWindBonus;\n    args.output.bonusDesc.push(`狂风 +${args.move.tempWindBonus}`);\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 95,
+                        "shenfa": 80,
+                        "tipo": 65,
+                        "neixi": 50,
+                        "qigan": 50,
+                        "shencai": 20
+                    },
+                    "description": "圆满运功特效：进战后，每移动一米获得一层“狂风”，最多20层，持续到战斗脱离。\n狂风：出招时可选择一次性将“狂风”全部消耗，每层使招式伤害+1。\n·一次性消耗十层及以上的“狂风”时，招式还会将目标击飞1米。\n·若你处于‘大风’中，领悟、小成、圆满时期的“狂风”可叠加层数上限+5。\n修满特效：修满[永久]：气血+80，内力+40，速度+2。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "神风诀-消耗狂风",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await effect.delete();\n        args.move.tempWindBonus = stacks;\n        ui.notifications.info(`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`);\n        if (stacks >= 10) ui.notifications.info(\"触发击飞效果！\");\n    }\n}"
+                        },
+                        {
+                            "label": "神风诀-应用加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (args.move.tempWindBonus) {\n    args.output.damage += args.move.tempWindBonus;\n    args.output.bonusDesc.push(`狂风 +${args.move.tempWindBonus}`);\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+80，内力+40，速度+2。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 80
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.combat.speed",
+                    "value": 2
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "狂风",
+                "icon": "icons/svg/wing.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuangfeng",
+                        "stackable": true,
+                        "maxStacks": 20
+                    }
+                },
+                "description": "移动积累的狂风层数，出招可消耗。"
+            }
+        ]
+    }
+]
