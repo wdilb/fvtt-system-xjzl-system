@@ -1,0 +1,427 @@
+[
+    {
+        "name": "《止刑功》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+        "system": {
+            "tier": 2,
+            "element": "yang",
+            "sect": "liushanmen",
+            "description": "<p>刑部核心内功，脱胎于法家典籍，讲究严正典刑，对待恶徒应当以刑止刑，以杀止杀，不可仁慈，练至大成后，浑身行刑之煞炁，浓不可挡。</p>",
+            "requirement": "悟性4",
+            "automationNote": "完全自动化。自动检测自身杀戮/杀孽加伤，检测目标杀戮/杀孽加虚招。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 13,
+                        "shenfa": 8,
+                        "tipo": 9,
+                        "neixi": 6,
+                        "qigan": 8,
+                        "shencai": 4
+                    }
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 26,
+                        "shenfa": 16,
+                        "tipo": 18,
+                        "neixi": 12,
+                        "qigan": 16,
+                        "shencai": 8
+                    },
+                    "description": "<p>小成运功特效：<br>若你具有杀戮值或杀孽，招式伤害+10。</p>",
+                    "scripts": [
+                        {
+                            "label": "止刑功-杀戮加伤(10)",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const shalu = system.resources.shalu.value || 0;\nconst shanie = system.resources.shanie || 0;\nif (shalu > 0 || shanie > 0) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"止刑功 +10\");\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 39,
+                        "shenfa": 24,
+                        "tipo": 27,
+                        "neixi": 18,
+                        "qigan": 24,
+                        "shencai": 12
+                    },
+                    "description": "<p>圆满运功特效：<br>若你具有杀戮值或杀孽，招式伤害+15。<br>·你攻击具有杀戮值或杀孽的目标时，虚招值+2。</p><p>修满特效：修满[永久]：气血+40，内力+20。</p>",
+                    "scripts": [
+                        {
+                            "label": "止刑功-杀戮加伤(15)",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const shalu = system.resources.shalu.value || 0;\nconst shanie = system.resources.shanie || 0;\nif (shalu > 0 || shanie > 0) {\n    args.output.damage += 15;\n    args.output.bonusDesc.push(\"止刑功 +15\");\n}"
+                        },
+                        {
+                            "label": "止刑功-罪徒虚招",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "const tShalu = args.target.system?.resources?.shalu?.value || 0;\nconst tShanie = args.target.system?.resources?.shanie || 0;\nif (tShalu > 0 || tShanie > 0) {\n    args.flags.grantFeint += 2;\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                }
+            ]
+        }
+    },
+    {
+        "name": "《罪恶断》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+        "system": {
+            "tier": 2,
+            "element": "yin",
+            "sect": "liushanmen",
+            "description": "<p>大理寺不传之秘，掌狱详刑所用，其功以知铐囚徒，分判罪事，思虑审察，正刑轻重。练至大成后，见细微，惑心神，寻常人所思所想难逃法眼。</p>",
+            "requirement": "悟性4",
+            "automationNote": "完全自动化。进战自动投掷洞察检定，获得断案值AE。断案值AE包含命中加成和主动消耗脚本。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 6,
+                        "shenfa": 5,
+                        "tipo": 8,
+                        "neixi": 7,
+                        "qigan": 14,
+                        "shencai": 8
+                    }
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 12,
+                        "shenfa": 10,
+                        "tipo": 16,
+                        "neixi": 14,
+                        "qigan": 28,
+                        "shencai": 16
+                    },
+                    "description": "<p>小成运功特效：进战时你进行[洞察]检定，并获得等同于检定结果的“断案值”，持续到脱战。</p>",
+                    "scripts": [
+                        {
+                            "label": "罪恶断-洞察检定",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    // 动态修改数值\n    effData.changes[0].value = val;\n    effData.changes[1].value = val;\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`罪恶断：获得 ${val} 点断案值`);\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 18,
+                        "shenfa": 15,
+                        "tipo": 24,
+                        "neixi": 21,
+                        "qigan": 42,
+                        "shencai": 24
+                    },
+                    "description": "<p>圆满运功特效：进战时你进行[洞察]检定，并获得等同于检定结果+5的“断案值”，持续到脱战。<br>断案值：你的命中获得等同于断案值的加值；<br>·你可以使下一次出招伤害提升等同于断案值的数值，然后移除“断案值”。</p><p>修满特效：修满[永久]：气血+30，内力+30，[洞察]+2。</p>",
+                    "scripts": [
+                        {
+                            "label": "罪恶断-洞察检定(+5)",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total + 5;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = val;\n    effData.changes[1].value = val;\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`罪恶断：获得 ${val} 点断案值`);\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 30
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 30
+                },
+                {
+                    "key": "system.skills.dongcha.mod",
+                    "value": 2
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "断案值",
+                "icon": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+                "transfer": false,
+                "description": "命中加值。可消耗以提升伤害。",
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": 0
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": 0
+                    }
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "neigong_duananzhi"
+                    },
+                    "scripts": [
+                        {
+                            "trigger": "calc",
+                            "label": "消耗断案值加伤",
+                            "script": "const val = thisEffect.getFlag('xjzl-system', 'duanVal');\nconst confirm = await foundry.applications.api.DialogV2.confirm({content: `消耗断案值提升 ${val} 点伤害？`});\nif(confirm) {\n    args.output.damage += val;\n    args.output.bonusDesc.push(`断案值 +${val}`);\n    await thisEffect.delete();\n}"
+                        }
+                    ]
+                }
+            }
+        ]
+    },
+    {
+        "name": "《破罡神功》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+        "system": {
+            "tier": 2,
+            "element": "taiji",
+            "sect": "liushanmen",
+            "description": "<p>六扇门核心内功，淬炼侠士坚强的意志力，凝练内劲轻如鸿毛，收发之法重逾泰山。练至大成后，内力如纤毫独特难防，专破真气。</p>",
+            "requirement": "悟性4",
+            "automationNote": "完全自动化。出招时检测到内力足够，会弹窗询问是否发动特效。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 6,
+                        "shenfa": 11,
+                        "tipo": 8,
+                        "neixi": 11,
+                        "qigan": 6,
+                        "shencai": 6
+                    }
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 12,
+                        "shenfa": 20,
+                        "tipo": 16,
+                        "neixi": 24,
+                        "qigan": 12,
+                        "shencai": 12
+                    },
+                    "description": "<p>小成运功特效：你出招时可以使招式消耗内力+5，然后该次出招暴击骰-2。</p>",
+                    "scripts": [
+                        {
+                            "label": "破罡-耗蓝特效",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (S.resources.mp.value >= (move.currentCost.mp + 5)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({ content: \"发动破罡神功？(耗内+5, 暴击-2)\" });\n    if (confirm) {\n        // 增加消耗\n        move.currentCost.mp += 5;\n        // 修正暴击\n        args.flags.critThresholdMod += 2; // 注意：暴击骰-2意味着阈值降低，更容易暴击，所以是 Advantage +2\n    }\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 16,
+                        "shenfa": 30,
+                        "tipo": 24,
+                        "neixi": 41,
+                        "qigan": 16,
+                        "shencai": 17
+                    },
+                    "description": "<p>圆满运功特效：你出招时可以使招式消耗内力+5，然后该次出招暴击骰-3，若你攻击具有护体真气的目标，结算伤害前先减少其20点护体真气。</p><p>修满特效：修满[永久]：气血+40，内力+20，气感+5。</p>",
+                    "scripts": [
+                        {
+                            "label": "破罡-耗蓝特效(圆满)",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (S.resources.mp.value >= (move.currentCost.mp + 5)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({ content: \"发动破罡神功？(耗内+5, 暴击-3, 破护体)\" });\n    if (confirm) {\n        move.currentCost.mp += 5;\n        args.flags.critThresholdMod += 3;\n        args.flags.pogangActive = true; // 标记，供 hit 脚本使用\n    }\n}"
+                        },
+                        {
+                            "label": "破罡-破护体",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.flags?.pogangActive) {\n    const tHuti = args.target.system.resources.huti || 0;\n    if (tHuti > 0) {\n        await args.target.update({ \"system.resources.huti\": Math.max(0, tHuti - 20) });\n        ui.notifications.info(`破罡神功：消融了 ${Math.min(20, tHuti)} 点护体！`);\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                },
+                {
+                    "key": "system.stats.qigan.value",
+                    "value": 5
+                }
+            ]
+        }
+    },
+    {
+        "name": "《界元真气》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+        "system": {
+            "tier": 3,
+            "element": "taiji",
+            "sect": "liushanmen",
+            "description": "<p>六扇门绝学，总捕头亲授神功。独树一帜在丹田内开辟阴柔、阳刚、太极三域，真气运转生生不息。练至最高深处，丹田仿佛若有三个小世界。</p>",
+            "requirement": "悟性10",
+            "automationNote": "完全自动化。通过 hit_once 脚本读取实际消耗并回血。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 14,
+                        "tipo": 30,
+                        "neixi": 22,
+                        "qigan": 14,
+                        "shencai": 10
+                    },
+                    "description": "<p>领悟运功特效：<br>你出招每消耗1点内力，回复1点气血。</p>",
+                    "scripts": [
+                        {
+                            "label": "界元-回血(1)",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    await actor.applyHealing({ amount: mpSpent * 1, type: \"hp\", showScrolling: true });\n}"
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 60,
+                        "shenfa": 28,
+                        "tipo": 60,
+                        "neixi": 44,
+                        "qigan": 28,
+                        "shencai": 20
+                    },
+                    "description": "<p>小成运功特效：<br>你出招每消耗1点内力，回复2点气血。</p>",
+                    "scripts": [
+                        {
+                            "label": "界元-回血(2)",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    await actor.applyHealing({ amount: mpSpent * 2, type: \"hp\", showScrolling: true });\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 90,
+                        "shenfa": 46,
+                        "tipo": 90,
+                        "neixi": 66,
+                        "qigan": 40,
+                        "shencai": 28
+                    },
+                    "description": "<p>圆满运功特效：<br>你出招每消耗1点内力，回复3点气血。</p><p>修满特效：修满[永久]：气血+60，内力+60。若你未濒死，每回合末恢复5点内力。</p>",
+                    "scripts": [
+                        {
+                            "label": "界元-回血(3)",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    await actor.applyHealing({ amount: mpSpent * 3, type: \"hp\", showScrolling: true });\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "flags.xjzl-system.regenMpTurnEnd",
+                    "value": 5
+                }
+            ]
+        }
+    },
+    {
+        "name": "《捕役诀》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+        "system": {
+            "tier": 1,
+            "element": "taiji",
+            "sect": "liushanmen",
+            "description": "<p>六扇门捕快所修行的内功，专注于练习目力和脚力。修炼圆满后，可使眼神更加敏锐，体力充沛，不惧长途奔袭，延缓疲惫。</p>",
+            "requirement": "悟性1",
+            "automationNote": "部分自动化。属性加成自动。疲惫豁免需手动。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 5,
+                        "shenfa": 3,
+                        "tipo": 5,
+                        "neixi": 2,
+                        "qigan": 2,
+                        "shencai": 1
+                    }
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 9,
+                        "shenfa": 8,
+                        "tipo": 8,
+                        "neixi": 4,
+                        "qigan": 4,
+                        "shencai": 3
+                    }
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 14,
+                        "shenfa": 11,
+                        "tipo": 12,
+                        "neixi": 6,
+                        "qigan": 6,
+                        "shencai": 5
+                    },
+                    "description": "<p>圆满运功特效：你的先攻+1，速度+1。<br>·当你即将陷入“疲惫”时，投掷一个D20，若大于10，你的信念将支撑着你不会陷入疲惫。</p><p>修满特效：修满[永久]：气血+10，内力+10，[探查]+1。</p>",
+                    "scripts": [
+                        {
+                            "label": "捕役诀-属性",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "system.combat.initiative += 1; system.combat.speed += 1;"
+                        }
+                    ]
+                }
+            },
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "system.skills.tancha.mod",
+                    "value": 1
+                }
+            ]
+        }
+    }
+]
