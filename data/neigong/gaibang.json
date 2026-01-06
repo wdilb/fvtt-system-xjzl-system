@@ -1,0 +1,456 @@
+[
+    {
+        "name": "《莲花落》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/丐帮.png",
+        "system": {
+            "tier": 1,
+            "element": "yang",
+            "sect": "gaibang",
+            "description": "<p>丐帮入门心法。弟子外出乞讨时哼唱的小调，小调中隐含着一套内家呼吸法门，为新入丐帮弟子练武打根基。</p>",
+            "requirement": "悟性需求: 1",
+            "automationNote": "完全自动化。战斗开始时重置标记，每次战斗第一次命中时自动增加伤害。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 5,
+                        "shenfa": 3,
+                        "tipo": 4,
+                        "neixi": 3,
+                        "qigan": 2,
+                        "shencai": 1
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 9,
+                        "shenfa": 6,
+                        "tipo": 7,
+                        "neixi": 5,
+                        "qigan": 5,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 14,
+                        "shenfa": 8,
+                        "tipo": 11,
+                        "neixi": 7,
+                        "qigan": 7,
+                        "shencai": 7
+                    },
+                    "description": "<p>圆满运功特效：每次战斗第一次命中敌人时，招式伤害提高20点。</p><p>修满特效：气血+10，内力+10。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "战斗初始化",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "await actor.setFlag('xjzl-system', 'neigong_lianhualuo_first', true);"
+                        },
+                        {
+                            "label": "首刀增伤计算",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isFirst = actor.getFlag('xjzl-system', 'neigong_lianhualuo_first');\nif (isFirst) {\n    args.output.damage += 20;\n    args.output.bonusDesc.push('莲花落首刀 +20');\n}"
+                        },
+                        {
+                            "label": "消耗首刀标记",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const isFirst = actor.getFlag('xjzl-system', 'neigong_lianhualuo_first');\n// 只有攻击命中才消耗，治疗/Buff不消耗\nif (isFirst && args.type === 'attack' && args.isHit) {\n    await actor.setFlag('xjzl-system', 'neigong_lianhualuo_first', false);\n    ui.notifications.info(`${actor.name} 的莲花落首刀效果已触发。`);\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+10，内力+10。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 10
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        }
+    },
+    {
+        "name": "《混天功》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/丐帮.png",
+        "system": {
+            "tier": 2,
+            "element": "yang",
+            "sect": "gaibang",
+            "description": "<p>丐帮核心内功，讲究四肢经脉协调，看似简单，实则极难，却又适合粗通武道之人理解。练至大成后，掌腿同步，内力运转身外，浑然一体。</p>",
+            "requirement": "悟性需求: 4",
+            "automationNote": "完全自动化。造成外功伤害时自动附加基于内息的额外伤害。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 10,
+                        "shenfa": 6,
+                        "tipo": 7,
+                        "neixi": 12,
+                        "qigan": 10,
+                        "shencai": 3
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 20,
+                        "shenfa": 12,
+                        "tipo": 14,
+                        "neixi": 24,
+                        "qigan": 20,
+                        "shencai": 6
+                    },
+                    "description": "<p>小成运功特效：你在造成外功伤害时，伤害增加0.2内息点（不受内功系数加成）。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "混天劲(小成)",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (args.move.damageType === 'waigong') {\n    const neixi = S.stats.neixi.total || 0;\n    const bonus = Math.floor(neixi * 0.2);\n    if (bonus > 0) {\n        args.output.damage += bonus;\n        args.output.bonusDesc.push(`混天劲 +${bonus}`);\n    }\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 18,
+                        "tipo": 22,
+                        "neixi": 36,
+                        "qigan": 30,
+                        "shencai": 8
+                    },
+                    "description": "<p>圆满运功特效：你在造成外功伤害时，伤害增加0.3内息点（不受内功系数加成）。</p><p>修满特效：气血+40，内力+20。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "混天劲(圆满)",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (args.move.damageType === 'waigong') {\n    const neixi = S.stats.neixi.total || 0;\n    const bonus = Math.floor(neixi * 0.3);\n    if (bonus > 0) {\n        args.output.damage += bonus;\n        args.output.bonusDesc.push(`混天劲 +${bonus}`);\n    }\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        }
+    },
+    {
+        "name": "《玉阳诀》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/丐帮.png",
+        "system": {
+            "tier": 2,
+            "element": "yang",
+            "sect": "gaibang",
+            "description": "<p>丐帮核心功法，功法注重阴阳乾坤，相辅相成，以天地阳刚之气滋养丹田，精进修为，练至大成后心神合一，内劲沛然，磅礴激荡。</p>",
+            "requirement": "悟性需求: 4",
+            "automationNote": "完全自动化。自动统计对同一目标的攻击次数，满3次自动扣内力并施加击倒和流失伤害。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 12,
+                        "shenfa": 8,
+                        "tipo": 9,
+                        "neixi": 6,
+                        "qigan": 10,
+                        "shencai": 3
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 25,
+                        "shenfa": 13,
+                        "tipo": 18,
+                        "neixi": 12,
+                        "qigan": 22,
+                        "shencai": 6
+                    },
+                    "description": "<p>小成运功特效：你对同一个目标造成第三次伤害后，可以消耗5点内力击倒对方，同时对其造成0.5力量点气血流失。（不受内功系数加成）</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "玉阳三叠(小成)",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.type !== 'attack' || !args.isHit) return;\nconst targetId = args.target.id;\nconst flagKey = `neigong_yuyang_hits_${targetId}`;\nlet hits = actor.getFlag('xjzl-system', flagKey) || 0;\nhits += 1;\n\nif (hits >= 3) {\n    // 检查内力\n    if (S.resources.mp.value >= 5) {\n        // 消耗内力\n        await actor.update({'system.resources.mp.value': S.resources.mp.value - 5});\n        // 重置计数\n        hits = 0;\n        \n        // 1. 击倒 (Prone)\n        await game.xjzl.api.effects.toggleStatus(args.target, 'prone', true);\n        \n        // 2. 流失伤害 (0.5 * 力量)\n        const dmg = Math.floor(S.stats.liliang.total * 0.5);\n        await args.target.applyDamage({\n            amount: dmg,\n            type: 'liushi',\n            attacker: actor,\n            isHit: true\n        });\n        ui.notifications.info(`${actor.name} 玉阳诀发动！消耗5点内力击倒了目标并造成流失。`);\n    } else {\n        ui.notifications.warn('玉阳诀触发，但内力不足！');\n        hits = 2; // 保持在2，下次有蓝就能触发\n    }\n}\nawait actor.setFlag('xjzl-system', flagKey, hits);"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 38,
+                        "shenfa": 19,
+                        "tipo": 26,
+                        "neixi": 21,
+                        "qigan": 32,
+                        "shencai": 8
+                    },
+                    "description": "<p>圆满运功特效：你对同一个目标造成第三次伤害后，可以消耗5点内力击倒对方，同时对其造成1.0力量点气血流失。（不受内功系数加成）</p><p>修满特效：气血+40，内力+20。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "玉阳三叠(圆满)",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.type !== 'attack' || !args.isHit) return;\nconst targetId = args.target.id;\nconst flagKey = `neigong_yuyang_hits_${targetId}`;\nlet hits = actor.getFlag('xjzl-system', flagKey) || 0;\nhits += 1;\n\nif (hits >= 3) {\n    if (S.resources.mp.value >= 5) {\n        await actor.update({'system.resources.mp.value': S.resources.mp.value - 5});\n        hits = 0;\n        await game.xjzl.api.effects.toggleStatus(args.target, 'prone', true);\n        \n        const dmg = Math.floor(S.stats.liliang.total * 1.0);\n        await args.target.applyDamage({\n            amount: dmg,\n            type: 'liushi',\n            attacker: actor,\n            isHit: true\n        });\n        ui.notifications.info(`${actor.name} 玉阳诀发动！消耗5点内力击倒了目标并造成流失。`);\n    } else {\n        ui.notifications.warn('玉阳诀触发，但内力不足！');\n        hits = 2;\n    }\n}\nawait actor.setFlag('xjzl-system', flagKey, hits);"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+40，内力+20。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 20
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        }
+    },
+    {
+        "name": "《醉雨诀》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/丐帮.png",
+        "system": {
+            "tier": 3,
+            "element": "yang",
+            "sect": "gaibang",
+            "description": "<p>大夏酒圣杜康所创，以“形醉意不醉，意醉神不醉”为精要，功法不拘一格，刚猛无匹。御敌时天地皆醉，醉梦醉醒，出奇制胜。</p>",
+            "requirement": "悟性需求: 11",
+            "automationNote": "半自动化。内功内包含“醉雨”和“酒醉”的状态模板，请玩家根据当前境界手动应用对应持续时间的“醉雨”状态，并手动管理“酒醉”的层数。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 38,
+                        "shenfa": 22,
+                        "tipo": 22,
+                        "neixi": 14,
+                        "qigan": 16,
+                        "shencai": 8
+                    },
+                    "description": "<p>领悟运功特效：进入战斗的第一次出招命中后，为目标添加“醉雨”，持续一回合。<br>醉雨：闪避和内外功防御下降10点，受到阳属性伤害时伤害提高30点。<br>·攻击命中具有“醉雨”状态的角色后，获得一层“酒醉”，持续到战斗脱离。<br>酒醉：每层增加10点醉意；出招前，每移除一层酒醉，招式暴击骰-1。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 76,
+                        "shenfa": 44,
+                        "tipo": 44,
+                        "neixi": 28,
+                        "qigan": 32,
+                        "shencai": 16
+                    },
+                    "description": "<p>小成运功特效：进入战斗的第一次出招命中后，为目标添加“醉雨”，持续二回合。<br>醉雨：闪避和内外功防御下降10点，受到阳属性伤害时伤害提高30点。<br>·攻击命中具有“醉雨”状态的角色后，获得一层“酒醉”，持续到战斗脱离。<br>酒醉：每层增加10点醉意；出招前，每移除一层酒醉，招式暴击骰-1。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 114,
+                        "shenfa": 66,
+                        "tipo": 66,
+                        "neixi": 42,
+                        "qigan": 48,
+                        "shencai": 24
+                    },
+                    "description": "<p>圆满运功特效：进入战斗的第一次出招命中后，为目标添加“醉雨”，持续三回合。<br>醉雨：闪避和内外功防御下降10点，受到阳属性伤害时伤害提高30点。<br>·攻击命中具有“醉雨”状态的角色后，获得一层“酒醉”，持续到战斗脱离。<br>酒醉：每层增加10点醉意；出招前，每移除一层酒醉，招式暴击骰-1。</p><p>修满特效：气血+80，内力+40，力量+10。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                }
+            },
+            "masteryEffect": "修满[永久]：气血+80，内力+40，力量+10。",
+            "masteryChanges": [
+                {
+                    "key": "system.resources.hp.bonus",
+                    "value": 80
+                },
+                {
+                    "key": "system.resources.mp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "system.stats.liliang.mod",
+                    "value": 10
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        },
+        "effects": [
+            {
+                "name": "醉雨 (1回合)",
+                "icon": "icons/svg/rain.svg",
+                "duration": {
+                    "rounds": 1
+                },
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zuiyu"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.resistances.yang.mod",
+                        "mode": 2,
+                        "value": "-30"
+                    }
+                ]
+            },
+            {
+                "name": "醉雨 (2回合)",
+                "icon": "icons/svg/rain.svg",
+                "duration": {
+                    "rounds": 2
+                },
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zuiyu"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.resistances.yang.mod",
+                        "mode": 2,
+                        "value": "-30"
+                    }
+                ]
+            },
+            {
+                "name": "醉雨 (3回合)",
+                "icon": "icons/svg/rain.svg",
+                "duration": {
+                    "rounds": 3
+                },
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zuiyu"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.resistances.yang.mod",
+                        "mode": 2,
+                        "value": "-30"
+                    }
+                ]
+            },
+            {
+                "name": "酒醉",
+                "icon": "icons/svg/mug.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jiuzui",
+                        "stackable": true
+                    }
+                },
+                "changes": []
+            }
+        ]
+    }
+]
