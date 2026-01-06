@@ -3,7 +3,7 @@
 const PACK_NAME = "xjzl-system.neigong";
 
 const SECT_MAP = {
-    "none": "江湖/无门派",
+    // "none": "江湖/无门派",
     "zhengqizong": "正气宗",
     "zhenwujiao": "真武教",
     "wanfosi": "万佛寺",
@@ -42,7 +42,7 @@ export async function seedNeigong() {
 
         if (sect === "jianghushili") {
             // 如果是江湖势力，尝试读取 1-10 号文件（可以根据需求调整范围）
-            for (let i = 1; i <= 10; i++) {
+            for (let i = 1; i <= 2; i++) {
                 filesToFetch.push(`systems/xjzl-system/data/neigong/${sect}${i}.json`);
             }
         } else {
