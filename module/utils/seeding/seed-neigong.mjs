@@ -42,7 +42,7 @@ export async function seedNeigong() {
 
         if (sect === "jianghushili") {
             // 如果是江湖势力，尝试读取 1-10 号文件（可以根据需求调整范围）
-            for (let i = 1; i <= 2; i++) {
+            for (let i = 1; i <= 4; i++) {
                 filesToFetch.push(`systems/xjzl-system/data/neigong/${sect}${i}.json`);
             }
         } else {
