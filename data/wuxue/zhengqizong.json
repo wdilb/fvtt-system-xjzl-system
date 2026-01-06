@@ -1,0 +1,1334 @@
+[
+    {
+        "name": "五常剑（混）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+        "system": {
+            "sect": "zhengqizong",
+            "category": "wuxue",
+            "tier": 1,
+            "description": "<p>又称“儒剑”，结合仁义礼智信而来。它的前三剑是人级，第四剑是地级武学，第五剑是天级武学。<br>前三剑所有书院皆可学，后两剑只有儒家可学。<br>需求：剑 属性：太极</p>",
+            "moves": [
+                {
+                    "name": "仁",
+                    "type": "feint",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，仁者爱人，虚递一剑，对目标造成 0.3 力量点外功伤害。击破架招则为其添加“惭愧”，持续一回合。<br>惭愧：无法以状态添加者为攻击目标。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。击破架招后自动应用“惭愧”效果（需玩家遵守无法攻击的限制）。",
+                    "scripts": [
+                        {
+                            "label": "击破架招：惭愧",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const effectData = {\n        name: \"惭愧\",\n        icon: \"icons/svg/daze.svg\",\n        description: \"无法以状态添加者为攻击目标。\",\n        duration: { rounds: 1 },\n        origin: item.uuid\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 感到惭愧！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "义",
+                    "type": "real",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，孔曰成仁，孟曰取义，此剑刺出无可避，对目标造成 0.4 力量点外功伤害。<br>若对方为邪、恶之人，此招伤害提高 5 点。<br>若你标签为侠且重视伦理，此招对方无法闪避。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。自动检测目标恶行/侠义值计算伤害；自动检测自身侠义/性格给予命中修正。",
+                    "scripts": [
+                        {
+                            "label": "惩恶增伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nif (target) {\n    const xiayi = target.system.social?.xiayi || 0;\n    const exing = target.system.social?.exing || 0;\n    if (exing >= 100 && xiayi <= 50) {\n        args.output.damage += 5;\n        args.output.bonusDesc.push(\"惩恶 +5\");\n    }\n}"
+                        },
+                        {
+                            "label": "侠义必中",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "const xiayi = actor.system.social?.xiayi || 0;\nconst exing = actor.system.social?.exing || 0;\n// 检查性格：重视伦理 (这里假设 personality 是字符串或需要人工确认，暂以侠义值为主要判断，提示GM确认伦理)\nif (xiayi >= 100 && exing <= 50) {\n    // 无法闪避通常实现为给予极大的命中加值或直接判定必中，这里给+50命中\n    args.flags.grantHit += 50;\n    ui.notifications.info(\"【义】侠义加持：对方无法闪避 (命中+50)，请确认是否符合‘重视伦理’性格。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "礼",
+                    "type": "stance",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>次要动作，以礼待人，垂剑而下，开启架招，每次成功格挡后，可以不消耗速度朝任意方向移动 1 米。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": []
+                    },
+                    "automationNote": "需手动移动。脚本仅提示。",
+                    "scripts": [
+                        {
+                            "label": "格挡提示",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // 获取移动距离 (1 + (level-1))\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const dist = 1 + (lvl - 1);\n    if (actor.token?.object) {\n        canvas.interface.createScrollingText(actor.token.object.center, `可移动 ${dist}米`, {\n            fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n        });\n    }\n    ChatMessage.create({\n        content: `${actor.name} 格挡成功，可以不消耗速度朝任意方向移动 <b>${dist}</b> 米。`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "智",
+                    "type": "counter",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>当你看破对方虚招的时候，你可以消耗反应动作释放此招，压制目标虚招，智者知也，对其造成 0.6 力量点外功伤害。<br>若你标签为侠且重视伦理，招式伤害提升 20 点。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。自动检测侠义标签增加伤害。",
+                    "scripts": [
+                        {
+                            "label": "侠义增伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const xiayi = actor.system.social?.xiayi || 0;\nconst exing = actor.system.social?.exing || 0;\nif (xiayi >= 100 && exing <= 50) {\n    args.output.damage += 20;\n    args.output.bonusDesc.push(\"侠义 +20 (需重视伦理)\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "信",
+                    "type": "real",
+                    "isUltimate": true,
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>-人无信不立- 主要动作，言而有信，剑出法随。命中目标后造成 0.5 力量+0.5 内息点外功伤害。<br>若你标签为侠且重视伦理，将目标封招一回合。</p>",
+                    "tier": 3,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            4,
+                            3,
+                            2,
+                            1
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。命中后若满足侠义条件自动应用封招。",
+                    "scripts": [
+                        {
+                            "label": "侠义封招",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const xiayi = actor.system.social?.xiayi || 0;\n    const exing = actor.system.social?.exing || 0;\n    if (xiayi >= 100 && exing <= 50) {\n        const effectData = {\n            id: \"fengzhao\", // 系统通用状态\n            duration: { rounds: 1 },\n            origin: item.uuid\n        };\n        // 使用通用状态 ID \"fengzhao\"\n        await game.xjzl.api.effects.addEffect(args.target, \"fengzhao\");\n        ui.notifications.info(`${args.target.name} 被封招！(需重视伦理)`);\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "寒门笔法（人）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+        "system": {
+            "sect": "zhengqizong",
+            "category": "wuxue",
+            "tier": 1,
+            "description": "<p>书生意气，自强不息，只待金榜题名，天下皆闻。<br>需求：匕首-笔 属性：太极</p>",
+            "moves": [
+                {
+                    "name": "十年寒窗",
+                    "type": "stance",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>次要动作，执笔定心，开启架招，进入“苦读”，持续到战斗脱离或解除架招。<br>苦读：你受到内外功伤害时，减免 5 点。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": []
+                    },
+                    "automationNote": "完全自动化。开启架招时自动添加“苦读”Buff。",
+                    "scripts": [
+                        {
+                            "label": "开启苦读",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const effectData = {\n    name: \"苦读\",\n    icon: \"icons/svg/book.svg\",\n    description: \"受到内外功伤害减免 5 点。\",\n    changes: [\n        { key: \"system.combat.resistances.global.mod\", mode: 2, value: 5 }\n    ],\n    flags: { \"xjzl-system\": { slug: \"wuxue_kudu\", stackable: false } },\n    origin: item.uuid\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                        }
+                    ]
+                },
+                {
+                    "name": "好学不倦",
+                    "type": "real",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，挥笔敲打，对目标造成 0.4 力量点外功伤害。<br>·若自身存在“苦读”，向对方念诵一句诗，对方进行[书写]检定（难度 13），成功或对方知道这句诗则无事，失败或没听过则招式伤害+5。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "automationNote": "半自动化。若有“苦读”，自动计算额外伤害并提示GM/玩家进行检定（系统无法自动判定对方是否通过检定，故直接加伤并提示修正）。",
+                    "scripts": [
+                        {
+                            "label": "苦读念诗",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.find(e => e.name === \"苦读\" || e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_kudu\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const bonus = 5 + (lvl - 1) * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`苦读念诗 +${bonus} (若通过书写DC13则无效)`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "悬梁刺股",
+                    "type": "feint",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，笔戳其股，对目标造成 0.3 力量点外功伤害。击破架招时，使目标倒地并陷入“下盘不稳”，持续一回合。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。击破架招自动应用状态。",
+                    "scripts": [
+                        {
+                            "label": "击破效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    unstable.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, unstable);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "凿壁借光",
+                    "type": "counter",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，笔锋连点，对其造成 0.5 力量点外功伤害，并添加一层“流血”，持续到战斗脱离。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。命中自动施加流血。",
+                    "scripts": [
+                        {
+                            "label": "施加流血",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "金榜题名",
+                    "type": "real",
+                    "isUltimate": true,
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，提笔挥毫，一鸣惊人，对目标造成 0.6 力量点外功伤害。<br>·若自身存在“苦读”，移除“苦读”，获得“及第”，持续到战斗脱离。<br>及第：[书写]等级低于你的目标，对你造成的内外功伤害降低 20 点。</p>",
+                    "tier": 1,
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。自动转换苦读为及第。",
+                    "scripts": [
+                        {
+                            "label": "苦读转及第",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const kudu = actor.effects.find(e => e.name === \"苦读\" || e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_kudu\");\nif (kudu) {\n    await kudu.delete();\n    const jidiEffect = {\n        name: \"及第\",\n        icon: \"icons/svg/sun.svg\",\n        description: \"书写等级低于你的目标，对你造成的内外功伤害降低 20 点。\",\n        flags: { \n            \"xjzl-system\": { \n                slug: \"wuxue_jidi\", \n                stackable: false,\n                scripts: [{\n                    label: \"及第减伤\",\n                    trigger: \"preTake\",\n                    active: true,\n                    script: `\n                        // attacker 是攻击我的人 (目标)\n                        // actor 是我 (防御者)\n                        if (!attacker) return;\n                        const myArt = actor.system.arts?.shuxie?.total || 0;\n                        const enemyArt = attacker.system.arts?.shuxie?.total || 0;\n                        if (enemyArt < myArt) {\n                            args.output.damage = Math.max(0, args.output.damage - 20);\n                            ui.notifications.info(\"及第生效：减伤 20\");\n                        }\n                    `\n                }]\n            }\n        },\n        origin: item.uuid\n    };\n    await game.xjzl.api.effects.addEffect(actor, jidiEffect);\n    ui.notifications.info(\"金榜题名：苦读 -> 及第\");\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "知行剑法（地）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+        "system": {
+            "sect": "zhengqizong",
+            "category": "wuxue",
+            "tier": 2,
+            "description": "<p>此为理学所化武道剑法，讲究格物致知、知行合一，剑法入微而细致，通达真理。<br>需求：剑-单剑，理学 属性：柔</p>",
+            "moves": [
+                {
+                    "name": "明诸心",
+                    "type": "stance",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>次要动作，扬君子之道，开启架招，格挡后自身获得“知行”，持续一回合。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "rou",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "automationNote": "完全自动化。受击格挡后自动获得状态。",
+                    "scripts": [
+                        {
+                            "label": "格挡获知行",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // 每一级持续回合数+1 (基础1回合)\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const effectData = {\n        name: \"知行\",\n        icon: \"icons/svg/eye.svg\",\n        duration: { rounds: rounds },\n        flags: { \"xjzl-system\": { slug: \"wuxue_zhixing\", stackable: false } },\n        origin: item.uuid\n    };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "知所往",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，抚剑吟诵，道尽义理，你投掷 D20，若结果高于 10，则你获得范围内一个目标当前运行内功、施展武学的所有信息。<br>·若你投掷结果低于 10，你可以移除“知行”，不在意结果，而直接获得信息。</p>",
+                    "tier": 2,
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "element": "rou",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "automationNote": "部分自动化。自动投掷，若失败且有知行则自动消耗并提示成功。信息需GM告知。",
+                    "scripts": [
+                        {
+                            "label": "获取信息判定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const roll = await new Roll(\"1d20\").evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nlet success = roll.total > 10;\nlet consumed = false;\n\nif (!success) {\n    const zhixing = actor.effects.find(e => e.name === \"知行\" || e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhixing\");\n    if (zhixing) {\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"判定失败\" },\n            content: \"判定失败 (<=10)。是否消耗【知行】直接获得信息？\",\n            yes: { label: \"消耗知行\" },\n            no: { label: \"放弃\" }\n        });\n        if (confirm) {\n            await zhixing.delete();\n            success = true;\n            consumed = true;\n        }\n    }\n}\n\nif (success) {\n    ui.notifications.info(`${actor.name} 洞察了 ${args.target.name} 的虚实！`);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><h3>知所往 - 成功</h3><p>判定: ${roll.total} ${consumed ? \"(已消耗知行补正)\" : \"\"}</p><p>请GM告知目标当前内功与武学信息。</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    // 标记已获得信息，供后续招式使用 (持续1回合)\n    // 这里简化处理，直接给actor挂一个临时flag\n    const infoEffect = {\n        name: \"已洞察\",\n        icon: \"icons/svg/eye.svg\",\n        duration: { rounds: 1 },\n        changes: [{ key: \"flags.xjzl-system.wuxue_zhixing_info\", mode: 5, value: args.target.id }],\n        origin: item.uuid\n    };\n    await game.xjzl.api.effects.addEffect(actor, infoEffect);\n} else {\n    ui.notifications.warn(\"洞察失败。\");\n    ChatMessage.create({ content: `知所往判定失败: ${roll.total}`, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "力行求至",
+                    "type": "real",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，剑刺入微，对目标造成 0.5 力量点外功伤害。若你已经以【知所往】成功获得该目标的内功武学信息，招式伤害+10。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "rou",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。检测“已洞察”状态。",
+                    "scripts": [
+                        {
+                            "label": "洞察增伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nif (target) {\n    // 检查是否有“已洞察”Buff且指向该目标\n    const infoFlag = actor.getFlag(\"xjzl-system\", \"wuxue_zhixing_info\");\n    if (infoFlag === target.id) {\n        args.output.damage += 10;\n        args.output.bonusDesc.push(\"洞察弱点 +10\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "知行合一",
+                    "type": "real",
+                    "isUltimate": true,
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>蓄力动作，知为行之始，行为知之成，去恶为善！<br>若你为[侠]且你周围 3 米范围内的敌人中有[恶]，不消耗动作施展一次【知所往】；然后对自身周围敌人造成 0.7 力量点外功伤害。<br>·若你已经以【知所往】成功获得该目标的内功武学信息，招式伤害+30。</p>",
+                    "tier": 3,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "rou",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。自动检测侠义条件触发知所往；自动计算洞察增伤。",
+                    "scripts": [
+                        {
+                            "label": "去恶为善",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const xiayi = actor.system.social?.xiayi || 0;\nconst exing = actor.system.social?.exing || 0;\nif (xiayi >= 100 && exing <= 50) {\n    // 简易判断：只要当前场景有恶人Token在附近 (3米约等于2格)，就触发\n    // 由于无法精确获取距离，这里假设只要有目标是恶人就触发\n    const hasEvil = Array.from(game.user.targets).some(t => {\n        const e = t.actor?.system.social?.exing || 0;\n        const x = t.actor?.system.social?.xiayi || 0;\n        return e >= 100 && x <= 50;\n    });\n    \n    if (hasEvil) {\n        ui.notifications.info(\"知行合一：触发免费【知所往】\");\n        // 模拟执行知所往逻辑 (直接投骰)\n        const roll = await new Roll(\"1d20\").evaluate();\n        if (roll.total > 10) {\n             const infoEffect = {\n                name: \"已洞察\",\n                icon: \"icons/svg/eye.svg\",\n                duration: { rounds: 1 },\n                // 这里的value有点难搞，因为是AOE，我们假设对所有恶人生效？\n                // 简化：给自己上一个全局洞察Buff，对谁都生效\n                changes: [{ key: \"flags.xjzl-system.wuxue_zhixing_info_all\", mode: 5, value: \"true\" }],\n                origin: item.uuid\n            };\n            await game.xjzl.api.effects.addEffect(actor, infoEffect);\n            ui.notifications.info(\"知行合一：洞察成功！\");\n        }\n    }\n}"
+                        },
+                        {
+                            "label": "洞察增伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nif (target) {\n    const specificInfo = actor.getFlag(\"xjzl-system\", \"wuxue_zhixing_info\");\n    const allInfo = actor.getFlag(\"xjzl-system\", \"wuxue_zhixing_info_all\");\n    \n    if (allInfo || specificInfo === target.id) {\n        args.output.damage += 30;\n        args.output.bonusDesc.push(\"洞察弱点 +30\");\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "墨子剑法（地）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+        "system": {
+            "sect": "zhengqizong",
+            "category": "wuxue",
+            "tier": 2,
+            "description": "<p>此剑法由墨子所创，处处体现墨家非攻、尚同之意，以强身为主，而非杀伐。<br>需求：剑，墨家 属性：太极</p>",
+            "moves": [
+                {
+                    "name": "墨守成规",
+                    "type": "real",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，挥舞墨色剑气，对目标造成 0.5 力量点外功伤害，命中无架招目标时，自身额外获得 1 点怒气。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。命中检测架招并回怒。",
+                    "scripts": [
+                        {
+                            "label": "额外回怒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const current = actor.system.resources.rage.value;\n    const max = actor.system.resources.rage.max;\n    if (current < max) {\n        await actor.update({ \"system.resources.rage.value\": current + 1 });\n        ui.notifications.info(\"墨守成规：额外获得 1 点怒气\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "笔诛墨罚",
+                    "type": "stance",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>次要动作，墨气护身，开启架招。每次格挡成功，你获得一层“墨舞”，最多五层，持续到脱战或被击破架招。<br>每层“墨舞”为你提供额外 5 点格挡值。若被击破架招，失去所有墨舞。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "automationNote": "完全自动化。格挡叠层，破架清除。",
+                    "scripts": [
+                        {
+                            "label": "格挡叠墨舞",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础1层，升级额外获得一层 => Lv1:1, Lv2+:2\n    // 描述：升级：格挡成功额外获得一层“墨舞”\n    const gain = (lvl >= 2) ? 2 : 1;\n    \n    const effectData = {\n        name: \"墨舞\",\n        icon: \"icons/svg/ink.svg\",\n        description: \"每层提供 5 点格挡值。\",\n        changes: [{ key: \"system.combat.block\", mode: 2, value: 5 }],\n        flags: { \"xjzl-system\": { slug: \"wuxue_mowu\", stackable: true, maxStacks: 5 } },\n        origin: item.uuid\n    };\n    \n    // 循环添加多次以支持叠层API\n    for(let i=0; i<gain; i++) {\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        },
+                        {
+                            "label": "破架清墨舞",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.removeEffect(actor, \"wuxue_mowu\", 999);\n    ui.notifications.warn(\"架招被破，墨舞散尽！\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "水墨奔腾",
+                    "type": "feint",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，剑迅而出，剑气如潮，对目标造成 0.4 力量点外功伤害。命中无架招目标时，自身墨气爆发，获得两层“墨舞”。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。",
+                    "scripts": [
+                        {
+                            "label": "获得墨舞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = {\n        name: \"墨舞\",\n        icon: \"icons/svg/ink.svg\",\n        description: \"每层提供 5 点格挡值。\",\n        changes: [{ key: \"system.combat.block\", mode: 2, value: 5 }],\n        flags: { \"xjzl-system\": { slug: \"wuxue_mowu\", stackable: true, maxStacks: 5 } },\n        origin: item.uuid\n    };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"水墨奔腾：获得 2 层墨舞\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "墨点江山",
+                    "type": "real",
+                    "isUltimate": true,
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>蓄力动作，指点江山，剑墨飞舞，对目标及其周围 2 米范围内敌人造成 0.7 力量点外功伤害。<br>·你每有一点格挡值，招式伤害提升 1 点。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。自动将格挡值计入伤害。",
+                    "scripts": [
+                        {
+                            "label": "格挡转化伤害",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const block = actor.system.combat.blockTotal || 0;\nif (block > 0) {\n    args.output.damage += block;\n    args.output.bonusDesc.push(`格挡转化 +${block}`);\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "纵横剑术（地）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+        "system": {
+            "sect": "zhengqizong",
+            "category": "wuxue",
+            "tier": 2,
+            "description": "<p>先秦百家之中，纵横家精研武术，难逢敌手，纵横剑术大开大合，是以少胜多的搏杀之剑。<br>需求：剑-单剑，纵横家 属性：阳</p>",
+            "moves": [
+                {
+                    "name": "中天纵剑",
+                    "type": "real",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，扬剑指天，一劈而下。对目标造成 0.5 力量点外功伤害，之后你进入“纵剑”姿态，持续到战斗脱离或改为“横剑”姿态。<br>纵剑：施展剑法时招式伤害+5 且暴击骰-2。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "yang",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。切换姿态。",
+                    "scripts": [
+                        {
+                            "label": "切换纵剑",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"wuxue_hengjian\", 999);\nconst effectData = {\n    name: \"纵剑\",\n    icon: \"icons/svg/sword.svg\",\n    description: \"施展剑法时招式伤害+5 且暴击骰-2。\",\n    changes: [\n        { key: \"system.combat.damages.weaponTypes.sword.mod\", mode: 2, value: 5 },\n        { key: \"system.combat.crit_waigong\", mode: 2, value: -2 }\n    ],\n    flags: { \"xjzl-system\": { slug: \"wuxue_zongjian\", stackable: false } },\n    origin: item.uuid\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nui.notifications.info(\"进入【纵剑】姿态\");"
+                        }
+                    ]
+                },
+                {
+                    "name": "游龙入地",
+                    "type": "feint",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，龙翔浅底，剑抖而出，对目标造成 0.4 力量点外功伤害。击破架招则将目标击退至你面朝方向 5 米扇形范围内任意一个未被占据的空格并使其陷入“禁足”，持续两回合。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "yang",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。击破后应用禁足。位移需GM手动处理。",
+                    "scripts": [
+                        {
+                            "label": "击破禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    // root status duration default is undefined (forever), set to 2 rounds\n    // Need to update the added effect or add a new one with duration\n    // Easier to add specific one\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    rootData.duration = { rounds: 2 };\n    // Use toggleStatus logic or direct add. Since root is override, just add.\n    await game.xjzl.api.effects.addEffect(args.target, rootData);\n    ui.notifications.info(\"击破架招：目标被禁足！请手动移动目标位置。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "池横不顾",
+                    "type": "stance",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>次要动作，横剑而立，开启架招。同时进入“横剑”姿态，持续到战斗脱离或改为“纵剑”姿态。<br>横剑：当对方以你为目标出招时，你的闪避提高 4 点，若对方没有命中你，你可以不消耗速度朝任意方向纵跃 3 米（处于半空中），然后你的闪避恢复正常。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "yang",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "automationNote": "完全自动化。开启时切换姿态。",
+                    "scripts": [
+                        {
+                            "label": "切换横剑",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"wuxue_zongjian\", 999);\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n// 升级：横剑提供的闪避额外提高 3 点 => Base 4, Lv2+: 7, Lv3+: 10? \n// Description says: \"Upgrade: Dodge +3\". Assuming +3 per upgrade or flat +3? \n// Usually accumulation. 4 + (lvl-1)*3\nconst dodgeBonus = 4 + (lvl - 1) * 3;\n\nconst effectData = {\n    name: \"横剑\",\n    icon: \"icons/svg/shield.svg\",\n    description: \"被攻击时闪避提高。闪避成功后可移动并移除此状态。\",\n    changes: [\n        { key: \"system.combat.dodge\", mode: 2, value: dodgeBonus }\n    ],\n    flags: { \"xjzl-system\": { slug: \"wuxue_hengjian\", stackable: false } },\n    origin: item.uuid\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nui.notifications.info(\"进入【横剑】姿态\");"
+                        },
+                        {
+                            "label": "闪避移除横剑",
+                            "trigger": "avoided",
+                            "active": true,
+                            "script": "const hengjian = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_hengjian\");\nif (hengjian) {\n    await hengjian.delete();\n    ui.notifications.info(\"横剑闪避成功！你可以免费纵跃 3 米。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "百步飞剑",
+                    "type": "real",
+                    "isUltimate": true,
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>蓄力动作，选择范围内一个空格，一往无前持剑腾跃而去（处于在半空中），对直线路径上的敌人造成 0.7 力量点外功伤害。<br>直线上每有一个敌人，招式伤害提高 10 点。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "yang",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "automationNote": "部分自动化。根据选中的目标数量计算增伤（假设所有选中的都是直线上敌人）。",
+                    "scripts": [
+                        {
+                            "label": "穿透增伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const count = game.user.targets.size || 1;\n// 伤害计算是对每个目标分别进行的，但基础伤害增加是基于总人数\n// 每有一个敌人伤害+10\nconst bonus = count * 10;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`百步飞剑 (${count}人) +${bonus}`);"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "法剑四诀（地）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+        "system": {
+            "sect": "zhengqizong",
+            "category": "wuxue",
+            "tier": 2,
+            "description": "<p>法剑参依严刑峻法，取情可重、法不可违之意。<br>需求：剑-双剑，法家 属性：太极</p>",
+            "moves": [
+                {
+                    "name": "以法为教",
+                    "type": "stance",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>次要动作，以剑为令，开启架招。格挡成功后，给对方添加一层“乱法”，持续到战斗脱离。<br>乱法：每层使你的速度-1，闪避-5。</p>",
+                    "tier": 2,
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "automationNote": "完全自动化。格挡后给予攻击者乱法。",
+                    "scripts": [
+                        {
+                            "label": "格挡施加乱法",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = {\n        name: \"乱法\",\n        icon: \"icons/svg/justice.svg\",\n        description: \"每层速度-1，闪避-5。\",\n        changes: [\n            { key: \"system.combat.speed\", mode: 2, value: -1 },\n            { key: \"system.combat.dodge\", mode: 2, value: -5 }\n        ],\n        flags: { \"xjzl-system\": { slug: \"wuxue_luanfa\", stackable: true, maxStacks: 0 } },\n        origin: item.uuid\n    };\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    ui.notifications.info(\"以法为教：给予攻击者【乱法】\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "布法于众",
+                    "type": "real",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>蓄力动作，双剑交错，势围四方，对周围目标造成 0.4 内息点内功伤害，并给命中目标添加一层“乱法”，持续到战斗脱离。</p>",
+                    "tier": 2,
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。命中施加乱法。",
+                    "scripts": [
+                        {
+                            "label": "命中施加乱法",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const effectData = {\n        name: \"乱法\",\n        icon: \"icons/svg/justice.svg\",\n        description: \"每层速度-1，闪避-5。\",\n        changes: [\n            { key: \"system.combat.speed\", mode: 2, value: -1 },\n            { key: \"system.combat.dodge\", mode: 2, value: -5 }\n        ],\n        flags: { \"xjzl-system\": { slug: \"wuxue_luanfa\", stackable: true, maxStacks: 0 } },\n        origin: item.uuid\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "明法审令",
+                    "type": "feint",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，剑势连环而出，造成 0.4 内息点内功伤害。击破架招后目标下跪，陷入倒地，并为其添加“禁实”，持续一回合。</p>",
+                    "tier": 2,
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。击破施加效果。",
+                    "scripts": [
+                        {
+                            "label": "击破禁实倒地",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    \n    const jinshi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinshi\"));\n    jinshi.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, jinshi);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "绳之以法",
+                    "type": "counter",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>当你看破虚招后可消耗反应动作释放，压制对方虚招，双剑绞合，造成 0.6 内息点内功伤害，并为其添加“禁虚”，持续一回合。</p>",
+                    "tier": 2,
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。命中施加禁虚。",
+                    "scripts": [
+                        {
+                            "label": "命中禁虚",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const jinxu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinxu\"));\n    jinxu.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, jinxu);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "伏法受诛",
+                    "type": "real",
+                    "isUltimate": true,
+                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "<p>主要动作，法不留情，挥剑横斩目标造成 0.7 内息点内功伤害，根据其“乱法”层数造成叠加效果：<br>二层：招式无视其格挡值和内功防御；<br>四层：添加“禁足”“缚身”“迟滞”一回合；<br>六层及以上：添加“禁实”“禁虚”一回合。</p>",
+                    "tier": 2,
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "element": "taiji",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "automationNote": "完全自动化。根据目标乱法层数应用穿透和状态。",
+                    "scripts": [
+                        {
+                            "label": "判罪穿透",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "const luanfa = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_luanfa\");\nconst stacks = luanfa ? (luanfa.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 2) {\n    args.flags.ignoreBlock = true;\n    args.flags.ignoreDefense = true;\n    ui.notifications.info(\"伏法受诛：无视防御/格挡\");\n}"
+                        },
+                        {
+                            "label": "判罪状态",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const luanfa = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_luanfa\");\n    const stacks = luanfa ? (luanfa.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    \n    if (stacks >= 4) {\n        await game.xjzl.api.effects.addEffect(args.target, \"root\");\n        await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n        await game.xjzl.api.effects.addEffect(args.target, \"chizhi\");\n    }\n    if (stacks >= 6) {\n        const jinshi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinshi\"));\n        jinshi.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, jinshi);\n\n        const jinxu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinxu\"));\n        jinxu.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, jinxu);\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]
