@@ -1,0 +1,541 @@
+[
+    {
+        "name": "《七杀经》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/唐门.png",
+        "system": {
+            "tier": 1,
+            "element": "yin",
+            "sect": "tangmen",
+            "description": "<p>唐门入门内功心法。以唐律谋杀、劫杀、故杀、斗杀、误杀、戏杀、失杀为七杀，训诫弟子不可滥杀，但若该杀者，不可放过。</p>",
+            "requirement": "悟性需求: 1",
+            "automationNote": "完全自动化。每3次出招免蓝耗(通过返还)，击杀回蓝。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 3,
+                        "shenfa": 7,
+                        "tipo": 4,
+                        "neixi": 1,
+                        "qigan": 1,
+                        "shencai": 2
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 6,
+                        "shenfa": 14,
+                        "tipo": 7,
+                        "neixi": 3,
+                        "qigan": 3,
+                        "shencai": 3
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 9,
+                        "shenfa": 20,
+                        "tipo": 10,
+                        "neixi": 5,
+                        "qigan": 5,
+                        "shencai": 5
+                    },
+                    "description": "<p>圆满运功特效：每第三次出招，招式不消耗内力。<br>·你每次获得杀戮值时，回复5点内力。</p><p>修满特效：气血+10，内力+10，身法+3。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "七杀计数与免耗",
+                            "trigger": "attack",
+                            "script": "let count = args.actor.getFlag('xjzl-system', 'neigong_qisha_count') || 0;\ncount++;\nif (count % 3 === 0) {\n    ui.notifications.info('七杀经：本次出招不消耗内力(消耗后返还)');\n    // 记录这次需要返还内力，待资源扣除后执行\n    args.flags.qisha_refund = true;\n}\nawait args.actor.setFlag('xjzl-system', 'neigong_qisha_count', count);",
+                            "active": true
+                        },
+                        {
+                            "label": "执行返还",
+                            "trigger": "hit_once",
+                            "script": "if (args.attacker.flags.qisha_refund) {\n    const cost = args.move.currentCost.mp || 0;\n    if (cost > 0) await args.attacker.applyHealing({amount: cost, type: 'mp'});\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "杀戮回蓝",
+                            "trigger": "hit",
+                            "script": "if (args.isDead) {\n    await args.attacker.applyHealing({amount: 5, type: 'mp'});\n    ui.notifications.info('七杀经：击杀回复5点内力');\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 10
+                },
+                {
+                    "key": "stats.shenfa.mod",
+                    "value": 3
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        },
+        "effects": []
+    },
+    {
+        "name": "《潜渊心法》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/唐门.png",
+        "system": {
+            "tier": 2,
+            "element": "taiji",
+            "sect": "tangmen",
+            "description": "<p>唐门秘传内功。着重于敛息闭气、潜藏身形，修炼需时刻压抑自身情感，不喜不悲。待暴起出手时，释放全部怒意，一击毙命。</p>",
+            "requirement": "悟性需求: 4",
+            "automationNote": "技能加成需AE支持。进战回怒完全自动化。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 10,
+                        "shenfa": 16,
+                        "tipo": 10,
+                        "neixi": 4,
+                        "qigan": 4,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 20,
+                        "shenfa": 32,
+                        "tipo": 20,
+                        "neixi": 8,
+                        "qigan": 8,
+                        "shencai": 8
+                    },
+                    "description": "<p>小成运功特效：你的[潜行]、[敛息]检定结果+2。<br>你进入战斗后立即获得1点怒气。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "潜渊技能加成",
+                            "trigger": "passive",
+                            "script": "S.skills.qianxing.checkMod += 2;",
+                            "active": true
+                        },
+                        {
+                            "label": "潜渊怒气",
+                            "trigger": "combatStart",
+                            "script": "await args.actor.update({'system.resources.rage.value': (args.actor.system.resources.rage.value || 0) + 1});",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 48,
+                        "tipo": 30,
+                        "neixi": 12,
+                        "qigan": 12,
+                        "shencai": 12
+                    },
+                    "description": "<p>圆满运功特效：你的[潜行]、[敛息]检定结果+4。<br>你进入战斗后立即获得2点怒气。</p><p>修满特效：气血+40，内力+20，暴击骰-1。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "潜渊技能加成",
+                            "trigger": "passive",
+                            "script": "S.skills.qianxing.checkMod += 4;",
+                            "active": true
+                        },
+                        {
+                            "label": "潜渊怒气",
+                            "trigger": "combatStart",
+                            "script": "await args.actor.update({'system.resources.rage.value': (args.actor.system.resources.rage.value || 0) + 2});",
+                            "active": true
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 20
+                },
+                {
+                    "key": "combat.crit_waigong",
+                    "value": -1
+                },
+                {
+                    "key": "combat.crit_neigong",
+                    "value": -1
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        },
+        "effects": []
+    },
+    {
+        "name": "《六煞经》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/唐门.png",
+        "system": {
+            "tier": 2,
+            "element": "yin",
+            "sect": "tangmen",
+            "description": "<p>唐门核心内功心法。以贪狼、瘟疫、地空、灾煞、天哭、吊客为六煞，破其命格，杀敌于起势之前，为之六煞之法。</p>",
+            "requirement": "悟性需求: 4",
+            "automationNote": "暴击毒伤和易伤完全自动化。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 18,
+                        "shenfa": 11,
+                        "tipo": 9,
+                        "neixi": 3,
+                        "qigan": 3,
+                        "shencai": 4
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 35,
+                        "shenfa": 21,
+                        "tipo": 19,
+                        "neixi": 7,
+                        "qigan": 6,
+                        "shencai": 8
+                    },
+                    "description": "<p>小成运功特效：<br>招式暴击时额外造成20点毒素伤害。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "暴击毒伤",
+                            "trigger": "hit",
+                            "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 20, type: 'poison', isHit: true, attacker: args.attacker });\n    ui.notifications.info('六煞经：暴击附加20毒素伤害');\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 48,
+                        "shenfa": 32,
+                        "tipo": 29,
+                        "neixi": 11,
+                        "qigan": 10,
+                        "shencai": 14
+                    },
+                    "description": "<p>圆满运功特效：<br>招式暴击时额外造成40点毒素伤害。<br>·暴击时撕裂目标伤口,为其添加一层“易伤”，至多三层，持续到战斗脱离。<br>易伤：再次受到伤害时（甚至是毒素），每有一层“易伤”流失10点气血。</p><p>修满特效：气血+40，内力+20，身法+5。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "暴击毒伤与易伤",
+                            "trigger": "hit",
+                            "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 40, type: 'poison', isHit: true, attacker: args.attacker });\n    await game.xjzl.api.effects.addEffect(args.target, 'yishang');\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 20
+                },
+                {
+                    "key": "stats.shenfa.mod",
+                    "value": 5
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        },
+        "effects": []
+    },
+    {
+        "name": "《毒邪神煞》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/唐门.png",
+        "system": {
+            "tier": 3,
+            "element": "taiji",
+            "sect": "tangmen",
+            "description": "<p>唐门秘传毒功。以阳毒喂身，练就暴戾煞气，又配以阴毒柔者相抵，护住自身最后心脉，随时有毒血攻心暴毙而亡之险。此功若能大成，毒云如墨，嗜毒生血，难以匹敌。</p>",
+            "requirement": "悟性需求: 10",
+            "automationNote": "完全自动化。毒素吸收和附伤均已实现。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 25,
+                        "shenfa": 30,
+                        "tipo": 28,
+                        "neixi": 13,
+                        "qigan": 11,
+                        "shencai": 13
+                    },
+                    "description": "<p>领悟运功特效：你受到的毒素伤害数值翻倍，同时投掷D20，若大于等于15，伤害改为回复气血。<br>·出招额外造成你的[毒术]等级*2点毒素伤害。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "毒邪附伤",
+                            "trigger": "hit",
+                            "script": "if (args.type === 'attack') {\n    const dushu = args.attacker.system.arts.dushu.total || 0;\n    const bonus = dushu * 2;\n    if (bonus > 0) {\n        await args.target.applyDamage({ amount: bonus, type: 'poison', isHit: true, attacker: args.attacker });\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "嗜毒",
+                            "trigger": "preTake",
+                            "script": "if (args.type === 'poison' && args.output.damage > 0) {\n    const roll = await new Roll('1d20').evaluate();\n    if (roll.total >= 15) {\n        await args.target.applyHealing({amount: args.output.damage, type: 'hp'});\n        args.output.abort = true;\n        ui.notifications.info(`毒邪神煞：吸收毒素 ${args.output.damage}`);\n    } else {\n        args.output.damage *= 2;\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 50,
+                        "shenfa": 60,
+                        "tipo": 56,
+                        "neixi": 26,
+                        "qigan": 22,
+                        "shencai": 26
+                    },
+                    "description": "<p>小成运功特效：你受到的毒素伤害数值翻倍，同时投掷D20，若大于等于10，伤害改为回复气血。<br>·出招额外造成你的[毒术]等级*3点毒素伤害。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "毒邪附伤",
+                            "trigger": "hit",
+                            "script": "if (args.type === 'attack') {\n    const dushu = args.attacker.system.arts.dushu.total || 0;\n    const bonus = dushu * 3;\n    if (bonus > 0) {\n        await args.target.applyDamage({ amount: bonus, type: 'poison', isHit: true, attacker: args.attacker });\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "嗜毒",
+                            "trigger": "preTake",
+                            "script": "if (args.type === 'poison' && args.output.damage > 0) {\n    const roll = await new Roll('1d20').evaluate();\n    if (roll.total >= 10) {\n        await args.target.applyHealing({amount: args.output.damage, type: 'hp'});\n        args.output.abort = true;\n        ui.notifications.info(`毒邪神煞：吸收毒素 ${args.output.damage}`);\n    } else {\n        args.output.damage *= 2;\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 75,
+                        "shenfa": 90,
+                        "tipo": 84,
+                        "neixi": 39,
+                        "qigan": 33,
+                        "shencai": 39
+                    },
+                    "description": "<p>圆满运功特效：你受到的毒素伤害数值翻倍，同时投掷D20，若大于等于5，伤害改为回复气血。<br>·出招额外造成你的[毒术]等级*4点毒素伤害。</p><p>修满特效：气血+60，内力+60，[毒术]+2。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "毒邪附伤",
+                            "trigger": "hit",
+                            "script": "if (args.type === 'attack') {\n    const dushu = args.attacker.system.arts.dushu.total || 0;\n    const bonus = dushu * 4;\n    if (bonus > 0) {\n        await args.target.applyDamage({ amount: bonus, type: 'poison', isHit: true, attacker: args.attacker });\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "嗜毒",
+                            "trigger": "preTake",
+                            "script": "if (args.type === 'poison' && args.output.damage > 0) {\n    const roll = await new Roll('1d20').evaluate();\n    if (roll.total >= 5) {\n        await args.target.applyHealing({amount: args.output.damage, type: 'hp'});\n        args.output.abort = true;\n        ui.notifications.info(`毒邪神煞：吸收毒素 ${args.output.damage}`);\n    } else {\n        args.output.damage *= 2;\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "arts.dushu.checkMod",
+                    "value": 2
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        },
+        "effects": []
+    },
+    {
+        "name": "《五毒真经》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/唐门.png",
+        "system": {
+            "tier": 3,
+            "element": "yin",
+            "sect": "tangmen",
+            "description": "<p>唐门内功集大成者，以五毒化金木水火土修成特殊奇毒，内炼于身，外修于形。大成后力道大增，身法迅捷如雷，且举手投足间奇毒肆虐，控如使臂，极为可怕。</p>",
+            "requirement": "悟性需求: 11",
+            "automationNote": "完全自动化。自动计数出招，自动施加五毒，自动检测引爆。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 32,
+                        "shenfa": 32,
+                        "tipo": 21,
+                        "neixi": 11,
+                        "qigan": 11,
+                        "shencai": 13
+                    },
+                    "description": "<p>领悟运功特效：每第三次出招，为敌人添加“五毒”，持续两回合。<br>五毒：你在每回合末受到20点毒素伤害。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "五毒计数与施加",
+                            "trigger": "attack",
+                            "script": "let count = args.actor.getFlag('xjzl-system', 'neigong_wudu_count') || 0;\ncount++;\nif (count % 3 === 0) {\n    args.flags.applyWudu = true; // 传递给 HIT 脚本\n}\nawait args.actor.setFlag('xjzl-system', 'neigong_wudu_count', count);",
+                            "active": true
+                        },
+                        {
+                            "label": "施加五毒",
+                            "trigger": "hit",
+                            "script": "if (args.attacker.flags.applyWudu) {\n    // 检查是否存在\n    const existing = args.target.effects.find(e => e.name === '五毒');\n    if (!existing) {\n        const effect = thisItem.effects.getName('五毒');\n        if (effect) {\n            const effectData = effect.toObject();\n            delete effectData._id;\n            effectData.duration = { rounds: 2 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info('五毒真经：施加五毒');\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 67,
+                        "shenfa": 67,
+                        "tipo": 41,
+                        "neixi": 21,
+                        "qigan": 21,
+                        "shencai": 23
+                    },
+                    "description": "<p>小成运功特效：每第二次出招，为敌人添加“五毒”，持续三回合。<br>·若对方已经存在“五毒”，则毒发造成40点毒素伤害，移除目标“五毒”。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "五毒计数",
+                            "trigger": "attack",
+                            "script": "let count = args.actor.getFlag('xjzl-system', 'neigong_wudu_count') || 0;\ncount++;\nif (count % 2 === 0) {\n    args.flags.applyWudu = true;\n}\nawait args.actor.setFlag('xjzl-system', 'neigong_wudu_count', count);",
+                            "active": true
+                        },
+                        {
+                            "label": "施加/引爆五毒",
+                            "trigger": "hit",
+                            "script": "if (args.attacker.flags.applyWudu) {\n    const existing = args.target.effects.find(e => e.name === '五毒');\n    if (existing) {\n        await args.target.applyDamage({ amount: 40, type: 'poison', isHit: true, attacker: args.attacker });\n        await existing.delete();\n        ui.notifications.info('五毒真经：毒发！');\n    } else {\n        const effect = thisItem.effects.getName('五毒');\n        if (effect) {\n            const effectData = effect.toObject();\n            delete effectData._id;\n            effectData.duration = { rounds: 3 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info('五毒真经：施加五毒');\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 102,
+                        "shenfa": 102,
+                        "tipo": 61,
+                        "neixi": 31,
+                        "qigan": 31,
+                        "shencai": 33
+                    },
+                    "description": "<p>圆满运功特效：每次出招，为敌人添加“五毒”，持续三回合。<br>·若对方已经存在“五毒”，则毒发造成50点毒素伤害，移除目标“五毒”。</p><p>修满特效：气血+80，内力+40，内息+10。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "每次出招施毒",
+                            "trigger": "attack",
+                            "script": "args.flags.applyWudu = true;",
+                            "active": true
+                        },
+                        {
+                            "label": "施加/引爆五毒",
+                            "trigger": "hit",
+                            "script": "if (args.attacker.flags.applyWudu) {\n    const existing = args.target.effects.find(e => e.name === '五毒');\n    if (existing) {\n        await args.target.applyDamage({ amount: 50, type: 'poison', isHit: true, attacker: args.attacker });\n        await existing.delete();\n        ui.notifications.info('五毒真经：毒发！');\n    } else {\n        const effect = thisItem.effects.getName('五毒');\n        if (effect) {\n            const effectData = effect.toObject();\n            delete effectData._id;\n            effectData.duration = { rounds: 3 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info('五毒真经：施加五毒');\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 80
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 40
+                },
+                {
+                    "key": "stats.neixi.mod",
+                    "value": 10
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        },
+        "effects": [
+            {
+                "name": "五毒",
+                "icon": "icons/svg/biohazard.svg",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wudu",
+                        "scripts": [
+                            {
+                                "trigger": "turnEnd",
+                                "script": "await args.actor.applyDamage({amount: 20, type: 'poison', isHit: true});",
+                                "active": true
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    }
+]
