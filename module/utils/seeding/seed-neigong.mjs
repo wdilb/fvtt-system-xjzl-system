@@ -5,8 +5,8 @@ const PACK_NAME = "xjzl-system.neigong";
 const SECT_MAP = {
     "none": "江湖/无门派",
     "zhengqizong": "正气宗",
-    "zhenwujiao": "真武教", // 对应武当/真武
-    "wanfosi": "万佛寺",     // 对应少林/万佛
+    "zhenwujiao": "真武教",
+    "wanfosi": "万佛寺",
     "xiaoyaopai": "逍遥派",
     "qingtianmen": "擎天门",
     "emeipai": "峨眉派",

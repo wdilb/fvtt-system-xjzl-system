@@ -1333,7 +1333,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     if (isStanceActive) {
       // 情况 1: 架招开启
       // Total = 基础(含装备/经脉) + 架招本体强度
-      combat.blockTotal = baseBlock + stanceBlockValue + + equipmentBlock;
+      combat.blockTotal = baseBlock + stanceBlockValue + equipmentBlock;
       combat.stanceBlockValue = stanceBlockValue;
     } else if (hasPassiveBlock) {
       // 情况 2: 架招关闭，但有“被动格挡”特效 (如密宗瑜伽内功)
