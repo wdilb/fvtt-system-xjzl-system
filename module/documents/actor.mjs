@@ -1371,12 +1371,12 @@ export class XJZLActor extends Actor {
       const isHitWhileDying = (originalHP <= 0 && finalDamage > 0);
       if (isDying || isHitWhileDying) {
         await this.runScripts(SCRIPT_TRIGGERS.DYING, statusCtx);
-
         if (statusCtx.preventDying) {
           isDying = false;
         } else {
           const hasDying = this.effects.some(e => e.statuses.has("dying"));
-          if (!hasDying) await this.toggleStatusEffect("dying", { active: true });
+          //因为可能存在一些脚本不阻止濒死，但会回血，所以不能挂上濒死状态（对，就是我们的合欢宗），但是需要发送濒死卡片
+          if (!hasDying && this.system.resources.hp.value <= 0) await this.toggleStatusEffect("dying", { active: true });
 
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: false });
           ChatMessage.create({
@@ -1517,7 +1517,8 @@ export class XJZLActor extends Actor {
     const updates = {};
     let actualHeal = 0;
     let label = "";
-    let color = "#00FF00"; // 默认绿色 (HP)
+    // 颜色配置：HP用绿色，内力用蓝色，护体用青色
+    let color = "#27ae60";
     let oldVal = 0;
     let newVal = 0;
 
@@ -1526,13 +1527,12 @@ export class XJZLActor extends Actor {
       const current = this.system.resources.hp.value;
       const max = this.system.resources.hp.max;
       oldVal = current;
+      color = "#27ae60"; // Green
 
-      // 检查禁疗 (预检查，用于计算 actualHeal 显示 0 还是 真实值)
-      // 虽然 _preUpdate 会拦截，但为了飘字准确，这里先判一下
+      // 检查禁疗
       if (this.xjzlStatuses.noRecoverHP) {
         actualHeal = 0;
       } else {
-        // 手动计算 Min 是为了让飘字显示实际增加量，而不是溢出量
         newVal = Math.min(max, current + amount);
         actualHeal = newVal - current;
         if (actualHeal > 0) {
@@ -1547,6 +1547,7 @@ export class XJZLActor extends Actor {
       const current = this.system.resources.mp.value;
       const max = this.system.resources.mp.max;
       oldVal = current;
+      color = "#2980b9"; // Blue
 
       if (this.xjzlStatuses.noRecoverNeili) {
         actualHeal = 0;
@@ -1558,7 +1559,6 @@ export class XJZLActor extends Actor {
         }
       }
       label = `内力 +${actualHeal}`;
-      color = "#0000FF"; // 蓝色
     }
 
     // C. 护体真气 (Huti)
@@ -1566,26 +1566,36 @@ export class XJZLActor extends Actor {
       const current = this.system.resources.huti || 0;
       oldVal = current;
       newVal = current + amount;
-      // 护体通常没有固定上限，或者由 DataModel 限制
-      // 这里直接叠加
+      color = "#16a085"; // Teal
+
+      // 护体通常没有固定上限
       actualHeal = amount;
-
       updates["system.resources.huti"] = newVal;
-
       label = `护体 +${actualHeal}`;
-      color = "#00FFFF"; // 青色/天蓝
     }
 
     // 执行更新
-    // 注意：如果 updates 为空（被 Flag 拦截导致 actualHeal=0），这里就不会执行
     if (!foundry.utils.isEmpty(updates)) {
       await this.update(updates);
     }
 
-    // 视觉效果
-    // 逻辑：
-    // 1. 如果 actualHeal > 0，说明真的加血了，飘数字。
-    // 2. 如果 actualHeal == 0 且是因为被禁疗拦截了，飘“禁疗”提示 (可选优化)
+    // =====================================================
+    // 濒死移除判定
+    // =====================================================
+    let removedDying = false;
+    // 只有当这是气血回复，且当前血量(newVal)大于0时才检查
+    if (type === "hp" && actualHeal > 0 && newVal > 0) {
+      const hasDying = this.effects.some(e => e.statuses.has("dying"));
+      if (hasDying) {
+        // 移除濒死状态
+        await this.toggleStatusEffect("dying", { active: false });
+        removedDying = true;
+        // 如果需要，这里也可以顺便给个系统提示
+        // ui.notifications.info(`${this.name} 脱离了濒死状态。`);
+      }
+    }
+
+    // 视觉效果 (飘字)
     if (showScrolling) {
       if (actualHeal > 0) {
         if (this.token?.object) {
@@ -1595,25 +1605,56 @@ export class XJZLActor extends Actor {
           });
         }
       } else {
-        // 可选：如果是因为禁疗导致加血失败，飘一个提示
+        // 禁疗飘字
         let blockLabel = "";
         if (type === "hp" && this.xjzlStatuses.noRecoverHP) blockLabel = "禁疗";
         if ((type === "mp" || type === "neili") && this.xjzlStatuses.noRecoverNeili) blockLabel = "气滞";
 
         if (blockLabel && this.token?.object) {
           canvas.interface.createScrollingText(this.token.object.center, blockLabel, {
-            direction: 0, fontSize: 24, fill: "#cccccc", // 灰色
+            direction: 0, fontSize: 24, fill: "#cccccc",
             stroke: "#000000", strokeThickness: 2, jitter: 0.25
           });
         }
       }
     }
-    // 返回详细结果供调用者使用
+
+    // =====================================================
+    // 发送治疗卡片
+    // =====================================================
+    if (actualHeal > 0) {
+      const labelMap = { hp: "气血", mp: "内力", neili: "内力", huti: "护体" };
+      const typeLabel = labelMap[type] || type;
+
+      // 获取最大值 (护体没有最大值)
+      const maxVal = (type === 'huti') ? null : this.system.resources[type === 'neili' ? 'mp' : type].max;
+
+      const templateData = {
+        name: this.name,
+        img: this.img,
+        amount: actualHeal,
+        typeLabel: typeLabel,
+        newVal: newVal,
+        maxVal: maxVal,
+        color: color,
+        removedDying: removedDying // 传给模板用于显示"脱离濒死"
+      };
+
+      const content = await renderTemplate("systems/xjzl-system/templates/chat/heal-card.hbs", templateData);
+
+      await ChatMessage.create({
+        user: game.user.id,
+        speaker: ChatMessage.getSpeaker({ actor: this }),
+        content: content,
+        flags: { "xjzl-system": { type: "heal-card" } }
+      });
+    }
+
     return {
       actualHeal: actualHeal,
       type: type,
-      overflow: amount - actualHeal, // 溢出/被浪费的治疗量
-      isBlocked: (actualHeal === 0 && amount > 0 && newVal === oldVal) // 是否完全无效
+      overflow: amount - actualHeal,
+      isBlocked: (actualHeal === 0 && amount > 0 && newVal === oldVal)
     };
   }
 

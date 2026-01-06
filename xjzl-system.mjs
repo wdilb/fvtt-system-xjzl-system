@@ -785,6 +785,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/chat/move-card.hbs", //招式使用
     "systems/xjzl-system/templates/chat/request-defense.hbs", //虚招对抗
     "systems/xjzl-system/templates/chat/damage-card.hbs", //伤害卡片
+    "systems/xjzl-system/templates/chat/heal-card.hbs", //伤害卡片
     "systems/xjzl-system/templates/chat/defend-result.hbs", //看破结果
     "systems/xjzl-system/templates/chat/request-save.hbs", //属性判定
     //应用窗口
