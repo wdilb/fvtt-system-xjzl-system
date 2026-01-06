@@ -37,32 +37,46 @@ export async function seedNeigong() {
     const sectKeys = Object.keys(SECT_MAP);
 
     for (const sect of sectKeys) {
-        try {
-            const filePath = `systems/xjzl-system/data/neigong/${sect}.json`;
-            const response = await fetch(filePath);
+        // 定义一个需要尝试读取的文件列表
+        let filesToFetch = [];
 
-            if (!response.ok) {
-                // 很多门派可能还没录入数据，静默跳过或仅输出 Debug
-                // console.debug(`XJZL Seeder | 跳过内功文件 ${filePath}`);
-                continue;
+        if (sect === "jianghushili") {
+            // 如果是江湖势力，尝试读取 1-10 号文件（可以根据需求调整范围）
+            for (let i = 1; i <= 10; i++) {
+                filesToFetch.push(`systems/xjzl-system/data/neigong/${sect}${i}.json`);
             }
-
-            const data = await response.json();
-            const dataArray = Array.isArray(data) ? data : [data];
-
-            // 简单校验并打上门派标记（防止JSON里漏写sect字段）
-            dataArray.forEach(d => {
-                if (!d.system) d.system = {};
-                // 如果 JSON 里没写 sect，强行用文件名的门派归类
-                if (!d.system.sect) d.system.sect = sect;
-            });
-
-            console.log(`XJZL Seeder | 已加载内功 [${SECT_MAP[sect]}]: ${dataArray.length} 条数据`);
-            neigongData.push(...dataArray);
-
-        } catch (err) {
-            console.error(`XJZL Seeder | 加载 ${sect}.json 出错:`, err);
+        } else {
+            // 普通门派只读取一个文件
+            filesToFetch.push(`systems/xjzl-system/data/neigong/${sect}.json`);
         }
+        for (const filePath of filesToFetch) {
+            try {
+                const response = await fetch(filePath);
+
+                if (!response.ok) {
+                    // 很多门派可能还没录入数据，静默跳过或仅输出 Debug
+                    // console.debug(`XJZL Seeder | 跳过内功文件 ${filePath}`);
+                    continue;
+                }
+
+                const data = await response.json();
+                const dataArray = Array.isArray(data) ? data : [data];
+
+                // 简单校验并打上门派标记（防止JSON里漏写sect字段）
+                dataArray.forEach(d => {
+                    if (!d.system) d.system = {};
+                    // 如果 JSON 里没写 sect，强行用文件名的门派归类
+                    if (!d.system.sect) d.system.sect = sect;
+                });
+
+                console.log(`XJZL Seeder | 已加载内功 [${SECT_MAP[sect]}]: ${dataArray.length} 条数据`);
+                neigongData.push(...dataArray);
+
+            } catch (err) {
+                console.error(`XJZL Seeder | 加载 ${sect}.json 出错:`, err);
+            }
+        }
+
     }
 
     if (neigongData.length === 0) {
