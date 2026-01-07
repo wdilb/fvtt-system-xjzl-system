@@ -30,7 +30,7 @@ const SECT_MAP = {
  * 辅助函数：处理招式列表 (Moves Processing)
  * 将 JSON 中的简略数据转换为符合 WuxueDataModel 的完整结构
  */
-const processMoves = (rawMoves, bookReqs = "") => {
+const processMoves = (rawMoves, bookReqs = "", defaultTier = null) => {
     if (!Array.isArray(rawMoves)) return [];
 
     // 预处理武学需求，去除首尾空格
@@ -85,7 +85,7 @@ const processMoves = (rawMoves, bookReqs = "") => {
             // 3. 进阶配置
             isUltimate: m.isUltimate || false, // 是否绝招
             actionType: m.actionType || "default", // 气招类型 (heal/attack/default)
-            tier: m.tier ?? null, // null 代表继承书本品阶
+            tier: m.tier ?? defaultTier ?? null,  // null 代表继承书本品阶,优先取招式tier -> 其次取书本tier (defaultTier) -> 最后 null,如果后面想修改，可以去掉读取wuxue的品级的代码重新导入
 
             // 4. 成长数据 (初始化)
             level: 1,
@@ -214,8 +214,9 @@ export async function seedWuxue() {
     const items = [];
 
     for (const d of wuxueData) {
+        const bookTier = d.system.tier;
         // 1. 处理招式
-        const processedMoves = processMoves(d.system.moves, d.system.requirements);
+        const processedMoves = processMoves(d.system.moves, d.system.requirements, bookTier);
 
         // 2. 确定书本品阶 (Book Tier Resolution)
         // 逻辑：优先读取 JSON 数据中的 tier。

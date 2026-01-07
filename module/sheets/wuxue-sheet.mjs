@@ -126,15 +126,17 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             // 这是一个并行操作，不会因为招式多而阻塞
             await Promise.all(context.system.moves.map(async (move) => {
 
-                // 2. 解析每个招式的描述
+                // 解析每个招式的描述
                 // 这里需要处理 description 可能为 null 的情况
                 move.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
                     move.description || "",
                     { secrets: this.document.isOwner, async: true, relativeTo: this.document }
                 );
 
-                // --- 以下是原本的同步逻辑，直接搬进来即可 ---
-
+                // 为下拉菜单准备一个专门的值：如果 tier 是 null，就转为空字符串 ""
+                // 这样 selectOptions 就能匹配到 choices 中的 "" 选项了
+                move.uiTierSelected = move.tier ?? "";
+                
                 let levels = [];
                 let labels = [];
                 // 注入 CSS 类名
