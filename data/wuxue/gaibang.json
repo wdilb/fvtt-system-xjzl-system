@@ -1,0 +1,1389 @@
+[
+    {
+        "name": "哭丧棒",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "gaibang",
+            "tier": 1,
+            "description": "<p>原是家中孝子对逝者的哀悼和尊敬时持用，此中则颠三倒四，出招时夸张呼喝，样貌骇人。</p>",
+            "requirements": "棍-短棍，污衣派；",
+            "moves": [
+                {
+                    "name": "悼心疾首",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>挥棍大叫而击，对目标造成伤害。可消耗两层“痛哭”，击飞目标 1 米。</p>",
+                    "automationNote": "自动检测并消耗痛哭。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗痛哭",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const tongku = attacker.effects.find(e => e.name === '痛哭');\nif (tongku && tongku.stacks >= 2) {\n    await game.xjzl.api.effects.removeEffect(attacker, '痛哭', 2);\n    ui.notifications.info(`${attacker.name} 消耗两层痛哭！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "哭爹喊娘",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>流泪狠击，对目标造成伤害，击破架招时给目标添加“哭丧”，持续三回合。</p><p><strong>哭丧</strong>：施展消耗动作的轻功时，流失 5 点内力（升级后流失增加）。</p>",
+                    "automationNote": "破防施加哭丧。哭丧效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加哭丧",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const effectData = thisItem.effects.getName('哭丧').toObject();\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const val = 5 + (lvl - 1) * 5;\n    effectData.description = `施展消耗动作的轻功时，流失 ${val} 点内力。`;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "哭哭啼啼",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>以棍抵地，满脸哀丧，开启架招。成功格挡后，给对方添加“下盘不稳”，持续一回合。并获得两层“痛哭”，最多叠加 5 层。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反馈",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    await game.xjzl.api.effects.toggleStatus(args.attacker, 'unstable', true);\n    const tongku = thisItem.effects.getName('痛哭').toObject();\n    tongku.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, tongku);\n    await game.xjzl.api.effects.addEffect(actor, tongku);\n    ui.notifications.info(\"哭哭啼啼：获得痛哭并使对方下盘不稳！\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "鬼哭狼嚎",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>哭丧至极，若疯癫狂，抽打对目标造成伤害。如果你身上已经存在至少三层“痛哭”，可以选择消耗全部的“痛哭”，让这个招式不减少怒气值。</p>",
+                    "automationNote": "自动检测并消耗痛哭返还怒气。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "痛哭免怒",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const tongku = actor.effects.find(e => e.name === '痛哭');\nif (tongku && tongku.stacks >= 3) {\n    const refundRage = args.move.currentCost.rage;\n    await tongku.delete();\n    await actor.applyHealing({ amount: refundRage, type: 'rage', showScrolling: false });\n    ui.notifications.info(`${actor.name} 消耗全部痛哭，怒气已返还！`);\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "痛哭",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "哭丧棒累计的悲伤情绪，最高叠加5层。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tongku",
+                        "stackable": true,
+                        "maxStacks": 5
+                    }
+                }
+            },
+            {
+                "name": "哭丧",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "施展消耗动作的轻功时，流失内力。",
+                "duration": {
+                    "rounds": 3
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kusang",
+                        "stackable": false
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "莲花掌法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "gaibang",
+            "tier": 1,
+            "description": "<p>丐帮弟子蓄气养身，修心健体的武学。</p>",
+            "requirements": "徒手-拳掌，净衣派；",
+            "moves": [
+                {
+                    "name": "掌心生莲",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双掌聚气于胸口，开启架招。成功格挡后，可化解对方之力转为一层“莲花真气”至多三层。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "生成真气",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName('莲花真气').toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "芙蓉并蒂",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "周围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>对周围目标造成伤害，若目标无架招，将其拉扯至近身周围空格，每拉扯一个目标，获得一层“莲花真气”。</p>",
+                    "automationNote": "若目标无架招自动获得真气。拉扯手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "拉扯获气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName('莲花真气').toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(attacker, effectData);\n    ui.notifications.info(`拉扯成功，获得莲花真气！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "藕断丝连",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作/反应",
+                    "description": "<p>抬掌上击，造成伤害，你可以消耗一层莲花真气，将其击飞 1 米。若有人处于半空中，你可以消耗反应动作释放此招，将其抱摔至地面，造成伤害并倒地。</p>",
+                    "automationNote": "自动消耗真气。半空、抱摔、倒地手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗真气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const zhenqi = attacker.effects.find(e => e.name === '莲花真气');\n    if (zhenqi) {\n        await game.xjzl.api.effects.removeEffect(attacker, '莲花真气', 1);\n        ui.notifications.info(`${attacker.name} 消耗莲花真气（击飞请手动）`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "步步落花",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>招行如水，落掌似风，每有一层莲花真气，招式伤害提升 5 点。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "真气增伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const zhenqi = actor.effects.find(e => e.name === '莲花真气');\nif (zhenqi) {\n    const stacks = zhenqi.getFlag('xjzl-system', 'stacks') || 1;\n    const bonus = stacks * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`莲花真气 +${bonus}`);\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "莲花真气",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "每层使你内功命中+5。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lianhuazhenqi",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "铁帚脚法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "gaibang",
+            "tier": 2,
+            "description": "<p>丐帮腿法绝技，猛攻下三路，出招立竿见影。</p>",
+            "requirements": "徒手-腿；",
+            "moves": [
+                {
+                    "name": "浮萍点水",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>仰身抬腿，脚尖踢喉，击破架招时，使其陷入“禁足”一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const root = CONFIG.statusEffects.find(e => e.id === 'root');\n    const effectData = foundry.utils.deepClone(root);\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    effectData.duration = { rounds: lvl };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "飞燕穿林",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>直线冲向一处空格，对路径上的目标造成伤害。若目标无架招，为其添加“腿软”。</p><p><strong>腿软</strong>：回合结束时，若剩余移动力低于最大速度的一半，则倒地。</p>",
+                    "automationNote": "无架招自动施加腿软。腿软效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加腿软",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName('腿软').toObject();\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    effectData.duration = { rounds: lvl };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "豹尾拦腰",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破虚招时，压制虚招，脚踹心窝，造成伤害，将其击飞 3 米并倒地。</p>",
+                    "automationNote": "命中施加倒地。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "击倒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'prone', true);\n    ui.notifications.info(`${args.target.name} 被击倒（击飞请手动）`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "海底捞月",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>俯身撩腿，膝顶要害，造成伤害，同时目标进行韧性检定（难度 15），失败则陷入“腿软”“禁实”，持续三回合。若目标处于倒地状态，韧性检定难度+5。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "韧性检定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    let dc = 15;\n    if (args.target.statuses.has('prone')) dc += 5;\n    \n    const tuiruan = thisItem.effects.getName('腿软').toObject();\n    tuiruan.duration = { rounds: 3 };\n    tuiruan.origin = thisItem.uuid;\n    \n    const jinshi = CONFIG.statusEffects.find(e => e.id === 'jinshi');\n    const jinshiData = foundry.utils.deepClone(jinshi);\n    jinshiData.duration = { rounds: 3 };\n    jinshiData.origin = thisItem.uuid;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: 'renxing',\n        dc: dc,\n        label: '抵抗膝顶',\n        onFail: [tuiruan, jinshiData]\n    });\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "腿软",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "回合结束时，若剩余移动力低于最大速度的一半，则倒地。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tuiruan",
+                        "stackable": false
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "打狗棍诀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "gaibang",
+            "tier": 2,
+            "description": "<p>丐帮祖师爷所创，专打丧家之犬。</p>",
+            "requirements": "棍-短棍；",
+            "moves": [
+                {
+                    "name": "棒打群犬",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身/2米",
+                    "actionCost": "次要动作",
+                    "description": "<p>横棍拦截，开启架招。成功格挡后，可消耗反应动作释放【野狗挡道】。</p>",
+                    "automationNote": "格挡提示。反击动作手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡提示",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"格挡成功！可释放【野狗挡道】。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "碎齿脱爪",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>扬棍敲击手腕，击破架招时，使其陷入“缚身”两回合；并给目标添加三层“颤手”，持续到战斗脱离。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加状态",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    \n    if (args.isBroken) {\n        const fushen = CONFIG.statusEffects.find(e => e.id === 'fushen');\n        const fsData = foundry.utils.deepClone(fushen);\n        fsData.duration = { rounds: 2 };\n        fsData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fsData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "丧门之犬",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>压制虚招，舞棒戳击。同时可消耗目标身上的一层“颤手”，使其陷入“缚身”，持续一回合。</p>",
+                    "automationNote": "自动消耗颤手施加缚身。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗颤手",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const cs = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'chanshou');\n    if (cs) {\n        await game.xjzl.api.effects.removeEffect(args.target, 'chanshou', 1);\n        const fushen = CONFIG.statusEffects.find(e => e.id === 'fushen');\n        const fsData = foundry.utils.deepClone(fushen);\n        fsData.duration = { rounds: 1 };\n        fsData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fsData);\n        ui.notifications.info(\"消耗颤手，施加缚身！\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "野狗挡道",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "周围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>对周围敌方造成伤害。若目标无架招，将其击飞 1 米，并为其添加一层“颤手”。</p>",
+                    "automationNote": "无架招施加颤手。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "添加颤手",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "关门打狗",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "周围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>乱棒抽打周围敌人，添加两层“颤手”，同时击飞 3 米。可移动释放。</p>",
+                    "automationNote": "命中施加颤手。移动和击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "双层颤手",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\n    const csData = foundry.utils.deepClone(chanshou);\n    csData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n    await game.xjzl.api.effects.addEffect(args.target, csData);\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "降龙神掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "gaibang",
+            "tier": 3,
+            "description": "<p>天下第一掌法，取自《易经乾卦》爻辞，可惜在凤仙楼之战后失传。</p>",
+            "requirements": "徒手-拳掌；",
+            "moves": [
+                {
+                    "name": "降龙总纲",
+                    "type": "qi",
+                    "element": "yang",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>施展《降龙神掌》招式时，额外消耗 4 点内力，招式暴击骰-1。然后获得一层“劲气”，至多三层。</p>",
+                    "automationNote": "完全自动化（通过AE增加消耗）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得劲气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const effectData = thisItem.effects.getName('劲气').toObject();\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, effectData);\n// 额外消耗效果\nconst costEffect = thisItem.effects.getName('降龙消耗').toObject();\ncostEffect.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, costEffect);"
+                        }
+                    ]
+                },
+                {
+                    "name": "【初九】潜龙勿用",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>每次格挡成功时获得一条“神龙”围绕周身，至多一条。施展降龙神掌前，可消耗神龙复制本次出招。</p>",
+                    "automationNote": "格挡获得神龙。复制招式手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得神龙",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName('神龙').toObject();\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    foundry.utils.setProperty(effectData, 'flags.xjzl-system.maxStacks', lvl);\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "【九二】见龙在田",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双掌平推，对目标造成伤害。若目标半空且有劲气，可消耗反应动作释放，撕咬空中敌人。</p>",
+                    "automationNote": "反应动作及空中判定手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    }
+                },
+                {
+                    "name": "【九三】惕龙乾坤",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "周围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>对周围敌人造成伤害，并将所有敌人击退至 3 米外。可消耗一层“劲气”，将击退改为击飞。</p>",
+                    "automationNote": "可手动消耗劲气改变击退效果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗劲气提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const jinqi = attacker.effects.find(e => e.name === '劲气');\n    if (jinqi) {\n        ui.notifications.info(\"可手动消耗[劲气]将击退改为击飞。\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "【九四】跃龙在渊",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "10米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>对目标及周围 2 米范围造成伤害，击破架招时，将其眩晕一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "破防眩晕",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'xuanyun', true);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "【九五】飞龙在天",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "8米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>对目标及周围 2 米范围造成伤害，并将其击倒。可消耗一层“劲气”，施展本招时无法被选中。</p>",
+                    "automationNote": "命中施加倒地。无法被选中手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "击倒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'prone', true);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "【用九】群龙无首",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "周围",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破虚招后施展，对周围敌人造成伤害并击飞 1 米。当自身即将被控时，可消耗反应动作及一层“劲气”免疫。</p>",
+                    "automationNote": "击飞及免疫控制手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    }
+                },
+                {
+                    "name": "【上九】亢龙有悔",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "周围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>对周围敌人造成伤害。若自身存在三层“劲气”，将敌人眩晕一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            16,
+                            32,
+                            48,
+                            64
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "劲气眩晕",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const jinqi = attacker.effects.find(e => e.name === '劲气');\nif (args.isHit && jinqi && jinqi.getFlag('xjzl-system', 'stacks') >= 3) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'xuanyun', true);\n    ui.notifications.info(`${args.target.name} 被亢龙有悔震晕！`);\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "劲气",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "每层提高招式伤害 10 点。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jinqi",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            },
+            {
+                "name": "降龙消耗",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "消耗+4，暴击骰-1。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xianglong_cost",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "-4"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-1"
+                    },
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            },
+            {
+                "name": "神龙",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "围绕周身的神龙劲气，可用于复制出招。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shenlong",
+                        "stackable": true,
+                        "maxStacks": 1
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "卑躬屈膝",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "gaibang",
+            "tier": 1,
+            "description": "<p>你进行[交易]、[说服]技能检定时，结果+2。</p>",
+            "automationNote": "完全自动化。",
+            "moves": [],
+            "scripts": [
+                {
+                    "label": "技能加成",
+                    "trigger": "passive",
+                    "active": true,
+                    "script": "S.skills.jiaoyi.checkMod += 2;\nS.skills.shuofu.checkMod += 2;"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "卑躬屈膝",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.skills.jiaoyi.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.skills.shuofu.checkMod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "百事通",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "gaibang",
+            "tier": 1,
+            "description": "<p>你的[江湖八卦]等级+1。每天可以打探消息。</p>",
+            "automationNote": "技能加成自动。打探扣钱自动，信息RP。",
+            "moves": [
+                {
+                    "name": "打探消息",
+                    "type": "qi",
+                    "element": "none",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "description": "<p>花费 1 两白银，向此地的丐帮弟子打探消息。</p>",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "扣除银两",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.system.resources.silver >= 1) {\n    await actor.update({'system.resources.silver': actor.system.resources.silver - 1});\n    ui.notifications.info(\"花费 1 两白银打探消息。\");\n} else {\n    ui.notifications.warn(\"银两不足！\");\n    args.flags.abort = true;\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "百事通",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.skills.bagua.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "乞术",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "gaibang",
+            "tier": 1,
+            "requirements": "《莲花落》修炼圆满",
+            "description": "<p>你的[乞讨]等级+1。乞讨成功时，若你正处于“饥饿”状态，对方还会善心大发，给予你干粮。</p>",
+            "automationNote": "技能加成自动。干粮GM发放。",
+            "moves": [],
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "乞术",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.arts.qitao.mod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "豪饮吞天",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "gaibang",
+            "tier": 3,
+            "requirements": "《醉雨诀》修炼圆满",
+            "description": "<p>你的[酒艺]等级+1。你的酒量上限+10。</p><p>每次在战斗中饮酒后，下一次出招命中后，为目标添加两回合“醉雨”。攻击命中具有“醉雨”状态的角色后，获得一层“酒醉”。</p>",
+            "automationNote": "属性加成自动。战斗饮酒及Buff手动。",
+            "moves": [],
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "豪饮吞天",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": true,
+                "changes": [
+                    {
+                        "key": "system.arts.jiuyi.mod",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.resources.alcohol.max",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            },
+            {
+                "name": "醉雨",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "闪避和内外功防御下降 10 点，受到阳属性伤害时伤害提高 30 点。",
+                "duration": {
+                    "rounds": 2
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zuiyu",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "阳伤易伤",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "if (args.type === 'yang') {\n    args.output.damage += 30;\n    ui.notifications.info(`${actor.name} 醉雨生效：阳属性伤害增加 30 点！`);\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            },
+            {
+                "name": "酒醉",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "description": "每层增加 10 点醉意；出招前，每移除一层酒醉，招式暴击骰-1。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jiuzui",
+                        "stackable": true
+                    }
+                }
+            }
+        ]
+    }
+]

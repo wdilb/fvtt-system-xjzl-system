@@ -14,7 +14,7 @@ const SECT_MAP = {
     "huashanpai": "华山派",
     "tangmen": "唐门",
     "mingjiao": "明教",
-    // "gaibang": "丐帮",
+    "gaibang": "丐帮",
     // "fenghuayuan": "枫华院",
     // "liushanmen": "六扇门",
     // "jiangnange": "江南阁",
