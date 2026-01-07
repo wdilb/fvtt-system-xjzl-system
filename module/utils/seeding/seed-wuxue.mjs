@@ -217,33 +217,53 @@ export async function seedWuxue() {
         // 1. 处理招式
         const processedMoves = processMoves(d.system.moves, d.system.requirements);
 
-        // 2. 自动计算书本品阶 (Auto-Calculate Book Tier)
-        // 逻辑：收集所有招式的 tier，取最小值。如果招式没写 tier，忽略。
-        // 如果算出来没有有效值，默认为 1 (人级)。
-        let calculatedTier = 1;
+        // 2. 确定书本品阶 (Book Tier Resolution)
+        // 逻辑：优先读取 JSON 数据中的 tier。
+        // 如果 JSON 中未定义，则尝试根据招式自动推断（取招式中最低的品阶）。
+        // 如果都无法确定，默认为 1 (人级)。
 
-        if (processedMoves.length > 0) {
-            // 提取所有有效的数字品阶
-            const validTiers = processedMoves
-                .map(m => m.tier)
-                .filter(t => typeof t === 'number');
+        let finalTier = d.system.tier; // 1. 尝试直接读取
 
-            if (validTiers.length > 0) {
-                calculatedTier = Math.min(...validTiers);
+        if (finalTier === undefined || finalTier === null) {
+            // 2. JSON 没写，开始自动计算
+            let calculatedTier = 1; // 默认保底
+
+            if (processedMoves.length > 0) {
+                // 提取所有有效的数字品阶 (非 null 的)
+                const validTiers = processedMoves
+                    .map(m => m.tier)
+                    .filter(t => typeof t === 'number');
+
+                if (validTiers.length > 0) {
+                    calculatedTier = Math.min(...validTiers);
+                }
             }
+            finalTier = calculatedTier;
         }
 
         // 武学一般没有 Item 级的 effects，通常脚本都在 moves 里
         // 但如果有些被动武学有全局效果，也可以支持
-        const effects = d.effects ? d.effects.map(e => ({
-            name: e.name,
-            icon: e.icon || d.img,
-            transfer: e.transfer ?? false,
-            disabled: e.disabled ?? false,
-            changes: e.changes || [],
-            flags: e.flags || {},
-            description: e.description || ""
-        })) : [];
+        // AI生成的JSON 似乎有时候会把 effects 写在 system 里，这里做一下兼容性的查找
+        const rawEffects = d.effects || d.system?.effects || [];
+        const effects = rawEffects.map(e => {
+            // 基础结构
+            const effectData = {
+                name: e.name,
+                icon: d.img, // 如果特效没配图标，默认用物品图标，暂时使用物品图标吧，AI会给特效配上不存在的图标 e.icon
+                transfer: e.transfer ?? false,
+                disabled: e.disabled ?? false,
+                changes: e.changes || [],
+                flags: e.flags || {},
+                description: e.description || ""
+            };
+            // 只有当 JSON 里显式定义了 duration 时才写入
+            if (e.duration) {
+                effectData.duration = e.duration;
+            }
+            return effectData;
+        });
+
+
 
         // 如果存在全局 Item 脚本 (非常少见，比如“装备此书获得被动”)
         const itemScripts = Array.isArray(d.system.scripts) ? d.system.scripts.map(s => ({
@@ -263,7 +283,7 @@ export async function seedWuxue() {
                 category: d.system.category || "wuxue", // wuxue, sanshou, qinggong, zhenfa
                 sect: d.system.sect || "none",
                 // 使用自动计算出的 Tier
-                tier: calculatedTier,
+                tier: finalTier,
 
                 description: d.system.description || "",
                 requirements: d.system.requirements || "",

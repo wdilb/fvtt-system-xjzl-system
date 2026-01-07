@@ -615,6 +615,11 @@ export class XJZLActor extends Actor {
           // 兼容性指向：让 thisItem 也指向 AE，防止脚本报错
           thisItem = entry.source;
         }
+        // 如果此时 thisItem 仍为空，尝试从沙盒上下文(args)中获取
+        // 招式脚本会将武学物品作为 'item' 传入上下文
+        if (!thisItem && sandbox.item instanceof Item) {
+            thisItem = sandbox.item;
+        }
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
         sandbox.effect = thisEffect; // 别名
@@ -655,6 +660,11 @@ export class XJZLActor extends Actor {
           thisEffect = entry.source;
           // 兼容性指向：让 thisItem 也指向 AE，防止脚本报错
           thisItem = entry.source;
+        }
+        // 如果此时 thisItem 仍为空，尝试从沙盒上下文(args)中获取
+        // 招式脚本会将武学物品作为 'item' 传入上下文
+        if (!thisItem && sandbox.item instanceof Item) {
+            thisItem = sandbox.item;
         }
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
