@@ -30,10 +30,40 @@ const SECT_MAP = {
  * 辅助函数：处理招式列表 (Moves Processing)
  * 将 JSON 中的简略数据转换为符合 WuxueDataModel 的完整结构
  */
-const processMoves = (rawMoves) => {
+const processMoves = (rawMoves, bookReqs = "") => {
     if (!Array.isArray(rawMoves)) return [];
 
+    // 预处理武学需求，去除首尾空格
+    const baseReq = bookReqs.trim();
+
     return rawMoves.map(m => {
+
+        // === 核心修改：需求继承与拼接逻辑 ===
+        let moveReq = (m.requirements || "").trim();
+        let finalReq = "";
+
+        if (!moveReq) {
+            // 情况1: 招式没写需求 -> 直接继承书本
+            finalReq = baseReq;
+        } else {
+            // 情况2: 招式写了需求
+            if (moveReq === baseReq) {
+                // 子集和父集完全一致 -> 直接使用
+                finalReq = moveReq;
+            } else {
+                // 子集和父集不一致
+                // 检查子集是否已经包含了父集的内容（防止人工录入时已经手动拼接过了）
+                if (baseReq && !moveReq.includes(baseReq)) {
+                    // 拼接：父集 + 中文分号 + 子集
+                    // 例如: "剑-单剑；处于半空中"
+                    finalReq = `${baseReq}；${moveReq}`;
+                } else {
+                    // 如果已经包含了，就直接用子集的
+                    finalReq = moveReq;
+                }
+            }
+        }
+
         // 1. 基础数据
         const moveData = {
             id: m.id || foundry.utils.randomID(),
@@ -50,7 +80,7 @@ const processMoves = (rawMoves) => {
             targetInfo: m.targetInfo || "单体",
             actionCost: m.actionCost || "主要动作",
             automationNote: m.automationNote || "",
-            requirements: m.requirements || "",
+            requirements: finalReq,
 
             // 3. 进阶配置
             isUltimate: m.isUltimate || false, // 是否绝招
@@ -185,7 +215,7 @@ export async function seedWuxue() {
 
     for (const d of wuxueData) {
         // 1. 处理招式
-        const processedMoves = processMoves(d.system.moves);
+        const processedMoves = processMoves(d.system.moves, d.system.requirements);
 
         // 2. 自动计算书本品阶 (Auto-Calculate Book Tier)
         // 逻辑：收集所有招式的 tier，取最小值。如果招式没写 tier，忽略。
