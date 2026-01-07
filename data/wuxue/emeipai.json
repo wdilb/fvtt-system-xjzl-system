@@ -1,0 +1,2286 @@
+[
+    {
+        "name": "峨眉刺法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 1,
+            "description": "<p>峨眉弟子标志，白眉道长所创，轻巧灵动，挪闪蹉转，舞之别有风格，威力不俗，适合女性施展。</p>",
+            "requirements": "匕首-双刺",
+            "moves": [
+                {
+                    "name": "六合起势",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>起手势，双手持刺垂于两侧，开启架招。格挡成功后获得一层“眼力”，持续到脱战。</p><p><strong>眼力</strong>：每层使你的命中+5。</p>",
+                    "automationNote": "完全自动化。格挡后自动叠加眼力Buff。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡触发眼力",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && args.damageResult.isHit) {\n    const source = thisItem.effects.getName(\"眼力\");\n    if (source) {\n        await game.xjzl.api.effects.addEffect(actor, source.toObject());\n        if(actor.token?.object) canvas.interface.createScrollingText(actor.token.object.center, \"眼力+1\", {fill: \"#00FF00\"});\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "乳燕劈翅",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>右脚前踩，回裹手腕，翻转出刺，造成0.3内息点内功伤害，若击破对方架招，为其添加禁足，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const rounds = Math.max(1, args.move.computedLevel || 1);\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "喜鹊穿枝",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作/反应动作",
+                    "description": "<p>横移寸步，持刺外旋，对目标造成0.4内息点内功伤害。</p><p>若你的命中高于目标闪避，你可以消耗反应动作释放此招，扎其手腕，对目标造成伤害。</p>",
+                    "automationNote": "反应动作需手动。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "鹞子取水",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>跃至目标身边空格，于半空中转身甩刺，迅速连划，对目标造成0.6内息点内功伤害，然后为其添加“禁足”，持续三回合。</p><p>·若在施展此招处于半空中时被击倒、击飞后中断，攻击你的目标被添加“禁足”，持续一回合。</p>",
+                    "automationNote": "移动/半空/被打断需手动。命中自动施加禁足。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "眼力",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "每层使你的命中+5",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yanli",
+                        "stackable": true
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": 5
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": 5
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "峨眉绵掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 1,
+            "description": "<p>峨眉弟子标志，以峨眉绝景命名，出掌迟缓但掌力透体，极易造成内伤，与《武当太乙绵掌》齐名。</p>",
+            "requirements": "徒手-拳掌",
+            "moves": [
+                {
+                    "name": "萝峰晴云",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>迟缓一击，对其造成0.4内息点内功伤害，同时为目标添加“下盘不稳”，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加下盘不稳",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    effectData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "大坪霁雪",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>柔掌气出，造成0.3内息点内功伤害，若击破对方架招，消减对方1点怒气。（对方还是会因为受到伤害而获得1怒气）</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消减怒气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const drain = 1 + (lvl - 1);\n    const currentRage = args.target.system.resources.rage.value;\n    if (currentRage > 0) {\n        const newRage = Math.max(0, currentRage - drain);\n        await args.target.update({\"system.resources.rage.value\": newRage});\n        if(args.target.token?.object) canvas.interface.createScrollingText(args.target.token.object.center, `怒气 -${drain}`, {fill: \"#0000FF\"});\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "白水秋风",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "蓄力动作/反应动作",
+                    "description": "<p>透空一掌对目标造成0.3内息点内功伤害，同时自身获得一层“绵劲”，持续到战斗脱离。</p><p><strong>绵劲</strong>：每层使你的柔属性武学招式伤害+5。</p><p>·若有敌人处于半空中，你可以消耗反应动作释放此招，站于原地释放掌劲，对目标造成伤害，并获得一层“绵劲”。</p>",
+                    "automationNote": "伤害与获得绵劲自动化。反应动作与半空判定需手动。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得绵劲",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const source = thisItem.effects.getName(\"绵劲\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: 99 };\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "金顶祥光",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "rou",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "范围友方",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>双手合十，慈悲无比，给范围所有友方添加0.4内息点护体真气，持续到战斗脱离。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加护体",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const amount = Math.floor(args.finalAmount);\nif (amount > 0) {\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "绵劲",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "每层使你的柔属性武学招式伤害+5",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "mianjin",
+                        "stackable": true
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.rou.mod",
+                        "mode": 2,
+                        "value": 5
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "峨眉剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 1,
+            "description": "<p>峨眉派绝技，有诗赞“残虹一式定乾坤，剑似追魂不离人”，姿势优美而威力十足，招招制胜。</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "文姬挥笔",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "周围目标",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>走剑入蛇，外松内聚，对周围目标造成0.3内息点内功伤害，为自身添加“残虹”，持续到战斗脱离。</p><p><strong>残虹</strong>：你投掷命中检定、属性检定、技能检定、技能对抗、虚招对抗、死亡检定的 D20 出现 20 时，立即回复 50 点气血，50 点内力，然后移除残虹。</p>",
+                    "automationNote": "获得残虹自动。残虹触发的回血回蓝需玩家手动操作。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得残虹",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"残虹\");\nif (source) {\n    await game.xjzl.api.effects.addEffect(actor, source.toObject());\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "素女掸尘",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>心境自若，飘然一剑，对目标造成0.3内息点内功伤害，若击破对方架招，为其添加“目盲”，持续三回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破目盲",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"blind\"));\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被致盲！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "西子洗面",
+                    "type": "counter",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制虚招，身若惊鸿，剑扫目标，对其造成0.5内息点内功伤害，并与对方进行一次[渡气]对抗，若你获胜，将目标击倒。</p><p>·你的此次对抗检定具有优势。</p>",
+                    "automationNote": "对抗需手动发起（可使用宏），击倒需手动应用。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "发起渡气对抗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"duqi\",\n        dc: 10 + Math.floor(actor.system.skills.duqi.total / 10), \n        label: \"西子洗面-渡气对抗\",\n        level: 1, // 优势\n        onFail: CONFIG.statusEffects.find(e => e.id === \"prone\")\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "越女追魂",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>压低剑身，以极快速度刺向目标胸膛，对目标造成0.6内息点内功伤害。</p><p>·若自身具有“残虹”，此招式的命中检定需要投掷两次 D20，然后取最高的那一个。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "残虹优势",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.name === \"残虹\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    args.flags.level += (1 + (lvl - 1)); \n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "残虹",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "投掷 D20 出现 20 时，立即回复 50 点气血，50 点内力，然后移除残虹 (需手动)",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "canhong"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "四象掌法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 2,
+            "description": "<p>峨眉派绝技，以太阳、太阴、少阳、少阴四象为义理，阴阳相成，共上千种变化。</p><p>当你存在“少阳”“少阴”“太阳”“太阴”时，你进入“阴阳调和”状态，浑身四象流转，持续到战斗脱离。</p>",
+            "requirements": "徒手-拳掌",
+            "scripts": [
+                {
+                    "label": "阴阳调和检测",
+                    "trigger": "turnStart",
+                    "active": true,
+                    "script": "const hasSun = actor.effects.some(e => e.name === \"太阳\");\nconst hasMoon = actor.effects.some(e => e.name === \"太阴\");\nconst hasShaoYang = actor.effects.some(e => e.name === \"少阳\");\nconst hasShaoYin = actor.effects.some(e => e.name === \"少阴\");\nif (hasSun && hasMoon && hasShaoYang && hasShaoYin) {\n    const source = thisItem.effects.getName(\"阴阳调和\");\n    if (source) await game.xjzl.api.effects.addEffect(actor, source.toObject());\n}"
+                }
+            ],
+            "moves": [
+                {
+                    "name": "推窗望月",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>探出双掌，连拍四方，对周围敌人造成0.4内息点内功伤害，同时自身回复10点气血。</p><p>·当你处于“阴阳调和”状态时，招式可消耗反应动作释放，并将目标朝你的方向拉扯 1 米。</p>",
+                    "automationNote": "拉扯效果需手动。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "自身回血",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });"
+                        }
+                    ]
+                },
+                {
+                    "name": "叶底藏花",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "周围目标",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制虚招，半蹲转身，掌心外旋，对周围目标造成0.5内息点内功伤害。</p><p>·当你处于“阴阳调和”状态时，还可为其添加“禁实”或“禁虚”（由你选择），持续一回合。</p>",
+                    "automationNote": "阴阳调和时的状态添加需手动选择（或通过宏）。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "阴阳特效提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && actor.effects.some(e => e.name === \"阴阳调和\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><h3>叶底藏花·阴阳</h3><p>请选择为 ${args.target.name} 添加的状态 (${rounds}回合):</p><p>需手动添加 [禁实] 或 [禁虚]</p></div>`\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "气象万千",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>叠掌胸前，开启架招。格挡成功时，若对方运行阳刚内功，获得“太阳”“少阳”；若对方运行阴柔内功，获得“太阴”“少阴”；若对方运行太极内功，获得上述状态中任意两个；“少阳”“少阴”“太阳”“太阴”持续到脱战。</p>",
+                    "automationNote": "半自动化。需手动判断对方内功属性并添加对应状态。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡获取四象",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && args.damageResult.isHit) {\n    if (args.attacker) {\n        const neigongId = args.attacker.system.martial.active_neigong;\n        let element = \"none\";\n        if (neigongId) {\n            const ng = args.attacker.items.get(neigongId);\n            if (ng) element = ng.system.element;\n        }\n        \n        let buffs = [];\n        if (element === \"yang\") buffs = [\"太阳\", \"少阳\"];\n        else if (element === \"yin\") buffs = [\"太阴\", \"少阴\"];\n        else if (element === \"taiji\") buffs = [\"太阳\", \"太阴\"]; \n        \n        for (const name of buffs) {\n            const source = thisItem.effects.getName(name);\n            if(source) await game.xjzl.api.effects.addEffect(actor, source.toObject());\n        }\n        if(buffs.length > 0) ui.notifications.info(`气象万千触发：获得 ${buffs.join(\",\")}`);\n        else ui.notifications.warn(\"气象万千：无法识别对方内功属性，请手动添加四象状态\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "动静方圆",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>掌影连绵，阴阳变色，对目标造成0.7内息点内功伤害，并为其添加“封招”一回合。</p><p>·当你处于“阴阳调和”状态时，你出招前，会先给目标添加“禁足”，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加状态",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const fengzhao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fengzhao\"));\n    fengzhao.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, fengzhao);\n    \n    if (actor.effects.some(e => e.name === \"阴阳调和\")) {\n        const lvl = Math.max(1, args.move.computedLevel || 1);\n        const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n        root.duration = { rounds: 1 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.target, root);\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "太阳",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "四象之一：太阳",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "taiyang"
+                    }
+                }
+            },
+            {
+                "name": "少阳",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "四象之一：少阳",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shaoyang"
+                    }
+                }
+            },
+            {
+                "name": "太阴",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "四象之一：太阴",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "taiyin"
+                    }
+                }
+            },
+            {
+                "name": "少阴",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "四象之一：少阴",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shaoyin"
+                    }
+                }
+            },
+            {
+                "name": "阴阳调和",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "四象流转，阴阳调和",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yinyang_harmony"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "天罡指穴手",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 2,
+            "description": "<p>又名峨眉指穴法三十六势、莲花生死功等，南宋白云禅师所创绝技，以导引经络气脉，治病救人。</p>",
+            "requirements": "徒手-指法",
+            "moves": [
+                {
+                    "name": "鸭嘴劲",
+                    "type": "stance",
+                    "element": "rou",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>-擒拿平指轻提纵，再配摩云掌下安-<br>两手双指微微弯曲，开启架招。格挡成功后为目标添加“迟滞”，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡施加迟滞",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "日月劲",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-威明日月晦明中，两指庚辛扣似弓-<br>十指尖扣，抓拿肩臂，对敌人造成0.5内息点内功伤害。</p><p>·若目标是友方，则可消耗 1 点怒气，为其推拿导引，他每开启一个十二正经穴位，回复 5 点气血。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "友方穴位治疗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.target.disposition === actor.disposition) {\n    if (actor.system.resources.rage.value < 1) return ui.notifications.warn(\"怒气不足，无法治疗\");\n    \n    let openCount = 0;\n    const standard = args.target.system.jingmai.standard;\n    for(const key in standard) { if(standard[key]) openCount++; }\n    \n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const perPoint = 5 + (lvl - 1) * 5;\n    const totalHeal = openCount * perPoint;\n    \n    if (totalHeal > 0) {\n        await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value - 1});\n        await args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "平指劲",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-四指平联踞位高，单将大指下道跷-<br>大指平伸，碾其头部，对造成0.4内息点内功伤害。击破架招时，若目标处于“禁足”，可以立即消耗反应动作释放此招，双指杵向目标太阳穴，对其进行一次[点穴]检定。</p>",
+                    "automationNote": "禁足点穴需手动触发宏。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "点穴提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken && args.target.statuses.has(\"root\")) {\n    ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><h3>平指劲·追击</h3><p>${args.target.name} 处于禁足且被破防，可消耗反应动作再次施展，并发起点穴检定。</p></div>` });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "天龙行雨劲",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-天龙行雨法三般，驾鹤登空七煞联-<br>指点七窍，对目标造成0.6内息点内功伤害，并为其添加“点穴”（冲穴难度 11），持续一回合。</p><p>·目标每开启一个十二正经穴位，冲穴难度+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加点穴",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    let openCount = 0;\n    const standard = args.target.system.jingmai.standard;\n    for(const key in standard) { if(standard[key]) openCount++; }\n    \n    const dc = 11 + openCount;\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"dianxue\"));\n    effectData.duration = { rounds: 1 };\n    effectData.description = `冲穴难度: ${dc}`;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被点穴 (DC ${dc})`);\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "云霞离别刺",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 2,
+            "description": "<p>峨眉派绝技，招式繁复，动作多变，防不胜防，又有气功法门，可兼治疗伤势之效。</p>",
+            "requirements": "匕首-双刺",
+            "moves": [
+                {
+                    "name": "云兴霞蔚",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "次要动作",
+                    "description": "<p>运气而出，薄雾升腾，为目标回复【[疗伤]技能等级】点气血，同时使其获得“云霞”，持续三回合。</p><p><strong>云霞</strong>：下次施展招式时，招式伤害+10。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            1,
+                            1,
+                            1
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "skills.liaoshang",
+                                "ratio": 1
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "云霞Buff",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const source = thisItem.effects.getName(\"云霞\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "离愁别绪",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>刺起四方，铿锵雨落，对周围敌人造成0.4内息点内功伤害。</p><p>·招式可以在半空中释放，你凌空跃起，招式伤害+10。</p>",
+                    "automationNote": "半空判断需手动增加修正。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "爱苦别离",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>分刺于侧，开启架招。每次成功格挡后，额外增加 1 点怒气，且获得一层“离苦”，至多 5 层，持续到战斗脱离。</p><p><strong>离苦</strong>：每有一层招式伤害+5，每次出招后消耗一层“离苦”。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡触发离苦",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && args.damageResult.isHit) {\n    await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value + 1});\n    const source = thisItem.effects.getName(\"离苦\");\n    if (source) {\n        await game.xjzl.api.effects.addEffect(actor, source.toObject());\n    }\n}"
+                        },
+                        {
+                            "label": "出招消耗离苦",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (args.move.type !== \"stance\") {\n    await game.xjzl.api.effects.removeEffect(actor, \"liku\", 1);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "朝云暮霞",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>旋身挥刺连舞，发出阴阳二劲，对周围敌人造成0.5内息点内功伤害，为周围友方回复【[疗伤]技能等级*2】点气血；</p><p>·此招可移动释放，对移动路径上周围 2 米范围内的敌人造成伤害，为友方回复气血。（不会重复造成伤害或回复气血）</p>",
+                    "automationNote": "移动路径需手动。",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "范围治疗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.target.disposition === actor.disposition) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const bonus = 10 + (lvl - 1) * 10;\n    const heal = (actor.system.skills.liaoshang.total * 2) + bonus;\n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "云霞",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "下次施展招式时，招式伤害+10",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yunxia",
+                        "maxStacks": 1
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": 10
+                    }
+                ]
+            },
+            {
+                "name": "离苦",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "每有一层招式伤害+5，每次出招后消耗一层",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "liku",
+                        "stackable": true,
+                        "maxStacks": 5
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": 5
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "玉女剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 2,
+            "description": "<p>峨眉派绝技，在峨眉剑法基础上融汇各派剑术精华，施展时人面皎如峨眉月，剑光辉映满江湖。</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "青女素娥",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作/蓄力动作",
+                    "description": "<p>撤剑玉立，一顾倾城，剑气对目标造成0.5内息点内功伤害；</p><p>可消耗蓄力动作释放，则释放距离+2，伤害+5。</p>",
+                    "automationNote": "蓄力释放需手动增加伤害修正。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "分花扬柳",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>剑挑流光，澄澈碧空，造成0.4内息点内功伤害，若击破对方架招，将目标击飞1米。</p>",
+                    "automationNote": "击飞提示需GM操作。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破击飞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "皓腕如霜",
+                    "type": "stance",
+                    "element": "rou",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>风姿绰约，盈态似雪，开启架招，成功格挡后，进入“皓腕”，持续一回合。</p><p><strong>皓腕</strong>：你无法被击落、击飞、击倒。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡触发皓腕",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && args.damageResult.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"皓腕\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "凤舞天罗",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "范围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>剑风回旋，对范围内敌人造成0.4内息点内功伤害，并击飞无架招目标1米。</p><p>·若有人处于半空中，可消耗反应动作释放此招，飞至半空，擎剑直刺目标对其造成伤害，并将其再向上击飞至高空。</p>",
+                    "automationNote": "击飞与半空需手动。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "无架招击飞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "寒月窥人",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>纤纤碎步，长剑若离，对目标造成0.8内息点伤害。</p><p>若目标无架招，则被暗劲入侵经脉，为其添加“禁足”“缚身”，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "无架招控制",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "皓腕",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "无法被击落、击飞、击倒",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "haowan"
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "霁雪飘云掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 3,
+            "description": "<p>峨眉派镇派绝技，取自峨眉峰冬日绝景，冰霜万里，薄雾绕云，内劲极寒，化水为冰。</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "白雪皑皑",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "周围友方",
+                    "actionCost": "次要动作",
+                    "description": "<p>玉手回转，拍出清冷内劲，立即移除自身及周围友方的移动限制，包括但不限于“下盘不稳”“禁足”等任意降低移动速度的武学内功状态，之后，自身速度+2，持续到回合末。</p>",
+                    "automationNote": "半自动化。需脚本移除特定Effect。速度Buff自动。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "移除移速限制",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const target = args.target;\nconst toRemove = target.effects.filter(e => \n    e.statuses.has(\"unstable\") || e.statuses.has(\"root\") || \n    e.changes.some(c => c.key === \"system.combat.speed\" && Number(c.value) < 0)\n).map(e => e.id);\nif(toRemove.length > 0) await target.deleteEmbeddedDocuments(\"ActiveEffect\", toRemove);\n\nif (target === actor) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1;\n    const source = thisItem.effects.getName(\"白雪皑皑\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        const spd = 2 + (lvl - 1);\n        effectData.changes[0].value = spd;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "风雪交加",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>出掌飘逸，两畔生风，对目标造成0.7内息点内功伤害，同时为其添加“冻伤”一回合。</p><p><strong>冻伤</strong>：被阴、柔属性招式攻击时，额外受到 30 点伤害。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加冻伤",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "飞鸿踏雪",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>掌心拖上，清身侧立，开启架招。同时获得“飞鸿踏雪”，持续一回合或被击破架招。</p><p><strong>飞鸿踏雪</strong>：你免疫所有你不想要的状态。</p>",
+                    "automationNote": "免疫状态需手动操作。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "飞鸿踏雪Buff",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && !actor.effects.some(e => e.name === \"飞鸿踏雪\")) {\n    const source = thisItem.effects.getName(\"飞鸿踏雪\");\n    if (source) await game.xjzl.api.effects.addEffect(actor, source.toObject());\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "流风回雪",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>飘然若仙，回旋拍出冰气，对周围敌人造成0.6内息点内功伤害。此招每击破一个目标的架招，自身便回复最大气血 10%的气血。</p><p>·招式每选中一个具有“冻伤”的目标，本招式虚招值+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "冻伤加虚招",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "if (args.target.effects.some(e => e.name === \"冻伤\")) {\n    args.flags.grantFeint += 1;\n}"
+                        },
+                        {
+                            "label": "击破回血",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const pct = 0.10 + (lvl - 1) * 0.05;\n    const heal = Math.floor(actor.system.resources.hp.max * pct);\n    await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "傲雪凌霜",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "8米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，冰掌连绵，落雪追敌，对目标造成0.7内息点内功伤害。</p><p>·若对方处于“冻伤”，招式伤害+30。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "冻伤增伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.target.effects.some(e => e.name === \"冻伤\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    args.config.amount += (30 + (lvl - 1) * 10);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "白雪茫茫",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "范围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>迸发寒劲，地面凝霜，侵蚀周围，对范围内敌人造成0.6内息点内功伤害。</p><p>若有敌人处于半空中，可以消耗反应动作释放此招，凌空穿云（半空中）至目标处，掌劲肆意化为落雪，使自身周围所有敌方受到伤害。</p>",
+                    "automationNote": "半空需手动。",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "鹅毛大雪",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "20米",
+                    "targetInfo": "范围内所有单位",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>向周围释放冰雪真气，刹那间宛如冰天雪地，为范围内的敌方添加“下盘不稳”，持续一回合；</p><p>为范围内的友方添加“凝霜”：招式伤害提高 5 点，且可视为阴属性伤害，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "敌友判定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nif (args.target.disposition === actor.disposition) {\n    const bonus = 5 + (lvl - 1) * 5;\n    const source = thisItem.effects.getName(\"凝霜\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        effectData.description = `招式伤害+${bonus}，视为阴属性`;\n        effectData.changes[0].value = bonus;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n} else {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "万里雪飘",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "8米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>拍出寒气弥漫，冰雪翻涌，对周围敌人造成0.8内息点内功伤害。</p><p>·为敌人添加“冻伤”，持续到战斗脱离。</p><p>·如果目标身上已经存在“冻伤”，目标陷入“眩晕”，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            16,
+                            32,
+                            48,
+                            64
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "冻伤与眩晕",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    if (args.target.effects.some(e => e.name === \"冻伤\")) {\n        const stun = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"stun\"));\n        stun.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, stun);\n        ui.notifications.info(`${args.target.name} 被冰封眩晕！`);\n    }\n    \n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: 99 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "白雪皑皑",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "移动速度提升",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "baixueaiai"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": 2
+                    }
+                ]
+            },
+            {
+                "name": "冻伤",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "被阴、柔属性招式攻击时，额外受到 30 点伤害",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "frostbite"
+                    }
+                },
+                "scripts": [
+                    {
+                        "label": "冻伤易伤",
+                        "trigger": "preTake",
+                        "active": true,
+                        "script": "if (args.type === 'neigong' || args.move?.element === 'yin' || args.move?.element === 'rou') { args.output.damage += 30; }"
+                    }
+                ]
+            },
+            {
+                "name": "飞鸿踏雪",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "免疫所有你不想要的状态 (需手动移除)",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "feihongtaxue"
+                    }
+                }
+            },
+            {
+                "name": "凝霜",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "招式伤害提高，且可视为阴属性伤害",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "ningshuang"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.global.mod",
+                        "mode": 2,
+                        "value": 5
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "越女剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "emeipai",
+            "tier": 3,
+            "description": "<p>越女剑法传承千年，失传前乃是纵横无敌之剑法绝技，如今能悟透参照者寥寥，仅峨眉掌门可习得。</p><p>·此套路可以短竹棍释放，升级只提升[剑]等级。</p>",
+            "requirements": "剑-单剑/棍-短棍",
+            "moves": [
+                {
+                    "name": "袁公试剑",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-吾闻子善剑，愿一见之-<br>青光闪烁，幻成剑网，对目标造成0.6内息点内功伤害，与其进行【D20+[剑]等级】的对抗，获胜后获得“神虹”，持续到战斗脱离。</p><p><strong>神虹</strong>：你投掷命中检定、属性检定、技能检定、技能对抗、虚招对抗、死亡检定的 D20 出现 20 时，立即回复 50 点气血，50 点内力。</p><p>·你的虚招对抗结果+1。</p>",
+                    "automationNote": "对抗需手动。获胜后需手动添加神虹Buff。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "神虹提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if(args.isHit) { ui.notifications.info(\"请进行对抗，获胜后手动添加 [神虹] 状态\"); }"
+                        }
+                    ]
+                },
+                {
+                    "name": "追形逐影（失传）",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-杳之若日，偏如腾兔-<br>瞬身出剑，奔袭至目标身旁空格，对其造成0.6内息点内功伤害。击破目标架招时，你可以消耗反应动作，同时对目标周围 3 米范围内的另一个敌人施展一次【追形逐影】，且此次虚招对抗检定的 D20 必定为 20。</p>",
+                    "automationNote": "追击需玩家手动操作。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "西子捧心（失传）",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>-见之似好妇，夺之似惧虎-<br>微蹙眉头，剑护心口，开启架招。格挡成功时，为其添加两层“颤手”，持续到战斗脱离。</p><p><strong>颤手</strong>：满五层后，手持武器脱手落地，并陷入“缴械”一回合，然后移除所有颤手。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡施加颤手",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && args.damageResult.isHit) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chanshou\"));\n    effectData.duration = { rounds: 99 };\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "纵横逆顺（失传）",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>-布形候气，与神俱往-<br>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，绿影闪动，剑气激射而出，对目标造成0.8内息点内功伤害，同时与其进行【D20+[剑]等级】的对抗，获胜后获得“神虹”，持续到战斗脱离，你的这次对抗检定结果+3。</p>",
+                    "automationNote": "对抗需手动。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "折枝捷末（失传）",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "次要动作",
+                    "description": "<p>-内实精神，外示安仪-<br>道微而易，意幽而深，弹剑清吟，为周围敌人添加一层“颤手”，持续到战斗脱离。</p><p>·若你处于“神虹”，则还会刺击敌人双眼，为他们添加“目盲”，持续一回合。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加Debuff",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const chanshou = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chanshou\"));\nchanshou.duration = { rounds: 99 };\nawait game.xjzl.api.effects.addEffect(args.target, chanshou);\n\nif (actor.effects.some(e => e.name === \"神虹\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const blind = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"blind\"));\n    blind.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, blind);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "越甲三千（失传）",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "路径敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>-以一当百，举世无双-<br>一声清啸，剑扫千军，神剑无影，直线奔袭至目标空格处，对路径周围 1 米范围内的敌人造成0.8内息点内功伤害，同时与他们每一个人分别进行【D20+[剑]等级】的对抗，获胜后，你选择他的任意一只手“骨折”。</p>",
+                    "automationNote": "对抗与骨折需手动。",
+                    "costs": {
+                        "mp": [
+                            16,
+                            32,
+                            48,
+                            64
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    }
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "神虹",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "description": "投掷 D20 出现 20 时，立即回复 50 点气血，50 点内力。虚招对抗结果+1",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shenhong"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": 1
+                    },
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": 1
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "峨眉十二桩",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "emeipai",
+            "tier": 1,
+            "description": "<p>结合道家吐纳养生、医家腑脏肌理、佛家静气坐禅，和峨眉派以气运身的方法融为一体，是峨眉派入门弟子日夜打磨，陶冶性情，修身养性之功。</p><p>需求：《峨眉心法》圆满</p><p>·你的[道法]、[医术]、[佛法]检定结果+1。</p><p>·你阅读道士书籍或僧人书籍或药师书籍时，每月额外增长 50 修为进度。</p><p>升级：每月增长的书籍修为进度提高 25 点。</p>",
+            "requirements": "《峨眉心法》圆满",
+            "moves": [
+                {
+                    "name": "峨眉十二桩",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "<p>被动效果：你的[道法]、[医术]、[佛法]检定结果+1。</p><p>特殊：阅读特定书籍修为进度增加。</p>",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "automationNote": "阅读书籍修为获取需手动。",
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": []
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "峨眉十二桩",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                "transfer": true,
+                "description": "你的[道法]、[医术]、[佛法]检定结果+1。",
+                "changes": [
+                    {
+                        "key": "system.arts.daofa.checkMod",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.arts.yishu.checkMod",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.arts.fofa.checkMod",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "佛光普照",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "emeipai",
+            "tier": 2,
+            "description": "<p>峨眉绝技之一，激发时掌力笼罩敌人全身，使对方挡无可挡。</p><p>需求：徒手-拳掌 属性：阳</p><p>类型：实招</p><p>距离：1</p><p>消耗：2，怒气 2</p><p>主要动作，平平淡淡，一掌击出，对敌人造成 0.5 内息点内功伤害，并为其添加“错骨”，持续三回合。同时该敌人需要进行一个[韧性]检定（难度 15），若失败，投掷 D4，按照数字，目标的左手、右手、左脚、右脚，随机一个部位被打骨折。</p><p>·你每有一级[佛法]，招式伤害提高 10 点。</p><p>·对方每有一级[佛法]，韧性检定难度-1。</p><p>升级：招式伤害+10，内力消耗+2。</p>",
+            "requirements": "徒手-拳掌",
+            "moves": [
+                {
+                    "name": "佛光普照",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
+                    "description": "<p>主要动作，平平淡淡，一掌击出，对敌人造成 0.5 内息点内功伤害，并为其添加“错骨”，持续三回合。同时该敌人需要进行一个[韧性]检定（难度 15），若失败，投掷 D4，按照数字，目标的左手、右手、左脚、右脚，随机一个部位被打骨折。</p>",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "automationNote": "骨折效果需玩家手动投掷D4并处理。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            2,
+                            2,
+                            2
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "佛法伤害加成",
+                            "trigger": "calc",
+                            "script": "const fofa = S.arts.fofa.total || 0;\nif (fofa > 0) {\n    args.output.damage += fofa * 10;\n    args.output.bonusDesc.push(`佛法 +${fofa * 10}`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "错骨与骨折判定",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    // 1. 添加错骨状态\n    await game.xjzl.api.effects.addEffect(args.target, \"cuogu\");\n\n    // 2. 计算DC (对方每有一级佛法，难度-1)\n    const targetFofa = args.target.system.arts?.fofa?.total || 0;\n    const dc = Math.max(0, 15 - targetFofa);\n\n    // 3. 获取自定义特效\n    const fracture = thisItem.effects.getName(\"骨折\");\n    if (fracture) {\n        // 4. 发起检定\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"renxing\",\n            dc: dc,\n            label: \"抵抗骨折\",\n            onFail: fracture.toObject()\n        });\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "骨折",
+                "icon": "icons/svg/bone-broken.svg",
+                "transfer": false,
+                "description": "投掷 D4: 1-左手, 2-右手, 3-左脚, 4-右脚。请手动应用对应效果（如缴械或禁足）。",
+                "changes": []
+            }
+        ]
+    },
+    {
+        "name": "神女拈针",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "emeipai",
+            "tier": 2,
+            "description": "<p>峨眉绝技之一，以针灸之法制敌，亦可疗伤。</p><p>需求：暗器-针 属性：太极</p><p>类型：实招</p><p>距离：10</p><p>消耗：2，怒气 2，暗器-针*1</p><p>-夫何神女之姣丽兮，含阴阳之渥饰- 主要动作，弹指飞针，激射而出，对敌人造成 0.5 内息点内功伤害，并为其添加“禁虚”一回合。</p><p>禁虚：无法施展虚招。</p><p>·若目标为友方，则招式释放距离降低为 1 米，以针灸刺入其重要穴位，为其添加一层“养血”，至多三层，持续到战斗脱离。</p><p>养血：每层使你回合末回复 10 点气血。</p><p>升级：招式伤害+10，内力消耗+2。</p>",
+            "requirements": "暗器-针",
+            "moves": [
+                {
+                    "name": "神女拈针 (攻)",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "hidden",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "<p>主要动作，弹指飞针，激射而出，对敌人造成 0.5 内息点内功伤害，并为其添加“禁虚”一回合。</p><p>消耗：暗器-针*1</p>",
+                    "range": "10米",
+                    "targetInfo": "单体 (敌方)",
+                    "actionCost": "主要动作",
+                    "automationNote": "暗器消耗需手动扣除。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            2,
+                            2,
+                            2
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加禁虚",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    // 从系统配置中获取禁虚数据\n    const statusData = CONFIG.statusEffects.find(e => e.id === \"jinxu\");\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "神女拈针 (医)",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "hidden",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "<p>以针灸刺入其重要穴位，为其添加一层“养血”，至多三层，持续到战斗脱离。</p><p>消耗：暗器-针*1</p>",
+                    "range": "1米",
+                    "targetInfo": "单体 (友方)",
+                    "actionCost": "主要动作",
+                    "automationNote": "暗器消耗需手动扣除。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            2,
+                            2,
+                            2
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加养血",
+                            "trigger": "hit",
+                            "script": "// 养血是系统可叠层状态，管理器会自动处理叠层逻辑\nawait game.xjzl.api.effects.addEffect(args.target, \"yangxue\");\nui.notifications.info(`${actor.name} 为 ${args.target.name} 施针疗伤，施加了 [养血]`);",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]

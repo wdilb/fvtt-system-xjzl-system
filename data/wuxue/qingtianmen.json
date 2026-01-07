@@ -21,7 +21,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "主要动作，全力将重剑抛向目标位置，坠落砸下对其造成 0.3 力量点外功伤害，并使目标周围 1 米范围地表破碎，成为困难地形。<br>·施展此招后，你的[剑-重剑]武器视作脱手,掉落在目标所处空格，重剑视为障碍物无法跨过，目标会被挤开 1 米（由他选择位置）。<br>·你贴近重剑后可以用一个简要动作将其捡起。<br>·敌人贴近重剑后可以用一个主要动作将其捡起。",
-                    "automationNote": "伤害自动计算。武器脱手、地形破坏、捡起逻辑需手动处理。",
+                    "automationNote": "伤害自动计算。武器脱手、地形破坏、捡起逻辑需玩家手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -62,7 +62,7 @@
                     "targetInfo": "特殊",
                     "actionCost": "主要动作",
                     "description": "主要动作，选择两个无人占据的空格，将重剑横于地面，形成‘重剑屏障’。<br>重剑屏障：具有 40 点结构值，防护 0，结构值归零后，重剑损坏，无法修复。（详见建筑结构值）<br>·施展此招后，你的[剑-重剑]武器视作脱手,重剑视为障碍物无法跨过，躲在重剑身后的目标视作被完全遮挡。<br>·你贴近重剑后可以用一个简要动作将其捡起。<br>·敌人贴近重剑后可以用一个主要动作将其捡起。",
-                    "automationNote": "完全手动。请GM在场景中放置障碍物并管理结构值。",
+                    "automationNote": "完全手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0,
@@ -97,7 +97,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "主要动作，回捞重剑，上挑打击，造成 0.3 力量点外功伤害，若目标无架招，将其击飞 1 米。",
-                    "automationNote": "伤害自动计算。击飞效果需手动处理。",
+                    "automationNote": "伤害自动计算。击飞效果需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -138,7 +138,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "次要动作，解除自身的下盘不稳、禁足、缚身，然后奔至范围内一处[剑-重剑]所在的位置，捡起并装备该重剑然后横扫周围 1 米敌人，造成 0.2 力量点外功伤害并将无架招的目标击倒。<br>·若自身已经装备武器，则该武器替换为新捡起的重剑。",
-                    "automationNote": "伤害自动计算。解除状态脚本已实现。移动和捡起武器需手动。",
+                    "automationNote": "伤害自动计算。出招时自动解除限制状态。移动和捡起武器需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -200,7 +200,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "次要动作，双掌回环，开启架招。格挡成功后，为目标添加“顽石”，持续到战斗脱离。<br>顽石：当目标与其他具有“顽石”的目标贴近时（距离为 1），双方立即流失 10 点气血并倒地，然后双方移除“顽石”。",
-                    "automationNote": "架招格挡值自动生效。'顽石'特效需在[受击后]脚本中手动给攻击者添加(如果需要)。顽石的距离判定和扣血需手动处理。",
+                    "automationNote": "架招格挡值自动生效。反击成功后会自动提示并为攻击者添加【顽石】。顽石的距离判定和扣血需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -227,7 +227,7 @@
                         {
                             "label": "反击施加顽石",
                             "trigger": "damaged",
-                            "script": "// 检查是否满足触发架招条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 获取顽石特效模板\nconst wanshiEffect = {\n    name: \"顽石\",\n    icon: \"icons/svg/stone.svg\",\n    duration: { rounds: 99 },\n    description: \"当与其他顽石目标贴近时流失气血并倒地。\",\n    flags: { \"xjzl-system\": { slug: \"wanshi\" } }\n};\n\n// 获取等级计算流失伤害说明(仅作提示，不改数值)\n// 顽石气血流失: 10 + (Level-1)*5\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmg = 10 + (lvl - 1) * 5;\nui.notifications.info(`架招反击：请给 ${args.attacker.name} 添加【顽石】。距离贴近时流失 ${dmg} 点气血。`);\n\nawait game.xjzl.api.effects.addEffect(args.attacker, wanshiEffect);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst wanshi = thisItem.effects.getName(\"顽石\");\nif (wanshi) {\n    await game.xjzl.api.effects.addEffect(args.attacker, wanshi);\n    ui.notifications.info(`架招反击：已为 ${args.attacker.name} 添加【顽石】。`);\n}",
                             "active": true
                         }
                     ]
@@ -315,7 +315,7 @@
                         {
                             "label": "命中施加顽石",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst target = args.target;\n// 检查目标是否开启架招\nif (target.system.martial?.stanceActive) return;\n\nconst wanshiEffect = {\n    name: \"顽石\",\n    icon: \"icons/svg/stone.svg\",\n    duration: { rounds: 99 },\n    description: \"当与其他顽石目标贴近时流失气血并倒地。\",\n    flags: { \"xjzl-system\": { slug: \"wanshi\" } }\n};\n\nawait game.xjzl.api.effects.addEffect(target, wanshiEffect);\nui.notifications.info(`推石出山：已为 ${target.name} 添加【顽石】。`);",
+                            "script": "if (!args.isHit) return;\nconst target = args.target;\nif (target.system.martial?.stanceActive) return;\n\nconst wanshi = thisItem.effects.getName(\"顽石\");\nif (wanshi) {\n    await game.xjzl.api.effects.addEffect(target, wanshi);\n    ui.notifications.info(`推石出山：已为 ${target.name} 添加【顽石】。`);\n}",
                             "active": true
                         }
                     ]
@@ -363,7 +363,7 @@
                         {
                             "label": "施加禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true);\n    // 修正持续时间为2回合\n    const effect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"root\");\n    if (effect) await effect.update({ \"duration.rounds\": 2 });\n}",
+                            "script": "if (args.isHit) {\n    const effect = await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    if (effect) await effect.update({ \"duration.rounds\": 2 });\n}",
                             "active": true
                         }
                     ]
@@ -412,10 +412,26 @@
                         {
                             "label": "施加顽石",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const wanshiEffect = {\n        name: \"顽石\",\n        icon: \"icons/svg/stone.svg\",\n        duration: { rounds: 99 },\n        description: \"当与其他顽石目标贴近时流失气血并倒地。\",\n        flags: { \"xjzl-system\": { slug: \"wanshi\" } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, wanshiEffect);\n}",
+                            "script": "if (args.isHit) {\n    const wanshi = thisItem.effects.getName(\"顽石\");\n    if (wanshi) await game.xjzl.api.effects.addEffect(args.target, wanshi);\n}",
                             "active": true
                         }
                     ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "顽石",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "当目标与其他具有“顽石”的目标贴近时（距离为 1），双方立即流失 10 点气血并倒地，然后双方移除“顽石”。",
+                    "duration": {
+                        "rounds": 99
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wanshi"
+                        }
+                    }
                 }
             ]
         }
@@ -530,7 +546,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "次要动作，稳扎马步，紧握双锤，开启架招。格挡成功后，为自己添加“蛮力”，持续一回合或被击破架招。<br>蛮力：以力量为伤害系数的招式伤害+10。",
-                    "automationNote": "架招格挡值自动生效。'蛮力'特效(招式伤害+10)需在反击时手动添加或通过脚本实现(已实现)。注意：系统无法自动区分力量系数招式，默认全招式加成。",
+                    "automationNote": "架招格挡值自动生效。'蛮力'特效(招式伤害+10)反击后自动添加。注意：系统无法自动区分力量系数招式，默认全招式加成。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -557,7 +573,7 @@
                         {
                             "label": "反击获得蛮力",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算持续时间\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst manli = {\n    name: \"蛮力\",\n    icon: \"icons/svg/upgrade.svg\",\n    duration: { rounds: durationRounds },\n    description: \"招式伤害+10\",\n    changes: [\n        { key: \"system.combat.damages.skill.mod\", mode: 2, value: 10 }\n    ],\n    flags: { \"xjzl-system\": { slug: \"manli\" } }\n};\n\nawait game.xjzl.api.effects.addEffect(actor, manli);\nui.notifications.info(\"架招反击：获得【蛮力】\");",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算持续时间\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst manli = thisItem.effects.getName(\"蛮力\");\nif (manli) {\n    // 动态调整持续时间\n    const effectData = manli.toObject();\n    effectData.duration.rounds = durationRounds;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【蛮力】\");\n}",
                             "active": true
                         }
                     ]
@@ -605,7 +621,7 @@
                         {
                             "label": "击倒",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n}",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}",
                             "active": true
                         }
                     ]
@@ -650,6 +666,29 @@
                             0
                         ]
                     }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "蛮力",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "以力量为伤害系数的招式伤害+10。",
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "manli"
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
                 }
             ]
         }
@@ -716,7 +755,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "主要动作，挥动重剑全力斩击，对其造成 0.5 力量点外功伤害。<br>若有敌人处于半空中，可消耗反应动作施展此招，跃至半空，巨剑劈下，造成伤害并将其击倒。",
-                    "automationNote": "伤害自动计算。半空击倒(prone)需手动确认目标状态后施加。",
+                    "automationNote": "伤害自动计算。半空击倒(倒地)需手动确认目标状态后施加。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -756,7 +795,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "次要动作，立重剑于身前，开启架招。格挡成功后获得“铁壁”持续一回合。<br>铁壁：无法被范围攻击选中。",
-                    "automationNote": "架招格挡值自动生效。'铁壁'特效需在反击时手动添加(已实现)，但'无法被范围攻击选中'效果需要GM裁定。",
+                    "automationNote": "架招格挡值自动生效。反击自动获得'铁壁'。'无法被范围攻击选中'效果需要手动裁定。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -783,7 +822,7 @@
                         {
                             "label": "反击获得铁壁",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst tiebi = {\n    name: \"铁壁\",\n    icon: \"icons/svg/shield.svg\",\n    duration: { rounds: 1 },\n    description: \"无法被范围攻击选中。\",\n    flags: { \"xjzl-system\": { slug: \"tiebi\" } }\n};\n\nawait game.xjzl.api.effects.addEffect(actor, tiebi);\nui.notifications.info(\"架招反击：获得【铁壁】\");",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst tiebi = thisItem.effects.getName(\"铁壁\");\nif (tiebi) {\n    await game.xjzl.api.effects.addEffect(actor, tiebi);\n    ui.notifications.info(\"架招反击：获得【铁壁】\");\n}",
                             "active": true
                         }
                     ]
@@ -831,7 +870,7 @@
                         {
                             "label": "击倒",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n}",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}",
                             "active": true
                         }
                     ]
@@ -848,7 +887,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "主要动作，拖剑奔袭至目标周围空格，怒劈而下，对其造成 0.7 力量点外功伤害，并将其击倒，然后在目标及其周围 5 米范围内形成困难地形。<br>·若目标已经处于困难地形，招式必定造成暴击。",
-                    "automationNote": "伤害自动计算。击倒效果自动添加。困难地形手动。困难地形必暴击效果需手动在出招配置中勾选。",
+                    "automationNote": "伤害自动计算。击倒效果自动添加。困难地形手动。若目标在困难地形，请玩家在出招弹窗手动勾选【暴击】。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -880,10 +919,26 @@
                         {
                             "label": "击倒",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n}",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}",
                             "active": true
                         }
                     ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "铁壁",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "无法被范围攻击选中。",
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tiebi"
+                        }
+                    }
                 }
             ]
         }
@@ -942,7 +997,7 @@
                         {
                             "label": "无架招施加错骨",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\n// 检查目标是否开启架招\nif (!args.target.system.martial?.stanceActive) {\n    // 施加错骨，持续1回合\n    await game.xjzl.api.effects.toggleStatus(args.target, \"cuogu\", true);\n    // 修正持续时间\n    const effect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"cuogu\");\n    if (effect) await effect.update({ \"duration.rounds\": 1 });\n    ui.notifications.info(`${args.target.name} 被施加【错骨】。`);\n}",
+                            "script": "if (!args.isHit) return;\n// 检查目标是否开启架招\nif (!args.target.system.martial?.stanceActive) {\n    // 施加错骨，持续1回合\n    const effect = await game.xjzl.api.effects.addEffect(args.target, \"cuogu\");\n    // 修正持续时间\n    if (effect) await effect.update({ \"duration.rounds\": 1 });\n    ui.notifications.info(`${args.target.name} 被施加【错骨】。`);\n}",
                             "active": true
                         }
                     ]
@@ -985,7 +1040,7 @@
                         {
                             "label": "反击获得眼力",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst yanli = {\n    name: \"眼力\",\n    icon: \"icons/svg/eye.svg\",\n    flags: { \"xjzl-system\": { slug: \"yanli\", stackable: true, maxStacks: 3 } },\n    changes: [\n        { key: \"system.combat.hit_waigong\", mode: 2, value: 5 },\n        { key: \"system.combat.hit_neigong\", mode: 2, value: 5 }\n    ]\n};\n\nawait game.xjzl.api.effects.addEffect(actor, yanli);\nui.notifications.info(\"架招反击：获得/叠加【眼力】\");",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nawait game.xjzl.api.effects.addEffect(actor, \"yanli\");\nui.notifications.info(\"架招反击：获得/叠加【眼力】\");",
                             "active": true
                         }
                     ]
@@ -1068,9 +1123,9 @@
                 },
                 {
                     "name": "固若金汤",
-                    "type": "real",
-                    "isUltimate": true,
-                    "damageType": "waigong",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
                     "weaponType": "unarmed",
                     "element": "taiji",
                     "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
@@ -1154,7 +1209,7 @@
                         {
                             "label": "反击获得燧火",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算效果(暴击骰减免)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst critReduct = -1 + (lvl - 1) * (-1);\n\nconst suihuo = {\n    name: \"燧火\",\n    icon: \"icons/svg/fire.svg\",\n    flags: { \"xjzl-system\": { slug: \"suihuo\" } },\n    changes: [\n        { key: \"system.combat.crit_waigong\", mode: 2, value: critReduct }\n    ],\n    // 燧火内部脚本：监听攻击命中\n    flags: { \n        \"xjzl-system\": { \n            scripts: [{\n                label: \"燧火暴击施加烙伤\",\n                trigger: \"hit\",\n                active: true,\n                script: `\n                    // 必须暴击才触发\n                    if (!args.isCrit) return;\n                    // 烙伤：回合结束/出招后受伤。这里使用出招时扣血逻辑(regenHpAttack -10)\n                    const laoshang = {\n                        name: \"烙伤\",\n                        icon: \"icons/svg/fire-circle.svg\",\n                        duration: { rounds: 1 },\n                        description: \"每次出招后，受到 10 点火焰伤害。\",\n                        changes: [{ key: \"flags.xjzl-system.regenHpAttack\", mode: 2, value: -10 }]\n                    };\n                    await game.xjzl.api.effects.addEffect(args.target, laoshang);\n                    ui.notifications.info(\"燧火暴击：目标被施加【烙伤】\");\n                `\n            }]\n        }\n    }\n};\n\nawait game.xjzl.api.effects.addEffect(actor, suihuo);\nui.notifications.info(\"架招反击：获得【燧火】\");",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算效果(暴击骰减免)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst critReduct = -1 + (lvl - 1) * (-1);\n\nconst suihuo = thisItem.effects.getName(\"燧火\");\nif (suihuo) {\n    const effectData = suihuo.toObject();\n    // 动态修改暴击骰减免\n    effectData.changes[0].value = critReduct;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【燧火】\");\n}",
                             "active": true
                         }
                     ]
@@ -1202,7 +1257,7 @@
                         {
                             "label": "无架招施加烙伤",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nif (!args.target.system.martial?.stanceActive) {\n    // 获取等级计算持续时间\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n\n    const laoshang = {\n        name: \"烙伤\",\n        icon: \"icons/svg/fire-circle.svg\",\n        duration: { rounds: rounds },\n        description: \"每次出招后，受到 10 点火焰伤害。\",\n        changes: [{ key: \"flags.xjzl-system.regenHpAttack\", mode: 2, value: -10 }]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, laoshang);\n    ui.notifications.info(`${args.target.name} 被施加【烙伤】。`);\n}",
+                            "script": "if (!args.isHit) return;\nif (!args.target.system.martial?.stanceActive) {\n    // 获取等级计算持续时间\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n\n    const laoshang = thisItem.effects.getName(\"烙伤\");\n    if (laoshang) {\n        const effectData = laoshang.toObject();\n        effectData.duration.rounds = rounds;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 被施加【烙伤】。`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1267,7 +1322,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "主要动作，锤头火星大盛，砸击目标，造成 0.6 力量点外功伤害。<br>·若自身具有燧火，可选择范围内一个友方目标，为其添加“薪火”，持续到战斗脱离。<br>薪火：下一次出招招式伤害+10 且必定暴击。",
-                    "automationNote": "伤害自动计算。若有'燧火'，会提示玩家给友方添加'薪火'。薪火特效(下一次+10 dmg, 必暴)需手动操作或另行实现。",
+                    "automationNote": "伤害自动计算。若有'燧火'，会提示玩家给友方添加'薪火'。薪火特效(下一次+10 dmg, 必暴)需手动操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1301,6 +1356,81 @@
                             "trigger": "attack",
                             "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suihuo\")) {\n    ui.notifications.info(\"【薪火相传】检测到燧火！请选择友方施加【薪火】（伤害+10且必暴）。\");\n}",
                             "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "燧火",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "暴击骰-X。暴击时给目标添加“烙伤”。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "suihuo",
+                            "scripts": [
+                                {
+                                    "label": "燧火暴击施加烙伤",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "\n                    // 必须暴击才触发\n                    if (!args.isCrit) return;\n                    \n                    // 获取烙伤模板\n                    // 因为脚本在AE上运行，thisItem是AE。需要找到所属的物品(Wuxue)。\n                    // AE.origin 指向的是 Item.uuid。我们可以通过 fromUuidSync 获取。\n                    // 但 args.item 已经是当前攻击使用的物品了，直接用 args.item 即可。\n                    \n                    const laoshang = args.item.effects.getName(\"烙伤\");\n                    if (laoshang) {\n                        await game.xjzl.api.effects.addEffect(args.target, laoshang);\n                        ui.notifications.info(\"燧火暴击：目标被施加【烙伤】\");\n                    }\n                "
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "-1"
+                        }
+                    ]
+                },
+                {
+                    "name": "烙伤",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "每次出招后，受到 10 点火焰伤害。",
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "laoshang"
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpAttack",
+                            "mode": 2,
+                            "value": "-10"
+                        }
+                    ]
+                },
+                {
+                    "name": "薪火",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "下一次出招招式伤害+10 且必定暴击。",
+                    "duration": {
+                        "turns": 1
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xinhuo"
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "10"
+                        },
+                        {
+                            "key": "flags.xjzl-system.critThresholdMod",
+                            "mode": 2,
+                            "value": "20"
                         }
                     ]
                 }
@@ -1396,7 +1526,7 @@
                         {
                             "label": "反击获得泰山磐石",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算持续时间\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst panshi = {\n    name: \"泰山磐石\",\n    icon: \"icons/svg/castle.svg\",\n    duration: { rounds: durationRounds },\n    description: \"免疫所有敌人添加的状态(需手动确认)。\",\n    flags: { \"xjzl-system\": { slug: \"taishanpanshi\" } }\n};\n\nawait game.xjzl.api.effects.addEffect(actor, panshi);\nui.notifications.info(\"架招反击：获得【泰山磐石】\");",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算持续时间\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst panshi = thisItem.effects.getName(\"泰山磐石\");\nif (panshi) {\n    const effectData = panshi.toObject();\n    effectData.duration.rounds = durationRounds;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【泰山磐石】\");\n}",
                             "active": true
                         }
                     ]
@@ -1444,16 +1574,17 @@
                         {
                             "label": "破架施加控制",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true);\n    await game.xjzl.api.effects.toggleStatus(args.target, \"fushen\", true);\n    ui.notifications.info(`${args.target.name} 被破架，陷入【禁足】和【缚身】。`);\n}",
+                            "script": "if (args.isHit && args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n    ui.notifications.info(`${args.target.name} 被破架，陷入【禁足】和【缚身】。`);\n}",
                             "active": true
                         }
                     ]
                 },
                 {
                     "name": "慢势-大巧若拙",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "default",
                     "isUltimate": true,
-                    "damageType": "waigong",
+                    "damageType": "none",
                     "weaponType": "sword",
                     "element": "gang",
                     "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
@@ -1461,7 +1592,7 @@
                     "targetInfo": "自身",
                     "actionCost": "简要动作",
                     "description": "-千锤百炼，大象无形- 简要动作，凝气化神，遗忘一切，进入“神剑”姿态，持续一回合。<br>神剑：你只能持一把重剑，并解除自身架招。你使用该重剑进行普通攻击的伤害变为造成 0.4 力量点外功伤害，且属于招式。",
-                    "automationNote": "获得'神剑'状态自动。但普攻伤害变化和'属于招式'的判定需手动或通过全局脚本辅助，目前系统不支持直接修改普攻公式。",
+                    "automationNote": "获得'神剑'状态自动。已额外生成【神剑普攻】招式供使用。",
                     "calculation": {
                         "base": 0,
                         "growth": 0,
@@ -1487,13 +1618,350 @@
                     "scripts": [
                         {
                             "label": "进入神剑姿态",
+                            "trigger": "attack",
+                            "script": "// 解除架招\nawait actor.stopStance();\n\n// 获取等级计算持续时间\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst shenjian = thisItem.effects.getName(\"神剑\");\nif (shenjian) {\n    const effectData = shenjian.toObject();\n    effectData.duration.rounds = durationRounds;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"进入【神剑】姿态。请使用【神剑普攻】招式。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "神剑普攻",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "element": "gang",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "range": "1",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "神剑姿态下的普通攻击。造成 0.4 力量点外功伤害，且属于招式。",
+                    "automationNote": "额外生成的招式，用于模拟神剑姿态下的普攻。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "rage": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "泰山磐石",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "你免疫所有敌人添加的状态。",
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "taishanpanshi"
+                        }
+                    }
+                },
+                {
+                    "name": "神剑",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "只能持一把重剑，解除架招。重剑普攻伤害变为 0.4 力量系数，且属于招式。",
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shenjian"
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "踵息诀（地级）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "qingtianmen",
+            "tier": 2,
+            "description": "<p>庄子云，“真人之息以踵，众人之息以喉”。<br>擎天门功法过于刚猛，修炼时需排除杂念，静心稳性，不然轻则伤人伤己，重则走火入魔。</p>",
+            "requirements": "《十三太保横练功》修炼圆满",
+            "moves": [
+                {
+                    "name": "踵息",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "<p>在休整时，单指倒立、扛重举鼎，再以特殊心法运气调息，获得“踵息”，持续到你下一次休整。<br>踵息：若你在本回合没有造成任何伤害，则下回合招式命中+10。<br>升级：命中再+10。</p>",
+                    "automationNote": "点击应用效果给自己添加[踵息]状态。Buff的具体生效条件（本回合未造成伤害）需手动判断。",
+                    "costs": {
+                        "mp": [
+                            0,
+                            0
+                        ],
+                        "rage": [
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得踵息",
                             "trigger": "hit",
-                            "script": "// 解除架招\nawait actor.stopStance();\n\n// 获取等级计算持续时间\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n// 获取普攻增伤 (0 + 20*lvl-1)\nconst bonusDmg = 20 * (lvl - 1);\n\nconst shenjian = {\n    name: \"神剑\",\n    icon: \"icons/svg/sword.svg\",\n    duration: { rounds: durationRounds },\n    description: \"普攻视为0.4力量系数招式。\",\n    changes: [\n        { key: \"system.combat.damages.normal.mod\", mode: 2, value: bonusDmg }\n    ],\n    flags: { \"xjzl-system\": { slug: \"shenjian\" } }\n};\n\nawait game.xjzl.api.effects.addEffect(actor, shenjian);\nui.notifications.info(\"进入【神剑】姿态。普攻加成已应用，但系数变化需手动计算。\");",
+                            "script": "const eff = thisItem.effects.getName(\"踵息\");\nif (!eff) return ui.notifications.warn(\"未找到特效数据\");\n// 动态更新描述中的数值\nconst bonus = (args.move.computedLevel || 1) * 10;\nconst effectData = eff.toObject();\neffectData.description = `若本回合没有造成任何伤害，则下回合招式命中+${bonus}。`;\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
                             "active": true
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "踵息",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "description": "若本回合没有造成任何伤害，则下回合招式命中增加。",
+                "transfer": false,
+                "duration": {
+                    "seconds": 28800
+                },
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhongxi",
+                        "stackable": false
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "力道千险（天级）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "qingtianmen",
+            "tier": 3,
+            "description": "<p>武道之路千难万阻，唯有以力破之。此乃外功修炼法门不世神功，以生死关头的潜力不断刺激壮大十二正经要穴，激发全身力道，淬炼浑身筋骨。</p>",
+            "requirements": "《玄鼎诀》修炼圆满",
+            "moves": [
+                {
+                    "name": "势不可当",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "<p>当你的力量大于等于 100 点时，每次出招可以与目标进行一次[角力]对抗，若你获胜，为其添加一层“颤手”，持续到战斗脱离。<br>颤手：满五层后，手持武器脱手落地（需花费主要动作拾起），并陷入“缴械”一回合，然后移除所有颤手。<br>缴械：你无法施展徒手以外的武学。</p>",
+                    "automationNote": "力量条件自动判断。对抗需手动进行（使用弹窗辅助请求）。颤手为系统通用状态，满层自动转化为缴械。",
+                    "costs": {
+                        "mp": [
+                            0,
+                            0
+                        ],
+                        "rage": [
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "发起角力",
+                            "trigger": "hit",
+                            "script": "if (actor.system.stats.liliang.total < 100) return ui.notifications.warn(\"力量不足100，无法触发。\");\n// 获取系统颤手数据\nconst chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"jiaoli\",\n    dc: 0, \n    label: \"角力对抗 (请双方投掷)\",\n    onFail: chanshou\n});",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "力战不懈",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "description": "<p>你每次进行死亡检定成功后，获得一层“力道”，至多叠加两层，持续到你死亡。<br>力道：每层使你的力量+10。<br>·力道无法被其他内功、武学的效果移除。<br>升级：力道可以叠加的层数+1。</p>",
+                    "automationNote": "请在死亡检定成功后手动施展给自己添加[力道]层数。层数上限已自动计算。",
+                    "costs": {
+                        "mp": [
+                            0,
+                            0
+                        ],
+                        "rage": [
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得力道",
+                            "trigger": "hit",
+                            "script": "const eff = thisItem.effects.getName(\"力道\");\nif (!eff) return ui.notifications.warn(\"未找到特效数据\");\nconst lvl = args.move.computedLevel || 1;\nconst maxStacks = 1 + lvl;\nconst effectData = eff.toObject();\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.maxStacks\", maxStacks);\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "力道",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "description": "每层力量+10，持续到死亡。",
+                "transfer": false,
+                "changes": [
+                    {
+                        "key": "system.stats.liliang.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lidao",
+                        "stackable": true,
+                        "maxStacks": 2
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "剑嶽临渊（天级）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "qingtianmen",
+            "tier": 3,
+            "description": "<p>擎天门不传之秘。<br>夫剑者，侠之刃也，宁折不屈，锋芒所向，无所畏惧，剑势巍峨如山岳，如履深渊。</p>",
+            "requirements": "《崭天诀》修炼圆满，剑-重剑",
+            "moves": [
+                {
+                    "name": "剑嶽",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "element": "gang",
+                    "description": "<p>主要动作，矗剑于地，山峙渊渟，在自身周围 2 米范围内形成‘剑嶽’，持续到战斗脱离。<br>剑嶽：区域内的敌人感受到磅礴沉重的压力，视作处于困难地形之中。‘剑嶽’范围外的敌人在你的每个回合末，向中心被拉扯 1 米。<br>升级：‘剑嶽’的范围扩大 1 米，‘剑嶽’范围外的敌人被拉扯的距离增加 1 米，内力消耗+10。</p>",
+                    "range": "2米",
+                    "actionCost": "主要动作",
+                    "automationNote": "点击应用给自己添加[剑嶽]状态作为提示。地形与拉扯效果需手动处理。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20
+                        ],
+                        "rage": [
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启剑嶽",
+                            "trigger": "hit",
+                            "script": "const eff = thisItem.effects.getName(\"剑嶽\");\nif (!eff) return ui.notifications.warn(\"未找到特效数据\");\nconst lvl = args.move.computedLevel || 1;\nconst range = 1 + lvl;\nconst pull = lvl;\nconst effectData = eff.toObject();\neffectData.description = `周围${range}米困难地形。回合末范围外敌人向中心拉扯${pull}米。`;\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "挥舞剑气",
+                    "type": "real",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "description": "<p>消耗次要动作拔起重剑，挥舞剑气，对‘剑嶽’范围内的每一个敌人分别进行一次普通攻击，且这次攻击无视目标架招（视作目标无架招）。</p>",
+                    "range": "剑嶽范围内",
+                    "actionCost": "次要动作",
+                    "automationNote": "已自动应用[无视架招]。请手动选中范围内所有敌人进行结算。",
+                    "costs": {
+                        "mp": [
+                            0,
+                            0
+                        ],
+                        "rage": [
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "无视架招",
+                            "trigger": "attack",
+                            "script": "args.flags.ignoreStance = true;",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "剑嶽",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "description": "周围形成剑嶽领域，造成困难地形与拉扯效果。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 10
+                },
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jianyue",
+                        "stackable": false
+                    }
+                }
+            }
+        ]
     }
 ]
