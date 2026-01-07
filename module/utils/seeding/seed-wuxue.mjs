@@ -6,7 +6,7 @@ const PACK_NAME = "xjzl-system.wuxue";
 const SECT_MAP = {
     // "none": "江湖/无门派",
     "zhengqizong": "正气宗",
-    // "zhenwujiao": "真武教",
+    "zhenwujiao": "真武教",
     // "wanfosi": "万佛寺",
     // "xiaoyaopai": "逍遥派",
     // "qingtianmen": "擎天门",
