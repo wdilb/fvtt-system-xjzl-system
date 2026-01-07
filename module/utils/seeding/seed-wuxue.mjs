@@ -8,7 +8,7 @@ const SECT_MAP = {
     "zhengqizong": "正气宗",
     "zhenwujiao": "真武教",
     "wanfosi": "万佛寺",
-    // "xiaoyaopai": "逍遥派",
+    "xiaoyaopai": "逍遥派",
     // "qingtianmen": "擎天门",
     // "emeipai": "峨眉派",
     // "huashanpai": "华山派",
