@@ -1141,9 +1141,25 @@ export class XJZLItem extends Item {
     }
     breakdownText += `+ 其他增伤: ${flatBonus - moraleBonus}\n`;
 
-    if (scriptDmgBonus !== 0) {
+    const hasScriptChange = scriptDmgBonus !== 0;
+    const hasScriptDesc = calcOutput.bonusDesc && calcOutput.bonusDesc.length > 0;
+
+    if (hasScriptChange || hasScriptDesc) {
       const sign = scriptDmgBonus > 0 ? "+" : "";
-      breakdownText += `\n${sign} 特效增伤: ${scriptDmgBonus}(仅生效计算阶段特效与被动特效，不代表最终结果)`;
+      // 显示总的数值变化
+      breakdownText += `${sign} 特效修正: ${scriptDmgBonus}`;
+
+      // 如果有详细描述，遍历显示
+      if (hasScriptDesc) {
+        breakdownText += `\n`; // 换行开始列出详情
+        calcOutput.bonusDesc.forEach(desc => {
+          // 使用缩进符号 (└) 让层级更清晰
+          breakdownText += `   └ ${desc}\n`;
+        });
+      } else {
+        // 如果没有描述但有数值变化，保留原来的通用提示
+        breakdownText += ` (计算/被动特效)\n`;
+      }
     }
 
     if (scriptFeintBonus !== 0) {
@@ -1474,7 +1490,7 @@ export class XJZLItem extends Item {
 
       const attackContext = {
         move: move,
-        item: this,      
+        item: this,
         attacker: actor, // 明确语义，方便 copy 脚本到其他地方
         // 使用数值计数器，不再使用布尔值的flags
         // 核心 Flags (供脚本修改)
