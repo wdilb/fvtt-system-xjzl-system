@@ -1,0 +1,1581 @@
+[
+    {
+        "name": "走镖歌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "effects": [
+            {
+                "name": "以武会友",
+                "icon": "icons/svg/downgrade.svg",
+                "description": "对添加该状态者以外的角色造成的伤害降低 20 点。",
+                "duration": {
+                    "rounds": 1
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_yiwuhuiyou_debuff",
+                        "stackable": false
+                    }
+                },
+                "scripts": [
+                    {
+                        "label": "伤害降低",
+                        "trigger": "preDamage",
+                        "active": true,
+                        "script": "const sourceUuid = thisEffect.getFlag('xjzl-system', 'sourceActorUuid');\nif (args.target && args.target.uuid !== sourceUuid) {\n    args.config.amount = Math.max(0, args.config.amount - 20);\n    ui.notifications.info(\"以武会友：伤害降低 20 点\");\n}"
+                    }
+                ]
+            },
+            {
+                "name": "和气生财",
+                "icon": "icons/svg/peace.svg",
+                "description": "招式伤害-10，暴击骰+2。",
+                "duration": {
+                    "rounds": 1
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_heqishengcai_debuff",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-2"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
+            }
+        ],
+        "system": {
+            "category": "wuxue",
+            "sect": "sihaibiaomeng",
+            "tier": 1,
+            "description": "走镖时趟子手所用，中气十足，喊法各不相同。",
+            "requirements": "乐器-锣鼓",
+            "moves": [
+                {
+                    "name": "我武唯扬",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "weaponType": "instrument",
+                    "range": "10",
+                    "actionCost": "蓄力动作",
+                    "description": "重重敲锣，高挂镖旗，行威武镖，为范围内所有敌方添加“以武会友”，持续一回合。<br>以武会友：对添加该状态者以外的角色造成的伤害降低 20 点。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "以武会友",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const effectData = thisItem.effects.getName(\"以武会友\").toObject();\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.sourceActorUuid\", actor.uuid);\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                        }
+                    ],
+                    "automationNote": "完全自动化。需要玩家手动选择范围内所有敌方。"
+                },
+                {
+                    "name": "合吾",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "weaponType": "instrument",
+                    "range": "10",
+                    "actionCost": "蓄力动作",
+                    "description": "轻缓敲锣，半降镖旗，行仁义镖，为范围内所有敌方添加“和气生财”，持续一回合。<br>和气生财：招式伤害-10，暴击骰+2。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "和气生财",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const effectData = thisItem.effects.getName(\"和气生财\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                        }
+                    ],
+                    "automationNote": "完全自动化。暴击骰+2实现为暴击属性-2（更难暴击）。"
+                },
+                {
+                    "name": "偃旗息锣",
+                    "type": "stance",
+                    "element": "yang",
+                    "weaponType": "instrument",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "按锣不敲，收起镖旗，行哑镖。<br>格挡成功后，可消耗反应动作施展【我武唯扬】或【合吾】。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "automationNote": "反击动作需玩家手动执行。"
+                },
+                {
+                    "name": "一齐打响",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "yang",
+                    "weaponType": "instrument",
+                    "damageType": "waigong",
+                    "range": "5",
+                    "actionCost": "蓄力动作",
+                    "description": "万不得已，猛敲铜锣，声震耳聋，对范围内敌人造成 0.5 力量点外功伤害。<br>同时给目标添加“耳鸣”，持续两回合。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "添加耳鸣",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"deaf\");"
+                        }
+                    ],
+                    "automationNote": "完全自动化。耳鸣持续时间由系统状态默认处理，如需强制2回合需玩家手动调整或GM干预。"
+                }
+            ]
+        }
+    },
+    {
+        "name": "雁羽翎",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "effects": [
+            {
+                "name": "雁行有序",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                "description": "下一次暗器普攻伤害翻倍。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_yanxing_buff",
+                        "stackable": false
+                    }
+                },
+                "scripts": [
+                    {
+                        "label": "普攻翻倍",
+                        "trigger": "calc",
+                        "active": true,
+                        "script": "if (args.move.type === \"basic\" && args.move.weaponType === \"hidden\") {\n    args.output.damage *= 2;\n    args.output.bonusDesc.push(\"雁行有序：伤害翻倍\");\n    await thisEffect.delete();\n}"
+                    }
+                ]
+            }
+        ],
+        "system": {
+            "category": "wuxue",
+            "sect": "sihaibiaomeng",
+            "tier": 1,
+            "description": "四海镖盟飞镖绝技，可穿叶飞花，击敌不备。",
+            "requirements": "暗器-飞镖",
+            "moves": [
+                {
+                    "name": "雁过留声",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "8",
+                    "actionCost": "主要动作",
+                    "description": "手腕轻抖，翎出雁鸣，对目标造成 0.4 身法点外功伤害。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗飞镖",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
+                        }
+                    ],
+                    "automationNote": "自动消耗名为“飞镖”的消耗品。"
+                },
+                {
+                    "name": "雁影纷飞",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "8",
+                    "actionCost": "主要动作",
+                    "description": "洒出雁羽，杀机暗藏。对目标造成 0.3 身法点外功伤害。击破架招时，为目标添加“易伤”，至多三层，持续到战斗脱离。<br>易伤：受到伤害时（包括特殊伤害），每有一层“易伤”流失 10 点气血。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗飞镖",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
+                        },
+                        {
+                            "label": "易伤",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const effect = await game.xjzl.api.effects.addEffect(args.target, \"yishang\");\n    // 确保最大层数为3\n    if (effect && effect.getFlag('xjzl-system', 'maxStacks') !== 3) {\n        await effect.update({ \"flags.xjzl-system.maxStacks\": 3 });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "雁行有序",
+                    "type": "stance",
+                    "element": "taiji",
+                    "weaponType": "hidden",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "排羽待发，开启架招。<br>格挡成功后，你的下一次暗器普攻伤害翻倍。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗飞镖",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
+                        },
+                        {
+                            "label": "雁行Buff",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"雁行有序\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "鸿雁哀鸣",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "10",
+                    "actionCost": "主要动作",
+                    "description": "雁翎尖啸而出，对目标造成 0.6 身法点外功伤害。同时给目标添加“禁足”，持续一回合。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗飞镖",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
+                        },
+                        {
+                            "label": "禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"root\");"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "破阴枪",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "sihaibiaomeng",
+            "tier": 1,
+            "description": "四海镖局枪法，枪落风啸，精准狠辣。",
+            "requirements": "棍-长枪",
+            "moves": [
+                {
+                    "name": "阴风怒号",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2",
+                    "actionCost": "主要动作",
+                    "description": "枪出随风，阴冷异常，造成 0.3 力量点外功伤害，击破架招时将其击倒。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击倒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "环扫八荒",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2",
+                    "targetInfo": "周围2个目标",
+                    "actionCost": "蓄力动作",
+                    "description": "挥舞枪尖，对周围至多两个目标造成 0.4 力量点外功伤害。<br>若目标处于“下盘不稳”或倒地，招式伤害+10 点。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "状态增伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const t = args.target;\nif (t.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n    args.config.amount += 10;\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "光阴似箭",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2",
+                    "actionCost": "反应动作",
+                    "description": "当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，抖动枪尖，刺击目标造成 0.5 力量点外功伤害。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "automationNote": "反应动作需手动触发。"
+                },
+                {
+                    "name": "皓月长风",
+                    "type": "stance",
+                    "element": "yin",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "金风当月，寒枪临空，开启架招。格挡成功时，对方陷入“下盘不稳”，持续一回合，若目标已经处于下盘不稳，则使其倒地。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "scripts": [
+                        {
+                            "label": "反击特效",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const target = args.attacker;\n    if (target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\")) {\n        await game.xjzl.api.effects.addEffect(target, \"prone\");\n    } else {\n        await game.xjzl.api.effects.addEffect(target, \"unstable\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "云开日现",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "3",
+                    "actionCost": "主要动作",
+                    "description": "持枪刺出，风吹云散，对目标造成 0.6 力量点外功伤害。同时将周围所有“下盘不稳”和倒地的目标击飞 1 米。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const t = args.target;\nif (t.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n    ui.notifications.info(`${t.name} 被击飞 1 米`);\n}"
+                        }
+                    ],
+                    "automationNote": "伤害自动化。击飞位移需手动处理。"
+                }
+            ]
+        }
+    },
+    {
+        "name": "翻天掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "sihaibiaomeng",
+            "tier": 1,
+            "description": "临威镖局家传绝技，气势不凡，但威力普通。",
+            "requirements": "徒手-拳掌；临威镖局",
+            "moves": [
+                {
+                    "name": "天人相隔",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "长臂探掌，对目标造成 0.4 力量点外功伤害，若目标无架招，将其击退 2 米。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击退",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    ui.notifications.info(`${args.target.name} 被击退 2 米`);\n}"
+                        }
+                    ],
+                    "automationNote": "击退位移需手动处理。"
+                },
+                {
+                    "name": "拨云现天",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "晃手拍击，对目标造成 0.3 力量点外功伤害，击破架招时，给对方添加“禁足”，持续一回合。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "无法无天",
+                    "type": "stance",
+                    "element": "taiji",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "双手背后，开启架招。被击破架招后，可以不消耗动作施展一次【天人相隔】，且该次招式伤害提升 5 点。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "automationNote": "被击破后的反击需玩家手动操作。"
+                },
+                {
+                    "name": "翻天覆地",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "劈天盖地，连续出掌，对目标造成 0.5 力量点外功伤害。同时给目标添加“目盲”，持续两回合。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "目盲",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"blind\");"
+                        }
+                    ],
+                    "automationNote": "目盲持续时间由系统状态默认处理，如需强制2回合需玩家手动调整或GM干预。"
+                }
+            ]
+        }
+    },
+    {
+        "name": "梅花刀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "effects": [
+            {
+                "name": "衔刀",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                "description": "视作装备嘴中之刀，仅在用嘴刀进行普通攻击时，方生效嘴中之刀的伤害、格挡、特效。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_xiandao_buff",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ],
+        "system": {
+            "category": "wuxue",
+            "sect": "sihaibiaomeng",
+            "tier": 1,
+            "description": "梅花刀法以其“舍身单刀”和“衔刀走黑，势如虎”而闻名，步快手疾，先声夺人，刚劲有力。",
+            "requirements": "刀；成兴镖局",
+            "moves": [
+                {
+                    "name": "欺身而上",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "刀身倒提，斜劈目标造成 0.4 力量点外功伤害。<br>·若你自身无架招，该招式可以代替《趁虚而入》施展。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "automationNote": "代替《趁虚而入》施展需手动处理。"
+                },
+                {
+                    "name": "倏形剁影",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "乘隙而入，撩刀对目标造成 0.3 力量点外功伤害，击破架招时，给对方添加“错乱”，持续一回合。<br>错乱：自己的每个回合末，朝 D4 随机方向不消耗速度走出一步，然后倒地。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "错乱",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"cuoluan\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "衔刀万里",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "gang",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "将手中刀叼在嘴里，刀随身走，进入“衔刀”状态，持续到战斗脱离。<br>衔刀：你可以用嘴中之刀施展普通攻击且伤害+5。<br>·你视作装备嘴中之刀，但仅在用嘴刀进行普通攻击时，方生效嘴中之刀的伤害、格挡、特效。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 5,
+                        "growth": 5
+                    },
+                    "scripts": [
+                        {
+                            "label": "衔刀BUFF",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const effectData = thisItem.effects.getName(\"衔刀\").toObject();\n// 衔刀伤害+5逻辑实现比较复杂，这里只给一个描述性buff，具体数值手动\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                        }
+                    ],
+                    "automationNote": "仅提供描述性BUFF。普攻特效和数值需手动处理。"
+                },
+                {
+                    "name": "单刀直入",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1",
+                    "actionCost": "蓄力动作",
+                    "description": "左步缠头，右步劈刀，快步奔行，对周围目标造成 0.5 力量点外功伤害。<br>·此招可移动释放，对移动路径上周围 1 米范围内的敌人造成伤害。（不会重复造成伤害）<br>·若你处于“衔刀”，本招式伤害提升嘴中之刀的伤害。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "automationNote": "移动攻击路径伤害需手动处理。衔刀增伤需手动添加。"
+                }
+            ]
+        }
+    },
+    {
+        "name": "地术拳",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "description": "又称“地龙拳”“地躺拳”，翻滚跌扑灵巧多变。",
+            "requirements": "徒手；万通镖局",
+            "moves": [
+                {
+                    "name": "灵狗伺洞",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "后发制人，出手软，击触硬，对目标造成 0.4 力量点外功伤害，命中无架招目标时，为其添加“迟滞”，持续一回合。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "迟滞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"chizhi\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "海底跤龙",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "屈膝勾脚，拳腿交替，对目标造成 0.5 力量点外功伤害。<br>若自身与目标同时处于倒地状态，可消耗反应动作释放此招，且招式伤害+10。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "倒地增伤应用",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (actor.statuses.has(\"prone\") && args.target.statuses.has(\"prone\")) {\n    args.config.amount += 10;\n    ui.notifications.info(\"地躺增伤生效\");\n}"
+                        }
+                    ],
+                    "automationNote": "反应动作施放需手动执行。"
+                },
+                {
+                    "name": "虾背龟身",
+                    "type": "stance",
+                    "element": "taiji",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "俯身脚朝天，开启架招。成功格挡来自 1 米范围内的攻击时，自身与攻击者一同倒地。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "同归于尽",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    // 需判定距离，脚本暂无法精准判定Token距离，默认为真\n    await game.xjzl.api.effects.addEffect(actor, \"prone\");\n    await game.xjzl.api.effects.addEffect(args.attacker, \"prone\");\n    ui.notifications.info(\"虾背龟身：双方倒地\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "虎尾象步",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1",
+                    "actionCost": "反应动作",
+                    "description": "当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，两手撑地踢击目标造成 0.6 力量点外功伤害，击倒对方，并使其“禁足”一回合。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击倒禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "震天裂地",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2",
+                    "actionCost": "主要动作",
+                    "description": "翻滚圆滑，根腰发力，变化出拳对目标造成 0.8 力量点外功伤害。若自身与目标同时处于倒地状态，双方进行一次[角力]对抗，失败者受到等同于获胜者[角力]等级*10 的气血流失。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "角力对抗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (actor.statuses.has(\"prone\") && args.target.statuses.has(\"prone\")) {\n    ui.notifications.info(\"双方倒地，请进行[角力]对抗，失败者手动扣除获胜者角力等级*10的气血。\");\n}"
+                        }
+                    ],
+                    "automationNote": "角力对抗需手动进行。"
+                }
+            ]
+        }
+    },
+    {
+        "name": "断浪刀法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "effects": [
+            {
+                "name": "浪潮",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                "description": "浪潮层数。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_langchao_stack",
+                        "stackable": true
+                    }
+                },
+                "changes": []
+            }
+        ],
+        "system": {
+            "category": "wuxue",
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "description": "广州王家家传刀法，王德茂传于镖师，以壮大镖局实力，风吹刀间，劈开浪花。",
+            "requirements": "刀-双刀；镇远镖局",
+            "moves": [
+                {
+                    "name": "潮涨潮落",
+                    "type": "stance",
+                    "element": "rou",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "双刀一扬一抑，开启架招。每次格挡成功时获得一层“浪潮”，战斗脱离后消失。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得浪潮",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"浪潮\").toObject();\n    let stacks = 1;\n    if (args.move.computedLevel >= 2) stacks++; \n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "劈流斩浪",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1",
+                    "actionCost": "主要动作",
+                    "description": "挥刀双斩，对目标造成 0.5 力量点外功伤害。命中无架招目标时，为其添加“下盘不稳”，持续两回合。<br>·若你具有“浪潮”，可以消耗一层“浪潮”，使该招式伤害+5。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗浪潮增伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (await game.xjzl.api.effects.removeEffect(actor, \"wuxue_langchao_stack\", 1)) {\n    args.flags.bonusDamage = (args.flags.bonusDamage || 0) + 5;\n    ui.notifications.info(\"消耗浪潮，伤害+5\");\n}"
+                        },
+                        {
+                            "label": "下盘不稳",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "浪子回头",
+                    "type": "counter",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "3",
+                    "actionCost": "反应动作",
+                    "description": "当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，双刀绞杀，对其造成 0.6 力量点外功伤害。<br>若你具有“浪潮”，可以消耗一层“浪潮”，击飞目标 1 米。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗浪潮击飞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (await game.xjzl.api.effects.removeEffect(actor, \"wuxue_langchao_stack\", 1)) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米`);\n}"
+                        }
+                    ],
+                    "automationNote": "击飞位移需手动处理。"
+                },
+                {
+                    "name": "一刀两断",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "2",
+                    "actionCost": "主要动作",
+                    "description": "心念决绝，劈江斩浪，对目标造成 0.8 力量点外功伤害。<br>若你具有“浪潮”，可以消耗所有“浪潮”，每消耗一层，招式伤害提升 5 点伤害。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "爆发增伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_langchao_stack\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 5;\n    args.flags.bonusDamage = (args.flags.bonusDamage || 0) + bonus;\n    await effect.delete();\n    ui.notifications.info(`消耗 ${stacks} 层浪潮，伤害+${bonus}`);\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "百鸟朝凤枪",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "effects": [
+            {
+                "name": "百鸟",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                "description": "记录点数。可替换他人的D20投掷结果。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_bainiao_buff",
+                        "stackable": false
+                    }
+                }
+            }
+        ],
+        "system": {
+            "category": "wuxue",
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "description": "蓬莱枪神散人所传绝技，灵活会意，步马皆通。",
+            "requirements": "棍-长枪；凌云镖局",
+            "moves": [
+                {
+                    "name": "鸾凤分飞",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "3",
+                    "actionCost": "主要动作",
+                    "description": "牢握枪把，枪扎一线，对目标造成 0.5 力量点外功伤害。<br>若有敌人处于半空中，而自身处于“百鸟”状态，可消耗反应动作释放此招，跃至半空，劈枪砸下，对目标造成伤害，并将其击倒。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击倒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const hasBainiao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bainiao_buff\");\nif (hasBainiao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
+                        }
+                    ],
+                    "automationNote": "对空反击需手动触发。击倒效果在普通释放时也会触发（如果手动判断了条件）。脚本逻辑：如果自身有百鸟，命中后击倒。"
+                },
+                {
+                    "name": "凤凰三点头",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2",
+                    "actionCost": "主要动作",
+                    "description": "提腕上挑，平刺戳捣，对目标造成 0.4 力量点外功伤害，击破架招时将目标击飞 1 米。<br>·若自身处于“百鸟”状态，还可不消耗动作上步点枪，再对其施展两次普通攻击。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米`);\n}"
+                        }
+                    ],
+                    "automationNote": "击飞位移需手动处理。百鸟追击需玩家手动操作普通攻击。"
+                },
+                {
+                    "name": "有凤来仪",
+                    "type": "stance",
+                    "element": "rou",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "持枪四平，三尖相照，开启架招。格挡成功后进入“百鸟”，持续到脱战或解除架招。<br>百鸟：投掷一个 D20 并将结果记录下来，当场上其他目标进行 D20 投掷（仅命中、虚招对抗、属性技能）时，你可以将对方的投掷结果替换为百鸟的结果，然后移除“百鸟”。<br>·若你已经具有百鸟，你可以投掷新的 D20，并将结果记录下来，替换之前的结果。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "获取百鸟",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"百鸟\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ],
+                    "automationNote": "百鸟记录点数与替换投掷需手动进行。"
+                },
+                {
+                    "name": "鹏程万里",
+                    "isUltimate": true,
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "3",
+                    "actionCost": "主要动作",
+                    "description": "变换步法，枪舞连环，对敌人造成 0.8 力量点外功伤害，并与他进行[角力]对抗，若你获胜，则将敌人击飞 1 米并击倒。<br>·若自身处于“百鸟”状态，招式范围+3，且[角力]对抗必定获胜。<br>·若在骑马时施展，可移动释放，对路径上周围敌人造成伤害（不会重复造成伤害），并和他们都进行[角力]对抗，获胜则将敌人击飞 1 米并击倒。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "角力对抗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const hasBainiao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bainiao_buff\");\nif (hasBainiao) {\n    ui.notifications.info(\"百鸟加持：对抗自动获胜，击飞+击倒\");\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n} else {\n    ui.notifications.info(\"请进行[角力]对抗，若获胜则将敌人击飞1米并击倒\");\n}"
+                        }
+                    ],
+                    "automationNote": "角力对抗需手动进行。移动攻击路径伤害需手动处理。"
+                }
+            ]
+        }
+    },
+    {
+        "name": "同心戮力",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "sihaibiaomeng",
+            "tier": 1,
+            "description": "镖局弟子往往齐心合力，面对劫道之人，团结一\n致，奋力杀贼。",
+            "requirements": "《走四方》修炼圆满",
+            "moves": [
+                {
+                    "name": "同心戮力",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "·进入战斗后，场上有其他友方未陷入濒死时，你\n的出招命中+5，暴击骰-1。\n·为他人进行[疗伤]检定时，该次检定结果+2。\n升级：命中+5，暴击骰再-1，疗伤检定结果+2。",
+                    "automationNote": "命中与暴击加成已实现为常驻被动（忽略进战与友方判定）。疗伤检定加成需玩家手动在检定弹窗中调整。",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "同心戮力-被动",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nS.combat.hit_waigong.mod += 5 * lvl;\nS.combat.hit_neigong.mod += 5 * lvl;\nS.combat.crit_waigong.mod -= 1 * lvl;\nS.combat.crit_neigong.mod -= 1 * lvl;"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "镖行天下",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "sihaibiaomeng",
+            "tier": 2,
+            "description": "镖师常言：“受人之托，忠人之事”，却也总\n因这份“诚信”和“义气”而卷入江湖纷扰、明争\n暗斗。无论是想赚够钱财归隐田园，亦或是杀出威\n名声震武林，镖师的走镖之路绝非坦途。",
+            "moves": [
+                {
+                    "name": "镖行天下",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "镖单\n当他人请求你运送物品或护送人物时，你可以展示\n你四海镖盟的身份，与其签订镖单，有四海镖盟作\n保，对方会对你更加信赖。镖单需写明委托双方、\n起运地点、目的地、接收人，货物数、镖利多少。\n喊趟子\n走镖遇到道上的朋友，若对方愿意交涉，则可进行\n[说服]（难度 10），每次成功后可选择以下一项\n交涉，交涉后具有额外效果，可以叠加：\n1.吃的朋友饭，穿的朋友衣。\n效果：目标在下一次战斗中造成的伤害-10。\n2.朋友听真，你在林里，我在林外，都是一家。\n效果：目标在下一次战斗中的先攻降低 5 点。\n3.咱有四大靠山，不必风摆草动，义如金山银山，\n朋友重如泰山，相会如到梁山。\n效果：目标在下一次战斗中的招式暴击骰+2。\n镖利\n走镖收取的费用叫做镖利，包含基础镖利和路途\n费。将运送货物的总价值的 5%作为基础镖利，路\n途费与你的实力和运送距离有关，参照如下：\n走镖前，委托人会先支付你一半镖利，当你将货物\n按照镖单运送到指定地点，接收货物者会根据镖单\n支付你剩余一半的镖利。\n·若货物损坏、丢失且无法找回，护送人物遭到袭\n击受伤或死亡，你必须向委托人赔偿双倍的镖利。\n升级：镖利中路途费提高 1 成、抽取货物总价值比\n例提高 5%。",
+                    "automationNote": "纯文本效果，无自动化脚本。请玩家根据交涉结果手动处理后续数值修正。",
+                    "xpCostRatio": 1
+                }
+            ]
+        }
+    },
+    {
+        "name": "地龙翻身",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "sihaibiaomeng",
+            "tier": 3,
+            "description": "四海镖盟绝技，气沉于身，不漏山水，修隐忍功\n夫，只待忍无可忍时，方可施展，震慑宵小。",
+            "requirements": "《地龙劲》修炼圆满，徒手",
+            "moves": [
+                {
+                    "name": "地龙翻身",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "range": "5",
+                    "actionCost": "全回合",
+                    "description": "全回合动作，双脚插地，双掌拍地，地动山摇，周\n围敌方进行[角力]检定（难度 15），失败受到 0.6\n力量点外功伤害后倒地，并“禁足”一回合。\n·每消耗 1 点怒气，招式释放距离提高 5 米。\n升级：招式伤害+10，角力难度+2，内力消耗+8。",
+                    "automationNote": "AOE伤害需手动选中所有目标后点击应用。角力检定自动触发，失败自动扣血并应用倒地/禁足。怒气增加距离需玩家手动扣除怒气并判断距离。",
+                    "xpCostRatio": 1,
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "地龙翻身-震击",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 15 + (lvl - 1) * 2;\n// 使用面板计算好的伤害 (args.calc.damage)\nconst damage = args.calc.damage;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'jiaoli',\n    dc: dc,\n    label: '抵抗地龙翻身',\n    onFail: async () => {\n        // 造成伤害\n        await args.target.applyDamage({\n            amount: damage,\n            type: 'waigong',\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: false // 外功伤害通常计算防御\n        });\n        \n        // 施加状态: 倒地(prone) + 禁足(root)\n        // 直接调用 API 引用系统状态，严禁硬编码\n        await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n\n        // 禁足需要覆盖持续时间为 1 回合\n        await game.xjzl.api.effects.addEffect(args.target, {\n             id: \"root\",\n             duration: { rounds: 1 }\n        });\n        \n        ui.notifications.info(`${args.target.name} 被震倒并禁足！`);\n    }\n});"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]

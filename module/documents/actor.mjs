@@ -1851,14 +1851,22 @@ export class XJZLActor extends Actor {
         level: s.attackLevel || 0,
         feintLevel: 0, // 普攻没有虚招
         abort: false,
-        abortReason: ""
+        abortReason: "",
+        autoApplied: false,    // 是否自动应用
+        critThresholdMod: 0,   // 暴击阈值修正
+        bonusHit: 0,           // 脚本给予的命中加值
+        bonusFeint: 0,         // 脚本给予的虚招加值(虽然普攻一般不用，但为了兼容性加上)
+        forceHit: false // 全局必中参数
       }
     };
 
     // 运行脚本：虽然没有招式但内功、装备等可能对“普通攻击”有特殊加成
     // 脚本中可以通过判断 trigger === 'attack' && args.move.type === 'basic' 来专门针对普攻写逻辑
     await this.runScripts(SCRIPT_TRIGGERS.ATTACK, attackContext, virtualMove);
-
+    // 获取全局必中状态
+    const isGlobalForceHit = attackContext.flags.forceHit || false;
+    // 提取脚本计算出的命中修正
+    const scriptBonusHit = attackContext.flags.bonusHit || 0;
     if (attackContext.flags.abort) {
       if (attackContext.flags.abortReason) ui.notifications.warn(attackContext.flags.abortReason);
       return;
@@ -1896,7 +1904,12 @@ export class XJZLActor extends Actor {
           grantLevel: 0,
           ignoreBlock: false,
           ignoreDefense: false,
-          ignoreStance: false
+          ignoreStance: false,
+          grantFeintLevel: 0,  // 虚招等级修正
+          critThresholdMod: 0, // 针对该目标的暴击阈值修正
+          grantHit: 0,         // 针对该目标的命中加值
+          grantFeint: 0,        // 针对该目标的虚招加值
+          forceHit: false // 添加单目标必中参数
         }
       };
 
@@ -1916,7 +1929,11 @@ export class XJZLActor extends Actor {
         feintState: 0, // 普攻不涉及虚招
         ignoreBlock: baseIgnoreBlock || checkContext.flags.ignoreBlock,
         ignoreDefense: baseIgnoreDefense || checkContext.flags.ignoreDefense,
-        ignoreStance: baseIgnoreStance || checkContext.flags.ignoreStance
+        ignoreStance: baseIgnoreStance || checkContext.flags.ignoreStance,
+        critThresholdMod: checkContext.flags.critThresholdMod || 0,
+        grantHit: checkContext.flags.grantHit || 0,
+        grantFeint: checkContext.flags.grantFeint || 0,
+        forceHit: checkContext.flags.forceHit || false
       });
     }
 
@@ -1925,49 +1942,70 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 普攻必定需要命中检定
     let hitMod = (config.damageType === "waigong" ? this.system.combat.hitWaigongTotal : this.system.combat.hitNeigongTotal);
-    hitMod += config.bonusAttack;
+    hitMod += (config.bonusAttack + scriptBonusHit);
 
-    // 判定骰子类型 (是否需要 2d20)
-    let needsTwoDice = false;
-    if (targets.length === 0) {
-      if (selfLevel !== 0) needsTwoDice = true;
-    } else {
-      for (const ctx of targetContexts.values()) {
-        if (ctx.attackState !== 0) {
-          needsTwoDice = true;
-          break;
-        }
-      }
-    }
+    let attackRoll = null;
+    let rollJSON = null;
+    let rollTooltip = null;
 
-    const diceFormula = needsTwoDice ? "2d20" : "1d20";
-    const attackRoll = await new Roll(`${diceFormula} + @mod`, { mod: hitMod }).evaluate();
-    const rollJSON = attackRoll.toJSON();
-    const rollTooltip = await attackRoll.getTooltip();
-
-    // 解析结果
-    const diceResults = attackRoll.terms[0].results.map(r => r.result);
-    const d1 = diceResults[0];
-    const d2 = diceResults[1] || d1;
-
-    // 计算主要显示的数值
-    let primaryState = 0;
-    if (targets.length > 0) {
-      primaryState = targetContexts.get(targets[0].document.uuid)?.attackState || 0;
-    } else {
-      primaryState = (selfLevel > 0) ? 1 : ((selfLevel < 0) ? -1 : 0);
-    }
-
+    // 初始化显示数据
     let displayTotal = 0;
     let flavorSuffix = "";
-    if (primaryState === 1) {
-      displayTotal = Math.max(d1, d2) + hitMod;
-      flavorSuffix = "(优势)";
-    } else if (primaryState === -1) {
-      displayTotal = Math.min(d1, d2) + hitMod;
-      flavorSuffix = "(劣势)";
+
+    // 初始化骰子结果变量，供后面使用
+    let d1 = 0;
+    let d2 = 0;
+
+    // 只有在 (非全局必中) 时才进行投掷
+    if (!isGlobalForceHit) {
+
+      // 判定骰子类型 (是否需要 2d20)
+      let needsTwoDice = false;
+      if (targets.length === 0) {
+        if (selfLevel !== 0) needsTwoDice = true;
+      } else {
+        for (const ctx of targetContexts.values()) {
+          if (ctx.attackState !== 0) {
+            needsTwoDice = true;
+            break;
+          }
+        }
+      }
+
+      const diceFormula = needsTwoDice ? "2d20" : "1d20";
+      attackRoll = await new Roll(`${diceFormula} + @mod`, { mod: hitMod }).evaluate();
+      rollJSON = attackRoll.toJSON();
+      rollTooltip = await attackRoll.getTooltip();
+
+      // 解析结果
+      const diceResults = attackRoll.terms[0].results.map(r => r.result);
+      d1 = diceResults[0];
+      d2 = diceResults[1] || d1;
+
+      // 计算主要显示的数值
+      let primaryState = 0;
+      if (targets.length > 0) {
+        primaryState = targetContexts.get(targets[0].document.uuid)?.attackState || 0;
+      } else {
+        primaryState = (selfLevel > 0) ? 1 : ((selfLevel < 0) ? -1 : 0);
+      }
+
+      displayTotal = 0;
+      flavorSuffix = "";
+      if (primaryState === 1) {
+        displayTotal = Math.max(d1, d2) + hitMod;
+        flavorSuffix = "(优势)";
+      } else if (primaryState === -1) {
+        displayTotal = Math.min(d1, d2) + hitMod;
+        flavorSuffix = "(劣势)";
+      } else {
+        displayTotal = d1 + hitMod;
+      }
     } else {
-      displayTotal = d1 + hitMod;
+      // 全局必中模式
+      flavorSuffix = "(必中)";
+      displayTotal = "-"; // 或者 0
+      // attackRoll 保持 null
     }
 
     // 填充目标结果
@@ -1976,19 +2014,34 @@ export class XJZLActor extends Actor {
       const tokenUuid = t.document.uuid;
       const ctx = targetContexts.get(tokenUuid) || { attackState: 0 };
       const state = ctx.attackState;
+      const isTargetForceHit = ctx.forceHit;
 
-      let finalDie = d1;
-      let outcomeLabel = "平";
-      if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
-      else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
-
-      const total = finalDie + hitMod;
-      const dodge = t.actor?.system.combat.dodgeTotal || 10;
-
+      let finalDie = "-";
+      let outcomeLabel = "-";
+      let total = "-";
       let isHit = false;
-      if (finalDie === 20) isHit = true;
-      else if (finalDie === 1) isHit = false;
-      else isHit = total >= dodge;
+      let dodge = "-";
+
+      // 判定逻辑
+      if (!isGlobalForceHit && !isTargetForceHit) {
+
+        finalDie = d1;
+        outcomeLabel = "平";
+        if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
+        else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
+
+        total = finalDie + hitMod + (ctx.grantHit || 0);
+        dodge = t.actor?.system.combat.dodgeTotal || 10;
+
+        if (finalDie === 20) isHit = true;
+        else if (finalDie === 1) isHit = false;
+        else isHit = total >= dodge;
+      } else {
+        // 必中逻辑
+        isHit = true;
+        outcomeLabel = "必中";
+        // total, finalDie 保持 "-"
+      }
 
       targetsResults[tokenUuid] = {
         name: t.name,
@@ -2000,13 +2053,15 @@ export class XJZLActor extends Actor {
         feintState: 0,
         ignoreBlock: ctx.ignoreBlock,
         ignoreDefense: ctx.ignoreDefense,
-        ignoreStance: ctx.ignoreStance
+        ignoreStance: ctx.ignoreStance,
+        forceHit: isTargetForceHit
       };
     });
 
     // =====================================================
     // 9. 发送聊天消息
     // =====================================================
+    const isAutoApplied = attackContext.flags.autoApplied || false;
     const templateData = {
       actor: this,
       item: null, // 普攻没有 Item
@@ -2021,7 +2076,8 @@ export class XJZLActor extends Actor {
       displayTotal: displayTotal,
       targetsResults: targetsResults,
       hasTargets: Object.keys(targetsResults).length > 0,
-      showFeintBtn: false // 普攻不显示虚招
+      showFeintBtn: false, // 普攻不显示虚招
+      autoApplied: isAutoApplied
     };
 
     const content = await renderTemplate(
@@ -2041,6 +2097,9 @@ export class XJZLActor extends Actor {
           itemId: "basic",
           moveId: isOpportunity ? "opportunity" : "basic", // 区分 ID
           moveType: "basic",
+          scriptBonusHit: scriptBonusHit, 
+          critThresholdMod: attackContext.flags.critThresholdMod || 0,
+          forceHit: isGlobalForceHit,
 
           costConsumed: costConsumed, // 记录消耗
           damage: calcResult.damage,
@@ -2061,6 +2120,8 @@ export class XJZLActor extends Actor {
             acc[safeKey] = {
               stateLabel: res.stateLabel,
               isHit: res.isHit,
+              forceHit: res.forceHit,
+              critThresholdMod: res.critThresholdMod || 0,
               total: res.total,
               dieUsed: res.dieUsed,
               feintState: 0,
@@ -2077,9 +2138,11 @@ export class XJZLActor extends Actor {
     ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
     const message = await ChatMessage.create(chatData);
 
-    if (game.dice3d) {
+    if (attackRoll && game.dice3d) {
       game.dice3d.showForRoll(attackRoll, game.user, true);
     }
+    // 插入 Hook：允许后续逻辑（如自动播放特效、自动化模组监听）
+    Hooks.callAll("xjzl.basicAttack", this, virtualMove, message, calcResult);
   }
 
   /**

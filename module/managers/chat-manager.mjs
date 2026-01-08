@@ -247,8 +247,10 @@ export class ChatCardManager {
         // 如果 flags.moveType 是 counter，或者 damageType 不属于内外功，则不需要检定
         const isCounter = flags.moveType === "counter"; // 读取你新加的 flag
         const isValidDamage = ["waigong", "neigong"].includes(damageType);
+        // 读取全局必中标记
+        const isGlobalForceHit = flags.forceHit || false;
         // 反击(Counter) 或 非内外功招式 不需要投骰子比对闪避
-        const needsCheck = isValidDamage && !isCounter;
+        const needsCheck = isValidDamage && !isCounter && !isGlobalForceHit;
 
 
         // 提前计算公共加值 (修复 ReferenceError 的关键)
@@ -335,7 +337,8 @@ export class ChatCardManager {
                     ignoreStance: false,
                     critThresholdMod: 0, // 允许 CHECK 脚本针对特定目标修改暴击阈值
                     grantHit: 0,      // 针对此人的命中修正
-                    grantFeint: 0    // 针对此人的虚招修正
+                    grantFeint: 0,    // 针对此人的虚招修正
+                    forceHit: false   //必中标记
                 }
             }; //换成优劣势计数
 
@@ -387,10 +390,12 @@ export class ChatCardManager {
                 critThresholdMod: checkContext.flags.critThresholdMod || 0,
                 grantHit: checkContext.flags.grantHit || 0,
                 grantFeint: checkContext.flags.grantFeint || 0,
+                forceHit: checkContext.flags.forceHit || false // 存储单目标必中
             });
-
+            // 如果该目标是必中(forceHit)，那么即使 needsCheck=true (全局非必中)，也不需要对他进行补骰
+            const isTargetForceHit = checkContext.flags.forceHit || false;
             // 关键判断：如果状态不平，且没有 D2，则需要补骰
-            if (needsCheck && attackState !== 0 && d2 === null) {
+            if (needsCheck && !isTargetForceHit && attackState !== 0 && d2 === null) {
                 needsSupplemental = true;
             }
         }
@@ -451,8 +456,8 @@ export class ChatCardManager {
                 let isHit = true; // 默认为中 (针对反击等)
                 let color = "green";
                 let label = "必中";
-
-                if (needsCheck) {
+                const isTargetForceHit = states.forceHit;
+                if (needsCheck && !isTargetForceHit) {
                     let finalDie = d1;
                     stateLabel = "平";
 
@@ -541,14 +546,15 @@ export class ChatCardManager {
             }
 
             // B. 确定最终使用的骰子 (Final Die)
-            const states = targetStates.get(uuid) || { attackState: 0, feintState: 0 };
+            const states = targetStates.get(uuid) || { attackState: 0, feintState: 0, forceHit: false };
             const state = states.attackState;
+            const isTargetForceHit = states.forceHit;
             let finalDie = d1;
             let isHit = true;
             let total = 0;
             // 计算最终虚招值 (全局基础 + 目标修正)
             const finalFeint = globalFeintBase + (states.grantFeint || 0);
-            if (needsCheck) {
+            if (needsCheck && !isTargetForceHit) {
                 // 此时 d2 一定就位 (除非 state=0 或者用户取消了)
                 if (state === 1 && d2 !== null) finalDie = Math.max(d1, d2);
                 else if (state === -1 && d2 !== null) finalDie = Math.min(d1, d2);
@@ -566,6 +572,11 @@ export class ChatCardManager {
                 } else {
                     isHit = total >= dodge;
                 }
+            } else {
+                // 全局必中 OR 单体必中
+                isHit = true;
+                finalDie = "-";
+                total = 0; // 或者标识符
             }
 
             results[uuid] = {
@@ -578,7 +589,8 @@ export class ChatCardManager {
                 ignoreDefense: states.ignoreDefense,
                 ignoreStance: states.ignoreStance,
                 critThresholdMod: states.critThresholdMod || 0,
-                finalFeint: finalFeint
+                finalFeint: finalFeint,
+                forceHit: isTargetForceHit
             };
         }
 

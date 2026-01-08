@@ -1502,7 +1502,8 @@ export class XJZLItem extends Item {
           autoApplied: false, // 是否已经完成流程的标记
           critThresholdMod: 0, // 允许脚本修改暴击阈值,正数表示更容易暴击 (例如 2 表示阈值降低 2 点)
           bonusHit: 0,    // 自身命中加值
-          bonusFeint: 0   // 自身虚招数值加值
+          bonusFeint: 0,   // 自身虚招数值加值
+          forceHit: false // 全局必中标记
         }
       };
       // 现在脚本里：
@@ -1633,7 +1634,8 @@ export class XJZLItem extends Item {
               ignoreStance: false,
               critThresholdMod: 0, // 添加这个字段，让 CHECK 脚本可以修改
               grantHit: 0,    // 针对该目标的命中加值
-              grantFeint: 0   // 针对该目标的虚招数值加值
+              grantFeint: 0,   // 针对该目标的虚招数值加值
+              forceHit: false
             }
           };
 
@@ -1678,7 +1680,8 @@ export class XJZLItem extends Item {
             ignoreStance: finalIgnoreStance,
             critThresholdMod: checkContext.flags.critThresholdMod || 0,
             grantHit: checkContext.flags.grantHit || 0,
-            grantFeint: checkContext.flags.grantFeint || 0
+            grantFeint: checkContext.flags.grantFeint || 0,
+            forceHit: checkContext.flags.forceHit || false
           });
         }
       }
@@ -1698,7 +1701,9 @@ export class XJZLItem extends Item {
       // 2. 气招(即使是Attack模式) -> False (除非未来有特殊需求，目前精神伤害等无需检定)
       // 3. 虚招、实招且伤害类型为内/外 -> True
       // 4. 反击 -> False
-      if (effectiveMode === "attack" && move.type !== "qi" && move.type !== "counter") {
+      // 如果全局 forceHit 为 true，则 needsHitCheck 强制为 false (跳过投掷)
+      const isGlobalForceHit = attackContext.flags.forceHit;
+      if (effectiveMode === "attack" && move.type !== "qi" && move.type !== "counter" && !isGlobalForceHit) {
         // 如果选了 'none' 或 'mental'，这里就会是 False，完美符合逻辑
         if (["waigong", "neigong"].includes(damageType)) {
           needsHitCheck = true;
@@ -1767,33 +1772,43 @@ export class XJZLItem extends Item {
           // 修改为使用 t.document.uuid 作为 Key，而不是 t.id
           // t.id 只是由 ID 组成的字符串，而 uuid 包含场景信息，更安全
           const tokenUuid = t.document.uuid;
-          const ctx = targetContexts.get(tokenUuid) || { attackState: 0, grantHit: 0, grantFeint: 0 };
+          const ctx = targetContexts.get(tokenUuid) || { attackState: 0, grantHit: 0, grantFeint: 0, forceHit: false };
           const state = ctx.attackState;
-          let finalDie = d1;
-          let outcomeLabel = "平";
-          // 根据每个目标的最终状态，从 d1/d2 中选一个
-          if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
-          else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
-          // 最终命中值 = 骰子 + 基础修正 + 针对该目标的修正
-          const total = finalDie + hitMod + (ctx.grantHit || 0);
+          // [MODIFIED] 核心命中判断逻辑
+          let finalDie = "-";
+          let outcomeLabel = "-";
+          let total = "-";
+          let isHit = false;
+          let dodge = "-";
+          // 情况1: 需要检定 (全局非必中) 且 这个目标也不是必中
+          if (needsHitCheck && !ctx.forceHit) {
+            finalDie = d1; // 默认
+            // 根据每个目标的最终状态，从 d1/d2 中选一个
+            if (state === 1) { finalDie = Math.max(d1, d2); outcomeLabel = "优"; }
+            else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
+            else { outcomeLabel = "平"; } // 补上平局标签
+            // 最终命中值 = 骰子 + 基础修正 + 针对该目标的修正
+            total = finalDie + hitMod + (ctx.grantHit || 0);
+            // 获取目标闪避
+            // 这里只是预览命中，不做逻辑判定
+            dodge = t.actor.system.combat.dodgeTotal || 10;
+            // 规则：20必中，1必失
+            if (finalDie === 20) isHit = true;
+            else if (finalDie === 1) isHit = false;
+            else isHit = total >= dodge;
+          }
+          // 情况2: 无需检定 (全局必中) OR 该目标被脚本强制必中
+          else {
+            isHit = true; // 强制命中
+            outcomeLabel = "必中";
+            total = "-";
+            finalDie = "-";
+            // 如果是单体 ForceHit 导致的跳过，dodge 也不显示了
+          }
+
           // 最终虚招值 = 全局虚招值 + 针对该目标的修正
           const finalFeint = calcResult.feint + (ctx.grantFeint || 0);
 
-          // 获取目标闪避
-          // 这里只是预览命中，不做逻辑判定
-          const dodge = t.actor.system.combat.dodgeTotal || 10;
-
-          let isHit = false;
-
-          // 规则：20必中，1必失
-          if (finalDie === 20) {
-            isHit = true;
-          } else if (finalDie === 1) {
-            isHit = false;
-          } else {
-            // 常规检定
-            isHit = total >= dodge;
-          }
 
           targetsResults[tokenUuid] = {
             name: t.name,
@@ -1807,7 +1822,8 @@ export class XJZLItem extends Item {
             ignoreDefense: ctx.ignoreDefense,
             ignoreStance: ctx.ignoreStance,
             critThresholdMod: ctx.critThresholdMod,
-            finalFeint: finalFeint
+            finalFeint: finalFeint,
+            forceHit: ctx.forceHit // 记录该目标是否触发了单体必中
           };
         });
       }
@@ -1903,7 +1919,7 @@ export class XJZLItem extends Item {
             moveId: move.id,           // 招式 ID
             moveType: move.type,       // 招式类型
             costConsumed: costConsumed,// 记录消耗
-
+            forceHit: isGlobalForceHit, // 存入全局必中状态
             // 2. 数值结果
             damage: calcResult.damage, // 最终伤害值 (整数)
             feint: calcResult.feint,   // 最终虚招值 (整数)
@@ -1936,6 +1952,7 @@ export class XJZLItem extends Item {
               acc[safeKey] = {
                 stateLabel: res.stateLabel, // "优", "劣", "平"
                 isHit: res.isHit,           // 是否命中
+                forceHit: res.forceHit, // 存入单体必中状态
                 total: res.total,           // 最终数值
                 dieUsed: res.dieUsed,           // 用的哪个骰子
                 feintState: res.feintState,

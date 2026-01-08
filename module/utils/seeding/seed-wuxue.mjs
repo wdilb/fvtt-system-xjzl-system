@@ -19,7 +19,7 @@ const SECT_MAP = {
     "liushanmen": "六扇门",
     "jiangnange": "江南阁",
     "shenfengbang": "神风帮",
-    // "sihaibiaomeng": "四海镖盟",
+    "sihaibiaomeng": "四海镖盟",
     // "jiangjunying": "将军营",
     // "wanshoushanzhuang": "万兽山庄",
     // "baicaoge": "百草阁",
