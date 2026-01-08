@@ -256,6 +256,7 @@ await Macros.requestSave({
     *   `attacker` (Actor): 攻击者。
     *   `target` (Actor): 防御者。
     *   `type` (String): 伤害类型。
+    *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
     *   `baseDamage` (Number): 原始面板伤害。
     *   `config` (Object, **可修改**):
         *   `ignoreBlock` (Bool): 是否无视格挡。
@@ -270,6 +271,7 @@ await Macros.requestSave({
 *   **参数 (`args`)**:
     *   `attacker` (Actor), `target` (Actor)。
     *   `type` (String), `baseDamage` (Number)。
+    *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
     *   `calcDamage` (Number): 减伤后的**理论伤害值** (防御/格挡已扣除)。
     *   `isCrit` (Bool), `isBroken` (Bool)。
     *   `config` (Object, **只读**): 查看当前的穿透/暴击配置。
@@ -286,6 +288,7 @@ await Macros.requestSave({
     *   `hpLost` (Number): **实际**扣除的气血。
     *   `hutiLost` (Number): **实际**扣除的护体。
     *   `mpLost` (Number): **实际**扣除的内力。
+    *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
     *   `isDying` (Bool): 是否因此进入濒死。
     *   `isDead` (Bool): 是否因此死亡。
     *   `isCrit` (Bool), `isBroken` (Bool)。
@@ -315,6 +318,7 @@ await Macros.requestSave({
     *   `config` (Object, **可修改**):
         *   `amount` (Number): 伤害数值。
         *   `type` (String): 伤害类型。
+        *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
         *   `ignoreBlock`, `ignoreDefense`, `ignoreStance`, `applyCritDamage` (Bool)。
 
 #### 🩸 `hit` (单体结算/应用)
@@ -792,6 +796,27 @@ ui.notifications.warn(`${actor.name} 触发免死金牌，满血复活！`);
 // 或者如果是 buff，则 thisEffect.delete()
 if (thisItem) {
     await thisItem.delete();
+}
+```
+
+### M. 针对五行属性防御 (如：寒冰真气)
+> **场景**: 防御者。如果受到 **阳(yang)** 或 **刚(gang)** 属性的攻击，利用相克原理减少 20 点伤害。
+> **时机**: `preTake` (受伤前/护盾)
+
+```javascript
+// 检查招式的五行属性 (args.element 或 args.config.element)
+const el = args.element;
+
+// 判断是否为被克制的属性
+if (el === "yang" || el === "gang") {
+    // 飘字提示
+    ui.notifications.info(`${actor.name} 寒冰真气化解了 ${el === 'yang' ? '纯阳' : '刚猛'} 之力！`);
+    
+    // 减免 20 点伤害
+    args.output.damage -= 20;
+    
+    // 防止减成负数 (加血)
+    if (args.output.damage < 0) args.output.damage = 0;
 }
 ```
 
