@@ -1,0 +1,1181 @@
+[
+    {
+        "name": "铁甲沉舟拳",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "liushanmen",
+            "tier": 1,
+            "description": "<p>六扇门捕快拿手功夫，拳路刚猛，寸劲崩烈，若是全力使出，可赤手空拳断人腿脚。</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "劈云拳",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "element": "yang",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，直拳重劈，造成 0.4 力量点外功伤害。<br>招式造成暴击时，将目标击退 1 米。<br>升级：招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 伤害计算。手动: 暴击后的击退效果。",
+                    "scripts": [
+                        {
+                            "label": "暴击击退提示",
+                            "trigger": "hit",
+                            "script": "if (args.isCrit) ui.notifications.info(`${args.target.name} 被击退 1 米。`);"
+                        }
+                    ]
+                },
+                {
+                    "name": "无影拳",
+                    "type": "feint",
+                    "damageType": "waigong",
+                    "element": "yang",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "cost": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，不见其影，快速挥拳，造成 0.3 力量点外功伤害，击破架招时，将其击飞 1 米并倒地。<br>升级：招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 伤害计算。手动: 击破架招后的击飞和倒地。",
+                    "scripts": [
+                        {
+                            "label": "破架击飞倒地提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) { ui.notifications.info(`${args.target.name} 被击飞 1 米并倒地（请手动应用'倒地'状态）。`); }"
+                        }
+                    ]
+                },
+                {
+                    "name": "沉舟",
+                    "type": "stance",
+                    "range": "自身",
+                    "cost": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "description": "<p>次要动作，双拳摆腰，开启架招，成功格挡后，获得“沉舟”，持续到战斗脱离。<br>沉舟：下一次出招额外消耗 5 内力，招式伤害+5。<br>升级：格挡值+5，沉舟的伤害再+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 开启架招; 格挡成功后自动获得沉舟Buff。",
+                    "scripts": [
+                        {
+                            "label": "格挡触发沉舟",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) { const effect = thisItem.effects.getName('沉舟'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, data); ui.notifications.info(`${actor.name} 格挡成功，获得沉舟。`); } }"
+                        }
+                    ]
+                },
+                {
+                    "name": "开山拳",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "element": "yang",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ],
+                        "rage": [
+                            7
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "description": "<p>蓄力动作，凝聚劲力，一发崩山，对目标造成 0.6 力量点外功伤害，并将其击退 3 米。<br>若命中无架招目标，还会给其添加“重创”，持续到战斗脱离。<br>重创：下一次受到伤害时，额外流失 20 点气血。<br>升级：招式伤害+10，额外流失+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "自动化: 伤害计算; 对无架招/破架目标自动施加“重创”。手动: 击退效果。",
+                    "scripts": [
+                        {
+                            "label": "无架招施加重创",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) { const effect = thisItem.effects.getName('重创'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(args.target, data); ui.notifications.info(`${args.target.name} 受到重创。`); } }"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "沉舟",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "下一次出招额外消耗 5 内力，招式伤害+5 (随等级成长)。",
+                    "changes": [],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "chenzhou",
+                            "stackable": false
+                        }
+                    },
+                    "scripts": [
+                        {
+                            "label": "沉舟消耗",
+                            "trigger": "attack",
+                            "script": "args.move.currentCost.mp += 5;"
+                        },
+                        {
+                            "label": "沉舟增伤",
+                            "trigger": "calc",
+                            "script": "const lvl = Math.max(1, thisItem.system.moves.find(m => m.name === '沉舟')?.computedLevel || 1); const bonus = 5 + (lvl - 1) * 5; args.output.damage += bonus; args.output.bonusDesc.push(`沉舟 +${bonus}`);"
+                        },
+                        {
+                            "label": "移除沉舟",
+                            "trigger": "hit",
+                            "script": "await thisEffect.delete();"
+                        }
+                    ]
+                },
+                {
+                    "name": "重创",
+                    "icon": "icons/svg/ruins.svg",
+                    "description": "下一次受到伤害时，额外流失 20 点气血 (随等级成长)。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhongchuang",
+                            "stackable": false
+                        }
+                    },
+                    "scripts": [
+                        {
+                            "label": "重创流失",
+                            "trigger": "preTake",
+                            "script": "if (args.calcDamage > 0) { const originItem = await fromUuid(thisEffect.origin); const lvl = originItem?.system?.moves?.find(m => m.name === '开山拳')?.computedLevel || 1; const loss = 20 + (lvl - 1) * 10; ui.notifications.warn(`${actor.name} 重创发作，流失 ${loss} 气血！`); await actor.applyDamage({ amount: loss, type: 'liushi', isHit: true }); await thisEffect.delete(); }"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "拘役尺法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "liushanmen",
+            "tier": 1,
+            "description": "<p>捕快所用武功，攻防紧凑，起落大方，专克刀剑，用于卸人兵刃，砸昏并制服贼匪。</p>",
+            "requirements": "匕首-尺",
+            "moves": [
+                {
+                    "name": "捉贼见赃",
+                    "type": "stance",
+                    "range": "自身",
+                    "cost": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "description": "<p>次要动作，反握铁尺，紧盯敌方，开启架招。当成功格挡刀、剑对你造成的伤害时，给攻击者添加一层“颤手”，最多五层，持续到战斗脱离。<br>颤手：满五层后，手持武器脱手落地（需花费主要动作拾起），并陷入“缴械”一回合，然后移除所有颤手。<br>缴械：你无法施展徒手以外的武学。<br>升级：格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 开启架招; 格挡检测。手动: 格挡成功后提示判断武器类型，若为刀剑需手动添加“颤手”（内置在物品中）。",
+                    "scripts": [
+                        {
+                            "label": "格挡提示颤手",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) { const cardContent = `<div class='xjzl-chat-card'><div class='card-header'><h3>捉贼见赃</h3></div><div class='card-content'>格挡成功！<br>若攻击者使用<b>刀、剑</b>，请手动为其添加一层颤手。<br>目标: ${args.attacker.name}</div></div>`; ChatMessage.create({ user: game.user.id, content: cardContent }); }"
+                        }
+                    ]
+                },
+                {
+                    "name": "疏而不漏",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "element": "gang",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，前扫点刺，造成 0.4 力量点外功伤害。<br>·若目标有恶行值，招式伤害+10。<br>升级：招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 伤害计算; 检测目标恶行值并自动加伤。",
+                    "scripts": [
+                        {
+                            "label": "恶行加成",
+                            "trigger": "preDamage",
+                            "script": "if (args.target && (args.target.system.social?.exing || 0) > 0) { args.config.amount += 10; ui.notifications.info('目标恶行昭彰，伤害+10！'); }"
+                        }
+                    ]
+                },
+                {
+                    "name": "人赃俱获",
+                    "type": "counter",
+                    "damageType": "waigong",
+                    "element": "gang",
+                    "weaponType": "dagger",
+                    "range": "5米",
+                    "cost": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "description": "<p>当你看破对手虚招时，你可以消耗反应释放此招，压制目标虚招，扔出铁尺砸向目标双手，造成 0.5 力量点外功伤害，并为其添加三层“颤手”，持续到战斗脱离。<br>·施展此招后，你的[匕首-尺]武器视作脱手,掉落在目标所处空格。<br>升级：招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 自动添加3层颤手。手动: 武器脱手逻辑。",
+                    "scripts": [
+                        {
+                            "label": "添加颤手",
+                            "trigger": "hit",
+                            "script": "const effect = CONFIG.statusEffects.find(e => e.id === 'chanshou'); if (effect) { const data = foundry.utils.deepClone(effect); foundry.utils.setProperty(data, 'flags.xjzl-system.stacks', 3); await game.xjzl.api.effects.addEffect(args.target, data); }"
+                        },
+                        {
+                            "label": "武器脱手提示",
+                            "trigger": "hit",
+                            "script": "ui.notifications.warn('你的武器已脱手，请手动处理装备状态。');"
+                        }
+                    ]
+                },
+                {
+                    "name": "抓一儆百",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "element": "gang",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ],
+                        "rage": [
+                            7
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，扬尺劈脸，对目标造成 0.6 力量点外功伤害。<br>若此招将目标气血归零，目标不会陷入濒死状态，也不会进行残疾检定，而是陷入“昏迷”，持续一个时辰。<br>升级：招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "自动化: 伤害计算; 若致死自动替换为昏迷。",
+                    "scripts": [
+                        {
+                            "label": "致死转昏迷",
+                            "trigger": "hit",
+                            "script": "if (args.isDying || args.isDead) { await args.target.toggleStatusEffect('dying', { active: false }); await args.target.toggleStatusEffect('dead', { active: false }); await game.xjzl.api.effects.toggleStatus(args.target, 'unconscious', true); ui.notifications.info(`${args.target.name} 被击昏。`); }"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "颤手",
+                    "icon": "icons/svg/paralysis.svg",
+                    "description": "满五层后，手持武器脱手落地，并陷入“缴械”一回合。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "chanshou",
+                            "stackable": true,
+                            "maxStacks": 5
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "追命神腿",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "liushanmen",
+            "tier": 2,
+            "description": "<p>上乘腿法，轻盈灵动，速度极快，劲力奇大且角度不可思议的刁钻。</p>",
+            "requirements": "徒手-腿法",
+            "moves": [
+                {
+                    "name": "追梦",
+                    "type": "stance",
+                    "range": "自身",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "description": "<p>次要动作，腿影幢幢，若虚若实，开启架招。你每次格挡成功时投掷 D6，获得以下状态中的一个，若重复则重新投掷，持续到战斗脱离：<br>1 追日 2 追电 3 追风 4 追浪 5 追魂 6 悔恨<br>升级：格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "自动化: 开启架招; 格挡检测。手动: 格挡成功后提示投D6并手动添加对应Buff（已内置）。",
+                    "scripts": [
+                        {
+                            "label": "格挡提示随机Buff",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) { ui.notifications.info('格挡成功！请投掷 D6 并手动添加对应“追”字诀状态。'); }"
+                        }
+                    ]
+                },
+                {
+                    "name": "追影",
+                    "type": "real",
+                    "damageType": "neigong",
+                    "element": "taiji",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，飘忽不定，造成 0.5 内息点内功伤害。<br>可消耗任意以下状态，使招式产生叠加变化：<br>1 追日：腿风炽烈，双腿环踢，招式伤害+10。<br>2 追电：爆裂迅猛，疾势一脚，招式暴击骰-1。<br>3 追风：速度飞快，腿化残影，释放距离+1。<br>4 追浪：气浪滔滔，席卷而至，招式攻击目标+1。<br>5 追魂：诡异难测，声东击西，招式类型变为虚招，且虚招值+1。<br>6 悔恨：心境难明，悲痛心死，招式为目标添加“禁足”“迟滞”一回合。<br>·当你一次性消耗三个（包含三个）以上的状态后，获得“连击”，持续到战斗脱离。<br>连击：你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。<br>升级：招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全手动：请根据拥有的Buff手动调整伤害/暴击/距离/类型。消耗Buff请手动删除。若消耗3个以上，请手动添加“连击”（系统状态 lianji）。",
+                    "scripts": []
+                },
+                {
+                    "name": "追神",
+                    "type": "counter",
+                    "damageType": "neigong",
+                    "element": "taiji",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "description": "<p>当你看破对手虚招时，可消耗反应动作释放此招，压制目标虚招，聚力于点，踢神灭佛，对目标造成 0.6 内息点内功伤害，招式无视目标格挡值。<br>升级：招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "自动化: 无视格挡。",
+                    "scripts": [
+                        {
+                            "label": "无视格挡",
+                            "trigger": "check",
+                            "script": "args.flags.ignoreBlock = true;"
+                        }
+                    ]
+                },
+                {
+                    "name": "追逝",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "neigong",
+                    "element": "taiji",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "cost": {
+                        "mp": [
+                            4
+                        ],
+                        "rage": [
+                            7
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "description": "<p>-不幸强说幸，欺人苦自欺-<br>主要动作，粉身碎骨，绝后光前，对目标造成 0.8 内息点内功伤害。<br>若战场上还存在陷入濒死或已经死亡的友方，你临阵觉悟，获得“追日”“追电”“追风”“追浪”“追魂”“悔恨”，持续到战斗脱离。<br>升级：招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "需手动：若有友方濒死/死亡，请手动给自己添加所有6个Buff（内置在物品中）。",
+                    "scripts": []
+                }
+            ],
+            "effects": [
+                {
+                    "name": "追日",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "腿风炽烈，双腿环踢，招式伤害+10。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhuiri",
+                            "stackable": false
+                        }
+                    }
+                },
+                {
+                    "name": "追电",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "爆裂迅猛，疾势一脚，招式暴击骰-1。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhuidian",
+                            "stackable": false
+                        }
+                    }
+                },
+                {
+                    "name": "追风",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "速度飞快，腿化残影，释放距离+1。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhuifeng",
+                            "stackable": false
+                        }
+                    }
+                },
+                {
+                    "name": "追浪",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "气浪滔滔，席卷而至，招式攻击目标+1。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhuilang",
+                            "stackable": false
+                        }
+                    }
+                },
+                {
+                    "name": "追魂",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "诡异难测，声东击西，招式类型变为虚招，且虚招值+1。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhuihun",
+                            "stackable": false
+                        }
+                    }
+                },
+                {
+                    "name": "悔恨",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "心境难明，悲痛心死，招式为目标添加“禁足”“迟滞”一回合。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "huihen",
+                            "stackable": false
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "冷血剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "liushanmen",
+            "tier": 2,
+            "description": "<p>上乘剑法，招招毙命，凌厉且杀伤力强。</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "百裂千击",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "element": "yin",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，疾风之势，迅速挥砍，对目标造成 0.5 力量点外功伤害。获得一层“无尽刃”，最多三层，持续到战斗脱离。<br>若有目标初次进入‘月影’或在其中位置发生移动（消耗速度移动、被击飞击退等），你可以消耗反应动作，无视双方距离对其释放【百裂千击】。<br>升级：招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "自动化: 命中后获得无尽刃。手动: 月影反应判定。",
+                    "scripts": [
+                        {
+                            "label": "获得无尽刃",
+                            "trigger": "hit_once",
+                            "script": "if (args.hitCount > 0) { const effect = thisItem.effects.getName('无尽刃'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, data); } }"
+                        }
+                    ]
+                },
+                {
+                    "name": "月影碎空",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "element": "yin",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "cost": {
+                        "mp": [
+                            4
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "description": "<p>蓄力动作，剑尖绕身画圆，对周围敌人造成 0.4 力量点外功伤害。然后在自身周围 3 米范围斩出半球形的‘月影’，持续到战斗脱离。<br>月影：你处于月影范围时，格挡值+5，看破值+1。<br>·月影形成在原地，不会跟随你移动，你只能拥有一个月影，如果你斩出新的月影，之前的消失。<br>升级：招式伤害+10，格挡值+5，看破值+1，内力消耗+4。</p>",
+                    "automationNote": "自动化: 伤害。手动: 月影范围判定和Buff添加（已提供'月影'AE供手动添加）。",
+                    "scripts": []
+                },
+                {
+                    "name": "荆轲现匕",
+                    "type": "counter",
+                    "damageType": "waigong",
+                    "element": "yin",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "description": "<p>当你看破对手虚招时，你可以消耗反应释放此招，压制目标虚招，内力迸发，瞬息一刺，对目标造成 0.6 力量点外功伤害。<br>你每消耗一层“无尽刃”，可以为目标添加一层“流血”，持续到战斗脱离。<br>升级：招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全手动：请手动删除无尽刃层数，并给目标添加对应层数的流血（bleed_stack）。",
+                    "scripts": []
+                },
+                {
+                    "name": "无尽",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "element": "yin",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "cost": {
+                        "mp": [
+                            8
+                        ],
+                        "rage": [
+                            7
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，奔袭至目标空格，寒光交错，对直线上的所有敌人造成 0.7 力量点外功伤害。<br>根据消耗的“无尽刃”层数，获得相应效果：<br>一层：招式释放完毕之后，你可以返回原位置。<br>两层：招式伤害+10 点伤害。<br>三层：你可以在目标空格处消耗反应动作施展一次【月影碎空】。<br>升级：招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "完全手动：请手动消耗无尽刃层数并结算效果。若消耗2层，请手动在伤害修正中+10。",
+                    "scripts": []
+                }
+            ],
+            "effects": [
+                {
+                    "name": "无尽刃",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "冷血剑法计数器，用于增强终结技。",
+                    "changes": [],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wujinren",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    }
+                },
+                {
+                    "name": "月影",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "处于月影范围内：格挡值+5，看破值+1。",
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "mode": 2,
+                            "value": "5"
+                        },
+                        {
+                            "key": "system.combat.kanpo",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yueying",
+                            "stackable": false
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "神捕尺法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "liushanmen",
+            "tier": 2,
+            "description": "<p>六扇门绝学，可轻松擒拿敌手，让人无处可逃。</p>",
+            "requirements": "匕首-尺",
+            "moves": [
+                {
+                    "name": "插翅难飞",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "element": "gang",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，挑刺要害，对目标造成 0.5 力量点外功伤害，并为其添加“下盘不稳”，持续两回合。<br>升级：招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "自动化: 添加下盘不稳（unstable）。",
+                    "scripts": [
+                        {
+                            "label": "添加下盘不稳",
+                            "trigger": "hit",
+                            "script": "const effectData = CONFIG.statusEffects.find(e => e.id === 'unstable'); if (effectData) { const data = foundry.utils.deepClone(effectData); data.duration = { rounds: 2 }; await game.xjzl.api.effects.addEffect(args.target, data); }"
+                        }
+                    ]
+                },
+                {
+                    "name": "束手就擒",
+                    "type": "feint",
+                    "damageType": "waigong",
+                    "element": "gang",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，尺格兵刃，巧劲反锁，对敌人造成 0.4 力量点外功伤害。击破架招时，可立即将目标“擒抱”（挣脱难度 15）。<br>升级:招式伤害+10，挣脱难度+3，内力消耗+2。</p>",
+                    "automationNote": "自动化: 伤害计算。手动: 击破架招后的擒抱判定。",
+                    "scripts": []
+                },
+                {
+                    "name": "天罗地网",
+                    "type": "stance",
+                    "range": "自身",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "description": "<p>次要动作，铁尺晃划，开启架招。格挡成功时，给对方添加一层“捉拿”，至多三层，持续到脱战。<br>捉拿：每层使你的速度-1，闪避下降 5 点。<br>升级:格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "自动化: 开启架招; 格挡成功后给对方添加“捉拿”AE（已内置）。",
+                    "scripts": [
+                        {
+                            "label": "格挡叠加捉拿",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) { const effect = thisItem.effects.getName('捉拿'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(args.attacker, data); ui.notifications.info(`${args.attacker.name} 被捉拿！`); } }"
+                        }
+                    ]
+                },
+                {
+                    "name": "孤立无援",
+                    "type": "counter",
+                    "damageType": "waigong",
+                    "element": "gang",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "cost": {
+                        "mp": [
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "description": "<p>当你看破对方虚招时，可以消耗反应动作施展此招，压制对方虚招，铁尺重击，对敌人造成 0.6 力量点外功伤害。<br>·若目标周围 2 米范围内没有他的友方，招式伤害+20。<br>升级：招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "需手动：检查友方位置。若满足条件，请在伤害修正中+20。",
+                    "scripts": []
+                },
+                {
+                    "name": "穷途末路",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "element": "gang",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "cost": {
+                        "mp": [
+                            4
+                        ],
+                        "rage": [
+                            7
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，除之以法，手到擒来，对目标造成 0.7 力量点外功伤害，并将其“禁足”三回合。<br>·若目标周围 2 米范围内没有他的友方，他还会失去一半的怒气（向上取整），你获得等额的怒气。<br>升级:招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "自动化: 添加禁足（root）。需手动：判断友方位置并执行吸怒。",
+                    "scripts": [
+                        {
+                            "label": "添加禁足",
+                            "trigger": "hit",
+                            "script": "const effectData = CONFIG.statusEffects.find(e => e.id === 'root'); if (effectData) { const data = foundry.utils.deepClone(effectData); data.duration = { rounds: 3 }; await game.xjzl.api.effects.addEffect(args.target, data); }"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "捉拿",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+                    "description": "速度-1，闪避-5。",
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "-1"
+                        },
+                        {
+                            "key": "system.combat.dodge",
+                            "mode": 2,
+                            "value": "-5"
+                        }
+                    ],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhuona",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "缚囚索",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "liushanmen",
+            "tier": 1,
+            "description": "<p>六扇门捕快招牌，持飞梭追击，遥遥射出缠人腿脚，再至捆绑全身，使之不得动弹，束手就擒。</p>",
+            "requirements": "奇门-鞭钩",
+            "moves": [
+                {
+                    "name": "缚囚索",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "element": "taiji",
+                    "weaponType": "special",
+                    "range": "10米",
+                    "cost": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "description": "<p>主要动作，甩出腰侧锁链，直掠而去，对目标造成 0.4 身法点外功伤害，若目标无架招，使目标陷入“禁足”，持续一回合。<br>若目标已经处于“禁足”，还会将其击倒。<br>升级：招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 无架招禁足、已禁足击倒。",
+                    "scripts": [
+                        {
+                            "label": "控制判定",
+                            "trigger": "hit",
+                            "script": "if (!args.target.system.martial.stanceActive) { if (args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'root')) { await game.xjzl.api.effects.toggleStatus(args.target, 'prone', true); ui.notifications.info(`${args.target.name} 被击倒。`); } else { const root = CONFIG.statusEffects.find(e => e.id === 'root'); const data = foundry.utils.deepClone(root); data.duration = { rounds: 1 }; await game.xjzl.api.effects.addEffect(args.target, data); ui.notifications.info(`${args.target.name} 被禁足。`); } }"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "断案",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "liushanmen",
+            "tier": 1,
+            "description": "<p>你擅长推理和审案，不会放过任何一个线索，寻找蛛丝马迹，仔细推衍过程，秉公执法，铁面无私。<br>需求：《捕役诀》修炼圆满。<br>·你的[书写]等级+1。<br>·你的[探查]、[洞察]、[追踪]、[说服]等级+1。<br>·你牢记曾探查过的所有线索和对话，若你忘了，每日可投掷一个 D20 的回忆检定（难度 15），成功则你全部回想起来（由主持人帮你回忆）。<br>升级：四个属性技能再+1，回忆检定难度-5。</p>",
+            "requirements": "无",
+            "moves": [
+                {
+                    "name": "断案",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "range": "自身",
+                    "cost": {
+                        "mp": [
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "description": "<p>被动效果：书写+1；探查、洞察、追踪、说服+1（随等级成长）。</p>",
+                    "automationNote": "被动效果请手动添加，暂不支持常驻技能加值。",
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "刑罚",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "liushanmen",
+            "tier": 2,
+            "description": "<p>刑罚者，民之鞭策也。侠界凡罪大恶极者，必有重刑，诛其身，补其过，方赦其罪。《大诰》之中刑罚至惨比比皆是，寻常人难以想象。<br>需求：《止刑功》修炼圆满。</p>",
+            "requirements": "无",
+            "moves": [
+                {
+                    "name": "拷问",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "description": "<p>花费十分钟拷打一个处于“定身”的目标，让其进行一次残疾检定并进行[忍耐]检定（难度 11），若检定失败，会求饶地告知你所有他知道的信息。<br>·你对受拷问目标进行的[洞察]有优势。</p>",
+                    "automationNote": "完全手动：请GM主持拷问过程。",
+                    "scripts": []
+                },
+                {
+                    "name": "上刑",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "description": "<p>你可以花费一个时辰，准备刑具，对目标进行严刑拷打，根据以下类型不同，效果不同：<br>拶刑：木夹手指，目标双手骨折。<br>刖刑：削其膝盖，目标失去双腿。<br>劓刑：挖眼、割耳，目标失去双眼、双耳。<br>穿琵琶：刀划身，锤穿肋，目标力量-10。<br>钉足：尖钉穿足，目标身法-10。<br>刷洗：浇上沸水，铁刺刷背，目标体魄-10。<br>焚筋：毁其经脉，目标十二正经损毁，不再有效。<br>碎丹：击碎丹田，目标丹田被损毁，不再有效。<br>·你每对目标使用一种刑罚，目标除了受到刑罚影响，还需要额外进行一次残疾检定，该次残疾检定结果-5（最低 1），然后你的杀戮值+5。<br>·目标每受到一种刑罚，下一次接受拷问时[忍耐]的检定结果-1。<br>升级：你对拷问目标进行的[洞察]结果+2，受刑之人受到拷问时的[忍耐]检定结果再-1。</p>",
+                    "automationNote": "完全手动：请GM根据描述应用残疾和属性减值。",
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "洗冤",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "liushanmen",
+            "tier": 2,
+            "description": "<p>替人洗雪冤屈，推翻诬陷不实，翻案还原真相。<br>需求：《罪恶断》修炼圆满</p>",
+            "requirements": "无",
+            "moves": [
+                {
+                    "name": "讼状",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "description": "<p>花费一个时辰，你与目标细细交谈，了解对方遭受的委屈和不公，然后前往衙门为其陈情，为其免除一定的罪责，使其恶行值-20，朝廷声望+1（朝廷声望低于-20 的目标无效，且最高加到-5）。<br>·你可以向对方收取银两上交衙门，为其免除更多罪责，每多收取 100 两，恶行值额外-20，朝廷声望额外+1。你收取银两中的 10%归你所有。<br>·你每个月只能为一人递交讼状，同一人每年只能由一名六扇门捕快递交讼状一次。</p>",
+                    "automationNote": "完全手动：请GM修改恶行值和声望。",
+                    "scripts": []
+                },
+                {
+                    "name": "翻案",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "range": "1米",
+                    "cost": {
+                        "mp": [
+                            0
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "description": "<p>（注：此为六扇门弟子必要时所行之非常手段，主观依赖性极强，请主持人酌情安排。）<br>你可以在探查清楚后，前往衙门对簿公堂，为一名在押犯人翻案。<br>你需要分别对衙门（县令或知府）、原告、百姓进行三次难度相同的[说服]检定，全部成功后，翻案成功，否则失败，根据目标的恶行值来确定难度。<br>恶行值 0 小于 100 小于 500<br>说服难度 15 20 25 ·若你有该犯人无罪的证据，说服难度-5。<br>·若犯人的恶行值大于等于 500，翻案必定失败。<br>翻案失败：你身败名裂，朝廷声望-3，一年内无法再替人翻案。<br>翻案成功：犯人被无罪释放，他对你感激涕零，将赠送他所有现银、产业总价值 20%的银两给你作为报酬（至少 100 两）。<br>·你增长该犯人当前恶行值 20%的恶行值，若你没有增长恶行值，你获得自身神采数值的侠义值。<br>·按照朝廷律法，你每月只能翻案一次。<br>升级：讼状中归你所有的银两比例提高 10%，翻案中进行的[说服]检定结果+1。</p>",
+                    "automationNote": "完全手动：请GM主持翻案流程。",
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "惊艳神枪",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "liushanmen",
+            "tier": 3,
+            "description": "<p>六扇门绝技，极致的内力所刺出的一枪，宛如一朵花般惊艳，却能粉碎敌人、致敌死命。</p>",
+            "requirements": "棍-长枪",
+            "moves": [
+                {
+                    "name": "惊艳神枪",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "element": "taiji",
+                    "weaponType": "staff",
+                    "range": "5米",
+                    "cost": {
+                        "mp": [
+                            20
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.9
+                            }
+                        ]
+                    },
+                    "description": "<p>-一点寒芒，万象神光- 蓄力动作，刺出绝世枪法，对目标及其周围 2 米范围内的敌人造成 0.9 力量点外功伤害，同时使目标陷入“下盘不稳”，持续三回合。<br>升级：招式伤害+10，内力消耗+20。</p>",
+                    "automationNote": "自动化: 添加下盘不稳（unstable）。手动: AOE范围伤害。",
+                    "scripts": [
+                        {
+                            "label": "添加下盘不稳",
+                            "trigger": "hit",
+                            "script": "const effectData = CONFIG.statusEffects.find(e => e.id === 'unstable'); if (effectData) { const data = foundry.utils.deepClone(effectData); data.duration = { rounds: 3 }; await game.xjzl.api.effects.addEffect(args.target, data); }"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "一以贯通",
+        "type": "wuxue",
+        "img": "icons/magic/life/heart-red.webp",
+        "system": {
+            "category": "sanshou",
+            "sect": "liushanmen",
+            "tier": 3,
+            "description": "<p>六扇门独门心法，极难大成。<br>修炼需循序渐进，不断破除经脉桎梏，随后丹田内力保持巅峰。最终登临绝顶，一力万钧！</p><p><strong>第一关</strong><br>需求：第一关穴位打通 2 个以上，修为 1000。<br>效果：你的招式提升消耗内力值等额的伤害。</p><p><strong>第二关</strong><br>需求：第二关穴位打通 2 个以上，修为 2000。<br>效果：你的招式提升消耗内力值*2 的伤害。</p><p><strong>第三关</strong><br>需求：第三关穴位打通 2 个以上，修为 4000。<br>效果：你的招式提升消耗内力值*3 的伤害。</p>",
+            "requirements": "需配合六扇门内功修炼；升级需满足经脉打通数量要求（详见描述）。",
+            "moves": [
+                {
+                    "name": "一以贯通",
+                    "type": "qi",
+                    "actionType": "default",
+                    "img": "icons/magic/life/heart-red.webp",
+                    "description": "<p>记载着一以贯通心法的总纲与行气路线。</p>",
+                    "requirements": "",
+                    "automationNote": "被动效果已完全自动化。穴位打通需求需玩家自觉遵守。",
+                    "weaponType": "none",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            1000,
+                            2000,
+                            4000
+                        ]
+                    },
+                    "xpCostRatio": 1,
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    }
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "一以贯通",
+                "icon": "icons/magic/life/heart-red.webp",
+                "transfer": true,
+                "disabled": false,
+                "description": "根据当前等级，招式附加基于内力消耗的额外伤害。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yiyiguantong",
+                        "scripts": [
+                            {
+                                "label": "内力转化伤害",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "/**\n * 优化版脚本：内存查找，零IO损耗\n */\n// 1. 获取当前出招的基础内力消耗\n// 如果没有内力消耗，直接跳过\nconst mpCost = args.move.currentCost?.mp || 0;\nif (mpCost <= 0) return;\n\n// 2. 在 Actor 内存中直接查找源物品 (Item)\n// 假设招式名和书名一致，或者我们知道它叫'一以贯通'\n// 这里的 actor 就是 thisEffect.parent (因为 transfer=true)\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\n\n// 3. 查找招式数据\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nif (!passiveMove) return;\n\n// 4. 获取内存中的计算等级 (Computed Level)\nconst level = passiveMove.computedLevel || 0;\nif (level < 1) return;\n\n// 5. 计算倍率\nlet multiplier = level; // 1级=1倍, 2级=2倍, 3级=3倍\n// 如果后续规则有变(比如1级0.5倍)，可以在这里改 switch/if\nif (level > 3) multiplier = 3; // 封顶\n\n// 6. 应用增伤\nconst bonus = Math.floor(mpCost * multiplier);\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`一以贯通(Lv.${level}): +${bonus} (内力${mpCost} x ${multiplier})`);\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    }
+]
