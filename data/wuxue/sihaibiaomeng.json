@@ -1533,7 +1533,7 @@
             "category": "sanshou",
             "sect": "sihaibiaomeng",
             "tier": 3,
-            "description": "四海镖盟绝技，气沉于身，不漏山水，修隐忍功\n夫，只待忍无可忍时，方可施展，震慑宵小。",
+            "description": "四海镖盟绝技，气沉于身，不漏山水，修隐忍功夫，只待忍无可忍时，方可施展，震慑宵小。",
             "requirements": "《地龙劲》修炼圆满，徒手",
             "moves": [
                 {
@@ -1544,9 +1544,10 @@
                     "weaponType": "unarmed",
                     "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
                     "range": "5",
+                    "targetInfo": "周围敌方",
                     "actionCost": "全回合",
-                    "description": "全回合动作，双脚插地，双掌拍地，地动山摇，周\n围敌方进行[角力]检定（难度 15），失败受到 0.6\n力量点外功伤害后倒地，并“禁足”一回合。\n·每消耗 1 点怒气，招式释放距离提高 5 米。\n升级：招式伤害+10，角力难度+2，内力消耗+8。",
-                    "automationNote": "AOE伤害需手动选中所有目标后点击应用。角力检定自动触发，失败自动扣血并应用倒地/禁足。怒气增加距离需玩家手动扣除怒气并判断距离。",
+                    "description": "<p>全回合动作，双脚插地，双掌拍地，地动山摇，周围敌方进行[角力]检定（难度 15），失败受到 0.6 力量点外功伤害后倒地，并“禁足”一回合。</p><ul><li>每消耗 1 点怒气，招式释放距离提高 5 米。</li></ul><p>升级：招式伤害+10，角力难度+2，内力消耗+8。</p>",
+                    "automationNote": "完全自动化：全局必中（跳过命中检定）。自动化：角力检定请求、失败自动施加倒地/禁足状态。手动：伤害需点击卡片按钮应用（请仅对检定失败者应用）；怒气增加距离需手动处理。",
                     "xpCostRatio": 1,
                     "costs": {
                         "mp": [
@@ -1554,7 +1555,9 @@
                             16,
                             24,
                             32
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -1568,10 +1571,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "地龙翻身-震击",
+                            "label": "全局必中",
+                            "trigger": "attack",
+                            "script": "args.flags.forceHit = true;",
+                            "active": true
+                        },
+                        {
+                            "label": "震击检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 15 + (lvl - 1) * 2;\n// 使用面板计算好的伤害 (args.calc.damage)\nconst damage = args.calc.damage;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'jiaoli',\n    dc: dc,\n    label: '抵抗地龙翻身',\n    onFail: async () => {\n        // 造成伤害\n        await args.target.applyDamage({\n            amount: damage,\n            type: 'waigong',\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: false // 外功伤害通常计算防御\n        });\n        \n        // 施加状态: 倒地(prone) + 禁足(root)\n        // 直接调用 API 引用系统状态，严禁硬编码\n        await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n\n        // 禁足需要覆盖持续时间为 1 回合\n        await game.xjzl.api.effects.addEffect(args.target, {\n             id: \"root\",\n             duration: { rounds: 1 }\n        });\n        \n        ui.notifications.info(`${args.target.name} 被震倒并禁足！`);\n    }\n});"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 15 + (lvl - 1) * 2;\n\n// 1. 准备倒地数据 (Prone)\nconst proneData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'prone'));\nif(proneData) proneData.statuses = ['prone'];\n\n// 2. 准备禁足数据 (Root) - 需覆盖持续时间\nconst rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'root'));\nif(rootData) {\n    rootData.statuses = ['root'];\n    rootData.duration = { rounds: 1 };\n}\n\n// 3. 发起请求\n// 注意：onFail 必须是数据对象或数组，不能是函数\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'jiaoli',\n    dc: dc,\n    label: '抵抗地龙翻身',\n    onFail: [proneData, rootData]\n});"
                         }
                     ]
                 }
