@@ -1210,19 +1210,32 @@
             "category": "sanshou",
             "sect": "fenghuayuan",
             "tier": 2,
-            "description": "<p>自明祖定国以来，边疆安定，国富民安，百姓从事各行各业，空前繁荣。</p><p>需求：《浮沉功》修炼圆满</p>",
+            "description": "自明祖定国以来，边疆安定，国富民安，百姓从事各行各业，空前繁荣。",
             "requirements": "《浮沉功》修炼圆满",
-            "moves": [],
-            "scripts": [
+            "automationNote": "完全自动化：技艺检定加成已实现（被动生效）。需手动：阅读书籍额外修为需玩家手动调整。",
+            "moves": [
                 {
-                    "label": "技艺加成",
-                    "trigger": "passive",
-                    "active": true,
-                    "script": "// 遍历所有技艺并增加检定修正\nfor (const art of Object.values(S.arts)) {\n    art.checkMod += 1;\n}"
+                    "name": "百业俱兴",
+                    "type": "qi",
+                    "actionType": "default",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "被动",
+                    "description": "·你的技艺检定结果+1。<br>你选择一本技艺书籍，阅读该书籍时，每月额外增长 100 修为进度。通读完成可更换其他书籍。<br>升级：技艺检定结果再+1，每月修为进度再+100。",
+                    "progression": {
+                        "mode": "standard"
+                    },
+                    "scripts": [
+                        {
+                            "label": "百业俱兴-被动加值",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "const moveData = item.system.moves.find(m => m.name === '百业俱兴');\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst bonus = lvl;\nconst artKeys = Object.keys(CONFIG.XJZL.arts);\nfor (const key of artKeys) {\n    if (system.arts && system.arts[key]) {\n        system.arts[key].checkMod = (system.arts[key].checkMod || 0) + bonus;\n    }\n}"
+                        }
+                    ]
                 }
             ]
-        },
-        "effects": []
+        }
     },
     {
         "name": "所见所闻",
@@ -1232,24 +1245,66 @@
             "category": "sanshou",
             "sect": "fenghuayuan",
             "tier": 2,
-            "description": "<p>枫桦院弟子观深山雾海所得，知所见所闻所相者，皆如云气般虚无缥缈，不可得。</p><p>需求：《彤气蝶影》修炼圆满</p>",
+            "description": "枫桦院弟子观深山雾海所得，知所见所闻所相者，皆如云气般虚无缥缈，不可得。",
             "requirements": "《彤气蝶影》修炼圆满",
-            "moves": [],
-            "scripts": [
+            "automationNote": "部分自动化：气感技能加成被动生效。闪避挂残气功能需玩家点击招式应用【所见所闻-态】状态后生效。",
+            "moves": [
                 {
-                    "label": "残气反馈",
-                    "trigger": "avoided",
-                    "active": true,
-                    "script": "const effectData = thisItem.effects.getName(\"残气\").toObject();\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nui.notifications.info(`闪避成功，反击残气！`);"
+                    "name": "所见所闻",
+                    "type": "qi",
+                    "actionType": "default",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "你的气感属性技能等级+1。<br>你每次闪避敌方攻击时，为其添加一层“残气”，至多五层，持续到脱战。<br>·残气：每层使你命中-2，闪避-2。<br>升级：气感属性技能等级再+1。",
+                    "progression": {
+                        "mode": "standard"
+                    },
+                    "scripts": [
+                        {
+                            "label": "所见所闻-技能被动",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "const moveData = item.system.moves.find(m => m.name === '所见所闻');\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst bonus = lvl;\nconst skills = ['dianxue', 'zhuizong', 'tancha', 'dongcha'];\nfor (const sk of skills) {\n    if (system.skills[sk]) {\n        system.skills[sk].mod = (system.skills[sk].mod || 0) + bonus;\n    }\n}"
+                        }
+                    ]
                 }
             ]
         },
         "effects": [
             {
+                "name": "所见所闻-态",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "description": "闪避时给攻击者施加残气。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "suojiansuowen_buff",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "所见所闻-闪避触发",
+                                "trigger": "avoided",
+                                "active": true,
+                                "script": "if (!args.attacker) return;\nconst originItem = await fromUuid(thisEffect.origin);\nif (!originItem) return;\nconst sourceEffect = originItem.effects.getName('残气');\nif (!sourceEffect) return ui.notifications.warn('特效模板[残气]缺失');\nconst effectData = sourceEffect.toObject();\ndelete effectData._id;\neffectData.origin = originItem.uuid;\neffectData.disabled = false;\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nif (actor.token?.object) {\n    canvas.interface.createScrollingText(actor.token.object.center, '所见所闻', {\n        fill: '#00FFFF', stroke: '#000000', strokeThickness: 4\n    });\n}"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
                 "name": "残气",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
+                "description": "每层使你命中-2，闪避-2。",
                 "transfer": false,
-                "description": "命中-2，闪避-2",
+                "disabled": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "canqi",
+                        "stackable": true,
+                        "maxStacks": 5
+                    }
+                },
                 "changes": [
                     {
                         "key": "system.combat.hit_waigong",
@@ -1266,26 +1321,6 @@
                         "mode": 2,
                         "value": "-2"
                     }
-                ],
-                "flags": {
-                    "xjzl-system": {
-                        "stackable": true,
-                        "maxStacks": 5,
-                        "slug": "canqi"
-                    }
-                }
-            },
-            {
-                "name": "所见所闻",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                "transfer": true,
-                "description": "气感+1，闪避施加残气",
-                "changes": [
-                    {
-                        "key": "system.stats.qigan.mod",
-                        "mode": 2,
-                        "value": "1"
-                    }
                 ]
             }
         ]
@@ -1298,36 +1333,31 @@
             "category": "sanshou",
             "sect": "fenghuayuan",
             "tier": 3,
-            "description": "<p>夫万象森罗，不离两仪所育；百法纷凑，无越三教之境；气深如海，展现万千气象，此妙神之技也。</p><p>需求：任意一种武器技能的等级达到 8</p>",
-            "requirements": "任意一种武器技能等级8",
-            "moves": [],
-            "scripts": [],
-            "automationNote": "被动效果请手动添加AE层数。百通请手动操作。"
-        },
-        "effects": [
-            {
-                "name": "着意",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                "transfer": true,
-                "description": "每有一类武器等级达到8，气血内力上限+10 (请根据实际情况手动调整层数)",
-                "flags": {
-                    "xjzl-system": {
-                        "stackable": true
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.resources.hp.bonus",
-                        "mode": 2,
-                        "value": "10"
+            "description": "夫万象森罗，不离两仪所育；百法纷凑，无越三教之境；气深如海，展现万千气象，此妙神之技也。",
+            "requirements": "任意一种武器技能的等级达到 8",
+            "automationNote": "部分自动化：着意（被动加上限）已实现。百通（变招换属性）需手动扣除内力并告知GM/对方改变属性。",
+            "moves": [
+                {
+                    "name": "森罗万象",
+                    "type": "qi",
+                    "actionType": "default",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "被动",
+                    "description": "着意<br>通过修炼武学，每使一类武器技能等级达到 8 后，你的气血上限和内力上限+10。<br>百通<br>每次施展武器技能等级达到 8 的武学套路招式时，你可以流失 30 点内力，吐气纳新，让本次出招中的伤害属性替换为其他属性。<br>·如果该招式包含多个伤害属性，则无法替换。<br>升级：着意中，气血、内力上限再+10。百通中，流失的内力减少 10 点。",
+                    "progression": {
+                        "mode": "standard"
                     },
-                    {
-                        "key": "system.resources.mp.bonus",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
-            }
-        ]
+                    "scripts": [
+                        {
+                            "label": "着意-属性上限加成",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "const moveData = item.system.moves.find(m => m.name === '森罗万象');\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst bonusPerType = 10 + (lvl - 1) * 10;\nlet count = 0;\nconst ranks = system.combat.weaponRanks || {};\nfor (const key of Object.keys(ranks)) {\n    if (ranks[key].value >= 8) {\n        count++;\n    }\n}\nif (count > 0) {\n    const totalBonus = count * bonusPerType;\n    system.resources.hp.bonus = (system.resources.hp.bonus || 0) + totalBonus;\n    system.resources.mp.bonus = (system.resources.mp.bonus || 0) + totalBonus;\n}"
+                        }
+                    ]
+                }
+            ]
+        }
     }
 ]
