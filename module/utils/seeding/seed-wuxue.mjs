@@ -17,7 +17,7 @@ const SECT_MAP = {
     "gaibang": "丐帮",
     "fenghuayuan": "枫华院",
     "liushanmen": "六扇门",
-    // "jiangnange": "江南阁",
+    "jiangnange": "江南阁",
     // "shenfengbang": "神风帮",
     // "sihaibiaomeng": "四海镖盟",
     // "jiangjunying": "将军营",
