@@ -1079,6 +1079,7 @@ export class ChatCardManager {
         // 2. 虚招“漏网之鱼”检查
         // 检查是否有：目标开了架招 && 是虚招攻击 && 还没有对抗结果 && 被命中
         const move = item.system.moves.find(m => m.id === flags.moveId);
+        const moveElement = move ? (move.element || "none") : "none";
         const feintResults = flags.feintResults || {};
         const isFeintMove = move?.type === "feint";
         let missingDefense = false;
@@ -1219,7 +1220,8 @@ export class ChatCardManager {
                 ignoreBlock: ignoreBlock,       // 无视格挡
                 ignoreDefense: ignoreDefense,   // 无视防御
                 ignoreStance: ignoreStance,     // 无视架招
-                applyCritDamage: flags.canCrit  // 是否应用暴击倍率
+                applyCritDamage: flags.canCrit,  // 是否应用暴击倍率
+                element: moveElement
             };
 
             // 2. 只有命中了才跑这个脚本 (未命中不需要改伤害类型)
@@ -1229,6 +1231,7 @@ export class ChatCardManager {
                     target: targetActor,
                     item: item,
                     move: move,
+                    element: moveElement,
 
                     // 状态 (只读)
                     outcome: {
@@ -1258,7 +1261,8 @@ export class ChatCardManager {
                 ignoreBlock: damageConfig.ignoreBlock,    //无视格挡
                 ignoreDefense: damageConfig.ignoreDefense, //无视内外功防御
                 ignoreStance: damageConfig.ignoreStance,  //无视架招
-                isSkill: isSkillDamage
+                isSkill: isSkillDamage,
+                element: damageConfig.element
             });
 
             // 统计数据更新为该目标发送独立伤害卡片 (仅命中时)
@@ -1530,6 +1534,7 @@ export class ChatCardManager {
         const summary = [];
         let hitCount = 0;
         const move = item.system.moves.find(m => m.id === flags.moveId);
+        const moveElement = move ? (move.element || "none") : "none";
 
         for (const target of targets) {
             const targetActor = target.actor || target;
@@ -1555,6 +1560,7 @@ export class ChatCardManager {
                     target: targetActor,
                     item: item,
                     move: move,
+                    element: moveElement,
                     outcome: {
                         isHit: true,
                         isCrit: config.isCrit,
@@ -1581,7 +1587,8 @@ export class ChatCardManager {
                 ignoreBlock: damageConfig.ignoreBlock,
                 ignoreDefense: damageConfig.ignoreDefense,
                 ignoreStance: damageConfig.ignoreStance,
-                isSkill: isSkillDamage
+                isSkill: isSkillDamage,
+                element: damageConfig.element
             });
 
             if (isHit) {

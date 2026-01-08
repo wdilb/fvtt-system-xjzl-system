@@ -973,20 +973,13 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     if (x.broken) jingmaiFreePoints += 100;
 
     // ===========================================
-    // 2. 处理任督二脉的全属性加成 (这里只处理 Mod，不处理 Value)
+    // 2. 处理任督二脉的全属性加成 (只计算数值，不写入mod， 写入mod会被重复计算)
     // ===========================================
     const e = jingmai.extra;
-    let allStatBonus = 0;
+    let meridianAllStatBonus = 0;
     // 督脉/任脉 基础全属性+10
-    if (e.du) allStatBonus += 10;
-    if (e.ren) allStatBonus += 10;
-
-    if (allStatBonus > 0) {
-      for (const [key, stat] of Object.entries(stats)) {
-        if (key === 'wuxing' || key === 'freePoints') continue;
-        stat.mod = (stat.mod || 0) + allStatBonus;
-      }
-    }
+    if (e.du) meridianAllStatBonus += 10;
+    if (e.ren) meridianAllStatBonus += 10;
 
     // ===========================================
     // 3. 计算悟性 (含玄关上限逻辑)
@@ -1020,7 +1013,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       // Total = Base + Assigned + Mod + NeigongBonus
       // mod: AE修正 + (如果有)脚本动态修正
       // neigongBonus: 内功静态修正
-      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0) + (stat.neigongBonus || 0) + (stat.identityBonus || 0);
+      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0) + (stat.neigongBonus || 0) + (stat.identityBonus || 0) + + meridianAllStatBonus;
 
       // TODO 属性小于0 死亡
     }

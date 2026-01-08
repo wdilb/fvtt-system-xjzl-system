@@ -1109,6 +1109,7 @@ export class XJZLActor extends Actor {
     const {
       amount,             // 原始伤害 (面板)
       type = "waigong",   // 伤害类型
+      element = "none",       // 伤害元素类型（阴、柔、阳、刚、太极）
       attacker = null,    // 攻击者 Actor
       isHit = true,       // 是否命中
       isBroken = false,   // 是否被破防 (状态，不可逆)
@@ -1125,7 +1126,9 @@ export class XJZLActor extends Actor {
 
       // 暴击规则 (允许脚本修改暴击状态)
       isCrit: data.isCrit || false,
-      applyCritDamage: data.applyCritDamage ?? true
+      applyCritDamage: data.applyCritDamage ?? true,
+
+      element: element
     };
 
     // =====================================================
@@ -1165,6 +1168,7 @@ export class XJZLActor extends Actor {
       target: this,
       type: type,
       baseDamage: amount, // 原始面板伤害
+      element: config.element,
 
       // 允许修改的配置 (包括 isCrit)
       config: config
@@ -1239,6 +1243,7 @@ export class XJZLActor extends Actor {
       attacker: attacker,
       target: this,
       type: type,
+      element: config.element, 
       baseDamage: amount,        // 原始面板
       calcDamage: reducedDamage, // 减伤后理论值
 
@@ -1425,6 +1430,7 @@ export class XJZLActor extends Actor {
       attacker: attacker,
       target: this,
       type: type,
+      element: config.element, 
 
       finalDamage: finalDamage, // 理论应扣
       hpLost: stdHpLost,        // 实际扣血
