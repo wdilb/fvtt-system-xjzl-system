@@ -1,0 +1,1034 @@
+[
+    {
+        "name": "神风刀法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "shenfengbang",
+            "tier": 1,
+            "description": "神风帮名震四海之刀法，凌厉如风，刀势灵动。",
+            "requirements": "刀-单刀，刀意堂 属性：阴",
+            "moves": [
+                {
+                    "name": "风清云淡",
+                    "type": "stance",
+                    "cost": {
+                        "mp": 1
+                    },
+                    "range": "1",
+                    "description": "次要动作，刀尖下引，等风起，开启架招。格挡成功时，借势在自身周围聚气成风，获得一层“神风刀气”，最多叠加三层，持续到战斗脱离。<br>神风刀气：每层使刀法的释放距离+1。<br>·如果处于‘大风’天气环境，你格挡成功时额外获得一层“神风刀气”。<br>升级：格挡值+5，内力消耗+1。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "automationNote": "格挡成功自动获得刀气。大风天气下额外层数需手动。",
+                    "scripts": [
+                        {
+                            "label": "格挡获得刀气",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effectData = thisItem.effects.getName(\"神风刀气\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nui.notifications.info(`${actor.name} 聚气成风，获得神风刀气！`);"
+                        }
+                    ]
+                },
+                {
+                    "name": "风起云涌",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 1
+                    },
+                    "range": "1",
+                    "description": "主要动作，刀起神风，引云动，对目标造成 0.4 力量点外功伤害。<br>若自身存在“神风刀气”，每消耗一层“神风刀气”，可给目标添加一回合“禁足”。<br>升级：招式伤害+5，内力消耗+1。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "automationNote": "出招时自动检测并询问是否消耗刀气施加禁足。",
+                    "scripts": [
+                        {
+                            "label": "消耗刀气",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nif (daoqi) {\n    const stacks = daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const use = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"风起云涌\" },\n        content: `消耗全部 ${stacks} 层神风刀气以禁足目标？`,\n        rejectClose: false\n    });\n    if (use) {\n        await daoqi.delete();\n        args.flags.wuxue_shenfeng_consumed = stacks;\n    }\n}"
+                        },
+                        {
+                            "label": "应用禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const stacks = args.flags.wuxue_shenfeng_consumed || 0;\nif (stacks > 0 && args.isHit) {\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    rootData.duration = { rounds: stacks };\n    rootData.name = `禁足 (${stacks}回合)`;\n    await game.xjzl.api.effects.addEffect(args.target, rootData);\n    ui.notifications.info(`消耗 ${stacks} 层刀气，禁足 ${args.target.name}！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "风刀斩雪",
+                    "type": "counter",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 1
+                    },
+                    "range": "1",
+                    "description": "当你看破对方虚招时，可消耗反应动作施展此招。<br>压制虚招，回身一刀，斩云雪，造成 0.5 力量点外功伤害。同时获得两层“神风刀气”，持续到战斗脱离。<br>升级：招式伤害+5，内力消耗+1。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "automationNote": "反应动作需手动。命中自动获得2层刀气。",
+                    "scripts": [
+                        {
+                            "label": "获得刀气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst effectData = thisItem.effects.getName(\"神风刀气\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                        }
+                    ]
+                },
+                {
+                    "name": "神刀风暴",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "element": "yin",
+                    "range": "3*3 米",
+                    "description": "主要动作，刀刃环舞，三划一横，在正前方 3*3 区域内斩出‘刀气旋风’，持续一回合。<br>刀气旋风：在区域内开始回合的所有敌人和其他友方受到 40 点气血流失。<br>·刀气旋风区域视作‘大风’天气。<br>·每有一层神风刀气，刀气旋风额外持续一回合。<br>升级：刀气旋风流失气血提升 10 点，持续回合数+1，怒气消耗-1，内力消耗+4。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "automationNote": "仅提示持续时间。区域伤害/天气/目标选择手动。",
+                    "scripts": [
+                        {
+                            "label": "计算持续时间",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nlet bonusRounds = 0;\nif (daoqi) {\n    bonusRounds = daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n}\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseRounds = 1 + (lvl - 1);\nconst bleedDmg = 40 + (lvl - 1) * 10;\n\nconst content = `<div class=\"xjzl-chat-card\"><h3>刀气旋风</h3><p>持续 <b>${baseRounds + bonusRounds}</b> 回合 (含刀气加成)。</p><p>区域内流失 <b>${bleedDmg}</b> 点气血。</p></div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content: content });"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "神风刀气",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                    "description": "每层使刀法的释放距离+1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shenfeng_daoqi",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "易水诀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "shenfengbang",
+            "tier": 1,
+            "description": "神风帮武学，揣摩荆轲之古武刺法，招式决绝。",
+            "requirements": "匕首，杀意堂 属性：阴",
+            "moves": [
+                {
+                    "name": "风萧萧",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 1
+                    },
+                    "range": "1",
+                    "description": "主要动作，借风把袖，右手揕之，对目标造成 0.4 力量点外功伤害。若招式造成暴击，自身获得“易水寒”，持续到战斗结束。<br>易水寒：下一次施展《易水诀》招式时，可以消耗此状态，选择以下任意一个效果生效：<br>易水湭寒：使周围 1 米范围内目标倒地。<br>慷慨送行：招式提升 10 点伤害。<br>壮士断腕：怒气+1。<br>升级：招式伤害+5，内力消耗+1。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "automationNote": "暴击自动获得易水寒。消耗逻辑在各招式中触发。",
+                    "scripts": [
+                        {
+                            "label": "易水寒特效",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const use = await foundry.applications.api.DialogV2.confirm({ window: { title: \"易水寒\" }, content: \"消耗易水寒触发特效？\", rejectClose: false });\n    if (use) {\n        await han.delete();\n        const choice = await new Promise(resolve => {\n            new Dialog({\n                title: \"选择效果\",\n                buttons: {\n                    1: { label: \"倒地(周围)\", callback: () => resolve(1) },\n                    2: { label: \"伤害+10\", callback: () => resolve(2) },\n                    3: { label: \"怒气+1\", callback: () => resolve(3) }\n                },\n                close: () => resolve(0)\n            }).render(true);\n        });\n        if (choice === 2) args.flags.wuxue_yishui_dmg = true;\n        if (choice === 3) args.flags.wuxue_yishui_rage = true;\n        if (choice === 1) args.flags.wuxue_yishui_prone = true;\n        \n        if (choice === 3) {\n             const curRage = system.resources.rage.value;\n             const maxRage = system.resources.rage.max;\n             if (curRage < maxRage) await actor.update({ \"system.resources.rage.value\": curRage + 1 });\n        }\n    }\n}"
+                        },
+                        {
+                            "label": "伤害加成",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.config.amount += 10;\n}"
+                        },
+                        {
+                            "label": "面板预览",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.output.bonusDesc.push(\"易水寒: +10\");\n}"
+                        },
+                        {
+                            "label": "应用倒地/暴击获得",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && args.isCrit) {\n    const effectData = thisItem.effects.getName(\"易水寒\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}\nif (args.flags.wuxue_yishui_prone && args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    ui.notifications.info(\"易水寒：目标倒地！请手动检查周围1米其他目标。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "取图奉之",
+                    "type": "stance",
+                    "cost": {
+                        "mp": 1
+                    },
+                    "range": "自身",
+                    "description": "次要动作，双手平展，作献图状，开启架招。架招被击破时，可不消耗动作立即施展【图穷匕见】，并且自身获得“易水寒”，持续到战斗结束。<br>升级：格挡值+5，内力消耗+1。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "automationNote": "架招被破自动获得易水寒。免费施展需手动。",
+                    "scripts": [
+                        {
+                            "label": "架招被破",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (args.isBroken && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"易水寒\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.warn(\"架招被破！获得易水寒，可立即施展【图穷匕见】！\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "图穷匕见",
+                    "type": "feint",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 1
+                    },
+                    "range": "1",
+                    "description": "主要动作，弃图追击，对目标造成 0.3 力量点外功伤害。击破架招时，可将目标击倒，并获得“连击”，持续到战斗脱离。<br>连击：你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。<br>升级：招式伤害+5，内力消耗+1。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "automationNote": "易水寒通用逻辑同上。击破架招自动应用倒地和连击。",
+                    "scripts": [
+                        {
+                            "label": "易水寒特效",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const use = await foundry.applications.api.DialogV2.confirm({ window: { title: \"易水寒\" }, content: \"消耗易水寒触发特效？\", rejectClose: false });\n    if (use) {\n        await han.delete();\n        const choice = await new Promise(resolve => {\n            new Dialog({\n                title: \"选择效果\",\n                buttons: {\n                    1: { label: \"倒地(周围)\", callback: () => resolve(1) },\n                    2: { label: \"伤害+10\", callback: () => resolve(2) },\n                    3: { label: \"怒气+1\", callback: () => resolve(3) }\n                },\n                close: () => resolve(0)\n            }).render(true);\n        });\n        if (choice === 2) args.flags.wuxue_yishui_dmg = true;\n        if (choice === 3) args.flags.wuxue_yishui_rage = true;\n        if (choice === 1) args.flags.wuxue_yishui_prone = true;\n        if (choice === 3) {\n             const curRage = system.resources.rage.value;\n             const maxRage = system.resources.rage.max;\n             if (curRage < maxRage) await actor.update({ \"system.resources.rage.value\": curRage + 1 });\n        }\n    }\n}"
+                        },
+                        {
+                            "label": "伤害加成",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.config.amount += 10;\n}"
+                        },
+                        {
+                            "label": "面板预览",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.output.bonusDesc.push(\"易水寒: +10\");\n}"
+                        },
+                        {
+                            "label": "击破/易水寒效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    await game.xjzl.api.effects.toggleStatus(actor, \"lianji\", true);\n    ui.notifications.info(\"图穷匕见！击倒目标并获得连击。\");\n}\nif (args.flags.wuxue_yishui_prone) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    ui.notifications.info(\"易水寒：目标倒地！请手动检查周围1米其他目标。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "不复还",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 2,
+                        "rage": 7
+                    },
+                    "range": "2",
+                    "description": "主要动作，仰天呼气，瞬息一刺，对敌人造成 0.6 力量点外功伤害。<br>若你具有“易水寒”，可将之移除，然后对目标发动“濒死一击”，该次濒死一击暴击骰-2。<br>升级：招式伤害+10，怒气消耗-1，内力消耗+2。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "automationNote": "自动询问消耗易水寒。若确认，自动清空内力、增加伤害、修正暴击阈值。",
+                    "scripts": [
+                        {
+                            "label": "易水寒濒死一击",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"易水寒\" },\n        content: \"消耗易水寒发动濒死一击？(内力清空转为伤害，暴击阈值-2)\",\n        rejectClose: false\n    });\n    if (confirm) {\n        await han.delete();\n        const mp = system.resources.mp.value;\n        await actor.update({ \"system.resources.mp.value\": 0 });\n        args.flags.wuxue_desperate_bonus = mp;\n        args.flags.critThresholdMod += 2;\n        ui.notifications.info(`易水寒发动！濒死一击附加 ${mp} 伤害！`);\n    }\n}"
+                        },
+                        {
+                            "label": "伤害附加",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const bonus = args.flags.wuxue_desperate_bonus || 0;\nif (bonus > 0) {\n    args.config.amount += bonus;\n}"
+                        },
+                        {
+                            "label": "面板预览",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const bonus = args.flags.wuxue_desperate_bonus || 0;\nif (bonus > 0) {\n    args.output.bonusDesc.push(`濒死一击: +${bonus}`);\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "易水寒",
+                    "icon": "icons/svg/ice-aura.svg",
+                    "description": "下一次施展《易水诀》招式时，可以消耗此状态生效特殊效果。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yishui_han",
+                            "stackable": false
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "回风诀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "shenfengbang",
+            "tier": 2,
+            "description": "神风帮绝学，出其不意，攻敌不备，轻巧灵活。",
+            "requirements": "匕首，杀意堂 属性：阴",
+            "moves": [
+                {
+                    "name": "风吹拂柳",
+                    "type": "stance",
+                    "cost": {
+                        "mp": 2
+                    },
+                    "range": "自身/5 米",
+                    "description": "次要动作，拂袖挥风，开启架招。格挡成功时，气纳四方，将范围内一把落在地上的匕首摄入手中，然后获得一层“回风”，至多三层，持续到脱战。<br>回风：每层使施展带有“风”字的招式暴击骰-1。<br>升级：格挡值+10，内力消耗+2。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "automationNote": "格挡成功自动获得回风。摄入匕首/范围判定手动。",
+                    "scripts": [
+                        {
+                            "label": "格挡获得回风",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effectData = thisItem.effects.getName(\"回风\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nui.notifications.info(\"风吹拂柳！摄入匕首并获得回风。\");"
+                        }
+                    ]
+                },
+                {
+                    "name": "袖里回风",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 2
+                    },
+                    "range": "5",
+                    "description": "主要动作，袖里藏风，掷出匕首，对敌人造成 0.5 身法点外功伤害。命中无架招目标时，为自身添加一层“回风”，至多三层，持续到战斗脱离。<br>若有目标在半空中，可以消耗反应动作施展此招，立于原地掷出匕首，对其造成伤害。<br>·施展此招后，你的[匕首]武器视作脱手,掉落在目标所处空格处。<br>升级：招式伤害+10，内力消耗+2。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "automationNote": "回风暴击检测自动。命中无架招自动获得回风。武器脱手/反应动作手动。",
+                    "scripts": [
+                        {
+                            "label": "回风修正暴击",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf && args.move.name.includes(\"风\")) {\n    args.flags.critThresholdMod += (hf.getFlag(\"xjzl-system\", \"stacks\") || 1);\n}"
+                        },
+                        {
+                            "label": "获得回风",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName(\"回风\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "无风起浪",
+                    "type": "feint",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 2
+                    },
+                    "range": "5",
+                    "description": "主要动作，抬臂轻甩，暗刺急出，对目标造成 0.4 身法点外功伤害。击破架招时击倒敌人，并为其添加“迟滞”，持续两回合。<br>·每消耗一层“回风”，虚招值+1。<br>·施展此招后，你的[匕首]武器视作脱手,掉落在目标所处空格处。<br>升级：招式伤害+10，内力消耗+2。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "automationNote": "自动消耗回风增加虚招。击破自动应用效果。武器脱手手动。",
+                    "scripts": [
+                        {
+                            "label": "消耗回风与修正",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf) {\n    const stacks = hf.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.bonusFeint += stacks;\n    if (args.move.name.includes(\"风\")) args.flags.critThresholdMod += stacks;\n    await hf.delete();\n    ui.notifications.info(`消耗 ${stacks} 层回风，虚招值+${stacks}`);\n}"
+                        },
+                        {
+                            "label": "击破效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    await game.xjzl.api.effects.addEffect(args.target, \"chizhi\");\n    const eff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chizhi\");\n    if(eff) await eff.update({ duration: { rounds: 2 } });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "风起八方",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "element": "yin",
+                    "range": "10",
+                    "description": "蓄力动作，随风而动，贯穿八方，对东南西北四条直线以及东南、东北、西南、西北四条斜线上的所有敌人造成 0.7 身法点外功伤害。同时将范围内所有落在地上的匕首摄入手中，每摄入一把获得一层“回风”，且招式伤害+10 点。<br>升级:招式伤害+20，怒气消耗-1，内力消耗+8。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "automationNote": "回风暴击修正自动。摄入匕首数量通过弹窗询问，自动计算伤害和回风层数。AOE目标手动选择。",
+                    "scripts": [
+                        {
+                            "label": "回风暴击与匕首摄入",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf) {\n    args.flags.critThresholdMod += (hf.getFlag(\"xjzl-system\", \"stacks\") || 1);\n}\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"风起八方\" },\n    content: \"<label>摄入匕首数量</label><input type='number' name='cnt' value='0'>\",\n    ok: { callback: (e, b) => b.form.elements.cnt.value }\n});\nif (count > 0) {\n    args.flags.wuxue_dagger_bonus = parseInt(count);\n    const effectData = thisItem.effects.getName(\"回风\").toObject();\n    for(let i=0; i<count; i++) await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        },
+                        {
+                            "label": "伤害加成",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const count = args.flags.wuxue_dagger_bonus || 0;\nif (count > 0) {\n    args.config.amount += count * 10;\n}"
+                        },
+                        {
+                            "label": "面板预览",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const count = args.flags.wuxue_dagger_bonus || 0;\nif (count > 0) {\n    args.output.bonusDesc.push(`摄入${count}把匕首: +${count*10}`);\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "回风",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                    "description": "每层使施展带有“风”字的招式暴击骰-1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "huifeng",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "风息刀法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "shenfengbang",
+            "tier": 2,
+            "description": "神风帮绝学，风雨如晦，终归平静，帮主曲风彻悟风中刀意，并藉此登上地榜，建立神风帮。",
+            "requirements": "刀-单刀，刀意堂 属性：阴",
+            "moves": [
+                {
+                    "name": "惊风落雨",
+                    "type": "feint",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 4
+                    },
+                    "range": "3",
+                    "description": "蓄力动作，骏步如风，奔袭至目标空格，对周围 1 米范围内的敌方造成 0.4 力量点外功伤害，命中无架招时击倒对方。并获得一层“刀意”，最多叠加三层，持续到战斗脱离。<br>刀意：每层使刀法伤害+10，持续到你更换其他武器的武学套路。<br>升级：招式伤害+10，内力消耗+4。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "automationNote": "命中无架招自动击倒。自动获得刀意Buff。移动/AOE手动。",
+                    "scripts": [
+                        {
+                            "label": "命中效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    if (!args.target.system.martial?.stanceActive) {\n        await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    }\n    const effectData = thisItem.effects.getName(\"刀意\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "风绝奔属",
+                    "type": "real",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 2
+                    },
+                    "range": "3",
+                    "description": "主要动作，挥刀兴风，对目标造成 0.5 力量点外功伤害，并获得一层“神风刀气”，持续到脱战。<br>神风刀气：每层使刀法的释放距离+1。<br>若有目标在半空中，可以消耗反应动作施展此招，跃至半空，斩击目标，造成伤害并获得一层“神风刀气”，持续到战斗脱离。<br>升级：招式伤害+10，内力消耗+2。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "automationNote": "命中自动获得神风刀气。反应动作/滞空手动。",
+                    "scripts": [
+                        {
+                            "label": "获得刀气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const effectData = thisItem.effects.getName(\"神风刀气\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "叱咤风云",
+                    "type": "stance",
+                    "cost": {
+                        "mp": 2
+                    },
+                    "range": "自身",
+                    "description": "次要动作，云淡风轻，开启架招。格挡成功后，可消耗三层“神风刀气”然后无消耗地施展【风绝奔属】或【惊风落雨】。<br>升级：格挡值+10，内力消耗+2。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "automationNote": "格挡时仅提示可消耗层数。消耗与免费施展需玩家手动（不扣资源）。",
+                    "scripts": [
+                        {
+                            "label": "格挡检测",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\n    const stacks = daoqi ? (daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks >= 3) {\n        ui.notifications.info(`${actor.name} 可消耗3层刀气免费施展【风绝奔属】或【惊风落雨】！`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "神灭风消",
+                    "type": "real",
+                    "isUltimate": true,
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "element": "yin",
+                    "cost": {
+                        "mp": 8,
+                        "rage": 7
+                    },
+                    "range": "1",
+                    "description": "蓄力动作，狂风骤止，刀气对周围敌人造成 0.7 力量点外功伤害。<br>若自身存在“神风刀气”，每消耗一层“神风刀气”，目标额外受到 20 点气血流失。<br>若消耗三层“神风刀气”，还会给所有命中的敌人添加“禁绝”，持续三回合。<br>升级：招式伤害+20，怒气消耗-1，内力消耗+8。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "automationNote": "自动消耗神风刀气，命中应用流失伤害。若消耗3层自动添加禁绝。",
+                    "scripts": [
+                        {
+                            "label": "消耗刀气逻辑",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const daoqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenfeng_daoqi\");\nif (daoqi) {\n    const stacks = daoqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.wuxue_shenfeng_stacks = stacks;\n    await daoqi.delete();\n    ui.notifications.info(`消耗 ${stacks} 层刀气强化神灭风消！`);\n}"
+                        },
+                        {
+                            "label": "伤害与状态应用",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const stacks = args.flags.wuxue_shenfeng_stacks || 0;\n    if (stacks > 0) {\n        await args.target.applyDamage({\n            amount: stacks * 20,\n            type: \"liushi\",\n            isHit: true\n        });\n        if (stacks >= 3) {\n            await game.xjzl.api.effects.addEffect(args.target, \"jinjue\");\n            const eff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinjue\");\n            if (eff) await eff.update({ duration: { rounds: 3 } });\n        }\n    }\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "刀意",
+                    "icon": "icons/svg/sword.svg",
+                    "description": "每层使刀法伤害+10。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "daoyi",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.weaponTypes.blade.mod",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
+                },
+                {
+                    "name": "神风刀气",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                    "description": "每层使刀法的释放距离+1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shenfeng_daoqi",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "唤鸟术",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "shenfengbang",
+            "tier": 1,
+            "description": "神风帮驯养小型猛禽，擅长追击目标。",
+            "requirements": "兽宠-燕隼",
+            "moves": [
+                {
+                    "name": "唤鸟术",
+                    "type": "qi",
+                    "cost": {
+                        "mp": 0
+                    },
+                    "range": "5里",
+                    "description": "寻人<br>一天一次，花费一分钟，呼唤燕隼，命其追踪一个目标，你需要将目标穿着颜色、身形大小告知燕隼。燕隼听懂后飞掠而去，在半径 5 里范围内搜索目标，一分钟之后在空中鸣叫反馈结果。<br>·这视作一次对目标的[追踪]检定，检定结果+2。<br>传讯<br>你训练燕隼使其记住一个除家以外的指定地点，燕隼可携带一张不超 50 字的字条飞到该处并返回。<br>·燕隼日行五百里，至多可记住三个五千里以内的地点，大约两洲之地范围。<br>升级：寻人[追踪]检定结果+2，传讯可以额外记住一个指定地点。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
+                    "automationNote": "完全手动。请自行进行[追踪]检定并手动+2。",
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "大风起",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "shenfengbang",
+            "tier": 2,
+            "description": "神风帮标志性绝技，以蓬勃内力引动狂风环绕周身，气势骇人。",
+            "requirements": "刀，《风玄劲》修炼圆满。",
+            "moves": [
+                {
+                    "name": "大风起",
+                    "type": "qi",
+                    "actionType": "default",
+                    "cost": {
+                        "mp": 10
+                    },
+                    "range": "3",
+                    "description": "全回合动作，内力凝结，回旋起势，在自身周围 3 米范围内形成‘大风’，持续十回合。<br>大风：敌人视该区域为困难地形；<br>敌方暗器、奇门-弓等投掷、射出远程物体的招式（包含投掷兵器等），在区域内或经过区域后，造成的内外功伤害降低 10 点；我方则提升 10 点。<br>升级：释放距离+1，动作降低一级，内力消耗+5。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            15,
+                            20,
+                            25
+                        ]
+                    },
+                    "automationNote": "完全手动。区域/困难地形/远程伤害修正均由GM手动处理。",
+                    "scripts": [
+                        {
+                            "label": "大风提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const content = `<div class=\"xjzl-chat-card\"><h3>大风起</h3><p>在自身周围3米形成大风区域，持续10回合。</p><p>远程伤害 敌方-10 / 我方+10</p></div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content: content });"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "杀意动",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "shenfengbang",
+            "tier": 2,
+            "description": "神风帮弟子在外独行孤僻，从不与人好勇斗狠，而是杀伐果断。对于可杀之人，先斩之，不问后果，全由帮会负责善后。",
+            "requirements": "《杀无道》修炼圆满。",
+            "moves": [
+                {
+                    "name": "杀意动",
+                    "type": "qi",
+                    "actionType": "default",
+                    "cost": {
+                        "mp": 0
+                    },
+                    "range": "自身",
+                    "description": "一天一次，花费十分钟，静坐室内，凝练杀意，你的杀戮值+10（至多加到 90，即你不能以此散手增长杀孽），并获得“杀念”，持续一天。<br>杀念：你每次出招时可以消耗 20 点杀戮值，使招式伤害+10。<br>·每有 1 点杀孽，杀念招式伤害+1（至多+10）。<br>升级：静坐获得的杀戮值+10，杀孽提供的招式伤害上限+10。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
+                    "automationNote": "杀戮值增加手动。杀念Buff应用自动。出招消耗杀戮增伤自动（带弹窗）。",
+                    "scripts": [
+                        {
+                            "label": "添加杀念Buff",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const effectData = thisItem.effects.getName(\"杀念\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n// 增加杀戮值逻辑 (仅提示)\nconst currentShalu = system.resources.shalu.value;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 10 + (lvl - 1) * 10;\nui.notifications.info(`杀意凝练完成！请手动将杀戮值增加 ${gain} (上限90)。`);"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "杀念",
+                    "icon": "icons/svg/skull.svg",
+                    "duration": {
+                        "seconds": 86400
+                    },
+                    "description": "出招时可消耗20杀戮值增伤。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shanian"
+                        }
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗杀戮增伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const shalu = system.resources.shalu.value;\nif (shalu >= 20) {\n    const use = await foundry.applications.api.DialogV2.confirm({ window: { title: '杀念' }, content: '消耗 20 杀戮值使伤害+10？', rejectClose: false });\n    if (use) {\n        await actor.update({ 'system.resources.shalu.value': shalu - 20 });\n        const shanie = system.resources.shanie || 0;\n        const extra = Math.min(10, shanie);\n        // 使用临时Flag传递给preDamage\n        args.flags.wuxue_shanian_bonus = 10 + extra;\n        ui.notifications.info(`杀意涌动！伤害+${10+extra}`);\n    }\n}"
+                        },
+                        {
+                            "label": "伤害加成",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const bonus = args.flags.wuxue_shanian_bonus;\nif (bonus) {\n    args.config.amount += bonus;\n}"
+                        },
+                        {
+                            "label": "面板预览",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const bonus = args.flags.wuxue_shanian_bonus;\nif (bonus) {\n    args.output.bonusDesc.push(`杀念: +${bonus}`);\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "不定风",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "shenfengbang",
+            "tier": 3,
+            "description": "神风帮绝技，飘风不终朝，骤雨不终日，孰为此者，天地是也。",
+            "requirements": "《神风诀》修炼圆满。",
+            "moves": [
+                {
+                    "name": "不定风",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "cost": {
+                        "mp": 0
+                    },
+                    "range": "自身",
+                    "description": "风无定<br>风无定相，云无常态。<br>·当受到《趁虚而入》攻击并速度归零后，你获得 4 点移动速度，依旧可以继续移动。<br>·你的招式伤害提升等同于你[轻功]等级的数值。<br>定无风<br>天云欲凝，烟阔江涛。<br>一场战斗中，你每移动经过 25 个未经过的空格后，获得“不定风”，持续一回合。<br>不定风：你可以自由切换名称中带有“风”字的武学套路，不必遵循武学切换规则。<br>升级：风无定获得的移动速度+2，定无风需求经过的空格数-5。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
+                    "automationNote": "完全手动。请手动添加[不定风]状态以获得伤害加成。移动计数/套路切换/速度判定均由GM手动处理。",
+                    "scripts": []
+                }
+            ],
+            "effects": [
+                {
+                    "name": "不定风",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/神风.png",
+                    "description": "风无定：招式伤害+轻功等级。<br>定无风：可自由切换'风'字套路。<br>(速度修正需手动)",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "budingfeng"
+                        }
+                    },
+                    "scripts": [
+                        {
+                            "label": "轻功加成伤害",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "system.combat.damages.skill.mod += (system.skills.qinggong.total || 0);"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]
