@@ -308,7 +308,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>执笔定心，开启架招，进入“苦读”，持续到战斗脱离或解除架招。<br>苦读：你受到内外功伤害时，减免 5 点。</p>",
-                    "requirements": "<p>需求：匕首-笔</p>",
+                    "requirements": "匕首-笔",
                     "calculation": {
                         "base": 5,
                         "growth": 5,
@@ -325,13 +325,13 @@
                     },
                     "scripts": [
                         {
-                            "label": "苦读状态",
-                            "trigger": "damaged",
+                            "label": "开启苦读",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const source = thisItem.effects.getName(\"苦读\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"进入苦读状态\");\n    }\n}"
+                            "script": "const source = thisItem.effects.getName(\"苦读\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n\n    // 动态注入：被破防时移除特效的逻辑\n    const breakScript = {\n        label: \"架招击破移除\",\n        trigger: \"damaged\",\n        active: true,\n        script: \"if (args.isBroken) await thisEffect.delete();\"\n    };\n\n    // 合并脚本\n    let scripts = effectData.flags?.[\"xjzl-system\"]?.scripts || [];\n    if (typeof scripts === 'object' && !Array.isArray(scripts)) scripts = Object.values(scripts);\n    scripts.push(breakScript);\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.scripts\", scripts);\n\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"开启架招：进入苦读状态\");\n}"
                         }
                     ],
-                    "automationNote": "完全自动化：架招防御成功（未被击破）后自动获得苦读状态。"
+                    "automationNote": "完全自动化。被击破架招会自动解除。手动解除架招请手动删除BUFF。"
                 },
                 {
                     "name": "好学不倦",
