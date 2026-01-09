@@ -699,7 +699,7 @@
                             "label": "格挡清风",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const effect = thisItem.effects.getName(\"清风\");\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(`格挡成功，获得清风（持续 ${rounds} 回合）`);\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // [修复] 在 damaged 时机中，args.move 可能是未定义的\n    // 我们通过当前激活的架招 ID，在当前物品(thisItem)中查找招式数据\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    \n    // 安全获取等级\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    \n    // 获取特效模板 (同样修改变量名避免冲突)\n    const sourceEffect = thisItem.effects.getName(\"清风\");\n    \n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        \n        // 确保 Slug 一致\n        foundry.utils.setProperty(effectData, \"flags.xjzl-system.slug\", \"wuxue_qingfeng\");\n        effectData.duration = { rounds: rounds };\n        \n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(`格挡成功，获得清风（持续 ${rounds} 回合）`);\n    }\n}"
                         }
                     ]
                 },
