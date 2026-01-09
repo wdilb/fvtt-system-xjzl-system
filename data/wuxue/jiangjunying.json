@@ -1749,34 +1749,28 @@
                     "requirements": "火器-一窝蜂-银 1200 两",
                     "range": "10",
                     "description": "<p>全回合动作，火箭漫天，每支造成 5 点火焰伤害。<br>·你最多一次性射出 32 支火箭。<br>·目标每有一级[轻功]，便能减少一根火箭的火焰伤害（即减少 5 点火焰伤害）。<br>·一窝蜂需双手持握，使用的回合无法移动，使用后每回合可以装入一支火箭。<br>·无需投掷命中，敌人无法闪避。<br><strong>升级：</strong>每支火箭造成的火焰伤害+1，内力消耗+2。</p>",
-                    "automationNote": "出招时弹窗输入火箭数量。面板数值将临时显示为数量。应用伤害时自动根据目标轻功计算真实伤害。",
+                    "automationNote": "出招时弹窗输入火箭数量。自动计算总伤害，并在结算前根据目标轻功自动减免。",
                     "costs": {
                         "mp": [
                             2,
                             4,
-                            6,
-                            8
+                            6
                         ]
                     },
                     "calculation": {
-                        "base": 0,
-                        "growth": 0
+                        "base": 5,
+                        "growth": 1
                     },
                     "scripts": [
                         {
-                            "label": "一窝蜂-装填",
+                            "label": "一窝蜂-装填与增幅",
                             "trigger": "attack",
-                            "script": "const dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '一窝蜂: 发射数量' },\n    content: '<div class=\"form-group\"><label>发射火箭数 (1-32)</label><input type=\"number\" name=\"count\" value=\"32\" min=\"1\" max=\"32\"></div>',\n    ok: { label: '发射', callback: (e, b) => new FormData(b.form).get('count') }\n});\nconst count = parseInt(dialog) || 1;\n\n// 将数量伪装成伤害传递\nargs.flags.bonusDamage = count;\nargs.flags.forceHit = true;"
+                            "script": "const dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '一窝蜂: 发射数量' },\n    content: '<div class=\"form-group\"><label>发射火箭数 (1-32)</label><input type=\"number\" name=\"count\" value=\"32\" min=\"1\" max=\"32\"></div>',\n    ok: { label: '发射', callback: (e, b) => new FormData(b.form).get('count') }\n});\nconst count = parseInt(dialog) || 1;\n\n// 计算单发伤害 (5 + lvl -1)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerRocket = 5 + (lvl - 1);\n\n// 计算总伤害\nconst totalDmg = count * dmgPerRocket;\n\n// 计算需要补充的伤害 (总伤害 - 系统默认算的1发伤害)\n// 这样卡片上显示的就是所有火箭加起来的总和\nargs.flags.bonusDamage = totalDmg - dmgPerRocket;\n\n// 必中\nargs.flags.forceHit = true;"
                         },
                         {
-                            "label": "一窝蜂-描述修正",
-                            "trigger": "calc",
-                            "script": "args.output.bonusDesc.push('面板伤害数值代表火箭数量');"
-                        },
-                        {
-                            "label": "一窝蜂-结算拦截",
+                            "label": "一窝蜂-轻功减免",
                             "trigger": "preDamage",
-                            "script": "const rocketCount = args.config.amount;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerRocket = 5 + (lvl - 1) * 1;\n\nconst qinggong = args.target.system.skills?.qinggong?.total || 0;\nconst effectiveRockets = Math.max(0, rocketCount - qinggong);\nconst realDamage = effectiveRockets * dmgPerRocket;\n\nargs.config.amount = realDamage;\nargs.config.ignoreDefense = true;\nargs.config.ignoreBlock = true;\n\nif (effectiveRockets < rocketCount) {\n    ui.notifications.info(`${args.target.name} 轻功抵消了 ${rocketCount - effectiveRockets} 支火箭。`);\n}"
+                            "script": "// 获取单发伤害\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerRocket = 5 + (lvl - 1);\n\n// 获取目标轻功\nconst qinggong = args.target.system.skills?.qinggong?.total || 0;\n\n// 计算减免量 (轻功等级 * 单发伤害)\nconst reduction = qinggong * dmgPerRocket;\n\n// 在即将造成的总伤害上扣除减免\nconst oldAmount = args.config.amount;\nargs.config.amount = Math.max(0, oldAmount - reduction);\n\n// 提示信息\nif (reduction > 0) {\n    ui.notifications.info(`${args.target.name} 轻功卓越，规避了 ${reduction} 点伤害！`);\n}\n\n// 火箭特性：无视格挡和防御\nargs.config.ignoreBlock = true;\nargs.config.ignoreDefense = true;"
                         }
                     ]
                 }
