@@ -2254,7 +2254,7 @@
                     "range": "3米",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，飞快下笔，墨气四溢，精湛画技描绘一幅山水画，对周围目标造成 0.8 内息点内功伤害。根据你自身拥有的“祥云”“群山”“江河”，将他们自由组合然后移除，获得以下额外效果：</p><p>云卷西峰图：移除自身祥云、群山。招式范围扩大 5 米。</p><p>日出江海图：移除自身祥云、江河。将所有敌方击飞 5 米，招式伤害+10 点。</p><p>山河辉映图：移除自身群山、江河。将所有敌方击倒，招式伤害+10 点。</p><p>江山如画图：移除自身祥云、群山、江河。招式范围扩大 5 米，变为将所有敌方击飞 5 米并击倒，招式伤害提升 20 点。</p><p>升级：招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "伤害加成自动化。Buff移除自动化。击飞/击倒/范围需手动。",
+                    "automationNote": "请手动移除buff，并手动实现击飞/击倒/范围需手动。",
                     "requirements": "匕首-笔",
                     "costs": {
                         "mp": [
@@ -2283,20 +2283,7 @@
                             }
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "画境判定",
-                            "trigger": "calc",
-                            "active": true,
-                            "script": "const hasCloud = actor.effects.some(e => e.name === \"祥云\");\nconst hasMnt = actor.effects.some(e => e.name === \"群山\");\nconst hasRiver = actor.effects.some(e => e.name === \"江河\");\n\nlet damageBonus = 0;\nlet desc = \"\";\n\nif (hasCloud && hasMnt && hasRiver) {\n    desc = \"[江山如画图] 范围+5, 击飞+击倒\";\n    damageBonus = 20;\n} else if (hasCloud && hasMnt) {\n    desc = \"[云卷西峰图] 范围+5\";\n} else if (hasCloud && hasRiver) {\n    desc = \"[日出江海图] 击飞\";\n    damageBonus = 10;\n} else if (hasMnt && hasRiver) {\n    desc = \"[山河辉映图] 击倒\";\n    damageBonus = 10;\n}\n\nargs.output.damage += damageBonus;\nargs.output.bonusDesc.push(desc);"
-                        },
-                        {
-                            "label": "移除画境",
-                            "trigger": "hit_once",
-                            "active": true,
-                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhengqi_xiangyun\");\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhengqi_qunshan\");\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhengqi_jianghe\");"
-                        }
-                    ]
+                    "scripts": []
                 }
             ],
             "effects": [
@@ -2387,7 +2374,7 @@
                             "label": "格挡施加星位",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const stacksToAdd = lvl >= 2 ? 2 : 1;\n    const effectData = thisItem.effects.getName(\"星位\").toObject();\n    for(let i=0; i<stacksToAdd; i++) await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    ui.notifications.info(`${args.attacker.name} 被施加了星位！`);\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    // 升级：额外添加一层，即 Lv1=1, Lv2+=2\n    const stacksToAdd = lvl >= 2 ? 2 : 1;\n    const effectData = thisItem.effects.getName(\"星位\").toObject();\n    // 循环叠加\n    for(let i=0; i<stacksToAdd; i++) await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    ui.notifications.info(`${args.attacker.name} 被施加了 ${stacksToAdd} 层星位！`);\n}"
                         }
                     ]
                 },
@@ -2439,7 +2426,7 @@
                     "range": "3米",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，弹指黑白，环射而出，对目标造成 0.4 内息点内功伤害。命中无架招目标时，为其添加一层“星位”，持续到战斗脱离。</p><p>若目标已有星位，则添加的层数翻倍。</p><p>升级：招式伤害+10，命中无架招目标额外添加一层星位，内力消耗+2。</p>",
-                    "automationNote": "伤害自动化。星位叠加自动化。",
+                    "automationNote": "伤害自动化。星位叠加自动化（已修复翻倍逻辑）。",
                     "requirements": "暗器-弹丸",
                     "costs": {
                         "mp": [
@@ -2473,7 +2460,7 @@
                             "label": "添加星位",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const existing = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_xingwei\" || e.name === \"星位\");\n    let stacksToAdd = 1;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    if (lvl >= 2) stacksToAdd += 1;\n    \n    if (existing) {\n        const currentStacks = existing.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        stacksToAdd = currentStacks; \n    }\n\n    const effectData = thisItem.effects.getName(\"星位\").toObject();\n    for(let i=0; i<stacksToAdd; i++) await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 1. 计算基础添加量\n    // 基础1层。升级后额外添加1层(共2层)。\n    let stacksToAdd = 1;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    if (lvl >= 2) stacksToAdd += 1;\n    \n    // 2. 检测是否存在星位 (兼容 slug 和 name 检测，确保格挡手动添加的也能识别)\n    const existing = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_xingwei\" || e.name === \"星位\");\n    \n    // 3. 翻倍逻辑：如果存在，则本次添加量 * 2\n    if (existing) {\n        stacksToAdd *= 2;\n        ui.notifications.info(\"星位共鸣！添加层数翻倍！\");\n    }\n\n    const effectData = thisItem.effects.getName(\"星位\").toObject();\n    // 循环调用以叠加层数\n    for(let i=0; i<stacksToAdd; i++) await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -2780,7 +2767,7 @@
             "effects": [
                 {
                     "name": "弄梅",
-                    "icon": "icons/svg/flower.svg",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
                     "description": "梅花三弄距离+1，伤害+5",
                     "transfer": false,
                     "flags": {
@@ -2793,7 +2780,7 @@
                 },
                 {
                     "name": "傲梅",
-                    "icon": "icons/svg/ice-cube.svg",
+                    "icon": "isystems/xjzl-system/assets/icons/wuxue/正气.png",
                     "description": "每回合初获得一层弄梅，演奏检定+5",
                     "transfer": false,
                     "changes": [
