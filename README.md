@@ -8,6 +8,9 @@
 > **宁可无武，不可无侠。**
 >
 > 这是一个专为 **Foundry VTT V13** 开发的武侠跑团系统，基于《侠界之旅》规则集构建。
+
+> [![QQ Group](https://img.shields.io/badge/侠界交流群-753714737-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
+> [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
 > <img width="3077" height="1687" alt="image" src="https://github.com/user-attachments/assets/fedfaa11-de4c-42b3-9944-64d601bf47d6" />
 
 ---
