@@ -475,7 +475,8 @@ export class XJZLActor extends Actor {
               scripts.push({
                 script: s.script,
                 label: s.label || stanceMove.name,
-                source: wuxueItem // 源头依然归属于该武学物品
+                source: wuxueItem, // 源头依然归属于该武学物品
+                contextData: move
               });
             }
           });
@@ -489,26 +490,26 @@ export class XJZLActor extends Actor {
     // 只有在 PASSIVE 时机，我们才遍历所有武学，寻找是否有被动脚本。
     // 这样不会影响战斗时机 (ATTACK/HIT) 的性能。
     if (trigger === SCRIPT_TRIGGERS.PASSIVE) {
-      // 使用 itemTypes.wuxue 快速访问，避免遍历所有 items
-      const allWuxues = this.itemTypes.wuxue || [];
+      // 仅筛选特定类型的物品，大幅减少循环次数
+      const passiveItems = this.itemTypes.wuxue.filter(i =>
+        ["qinggong", "sanshou", "zhenfa"].includes(i.system.category)
+      );
 
-      for (const item of allWuxues) {
-        // 排除掉已经作为架招处理过的物品 (避免重复叠加)
-        if (item.id === martial?.stanceItemId && martial?.stanceActive) continue;
-
-        // 直接检查 system.scripts 数组长度，如果是空数组直接跳过，不进入 forEach
-        // (DataModel 的数组即使为空也是一个 Array 实例，length 访问极快)
-        const itemScripts = item.system.scripts;
-        if (!itemScripts || itemScripts.length === 0) continue;
-
-        // 只有真的有脚本时，才进入内层循环
-        for (const s of itemScripts) {
-          if (s.trigger === trigger && s.active) {
-            scripts.push({
-              script: s.script,
-              label: `${s.label} (${item.name})`,
-              source: item
-            });
+      for (const item of passiveItems) {
+        // 遍历这些物品下的所有招式
+        for (const move of item.system.moves) {
+          const moveScripts = move.scripts;
+          if (!moveScripts || moveScripts.length === 0) continue;
+          for (const s of move.scripts) {
+            // 找到 passive 脚本并激活
+            if (s.trigger === trigger && s.active) {
+              scripts.push({
+                script: s.script,
+                label: `${s.label} (${move.name} - ${item.name})`,
+                source: item, // 注意：源头依然是 Item，但在脚本里可以通过 args.move 获取招式详情
+                contextData: move
+              });
+            }
           }
         }
       }
@@ -619,6 +620,11 @@ export class XJZLActor extends Actor {
         // 招式脚本会将武学物品作为 'item' 传入上下文
         if (!thisItem && sandbox.item instanceof Item) {
           thisItem = sandbox.item;
+        }
+        if (entry.contextData) {
+          // 注入 move，让脚本能读到等级、消耗等数据
+          sandbox.move = entry.contextData;
+          sandbox.args.move = entry.contextData;
         }
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
@@ -2097,7 +2103,7 @@ export class XJZLActor extends Actor {
           itemId: "basic",
           moveId: isOpportunity ? "opportunity" : "basic", // 区分 ID
           moveType: "basic",
-          scriptBonusHit: scriptBonusHit, 
+          scriptBonusHit: scriptBonusHit,
           critThresholdMod: attackContext.flags.critThresholdMod || 0,
           forceHit: isGlobalForceHit,
 
