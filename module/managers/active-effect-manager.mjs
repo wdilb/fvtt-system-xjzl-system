@@ -432,12 +432,13 @@ export class ActiveEffectManager {
         const expiredIds = actor.effects.filter(e => {
             // 1. 如果是临时特效 (有持续时间)
             if (e.isTemporary) {
+                console.log("XJZL | 清理临时特效", e);
                 // 2. 获取剩余时间 (FVTT 核心已经帮我们算好了)
                 const duration = e.duration;
-
                 // 注意：remaining 属性在 V13 中通常是剩下的秒数或轮数
                 // 如果 remaining 存在且 <= 0，说明过期了
-                if (duration.remaining !== undefined && duration.remaining <= 0) {
+                // 使用 typeof 严格判断 number，防止 null <= 0 为 true 的 JS 陷阱
+                if (typeof duration.remaining === "number" && duration.remaining <= 0) {
                     return true;
                 }
             }
