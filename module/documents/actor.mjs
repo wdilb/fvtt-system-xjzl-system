@@ -628,7 +628,6 @@ export class XJZLActor extends Actor {
         }
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
-        sandbox.effect = thisEffect; // 别名
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -674,7 +673,6 @@ export class XJZLActor extends Actor {
         }
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
-        sandbox.effect = thisEffect; // 别名
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
         // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);

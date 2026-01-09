@@ -162,7 +162,7 @@ await Macros.requestSave({
 | **`system`** | `Object` | `actor.system` 的引用。角色的核心数据源（属性、资源、combat数据等）。 |
 | **`S`** | `Object` | `system` 的简写别名。例如 `S.stats.liliang.total`。 |
 | **`thisItem`** | `Item` \| `Effect` | **脚本的物理位置**。<br>指向**这段脚本存放的地方**。如果脚本写在“金蛇剑”里，它是金蛇剑；如果脚本写在“中毒”BUFF里，它是中毒BUFF。 |
-| **`thisEffect`** | `ActiveEffect` | **脚本宿主特效指针**。<br>仅当脚本挂载在 Active Effect 上时存在。别名 **`effect`**。 |
+| **`thisEffect`** | `ActiveEffect` | **脚本宿主特效指针**。<br>仅当脚本挂载在 Active Effect 上时存在。|
 | **`item`** | `Item` | **动作来源物品**。<br>**注意区别**: 当你挥剑攻击时，`item` 是这把剑。<br>如果你身上的“中毒”BUFF在此时触发脚本，`thisItem` 是BUFF，而 `item` 依然是那把剑。<br>*注: 普通攻击时，这是一个包含虚拟招式数据的对象。* |
 | **`move`** | `Object` | **当前正在施展的招式数据** (仅限招式相关脚本)。包含 `id`, `name`, `damageType`, `currentCost` 等字段。 |
 | **`trigger`** | `String` | **当前触发时机**。例如 `"attack"`, `"hit"`, `"damaged"`。用于在同一脚本中处理多重逻辑。 |
