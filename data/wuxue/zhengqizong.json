@@ -1476,7 +1476,7 @@
                     "scripts": [
                         {
                             "label": "添加诡辩",
-                            "trigger": "hit",
+                            "trigger": "attack",
                             "active": true,
                             "script": "const source = thisItem.effects.getName(\"诡辩\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         },
@@ -3038,8 +3038,8 @@
                     "element": "taiji",
                     "range": "2米",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，你必须处于“文骨”方能施展此招，笔尖轻点，为范围内一个友方回复 20 气血内力和 1 点怒气。同时为其添加“缴械”，持续一回合。</p><p>升级：回复的气血内力+20，内力消耗+4。</p>",
-                    "automationNote": "气血回复自动化。内力/怒气回复需手动。缴械状态需手动。文骨判定需人工。",
+                    "description": "<p>主要动作，你必须处于“文骨”方能施展此招，笔尖轻点，为范围内一个友方回复 20 气血内力和 1 点怒气。同时为其添加“缴械”，持续一回合。</p><p>缴械：你无法施展徒手以外的武学。</p><p>升级：回复的气血内力+20，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。自动检查施展条件（文骨）。治疗量自动应用。脚本额外执行内力/怒气回复及施加缴械（1回合）。",
                     "requirements": "匕首-笔",
                     "costs": {
                         "mp": [
@@ -3067,10 +3067,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "缴械",
+                            "label": "前置检查",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hasBone = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'status_tianxiabi_wengu');\nif (!hasBone) {\n    ui.notifications.warn('未处于“文骨”状态，无法施展此招！');\n    args.flags.abort = true;\n}"
+                        },
+                        {
+                            "label": "回复与缴械",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"jiaoxie\");\nui.notifications.info(`${args.target.name} 被缴械！`);"
+                            "script": "// 1. 基础HP回复已由系统处理\n// 2. 额外回复内力 (数值等于实际治疗面板)\nif (args.finalAmount > 0) {\n    await args.target.applyHealing({ amount: args.finalAmount, type: 'mp', showScrolling: true });\n    \n    // 3. 回复怒气 (固定1点)\n    const curRage = args.target.system.resources.rage.value;\n    const maxRage = args.target.system.resources.rage.max;\n    if (curRage < maxRage) {\n        await args.target.update({'system.resources.rage.value': curRage + 1});\n        ui.notifications.info(`${args.target.name} 怒气 +1`);\n    }\n}\n\n// 4. 施加缴械 (持续1回合)\nconst jiaoxieData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'jiaoxie'));\njiaoxieData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, jiaoxieData);"
                         }
                     ]
                 },
@@ -3083,8 +3089,8 @@
                     "element": "taiji",
                     "range": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>次要动作，浩荡天地，一身傲骨，开启架招。格挡成功后获得“文骨”，持续一回合。</p><p>文骨：你每次陷入濒死后，回复 1 点气血。</p><p>若你为[恶]或朝廷声望低于 10，文骨不生效。</p><p>升级：格挡值+10，持续回合数+1，内力消耗+4。</p>",
-                    "automationNote": "架招开启自动化。格挡获得文骨需手动或damaged脚本。文骨效果需配置在AE中。声望检测需手动。",
+                    "description": "<p>次要动作，浩荡天地，一身傲骨，开启架招。格挡成功后获得“文骨”，持续一回合。</p><p>文骨：你每次陷入濒死后，回复 1 点气血。</p><p>·若你为[恶]或朝廷声望低于 10，文骨不生效。</p><p>升级：格挡值+10，持续回合数+1，内力消耗+4。</p>",
+                    "automationNote": "架招开启自动化。受伤脚本(Damaged)自动检测善恶/声望条件并赋予文骨。文骨层数/持续时间随等级自动成长。",
                     "requirements": "匕首-笔",
                     "costs": {
                         "mp": [
@@ -3112,10 +3118,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得文骨",
+                            "label": "获得文骨(判定)",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"文骨\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "// 1. 检查架招触发条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 2. 检查限制条件\nconst social = actor.system.social;\n// 恶: 恶行>=100 且 侠义<=50\nconst isEvil = (social.exing >= 100 && social.xiayi <= 50);\nconst isLowRep = (social.rep_chaoting < 10);\n\nif (isEvil || isLowRep) {\n    ui.notifications.warn(`${actor.name} 心术不正或声望不足，无法凝聚文骨！`);\n    return;\n}\n\n// 3. 获取特效数据\nconst sourceEffect = thisItem.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'status_tianxiabi_wengu');\nif (!sourceEffect) return;\n\nconst effectData = sourceEffect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\n\n// 4. 计算持续时间: 基础1回合 + (等级-1)\n// args.move.computedLevel 最小为1\nconst extraRounds = Math.max(0, (args.move.computedLevel || 1) - 1);\neffectData.duration = { rounds: 1 + extraRounds };\n\n// 5. 应用特效\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nui.notifications.info(\"浩然正气，文骨天成！\");"
                         }
                     ]
                 },
@@ -3129,7 +3135,7 @@
                     "range": "1米",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，笔落政令，对目标造成 0.7 力量点内功伤害。根据你的圆满内功选择对应效果中一个生效，若你有“文骨”，选择数量不限：</p><p>《四书五经》：暴击骰降低[书写]等级的数值</p><p>《仁经要略》：招式伤害提升【侠义值/10】点。</p><p>《格物论》：招式类型可以视为虚招。</p><p>《墨攻》：招式伤害提升当前格挡值的数值。</p><p>《纵横诀》：招式可以额外选中一个敌人。</p><p>《世法论》：施放距离提升自身朝廷声望的数值。</p><p>《辨经》：招式必定命中。</p><p>升级：招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害自动化。内功特效判断需手动。",
+                    "automationNote": "基础伤害自动化。内功联动效果极其复杂且依赖Build，无法完全自动化。请根据当前圆满内功和文骨状态，手动调整伤害/骰子/目标。",
                     "requirements": "匕首-笔",
                     "costs": {
                         "mp": [
@@ -3172,8 +3178,8 @@
                     "element": "taiji",
                     "range": "5米",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，挥斥方遒，笔定国势，对范围内敌人造成 0.8 力量点内功伤害，自身进入“文骨”状态，持续到战斗脱离或解除架招。</p><p>若你已经具有“文骨”，招式还会给范围内所有友方添加 50 点护体真气，持续到战斗脱离。</p><p>升级：伤害+20，护体真气+50，怒气-1，消耗+16</p>",
-                    "automationNote": "伤害自动化。自身获得文骨自动化。群体护体需手动。",
+                    "description": "<p>蓄力动作，挥斥方遒，笔定国势，对范围内敌人造成 0.8 力量点内功伤害，自身进入“文骨”状态，持续到战斗脱离或解除架招。</p><p>·若你已经具有“文骨”，招式还会给范围内所有友方添加 50 点护体真气，持续到战斗脱离。</p><p>升级：伤害+20，护体真气+50，怒气-1，消耗+16</p>",
+                    "automationNote": "伤害自动化。出招时自动获得文骨。若已有文骨会提示添加护体。注意：若解除架招或战斗脱离，请手动移除文骨状态。群体护体需手动分发。",
                     "requirements": "匕首-笔",
                     "costs": {
                         "mp": [
@@ -3207,10 +3213,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得文骨",
-                            "trigger": "hit_once",
+                            "label": "文骨与护体判定",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.hitCount > 0) {\n    const effectData = thisItem.effects.getName(\"文骨\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "// 1. 检查施展前是否有文骨 (用于判定是否触发护体)\nconst hasBoneAlready = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'status_tianxiabi_wengu');\n\n// 2. 自身必定进入/刷新文骨状态\nconst sourceEffect = thisItem.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'status_tianxiabi_wengu');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    // 持续到战斗脱离 (无限时长)\n    effectData.duration = { rounds: 999, seconds: null, turns: null };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}\n\n// 3. 若原本就有文骨，提示群体护体\nif (hasBoneAlready) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const hutiAmount = 50 + (lvl - 1) * 50;\n    ui.notifications.info(`[文骨共鸣] 请手动为全友方添加 ${hutiAmount} 点护体真气！`);\n    \n    // 简单发送一条ChatLog备忘\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><p><strong>文骨共鸣触发</strong></p><p>请为所有友方添加 <b>${hutiAmount}</b> 点护体真气。</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 }
@@ -3219,16 +3225,17 @@
                 {
                     "name": "文骨",
                     "icon": "icons/svg/book.svg",
-                    "description": "濒死回复1点气血",
+                    "description": "你每次陷入濒死后，回复 1 点气血。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "wuxue_zhengqi_wengu",
+                            "slug": "status_tianxiabi_wengu",
                             "scripts": [
                                 {
                                     "trigger": "dying",
                                     "label": "文骨复活",
-                                    "script": "args.preventDying = true; await actor.applyHealing({amount: 1, type: 'hp'}); ui.notifications.info('文骨护体，免疫濒死！');"
+                                    "active": true,
+                                    "script": "args.preventDying = true;\nawait actor.applyHealing({amount: 1, type: 'hp', showScrolling: true});\nui.notifications.info(`${actor.name} 触发文骨，免疫濒死！`);"
                                 }
                             ]
                         }
