@@ -22,7 +22,7 @@ const SECT_MAP = {
     "sihaibiaomeng": "四海镖盟",
     "jiangjunying": "将军营",
     "wanshoushanzhuang": "万兽山庄",
-    // "baicaoge": "百草阁",
+    "baicaoge": "百草阁",
     // "jianghushili": "江湖势力"
 };
 

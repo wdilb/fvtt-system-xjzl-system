@@ -1,83 +1,35 @@
 [
     {
         "name": "正骨八法",
-        "img": "icons/skills/melee/unarmed-punch-fist.webp",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
         "system": {
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 1,
-            "description": "<p>集推拿正骨、活血理筋于一体，极受百姓欢迎。</p>",
+            "description": "集推拿正骨、活血理筋于一体，极受百姓欢迎。",
+            "requirements": "徒手",
             "moves": [
                 {
-                    "name": "拔伸牵引（绝招）",
-                    "type": "qi",
-                    "actionType": "attack",
-                    "damageType": "waigong",
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "isUltimate": true,
-                    "img": "icons/skills/wounds/bone-broken-arm-red.webp",
-                    "description": "<p>主要动作，抓住敌人肢体以纵轴方向对抗牵引，目标获得“剧痛”。<br>剧痛：目标失去次要动作，速度减半，命中和虚招对抗检定具有劣势。剧痛可被忍耐技能抵挡。</p>",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rage": [
-                            7,
-                            6,
-                            5
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "施加剧痛",
-                            "trigger": "hit",
-                            "script": "const durationMap = [5, 10, 15];\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = durationMap[lvl - 1] || 5;\n\nconst effectData = {\n    name: \"剧痛\",\n    icon: \"icons/svg/lightning.svg\",\n    duration: { rounds: rounds },\n    description: \"失去次要动作，速度减半，命中和虚招对抗劣势。\",\n    changes: [\n        { key: \"flags.xjzl-system.unstable\", mode: 5, value: \"true\" },\n        { key: \"flags.xjzl-system.attackLevel\", mode: 2, value: \"-1\" },\n        { key: \"flags.xjzl-system.feintLevel\", mode: 2, value: \"-1\" }\n    ]\n};\n\nawait args.target.createEmbeddedDocuments(\"ActiveEffect\", [effectData]);\nui.notifications.info(`${args.target.name} 遭受剧痛！`);"
-                        }
-                    ]
-                },
-                {
-                    "name": "手摸心会",
+                    "name": "按压推拿",
                     "type": "qi",
                     "actionType": "default",
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "img": "icons/magic/life/heart-hand-gold.webp",
-                    "description": "<p>全回合动作，指腹触摸目标，为目标添加“坚骨”，持续到脱战。<br>坚骨：下一次投掷残疾检定时，结果增加。</p>",
-                    "calculation": {
-                        "base": 5,
-                        "growth": 5,
-                        "scalings": []
-                    },
+                    "range": "1",
+                    "description": "全回合动作，以拇指和食中指，用力紧捏目标腿部，为其移除“下盘不稳”“禁足”状态。同时目标获得一层“乘风”，至多三层，持续到脱战。<br>乘风：每层使你的速度+1。",
+                    "automationNote": "完全自动化：移除指定状态并添加乘风。",
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "施加坚骨",
+                            "label": "按压推拿",
                             "trigger": "hit",
-                            "script": "const bonus = args.finalAmount;\nconst effectData = {\n    name: \"坚骨\",\n    icon: \"icons/magic/defensive/shield-barrier-glowing-blue.webp\",\n    description: `下一次残疾检定+${bonus}`,\n    flags: { \"xjzl-system\": { \"jianguBonus\": bonus } }\n};\nawait args.target.createEmbeddedDocuments(\"ActiveEffect\", [effectData]);"
+                            "active": true,
+                            "script": "if (!args.target) return;\n\n// 1. 移除状态\nconst effectsToRemove = args.target.effects.filter(e => \n    e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"root\"\n).map(e => e.id);\n\nif (effectsToRemove.length > 0) {\n    await args.target.deleteEmbeddedDocuments(\"ActiveEffect\", effectsToRemove);\n    ui.notifications.info(`${args.target.name} 的下盘不稳/禁足状态已移除。`);\n}\n\n// 2. 添加乘风\n// 计算层数: 基础1 + 升级\nconst lvl = args.move.computedLevel;\nconst stacksToAdd = 1 + (lvl - 1);\n\nconst chengfengData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\nchengfengData.name = \"乘风\";\n\n// 循环添加多次以叠加层数\nfor (let i = 0; i < stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
                         }
                     ]
                 },
@@ -85,15 +37,9 @@
                     "name": "提按端挤",
                     "type": "qi",
                     "actionType": "heal",
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "img": "icons/magic/life/cross-beam-green.webp",
-                    "description": "<p>全回合动作，移除目标的脱臼，以及“剧痛”状态，然后为目标回复气血和内力。</p>",
-                    "calculation": {
-                        "base": 5,
-                        "growth": 5,
-                        "scalings": []
-                    },
+                    "range": "1",
+                    "description": "全回合动作，固定骨骼，上下提按，左右端挤，移除目标的脱臼，以及“剧痛”状态，然后为目标回复 5 点气血,5 点内力。",
+                    "automationNote": "自动移除剧痛、回复气血和内力。脱臼为文本描述状态，需手动移除。",
                     "costs": {
                         "mp": [
                             1,
@@ -104,56 +50,71 @@
                             1,
                             1,
                             1
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
+                    },
+                    "calculation": {
+                        "base": 0
                     },
                     "scripts": [
                         {
-                            "label": "移除负面状态",
+                            "label": "提按端挤",
                             "trigger": "hit",
-                            "script": "// 移除剧痛(Pain)和脱臼(假设是Dislocation或自定义)\nconst effectsToRemove = args.target.effects.filter(e => \n    [\"剧痛\", \"脱臼\", \"pain\"].includes(e.name) || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"pain\"\n).map(e => e.id);\n\nif (effectsToRemove.length > 0) {\n    await args.target.deleteEmbeddedDocuments(\"ActiveEffect\", effectsToRemove);\n    ui.notifications.info(\"移除了目标身上的剧痛/脱臼状态。\");\n}\n\n// 额外回复内力 (气血已由 ActionType: Heal 自动回复)\nconst healAmount = args.finalAmount;\nif (healAmount > 0) {\n    await args.target.applyHealing({ amount: healAmount, type: \"mp\" });\n}"
+                            "active": true,
+                            "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst healAmount = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ amount: healAmount, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });"
                         }
                     ]
                 },
                 {
-                    "name": "按压推拿",
+                    "name": "手摸心会",
                     "type": "qi",
                     "actionType": "default",
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "img": "icons/magic/movement/trail-streak-impact-blue.webp",
-                    "description": "<p>全回合动作，移除“下盘不稳”、“禁足”。获得“乘风”（速度+1）。</p>",
-                    "calculation": {
-                        "base": 1,
-                        "growth": 1,
-                        "scalings": []
-                    },
+                    "range": "1",
+                    "description": "全回合动作，指腹触摸目标，手法由轻逐渐加重，用心体会，为目标添加“坚骨”，持续到脱战。<br>坚骨：下一次投掷残疾检定时，结果+5（最高100）。",
+                    "automationNote": "添加‘坚骨’状态提示。残疾检定需手动计算加值。",
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "推拿效果",
+                            "label": "手摸心会",
                             "trigger": "hit",
-                            "script": "// 移除状态\nconst removeSlugs = [\"unstable\", \"root\", \"tuoli\", \"jinzhu\"];\nconst ids = args.target.effects.filter(e => removeSlugs.includes(e.getFlag(\"xjzl-system\", \"slug\"))).map(e => e.id);\nif (ids.length > 0) await args.target.deleteEmbeddedDocuments(\"ActiveEffect\", ids);\n\n// 添加乘风 (Chengfeng) - 走系统预设\nconst stacks = args.finalAmount;\nconst chengfengData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\nchengfengData.flags[\"xjzl-system\"].maxStacks = 3;\n\n// 循环叠加\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
+                            "active": true,
+                            "script": "const lvl = args.move.computedLevel;\nconst bonus = 5 + (lvl - 1) * 5;\n\nconst effectData = {\n    name: \"坚骨\",\n    icon: args.item.img,\n    description: `下一次投掷残疾检定时，结果+${bonus}。`,\n    changes: [] // 纯提示\n};\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                        }
+                    ]
+                },
+                {
+                    "name": "拔伸牵引",
+                    "type": "real",
+                    "isUltimate": true,
+                    "range": "1",
+                    "damageType": "waigong",
+                    "description": "主要动作，抓住敌人肢体以纵轴方向对抗牵引，目标获得“剧痛”，持续五回合。<br>剧痛：目标失去次要动作，速度减半，命中和虚招对抗检定具有劣势。剧痛可被忍耐技能抵挡。",
+                    "automationNote": "命中后施加剧痛状态。剧痛效果已包含在系统状态中。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "拔伸牵引",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const lvl = args.move.computedLevel;\n    const durationRounds = 5 + (lvl - 1) * 5;\n\n    const painData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pain\"));\n    painData.duration = { rounds: durationRounds };\n\n    await game.xjzl.api.effects.addEffect(args.target, painData);\n}"
                         }
                     ]
                 }
@@ -162,76 +123,35 @@
     },
     {
         "name": "金针赋",
-        "img": "icons/weapons/thrown/needle-blue.webp",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
         "system": {
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 1,
-            "description": "<p>百草阁针刺手法，叙述龙虎龟凤飞经走气四大法。</p>",
+            "description": "百草阁针刺手法，出自《针灸大全》，叙述龙虎龟凤飞经走气四大法，简明扼要。",
+            "requirements": "暗器-针",
             "moves": [
                 {
-                    "name": "赤凤迎源（绝招）",
+                    "name": "青龙摆尾",
                     "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "isUltimate": true,
-                    "img": "icons/skills/melee/strike-dagger-blood-red.webp",
-                    "description": "<p>主要动作，为自身和目标添加“连击”。</p>",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ],
-                        "rage": [
-                            5,
-                            4,
-                            3
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "添加连击",
-                            "trigger": "hit",
-                            "script": "const lianjiData = CONFIG.statusEffects.find(e => e.id === \"lianji\");\n// 给自己\nawait game.xjzl.api.effects.addEffect(args.attacker, lianjiData);\n// 给目标\nif (args.target.uuid !== args.attacker.uuid) {\n    await game.xjzl.api.effects.addEffect(args.target, lianjiData);\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "苍龟探穴",
-                    "type": "stance",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/creatures/reptiles/turtle-shell-green.webp",
-                    "description": "<p>次要动作，开启架招。格挡成功时，为自身添加一层“养血”（回合末回血）。</p>",
+                    "actionType": "heal",
+                    "range": "1",
+                    "description": "主要动作，针尖刺向病所，如扶船舵，左右拨动，为其添加 10 点护体真气，持续到战斗脱离。<br>·每有一级[疗伤]，提高 1 点护体真气。<br>·每有一级[医术]，提高 2 点护体真气。",
+                    "automationNote": "自动计算并添加护体真气。",
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "格挡回血",
-                            "trigger": "damaged",
-                            "script": "if (args.outcome.isHit && !args.config.ignoreBlock && args.config.amount > 0) {\n    // 判定格挡成功：通常指利用了格挡值减少了伤害，或者未被破防\n    // 简化逻辑：只要没被击破架招(isBroken)且受到攻击\n    if (!args.outcome.isBroken) {\n        const yangxue = CONFIG.statusEffects.find(e => e.id === \"yangxue\");\n        await game.xjzl.api.effects.addEffect(args.target, yangxue);\n        ui.notifications.info(\"苍龟探穴：触发养血。\");\n    }\n}"
+                            "label": "青龙摆尾",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = args.move.computedLevel;\nconst base = 10 + (lvl - 1) * 5;\n\n// 获取技能等级\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\nconst yishu = args.attacker.system.arts.yishu.total || 0;\n\nconst total = base + liaoshang * 1 + yishu * 2;\n\nawait args.target.applyHealing({ amount: total, type: \"huti\", showScrolling: true });"
                         }
                     ]
                 },
@@ -239,84 +159,79 @@
                     "name": "白虎摇头",
                     "type": "qi",
                     "actionType": "default",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/creatures/mammals/cat-blue.webp",
-                    "description": "<p>主要动作，给自身和目标添加“延展”状态（招式距离+1）。</p>",
-                    "calculation": {
-                        "base": 1,
-                        "growth": 1,
-                        "scalings": []
-                    },
+                    "range": "1",
+                    "description": "主要动作，将针捻入，似手摇铃，退方进圆，给自身和目标添加一层“延展”状态，最多三层，持续到战斗脱离。<br>延展：每层使你招式释放距离+1。",
+                    "automationNote": "完全自动化：给双方添加延展。",
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "添加延展",
+                            "label": "白虎摇头",
                             "trigger": "hit",
-                            "script": "const stacks = args.finalAmount;\nconst yanzhan = CONFIG.statusEffects.find(e => e.id === \"yanzhan\");\n\n// 辅助函数\nconst apply = async (t) => {\n    for(let i=0; i<stacks; i++) await game.xjzl.api.effects.addEffect(t, yanzhan);\n};\n\nawait apply(args.attacker);\nif (args.target.uuid !== args.attacker.uuid) await apply(args.target);"
+                            "active": true,
+                            "script": "const lvl = args.move.computedLevel;\n// 升级额外添加一层，即 1级+1层，2级+2层...\nconst stacks = 1 + (lvl - 1);\n\nconst yanzhanData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yanzhan\"));\n\n// 循环给目标添加\nfor (let i = 0; i < stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, yanzhanData);\n}\n\n// 循环给自身添加\nfor (let i = 0; i < stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.attacker, yanzhanData);\n}"
                         }
                     ]
                 },
                 {
-                    "name": "青龙摆尾",
-                    "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/creatures/reptiles/dragon-horned-blue.webp",
-                    "description": "<p>主要动作，为目标添加护体真气。<br>加成：1*[疗伤] + 2*[医术]。</p>",
-                    "calculation": {
-                        "base": 10,
-                        "growth": 5,
-                        "scalings": [
-                            {
-                                "prop": "skills.liaoshang",
-                                "ratio": 1
-                            },
-                            {
-                                "prop": "arts.yishu",
-                                "ratio": 2
-                            }
-                        ]
-                    },
+                    "name": "苍龟探穴",
+                    "type": "stance",
+                    "range": "自身",
+                    "description": "次要动作，指捏毫针，开启架招。格挡成功时，针刺自身穴位，多向透刺，逐渐加深，为自身添加一层“养血”，至多三层，持续到脱战或解除架招。<br>养血：每层使你回合末回复 10 点气血。",
+                    "automationNote": "完全自动化：受伤后若有格挡值生效，则获得养血。",
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "scripts": [
+                        {
+                            "label": "苍龟探穴反击",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "// 检查架招条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 检查是否有格挡值 (被动格挡也算)\nconst blockValue = system.combat.blockTotal || 0;\nif (blockValue > 0) {\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    await game.xjzl.api.effects.addEffect(actor, yangxueData);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "赤凤迎源",
+                    "type": "real",
+                    "isUltimate": true,
+                    "range": "1",
+                    "damageType": "waigong",
+                    "description": "主要动作，展翅之仪，入针到底，提到表层，一捻一放，为自身和目标添加“连击”，持续到战斗脱离。<br>连击：你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。",
+                    "automationNote": "命中后给双方添加连击状态。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
                         ],
                         "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            5,
+                            4,
+                            3,
+                            2
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "添加护体",
+                            "label": "赤凤迎源",
                             "trigger": "hit",
-                            "script": "const amount = args.finalAmount;\nif (amount > 0) {\n    await args.target.applyHealing({ amount: amount, type: \"huti\" });\n}"
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const lianjiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    \n    await game.xjzl.api.effects.addEffect(args.target, lianjiData);\n    await game.xjzl.api.effects.addEffect(args.attacker, lianjiData);\n}"
                         }
                     ]
                 }
@@ -325,173 +240,271 @@
     },
     {
         "name": "春雨润物诀",
-        "img": "icons/magic/water/rain-cloud-blue.webp",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
         "system": {
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 2,
-            "description": "<p>百草阁回春绝技，施展时如春风化雨，润泽心田。</p>",
+            "description": "百草阁回春绝技，施展时如春风化雨，润泽心田。",
+            "requirements": "徒手",
             "moves": [
                 {
-                    "name": "润物细无声",
+                    "name": "好雨知时节",
                     "type": "qi",
                     "actionType": "heal",
-                    "isUltimate": true,
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "img": "icons/magic/water/rain-green.webp",
-                    "description": "<p>蓄力动作，为周围队友回复气血。（无法暴击）<br>公式：0.4内息 + 基础值。<br>每级[疗伤]额外+1。</p>",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.4
-                            },
-                            {
-                                "prop": "skills.liaoshang",
-                                "ratio": 1
-                            }
-                        ]
-                    },
+                    "range": "1",
+                    "description": "主要动作，雪中送炭，封住伤患之处，减轻伤势，回复目标 0.4 内息点气血。（无法造成暴击）<br>·每有一级[疗伤]，提高 1 点气血回复。",
+                    "automationNote": "完全自动化：基于施法者内息和疗伤技能计算回复量。",
                     "costs": {
                         "mp": [
-                            8,
-                            16,
-                            24
-                        ],
-                        "rage": [
-                            7,
+                            2,
+                            4,
                             6,
-                            5
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            8
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "好雨知时节",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\n// 基础 + 升级\nconst flatBonus = (lvl - 1) * 10;\n\n// 公式: 0.4 * 内息 + 疗伤 + 升级加值\nconst healAmount = Math.floor(0.4 * neixi) + liaoshang + flatBonus;\n\nawait args.target.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });"
+                        }
+                    ]
+                },
+                {
+                    "name": "当春乃发生",
+                    "type": "qi",
+                    "actionType": "default",
+                    "range": "1",
+                    "description": "主要动作，左手状若拈花，右手指尖连点，给目标添加“春雨”状态，持续到战斗脱离。<br>春雨：下次出招时，提升 0.4 内息点伤害。<br>·此招中的内息是施展本招式者的内息属性。",
+                    "automationNote": "完全自动化：快照施法者内息，创建携带增伤脚本的 Buff。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "群体治疗",
+                            "label": "当春乃发生",
                             "trigger": "hit",
-                            "script": "// 注意：此招式需要在聊天卡片上选中多个目标后点击应用\n// 如果是单体点击，就只奶一个。\n// 核心计算已由 Calculation 完成，这里只需要确保它是治疗行为\nif (args.finalAmount > 0) {\n    // 已经被 Core Heal 处理\n}"
+                            "active": true,
+                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\n\nconst flatBonus = (lvl - 1) * 10;\nconst damageBoost = Math.floor(0.4 * neixi) + flatBonus;\n\n// 动态创建特效\nconst effectData = {\n    name: \"春雨\",\n    icon: args.item.img,\n    description: `下次出招伤害 +${damageBoost}`,\n    flags: { \"xjzl-system\": { \"stackable\": true } }, // 允许叠加\n    changes: [] // 数值通过脚本实现\n};\n\n// 将脚本直接注入到 AE 中\n// 这个脚本在 CALC 阶段运行，增加伤害，并删除自身 (一次性)\neffectData.flags[\"xjzl-system\"].scripts = [{\n    label: \"春雨增伤\",\n    trigger: \"calc\",\n    active: true,\n    script: `\n        args.output.damage += ${damageBoost};\n        args.output.bonusDesc.push(\"春雨 +${damageBoost}\");\n        // 下次出招消耗掉\n        await thisEffect.delete();\n    `\n}];\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ]
                 },
                 {
                     "name": "随风潜入夜",
                     "type": "stance",
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "img": "icons/magic/air/wind-weather-blue-purple.webp",
-                    "description": "<p>次要动作，开启架招。获得“随风潜入夜”。<br>效果：范围内的队友每次进行伤残检定时，获得1点怒气。</p>",
+                    "range": "自身",
+                    "description": "次要动作，双手如绵绵细雨般展开，开启架招。获得“随风潜入夜”，持续到脱战或被击破架招。<br>随风潜入夜：5 米范围内的队友每次进行残疾检定时，获得 1 点怒气。",
+                    "automationNote": "手动：开启架招后，请提醒队友在进行残疾检定时手动增加怒气。",
                     "costs": {
                         "mp": [
                             2,
                             4,
-                            6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            6,
+                            8
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "添加光环描述",
-                            "trigger": "hit",
-                            "script": "// 这是一个复杂逻辑，暂添加一个被动描述\nconst dist = [5, 10, 15][Math.max(0, args.move.computedLevel-1)];\nconst buff = {\n    name: \"随风潜入夜\",\n    icon: \"icons/magic/air/wind-weather-blue-purple.webp\",\n    description: `${dist}米范围内队友进行伤残检定时+1怒气`,\n    origin: args.item.uuid\n};\nawait args.actor.createEmbeddedDocuments(\"ActiveEffect\", [buff]);"
-                        }
-                    ]
-                },
-                {
-                    "name": "当春乃发生",
-                    "type": "real",
-                    "damageType": "waigong",
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "img": "icons/magic/nature/leaf-glow-green.webp",
-                    "description": "<p>主要动作，给目标添加“春雨”状态。<br>春雨：下次出招时，提升伤害（0.4内息+基础）。</p>",
                     "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.4
-                            }
-                        ]
+                        "base": 10,
+                        "growth": 10
                     },
+                    "scripts": []
+                },
+                {
+                    "name": "润物细无声",
+                    "type": "qi",
+                    "isUltimate": true,
+                    "actionType": "heal",
+                    "range": "5",
+                    "description": "蓄力动作，体内内力迸发，如春雨般滋润万物。为周围队友回复 0.4 内息点气血。（无法造成暴击）<br>·每有一级[疗伤]，提高 1 点气血回复。",
+                    "automationNote": "完全自动化：需手动选中所有目标。",
                     "costs": {
                         "mp": [
-                            2,
-                            4,
-                            6
+                            8,
+                            16,
+                            24,
+                            32
                         ],
                         "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            7,
+                            6,
+                            5,
+                            4
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "施加增伤Buff",
+                            "label": "润物细无声",
                             "trigger": "hit",
-                            "script": "const dmgBonus = args.finalDamage; // 借用伤害计算结果作为Buff数值\nconst buff = {\n    name: \"春雨\",\n    icon: \"icons/magic/nature/leaf-glow-green.webp\",\n    changes: [\n        { key: \"system.combat.damages.global.mod\", mode: 2, value: dmgBonus }\n    ],\n    flags: { \"xjzl-system\": { \"maxStacks\": 1 } }\n};\n// 注意：这是一个实招，所以 hit 触发时如果是攻击敌人，这个buff是加给敌人的？\n// 描述说“给目标添加”，通常指队友。如果是攻击敌人，则是Debuff？\n// 规则书语境像是辅助招式。这里假设目标是友方。\nawait args.target.createEmbeddedDocuments(\"ActiveEffect\", [buff]);"
+                            "active": true,
+                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\nconst flatBonus = (lvl - 1) * 20;\n\nconst healAmount = Math.floor(0.4 * neixi) + liaoshang + flatBonus;\n\nawait args.target.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });"
                         }
                     ]
-                },
+                }
+            ]
+        }
+    },
+    {
+        "name": "五脏针诀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "baicaoge",
+            "tier": 2,
+            "description": "旨在调理五脏，运化其中精气，调节平衡。<br>锋针-铜 60 两：无伤害，筩其身，锋其末，刃三隅，绵延持有。<br>大针-铜 60 两：无伤害，尖如梃，当为筵，其锋微圆，剧烈短暂。",
+            "requirements": "暗器-针",
+            "moves": [
                 {
-                    "name": "好雨知时节",
+                    "name": "蕴脾血针",
                     "type": "qi",
                     "actionType": "heal",
-                    "weaponType": "unarmed",
-                    "element": "taiji",
-                    "img": "icons/magic/water/water-hand.webp",
-                    "description": "<p>主要动作，回复目标气血。<br>公式：0.4内息 + [疗伤]等级。</p>",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0,
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.4
-                            },
-                            {
-                                "prop": "skills.liaoshang",
-                                "ratio": 1
-                            }
-                        ]
-                    },
+                    "range": "5",
+                    "description": "主要动作，统摄气血，为气血生化之源，添加：<br>锋针：目标每回合末恢复 10 气血，持续三回合。<br>大针：目标立即恢复 30 点气血。",
+                    "automationNote": "出招前询问使用锋针或大针。自动扣除物品（需自觉），自动应用对应效果。",
                     "costs": {
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "前置:记录选择",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                        },
+                        {
+                            "label": "蕴脾效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 养血 (持续3+lvl-1回合)\n    const duration = 3 + (lvl - 1);\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    yangxueData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, yangxueData);\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const heal = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                        }
+                    ]
+                },
+                {
+                    "name": "理肺气针",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "range": "5",
+                    "description": "主要动作，肺司呼吸主气，循环内力，添加：<br>锋针：目标每回合末恢复 5 内力，持续三回合。<br>大针：目标立即恢复 15 点内力。",
+                    "automationNote": "出招前询问针法。自觉扣除。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "前置:记录选择",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                        },
+                        {
+                            "label": "理肺效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 聚气 (5MP, 持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const juqiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"juqi\"));\n    juqiData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, juqiData);\n} else {\n    // 大针: 瞬间回蓝 (15 + (lvl-1)*5)\n    const heal = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: heal, type: \"mp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                        }
+                    ]
+                },
+                {
+                    "name": "生肾水针",
+                    "type": "qi",
+                    "actionType": "default",
+                    "range": "5",
+                    "description": "主要动作，封藏精气，为先天生命之根，添加：<br>锋针：目标每回合初获得5护体真气，持续三回合。<br>大针：目标获得 15 点护体真气。<br>·本招式添加的护体真气均持续到战斗脱离。",
+                    "automationNote": "出招前询问针法。自觉扣除。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "前置:记录选择",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                        },
+                        {
+                            "label": "生肾效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 每回合加护体\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"生肾水针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 5 点护体真气。\",\n        flags: { \"xjzl-system\": { \"stackable\": true, scripts: [{\n            trigger: \"turnStart\",\n            active: true,\n            script: \"await actor.applyHealing({ amount: 5, type: 'huti', showScrolling: true });\"\n        }] } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间加护体 (15 + (lvl-1)*5)\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                        }
+                    ]
+                },
+                {
+                    "name": "养肝精针",
+                    "type": "qi",
+                    "actionType": "default",
+                    "range": "5",
+                    "description": "主要动作，疏泄疏通、调节精神情志，添加：<br>锋针：每回合初获得 1 怒气，持续三回合。<br>大针：两个友方各获得 1 怒气。",
+                    "automationNote": "出招前询问针法。大针请手动选择两个目标。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "前置:记录选择",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                        },
+                        {
+                            "label": "养肝效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 回怒 (持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"养肝精针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 1 怒气。\",\n        changes: [{ key: \"flags.xjzl-system.regenRageTurnStart\", mode: 2, value: 1 }]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间回怒 (数值固定1)\n    await args.target.applyHealing({ amount: 1, type: \"rage\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                        }
+                    ]
+                },
+                {
+                    "name": "护心火针",
+                    "type": "qi",
+                    "isUltimate": true,
+                    "actionType": "default",
+                    "range": "5",
+                    "description": "心主通明神志，维系一切生命精神。当目标即将陷入濒死后，可消耗反应动作释放此招，针刺其心，护其心火不灭。<br>目标需要进行一次[韧性]检定，难度=【本次受到伤害/20】，成功则回复 1 点气血，并将先攻顺序调整到最末。",
+                    "automationNote": "纯手动：请在目标濒死时手动使用，手动检定，手动修改先攻。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
                         ],
                         "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            7,
+                            6,
+                            5,
+                            4
                         ]
                     },
                     "scripts": []
@@ -500,238 +513,101 @@
         }
     },
     {
-        "name": "五脏针诀",
-        "img": "icons/magic/life/heart-shadow-red.webp",
-        "system": {
-            "category": "wuxue",
-            "sect": "baicaoge",
-            "tier": 2,
-            "description": "<p>旨在调理五脏，运化其中精气，调节平衡。</p>",
-            "moves": [
-                {
-                    "name": "护心火针（绝招）",
-                    "type": "qi",
-                    "actionType": "default",
-                    "isUltimate": true,
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/magic/fire/dagger-rune-enchant-flame-strong-orange.webp",
-                    "description": "<p>反应动作。当目标即将陷入濒死后释放。<br>韧性检定 DC = 伤害/20 - 修正。成功则回复1点气血。</p>",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12
-                        ],
-                        "rage": [
-                            7,
-                            6,
-                            5
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "濒死护心",
-                            "trigger": "hit",
-                            "script": "const bonusMap = [0, 3, 6];\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = bonusMap[lvl-1];\n\n// 提示 GM/玩家操作\nui.notifications.info(\"请在目标即将濒死时使用此招式。\");\n\n// 这是一个需要交互的逻辑，模拟检定\nconst d = await DialogV2.prompt({\n    window: { title: \"护心火针 - 输入伤害\" },\n    content: \"<input type='number' name='dmg' placeholder='致死伤害数值'>\",\n    ok: { callback: (e, b) => b.form.elements.dmg.value }\n});\nconst dmg = parseInt(d) || 0;\nconst dc = Math.floor(dmg / 20) - bonus;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: args.attacker,\n    type: \"renxing\",\n    dc: dc,\n    label: \"护心检定\",\n    onFail: { name: \"护心失败\", changes: [] } \n});\n\n// 若成功逻辑需手动回血，或写在 requestSave 的回调里（目前 requestSave 只支持 onFail AE）\nChatMessage.create({ content: `若检定成功，目标回复 1 点气血，先攻调整至最后。` });"
-                        }
-                    ]
-                },
-                {
-                    "name": "养肝精针",
-                    "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/commodities/biological/organ-liver-red.webp",
-                    "description": "<p>锋针：每回合初获得1怒气。<br>大针：多个友方各获得1怒气。</p>",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "选择针具",
-                            "trigger": "hit",
-                            "script": "const type = await DialogV2.wait({\n    window: { title: \"选择针具\" },\n    buttons: [\n        { action: \"feng\", label: \"锋针 (持续回怒)\", icon: \"fas fa-angle-right\" },\n        { action: \"da\", label: \"大针 (群体回怒)\", icon: \"fas fa-users\" }\n    ],\n    close: () => null\n});\n\nif (type === \"feng\") {\n    const rounds = [3, 4, 5][Math.max(0, args.move.computedLevel-1)];\n    const eff = {\n        name: \"养肝-锋针\",\n        duration: { rounds },\n        changes: [{ key: \"flags.xjzl-system.regenRageTurnStart\", mode: 2, value: 1 }]\n    };\n    await args.target.createEmbeddedDocuments(\"ActiveEffect\", [eff]);\n} else if (type === \"da\") {\n    // 大针逻辑：群体回复\n    const count = [2, 3, 4][Math.max(0, args.move.computedLevel-1)];\n    ChatMessage.create({ content: `<b>大针效果</b>：请手动为 ${count} 个友方目标添加 1 点怒气。` });\n    // 自身目标回1\n    await args.target.update({\"system.resources.rage.value\": args.target.system.resources.rage.value + 1});\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "生肾水针",
-                    "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/commodities/biological/organ-kidney.webp",
-                    "description": "<p>锋针：每回合初获得5护体。<br>大针：立即获得大量护体。</p>",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "选择针具",
-                            "trigger": "hit",
-                            "script": "const type = await DialogV2.wait({\n    window: { title: \"选择针具\" },\n    buttons: [\n        { action: \"feng\", label: \"锋针 (持续护体)\" },\n        { action: \"da\", label: \"大针 (瞬间护体)\" }\n    ],\n    close: () => null\n});\n\nconst lvlIdx = Math.max(0, args.move.computedLevel-1);\n\nif (type === \"feng\") {\n    const rounds = [3, 4, 5][lvlIdx];\n    // 暂时没有 regenHuti 的 flag，用宏提示或自定义 AE 逻辑\n    ChatMessage.create({ content: `${args.target.name} 获得锋针效果：每回合初获得 5 护体，持续 ${rounds} 回合。` });\n} else if (type === \"da\") {\n    const amount = [15, 20, 25][lvlIdx];\n    await args.target.applyHealing({ amount: amount, type: \"huti\" });\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "理肺气针",
-                    "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/commodities/biological/organ-lung.webp",
-                    "description": "<p>锋针：每回合末恢复5内力。<br>大针：立即恢复大量内力。</p>",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "选择针具",
-                            "trigger": "hit",
-                            "script": "const type = await DialogV2.wait({\n    window: { title: \"选择针具\" },\n    buttons: [\n        { action: \"feng\", label: \"锋针 (持续回内)\" },\n        { action: \"da\", label: \"大针 (瞬间回内)\" }\n    ],\n    close: () => null\n});\n\nconst lvlIdx = Math.max(0, args.move.computedLevel-1);\n\nif (type === \"feng\") {\n    const rounds = [3, 4, 5][lvlIdx];\n    const eff = {\n        name: \"理肺-锋针\",\n        duration: { rounds },\n        changes: [{ key: \"flags.xjzl-system.regenMpTurnEnd\", mode: 2, value: 5 }]\n    };\n    await args.target.createEmbeddedDocuments(\"ActiveEffect\", [eff]);\n} else if (type === \"da\") {\n    const amount = [15, 20, 25][lvlIdx];\n    await args.target.applyHealing({ amount: amount, type: \"mp\" });\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "蕴脾血针",
-                    "type": "qi",
-                    "actionType": "heal",
-                    "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/commodities/biological/organ-stomach.webp",
-                    "description": "<p>锋针：每回合末恢复10气血。<br>大针：立即恢复大量气血。</p>",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "选择针具",
-                            "trigger": "hit",
-                            "script": "const type = await DialogV2.wait({\n    window: { title: \"选择针具\" },\n    buttons: [\n        { action: \"feng\", label: \"锋针 (持续回血)\" },\n        { action: \"da\", label: \"大针 (瞬间回血)\" }\n    ],\n    close: () => null\n});\n\nconst lvlIdx = Math.max(0, args.move.computedLevel-1);\n\nif (type === \"feng\") {\n    const rounds = [3, 4, 5][lvlIdx];\n    const eff = {\n        name: \"蕴脾-锋针\",\n        duration: { rounds },\n        changes: [{ key: \"flags.xjzl-system.regenHpTurnEnd\", mode: 2, value: 10 }]\n    };\n    await args.target.createEmbeddedDocuments(\"ActiveEffect\", [eff]);\n} else if (type === \"da\") {\n    const amount = [30, 40, 50][lvlIdx];\n    await args.target.applyHealing({ amount: amount, type: \"hp\" });\n}"
-                        }
-                    ]
-                }
-            ]
-        }
-    },
-    {
         "name": "子午流注针法",
-        "img": "icons/tools/navigation/compass-brass-blue.webp",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
         "system": {
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 2,
-            "description": "<p>根据时辰变化对应十二经脉的气血盛衰情况，按时选穴下针。</p>",
+            "description": "<p>南唐何公何若愚，善针灸，根据时辰变化对应十二经脉的气血盛衰情况，按时选穴下针。</p>",
+            "requirements": "暗器-针",
             "moves": [
                 {
-                    "name": "截时定穴",
-                    "type": "qi",
-                    "actionType": "heal",
-                    "isUltimate": true,
+                    "name": "日时变易",
+                    "type": "stance",
+                    "range": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，观天时，推盛衰，脉开阖，开启架招。<br>根据当前时辰（由主持人告知）参考以下表格，获得对应“阳盛”或“阴盛”状态，持续到脱战。<br>·若你已经打通当前时辰对应的十二正经，你还会获得“子午”状态，持续到战斗脱离或解除架招。<br>阳盛：你以运行阳刚内功或施展阳、刚武学的人为目标时，命中、属性技能、[医术]检定结果+3。<br>阴盛：你以运行阴柔内功或施展阴、柔武学的人为目标时，命中、属性技能、[医术]检定结果+3。<br>子午：你在自己的回合末回复 5 点气血、内力。<br>·若在战斗过程中时辰出现变化，则阴盛阳盛的状态、是否存在子午也会相应变化。<br>升级：格挡值+10，阳盛阴盛的结果+1，消耗+2。</p>",
+                    "automationNote": "弹出对话框供玩家选择当前时辰属性（阳盛/阴盛）及是否触发子午状态，并自动应用对应 Buff。",
                     "weaponType": "hidden",
+                    "damageType": "waigong",
                     "element": "taiji",
-                    "img": "icons/magic/time/clock-stopwatch-white.webp",
-                    "description": "<p>回复0.6内息气血。<br>若有“子午”，额外回复。<br>阳盛：可改回内力；阴盛：可改流失。</p>",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
                     "calculation": {
                         "base": 0,
-                        "growth": 0,
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.6
-                            }
-                        ]
+                        "growth": 10
                     },
+                    "scripts": [
+                        {
+                            "label": "时辰判定",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const content = `<form><div class='form-group'><label>时辰属性:</label><select name='type'><option value='yang'>阳盛</option><option value='yin'>阴盛</option></select></div><div class='form-group'><label>是否打通对应经脉 (子午):</label><input type='checkbox' name='ziwu'></div></form>`;\n\nawait foundry.applications.api.DialogV2.prompt({\n    window: { title: '日时变易 - 时辰判定' },\n    content: content,\n    ok: {\n        callback: async (event, button) => {\n            const formData = new FormData(button.form);\n            const type = formData.get('type');\n            const hasZiwu = formData.get('ziwu');\n            const effects = [];\n            \n            if (type === 'yang') {\n                const yangEffect = thisItem.effects.getName('阳盛').toObject();\n                delete yangEffect._id;\n                effects.push(yangEffect);\n            } else {\n                const yinEffect = thisItem.effects.getName('阴盛').toObject();\n                delete yinEffect._id;\n                effects.push(yinEffect);\n            }\n            \n            if (hasZiwu) {\n                const ziwuEffect = thisItem.effects.getName('子午').toObject();\n                delete ziwuEffect._id;\n                effects.push(ziwuEffect);\n            }\n            \n            await game.xjzl.api.effects.addEffect(actor, effects[0]);\n            if (effects.length > 1) await game.xjzl.api.effects.addEffect(actor, effects[1]);\n        }\n    }\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "取穴开阖",
+                    "type": "counter",
+                    "range": "10米",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制对方虚招，飞针泄气，使其流失 10 点内力。<br>·若你具有“子午”，还会为对方添加一层“气虚”，至多三层，持续到战斗脱离。<br>气虚：每层使你回合末流失 5 点内力。<br>升级：流失内力+10，添加气虚层数+1，消耗+2。</p>",
+                    "automationNote": "命中后扣除目标内力。检测自身是否有“子午”状态，若有则给目标叠加“气虚”。",
+                    "weaponType": "hidden",
+                    "damageType": "waigong",
+                    "element": "taiji",
                     "costs": {
                         "mp": [
+                            2,
                             4,
-                            8,
-                            12
-                        ],
-                        "rage": [
-                            7,
                             6,
-                            5
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            8
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "效果应用",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 基础效果：流失内力\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst mpDrain = 10 + (lvl - 1) * 10;\nawait args.target.applyHealing({ amount: -mpDrain, type: 'mp', showScrolling: true });\n\n// 子午加成：叠加气虚\nconst hasZiwu = actor.effects.some(e => e.name === '子午');\nif (hasZiwu) {\n    const stacks = 1 + (lvl - 1);\n    const qixuData = CONFIG.statusEffects.find(e => e.id === 'qixu');\n    if (qixuData) {\n        for(let i=0; i<stacks; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, qixuData);\n        }\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "流经注气",
+                    "type": "qi",
+                    "actionType": "default",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，遍刺正经，气注要穴，你可以得知目标具体打通哪些十二正经，若有对应当前时辰的十二正经（详见【日时变易】），你为目标添加“流注”，持续三回合。<br>流注：每次出招后，回复 10 气血、10 内力。<br>·若你具有“子午”，可直接为其添加“流注”，同时，还可以将流注的回复效果更改为流失。<br>升级：流注回复的气血内力+5，内力消耗+2。</p>",
+                    "automationNote": "自动给目标添加基础版“流注”Buff。若需修改为流失效果或确认目标经脉条件，请玩家手动操作。",
+                    "weaponType": "hidden",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "子午修正",
-                            "trigger": "calc",
-                            "script": "// 检查子午状态\nif (actor.effects.some(e => e.name.includes(\"子午\"))) {\n    // 假设每开启一条经脉+10，这里简化为固定加值或手动修正\n    args.output.bonusDesc.push(\"子午加成生效\");\n    args.output.damage += 10; \n}"
-                        },
-                        {
-                            "label": "阴阳转化",
-                            "trigger": "hit",
-                            "script": "const hasYang = actor.effects.some(e => e.name.includes(\"阳盛\"));\nconst hasYin = actor.effects.some(e => e.name.includes(\"阴盛\"));\n\nif (hasYang) {\n    const doMp = await DialogV2.confirm({ window: { title: \"阳盛\" }, content: \"转化为回复内力？\" });\n    if (doMp) {\n        // 扣除自动回的血（假设已回），或在 applyHeal 前拦截... \n        // 由于 actionType=heal 已经自动执行了回血，这里我们再补一个回蓝，并扣除回血可能太复杂。\n        // 简单处理：额外回复内力\n        await args.target.applyHealing({ amount: args.finalAmount, type: \"mp\" });\n        ui.notifications.info(\"阳盛：额外回复了内力。\");\n    }\n}\nif (hasYin) {\n    const doDmg = await DialogV2.confirm({ window: { title: \"阴盛\" }, content: \"转化为流失伤害？\" });\n    if (doDmg) {\n        await args.target.applyDamage({ amount: args.finalAmount, type: \"liushi\", isHit: true });\n        ui.notifications.info(\"阴盛：造成了流失伤害。\");\n    }\n}"
+                            "label": "添加流注",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 获取目标\nconst targets = Array.from(game.user.targets).map(t => t.actor);\nif (targets.length === 0) return ui.notifications.warn('未选择目标');\n\n// 动态计算数值\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst val = 10 + (lvl - 1) * 5;\n\n// 构建特效数据\nconst effectData = {\n    name: '流注',\n    icon: 'icons/svg/regen.svg',\n    duration: { rounds: 3 },\n    description: `每次出招后回复 ${val} 点气血和内力。`,\n    changes: [\n        { key: 'flags.xjzl-system.regenHpAttack', mode: 2, value: val },\n        { key: 'flags.xjzl-system.regenMpAttack', mode: 2, value: val }\n    ]\n};\n\nfor (const t of targets) {\n    await game.xjzl.api.effects.addEffect(t, effectData);\n}\nui.notifications.info('已应用 [流注] 效果。');\nargs.flags.autoApplied = true;"
                         }
                     ]
                 },
@@ -739,290 +615,188 @@
                     "name": "经遂聚脉",
                     "type": "qi",
                     "actionType": "heal",
+                    "range": "1米",
+                    "description": "<p>主要动作，接经续脉，为目标进行[疗伤]检定（难度 15），成功则为其回复检定结果数值的气血和内力，并为其添加一层他正在使用武器的“X势”，持续到脱战。<br>X 势：每层使 X 法命中+10。持续到你更换其他武器的武学套路。（X 为武器类型）<br>升级：本次疗伤检定结果+5，内力消耗+2。</p>",
+                    "automationNote": "应用治疗时自动进行医术检定。成功则回复HP和MP，并根据目标武器赋予“X势”。",
                     "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/magic/life/vine-whip-green.webp",
-                    "description": "<p>进行疗伤检定，成功则回复检定值的气血和内力。并添加武器势。</p>",
                     "costs": {
                         "mp": [
                             2,
                             4,
-                            6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "疗伤检定",
-                            "trigger": "hit",
-                            "script": "const dc = [15, 10, 5][Math.max(0, args.move.computedLevel-1)];\nconst roll = await actor.rollAttributeTest(\"liaoshang\", { skipDialog: false });\nif (roll.total >= dc) {\n    const val = roll.total;\n    // 回血\n    await args.target.applyHealing({ amount: val, type: \"hp\" });\n    // 回内\n    await args.target.applyHealing({ amount: val, type: \"mp\" });\n    \n    // 添加武器势\n    const weaponType = args.target.system.combat?.weaponRanks ? \n        Object.keys(args.target.system.combat.weaponRanks).find(k => k!=='none' && k!=='unarmed') : \"unarmed\";\n    \n    if (weaponType) {\n        const eff = {\n            name: \"武器势\",\n            changes: [{ key: `system.combat.weaponRanks.${weaponType}.mod`, mode: 2, value: 10 }]\n        };\n        await args.target.createEmbeddedDocuments(\"ActiveEffect\", [eff]);\n    }\n} else {\n    ui.notifications.warn(\"疗伤检定失败。\");\n}"
+                            "label": "疗伤与加势",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 获取目标\nconst targets = Array.from(game.user.targets).map(t => t.actor);\nif (targets.length === 0) return ui.notifications.warn('未选择目标');\n\n// 1. 医术检定\nconst roll = await actor.rollAttributeTest('yishu', { dc: 15 });\nif (roll.total >= 15) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const healAmount = roll.total + (lvl - 1) * 5;\n    \n    for (const t of targets) {\n        // 应用治疗\n        await t.applyHealing({ amount: healAmount, type: 'hp', showScrolling: true });\n        await t.applyHealing({ amount: healAmount, type: 'mp', showScrolling: true });\n        \n        // 2. 添加 X势\n        const weapon = t.itemTypes.weapon.find(w => w.system.equipped);\n        if (weapon) {\n            const wType = weapon.system.type;\n            const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType]);\n            const effectData = {\n                name: `${wLabel}势`,\n                icon: 'icons/svg/upgrade.svg',\n                description: `使用${wLabel}时命中+10`,\n                changes: [\n                    { key: `system.combat.hit_waigong`, mode: 2, value: 10 }\n                ],\n                flags: { 'xjzl-system': { stackable: true } }\n            };\n            await game.xjzl.api.effects.addEffect(t, effectData);\n        }\n    }\n    ui.notifications.info(`医术检定成功！回复 ${healAmount} 点。`);\n} else {\n    ui.notifications.warn('医术检定失败。');\n}\nargs.flags.autoApplied = true;"
                         }
                     ]
                 },
                 {
-                    "name": "日时变易",
-                    "type": "stance",
+                    "name": "截时定穴",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "isUltimate": true,
+                    "range": "1米",
+                    "description": "<p>主要动作，气阳血阴，按时定穴，刺入目标穴位，为其回复 0.6 内息点气血。（无法造成暴击）<br>·若你具有“子午”，目标每开启一条十二正经，招式回复的气血数值+10。<br>·若你具有阳盛，可以将回复气血改为回复内力。<br>·若你具有阴盛，可以将回复气血改为流失气血。<br>升级：回复气血+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "自动计算基础治疗量。若需改为回蓝或造成伤害，请根据卡片提示手动操作。",
                     "weaponType": "hidden",
-                    "element": "taiji",
-                    "img": "icons/magic/time/sun-moon-stars-blue.webp",
-                    "description": "<p>开启架招。根据时辰获得阳盛/阴盛/子午。</p>",
                     "costs": {
                         "mp": [
-                            2,
                             4,
-                            6
+                            8,
+                            12,
+                            16
                         ],
                         "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "calculation": {
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "时辰判定",
-                            "trigger": "damaged",
-                            "script": "// 仅作为架招开启时的效果，通常应该在 attack/hit 阶段处理，或者手动添加 AE\n// 假设这是架招激活后的常驻效果，这里不写脚本，由玩家手动添加对应的 Status AE"
+                            "label": "计算与应用",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 获取目标\nconst targets = Array.from(game.user.targets).map(t => t.actor);\nif (targets.length === 0) return ui.notifications.warn('未选择目标');\n\n// 计算数值 (基础由系统算好，这里手动算加成)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst levelBonus = (lvl - 1) * 20;\nconst baseHeal = (args.flags.damageResult?.damage || 0) + levelBonus;\n\n// 检测状态\nconst hasZiwu = actor.effects.some(e => e.name === '子午');\nconst hasYang = actor.effects.some(e => e.name === '阳盛');\nconst hasYin = actor.effects.some(e => e.name === '阴盛');\n\nfor (const t of targets) {\n    let amount = baseHeal;\n    let type = 'hp';\n    \n    // 提示子午加成\n    if (hasZiwu) ui.notifications.info(`【子午】请检查目标经脉数，手动增加治疗 (每条+10)。当前基础值: ${amount}`);\n    \n    // 阴阳逻辑\n    if (hasYang) {\n        type = 'mp';\n        ui.notifications.info('【阳盛】转为回复内力');\n    } else if (hasYin) {\n        // 阴盛流失：这里用 applyHealing 负数来实现流失\n        amount = -amount;\n        ui.notifications.info('【阴盛】转为流失气血');\n    }\n    \n    await t.applyHealing({ amount: amount, type: type, showScrolling: true });\n}\n\nargs.flags.autoApplied = true;"
                         }
                     ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "阳盛",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                    "description": "你以运行阳刚内功或施展阳、刚武学的人为目标时，命中、属性技能、[医术]检定结果+3。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yang-sheng",
+                            "scripts": [
+                                {
+                                    "label": "阳盛加成",
+                                    "trigger": "attack",
+                                    "script": "const lvl = Math.max(1, args.move?.computedLevel || 1);\nconst bonus = 3 + (lvl - 1);\nargs.flags.bonusHit += bonus;\nargs.flags.damageResult.breakdown += `\\n+ 阳盛命中: ${bonus}`;"
+                                },
+                                {
+                                    "label": "检定加成",
+                                    "trigger": "check",
+                                    "script": "// 提示：医术检定结果需手动+3"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "阴盛",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                    "description": "你以运行阴柔内功或施展阴、柔武学的人为目标时，命中、属性技能、[医术]检定结果+3。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yin-sheng",
+                            "scripts": [
+                                {
+                                    "label": "阴盛加成",
+                                    "trigger": "attack",
+                                    "script": "const lvl = Math.max(1, args.move?.computedLevel || 1);\nconst bonus = 3 + (lvl - 1);\nargs.flags.bonusHit += bonus;\nargs.flags.damageResult.breakdown += `\\n+ 阴盛命中: ${bonus}`;"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "子午",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                    "description": "你在自己的回合末回复 5 点气血、内力。",
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnEnd",
+                            "mode": 2,
+                            "value": "5"
+                        },
+                        {
+                            "key": "flags.xjzl-system.regenMpTurnEnd",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zi-wu"
+                        }
+                    }
                 }
             ]
         }
     },
     {
-        "name": "颐养生机",
-        "img": "icons/environment/settlement/house-farmland-small.webp",
+        "name": "百草门派散手",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
         "system": {
             "category": "sanshou",
             "sect": "baicaoge",
             "tier": 1,
-            "description": "<p>百草阁环境怡人，是调养身体绝佳之地。</p>",
+            "description": "<p>百草阁门派散手合集。</p>",
             "moves": [
                 {
                     "name": "颐养生机",
                     "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "none",
-                    "img": "icons/environment/settlement/house-farmland-small.webp",
-                    "description": "<p>治疗残疾疗程缩短，并获得诊金奖励。</p>",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "显示说明",
-                            "trigger": "hit",
-                            "script": "const ratios = [\"10%\", \"30%\", \"50%\"];\nconst lvl = Math.max(0, args.move.computedLevel-1);\nconst timeReduc = [\"0%\", \"25%\", \"50%\"];\nChatMessage.create({ content: `<b>颐养生机 (Lv.${lvl+1})</b><br>疗程缩短: ${timeReduc[lvl]}<br>诊金奖励: ${ratios[lvl]}` });"
-                        }
-                    ]
-                }
-            ]
-        }
-    },
-    {
-        "name": "八脉交会",
-        "img": "icons/magic/symbols/runes-star-pentagon-orange.webp",
-        "system": {
-            "category": "sanshou",
-            "sect": "baicaoge",
-            "tier": 2,
-            "description": "<p>寻得交经八穴，辅助打通。</p>",
-            "moves": [
+                    "range": "特殊",
+                    "tier": 1,
+                    "description": "<p>百草谷环境怡人，是调养身体绝佳之地，即便无病在此居住，亦可增强体质、预防疾病。重病伤残之人，可前来花费一定时间金钱疗养，恢复健康。<br>·你可以将病人带往百草阁治疗残疾，你治疗目标期间，不可离开百草阁，治疗完成后，百草阁收取诊金的 10%会作为奖励给予你。<br>升级：疗程时间缩短 25%，诊金价格提升 20%。</p>",
+                    "automationNote": "完全手动，RP向技能。",
+                    "weaponType": "unarmed"
+                },
                 {
                     "name": "八脉交会",
                     "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "none",
-                    "img": "icons/magic/symbols/runes-star-pentagon-orange.webp",
-                    "description": "<p>打通十二正经后，可花费修为开启交经八穴。</p>",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "显示说明",
-                            "trigger": "hit",
-                            "script": "const costs = [1000, 500, 0];\nconst lvl = Math.max(0, args.move.computedLevel-1);\nChatMessage.create({ content: `<b>八脉交会</b><br>开启交经八穴消耗修为: ${costs[lvl]}` });"
-                        }
-                    ]
-                }
-            ]
-        }
-    },
-    {
-        "name": "开脉针法",
-        "img": "icons/tools/hand/needle-steel.webp",
-        "system": {
-            "category": "sanshou",
-            "sect": "baicaoge",
-            "tier": 2,
-            "description": "<p>以针渡人，辅助他人打通十二正经。</p>",
-            "moves": [
+                    "range": "自身",
+                    "tier": 2,
+                    "requirements": "《博脉心法》修炼圆满",
+                    "description": "<p>你明了自身十二正经、奇经八脉的所有经络走向和要穴位置，并知晓正经奇经相交的八个穴位（称为交经八穴）。<br>·在你打通十二正经后，可以进行休整并花费 1000 修为，直接开启该经脉上的交经八穴，并获得与对应奇经八脉循环相通的属性加成。<br>·交经八穴并非武道穴位，不可服食奇珍。<br>·若你已同时打通交经八穴连通的正经和奇经，则无需休整和修为，直接开启该穴位。<br>后溪穴：自由属性+5<br>列缺穴：自由属性+5<br>公孙穴：气血上限+20<br>足临泣穴：格挡值+10<br>外关穴：施展阳、刚属性武学，招式伤害+5<br>内关穴：施展阴、柔属性武学，招式伤害+5<br>申脉穴：速度+2<br>照海穴：先攻+2<br>升级：开启交经八穴所需修为减少 500。</p>",
+                    "automationNote": "请玩家使用手动修正器去修正属性。",
+                    "weaponType": "unarmed"
+                },
                 {
                     "name": "开脉针法",
                     "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "none",
-                    "img": "icons/tools/hand/needle-steel.webp",
-                    "description": "<p>通经：消耗银两和修为辅助目标打通经脉。<br>通脉：挑散奇珍。</p>",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "显示说明",
-                            "trigger": "hit",
-                            "script": "const discount = [\"0%\", \"20%\", \"40%\"];\nconst lvl = Math.max(0, args.move.computedLevel-1);\nChatMessage.create({ content: `<b>开脉针法</b><br>药浴花费减少: ${discount[lvl]}<br>功能：通经 / 通脉` });"
-                        }
-                    ]
-                }
-            ]
-        }
-    },
-    {
-        "name": "尝百草",
-        "img": "icons/consumables/plants/leaf-marked-green.webp",
-        "system": {
-            "category": "sanshou",
-            "sect": "baicaoge",
-            "tier": 3,
-            "description": "<p>辨药、入药、化药。</p>",
-            "moves": [
+                    "range": "接触",
+                    "tier": 2,
+                    "description": "<p>百草阁弟子以自身为本，以针渡人，你可以灌注内力辅助他人打通十二正经。<br>通经<br>花费休整，为目标配置药浴，等其洗沐过后，施针帮助目标打通一条经脉（无需对方修炼内功）。<br>·药浴所需的药材非常昂贵，需大量银两采买。<br>·你只能帮助对方打通自己已经打通的经脉，且双方都需要耗费修为，尤其是施针之人。<br>消耗银两和修为如下：<br>通脉<br>花费休整和 1000 修为，将目标一条经脉中服食的奇珍挑散，目标失去该奇珍效果。<br>升级：通经中药浴的花费减少 20%。</p>",
+                    "automationNote": "完全手动处理资源消耗和经脉开启。",
+                    "weaponType": "unarmed"
+                },
                 {
                     "name": "尝百草",
                     "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "none",
-                    "img": "icons/consumables/plants/leaf-marked-green.webp",
-                    "description": "<p>辨药：检定加成。<br>入药：制作新药获百草层数。<br>化药：消耗内力将药力存入丹田。</p>",
+                    "range": "自身",
+                    "tier": 3,
+                    "requirements": "《神农本草功》修炼圆满",
+                    "description": "<p>百草阁弟子秉持炎帝之志，跋山涉水，行遍大地，每遇自身未见过之根、茎、叶、花、果亦或是药物毒药，皆口尝而身试之，来辨别药性，并详细记载流传。<br>辨药<br>你可以通过小心地触摸、嗅闻、舔舐来辨别一种药物或毒药的作用，不会影响该药的药性，自身也不会受到该药的效果影响。<br>·制作经过辨药的药物或毒药时，检定结果+1。<br>入药<br>你每制作成功一种新的药物或毒药，获得一层“百草”，至多一百层，不会被其他效果移除。<br>百草：每层使你的气血、内力上限+1。<br>化药<br>类型：气招<br>距离：1<br>消耗：100<br>花费小憩，你盘坐并口服一种药物或毒药，获得相应效果，同时消耗 100 点内力吸取药力存于丹田，你获得“化药-药物名称”状态，持续一天。<br>化药-药物名称：当你对距离 1 米的贴身目标出招时，可以移除此状态，内力化药，灌注入目标体内，目标视作口服了该种药物或毒药。<br>升级：辨药的检定结果+1，化药消耗的内力-30。</p>",
+                    "automationNote": "完全手动。请玩家自行记录“百草”层数并手动修正属性。化药效果请手动处理。",
+                    "weaponType": "unarmed",
                     "costs": {
                         "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
+                            100,
+                            100,
+                            100,
+                            100
                         ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "功能说明",
-                            "trigger": "hit",
-                            "script": "const bonus = [1, 2, 3, 4];\nconst cost = [100, 70, 40, 10];\nconst lvl = Math.max(0, args.move.computedLevel-1);\nChatMessage.create({ content: `<b>尝百草 (Lv.${lvl+1})</b><br>辨药加值: +${bonus[lvl]}<br>化药消耗: ${cost[lvl]} 内力` });"
-                        }
-                    ]
-                }
-            ]
-        }
-    },
-    {
-        "name": "《采药谣-乐谱》",
-        "img": "icons/tools/instruments/flute-wooden.webp",
-        "system": {
-            "category": "sanshou",
-            "sect": "baicaoge",
-            "tier": 1,
-            "description": "<p>将医道草药融入歌诀。</p>",
-            "moves": [
-                {
-                    "name": "乐曲：采药谣",
-                    "type": "qi",
-                    "actionType": "default",
-                    "weaponType": "instrument",
-                    "element": "taiji",
-                    "img": "icons/tools/instruments/flute-wooden.webp",
-                    "description": "<p>为目标添加“采药”状态。<br>采药：服用药物时，额外回复 10 气血内力。</p>",
-                    "costs": {
-                        "mp": [
-                            5,
-                            5,
-                            5
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "添加采药",
-                            "trigger": "hit",
-                            "script": "const eff = {\n    name: \"采药\",\n    icon: \"icons/tools/instruments/flute-wooden.webp\",\n    description: \"服药额外回 10 气血内力\",\n    duration: { rounds: 3 }\n};\nawait args.target.createEmbeddedDocuments(\"ActiveEffect\", [eff]);"
-                        }
-                    ]
+                    }
                 }
             ]
         }
