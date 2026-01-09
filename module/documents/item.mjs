@@ -1175,7 +1175,7 @@ export class XJZLItem extends Item {
 
     // 返回结果包
     return {
-      damage: totalDmg,
+      damage: finalDamage,
       feint: feintVal,
       breakdown: breakdownText,
       feintBreakdown: feintBreakdown,

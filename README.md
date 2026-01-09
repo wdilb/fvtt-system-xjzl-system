@@ -768,8 +768,8 @@ if (actor.effects.find(e => e.name === "无我")) {
 
 ```javascript
 // 检查目标状态
-const target = args.target;
-const isVulnerable = target.statuses.has("stun") || target.effects.find(e => e.name === "破绽");
+const t = args.target;
+const isVulnerable = t.statuses.has("stun") || t.effects.find(e => e.name === "破绽");
 
 if (isVulnerable) {
     // 针对该目标的阈值修正 +3 (更容易暴击)
