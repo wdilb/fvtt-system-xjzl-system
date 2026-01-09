@@ -476,7 +476,7 @@ export class XJZLActor extends Actor {
                 script: s.script,
                 label: s.label || stanceMove.name,
                 source: wuxueItem, // 源头依然归属于该武学物品
-                contextData: move
+                contextData: stanceMove
               });
             }
           });
