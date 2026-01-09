@@ -10,10 +10,9 @@ TARGET_DIR = "./data/wuxue"
 OLD_CODE = "const lvl = Math.max(1, args.move.computedLevel || 1);"
 
 # 定义替换后的新代码模式
-# 使用 \\n 来表示 JSON 字符串中的换行符
 NEW_CODE = (
-    "const stanceId = actor.system.martial.stance;\\n"
-    "    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\\n"
+    "const stanceId = actor.system.martial.stance;\n"
+    "    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n"
     "    const lvl = Math.max(1, moveData?.computedLevel || 1);"
 )
 
