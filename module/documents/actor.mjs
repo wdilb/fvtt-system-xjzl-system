@@ -1847,6 +1847,16 @@ export class XJZLActor extends Actor {
     // TODO 暂时来说没有普通攻击触发的，以后会有吗？
 
     // =====================================================
+    // 4·5 提前计算基础伤害
+    // =====================================================
+    // 理由：让脚本能获取并修改这个结果
+    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
+
+    if (!calcResult) {
+        return ui.notifications.error("伤害计算失败");
+    }
+
+    // =====================================================
     // 5. 执行 ATTACK 阶段脚本
     // =====================================================
     const attackContext = {
@@ -1862,7 +1872,8 @@ export class XJZLActor extends Actor {
         critThresholdMod: 0,   // 暴击阈值修正
         bonusHit: 0,           // 脚本给予的命中加值
         bonusFeint: 0,         // 脚本给予的虚招加值(虽然普攻一般不用，但为了兼容性加上)
-        forceHit: false // 全局必中参数
+        forceHit: false, // 全局必中参数
+        damageResult: calcResult
       }
     };
 
@@ -1879,10 +1890,10 @@ export class XJZLActor extends Actor {
     }
 
     // =====================================================
-    // 6. 伤害计算
+    // 6. 伤害计算，应该不需要了，我们把伤害计算提前了
     // =====================================================
     // 我们需要把 moraleSpent 传给计算函数
-    const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
+    // const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
 
     // =====================================================
     // 7. 目标命中检定 (Hit Check)

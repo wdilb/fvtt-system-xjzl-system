@@ -226,21 +226,30 @@ await Macros.requestSave({
 ### B. 战斗决策与交互 (异步阶段)
 > ✅ **提示**: 此阶段及后续阶段**可以使用** `await`。
 
-#### ⚔️ `attack` (出招决策)
-*   **时机**: 点击招式按钮后，资源扣除完毕，掷骰前。
-*   **用途**: 决定自身的全局状态（是否优势、是否暴击加成、是否阻断出招、瞬发技能逻辑）。
+#### ⚔️ `attack` (出招决策/数值修正)
+*   **时机**: 点击招式按钮后 -> 资源扣除完毕 -> **基础伤害计算完毕** -> 掷骰前。
+*   **用途**:
+    1.  决定自身的全局状态（优势、暴击加成、必中）。
+    2.  **直接修改最终伤害数值**（这是新架构的核心能力）。
+    3.  阻断出招或标记瞬发。
 *   **参数 (`args`)**:
-    *   `move` (Object), `item` (Item), `attacker` (Actor)。
+    *   `move` (Object): 当前招式数据。
+    *   `item` (Item): 来源物品。
+    *   `attacker` (Actor): 攻击者实例。
     *   `flags` (Object, **可修改**):
-        *   `level` (Int): **自身命中优劣势**。
-        *   `feintLevel` (Int): **自身虚招优劣势**。
-        *   `bonusHit` (Int): **自身全局命中数值修正**。
-        *   `forceHit` (Bool): **单体必中**。设为 `true` 强制对该目标命中（跳过投掷，这也代表着不会暴击，如果需要能暴击的必中请给bonusHit一个很大的加值来实现）。
-        *   `bonusFeint` (Int): **自身全局虚招数值修正**。
-        *   `critThresholdMod` (Int): **全局暴击阈值修正**。此次出招对所有目标生效。
-        *   `abort` (Bool): 设为 `true` **阻断出招**。
-        *   `abortReason` (String): 阻断时弹出的提示文本。
-        *   `autoApplied` (Bool): 设为 `true` **隐藏**聊天卡片上的“应用”按钮 (用于实现瞬发技能)。
+        *   `damageResult` (Object): 伤害计算结果引用。
+            *   `damage` (Number): 当前计算出的总伤害（含基础+武器+属性+手动修正+濒死加成）。**脚本直接修改此值即可改变最终伤害**。
+            *   `feint` (Number): 基础虚招值（尚未包含脚本修正）。
+            *   `breakdown` (String): 伤害构成描述文本。建议修改伤害后同步追加描述 (`+= "\n+ 说明..."`)。
+        *   `level` (Int): 自身命中优劣势（+1优势/-1劣势）。
+        *   `feintLevel` (Int): 自身虚招优劣势。
+        *   `bonusHit` (Int): 自身全局命中数值修正。
+        *   `forceHit` (Bool): **单体必中**。设为 `true` 强制命中（跳过投掷，不暴击）。
+        *   `bonusFeint` (Int): **自身全局虚招数值修正**。此值会在脚本结束后加到 `calcResult.feint` 上。
+        *   `critThresholdMod` (Int): 全局暴击阈值修正。
+        *   `abort` (Bool): 设为 `true` 阻断出招。
+        *   `abortReason` (String): 阻断提示文本。
+        *   `autoApplied` (Bool): 设为 `true` 隐藏聊天卡片上的“应用”按钮。
 
 ---
 

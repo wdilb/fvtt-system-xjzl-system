@@ -1483,6 +1483,29 @@ export class XJZLItem extends Item {
       };
 
       // =====================================================
+      // 3.6 基础伤害计算 (提前到脚本前)
+      // =====================================================
+      // 必须先算出伤害，ATTACK 脚本才能对其进行"修改"
+
+      // 此时 effectiveMode 必定是 attack 或 heal
+      // 传入 overrideMorale，确保计算使用刚才消耗掉的值
+      const calcResult = this.calculateMoveDamage(moveId, { overrideMorale: moraleSpent });
+      if (!calcResult) {
+        this._rolling = false; // 记得这里要手动解锁，因为还未进入 try/catch 的深层或者直接抛错
+        return ui.notifications.error("数值计算失败。");
+      }
+
+      // 提前应用濒死一击伤害
+      // 这样脚本就能看到加上濒死后的总伤害，方便做 "造成伤害x%" 的逻辑
+      if (desperateBonus > 0) {
+        calcResult.damage += desperateBonus;
+        calcResult.breakdown += `\n+ 濒死一击: ${desperateBonus}`;
+      }
+
+      // 应用玩家弹窗的手动修正 (同样在脚本前应用)
+      calcResult.damage += config.bonusDamage;
+
+      // =====================================================
       // 4. 执行 ATTACK (Pre-Roll) 脚本
       // =====================================================
       // 这是“决策阶段”，用于决定是否优势、是否允许出招、消耗资源
@@ -1503,7 +1526,8 @@ export class XJZLItem extends Item {
           critThresholdMod: 0, // 允许脚本修改暴击阈值,正数表示更容易暴击 (例如 2 表示阈值降低 2 点)
           bonusHit: 0,    // 自身命中加值
           bonusFeint: 0,   // 自身虚招数值加值
-          forceHit: false // 全局必中标记
+          forceHit: false, // 全局必中标记
+          damageResult: calcResult //提供伤害给脚本修改
         }
       };
       // 现在脚本里：
@@ -1574,26 +1598,10 @@ export class XJZLItem extends Item {
       }
 
       // =====================================================
-      // 5. 伤害计算 (Sync Calculation)
+      // 5. 虚招值计算，因为我们把伤害计算提前了，所以这里只剩下虚招了
       // =====================================================
-      // 此时 effectiveMode 必定是 attack 或 heal
-      // calculateMoveDamage 负责算出数值 (damage)
-      // 直接调用我们之前封装好的方法，保证和角色卡预览一致
-      // 传入 overrideMorale，确保计算使用刚才消耗掉的值，而不是 0
-      const calcResult = this.calculateMoveDamage(moveId, { overrideMorale: moraleSpent });
-      if (!calcResult) return ui.notifications.error("数值计算失败。");
-
-      // 应用手动修正
-      calcResult.damage += config.bonusDamage;
       // 虚招值 = 基础 + 手动配置 + 脚本修正
       calcResult.feint += (config.bonusFeint + scriptBonusFeint);
-
-      // 追加濒死一击伤害
-      if (desperateBonus > 0) {
-        calcResult.damage += desperateBonus;
-        // 在 breakdown 中显示，方便玩家查看伤害来源
-        calcResult.breakdown += `\n+ 濒死一击: ${desperateBonus}`;
-      }
 
       // =====================================================
       // 6. 目标状态预计算 (Target Pre-Calculation)

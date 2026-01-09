@@ -1749,7 +1749,7 @@
                     "requirements": "火器-一窝蜂-银 1200 两",
                     "range": "10",
                     "description": "<p>全回合动作，火箭漫天，每支造成 5 点火焰伤害。<br>·你最多一次性射出 32 支火箭。<br>·目标每有一级[轻功]，便能减少一根火箭的火焰伤害（即减少 5 点火焰伤害）。<br>·一窝蜂需双手持握，使用的回合无法移动，使用后每回合可以装入一支火箭。<br>·无需投掷命中，敌人无法闪避。<br><strong>升级：</strong>每支火箭造成的火焰伤害+1，内力消耗+2。</p>",
-                    "automationNote": "出招时弹窗输入火箭数量。自动计算总伤害，并在结算前根据目标轻功自动减免。",
+                    "automationNote": "出招时弹窗输入数量，自动修改面板伤害。结算时自动根据目标轻功减免伤害。",
                     "costs": {
                         "mp": [
                             2,
@@ -1763,14 +1763,14 @@
                     },
                     "scripts": [
                         {
-                            "label": "一窝蜂-装填与增幅",
+                            "label": "一窝蜂-装填",
                             "trigger": "attack",
-                            "script": "const dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '一窝蜂: 发射数量' },\n    content: '<div class=\"form-group\"><label>发射火箭数 (1-32)</label><input type=\"number\" name=\"count\" value=\"32\" min=\"1\" max=\"32\"></div>',\n    ok: { label: '发射', callback: (e, b) => new FormData(b.form).get('count') }\n});\nconst count = parseInt(dialog) || 1;\n\n// 计算单发伤害 (5 + lvl -1)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerRocket = 5 + (lvl - 1);\n\n// 计算总伤害\nconst totalDmg = count * dmgPerRocket;\n\n// 计算需要补充的伤害 (总伤害 - 系统默认算的1发伤害)\n// 这样卡片上显示的就是所有火箭加起来的总和\nargs.flags.bonusDamage = totalDmg - dmgPerRocket;\n\n// 必中\nargs.flags.forceHit = true;"
+                            "script": "const dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '一窝蜂: 发射数量' },\n    content: '<div class=\"form-group\"><label>发射火箭数 (1-32)</label><input type=\"number\" name=\"count\" value=\"32\" min=\"1\" max=\"32\"></div>',\n    ok: { label: '发射', callback: (e, b) => new FormData(b.form).get('count') }\n});\nconst count = parseInt(dialog) || 1;\n\n// 读取基础单发伤害 (已经在 calculateMoveDamage 中算好)\nconst singleDmg = args.flags.damageResult.damage;\nconst totalDmg = singleDmg * count;\n\n// 直接修改最终伤害\nargs.flags.damageResult.damage = totalDmg;\n\n// 更新 Breakdown (为了显示好看)\nargs.flags.damageResult.breakdown += `\\n+ 一窝蜂装填 (${count}发): ${totalDmg - singleDmg}`;\n\n// 必中\nargs.flags.forceHit = true;\n\n// 存储数量供后续使用\n// 我们将其暂存在 damageResult 对象上，因为它会一直传递\nargs.flags.damageResult.rocketCount = count;\nargs.flags.damageResult.singleDmg = singleDmg;"
                         },
                         {
                             "label": "一窝蜂-轻功减免",
                             "trigger": "preDamage",
-                            "script": "// 获取单发伤害\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerRocket = 5 + (lvl - 1);\n\n// 获取目标轻功\nconst qinggong = args.target.system.skills?.qinggong?.total || 0;\n\n// 计算减免量 (轻功等级 * 单发伤害)\nconst reduction = qinggong * dmgPerRocket;\n\n// 在即将造成的总伤害上扣除减免\nconst oldAmount = args.config.amount;\nargs.config.amount = Math.max(0, oldAmount - reduction);\n\n// 提示信息\nif (reduction > 0) {\n    ui.notifications.info(`${args.target.name} 轻功卓越，规避了 ${reduction} 点伤害！`);\n}\n\n// 火箭特性：无视格挡和防御\nargs.config.ignoreBlock = true;\nargs.config.ignoreDefense = true;"
+                            "script": "// 从传递过来的对象中读取参数\n// 注意：hit/preDamage 阶段，之前的 flags.damageResult 被展开到了 args 中，或者作为 damageResult 存在\n// 根据你的 ChatManager 实现，它通常在 args.damageResult 里，或者直接在 args 里\n// 安全起见，我们在 attack 脚本里把 count 放进了 damageResult，这里应该能通过 args.damageResult 读到\n// 如果 args.damageResult 不存在，我们得检查下 ChatManager._applyDamage 的逻辑\n// 查看代码：summary.push(resultEntry); resultEntry 包含 ...damageResult\n// hitContext = { ...resultEntry }\n// 所以 args.rocketCount 应该直接可用 (如果它在 damageResult 里)\n\n// 重新确认逻辑：Attack 脚本修改的是 calcResult对象。\n// Item.roll 将 calcResult 存入了 flags['xjzl-system'].calc\n// ChatManager._applyDamage 读取 flags.calc\n// 构造 damageResult 时，并没有把 flags.calc 里的自定义字段全拷进去，只拷了 damage/feint/breakdown 等标准字段\n// ！！！修正：为了确保传递，我们还是得利用 preDamage 的 args.config.amount 反推，或者像之前一样把 count 存到 flags.bonusDamage 里 (不推荐了)\n\n// 【稳健写法】\n// 1. 获取当前伤害 (这是总伤害)\nconst totalDamage = args.config.amount;\n\n// 2. 重新计算单发伤害 (5 + lvl - 1)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst singleDmg = 5 + (lvl - 1);\n\n// 3. 反推数量\nconst count = Math.floor(totalDamage / singleDmg);\n\n// 4. 获取目标轻功\nconst qinggong = args.target.system.skills?.qinggong?.total || 0;\n\n// 5. 减免逻辑\nconst effective = Math.max(0, count - qinggong);\nconst realDamage = effective * singleDmg;\n\n// 6. 修改伤害\nargs.config.amount = realDamage;\n\n// 7. 必中属性\nargs.config.ignoreBlock = true;\nargs.config.ignoreDefense = true;\n\nif (qinggong > 0) {\n    ui.notifications.info(`${args.target.name} 轻功抵消了 ${Math.min(count, qinggong)} 支火箭`);\n}"
                         }
                     ]
                 }
