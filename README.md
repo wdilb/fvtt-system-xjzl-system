@@ -415,7 +415,7 @@ await Macros.requestSave({
     为了防止逻辑污染（例如：防止架招的攻击脚本污染了其他招式的攻击判定），处于背景状态的架招**仅响应以下触发器**：
     *   ✅ **被动类**: `passive`
     *   ✅ **防御/交互类**: `avoided`, `preDefense`, `preTake`, `damaged`, `dying`, `death`
-    *   ❌ **进攻类 (被屏蔽)**: `attack`, `calc`, `preDamage`, `hit`, `hit_once`
+    *   ❌ **进攻类 (被屏蔽)**: `attack`, `calc`, `preDamage`, `hit`, `hit_once`, `check`
 
 > **设计启示**：如果你希望架招能增强你的攻击（如“开启架招后，所有攻击伤害+10”），请不要在架招的 `attack` 脚本里写加攻逻辑（会被屏蔽）。你应该在架招的 `passive` 脚本里修改 `system.combat.damages.global.mod`，或者给角色挂一个 Active Effect。
 
