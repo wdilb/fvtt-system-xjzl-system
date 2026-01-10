@@ -539,327 +539,280 @@ await Macros.requestSave({
 
 ---
 
-## 💡 7. 脚本实战范例大全
+## 💡 7. 脚本实战范例大全 (Verified v6.1)
 
-以下范例涵盖了从简单到复杂的各类需求。
+以下范例均提取自系统核心合集包，经过实机验证，可直接作为模板使用。
 
-### A. 给目标施加 Buff (如：提升移动速度)
-> **场景**: 气招 (Buff)，选中队友或自己，持续 3 回合。
-> **时机**: `hit`
-
-```javascript
-// 1. 定义 Active Effect 数据结构
-const effectData = {
-    name: "神行百变",
-    icon: "icons/svg/wing.svg", // 图标路径
-    origin: item.uuid,          // 标记来源
-    duration: { rounds: 3 },    // 持续时间
-    description: "移动速度提升 3 点。",
-    changes: [
-        // 修改战斗属性：速度 +3
-        { key: "system.combat.speed.mod", mode: 2, value: 3 }
-    ]
-};
-
-// 2. 给目标创建特效
-// args.target 可能是选中的队友，也可能是施法者自己(隐式目标)
-await args.target.createEmbeddedDocuments("ActiveEffect", [effectData]);
-
-// 3. (可选) 飘字反馈
-if (args.target.token?.object) {
-    canvas.interface.createScrollingText(args.target.token.object.center, "神行", {
-        fill: "#00FF00", stroke: "#000000", strokeThickness: 4
-    });
-}
-```
-
-### B. 治疗 + 回复内力 (如：提按端挤)
-> **场景**: 气招 (Heal)。面板设置 10 点治疗量 (自动回血)，脚本负责回内力。
-> **时机**: `hit`
+### A. 叠加型 Buff 的获取
+> **场景**: 物品内部存有一个 Active Effect 模板（例如“魔气”或“劲力”）。每次攻击或受伤时，复制这个模板并叠加到角色身上。
+> **时机**: `attack` 或 `damaged`
 
 ```javascript
-// args.finalAmount 是实际回复的气血量
-if (args.finalAmount > 0) {
-    // 额外回复 5 点内力
-    // 使用 applyHealing 接口，会自动处理飘字
-    await args.target.applyHealing({ 
-        amount: 5, 
-        type: "mp", 
-        showScrolling: true 
-    });
-}
-```
+// 1. 获取物品内的特效模板 (Template)
+// 假设特效名称为 "魔气"
+const sourceEffect = thisItem.effects.getName("魔气");
+if (!sourceEffect) return;
 
-### C. 精神伤害 + 定力检定 (如：醉里吴音)
-> **场景**: 气招 (Attack)，伤害类型选 `Mental`。
-> **逻辑**: 点击应用伤害时，先不扣血，而是发起检定。如果检定失败再扣血。
-> **时机**: `hit`
-
-```javascript
-// 1. 发起检定请求
-await Macros.requestSave({
-    target: args.target,
-    attacker: actor,
-    type: "dingli", // 定力检定
-    dc: 13,         // 难度
-    label: "抵抗靡靡之音",
-    
-    // 检定失败的回调：直接扣血
-    onFail: async () => {
-        // 造成 10 点伤害
-        await args.target.applyDamage({
-            amount: 10,
-            type: "mental", // 精神伤害
-            attacker: actor,
-            isHit: true,
-            ignoreDefense: true // 精神伤害无视防御
-        });
-        ui.notifications.info(`${args.target.name} 受到精神重创！`);
-    }
-});
-```
-
-### D. 自动化回血 Buff (如：养血)
-> **场景**: 气招 (Buff)。给目标上一个状态，让他每回合结束自动回血。
-> **时机**: `hit`
-
-```javascript
-const effectData = {
-    name: "养血",
-    icon: "icons/magic/life/heart-cross-green.webp",
-    duration: { rounds: 3 },
-    changes: [
-        // 修改自动化 Flag: 回合结束回血 (regenHpTurnEnd)
-        // mode: 2 (ADD) 表示叠加
-        { key: "flags.xjzl-system.regenHpTurnEnd", mode: 2, value: 10 }
-    ]
-};
-
-await args.target.createEmbeddedDocuments("ActiveEffect", [effectData]);
-```
-
-### E. 随等级成长的特效 (如：万龙馈影)
-> **场景**: 架招或攻击。给目标施加一个 Debuff（如蛇瘴），其**数值**和**最大层数**随着招式等级提升而增加。
-> **前置**: 在武学物品中先创建一个名为“蛇瘴”的特效作为**模板**。
-> **时机**: `hit` 或 `damaged` (如果是架招反击)
-
-```javascript
-// 1. 获取特效模板
-// thisItem 指向当前武学，我们在其中查找名为 "蛇瘴" 的 AE
-const sourceEffect = thisItem.effects.getName("蛇瘴");
-if (!sourceEffect) return ui.notifications.warn("特效模板缺失");
-
-// 2. 克隆数据 (转为普通 Object)
+// 2. 克隆数据 (转为普通 Object 并清理 ID)
 const effectData = sourceEffect.toObject();
-delete effectData._id;          // 清除 ID 以便创建新实例
-effectData.origin = thisItem.uuid; // 确保来源指向本武学
+delete effectData._id;          
+effectData.origin = thisItem.uuid; // 关键：标记来源，防止重复创建
 
-// 3. 获取当前招式等级
-// args.move 包含了当前招式的运行时数据
-const lvl = Math.max(1, args.move.computedLevel || 1);
+// 3. 动态修改 (可选)
+// 例如：根据内功层数修改最大叠加层数
+// 这里假设我们想把最大层数动态设为 5
+foundry.utils.setProperty(effectData, "flags.xjzl-system.maxStacks", 5);
 
-// 4. 动态修改数据 (原生 JS 操作)
-
-// A. 修改最大层数 (基础3层，每级+1)
-const newMax = 3 + (lvl - 1) * 1;
-foundry.utils.setProperty(effectData, "flags.xjzl-system.maxStacks", newMax);
-
-// B. 修改流失数值 (基础5点，每级+5)
-// 找到控制流失的 change 条目 (通过 key 查找)
-const change = effectData.changes.find(c => c.key === "flags.xjzl-system.regenHpTurnStart");
-if (change) {
-    // 注意：流失通常是负数
-    const val = -5 + (lvl - 1) * (-5);
-    change.value = String(val);
-}
-
-// 5. 应用特效
-// 调用 API 挂载到目标身上 (attacker 是施法者)
-// 这里演示如果是在 Damaged 触发器里，目标应该是 attacker (打我的人)
-// 如果是在 Hit 触发器里，目标应该是 target
-const targetActor = (trigger === 'damaged') ? args.attacker : args.target;
-await game.xjzl.api.effects.addEffect(targetActor, effectData);
+// 4. 调用管理器应用特效 (自动处理叠加/刷新)
+await game.xjzl.api.effects.addEffect(actor, effectData);
 ```
 
-### F. 进阶消耗品：武器淬毒
-> **场景**: 消耗品赋予自身一个名为“武器淬毒”的 Active Effect，该 AE 内部携带一个监听 `hit` 的脚本。攻击命中时消耗自己并使敌人中毒。
-> **时机**: `hit` (挂载在 Active Effect 上)
+### B. 濒死触发与动态回血
+> **场景**: 这是一个写在 Active Effect 上的脚本。当角色气血归零（濒死）时，消耗自身层数回复气血，并移除该特效。
+> **时机**: `dying` (挂载在 Active Effect 上)
 
 ```javascript
-// --- 本脚本挂载在 "武器淬毒" AE 上 ---
-// 只要此 AE 存在，每次攻击命中都会触发此脚本
+// thisEffect 指向当前运行脚本的特效实例
+const stacks = thisEffect.stacks; // 获取当前层数
 
-// 1. 发起判定请求
-await Macros.requestSave({
-    target: args.target,
-    attacker: actor,
-    type: "tipo", // 体魄检定
-    dc: 15,       // 难度
-    label: "抵抗剧毒",
-    
-    // 2. 失败回调：应用中毒状态
-    onFail: async () => {
-        const poisonEffect = {
-            name: "剧毒攻心",
-            icon: "icons/svg/skull.svg",
-            duration: { rounds: 3 },
-            changes: [
-                { key: "system.combat.speed", mode: 2, value: -2 }
-            ]
-        };
-        await args.target.createEmbeddedDocuments("ActiveEffect", [poisonEffect]);
-        ui.notifications.warn(args.target.name + " 中毒了！");
-    }
+// 1. 计算回血量 (每层 10% 最大气血)
+const healAmount = Math.floor(S.resources.hp.max * 0.1 * stacks);
+
+// 2. 发送剧情卡片 (可选，增强代入感)
+const content = `<div class="xjzl-chat-card">
+    <div style="padding:5px; background:#f3e5f5; color:#8e44ad; font-weight:bold;">
+        <i class="fas fa-shield-alt"></i> 护体秘术触发！消耗 ${stacks} 层。
+    </div>
+</div>`;
+await ChatMessage.create({
+    user: game.user.id,
+    speaker: ChatMessage.getSpeaker({ actor: actor }),
+    content: content
 });
 
-// 3. 触发一次后销毁自身 (一次性毒药)
-// thisEffect 指向当前运行脚本的 Active Effect (即"武器淬毒")
+// 3. 执行治疗 (自动处理飘字)
+await actor.applyHealing({ amount: healAmount, type: 'hp', showScrolling: true });
+
+// 4. 移除特效 (任务完成)
 await thisEffect.delete();
-ui.notifications.info("毒药已耗尽。");
 ```
 
-### G. 瞬发型气招 (如：天魔解体)
-> **场景**: 气招 (Buff)。点击招式后，无需选择目标，立即执行脚本（如：扣血加攻）并隐藏聊天卡片上的按钮。
-> **时机**: `attack` (出招决策)
+### C. 击破架招施加状态
+> **场景**: 攻击命中后，如果判定为“击破架招 (isBroken)”，给目标施加一个系统通用状态（如“封招”）。
+> **时机**: `hit`
 
 ```javascript
-// 1. 执行逻辑：扣除自身 30% 气血
-const hpCost = Math.floor(S.resources.hp.max * 0.3);
-// 检查是否够扣
-if (S.resources.hp.value <= hpCost) {
-    ui.notifications.warn("气血不足以施展天魔解体！");
-    args.flags.abort = true; // 阻断出招
-    return;
-}
-
-// 扣血 (真实伤害)
-await actor.applyDamage({ amount: hpCost, type: "liushi", isHit: true });
-
-// 上 Buff (攻击力+50)
-const buff = {
-    name: "天魔解体",
-    icon: "icons/svg/blood.svg",
-    changes: [{ key: "system.combat.damages.global.mod", mode: 2, value: 50 }]
-};
-await actor.createEmbeddedDocuments("ActiveEffect", [buff]);
-
-// 2. 关键：告诉系统“我已经处理完了”，隐藏卡片按钮
-args.flags.autoApplied = true;
-
-ui.notifications.info(`${actor.name} 施展了天魔解体！`);
-```
-
-### H. 暴击转化伤害 (如：摄魂一击)
-> **场景**: 攻击命中后，如果判定为暴击，则将伤害转化为“精神伤害”并无视防御。
-> **时机**: `preDamage` (攻击者视角)
-
-```javascript
-// 检查只读状态：是否暴击
-if (args.outcome.isCrit) {
-    // 修改伤害配置
-    args.config.type = "mental";
-    args.config.ignoreDefense = true; // 精神伤害无视防御
+// args.isBroken 是系统计算好的布尔值
+if (args.isBroken) {
+    // 1. 从系统配置中查找通用状态 (例如封招 fengzhao)
+    const statusConfig = CONFIG.statusEffects.find(e => e.id === "fengzhao");
     
-    // 提示
-    ui.notifications.warn("摄魂一击触发暴击！转化为精神伤害！");
-}
-```
-
-### I. 自身爆发状态 (如：无我境界)
-> **场景**: 当自身处于“无我”状态时，施展任何招式暴击率大幅提升。
-> **时机**: `attack` (出招前)
-
-```javascript
-// 检查自身是否有 "无我" 的特效
-if (actor.effects.find(e => e.name === "无我")) {
-    // 阈值修正 +5 (假设原阈值20，现在15即可暴击)
-    args.flags.critThresholdMod += 5;
-    
-    // 飘字提示
-    if (actor.token?.object) {
-        canvas.interface.createScrollingText(actor.token.object.center, "无我·暴击提升", { 
-            fill: "#e74c3c", stroke: "#000000", strokeThickness: 4 
-        });
+    if(statusConfig) {
+        // 2. 克隆并修改持续时间
+        const data = foundry.utils.deepClone(statusConfig);
+        data.duration = { rounds: 1 }; // 强制持续 1 回合
+        
+        // 3. 应用给目标
+        await game.xjzl.api.effects.addEffect(args.target, data);
+        ui.notifications.info(`${args.target.name} 被封招！`);
     }
 }
 ```
 
-### J. 针对破绽精准打击 (如：攻其不备)
-> **场景**: 目标如果有“晕眩”或“破绽”，对其命中率大幅提升（数值+10）且更容易暴击。
-> **时机**: `check` (对每个目标运行)
+### D. 属性快照型 Buff
+> **场景**: 给自己上一个 Buff，其数值（如格挡值）等于施法瞬间角色的“悟性”总值。即使后续悟性变化，该 Buff 的数值也不变。
+> **时机**: `hit` (气招/Buff模式)
 
 ```javascript
-// 检查目标状态
-const t = args.target;
-const isVulnerable = t.statuses.has("stun") || t.effects.find(e => e.name === "破绽");
+// 1. 计算动态数值
+const wuxing = actor.system.stats.wuxing.total; // 获取当前悟性
+const lvl = Math.max(1, move.computedLevel || 1);
+const rounds = 1 + (lvl - 1); // 持续时间随等级成长
 
-if (isVulnerable) {
-    // 针对该目标的阈值修正 +3 (更容易暴击)
-    args.flags.critThresholdMod += 3;
+// 2. 获取模板 (假设名为 "玄龟")
+const eff = thisItem.effects.getName("玄龟").toObject();
+
+// 3. 写入动态数据
+eff.duration = { rounds: rounds };
+// 假设模板里第0个 change 是修改格挡值的
+// 将当前悟性值“快照”写入
+eff.changes[0].value = String(wuxing); 
+
+// 4. 应用
+await game.xjzl.api.effects.addEffect(actor, eff);
+```
+
+### E. 伤害预览与资源消耗决策
+> **场景**: 这是一个组合拳脚本。
+> 1. `calc` 阶段：如果在预览时发现满足加成条件（如身上有Buff），直接把伤害加成显示在面板上。
+> 2. `attack` 阶段：正式出招时弹窗询问是否消耗该Buff。如果玩家拒绝，则把加成的伤害扣除。
+
+**脚本 1 (Calc 阶段 - 预览):**
+```javascript
+// 检查是否有指定 Buff (假设名为 "蓄力")
+const hasBuff = actor.effects.some(e => e.getFlag("xjzl-system", "slug") === "xuli_buff");
+
+if (hasBuff) {
+    // 计算加成 (示例：固定值 50)
+    const bonus = 50; 
     
-    // 针对该目标的命中数值 +10 (大幅提升命中率，但并不改变优劣势状态)
-    args.flags.grantHit += 10;
+    // 修改输出对象，不仅改数值，还加描述
+    args.output.damage += bonus;
+    args.output.bonusDesc.push(`蓄力加伤 +${bonus} (需消耗Buff)`);
 }
 ```
 
-### K. 反伤/反震 (如：软猬甲)
-> **场景**: 防御者。受到伤害时，将实际扣除气血的 50% 以真实伤害反弹给攻击者。
+**脚本 2 (Attack 阶段 - 决策):**
+```javascript
+const buff = actor.effects.find(e => e.getFlag("xjzl-system", "slug") === "xuli_buff");
+const bonus = 50; // 需与 calc 保持一致逻辑
+
+if (buff) {
+    // 弹出确认框
+    const confirm = await foundry.applications.api.DialogV2.confirm({
+        window: { title: "强力一击" },
+        content: `<p>预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗一层 [蓄力] 以生效此加成？</p>`,
+        yes: { label: "消耗 (保留加成)", icon: "fas fa-check" },
+        no: { label: "不消耗 (移除加成)", icon: "fas fa-times" }
+    });
+
+    if (confirm) {
+        // 玩家同意：消耗 1 层 Buff
+        await game.xjzl.api.effects.removeEffect(actor, "xuli_buff", 1);
+        ui.notifications.info("已消耗 [蓄力] 增强招式");
+    } else {
+        // 玩家拒绝：手动回滚伤害
+        // 注意：args.flags.damageResult.damage 是包含 calc 结果的总值
+        args.flags.damageResult.damage -= bonus;
+        // 修改描述，让聊天卡片显示减法
+        args.flags.damageResult.breakdown += `\n- 未消耗：移除加成 (-${bonus})`;
+    }
+}
+```
+
+### F. 属性判定与失败惩罚
+> **场景**: 命中后，要求目标进行属性判定（如内息），失败则施加特定状态（如点穴）。
+> **时机**: `hit`
+
+```javascript
+// 仅当命中且目标未开启架招时生效
+if (args.isHit && !args.target.system.martial.stanceActive) {
+    // 计算动态难度 (DC)
+    const dc = 20 + (Math.max(1, move.computedLevel || 1) - 1) * 2;
+
+    await Macros.requestSave({
+        target: args.target,
+        attacker: actor,
+        type: "neixi", // 判定属性
+        dc: dc,
+        label: "抵抗点穴",
+        onFail: "dianxue" // 失败时应用的状态 ID (来自 CONFIG.statusEffects)
+        // 也可以直接传一个 Active Effect 数据对象
+    });
+}
+```
+
+### G. 智能反伤与防死循环
+> **场景**: 受到近战攻击时反弹伤害。必须防止“反伤触发反伤”的无限循环。
 > **时机**: `damaged` (防御者视角)
 
 ```javascript
-// 必须有攻击者，且自己真的扣血了
-if (args.attacker && args.hpLost > 0) {
-    const reflect = Math.floor(args.hpLost * 0.5);
+// 1. 基础校验：必须有攻击者，且不能是自己
+if (!args.attacker || args.attacker.uuid === actor.uuid) return;
+
+// 2. 防乒乓机制 (Ping-Pong Protection)
+// 检查攻击者身上是否有“正在承受反伤”的临时标记
+if (args.attacker.isReceivingReflection) return;
+
+// 3. 距离检测 (V13 标准写法)
+const t1 = actor.token?.object || actor.getActiveTokens()[0];
+const t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];
+let inRange = false;
+
+if (t1 && t2) {
+    // 使用 Canvas Grid 测量距离
+    const measure = canvas.grid.measurePath([t1.center, t2.center]);
+    // 允许 1.1 米误差 (兼容斜向贴身)
+    if (measure.distance <= 1.1) inRange = true;
+}
+
+// 4. 执行反伤
+if (inRange) {
+    // [关键] 标记目标正在承受反伤，防止目标身上的反伤装备再次触发反弹
+    args.attacker.isReceivingReflection = true;
+
+    try {
+        // 造成真实伤害 (ignoreDefense: true)
+        await args.attacker.applyDamage({ 
+            amount: 15, 
+            type: "poison", 
+            attacker: actor, 
+            isHit: true,        // 反伤视为必中
+            ignoreDefense: true // 无视防御
+        });
+        
+        // 发送提示
+        ui.notifications.info("反伤甲触发！");
+
+    } finally {
+        // [关键] 无论成功失败，必须清除标记
+        args.attacker.isReceivingReflection = false;
+    }
+}
+```
+
+### H. 架招机制：激活与触发
+> **场景**: 架招包含两部分逻辑：
+> 1. **激活时**：开启架招瞬间，获得一个持续性 Buff（如“剑意”）。
+> 2. **生效时**：开启架招期间，每次成功格挡攻击，给对方施加 Debuff 或自己获得增益。
+
+**脚本 1 (激活架招 - 获得状态):**
+> **注意**: 架招的流程会在 `attack` 阶段结束后终止，不会进入 `hit` 阶段。因此“开启即生效”的逻辑必须写在 `attack` 里。
+> **时机**: `attack`
+
+```javascript
+// 1. 获取物品内预设的 Buff 模板 (例如 "剑意")
+const buff = thisItem.effects.getName("剑意");
+
+if (buff) {
+    const effectData = buff.toObject();
+    delete effectData._id;
+    effectData.origin = thisItem.uuid;
     
-    // 反向造成真实伤害 (applyDamage 支持 isSkill=false 的普通来源)
-    await args.attacker.applyDamage({
-        amount: reflect,
-        type: "liushi", // 流失/真实伤害
-        isHit: true
-    });
-    ui.notifications.info(`软猬甲反震！造成 ${reflect} 点伤害`);
+    // 2. 应用 Buff
+    // 因为是架招，这个 Buff 通常持续到战斗结束或架招关闭
+    await game.xjzl.api.effects.addEffect(actor, effectData);
+    
+    // ui.notifications.info("架势已展开，剑意流转。");
 }
 ```
 
-### L. 濒死豁免 (如：免死金牌)
-> **场景**: 防御者。气血归零即将进入濒死时触发，免疫此次濒死并回满血，然后消耗掉该物品。
-> **时机**: `dying` (防御者视角)
+**脚本 2 (格挡成功 - 触发特效):**
+> **注意**: 这是防御逻辑。使用 `Macros.checkStance` 辅助函数，它会自动判断：是否开启了架招、攻击是否命中、是否为内/外功、是否被“无视架招”。
+> **时机**: `damaged` (防御者视角)
 
 ```javascript
-// 1. 阻止濒死状态应用
-args.preventDying = true;
+// 1. 核心判断：是否满足架招触发条件
+// 如果没开架招，或者攻击被闪避，或者攻击具有[无视架招]特性，这里会返回 false
+if (!Macros.checkStance(actor, args)) return;
 
-// 2. 回满气血
-await actor.applyHealing({ amount: S.resources.hp.max, type: "hp" });
+// 2. 执行逻辑 (例如：给攻击者施加 "震慑")
+const debuff = thisItem.effects.getName("震慑");
 
-// 3. 提示
-ui.notifications.warn(`${actor.name} 触发免死金牌，满血复活！`);
-
-// 4. 消耗掉物品 (假设是挂在消耗品上的)
-// 或者如果是 buff，则 thisEffect.delete()
-if (thisItem) {
-    await thisItem.delete();
-}
-```
-
-### M. 针对五行属性防御 (如：寒冰真气)
-> **场景**: 防御者。如果受到 **阳(yang)** 或 **刚(gang)** 属性的攻击，利用相克原理减少 20 点伤害。
-> **时机**: `preTake` (受伤前/护盾)
-
-```javascript
-// 检查招式的五行属性 (args.element 或 args.config.element)
-const el = args.element;
-
-// 判断是否为被克制的属性
-if (el === "yang" || el === "gang") {
+if (debuff && args.attacker) {
+    const effectData = debuff.toObject();
+    delete effectData._id;
+    effectData.origin = thisItem.uuid;
+    
+    // 给攻击者 (args.attacker) 上状态
+    await game.xjzl.api.effects.addEffect(args.attacker, effectData);
+    
     // 飘字提示
-    ui.notifications.info(`${actor.name} 寒冰真气化解了 ${el === 'yang' ? '纯阳' : '刚猛'} 之力！`);
-    
-    // 减免 20 点伤害
-    args.output.damage -= 20;
-    
-    // 防止减成负数 (加血)
-    if (args.output.damage < 0) args.output.damage = 0;
+    if (actor.token?.object) {
+        canvas.interface.createScrollingText(actor.token.object.center, "格挡反震！", { 
+            fill: "#FFA500", stroke: "#000000", strokeThickness: 4 
+        });
+    }
 }
 ```
 
