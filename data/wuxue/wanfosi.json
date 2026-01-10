@@ -184,21 +184,26 @@
                 "name": "迦叶微笑",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
                 "description": "强化刚劲与磐石效果。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jiayeweixiao",
+                        "scripts": [
+                            {
+                                "label": "刚劲强化",
+                                "trigger": "calc",
+                                "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gangjin\") && move.name.includes(\"罗汉拳\")) {\n    const bonus = 5 + (args.move.computedLevel >= 2 ? 5 : 0);\n    output.damage += bonus;\n    output.bonusDesc.push(`迦叶微笑 +${bonus}`);\n}"
+                            },
+                            {
+                                "label": "磐石强化",
+                                "trigger": "passive",
+                                "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"panshi\")) {\n    const current = S.combat.block || 0;\n    S.combat.block += current;\n}"
+                            }
+                        ]
+                    }
+                },
                 "duration": {
                     "rounds": 3
-                },
-                "scripts": [
-                    {
-                        "label": "刚劲强化",
-                        "trigger": "calc",
-                        "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gangjin\") && move.name.includes(\"罗汉拳\")) {\n    const bonus = 5 + (args.move.computedLevel >= 2 ? 5 : 0);\n    output.damage += bonus;\n    output.bonusDesc.push(`迦叶微笑 +${bonus}`);\n}"
-                    },
-                    {
-                        "label": "磐石强化",
-                        "trigger": "passive",
-                        "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"panshi\")) {\n    const current = S.combat.block || 0;\n    S.combat.block += current;\n}"
-                    }
-                ]
+                }
             }
         ]
     },
@@ -427,7 +432,8 @@
                         {
                             "label": "添加下盘不稳",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: 2 } });\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -456,7 +462,8 @@
                         {
                             "label": "反击下盘不稳",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const rounds = 1 + (args.move.computedLevel >= 2 ? 1 : 0);\n    await game.xjzl.api.effects.addEffect(args.attacker, { id: \"unstable\", duration: { rounds: rounds } });\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const rounds = 1 + (args.move.computedLevel >= 2 ? 1 : 0);\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -469,7 +476,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>臂力灌注，棍端猛击，造成 0.3 力量点外功伤害。击破架招时，使目标“下盘不稳”两回合。</p><p>若对方已经处于“下盘不稳”，则将其击倒。</p>",
+                    "description": "<p>臂力灌注，棍端猛击，造成伤害。击破架招时，使目标“下盘不稳”两回合。</p><p>若对方已经处于“下盘不稳”，则将其击倒。</p>",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -491,7 +498,8 @@
                         {
                             "label": "击破效果",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const hasUnstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\n    if (hasUnstable) {\n        await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    } else {\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: 2 } });\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const hasUnstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\n    if (hasUnstable) {\n        // 倒地通常不需要改时间，直接传 ID 即可\n        await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    } else {\n        const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n        if (eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { rounds: 2 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -532,7 +540,8 @@
                         {
                             "label": "击飞提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const unstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\n    const prone = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\");\n    if (unstable || prone) {\n        ui.notifications.info(`${args.target.name} 被击飞至半空！(需手动处理)`);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const unstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\n    const prone = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\");\n    if (unstable || prone) {\n        ui.notifications.info(`${args.target.name} 被击飞至半空！(需手动处理)`);\n    }\n}",
+                            "active": true
                         }
                     ]
                 }
@@ -698,13 +707,18 @@
                 "name": "刀木",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
                 "description": "受到刀法招式攻击时，暴击骰-3（更难暴击）。",
-                "scripts": [
-                    {
-                        "label": "降低暴击",
-                        "trigger": "check",
-                        "script": "if (args.move.weaponType === \"blade\") {\n    args.flags.critThresholdMod -= 3;\n}"
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "daomu",
+                        "scripts": [
+                            {
+                                "label": "降低暴击",
+                                "trigger": "check",
+                                "script": "if (args.move.weaponType === \"blade\") {\n    args.flags.critThresholdMod -= 3;\n}"
+                            }
+                        ]
                     }
-                ]
+                }
             },
             {
                 "name": "引燃",
@@ -1047,16 +1061,16 @@
                 "description": "佛门内功时，招式伤害+5。",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "chanxin"
+                        "slug": "chanxin",
+                        "scripts": [
+                            {
+                                "label": "伤害加成",
+                                "trigger": "calc",
+                                "script": "if (thisItem.system.active) { output.damage += 5; output.bonusDesc.push(\"禅心 +5\"); }"
+                            }
+                        ]
                     }
-                },
-                "scripts": [
-                    {
-                        "label": "伤害加成",
-                        "trigger": "calc",
-                        "script": "if (thisItem.system.active) { output.damage += 5; output.bonusDesc.push(\"禅心 +5\"); }"
-                    }
-                ]
+                }
             },
             {
                 "name": "禅意",
@@ -1064,16 +1078,16 @@
                 "description": "佛门内功时，招式伤害+15。",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "chanyi"
+                        "slug": "chanyi",
+                        "scripts": [
+                            {
+                                "label": "伤害加成",
+                                "trigger": "calc",
+                                "script": "if (thisItem.system.active) { output.damage += 15; output.bonusDesc.push(\"禅意 +15\"); }"
+                            }
+                        ]
                     }
-                },
-                "scripts": [
-                    {
-                        "label": "伤害加成",
-                        "trigger": "calc",
-                        "script": "if (thisItem.system.active) { output.damage += 15; output.bonusDesc.push(\"禅意 +15\"); }"
-                    }
-                ]
+                }
             },
             {
                 "name": "禅法",
@@ -1081,16 +1095,16 @@
                 "description": "佛门内功时，招式伤害+20。",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "chanfa"
+                        "slug": "chanfa",
+                        "scripts": [
+                            {
+                                "label": "伤害加成",
+                                "trigger": "calc",
+                                "script": "if (thisItem.system.active) { output.damage += 20; output.bonusDesc.push(\"禅法 +20\"); }"
+                            }
+                        ]
                     }
-                },
-                "scripts": [
-                    {
-                        "label": "伤害加成",
-                        "trigger": "calc",
-                        "script": "if (thisItem.system.active) { output.damage += 20; output.bonusDesc.push(\"禅法 +20\"); }"
-                    }
-                ]
+                }
             }
         ]
     },
@@ -1289,7 +1303,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>三千世界，皆为尘埃，别棍搅势，对周围 3 米范围内敌人造成 0.4 力量点外功伤害。</p><p>若自身存在“伏魔”，还可将目标击倒。</p>",
+                    "description": "<p>三千世界，皆为尘埃，别棍搅势，对周围 3 米范围内敌人造成伤害。</p><p>若自身存在“伏魔”，还可将目标击倒。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伏魔击倒自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1311,7 +1326,8 @@
                         {
                             "label": "伏魔击倒",
                             "trigger": "hit",
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fumo\")) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
+                            "script": "// 检查自身是否有伏魔状态\n// [修正] Collection API 和 位置错误\nconst hasFumo = !!actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fumo\");\nif (hasFumo) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(`${args.target.name} 被伏魔劲气击倒！`);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -1324,7 +1340,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>垂目观世态炎凉，累善行慈悲为怀。开启架招。成功格挡时，给自身添加“伏魔”状态，持续一回合。</p><p><b>伏魔</b>：你对[恶][邪]的目标出招时招式伤害+10。</p>",
+                    "description": "<p>垂目观世态炎凉，累善行慈悲为怀。开启架招。成功格挡时，给自身添加“伏魔”状态，持续一回合。</p><p><b>伏魔</b>：你对[恶][邪]的目标出招时招式伤害+10。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。2级后伏魔持续时间+1回合。</p>",
+                    "automationNote": "格挡获伏魔自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1340,7 +1357,8 @@
                         {
                             "label": "格挡获得伏魔",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName(\"伏魔\");\n    if (effect) {\n        const data = effect.toObject();\n        if (args.move.computedLevel >= 2) data.duration.rounds += 1;\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName(\"伏魔\");\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        \n        // [修正] 正确获取当前架招等级\n        const stanceId = actor.system.martial.stance;\n        const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n        const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n        // 2级以上增加持续时间\n        if (lvl >= 2) {\n             data.duration.rounds = 2;\n        }\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -1353,7 +1371,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，旋棍突击，对目标造成 0.6 力量点外功伤害。</p><p>可消耗自身 10 点气血，使目标流失 10 点内力。</p>",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，旋棍突击，对目标造成伤害。</p><p>可消耗自身 10 点气血，使目标流失 10 点内力。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "手动处理血换蓝。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1375,7 +1394,8 @@
                         {
                             "label": "以血换蓝提示",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"可手动扣除自身10HP，并扣除目标10MP。\");"
+                            "script": "ui.notifications.info(\"提示：可手动扣除自身10HP，并扣除目标10MP。\");",
+                            "active": true
                         }
                     ]
                 },
@@ -1389,7 +1409,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>扫棍狂舞，旋风打叶。对周围范围内敌人造成 0.6 力量点外功伤害。</p><p>对倒地目标招式伤害+10。</p><p>若自身存在“伏魔”，还可将目标击倒。</p>",
+                    "description": "<p>扫棍狂舞，旋风打叶。对周围范围内敌人造成伤害。</p><p>对倒地目标招式伤害+10。</p><p>若自身存在“伏魔”，还可将目标击倒。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+8，怒气消耗-1。</p>",
+                    "automationNote": "倒地增伤自动。伏魔击倒自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1416,16 +1437,19 @@
                         {
                             "label": "倒地增伤",
                             "trigger": "preDamage",
-                            "script": "if (args.target && args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n    args.config.amount += 10;\n}"
+                            "script": "// 直接读取系统维护的 xjzlStatuses.prone 状态\nif (args.target && args.target.xjzlStatuses.prone) {\n    args.config.amount += 10;\n    ui.notifications.info(\"目标倒地，普度众生伤害+10！\");\n}",
+                            "active": true
                         },
                         {
                             "label": "伏魔击倒",
                             "trigger": "hit",
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fumo\")) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
+                            "script": "const hasFumo = !!actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fumo\");\nif (hasFumo) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(`${args.target.name} 被伏魔劲气击倒！`);\n}",
+                            "active": true
                         }
                     ]
                 }
-            ]
+            ],
+            "scripts": []
         },
         "effects": [
             {
@@ -1437,16 +1461,19 @@
                 },
                 "flags": {
                     "xjzl-system": {
-                        "slug": "fumo"
+                        "slug": "fumo",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "伏魔增伤",
+                                "trigger": "preDamage",
+                                "active": true,
+                                "script": "// --- 调试模式 ---\nconsole.log(\"XJZL | 伏魔检查目标:\", args.target?.name);\nif (args.target) {\n    const xiayi = args.target.system.social.xiayi || 0;\n    const exing = args.target.system.social.exing || 0;\n    \n    console.log(`XJZL | 目标数值: 恶行=${exing}, 侠义=${xiayi}`);\n\n    if (exing >= 100 && xiayi <= 50) {\n        console.log(\"XJZL | 伏魔生效!\");\n        args.config.amount += 10;\n        ui.notifications.info(`伏魔生效：对邪恶目标 [${args.target.name}] 伤害+10！`);\n    } else {\n        console.log(\"XJZL | 伏魔未生效: 目标不是大奸大恶之徒\");\n    }\n}"
+                            }
+                        ]
                     }
                 },
-                "scripts": [
-                    {
-                        "label": "伏魔增伤",
-                        "trigger": "preDamage",
-                        "script": "if (args.target) {\n    const xiayi = args.target.system.social.xiayi;\n    const exing = args.target.system.social.exing;\n    if (exing >= 100 && xiayi <= 50) {\n        args.config.amount += 10;\n    }\n}"
-                    }
-                ]
+                "changes": []
             }
         ]
     },
@@ -1803,7 +1830,14 @@
                     "xjzl-system": {
                         "slug": "yuanli",
                         "stackable": true,
-                        "maxStacks": 3
+                        "maxStacks": 3,
+                        "scripts": [
+                            {
+                                "label": "虚招增伤",
+                                "trigger": "calc",
+                                "script": "if (move.type === \"feint\") {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    output.damage += 10 * stacks;\n    output.bonusDesc.push(`愿力 +${10 * stacks}`);\n}"
+                            }
+                        ]
                     }
                 },
                 "changes": [
@@ -1811,13 +1845,6 @@
                         "key": "flags.xjzl-system.feintLevel",
                         "mode": 2,
                         "value": "1"
-                    }
-                ],
-                "scripts": [
-                    {
-                        "label": "虚招增伤",
-                        "trigger": "calc",
-                        "script": "if (move.type === \"feint\") {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    output.damage += 10 * stacks;\n    output.bonusDesc.push(`愿力 +${10 * stacks}`);\n}"
                     }
                 ]
             },
@@ -1827,16 +1854,16 @@
                 "description": "佛门内功时，招式伤害+5。",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "chanxin"
+                        "slug": "chanxin",
+                        "scripts": [
+                            {
+                                "label": "伤害加成",
+                                "trigger": "calc",
+                                "script": "if (thisItem.system.active) { output.damage += 5; output.bonusDesc.push(\"禅心 +5\"); }"
+                            }
+                        ]
                     }
-                },
-                "scripts": [
-                    {
-                        "label": "伤害加成",
-                        "trigger": "calc",
-                        "script": "if (thisItem.system.active) { output.damage += 5; output.bonusDesc.push(\"禅心 +5\"); }"
-                    }
-                ]
+                }
             }
         ]
     },
@@ -2793,16 +2820,16 @@
                 "description": "视为持剑，徒手施展八部天龙剑时叠加化身。",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "wuxue_babu_tianlong"
+                        "slug": "wuxue_babu_tianlong",
+                        "scripts": [
+                            {
+                                "label": "徒手加化身",
+                                "trigger": "hit",
+                                "script": "// 检查是否徒手且使用的是本武学的招式\nif (args.move.weaponType === 'unarmed' && args.item.id === thisItem.id) {\n    const effectData = thisItem.effects.find(e => e.name === \"化身\");\n    if (effectData) await game.xjzl.api.effects.addEffect(actor, effectData.toObject());\n}"
+                            }
+                        ]
                     }
-                },
-                "scripts": [
-                    {
-                        "label": "徒手加化身",
-                        "trigger": "hit",
-                        "script": "// 检查是否徒手且使用的是本武学的招式\nif (args.move.weaponType === 'unarmed' && args.item.id === thisItem.id) {\n    const effectData = thisItem.effects.find(e => e.name === \"化身\");\n    if (effectData) await game.xjzl.api.effects.addEffect(actor, effectData.toObject());\n}"
-                    }
-                ]
+                }
             },
             {
                 "name": "化身：天众",
@@ -2941,16 +2968,16 @@
                 "description": "伤害类型转为毒素。",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "wuxue_babu_mohuluojia"
+                        "slug": "wuxue_babu_mohuluojia",
+                        "scripts": [
+                            {
+                                "label": "毒素转化",
+                                "trigger": "preDamage",
+                                "script": "args.config.type = 'poison';"
+                            }
+                        ]
                     }
-                },
-                "scripts": [
-                    {
-                        "label": "毒素转化",
-                        "trigger": "preDamage",
-                        "script": "args.config.type = 'poison';"
-                    }
-                ]
+                }
             }
         ]
     },
@@ -3735,17 +3762,17 @@
                         "xjzl-system": {
                             "slug": "yeli",
                             "stackable": true,
-                            "maxStacks": 9
+                            "maxStacks": 9,
+                            "scripts": [
+                                {
+                                    "label": "业力-出招后移除",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "if (thisEffect) await game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 99);"
+                                }
+                            ]
                         }
-                    },
-                    "scripts": [
-                        {
-                            "label": "业力-出招后移除",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (thisEffect) await game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 99);"
-                        }
-                    ]
+                    }
                 }
             ]
         }

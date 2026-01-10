@@ -269,6 +269,25 @@ export async function seedWuxue() {
         // AI生成的JSON 似乎有时候会把 effects 写在 system 里，这里做一下兼容性的查找
         const rawEffects = d.effects || d.system?.effects || [];
         const effects = rawEffects.map(e => {
+            // === 自动修复逻辑：根目录 scripts 迁移 ===
+            if (e.scripts) {
+                // 严厉校验：如果有 scripts 但连 flags 对象都没有，视为严重结构错误，直接阻断
+                if (!e.flags) {
+                    const errMsg = `[XJZL Import Error] 武学 [${d.name}] 的特效 [${e.name}] 在根目录定义了 scripts，但完全缺失 flags 字段。导入已紧急停止。`;
+                    ui.notifications.error(errMsg);
+                    console.error(e); // 打印出错的对象以便调试
+                    throw new Error(errMsg); // 抛出错误以停止 Promise 执行
+                }
+
+                // 确保 xjzl-system 命名空间存在
+                if (!e.flags["xjzl-system"]) e.flags["xjzl-system"] = {};
+
+                // 执行迁移：将根目录的 scripts 移动到 flags.xjzl-system 下
+                e.flags["xjzl-system"].scripts = e.scripts;
+
+                console.warn(`XJZL Seeder | ⚠️ 自动修复: 已将特效 [${e.name}] 的脚本移动至 flags 正确位置。`);
+            }
+            // ================================================
             // 基础结构
             const effectData = {
                 name: e.name,

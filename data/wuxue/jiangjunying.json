@@ -838,24 +838,34 @@
                     "duration": {
                         "rounds": 2
                     },
-                    "scripts": [
-                        {
-                            "trigger": "hit",
-                            "label": "威风士气变动",
-                            "script": "if (args.type === 'attack') { await actor.update({'system.resources.morale.value': S.resources.morale.value + 5}); if (args.target.system?.resources?.morale) await args.target.update({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - 5)}); }"
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "weifeng",
+                            "scripts": [
+                                {
+                                    "trigger": "hit",
+                                    "label": "威风士气变动",
+                                    "script": "if (args.type === 'attack') { await actor.update({'system.resources.morale.value': S.resources.morale.value + 5}); if (args.target.system?.resources?.morale) await args.target.update({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - 5)}); }"
+                                }
+                            ]
                         }
-                    ]
+                    }
                 },
                 {
                     "name": "骠骑",
                     "icon": "icons/svg/horse.svg",
                     "description": "马匹速度+5，下一次攻击提升马匹速度*1 的伤害。",
-                    "scripts": [
-                        {
-                            "trigger": "calc",
-                            "script": "const speed = S.combat.speedTotal || 0; const ratio = 1 + (args.move.computedLevel - 1); args.output.damage += speed * ratio; args.output.bonusDesc.push('骠骑冲锋加成'); await thisEffect.delete();"
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "piaoqi",
+                            "scripts": [
+                                {
+                                    "trigger": "calc",
+                                    "script": "const speed = S.combat.speedTotal || 0; const ratio = 1 + (args.move.computedLevel - 1); args.output.damage += speed * ratio; args.output.bonusDesc.push('骠骑冲锋加成'); await thisEffect.delete();"
+                                }
+                            ]
                         }
-                    ]
+                    }
                 }
             ]
         }
@@ -1234,12 +1244,17 @@
                             "value": 10
                         }
                     ],
-                    "scripts": [
-                        {
-                            "trigger": "turnStart",
-                            "script": "await actor.update({'system.resources.morale.value': S.resources.morale.value + 10}); ui.notifications.info('怒发冲冠: 士气+10');"
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "nufachongguan",
+                            "scripts": [
+                                {
+                                    "trigger": "turnStart",
+                                    "script": "await actor.update({'system.resources.morale.value': S.resources.morale.value + 10}); ui.notifications.info('怒发冲冠: 士气+10');"
+                                }
+                            ]
                         }
-                    ]
+                    }
                 }
             ]
         }
@@ -1400,15 +1415,16 @@
                     "flags": {
                         "xjzl-system": {
                             "stackable": true,
-                            "maxStacks": 3
+                            "maxStacks": 3,
+                            "slug": "zhanyi",
+                            "scripts": [
+                                {
+                                    "trigger": "turnStart",
+                                    "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1; await actor.update({'system.resources.morale.value': S.resources.morale.value + (5 * stacks)}); ui.notifications.info('战意回复士气');"
+                                }
+                            ]
                         }
-                    },
-                    "scripts": [
-                        {
-                            "trigger": "turnStart",
-                            "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1; await actor.update({'system.resources.morale.value': S.resources.morale.value + (5 * stacks)}); ui.notifications.info('战意回复士气');"
-                        }
-                    ]
+                    }
                 },
                 {
                     "name": "溃散",
@@ -1417,12 +1433,17 @@
                     "duration": {
                         "rounds": 1
                     },
-                    "scripts": [
-                        {
-                            "trigger": "turnStart",
-                            "script": "if(S.resources.morale) await actor.update({'system.resources.morale.value': Math.max(0, S.resources.morale.value - 20)}); ui.notifications.info('溃散流失士气');"
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "kuisan",
+                            "scripts": [
+                                {
+                                    "trigger": "turnStart",
+                                    "script": "if(S.resources.morale) await actor.update({'system.resources.morale.value': Math.max(0, S.resources.morale.value - 20)}); ui.notifications.info('溃散流失士气');"
+                                }
+                            ]
                         }
-                    ]
+                    }
                 },
                 {
                     "name": "金鼓",
@@ -1432,12 +1453,17 @@
                         "rounds": 3
                     },
                     "transfer": false,
-                    "scripts": [
-                        {
-                            "trigger": "turnStart",
-                            "script": "await actor.update({'system.resources.morale.value': S.resources.morale.value + 10});"
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jingu",
+                            "scripts": [
+                                {
+                                    "trigger": "turnStart",
+                                    "script": "await actor.update({'system.resources.morale.value': S.resources.morale.value + 10});"
+                                }
+                            ]
                         }
-                    ]
+                    }
                 }
             ]
         }
@@ -1961,16 +1987,16 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "haoling_5",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "包抄夹击-触发",
+                                "trigger": "hit",
+                                "script": "if (args.type === 'attack' && args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'unstable');\n}"
+                            }
+                        ]
                     }
-                },
-                "scripts": [
-                    {
-                        "label": "包抄夹击-触发",
-                        "trigger": "hit",
-                        "script": "if (args.type === 'attack' && args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'unstable');\n}"
-                    }
-                ]
+                }
             },
             {
                 "name": "号令-破军诛将",
