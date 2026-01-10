@@ -1739,8 +1739,8 @@
                     "scripts": [
                         {
                             "label": "获得护体&挂载监测",
-                            "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst huti = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({amount: huti, type: \"huti\"});\n\nconst eff = thisItem.effects.getName(\"薄雾浓云-转化\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "trigger": "attack",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst hutiVal = 10 + (lvl - 1) * 10;\n// 1. 获得护体 (使用 applyHealing 会有飘字反馈)\nawait actor.applyHealing({amount: hutiVal, type: \"huti\"});\n\n// 2. 挂载转化监测\nconst eff = thisItem.effects.getName(\"薄雾浓云-转化\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -1819,7 +1819,7 @@
                         {
                             "label": "转化护体",
                             "trigger": "turnStart",
-                            "script": "const huti = actor.system.resources.huti || 0; if (huti > 0) { await actor.applyHealing({amount: huti, type: 'hp'}); await actor.update({'system.resources.huti': 0}); ui.notifications.info('薄雾浓云：护体转化为气血'); } await thisEffect.delete();",
+                            "script": "const huti = actor.system.resources.huti || 0;\nif (huti > 0) {\n    // 转化回血\n    await actor.applyHealing({amount: huti, type: 'hp'});\n    // 清空护体\n    await actor.update({'system.resources.huti': 0});\n    // 视觉提示\n    if (actor.token?.object) {\n        canvas.interface.createScrollingText(actor.token.object.center, \"护体转化\", { fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4 });\n    }\n}\n// 无论是否触发转化，回合开始后监测即结束\nawait thisEffect.delete();",
                             "active": true
                         }
                     ]
@@ -1849,7 +1849,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>消耗自身所有“清气”状态，每消耗一层，选择“真”“玄”“神”三个状态中的一个获得，持续到战斗脱离。</p><p><strong>升级：</strong>怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "选择状态自动。",
+                    "automationNote": "完全自动化：自动检测层数并串行弹出选择窗口。",
                     "costs": {
                         "mp": [
                             4,
@@ -1866,7 +1866,7 @@
                         {
                             "label": "转化清气",
                             "trigger": "hit",
-                            "script": "const qingqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qingqi\");\nif (!qingqi) return ui.notifications.warn(\"没有清气！\");\n\nconst stacks = qingqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait qingqi.delete();\n\n// 简单循环弹出对话框选择\nfor (let i = 0; i < stacks; i++) {\n    new Dialog({\n        title: `选择第 ${i+1} 个状态`,\n        buttons: {\n            zhen: { label: \"真\", callback: async () => await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"三清-真\").toObject()) },\n            xuan: { label: \"玄\", callback: async () => await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"三清-玄\").toObject()) },\n            shen: { label: \"神\", callback: async () => await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"三清-神\").toObject()) }\n        }\n    }).render(true);\n}",
+                            "script": "const qingqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qingqi\");\nif (!qingqi) return ui.notifications.warn(\"没有清气！\");\n\nconst stacks = qingqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait qingqi.delete();\n\nconst { DialogV2 } = foundry.applications.api;\n\n// 串行执行选择，防止弹窗炸裂\nfor (let i = 0; i < stacks; i++) {\n    const choice = await DialogV2.wait({\n        window: { title: `剑化三清 (${i + 1}/${stacks})`, icon: \"fas fa-yin-yang\" },\n        content: \"<p>道生一，一生二，二生三。请选择化生之相：</p>\",\n        buttons: [\n            { action: \"zhen\", label: \"真 (必中)\", icon: \"fas fa-check-circle\" },\n            { action: \"xuan\", label: \"玄 (暴击)\", icon: \"fas fa-bolt\" },\n            { action: \"shen\", label: \"神 (移除)\", icon: \"fas fa-eraser\" }\n        ],\n        close: () => null\n    });\n\n    if (!choice) break;\n\n    let effectName = \"\";\n    if (choice === \"zhen\") effectName = \"三清-真\";\n    if (choice === \"xuan\") effectName = \"三清-玄\";\n    if (choice === \"shen\") effectName = \"三清-神\";\n\n    const eff = thisItem.effects.getName(effectName)?.toObject();\n    if (eff) {\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1881,7 +1881,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>擎剑刺出，对目标造成伤害，击破架招时移除目标身上的一个状态。</p><p>消耗“真”：招式必定命中。</p><p>消耗“玄”：招式虚招值+3。</p><p>消耗“神”：击破架招时，可移除目标三个地级及以下状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "效果均为手动。",
+                    "automationNote": "所有消耗效果均为手动，请玩家在出招时自行决定是否移除状态并调整数值（如虚招值+3在弹窗中输入）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1899,14 +1899,7 @@
                             6
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "提示",
-                            "trigger": "calc",
-                            "script": "ui.notifications.info(\"真：必中。玄：虚招+3。神：击破移除3个状态。请玩家手动执行。\");",
-                            "active": true
-                        }
-                    ]
+                    "scripts": []
                 },
                 {
                     "name": "乾坤合一",
@@ -1918,7 +1911,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>剑气翻涌，对目标造成伤害。若你具有状态，招式伤害+10 点。</p><p>消耗“真”：招式距离+3 米且变为范围伤害。</p><p>消耗“玄”：招式暴击骰-3。</p><p>消耗“神”：自身每有一种状态招式伤害再+10（至多+30）。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "状态基础加伤自动。其他消耗效果手动。",
+                    "automationNote": "被动加伤自动（检测是否拥有状态）。消耗效果（范围、暴击骰、额外加伤）均为手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1938,9 +1931,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "状态加伤",
+                            "label": "被动状态加伤",
                             "trigger": "calc",
-                            "script": "const hasState = actor.effects.some(e => [\"sanqing_zhen\", \"sanqing_xuan\", \"sanqing_shen\"].includes(e.getFlag(\"xjzl-system\", \"slug\")));\nif (hasState) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"状态加成 +10\");\n}",
+                            "script": "// 仅处理“若你具有状态”的被动加成，不涉及消耗，安全自动\nconst states = [\"sanqing_zhen\", \"sanqing_xuan\", \"sanqing_shen\"];\nconst activeStates = actor.effects.filter(e => states.includes(e.getFlag(\"xjzl-system\", \"slug\")));\n\nif (activeStates.length > 0) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"三清状态被动 +10\");\n}",
                             "active": true
                         }
                     ]
@@ -1955,7 +1948,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>持剑运气，开启架招。格挡成功时获得一层“清气”，至多三层，持续到脱战。</p><p><strong>清气：</strong>每层使自身回合末回复 5 点气血、内力。</p><p>消耗“真”：架招额外提供 20 点格挡值。</p><p>消耗“玄”：立即获得一层清气。</p><p>消耗“神”：移除自身一个地级及以下的状态。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡获清气自动。",
+                    "automationNote": "格挡获清气自动。消耗效果手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2297,6 +2290,9 @@
                     "icon": "icons/magic/nature/leaf-glow-teal.webp",
                     "description": "你无法被以单体为目标的招式选中。",
                     "transfer": false,
+                    "duration": {
+                        "rounds": 1
+                    },
                     "flags": {
                         "xjzl-system": {
                             "slug": "qingping",
@@ -2310,6 +2306,9 @@
                     "icon": "icons/magic/nature/leaf-glow-teal.webp",
                     "description": "你无法被以单体为目标的招式选中。若已有青萍，改为无法被招式选中。",
                     "transfer": false,
+                    "duration": {
+                        "rounds": 1
+                    },
                     "flags": {
                         "xjzl-system": {
                             "slug": "qingping_ultimate",
@@ -3219,7 +3218,7 @@
                     "targetInfo": "自身",
                     "actionCost": "无",
                     "description": "<p>你的[道法]等级+1。<br>·休整时，可以炼精化气，炼气化神，获得“内丹”，持续到下一次进行休整。<br>内丹：内力上限降低 10 点，招式伤害提升[道法]*1 点。<br>升级：内力上限额外降低 10 点，招式伤害提升额外增加[道法]等级点。</p>",
-                    "automationNote": "伤害加成、内力上限降低自动化。",
+                    "automationNote": "完全自动化。道法等级常驻增加；使用招式时，脚本会根据当前的武学等级和道法等级，一次性计算好最终数值并应用“内丹”状态。状态为纯数值修正，无性能消耗。",
                     "costs": {
                         "mp": [
                             0,
@@ -3245,13 +3244,13 @@
                             "label": "被动：道法加成",
                             "trigger": "passive",
                             "active": true,
-                            "script": "S.arts.daofa.mod += 1;"
+                            "script": "S.arts.daofa.mod = (S.arts.daofa.mod || 0) + 1;"
                         },
                         {
-                            "label": "获得内丹",
-                            "trigger": "attack",
+                            "label": "应用内丹(动态快照)",
+                            "trigger": "hit",
                             "active": true,
-                            "script": "const source = thisItem.effects.getName(\"内丹\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    \n    // 动态计算 Max MP 减少量\n    const reduceMp = move.level >= 2 ? -20 : -10;\n    // 找到并修改 change 值\n    const mpChange = effectData.changes.find(c => c.key === \"system.resources.mp.max\");\n    if (mpChange) mpChange.value = String(reduceMp);\n    \n    await game.xjzl.api.effects.addEffect(attacker, effectData);\n    args.flags.autoApplied = true;\n}"
+                            "script": "// 1. 获取基础数据\nconst lvl = move.computedLevel || 1;\nconst daofa = actor.system.arts.daofa.total || 0;\n\n// 2. 计算数值 (快照)\n// 1级减10，2级以上减20\nconst mpReduce = (lvl >= 2) ? -20 : -10;\n// 1级1倍，2级以上2倍\nconst multiplier = (lvl >= 2) ? 2 : 1;\nconst dmgBonus = daofa * multiplier;\n\n// 3. 获取并修改 AE 模板\nconst sourceEffect = thisItem.effects.getName(\"内丹\");\nif (sourceEffect) {\n    // 转换为普通对象以便修改\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n\n    // 动态构建 changes 数组\n    effectData.changes = [\n        {\n            key: \"system.resources.mp.max\",\n            mode: 2, // ADD\n            value: String(mpReduce)\n        },\n        {\n            key: \"system.combat.damages.skill.mod\",\n            mode: 2, // ADD\n            value: String(dmgBonus)\n        }\n    ];\n\n    // 4. 应用 (管理器会自动处理同 Slug 覆盖)\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${actor.name} 结成内丹 (内力${mpReduce}, 伤害+${dmgBonus})`);\n}"
                         }
                     ]
                 }
@@ -3261,25 +3260,11 @@
                     "name": "内丹",
                     "icon": "icons/commodities/materials/orb-energy-white.webp",
                     "description": "内力上限降低，招式伤害提升。",
-                    "changes": [
-                        {
-                            "key": "system.resources.mp.max",
-                            "mode": 2,
-                            "value": "-10"
-                        }
-                    ],
+                    "changes": [],
                     "flags": {
                         "xjzl-system": {
                             "slug": "neidan",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "内丹伤害加成",
-                                    "trigger": "calc",
-                                    "active": true,
-                                    "script": "const lvl = thisItem.system.moves.find(m => m.name === '内丹术')?.computedLevel || 1;\nconst daofa = actor.system.arts.daofa.total || 0;\nconst multiplier = lvl >= 2 ? 2 : 1;\nconst bonus = daofa * multiplier;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`内丹 +${bonus}`);"
-                                }
-                            ]
+                            "stackable": false
                         }
                     }
                 }
