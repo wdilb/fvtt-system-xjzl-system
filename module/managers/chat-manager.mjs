@@ -1131,6 +1131,7 @@ export class ChatCardManager {
         // 3. 准备全局统计 (用于 HIT_ONCE)
         const summary = [];
         let hitCount = 0;
+        let validRageHits = 0; // 用于统计实际有效的可以回复怒气的目标数
 
         // 4. 遍历目标
         for (const target of targets) {
@@ -1188,6 +1189,13 @@ export class ChatCardManager {
             const safeKey = uuid.replaceAll(".", "_");
             const feintStatus = feintResults[safeKey];
             const isBroken = (feintStatus === "broken");
+            if (isHit) {
+                const currentStance = targetActor.system.martial.stanceActive;
+                // 如果没有开架招、击破了、或者忽略了才算是有效的回怒目标
+                if (!currentStance || isBroken || ignoreStance) {
+                    validRageHits++;
+                }
+            }
             // =====================================================
             // 把击破架招移动到这里来处理
             // =====================================================
@@ -1373,7 +1381,7 @@ export class ChatCardManager {
         // 放在这里执行满足 "AOE只回1点" 的需求
         // A. 攻击者回怒 (Attacker Rage)
         // 规则：只要本次出招命中了至少一个敌人，且是内外功伤害，攻击者回复 1 点怒气
-        if (hitCount > 0) {
+        if (validRageHits > 0) {
             const attRage = attacker.system.resources.rage;
             // 检查封穴状态
             const attNoRecover = attacker.xjzlStatuses?.noRecoverRage;
