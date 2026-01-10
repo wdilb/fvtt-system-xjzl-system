@@ -1365,7 +1365,13 @@ export class ChatCardManager {
                 ...resultEntry, // 展开上面的结果
                 attacker: attacker,
                 item: item,
-                move: move
+                move: move,
+                // 添加一些参数和_applyHeal保持一致
+                type: "attack",       // 明确类型
+                isAttack: true,       // 明确标记
+                isHeal: false,
+                isBuff: false,
+                isManual: false,      // 默认非手动，如果是 _handleManualDamage 会覆盖这个
             };
 
             // 无论命中与否都执行，脚本内自己判断 if (args.isHit)

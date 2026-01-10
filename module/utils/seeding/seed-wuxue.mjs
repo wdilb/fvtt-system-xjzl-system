@@ -23,7 +23,24 @@ const SECT_MAP = {
     "jiangjunying": "将军营",
     "wanshoushanzhuang": "万兽山庄",
     "baicaoge": "百草阁",
-    // "jianghushili": "江湖势力"
+    "jianghushili": "江湖势力"
+};
+
+/**
+ * 文件列表配置
+ * 如果某个门派有多个 JSON 文件，或者文件名不符合默认命名规则，请在此处列出。
+ * 格式：门派Key: ["文件名1", "文件名2"]
+ */
+const MULTI_FILE_CONFIG = {
+    "jianghushili": [
+        "jianghu_base",      // 基础武学
+        "menpai_scattered",  // 散落门派
+        "secret_manuals",    // 绝世秘籍
+        "common_martial"     // 常用武艺
+        // 以后每增加一个 JSON，只需在这里添加文件名即可
+    ],
+    // 如果其他门派也变多了，也可以支持：
+    // "gaibang": ["gaibang_low", "gaibang_high"]
 };
 
 /**
@@ -143,11 +160,13 @@ export async function seedWuxue() {
         let filesToFetch = [];
 
         // 处理江湖势力多文件的情况
-        if (sect === "jianghushili") {
-            for (let i = 1; i <= 10; i++) {
-                filesToFetch.push(`systems/xjzl-system/data/wuxue/${sect}${i}.json`);
-            }
-        } else {
+        if (MULTI_FILE_CONFIG[sect]) {
+            // 如果在配置表里，则遍历数组生成路径
+            filesToFetch = MULTI_FILE_CONFIG[sect].map(fileName =>
+                `systems/xjzl-system/data/wuxue/${fileName}.json`
+            );
+        } else if (sect !== "jianghushili") {
+            // 否则，按默认规则：门派Key.json
             filesToFetch.push(`systems/xjzl-system/data/wuxue/${sect}.json`);
         }
 
