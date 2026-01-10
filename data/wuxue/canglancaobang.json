@@ -1,0 +1,1317 @@
+[
+    {
+        "name": "山海剑式",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>本名《沧澜剑法》，平平无奇的剑招，只有招式名称好听。</p><p><strong>需求：</strong>剑-重剑</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "剑-重剑",
+            "moves": [
+                {
+                    "name": "水何澹澹",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "范围(最多2名)",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，腰转臂舞，挥剑横扫，对范围内最多两名敌人造成 0.3 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "伤害计算自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "洪波涌起",
+                    "type": "qi",
+                    "actionType": "attack",
+                    "element": "gang",
+                    "damageType": "liushi",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "反应动作",
+                    "description": "<p>受到伤害后，可消耗反应动作施展此招，举剑高悬，内力如潮喷涌，使周围敌人流失 5 点气血。</p><p>·你可以选择额外消耗 5 内力，让周围敌人再流失 5 点气血。</p><p><strong>升级：</strong>释放距离+1，消耗内力额外流失气血+5。</p>",
+                    "automationNote": "反应动作手动。施展时弹窗询问是否消耗额外内力增强效果。",
+                    "calculation": {
+                        "base": 5,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "额外消耗询问",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst extraLoss = 5 + (lvl - 1) * 5;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"洪波涌起\" },\n    content: `<p>是否额外消耗 5 点内力，使敌人再流失 <b>${extraLoss}</b> 点气血？</p>`,\n    yes: { label: \"消耗并增强\", icon: \"fas fa-check\" },\n    no: { label: \"仅基础效果\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    const currentMp = actor.system.resources.mp.value;\n    if (currentMp < 5) {\n        ui.notifications.warn(\"内力不足，无法增强！\");\n    } else {\n        await actor.update({\"system.resources.mp.value\": currentMp - 5});\n        args.flags.damageResult.damage += extraLoss;\n        args.flags.damageResult.breakdown += `\\n+ 额外内力增强: ${extraLoss}`;\n        ui.notifications.info(\"已消耗 5 内力增强洪波涌起\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "山岛竦峙",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，倒悬重剑，无锋映影，开启架招。格挡成功后回复 5 点内力。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "格挡回蓝自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡回蓝",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nawait actor.applyHealing({amount: 5, type: \"mp\", showScrolling: true});"
+                        }
+                    ]
+                },
+                {
+                    "name": "星汉灿烂",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "直线/范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，内力爆发如悬河注水，剑气迸射而出，对前方直线路径敌人造成 0.5 力量点内功伤害，并击飞自身周围 1 米范围内的所有敌人。</p><p><strong>升级：</strong>招式伤害+10，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "击飞效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const dist = canvas.grid.measureDistance(actor.token.object.center, args.target.token.object.center);\n    if (dist <= 1.5) {\n        ui.notifications.info(`${args.target.name} 位于1米内，请手动 [击飞]`);\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "孤峰狂剑",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>渊渟岳峙，孤而不独，傲而不骄。</p><p><strong>需求：</strong>剑-重剑</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "剑-重剑",
+            "moves": [
+                {
+                    "name": "砥柱中流",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，力劈而下，势不可挡，对敌人造成 0.5 力量点外功伤害。若本次攻击被敌人成功格挡，可倾注全力，立即消耗自身 20 点内力，使其架招的格挡成功的特效不触发。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "抵消格挡特效手动 (需手动扣蓝并通知GM)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "壁立千仞",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，抡剑回转，狂猛无俦 chóu，对范围内所有敌人造成 0.4 力量点外功伤害。</p><p>若击中无架招敌人，还会将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(`${args.target.name} 无架招，请手动 [击飞 1 米]`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "气冲霄汉",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，平举重剑，蔑视宵小，开启架招。受到有锋、刃、尖的武器的攻击且格挡成功后，可立即不消耗动作施展一次【壁立千仞】，然后解除自身架招。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "反击触发提示自动。不消耗动作施展手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "反击判定",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\"><b>气冲霄汉 - 反击判定</b></div>\n        <div style=\"font-size:0.9em; padding:5px;\">\n            <p>格挡成功！请确认攻击者武器是否为 <b>有锋、刃、尖</b>。</p>\n            <p>若是，请手动：</p>\n            <ol>\n                <li>解除架招</li>\n                <li>免费施展 <b>[壁立千仞]</b></li>\n            </ol>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "石破天惊",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "10米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，千钧一掷，对前方直线范围内的所有敌人造成 0.7 力量点外功伤害，并将所有命中的敌人击退至招式距离范围内最远一名敌人身前，由近到远依次排布。</p><p>·范围内每有一名敌人，招式伤害+10。</p><p>若有敌人在半空中，可以消耗反应动作施展此招，原地掷出重剑并将其击倒。</p><p>·重剑会掉落在命中的第一名敌人附近 1 米；</p><p>·你贴近重剑后需要用一个简要动作将其捡起；</p><p>·敌人可以贴近重剑后用一个主要动作将其捡起。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+8。</p>",
+                    "automationNote": "人数增伤自动。击退/击倒/武器掉落/反应动作均为手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "人数增伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const targetCount = args.flags.damageResult.targets?.length || game.user.targets.size || 0;\nif (targetCount > 0) {\n    const bonus = targetCount * 10;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 人数增伤 (${targetCount}人): ${bonus}`;\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "啸海绝剑",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>气吞湖海，静则风平浪静，动掀惊涛骇浪。</p><p><strong>需求：</strong>剑-重剑</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑-重剑",
+            "moves": [
+                {
+                    "name": "潮涌三叠",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，剑气鼓震，内力侵扰，对敌人造成 0.5 力量点内功伤害，并获得一层“蓄劲”，至多 3 层，持续到战斗脱离。</p><p>造成暴击时，还会给敌人添加一层“乏力”，至多三层，持续到战斗脱离。</p><p><strong>蓄劲：</strong>每层使你暴击骰-1。</p><p><strong>乏力：</strong>每层使招式伤害-10。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "蓄劲(自身)自动。暴击施加乏力(目标)自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得蓄劲",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"蓄劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                        },
+                        {
+                            "label": "暴击乏力",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isCrit) {\n    const eff = thisItem.effects.getName(\"乏力\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被施加 [乏力]`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "波涛深潜",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，剑尖触地，心神沉浸，开启架招。</p><p>格挡成功后，根据战场上的“乏力”层数获得护体真气，每有一层“乏力”获得 5 点护体真气，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+10，每层“乏力”提供的护体真气再+5，内力消耗+2。</p>",
+                    "automationNote": "扫描全场(所有Actor)乏力层数获取护体自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "感应乏力获护体",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 扫描场景所有 Actor\nlet totalFali = 0;\ncanvas.tokens.placeables.forEach(t => {\n    if (t.actor) {\n        const fali = t.actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fali\");\n        if (fali) {\n            totalFali += (fali.getFlag(\"xjzl-system\", \"stacks\") || 1);\n        }\n    }\n});\n\nif (totalFali > 0) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const huti = totalFali * (5 + (lvl - 1) * 5);\n    await actor.applyHealing({amount: huti, type: \"huti\", showScrolling: true});\n    ui.notifications.info(`感应到战场 ${totalFali} 层乏力，获得 ${huti} 护体`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "海天一线",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "扇形",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制对方虚招，横扫千军，剑气横推，如浪扑岸，对前方 3 米扇形范围内的所有敌人造成 0.6 力量点内功伤害，并给他们添加一层“乏力”，至多三层，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "施加乏力自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加乏力",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"乏力\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                        }
+                    ]
+                },
+                {
+                    "name": "怒涛霜卷",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "全回合动作",
+                    "description": "<p>全回合动作，剑身没入地面（水面)，内力倾泻奔涌，掀起千重浪，对周围敌人造成 0.7 力量点内功伤害，并引爆他们身上的所有“乏力”，每引爆一层乏力使该敌人流失 10 点气血内力，并使自身回复流失等额数值的气血内力。</p><p>·若一名敌人被引爆了三层“乏力”，则海浪灼目，使其进入“目盲”状态，持续三回合。</p><p><strong>升级：</strong>招式伤害+20，每引爆一层乏力流失的气血内力+5，怒气-1。</p>",
+                    "automationNote": "消耗半管蓝自动。引爆乏力吸取血蓝自动。施加目盲自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗半蓝",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const maxMp = actor.system.resources.mp.max;\nconst cost = Math.floor(maxMp / 2);\nconst currentMp = actor.system.resources.mp.value;\nif (currentMp < cost) {\n    ui.notifications.warn(`内力不足半管 (需 ${cost})`);\n    args.flags.abort = true;\n    return;\n}\nawait actor.update({\"system.resources.mp.value\": currentMp - cost});\nui.notifications.info(`怒涛霜卷消耗 ${cost} 点内力`);"
+                        },
+                        {
+                            "label": "引爆乏力",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const fali = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fali\");\nif (fali) {\n    const stacks = fali.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = stacks * (10 + (lvl - 1) * 5);\n    \n    // 移除乏力\n    await fali.delete();\n    \n    // 吸取\n    await args.target.applyHealing({amount: -drain, type: \"hp\", showScrolling: true});\n    await args.target.applyHealing({amount: -drain, type: \"mp\", showScrolling: true});\n    await actor.applyHealing({amount: drain, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({amount: drain, type: \"mp\", showScrolling: true});\n    \n    ui.notifications.info(`引爆 ${stacks} 层乏力，吸取 ${drain}`);\n    \n    // 目盲判定\n    if (stacks >= 3) {\n        await game.xjzl.api.effects.addEffect(args.target, \"blind\");\n    }\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "蓄劲",
+                    "icon": "icons/svg/target.svg",
+                    "description": "每层使你暴击骰-1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xujin",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "-1"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "-1"
+                        }
+                    ]
+                },
+                {
+                    "name": "乏力",
+                    "icon": "icons/svg/downgrade.svg",
+                    "description": "每层使招式伤害-10。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fali",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "-10"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "穹溟剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>鲲翔渊海，鹏游青冥。鲲大几千里，迎风化为鹏。</p><p>·你必须精通地级及以上的两套内功剑法和两套外功剑法，方可修习本套路。</p><p><strong>需求：</strong>剑-重剑</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑-重剑",
+            "moves": [
+                {
+                    "name": "架海擎天",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，心随意动，势随架转，将自身剑势在【穹苍式】、【重溟式】两者之间切换，持续到战斗脱离。</p><p>·穹苍式：本套路使用外功命中，造成外功伤害。</p><p>·重溟式：本套路使用内功命中，造成内功伤害。</p><p>·每次切换剑势后，下一次施展《穹溟剑法》获得相应的额外特效，持续到战斗脱离。</p><p>·进入战斗后，自动获得【穹苍式】，但并不视为切换剑势，不获得相应特效。</p><p><strong>升级：</strong>每提升一级使此招动作等级降低一级。（蓄力-主要-次要-简要）</p>",
+                    "automationNote": "姿态切换自动。额外特效逻辑自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "切换剑势",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const currentMode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst newMode = currentMode === \"sky\" ? \"ocean\" : \"sky\";\nawait actor.setFlag(\"xjzl-system\", \"wuxue_qiongming_mode\", newMode);\n\nconst label = newMode === \"sky\" ? \"穹苍式 (外功)\" : \"重溟式 (内功)\";\nui.notifications.info(`穹溟剑法已切换至: ${label}`);\n\n// 标记“切换过” (用于触发下一次额外特效)\nawait actor.setFlag(\"xjzl-system\", \"wuxue_qiongming_switched\", true);"
+                        }
+                    ]
+                },
+                {
+                    "name": "云垂海立",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，气力无双，运剑驭敌，开启架招。</p><p>开启此架招期间，若回复气血时数值溢出，溢出的数值会变为等额的护体真气，持续到战斗脱离。</p><p>·穹苍式：每次格挡成功后，下一次《穹溟剑法》命中并造成伤害，还会对敌人造成 5 点气血流失。</p><p>·重溟式：每次格挡成功后，下一次《穹溟剑法》命中并造成伤害，还会为自身回复 5 点内力。</p><p><strong>升级：</strong>格挡值+10，流失和回复的数值+5，消耗+4。</p>",
+                    "automationNote": "治疗溢出转护体手动(暂无OnHeal触发器)。格挡特效逻辑复杂，暂设为提示。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡触发提示",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = 5 + (Math.max(1, move.computedLevel||1) - 1) * 5;\nif (mode === \"sky\") {\n    ui.notifications.info(`格挡成功(穹苍): 下一击需手动附加 ${val} 流失`);\n} else {\n    ui.notifications.info(`格挡成功(重溟): 下一击需手动回复 ${val} 内力`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "扶摇万里",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，剑贯长龙，气吞山河，对敌人造成 0.7 力量点伤害，此招无视目标格挡值。</p><p>·穹苍式：击退敌人 5 米，若撞击其他敌方或障碍物则立即停下，使他们倒地，并对他们额外造成 50 点气血流失。</p><p>·重溟式：内力消耗+20，攻击距离+5，对敌人造成相距于你米数 x5 的内力流失。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "无视格挡自动。姿态切换属性/伤害类型/效果通过脚本实现。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            12,
+                            16,
+                            20
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "姿态适配",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.ignoreBlock = true;\nif (mode === \"ocean\") {\n    args.config.type = \"neigong\";\n} else {\n    args.config.type = \"waigong\";\n}"
+                        },
+                        {
+                            "label": "额外效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nif (mode === \"sky\") {\n    ui.notifications.info(\"穹苍式：请手动处理 [击退5米] 及 [撞击流失50]\");\n} else {\n    // 重溟式：额外消耗\n    const currentMp = actor.system.resources.mp.value;\n    await actor.update({\"system.resources.mp.value\": Math.max(0, currentMp - 20)});\n    \n    // 距离计算流失\n    const dist = canvas.grid.measureDistance(actor.token.object.center, args.target.token.object.center);\n    const loss = Math.floor(dist * 5);\n    await args.target.applyHealing({amount: -loss, type: \"mp\", showScrolling: true});\n    ui.notifications.info(`重溟式：距离 ${dist}米，流失 ${loss} 内力 (已额外消耗20内力)`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "凤翥鹏翔",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，剑气纵横，翻江倒海，对范围内所有敌人造成 0.6 力量点伤害。</p><p>·穹苍式：若将敌人打入濒死状态，可立即不消耗动作施展一次【扶摇万里】。</p><p>·重溟式：使范围内所有敌人流失 20 点内力，自身回复敌人流失总和的内力，若自身内力溢出，溢出的数值会转化为气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "重溟吸内自动。穹苍追击提示。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "姿态判定",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.type = (mode === \"ocean\") ? \"neigong\" : \"waigong\";"
+                        },
+                        {
+                            "label": "特效",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nif (mode === \"sky\") {\n    if (args.isDying || args.isDead) {\n        ui.notifications.info(\"击杀/濒死触发：请手动免费施展 [扶摇万里]\");\n    }\n} else {\n    // 重溟吸内\n    await args.target.applyHealing({amount: -20, type: \"mp\", showScrolling: true});\n    await actor.applyHealing({amount: 20, type: \"mp\", showScrolling: true});\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "转海回天",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，旋舞剑身，气镇八方，压制对方虚招，对范围内所有敌人造成 0.7 力量点伤害，并可移除自身一个状态。</p><p>·穹苍式：可额外移除自身一个状态，并对范围内所有敌人造成 20 点气血流失。</p><p>·重溟式：可额外移除自身一个状态，且每命中一名敌人，自身回复 10 点内力和气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "移除状态手动。流失/回复自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "姿态判定",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.type = (mode === \"ocean\") ? \"neigong\" : \"waigong\";"
+                        },
+                        {
+                            "label": "特效",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nif (mode === \"sky\") {\n    await args.target.applyHealing({amount: -20, type: \"hp\", showScrolling: true});\n    ui.notifications.info(\"穹苍式：造成20流失。请手动移除2个状态。\");\n} else {\n    await actor.applyHealing({amount: 10, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({amount: 10, type: \"mp\", showScrolling: true});\n    ui.notifications.info(\"重溟式：回复10血蓝。请手动移除2个状态。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "海晏河清",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "10米",
+                    "targetInfo": "3x10范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，将全身内力悉数灌注此招，真气剑气如洪如瀑，狂飙卷动千尺浪，对正前方 3 米宽*10 米长范围内所有敌人造成 0.9 力量点伤害。</p><p>·穹苍式：将真气剑气轰入敌人体内，对他们造成此招消耗内力数值一半的气血流失。</p><p>·重溟式：真气环流，生生不息，回复此招消耗内力数值一半的气血。</p><p>·从【重溟式】切换至【穹苍式】时，剑气过盛，此招不可用于施展濒死一击。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1。</p>",
+                    "automationNote": "消耗全部内力自动。流失自动。回复手动(提示数值)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.9
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        "rage": [
+                            10,
+                            9,
+                            8,
+                            7
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗全蓝",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const currentMp = actor.system.resources.mp.value;\nconst consumed = currentMp;\nawait actor.update({\"system.resources.mp.value\": 0});\nconst effectVal = Math.floor(consumed / 2);\n// 暂存数值\nargs.flags.damageResult.qiongmingVal = effectVal;"
+                        },
+                        {
+                            "label": "姿态判定",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.type = (mode === \"ocean\") ? \"neigong\" : \"waigong\";"
+                        },
+                        {
+                            "label": "应用效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = args.damageResult.qiongmingVal || 0;\nif (mode === \"sky\") {\n    await args.target.applyHealing({amount: -val, type: \"hp\", showScrolling: true});\n}"
+                        },
+                        {
+                            "label": "重溟回复提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = args.baseDamage; // 实际上flags里没有传qiongmingVal到hit_once，这里重新算或者手动提示\n// 简单起见，提示手动\nif (mode === \"ocean\" && args.hitCount > 0) {\n    ui.notifications.info(\"重溟式：请手动回复消耗内力一半的气血。\");\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "海枯石烂",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>沧澜派弟子以搏风击浪、毁石破山为修炼手段，全凭其携带的玄铁碎石有稳健步履，沉心静气之效。如此日复一日，苦修不辍，铁石终成玉。</p><p><strong>需求：</strong>《涛浪诀》圆满</p><p><strong>效果：</strong>你佩戴的玄铁碎石磨砺成玄铁玉石。</p>",
+            "automationNote": "Roleplay效果。玄铁玉石需手动添加。",
+            "moves": []
+        }
+    },
+    {
+        "name": "荡海拔山",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>逾山越海，双剑归一。</p><p><strong>需求：</strong>《孤峰狂剑》和《啸海绝剑》所有招式全部精通</p><p><strong>效果：</strong>对你而言，《孤峰狂剑》和《啸海绝剑》现在视为同一套武学，不受武学切换规则的影响。</p><p>·你施展剑-重剑武学时，命中+5，暴击骰-1。</p><p><strong>升级：</strong>命中再+5，暴击骰再-1。</p>",
+            "automationNote": "重剑命中与暴击修正已自动化(被动)。",
+            "moves": [
+                {
+                    "name": "荡海拔山",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "description": "被动生效。",
+                    "scripts": [
+                        {
+                            "label": "重剑加成",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (args.move.weaponType === \"sword\") {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const hitBonus = 5 + (lvl - 1) * 5;\n    const critBonus = 1 + (lvl - 1) * 1;\n    args.flags.bonusHit += hitBonus;\n    args.flags.critThresholdMod += critBonus;\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "船拳",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>与一般陆地上的武功不一样，为了适应摇晃的船身，船上功夫既稳又轻，似出非出，似打非打，出招敏捷，收招迅速。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "徒手",
+            "effects": [
+                {
+                    "name": "水中环境",
+                    "icon": "icons/magic/water/wave-water-blue.webp",
+                    "description": "标记：处于水中。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "environment_water"
+                        }
+                    },
+                    "changes": []
+                }
+            ],
+            "moves": [
+                {
+                    "name": "船猫捕鼠",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，伺机出手，造成 0.4 力量点外功伤害。若目标存在下盘不稳，下盘不稳持续回合数+1。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "延长下盘不稳手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "浑水摸鱼",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>主要动作，左捣右挠，击敌下盘，命中则造成 0.3 力量点外功伤害。</p><p>·当范围内有“下盘不稳”的敌人受到【船猫捕鼠】的攻击时，可以使用反应动作释放此招攻击该敌人，且此次招式虚招值+1。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "反应动作手动。虚招加值自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "虚招加值",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "const unstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (unstable) {\n    args.flags.grantFeint += 1;\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "下锚停舟",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，单手横臂，开启架招。格挡成功时，为目标添加“下盘不稳”，持续一回合。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "格挡施加下盘不稳自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加下盘不稳",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nawait game.xjzl.api.effects.addEffect(args.attacker, \"unstable\");\nui.notifications.info(`${args.attacker.name} 下盘不稳！`);"
+                        }
+                    ]
+                },
+                {
+                    "name": "逆流摇桨",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，撤步收手，反身而上，不消耗速度至目标周围空格处，对其造成 0.5 力量点外功伤害。</p><p>·若目标处于下盘不稳，则移除其下盘不稳，为其添加“东倒西歪”，持续三回合。</p><p><strong>东倒西歪：</strong>你的移动速度减至 1，期间内无法施展架招。</p><p><strong>升级：</strong>招式伤害+10，怒气-1，内力消耗+2。</p>",
+                    "automationNote": "移动手动。状态转化自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "东倒西歪",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const unstable = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (unstable) {\n    await unstable.delete();\n    // 东倒西歪 (临时AE)\n    const dongdao = {\n        name: \"东倒西歪\",\n        icon: \"icons/svg/daze.svg\",\n        duration: { rounds: 3 },\n        changes: [\n            { key: \"flags.xjzl-system.forceSpeedZero\", mode: 5, value: \"true\" }, // 描述说减至1，这里用forceSpeedZero模拟禁足，或者手动改速度\n            // 修正：描述说“移动速度减至1”，不是归零。这里用属性覆盖。\n            { key: \"system.combat.speed\", mode: 5, value: \"1\" },\n            { key: \"flags.xjzl-system.blockStance\", mode: 5, value: \"true\" }\n        ],\n        flags: { \"xjzl-system\": { slug: \"dongdao\" } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, dongdao);\n    ui.notifications.info(`${args.target.name} 陷入 [东倒西歪]`);\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "破船锥法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>水上讨生活的侠士所修武功，名为破船，实为家破人亡的绝户招法。</p><p><strong>需求：</strong>匕首</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "匕首",
+            "effects": [
+                {
+                    "name": "水中环境",
+                    "icon": "icons/magic/water/wave-water-blue.webp",
+                    "description": "标记：处于水中。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "environment_water"
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "水鬼潜游-水中",
+                    "icon": "icons/magic/water/water-bubble-blue.webp",
+                    "description": "水中架招加成。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shuigui_water_bonus",
+                            "scripts": [
+                                {
+                                    "label": "水中加成",
+                                    "trigger": "passive",
+                                    "active": true,
+                                    "script": "const stanceMove = thisItem.system.moves.find(m => m.name === \"水鬼潜游\");\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nS.combat.block += (5 + (lvl - 1) * 5);\nS.combat.kanpo += (1 + (lvl - 1) * 1);"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ],
+            "moves": [
+                {
+                    "name": "凿船破板",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，利凿狠刺，对目标则造成 0.5 力量点外功伤害。</p><p>·若范围内有敌人处于水中，可以使用反应动作释放此招攻击该敌人，且无视其格挡值。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "反应动作手动。水中无视格挡手动(弹窗调节)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "凿船毁舵",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，钉其面门，造成 0.4 力量点外功伤害，击破敌人架招时，使其陷入“溺水”，持续一回合。</p><p><strong>溺水：</strong>你陷入“缚身”且移动速度-5。</p><p>·若在水中施展此招，虚招值+2。</p><p><strong>升级：</strong>招式伤害+10，溺水持续回合+1，消耗+2。</p>",
+                    "automationNote": "击破施加溺水自动。水中虚招加成手动(弹窗调节)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破溺水",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    // 溺水 AE\n    const nishui = {\n        name: \"溺水\",\n        icon: \"icons/svg/net.svg\",\n        duration: { rounds: rounds },\n        changes: [\n            { key: \"system.combat.speed\", mode: 2, value: \"-5\" }\n        ],\n        flags: { \"xjzl-system\": { slug: \"nishui\" } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n    await game.xjzl.api.effects.addEffect(args.target, nishui);\n    ui.notifications.info(\"目标陷入溺水！\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "恶蛟索命",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "4米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，掷出匕首缠绕目标脖颈（外功命中），然后将其朝自己的方向拉扯 3 米，并为目标添加一层“笨拙”，至多三层，持续到脱战。</p><p><strong>笨拙：</strong>每层使你闪避-5。</p><p>·当范围内有敌人处于半空中时，你可以消耗反应动作对其释放此招，并额外为其添加禁足一回合。</p><p><strong>升级：</strong>释放距离+3，额外添加一层笨拙，消耗+2。</p>",
+                    "automationNote": "拉扯/反应动作手动。添加笨拙自动。禁足手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加笨拙",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    // 笨拙 (benzhuo)\n    const eff = CONFIG.statusEffects.find(e => e.id === \"benzhuo\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const stacksToAdd = 1 + (lvl - 1);\n        for(let i=0; i<stacksToAdd; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n        ui.notifications.info(`已施加 ${stacksToAdd} 层笨拙`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "水鬼潜游",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，作潜水状，开启架招。若你在水中，架招持续期间，额外格挡值+5，且看破值+1。</p><p><strong>升级：</strong>格挡值+10，看破值+1，内力消耗+2。</p>",
+                    "automationNote": "水中加成手动(请手动挂上武学自带的AE)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "凿龙断骨",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，乾锥做锤，坤锥做凿，凿穿一切，对敌人造成 0.7 力量点外功伤害。</p><p>·若范围内有敌人处于水中，可以使用反应动作释放此招攻击该敌人，且无视其格挡值。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "反应动作手动。水中无视格挡手动(弹窗调节)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "漕运行",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>此乃漕工衣食所系，漕运工作极为繁重，却也是漕帮弟子日夜打磨之功，强身健体，基础夯实。</p><p><strong>效果：</strong>修习此功，你需要每日做苦工六个时辰，连续三十日，这三十日中你不断体会精疲力尽和肌肉皮骨的坚实之感。</p><p><strong>工钱：</strong>你每参与漕运三十日可根据职位领取工钱：<br>水娃子（略有小成）：二两白银。<br>船佣（融会贯通）：四两白银。<br>船首（炉火纯青）：十两白银。<br>舵首（撼天动地）：五十两白银。</p><p><strong>健体检定：</strong>三十日后，你可以选择力量、身法、体魄中一个属性，进行一个 D20 的检定，难度等于该属性的数值，成功则该属性永久增加 1 点，失败则需要继续做苦工三十日后才能再进行检定。</p><p>·每次进行健体检定时候需消耗 100 修为。</p><p>·当你修炼此功使某项属性提升 10 点时，你获得对应健体属性圆满，无法再通过此功增长属性。</p><p>即：漕运行-力量圆满；漕运行-身法圆满；漕运行-体魄圆满。</p><p><strong>升级：</strong>工钱提高 50%。进行健体检定时结果+1。</p>",
+            "automationNote": "Roleplay向。完全手动。",
+            "moves": []
+        }
+    },
+    {
+        "name": "鲤鱼打挺",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>漕帮弟子在船上练就的步伐身板功夫，可以稳定身形，在混乱的战斗中极为有用。</p><p><strong>需求：</strong>《船家心法》修炼圆满</p>",
+            "automationNote": "反应动作。手动处理。",
+            "moves": [
+                {
+                    "name": "鲤鱼打挺",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你被击倒、击飞且不处于“下盘不稳”时，你可以消耗反应动作稳住身形，改为被击退 1 米。</p><p><strong>升级：</strong>怒气-1。</p>",
+                    "costs": {
+                        "rage": [
+                            3,
+                            2,
+                            1
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "水栖诀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>船家时常下水作业，多会习得一些水下憋气的法门，而漕帮的这套口诀，却是他们横行大明水域的独门绝技，一旦学会，如鱼得水。</p><p><strong>效果：</strong>你的[闭气]等级+2。</p><p>·你在水中战斗时，不会受到下盘不稳的影响。</p><p>·你在水中战斗时，虚招对抗+1。</p><p><strong>升级：</strong>闭气等级再+2，水中战斗时虚招对抗再+1。</p>",
+            "automationNote": "水中效果手动(请手动挂上武学自带的AE)。闭气等级自动。",
+            "effects": [
+                {
+                    "name": "水栖诀-水中",
+                    "icon": "icons/magic/water/water-bubble-blue.webp",
+                    "description": "水中虚招对抗加成。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shuiqijue_water_bonus",
+                            "scripts": [
+                                {
+                                    "label": "水中加成",
+                                    "trigger": "passive",
+                                    "active": true,
+                                    "script": "const passiveMove = thisItem.system.moves.find(m => m.name === \"水栖诀\");\nconst lvl = Math.max(1, passiveMove?.computedLevel || 1);\nconst bonus = 1 + (lvl - 1) * 1;\nactor.xjzlStatuses.defendFeintLevel = (actor.xjzlStatuses.defendFeintLevel || 0) + bonus;"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ],
+            "moves": [
+                {
+                    "name": "水栖诀",
+                    "type": "qi",
+                    "actionType": "default",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "description": "被动生效。",
+                    "scripts": [
+                        {
+                            "label": "闭气加成",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.biqi.mod += 2 + (lvl - 1) * 2;"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]

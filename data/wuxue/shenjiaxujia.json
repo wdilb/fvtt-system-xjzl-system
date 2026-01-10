@@ -1,0 +1,1038 @@
+[
+    {
+        "name": "五珠盘",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>商人算盘不离手，珠响铿锵账目清。</p><p><strong>需求：</strong>奇门-算盘</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "奇门-算盘",
+            "moves": [
+                {
+                    "name": "如意算盘",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "instrument",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>心算不停，顺指拨弹，开启架招，你进入“算盘”状态，持续到战斗脱离或解除架招。</p><p><strong>算盘：</strong>招式伤害提升[交易]等级的数值。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "开启时快照[交易]等级并赋予Buff。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启算盘",
+                            "trigger": "attack",
+                            "script": "const jiaoyi = actor.system.skills.jiaoyi.total || 0;\nconst eff = thisItem.effects.getName(\"算盘\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(jiaoyi);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`算盘开启：招式伤害 +${jiaoyi}`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "奇货可居",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "instrument",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>转方寸盘，迎面直击，对目标造成伤害。你可以向对方炫耀展示一件行囊物品，若目标身上没有任何一项物品品级（凡铜银金玉）高于你的物品，则不会因此招获得怒气。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "比富炫耀纯手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    }
+                },
+                {
+                    "name": "秋后算账",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "instrument",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>棱珠快拨，清白与否？对目标造成伤害。击破架招时，目标掉落其行囊中 10%的银两，落在他所处空格内。</p><p>·掉落银两可在其 1 米内以一个主要动作捡起。</p><p><strong>升级：</strong>招式伤害+5，掉落银两增加 10%，消耗+1。</p>",
+                    "automationNote": "击破后仅提示掉落规则，具体数值需手动计算。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const ratio = 10 + (Math.max(1, move.computedLevel || 1) - 1) * 10;\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">秋后算账 - 击破触发</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>目标应掉落行囊中 <b>${ratio}%</b> 的银两。</p>\n                <p><i>请GM手动处理掉落。</i></p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "一本万利",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "instrument",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>珠落珠升，额舞眉飞，持算旋扫对周围敌人造成伤害，之后为自身添加“万利”，持续到战斗脱离。</p><p><strong>万利：</strong>你行囊中每有 100 两白银，招式伤害+1。（至多+100）</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "应用万利BUFF时自动快照当前银两计算加成。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得万利",
+                            "trigger": "attack",
+                            "script": "const silver = actor.system.resources.silver || 0;\nconst bonus = Math.min(100, Math.floor(silver / 100));\nconst eff = thisItem.effects.getName(\"万利\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`一本万利：获得伤害加成 +${bonus}`);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "算盘",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "招式伤害提升等同于[交易]等级。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "suanpan",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "0"
+                        }
+                    ]
+                },
+                {
+                    "name": "万利",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "基于银两提升招式伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wanli",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "0"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "金石指法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>巨贾家财万贯，挥金如土，方能练成这般绝技。</p><p><strong>需求：</strong>徒手-指法</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "徒手-指法",
+            "moves": [
+                {
+                    "name": "财大气粗",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>骈指夹银，自信大方，获得【携带银两/1000】的“财气值”，向上取整，上限为 20，持续到战斗脱离。</p><p><strong>财气值：</strong>你的招式命中获得等额的加值。</p><p><strong>升级：</strong>获得的财气值+5，内力消耗+2。</p>",
+                    "automationNote": "自动计算财气值并赋予Buff。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得财气",
+                            "trigger": "hit",
+                            "script": "const silver = actor.system.resources.silver || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseCap = 20 + (lvl - 1) * 5;\nconst caiqi = Math.min(baseCap, Math.ceil(silver / 1000));\n\nconst eff = thisItem.effects.getName(\"财气值\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(caiqi);\neff.changes[1].value = String(caiqi);\n// 将财气值存入Flag供其他招式调用\neff.flags[\"xjzl-system\"].caiqiValue = caiqi;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`财大气粗：获得财气值 ${caiqi}`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "堆金积玉",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双手聚指齐飞，戳击目标造成伤害。你可以掷出等同于“财气值”的银两，使此招提升相应数值的伤害。</p><p>·掷出的银两掉落在目标所处空格内，可在其 1 米内以一个主要动作捡起。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "检测财气值，弹窗询问是否掷出银两加伤。扣除银两需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "掷金加伤",
+                            "trigger": "attack",
+                            "script": "const caiqiEff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"caiqi\");\nif (caiqiEff) {\n    const caiqiVal = caiqiEff.getFlag(\"xjzl-system\", \"caiqiValue\") || 0;\n    if (caiqiVal > 0) {\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"堆金积玉\" },\n            content: `<p>当前财气值：<b>${caiqiVal}</b></p><p>是否掷出等额银两以增加伤害？</p><p style=\"color:red; font-size:0.8em;\">(银两扣除请手动操作)</p>`,\n            yes: { label: \"掷出 (+伤害)\", icon: \"fas fa-coins\" },\n            no: { label: \"保留\", icon: \"fas fa-times\" }\n        });\n\n        if (confirm) {\n            args.flags.damageResult.damage += caiqiVal;\n            args.flags.damageResult.breakdown += `\\n+ 掷金加伤: ${caiqiVal}`;\n            ui.notifications.info(`已掷出 ${caiqiVal} 两白银！`);\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "生财有道",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>拇指食指揉搓，拿捏目标造成伤害。击破架招时，目标陷入“散财”，持续三回合。</p><p><strong>散财：</strong>每移动 1 米掉落 10 两在之前的空格处。</p><p>·掉落银两可在其 1 米内以一个主要动作捡起。</p><p>你可以与目标进行[交易]对抗检定，若你获胜，招式虚招值+3。</p><p><strong>升级：</strong>招式伤害+10，散财掉落银两+5，消耗+2。</p>",
+                    "automationNote": "出招前弹窗提示是否进行交易对抗，若胜利自动增加虚招值。击破自动施加散财Buff。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "交易对抗",
+                            "trigger": "attack",
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"生财有道\" },\n    content: `<p>是否进行了 [交易] 对抗并获胜？</p>`,\n    yes: { label: \"获胜 (+3虚招)\", icon: \"fas fa-check\" },\n    no: { label: \"未进行/失败\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    args.flags.bonusFeint += 3;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击破-散财",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"散财\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 陷入散财状态！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "仗义疏财",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>挥金洒银，对周围敌人造成伤害。</p><p>·你可以向范围内每个友方所处空格掷出等同于“财气值”的银两，之后场上每有一个空格中有金银财物，此招招式伤害提高 10 点。</p><p>·掷出的银两可在其 1 米内以一个主要动作捡起。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "伤害加成纯手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "财气值",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "招式命中获得加值。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "caiqi",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "mode": 2,
+                            "value": "0"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "mode": 2,
+                            "value": "0"
+                        }
+                    ]
+                },
+                {
+                    "name": "散财",
+                    "icon": "icons/commodities/currency/coins-assorted-mix-copper-silver-gold.webp",
+                    "description": "移动时掉落银两。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "sancai",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "世家散手",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>江湖世家流传的散手招式。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "金钱镖",
+                    "type": "real",
+                    "tier": 2,
+                    "element": "taiji",
+                    "damageType": "liushi",
+                    "weaponType": "hidden",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>金光灿灿，朝目标投掷若干枚金钱镖，每投掷一枚使其流失 10 点气血（外功命中可暴击），至多掷出五枚。</p><p>·若目标嗜好兵器、华服、首饰、金银财宝、古玩字画中的任意一种，此招必定命中。</p><p><strong>升级：</strong>可额外掷出 5 枚。</p>",
+                    "automationNote": "投掷数量弹窗询问，自动计算总流失量。嗜好必中自动检测（尝试读取目标shihao字段）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "嗜好必中检测",
+                            "trigger": "check",
+                            "script": "const targetShihao = args.target.system.social?.shihao || [];\nconst moneyHobbies = [\"weapon\", \"clothes\", \"jewelry\", \"money\", \"antique\"];\n// 检查是否有交集\nconst hasHobby = targetShihao.some(h => moneyHobbies.includes(h));\nif (hasHobby) {\n    args.flags.forceHit = true;\n    // ui.notifications.info(\"目标嗜财，金钱镖必中！\"); // check阶段频繁触发，不建议弹窗\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "投掷数量与伤害",
+                            "trigger": "calc",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxDarts = 5 + (lvl - 1) * 5;\n\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"金钱镖\" },\n    content: `<div style=\"text-align:center;\"><p>最大投掷数: ${maxDarts}</p><label>投掷数量</label><input type=\"number\" name=\"count\" value=\"1\" min=\"1\" max=\"${maxDarts}\" autofocus></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value }\n});\n\nconst num = Math.min(maxDarts, parseInt(count) || 1);\nargs.output.damage = num * 10;\nargs.output.bonusDesc.push(`投掷 ${num} 枚金钱镖`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "撒手锏",
+                    "type": "real",
+                    "tier": 2,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>大喊“着”，掷出双锏，打着旋儿朝目标飞射而去，对其造成伤害。</p><p>·出招的同时还可以不消耗动作进行一次投射的[抛掷]检定，将结果加到招式伤害上。</p><p>·若目标没有反应动作，招式必定暴击。</p><p>·施展此招后，你的[棍-双棍]武器视作脱手，掉落在目标所处空格处，需要用主要动作捡起。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "抛掷检定伤害需手动修正。脱手自动卸下武器。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "抛掷加伤提示",
+                            "trigger": "calc",
+                            "script": "const bonus = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"撒手锏 - 抛掷检定\" },\n    content: `<p>请进行[抛掷]检定，并输入结果。</p><input type=\"number\" name=\"roll\" value=\"0\">`,\n    ok: { callback: (event, button) => parseInt(button.form.elements.roll.value) || 0 }\n});\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`抛掷加伤 +${bonus}`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "武器脱手",
+                            "trigger": "hit",
+                            "script": "// 查找已装备的棍类武器 (假设双棍属于 staff 类型)\nconst weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === \"staff\");\nif (weapon) {\n    await weapon.update({\"system.equipped\": false});\n    ui.notifications.warn(`${weapon.name} 已脱手！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "物华天宝",
+                    "type": "qi",
+                    "tier": 3,
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "无",
+                    "targetInfo": "无",
+                    "actionCost": "被动/交互",
+                    "description": "<p>需求：《聚宝功》修炼圆满</p><p><strong>穷奢极欲：</strong>在你眼中，任何无价之宝都可将其定价为万两黄金（100000 两白银），然后买之。·你每拥有一件金品及以上品质的物品，你的神采+1（至多+10）。</p><p><strong>荣华富贵：</strong>你购物花费每满 10000 两白银，你的朝廷声望+1。你出售物品、产业收益而获得每 10000 两白银，你的武林声望+1。·以上两种方式至多使你的朝廷、武林声望+10。</p><p><strong>重义轻财：</strong>你视金钱如粪土，你可以赠予他人一千两白银，然后获得“豪绅”，持续一个月。</p><p><strong>豪绅：</strong>他人对你出招时伤害-10，暴击骰+1。·你赠予他人的金钱不可拿回，否则你遗忘《物华天宝》。</p><p><strong>升级：</strong>穷奢极欲的神采上限+5，荣华富贵的声望上限+5，重义轻财他人对你的伤害额外-5。</p>",
+                    "automationNote": "完全手动/RP。涉及经营与声望。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    }
+                }
+            ],
+            "scripts": [
+                {
+                    "label": "流水辨银",
+                    "trigger": "passive",
+                    "script": "if (args.move.tier === 1) { // 仅针对流水辨银(人级)\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 交易等级+1 (基础1 + 升级)\n    actor.system.skills.jiaoyi.mod += lvl;\n}",
+                    "active": true
+                }
+            ],
+            "effects": [
+                {
+                    "name": "流水辨银",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "交易等级提升。",
+                    "transfer": true,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "liushuibianyin",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.skills.jiaoyi.mod",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "铁花枪",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>刚劲有力，节奏分明，枪法变化多端，连贯通达。</p><p><strong>需求：</strong>棍-长枪</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "棍-长枪",
+            "moves": [
+                {
+                    "name": "朝天拨云",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>高提平枪，开启架招。格挡成功时，获得一层“刚劲”，至多三层，持续到战斗脱离。</p><p><strong>刚劲：</strong>每层使你的刚属性武学招式伤害+5。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "格挡获刚劲自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-刚劲",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"刚劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "铁牛耕地",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>枪扫下盘，对目标造成伤害，并为其添加“下盘不稳”，持续一回合。</p><p>·若在骑马时施展，改为为其添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "默认施加下盘不稳。骑马检测需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "状态施加",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    // 默认下盘不稳\n    let statusId = \"unstable\";\n    // 简单询问是否骑马 (或者让玩家自己选禁足)\n    // 为简化流程，这里只应用默认，特殊情况手动\n    const eff = CONFIG.statusEffects.find(e => e.id === statusId);\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "铁石心肠",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "element": "gang",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p>缠枪摔把，回复气血，并为自身添加一层“棍势”，至多三层，持续到脱战或更换其他武器的武学套路。</p><p><strong>棍势：</strong>每层使棍法命中+10。</p><p><strong>升级：</strong>回复气血+5，内力消耗+1。</p>",
+                    "automationNote": "应用治疗时自动获得棍势。",
+                    "calculation": {
+                        "base": 10,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ],
+                        "rage": [
+                            1,
+                            1,
+                            1,
+                            1
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得棍势",
+                            "trigger": "hit",
+                            "script": "const eff = thisItem.effects.getName(\"棍势\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "斩钉截铁",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>速势出枪，上下翻飞，对敌人造成伤害。</p><p>·若在骑马时施展，改为对直线路径上所有敌人造成伤害。</p><p>·你可以移除一层“棍势”，使招式释放距离+3。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "骑马直线手动。消耗棍势手动(或在Attack脚本中提示)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗棍势提示",
+                            "trigger": "attack",
+                            "script": "const gunshi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gunshi\");\nif (gunshi) {\n    ui.notifications.info(\"提示：可手动移除 1 层 [棍势] 以增加距离。\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "刚劲",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "刚属性招式伤害增加。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "gangjin",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.gang.mod",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "棍势",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "棍法命中增加。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "gunshi",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.weaponRanks.staff.mod",
+                            "mode": 2,
+                            "value": "0"
+                        },
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "游龙金锏",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>隋唐第一猛将秦琼所创武学。马踏黄河两岸，锏打三州六府，上打君不正，下打臣不忠，十分威风。</p><p><strong>需求：</strong>棍-双棍</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "棍-双棍",
+            "moves": [
+                {
+                    "name": "云起龙骧",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>仰身高举，力劈而下，对目标造成伤害，你每有 100 侠义值招式伤害+5。</p><p>·若在骑马时施展，你的力量每高过对方 30 点，将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "侠义值加伤自动计算。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "侠义加伤",
+                            "trigger": "calc",
+                            "script": "const xiayi = actor.system.social?.xiayi || 0;\nconst bonus = Math.floor(xiayi / 100) * 5;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`侠义加伤 +${bonus}`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "金锏截蛟",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双锏挑打，对目标造成伤害。击破架招时为其添加“破甲”持续三回合。</p><p><strong>破甲：</strong>你的外功防御归零。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破自动施加破甲。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破-破甲",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"pojia\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被破甲！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "狮子张口",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双锏打开，开启架招。格挡成功后，可立即不消耗动作，对攻击者施展【云起龙骧】。</p><p>·若在骑马时格挡成功，你的力量每高过对方 30 点，此次【云起龙骧】的招式伤害+10。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡后提示反击。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反击提示",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nui.notifications.info(\"狮子张口：格挡成功，可免费施展 [云起龙骧]\");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "门神鞭石",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>雨打白沙地，锏打乱劈柴，巨力对目标造成伤害。</p><p>·若在骑马时施展，你的力量每高过对方 30 点，招式伤害+10，且暴击骰-1。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "条件加成需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "世家散手 (杂篇)",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>包含明是非、侠肝义胆等散手。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "明是非",
+                    "type": "qi",
+                    "tier": 1,
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "交谈",
+                    "targetInfo": "单体",
+                    "actionCost": "一分钟",
+                    "description": "<p>识人辨事，你可以与一个目标交谈一分钟，若目标不为[恶]或[邪道]，则你认可其人品，为目标添加“是”，持续到其增长恶行值。</p><p><strong>是：</strong>你行得直坐得正，被一名德高望重之人看重，但若你作恶，该状态会变成“否”，持续到你的恶行值归零。</p><p><strong>否：</strong>你的[说服]具有劣势。受到[侠]的攻击时，额外受到 10 点伤害。</p><p>·你至多只能为一个目标添加“是”，若再给其他人添加，第一个被你添加的目标将移除“是”。</p><p>·当目标状态从“是”变为“否”时，会立刻被你知晓。</p><p><strong>升级：</strong>你可以额外为一个目标添加“是”。</p>",
+                    "automationNote": "纯RP技能，状态需手动管理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    }
+                },
+                {
+                    "name": "打抱不平",
+                    "type": "qi",
+                    "tier": 2,
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "不消耗动作",
+                    "description": "<p>飒然出手，为自身添加“侠胆”，持续三回合，若你在中途加入一场正在发生的战斗，侠胆持续到战斗脱离。</p><p><strong>侠胆：</strong>格挡值+10，招式暴击骰-1。</p><p>·你每个回合末必须消耗 5 点侠义值维持“侠胆”，否则移除侠胆。</p><p>·一场战斗中，你只能打抱不平一次。</p><p><strong>升级：</strong>轻财任侠每月获得的侠义值额外+10；侠胆的格挡值+5，暴击骰再-1。</p>",
+                    "automationNote": "获得侠胆自动。回合末消耗手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得侠胆",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst block = 10 + (lvl - 1) * 5;\nconst crit = -1 + (lvl - 1) * -1;\n\nconst eff = thisItem.effects.getName(\"侠胆\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(block);\neff.changes[1].value = String(crit);\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "侠胆",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "提升格挡与暴击率。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xiadan",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "mode": 2,
+                            "value": "0"
+                        },
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "0"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "0"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]

@@ -33,10 +33,13 @@ const SECT_MAP = {
  */
 const MULTI_FILE_CONFIG = {
     "jianghushili": [
-        "jianghu_base",      // 基础武学
-        "menpai_scattered",  // 散落门派
-        "secret_manuals",    // 绝世秘籍
-        "common_martial"     // 常用武艺
+        "qinwangfu",      // 秦王府
+        "shenjiaxujia",   // 沈家徐家
+        "dongfangtianyan", // 东方天阉
+        "huashengumu",    // 花神古墓
+        "bixiaoshishen",  // 碧宵食神
+        "canglancaobang", // 沧澜槽帮
+        "yanwangmiaomiao", // 阎王喵喵
         // 以后每增加一个 JSON，只需在这里添加文件名即可
     ],
     // 如果其他门派也变多了，也可以支持：

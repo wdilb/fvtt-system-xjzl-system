@@ -1,0 +1,2682 @@
+[
+    {
+        "name": "玉箫剑诀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>碧箫岛独传剑法，以箫代剑，以剑奏箫，招式潇洒灵动，雅致大方，箫声如龙，响彻沧海。</p><p><strong>需求：</strong>乐器-箫笛/剑-单剑</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "乐器-箫笛/剑-单剑",
+            "moves": [
+                {
+                    "name": "金声玉振",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>剑气激荡，简落一击，对目标造成伤害。</p><p>招式命中无架招敌人时，为其添加“下盘不稳”状态，持续 2 回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中无架招自动施加下盘不稳。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "下盘不稳",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "客舟何处",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>以声为剑，开启架招。格挡成功时，在周身 1 米范围内制造一个‘箫音障’持续两回合。</p><p><strong>箫音障：</strong>区域内敌人在他的回合初受到 10 点精神伤害。</p><p>·箫音障形成在原地，不会跟随你移动，你只能拥有一个箫音障，如果你形成新的，之前的消失。</p><p><strong>升级：</strong>格挡值+10，箫音障范围+1 米，消耗+2。</p>",
+                    "automationNote": "格挡后获得箫音障提示AE。区域伤害手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-箫音障",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取升级后的范围\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst range = 1 + (lvl - 1);\n\n// 查找旧的并删除\nconst oldEff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xiaoyinzhang\");\nif (oldEff) await oldEff.delete();\n\n// 添加新AE作为标记\nconst effData = thisItem.effects.getName(\"箫音障\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.name = `箫音障 (${range}米)`;\nawait game.xjzl.api.effects.addEffect(actor, effData);\n\nui.notifications.info(`已生成箫音障 (半径${range}米)，请手动处理回合初伤害。`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "清音徐徐",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>抖动剑身，释放音波，对范围内至多三个目标造成伤害。目标需要进行气感检定（难度 16），失败则陷入“禁足”一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "命中请求气感检定，失败自动禁足。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "气感检定",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"qigan\",\n        dc: 16,\n        label: \"抵抗音波\",\n        onFail: \"root\"\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "箫心剑气",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>擎剑戳击，对目标造成伤害。击破对方架招时，可以立即消耗次要动作来释放一次【清音徐徐】。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破后提示连招。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "连招提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold; color:green;\">箫心剑气 - 击破触发</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>架招已击破！</p>\n                <p>你可以立即消耗 <b>次要动作</b> 施展 <b>【清音徐徐】</b>。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "箫竹长鸣",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>箫声袅袅，对周围目标造成伤害，并为目标添加“耳鸣”，持续两回合。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "命中施加耳鸣自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加耳鸣",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "箫音障",
+                    "icon": "icons/magic/sonic/explosion-shock-wave-teal.webp",
+                    "description": "区域内敌人在他的回合初受到 10 点精神伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xiaoyinzhang",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "落英掌法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>碧箫岛弟子防身掌法，招数繁复，如落花般纷乱。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "落英缤纷",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>发出掌风，对目标造成伤害。</p><p>·可使用蓄力动作释放，释放距离+3。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "蓄力增加距离手动。若目标有[落英]标记，自动触发倒地禁足。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "落英效果触发",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"luoying_mark\");\n    if (hasMark) {\n        // 倒地 (Prone)\n        await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n        // 禁足 (Root)\n        const rootEff = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if (rootEff) {\n            const data = foundry.utils.deepClone(rootEff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n        ui.notifications.info(`${args.target.name} 触发落英：倒地并禁足！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "夕食秋菊",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "次要动作",
+                    "description": "<p>低头横掌，开启架招，每次成功格挡后，给对方添加“落英”，持续三回合。</p><p><strong>落英：</strong>被《落英掌法》招式命中后倒地，且被添加“禁足”，持续一回合。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡施加落英自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-施加落英",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取AE模板\nconst effData = thisItem.effects.getName(\"落英\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 施加给攻击者\nif (args.attacker) {\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    ui.notifications.info(`${args.attacker.name} 被标记 [落英]`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "花自飘零",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，双掌齐出，乱影花舞，对其造成伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "若目标有[落英]标记，自动触发倒地禁足。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "落英效果触发",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"luoying_mark\");\n    if (hasMark) {\n        await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n        const rootEff = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if (rootEff) {\n            const data = foundry.utils.deepClone(rootEff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n        ui.notifications.info(`${args.target.name} 触发落英：倒地并禁足！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "百花缭乱",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>掌环纷飞，内力激荡对周围敌人造成伤害。</p><p>·此招可移动释放，对移动路径上周围 2 米范围内的敌人造成伤害。（不会重复造成伤害）</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "移动路径判定手动。若目标有[落英]标记，自动触发倒地禁足。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "落英效果触发",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"luoying_mark\");\n    if (hasMark) {\n        await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n        const rootEff = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if (rootEff) {\n            const data = foundry.utils.deepClone(rootEff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n        ui.notifications.info(`${args.target.name} 触发落英：倒地并禁足！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "落英",
+                    "icon": "icons/magic/nature/leaf-marked-green.webp",
+                    "description": "被《落英掌法》招式命中后倒地，且被添加“禁足”，持续一回合。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "luoying_mark",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 3
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "碧海青天",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>以内力模仿大海潮浪，聆听如见沧波万顷，定力稍弱者听得此曲，必然心旌摇动，为其所牵。轻者受伤，重则丧命。</p><p><strong>需求：</strong>乐器-箫笛</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "乐器-箫笛",
+            "moves": [
+                {
+                    "name": "碧海青天",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "100米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>起音婉转，瞬而磅礴，对范围内至多 10 名敌人造成伤害（内功命中、内功暴击），敌人还需要进行[定力]检定（难度 17），失败则陷入“自闭”，持续到你吹奏结束，成功无事，但会立刻对你发起战斗。</p><p>·施展此招后，你的每个回合都需要花费蓄力动作持续吹奏，否则吹奏结束，最长可吹奏五分钟。</p><p>·本招式消耗极大精力，一天只能施展一次。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "命中请求定力检定，失败施加自闭。持续吹奏和次数限制手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shencai",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "定力检定",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 17,\n        label: \"抵抗音律\",\n        onFail: \"zibi\"\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "点指神通",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>江湖曾有一老叟以此技横行江湖，后归隐碧箫岛。需以内力凝于拇指中指后，弹出石子、钱币等其他小物体，威力绝伦，亦可击打对方穴道。</p><p><strong>需求：</strong>徒手-指法</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "徒手-指法",
+            "moves": [
+                {
+                    "name": "点指神通",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "20米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>运劲于指，力通而发。击中目标造成伤害。命中无架招目标时，你可以放弃这次造成的伤害，转为将目标点穴（解穴难度 15），持续一回合。</p><p><strong>消耗：</strong>小石子*1</p><p><strong>升级：</strong>招式伤害+10，解穴难度+2，内力消耗+4。</p>",
+                    "automationNote": "命中无架招自动询问是否转为点穴，选择是则伤害归零并施加点穴。小石子消耗手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "点穴抉择",
+                            "trigger": "preDamage",
+                            "script": "if (args.outcome.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"点指神通\" },\n        content: `<p>命中无架招目标！</p><p>是否<b>放弃伤害</b>转为<b>点穴</b>？</p><p>(DC: ${dc})</p>`,\n        yes: { label: \"点穴 (放弃伤害)\", icon: \"fas fa-bullseye\" },\n        no: { label: \"仅造成伤害\", icon: \"fas fa-fist-raised\" }\n    });\n\n    if (confirm) {\n        // 伤害归零\n        args.config.amount = 0;\n\n        // 施加点穴状态\n        const eff = CONFIG.statusEffects.find(e => e.id === \"dianxue\");\n        if (eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { rounds: 1 };\n            // 记录解穴DC到AE上 (虽然系统目前没用到，但留作参考)\n            data.flags[\"xjzl-system\"] = { ...data.flags[\"xjzl-system\"], dc: dc };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 被点穴 (DC ${dc})，伤害已豁免。`);\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "至阴真经",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>其作者不详，自唐朝就有流传，全经共千字不到，却分上下册十余篇章，深奥难懂，晦涩至极。宋时，因真经载有破解各大门派武学的方法，更是被追捧为天下武学总纲，遂引起江湖群雄的争夺，掀起腥风血雨，后失传，仅余残篇留于碧箫岛。</p><p>至阴真经全书除总纲外共分十四篇，碧箫岛仅余三章。岛主黄谌以毕生精力破解三篇至阴残章，与秦王许下神秘赌注，输赢无人知晓。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "疗伤篇",
+                    "type": "qi",
+                    "actionType": "default",
+                    "tier": 1,
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>调息养血，以内力快速恢复内伤。</p><p><strong>需求：</strong>1000 修为领悟（不可升级）</p><p><strong>效果：</strong>你小憩时可以额外进行 1 次[疗伤]，且你每次用[疗伤]回复气血时，回复的气血翻倍。</p><p>·药品为你回复气血时，额外回复 10 点气血。</p>",
+                    "automationNote": "疗伤翻倍与额外次数被动生效。药品回复加成被动生效。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            1000
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "疗伤翻倍",
+                            "trigger": "passive",
+                            "script": "// 暂无直接疗伤倍率属性，需系统支持或手动。\n// 药品回复 +10 目前无法通过简单 flags 实现，需 Hook。\n// 此处仅作为记录。\nconsole.log(\"XJZL | 疗伤篇已激活\");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "筋骨篇",
+                    "type": "qi",
+                    "actionType": "default",
+                    "tier": 3,
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>初学之际，宜先筋骨，筋骨不立，肉何所附。</p><p><strong>需求：</strong>4000 修为领悟（不可升级）</p><p><strong>【脉畅髓通】：</strong>你不需要休整便可灌注修为。</p><p><strong>【骨骼惊奇】：</strong>你每月额外获得 100 点修为。</p><p><strong>【突飞猛进】：</strong>每开一条经脉，获得 5 自由属性。</p>",
+                    "automationNote": "纯被动描述，无战斗脚本。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            4000
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    }
+                },
+                {
+                    "name": "解穴篇",
+                    "type": "qi",
+                    "actionType": "default",
+                    "tier": 3,
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>冲穴秘法，与寻常点穴路数完全不同，故有奇效。</p><p><strong>需求：</strong>4000 修为领悟（不可升级）</p><p><strong>效果：</strong>你在战斗时[冲穴]成功后，不失去主要，而是次要动作。</p><p>·你进行[冲穴]时，检定结果+5。</p><p>·你在为他人解开穴道时，具有优势。</p>",
+                    "automationNote": "冲穴检定+5自动。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            4000
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "冲穴加成",
+                            "trigger": "passive",
+                            "script": "S.skills.chongxue.mod += 5;",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "雕花刀法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>食神府厨子刀工极其精湛，指头大的萝卜也能刻成精致小人，细微处见真功。</p><p><strong>需求：</strong>刀，食之道</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "刀；食之道",
+            "moves": [
+                {
+                    "name": "丁块条段",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>刀口垂直，准备细密刀工，开启架招，成功格挡时，获得“雕花”，持续三回合。</p><p><strong>雕花：</strong>你的[烹饪]等级+1。</p><p><strong>升级：</strong>格挡值+5，雕花提供的烹饪+1，消耗+1。</p>",
+                    "automationNote": "格挡获雕花自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-雕花",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst effData = thisItem.effects.getName(\"雕花\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 动态计算烹饪加成 (1 + Lv-1)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst bonus = 1 + (lvl - 1);\n\neffData.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "鱼鳞花刀",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>斜刀一推一拉，切人字，对敌人造成伤害。若目标无架招，且自身[烹饪]等级达到 5，此招暴击骰-2。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "烹饪等级判定与暴击阈值修正自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "烹饪暴击修正",
+                            "trigger": "check",
+                            "script": "const pengren = actor.system.arts.pengren.total || 0;\nif (pengren >= 5 && !args.target.system.martial.stanceActive) {\n    args.flags.critThresholdMod += 2;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "松鼠花刀",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>直斜刀纹均剞，交构菱形，对目标造成伤害。击破架招时，给目标添加一层“流血”状态，持续到战斗脱离。</p><p>·若你的[烹饪]达到 5 级，虚招值+2。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "烹饪加虚招自动。击破施加流血自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "烹饪加虚招",
+                            "trigger": "calc",
+                            "script": "const pengren = actor.system.arts.pengren.total || 0;\nif (pengren >= 5) {\n    args.output.feint += 2;\n    args.output.bonusDesc.push(\"烹饪精通: 虚招+2\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击破-流血",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"bleed_stack\");\n    if (eff) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "百千花刀",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>月牙斜纹、麦穗蓑衣，各类花刀层出不穷，对目标造成伤害。</p><p>·若自身具有“雕花”，可移除雕花，招式伤害+10，并在目标裸露部位刺下一个半寸大小的痕迹，图案任意。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "预览时显示加成。出招时询问是否消耗雕花。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "预览加成",
+                            "trigger": "calc",
+                            "script": "const hasDiaohua = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"diaohua\");\nif (hasDiaohua) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"雕花加成 +10\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "消耗雕花",
+                            "trigger": "attack",
+                            "script": "const diaohua = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"diaohua\");\nif (diaohua) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"百千花刀\" },\n        content: `<p>检测到 [雕花]，伤害已 +10。</p><p>是否消耗 [雕花] 以生效此加成？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        await diaohua.delete();\n        ui.notifications.info(\"消耗 [雕花]，伤害提升并留下印记。 \");\n    } else {\n        args.flags.damageResult.damage -= 10;\n        args.flags.damageResult.breakdown += \"\\n- 未消耗雕花：移除加成 (-10)\";\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "雕花",
+                    "icon": "icons/tools/scribal/ink-quill-orange.webp",
+                    "description": "你的[烹饪]等级+1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "diaohua",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 3
+                    },
+                    "changes": [
+                        {
+                            "key": "system.arts.pengren.mod",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "谢家棍法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>谢家祖传棍法。食神府面点特级大师谢七，曾以此棍法横行广东，名噪一时。</p><p><strong>需求：</strong>棍，食之道</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "棍；食之道",
+            "moves": [
+                {
+                    "name": "黄金烧麦",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>钢棍横扫，造成伤害。</p><p>·若自身拥有“黄金比例”，则消耗“黄金比例”，并回复 10 点气血，10 点内力。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "命中消耗黄金比例回血回蓝自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗黄金比例",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huangjinbili\");\n    if (buff) {\n        await buff.delete();\n        await actor.applyHealing({amount: 10, type: 'hp', showScrolling: true});\n        await actor.applyHealing({amount: 10, type: 'mp', showScrolling: true});\n        ui.notifications.info(`${actor.name} 消耗 [黄金比例] 回复状态！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "黄金旋风",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "次要动作",
+                    "description": "<p>挥舞钢棍，开启架招。同时卷起疾风，将 3 米范围内无架招的目标击飞 1 米。</p><p><strong>升级：</strong>格挡值+5，内力消耗+2。</p>",
+                    "automationNote": "击飞效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞提示",
+                            "trigger": "attack",
+                            "script": "ui.notifications.info(\"已开启架招。请手动处理周围 3 米内无架招目标的击飞效果。 \");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "黄金面点",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "element": "gang",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>抛出事先做好的主食或小吃类佳肴，然后大口吞下，自身获得佳肴效果，同时额外回复 5 气血，5 内力。然后获得“黄金比例”，持续到战斗脱离。</p><p><strong>消耗：</strong>主食或小吃*1</p><p><strong>升级：</strong>额外回复 5 气血，5 内力，内力消耗+1。</p>",
+                    "automationNote": "回复HP/MP自动。获得黄金比例自动。物品消耗手动。",
+                    "calculation": {
+                        "base": 5,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "额外效果",
+                            "trigger": "hit",
+                            "script": "// 基础回复已由 heal 模式处理(HP)，需额外处理MP\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 5 + (lvl - 1) * 5;\nawait actor.applyHealing({amount: amount, type: 'mp', showScrolling: true});\n\n// 添加黄金比例\nconst eff = thisItem.effects.getName(\"黄金比例\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nui.notifications.info(\"请手动消耗一个主食或小吃。\");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "黄金开口笑",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>长棍挥舞，对目标造成伤害。</p><p>·若自身拥有“黄金比例”，则消耗“黄金比例”，移除自身任意状态。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "消耗黄金比例提示移除状态手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "净化",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huangjinbili\");\n    if (buff) {\n        await buff.delete();\n        ui.notifications.info(`${actor.name} 消耗 [黄金比例]，请手动移除一个负面状态。`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "黄金比例",
+                    "icon": "icons/commodities/materials/bowl-powder-gold.webp",
+                    "description": "特殊的面点技艺状态。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "huangjinbili",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "饕餮刀法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>贪财为饕，贪食为餮。食、性、命为人之根本，此刀法以贪婪之势，横扫群雄。</p><p><strong>需求：</strong>刀，食之道</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "刀；食之道",
+            "moves": [
+                {
+                    "name": "山珍海味",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>弓步盖把，开启架招。同时获得“山珍”，持续一回合。成功格挡时，获得“海味”，持续一回合。</p><p><strong>山珍：</strong>受到伤害时，你可以消耗饱食度来抵消受到的伤害，每 1 点饱食度抵消 1 点伤害。</p><p><strong>海味：</strong>可以使用全回合动作来食用佳肴。</p><p>·当“山珍”“海味”同时存在时，格挡值+10。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "开启获山珍自动。格挡获海味自动。双BUFF格挡+10通过被动脚本实现。山珍抵伤需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启-山珍",
+                            "trigger": "attack",
+                            "script": "const eff = thisItem.effects.getName(\"山珍\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        },
+                        {
+                            "label": "格挡-海味",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"海味\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        },
+                        {
+                            "label": "双珍共鸣",
+                            "trigger": "passive",
+                            "script": "const hasShan = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shanzhen\");\nconst hasHai = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"haiwei\");\nif (hasShan && hasHai) {\n    S.combat.block += 10;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "饥不择食",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>挥刀在手，刀插其口，造成伤害。击破架招时，目标嘴中鲜血如注，流失等于你[烹饪]等级*5 的气血，你回复等额气血。</p><p><strong>升级：</strong>招式伤害+10，流失气血+10，内力消耗+2。</p>",
+                    "automationNote": "击破流血吸血自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破吸血",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const pengren = actor.system.arts.pengren.total || 0;\n    // 基础流失由等级成长决定? 原文说 升级:流失气血+10，这里假设烹饪*5是基础公式，升级增加额外值。\n    // 修正理解：原文\"流失等于你[烹饪]等级*5 的气血\"，升级部分说\"流失气血+10\"。\n    // 组合公式： (烹饪 * 5) + ((Lv-1) * 10)\n    const bleedAmount = (pengren * 5) + ((lvl - 1) * 10);\n    \n    await args.target.applyDamage({\n        amount: bleedAmount,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    await actor.applyHealing({amount: bleedAmount, type: 'hp', showScrolling: true});\n    ui.notifications.info(`击破吸血：造成 ${bleedAmount} 流失，回复自身。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "胡吃海喝",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "主要动作",
+                    "description": "<p>掏出一份佳肴，一划为四，抛入四名友方（包括自己）口中。友方视作食用该佳肴，可回复佳肴四分之一（向上取整）的饱食度，并获得佳肴效果，但只持续一回合。</p><p>·当自己同时拥有“山珍”“海味”时，所有友方获得完整的饱食度，且佳肴效果持续到战斗脱离。</p><p><strong>升级：</strong>释放距离+2，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "纯手动。请手动扣除物品并给友方调整饱食度和添加效果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [
+                            4,
+                            3,
+                            2,
+                            1
+                        ]
+                    }
+                },
+                {
+                    "name": "食遍天下",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "全回合动作",
+                    "description": "<p>掏出一份佳肴当场开吃，边吃边跑边砍，对周围敌人造成伤害，同时获得“不时不食”，持续到战斗脱离。</p><p>·此招可移动释放，对移动路径上周围 1 米范围内的敌人造成伤害。（不会重复造成伤害）</p><p><strong>不时不食：</strong>你每对一个目标造成伤害，移除他身上的佳肴效果（如果有），然后转移给自己，持续到该状态结束。状态持续期间，你可以叠加获得无数的美食效果。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "移动路径手动。施加不时不食状态自动。夺取佳肴效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得状态",
+                            "trigger": "attack",
+                            "script": "const eff = thisItem.effects.getName(\"不时不食\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "山珍",
+                    "icon": "icons/consumables/meat/shank-cooked-brown.webp",
+                    "description": "受到伤害时，你可以消耗饱食度来抵消受到的伤害，每 1 点饱食度抵消 1 点伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shanzhen",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "海味",
+                    "icon": "icons/consumables/fish/salmon-fillet-cooked-pink.webp",
+                    "description": "可以使用全回合动作来食用佳肴。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "haiwei",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "不时不食",
+                    "icon": "icons/tools/kitchen/pot-iron-dutch.webp",
+                    "description": "伤害夺取佳肴效果。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bushibushi",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "庖丁解牛刀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>厨师当中流传的至高刀技巧，可轻松破开动物皮囊，拆解肉体。并非仰仗蛮力，而是以技巧为上。</p><p><strong>需求：</strong>刀-单刀</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "刀-单刀",
+            "moves": [
+                {
+                    "name": "剜肉剔骨",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>飞速削斩，对目标造成伤害，若击破目标架招，随机削去目标一块血肉。（头，鼻子，手， 腿，肩部，胸口，背部，腰部、臀部，脚），若此处血肉已经被削去，则使目标陷入“骨折”状态，持续到治愈。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破后提示手动处理部位伤害或骨折(可以使用系统自带的“断肢”功能)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; color:red;\">剜肉剔骨 - 击破</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>击破架招！请随机削去一块血肉。</p>\n                <p>若该部位已残缺，施加 <b>[骨折]</b> 状态。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "拆节卸筋",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>以刀法斩击目标关节大筋，此次命中具有劣势，对其造成伤害。若击中无架招目标，使其四肢随机一处脱臼。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "自动劣势。无架招脱臼提示手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "自动劣势",
+                            "trigger": "attack",
+                            "script": "args.flags.level -= 1;",
+                            "active": true
+                        },
+                        {
+                            "label": "脱臼提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(\"命中无架招目标：请手动处理 [脱臼] 效果。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "开脑取髓",
+                    "type": "counter",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破虚招时，消耗反应施展，压制目标虚招，刀取颅顶，对目标造成伤害，若击中无架招目标，则削去对手头皮，并使目标陷入“血流不止”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "无架招施加流血(血流不止)自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "血流不止",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"bleed_stack\");\n    if (eff) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 头皮被削，血流不止！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "猛牛青龙斩",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>一刀斩出，刀光乱飞，对目标造成伤害，若击中无架招目标，根据你的[烹饪]等级，获得额外效果：</p><p>3：将头，鼻子，手，腿，肩部，胸口，背部，腰部、臀部，脚的肉各斩飞一块。</p><p>5：斩瞎目标双眼。</p><p>7：斩断目标手脚四处各 1d4 根指头。</p><p>10：斩掉对手四肢中随机一条。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "命中无架招后，检测烹饪等级并提示效果。实际残疾需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "烹饪特效",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const pengren = actor.system.arts.pengren.total || 0;\n    let effects = [];\n    if (pengren >= 3) effects.push(\"Lv3: 全身削肉\");\n    if (pengren >= 5) effects.push(\"Lv5: 斩瞎双眼\");\n    if (pengren >= 7) effects.push(\"Lv7: 斩断指头 (1d4/处)\");\n    if (pengren >= 10) effects.push(\"Lv10: 斩断四肢之一\");\n\n    if (effects.length > 0) {\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\">\n                <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; color:#8b0000;\">猛牛青龙斩 - 烹饪特效 (Lv${pengren})</div>\n                <ul style=\"padding-left:20px; margin:5px 0;\">\n                    ${effects.map(e => `<li>${e}</li>`).join('')}\n                </ul>\n            </div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "醉棍",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>醉汉握棍、翻滚、跌爬，其实心无一丝醉意，用时得心应手，寓技法于醉形，藏杀机于醉态。</p><p><strong>注：</strong>若侠士处于“醉倒”，《醉棍》招式可将对方击倒，且招式伤害+5。</p><p><strong>需求：</strong>棍，酒之道</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "棍；酒之道",
+            "scripts": [
+                {
+                    "label": "醉倒加成",
+                    "trigger": "calc",
+                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉倒加成 +5\");\n}",
+                    "active": true
+                },
+                {
+                    "label": "醉倒击倒提示",
+                    "trigger": "hit",
+                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao && args.isHit) {\n    ui.notifications.info(`${actor.name} 处于醉倒状态，可将 ${args.target.name} 击倒！（请手动执行倒地）`);\n}",
+                    "active": true
+                }
+            ],
+            "moves": [
+                {
+                    "name": "踏浪弄箫",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>棍置双腿间，双腿巧拨棍，开启架招。若处于“醉倒”时，你获得“醉态”，可叠加三层，持续到战斗脱离或解除架招。</p><p><strong>醉态：</strong>每层醉态使你虚招值+1，棍法伤害+5。</p><p><strong>升级：</strong>格挡值+10。内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。开启时若醉倒获醉态自动。格挡获醉态自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗检查",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
+                            "active": true
+                        },
+                        {
+                            "label": "开启获态",
+                            "trigger": "attack",
+                            "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "格挡获态",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "急步挑灯",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>持棍上挑，棍击敌人造成 0.4 力量点外功伤害。若命中无架招目标，可将其击退 1 米，然后消耗次要动作饮用一壶美酒。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。击退与饮酒手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
+                            "active": true
+                        },
+                        {
+                            "label": "效果提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(`命中无架招目标！请手动击退 ${args.target.name} 1 米，并消耗次要动作饮酒。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "倒拍驴尾",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>低头含胸，出棍佯攻，而后扫敌后脑，造成 0.4 力量点外功伤害。击破架招后，自身获得一层“醉态”，并击飞敌人 3 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。击破获态自动。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
+                            "active": true
+                        },
+                        {
+                            "label": "击破效果",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(`击破架招！获得 [醉态]。请手动击飞 ${args.target.name} 3 米。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "独立敬酒",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破虚招时，可以消耗反应动作释放此招，压制对方虚招，掌心推棍，直击对方咽喉，造成 0.5 力量点外功伤害，并使其陷入“醉倒”三回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。施加醉倒自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
+                            "active": true
+                        },
+                        {
+                            "label": "施加醉倒",
+                            "trigger": "hit",
+                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"zuidao\");\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "醉仙指路",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双手握棍，棍顶戮敌，造成 0.8 力量点外功伤害。可消耗醉态层数获得以下一个效果：</p><p>消耗 1 层“醉态”，招式命中+10。</p><p>消耗 2 层“醉态”，击飞敌人三米后使其倒地。</p><p>消耗 3 层“醉态”，招式伤害提升 20 点。</p><p>·若你的[酒艺]等级达到 10，返还消耗的醉态。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "醉意消耗自动。醉态消耗与效果自动。酒艺返还自动。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
+                            "active": true
+                        },
+                        {
+                            "label": "消耗醉态",
+                            "trigger": "attack",
+                            "script": "// 检查层数\nconst zuitai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuitai\");\nconst stacks = zuitai ? (zuitai.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\n// 弹窗选择\nconst options = [];\nif (stacks >= 1) options.push({value: 1, label: \"消耗1层：命中+10\"});\nif (stacks >= 2) options.push({value: 2, label: \"消耗2层：击飞倒地\"});\nif (stacks >= 3) options.push({value: 3, label: \"消耗3层：伤害+20\"});\n\nif (options.length === 0) return;\n\nconst content = `<form><div class=\"form-group\"><label>选择消耗</label><select id=\"choice\">${options.map(o => `<option value=\"${o.value}\">${o.label}</option>`).join(\"\")}</select></div></form>`;\n\nconst choice = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"醉仙指路\" },\n    content: content,\n    ok: { callback: (event, button) => button.form.elements.choice.value }\n});\n\nif (!choice) return;\nconst cost = parseInt(choice);\n\n// 应用效果\nif (cost === 1) {\n    args.flags.bonusHit += 10;\n    args.flags.damageResult.breakdown += \"\\n+ 醉态：命中+10\";\n} else if (cost === 2) {\n    // 记录标记，在 hit 阶段应用倒地\n    // 使用规范的 wuxue_ 前缀\n    actor.flags[\"xjzl-system\"].wuxue_applyProne = true;\n    ui.notifications.info(\"醉态强化：请手动击飞 3 米！即将自动施加倒地。\");\n} else if (cost === 3) {\n    args.flags.damageResult.damage += 20;\n    args.flags.damageResult.breakdown += \"\\n+ 醉态：伤害+20\";\n}\n\n// 消耗处理 (酒艺>=10 则不消耗)\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nif (jiuyi < 10) {\n    await game.xjzl.api.effects.removeEffect(actor, \"zuitai\", cost);\n} else {\n    ui.notifications.info(\"酒艺高超，醉态已返还！\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "应用倒地",
+                            "trigger": "hit",
+                            "script": "if (actor.flags[\"xjzl-system\"]?.wuxue_applyProne && args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n    // 清理标记\n    delete actor.flags[\"xjzl-system\"].wuxue_applyProne;\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "醉态",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "每层醉态使你虚招值+1，棍法伤害+5。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zuitai",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.xuzhao",
+                            "mode": 2,
+                            "value": "1"
+                        },
+                        {
+                            "key": "system.combat.damages.weaponTypes.staff.mod",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "醉仙剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>传说是李白所创，也有人言乃蜀山剑仙传下，抑或后人攀附，虽糊里糊涂，却是个罕见的高明剑法。</p><p><strong>注：</strong>若侠士处于“醉倒”，《醉仙剑法》招式可将对方击倒，且招式伤害+5。</p><p><strong>需求：</strong>剑，酒之道</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑；酒之道",
+            "scripts": [
+                {
+                    "label": "醉倒加成",
+                    "trigger": "calc",
+                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉倒加成 +5\");\n}",
+                    "active": true
+                },
+                {
+                    "label": "醉倒击倒提示",
+                    "trigger": "hit",
+                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao && args.isHit) {\n    ui.notifications.info(`${actor.name} 处于醉倒状态，可将 ${args.target.name} 击倒！（请手动执行倒地）`);\n}",
+                    "active": true
+                }
+            ],
+            "moves": [
+                {
+                    "name": "敬酒天阁",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>酒浮于剑，飞溅四方，对周围敌人造成 0.4 内息点内功伤害。命中无架招目标时，美酒迷眼，使目标陷入“目盲”状态，持续一回合。</p><p>·若自身具有“仙酿”，可移除一层“仙酿”，使本次招式伤害提升当前醉意值的数值，然后自身移除所有醉意。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "醉意消耗自动。命中无架招目盲自动。仙酿消耗与增伤全自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
+                            "active": true
+                        },
+                        {
+                            "label": "无架招目盲",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被美酒迷眼 (目盲)`);\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "消耗仙酿爆发",
+                            "trigger": "attack",
+                            "script": "const xianniang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nif (xianniang) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"敬酒天阁\" },\n        content: \"<p>是否消耗 1 层 [仙酿]？</p><p>效果：伤害增加当前醉意值，随后清空醉意。</p>\",\n        yes: { label: \"消耗爆发\" },\n        no: { label: \"普通施展\" }\n    });\n\n    if (confirm) {\n        // 1. 获取当前醉意 (注意：attack前已经扣了10点基础消耗)\n        const currentAlc = actor.system.resources.alcohol.value;\n        \n        // 2. 增加伤害\n        args.flags.damageResult.damage += currentAlc;\n        args.flags.damageResult.breakdown += `\\n+ 仙酿爆发：+${currentAlc}`;\n        \n        // 3. 移除效果\n        await game.xjzl.api.effects.removeEffect(actor, \"xianniang\", 1);\n        await actor.update({\"system.resources.alcohol.value\": 0});\n        ui.notifications.info(\"仙酿已尽，醉意全消！\");\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "剑虚品酒",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>剑撇三路，剑鸣不止，对目标造成 0.4 内息点内功伤害。命中无架招目标时，为自己和对方添加一层“仙酿”，至多三层，持续到脱战。</p><p><strong>仙酿：</strong>每层使你每回合末获得 5 点醉意。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。命中无架招添加仙酿自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
+                            "active": true
+                        },
+                        {
+                            "label": "添加仙酿",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"仙酿\").toObject();\n    // 给自己\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    // 给目标\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(\"对饮成三人！双方获得 [仙酿]。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "仙酿浮步",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>酒洒遍地，脚步虚浮，开启架招，格挡成功后，使敌我双方各获得一层“仙酿”。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。格挡添加仙酿自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗检查",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
+                            "active": true
+                        },
+                        {
+                            "label": "格挡-仙酿",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst eff = thisItem.effects.getName(\"仙酿\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);\nif (args.attacker) {\n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "酒醒虚妄",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可以消耗反应动作施展此招，压制对方虚招。酒意顿失，恍惚一瞬寒光现，对目标造成 0.7 内息点内功伤害。</p><p>·若目标身上存在 3 层“仙酿”，可移除目标 3 层仙酿，不进行虚招对抗，直接施展此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。跳过对抗逻辑需GM/玩家手动确认执行（提示信息已加）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
+                            "active": true
+                        },
+                        {
+                            "label": "特殊施展提示",
+                            "trigger": "check",
+                            "script": "const xianniang = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nconst stacks = xianniang ? (xianniang.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3) {\n    ui.notifications.info(`${args.target.name} 身上有 3 层仙酿，您可以手动移除它们并【直接施展】此反击（无需对抗）。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "举杯邀月",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "全回合动作",
+                    "description": "<p>向月共饮，扬臂饮尽壶中酒，消耗自身行囊任意一壶美酒获得效果，且额外增加 10 醉意。根据你的酒量，获得“护身”，至多三层：</p><p>酒量大于 30，获得一层，持续到脱战。</p><p>酒量大于 50，获得两层，持续到脱战。</p><p>酒量大于 100，获得三层，持续到脱战。</p><p><strong>护身：</strong>每层增加内外功防御 5 点。</p><p>·自身受到内外功伤害后，移除所有“护身”，每移除一层护身，获得一层“仙酿”状态。</p><p><strong>升级：</strong>再增加 10 点醉意，内力消耗+2。</p>",
+                    "automationNote": "消耗美酒手动。增加醉意、计算护身层数自动。受击移除护身并转仙酿自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "饮酒获益",
+                            "trigger": "hit",
+                            "script": "// 1. 增加醉意 (基础10 + 升级)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst alcBonus = 10 + (lvl - 1) * 10;\nconst currentAlc = actor.system.resources.alcohol.value;\nawait actor.update({\"system.resources.alcohol.value\": currentAlc + alcBonus});\n\n// 2. 计算护身层数\nconst maxAlc = actor.system.resources.alcohol.max;\nlet stacks = 0;\nif (maxAlc > 100) stacks = 3;\nelse if (maxAlc > 50) stacks = 2;\nelse if (maxAlc > 30) stacks = 1;\n\nif (stacks > 0) {\n    const eff = thisItem.effects.getName(\"护身\").toObject();\n    eff.flags[\"xjzl-system\"].maxStacks = 3;\n    // 循环叠加\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n    ui.notifications.info(`酒量 ${maxAlc}，获得 ${stacks} 层 [护身]`);\n} else {\n    ui.notifications.warn(\"酒量不足 30，未获得护身。 (记得手动消耗美酒物品)\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "何处人间",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>颠颠倒倒，肆意挥剑，月光难泄，剑影难窥，不消耗速度突进至目标身前，对目标及其 1 米内所有敌人造成 0.7 内息点内功伤害。</p><p>·可以消耗自身与目标的“仙酿”状态，每合计消耗一层“仙酿”，招式伤害+5，若合计消耗层数大于等于 5 层，则此招必定命中。</p><p>·施展此招后，进入“酒仙”状态，持续到脱战。</p><p><strong>酒仙：</strong>你每回合初获得 10 点醉意，且不受“醉倒”的移动速度减半和命中劣势效果影响。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "醉意消耗自动。仙酿统计与消耗、伤害加成、必中判定全自动。酒仙状态自动。突进手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 20) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 20点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 20});",
+                            "active": true
+                        },
+                        {
+                            "label": "仙酿爆发与酒仙",
+                            "trigger": "attack",
+                            "script": "// 1. 统计全场仙酿\nlet totalStacks = 0;\nconst selfEff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nif (selfEff) totalStacks += (selfEff.getFlag(\"xjzl-system\", \"stacks\") || 1);\n\n// 注意：game.user.targets 是 Set\nconst targets = Array.from(game.user.targets);\nfor (const t of targets) {\n    const tActor = t.actor;\n    if (tActor) {\n        const tEff = tActor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\n        if (tEff) totalStacks += (tEff.getFlag(\"xjzl-system\", \"stacks\") || 1);\n    }\n}\n\nif (totalStacks > 0) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"何处人间\" },\n        content: `<p>全场共有 <b>${totalStacks}</b> 层 [仙酿]。</p><p>是否全部消耗以增强威力？</p><p>效果：每层伤害+5。若>=5层，必定命中。</p>`,\n        yes: { label: \"全部消耗\" },\n        no: { label: \"不消耗\" }\n    });\n\n    if (confirm) {\n        // 效果\n        const dmgBonus = totalStacks * 5;\n        args.flags.damageResult.damage += dmgBonus;\n        args.flags.damageResult.breakdown += `\\n+ 仙酿消耗(${totalStacks})：+${dmgBonus}`;\n        \n        if (totalStacks >= 5) {\n            args.flags.forceHit = true;\n            ui.notifications.info(\"酒意滔天，此剑必中！\");\n        }\n\n        // 移除\n        if (selfEff) await selfEff.delete();\n        for (const t of targets) {\n            const tActor = t.actor;\n            if (tActor) {\n                const tEff = tActor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\n                if (tEff) await tEff.delete();\n            }\n        }\n    }\n}\n\n// 获得酒仙\nconst jiuxian = thisItem.effects.getName(\"酒仙\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, jiuxian);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "仙酿",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "每回合末获得醉意。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xianniang",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenAlcoholTurnEnd",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "护身",
+                    "icon": "icons/magic/defensive/shield-barrier-glowing-blue.webp",
+                    "description": "增加防御。受击转仙酿。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "hushen_zui",
+                            "stackable": true,
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "转化仙酿",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "if (['waigong', 'neigong'].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 移除护身\n    await thisEffect.delete();\n    \n    // 添加等量仙酿\n    // 我们需要找到源Item来获取仙酿模板，但这里 active effect 的 origin 只是 uuid string\n    // 简便方法：直接用名称查找\n    const item = await fromUuid(thisEffect.origin);\n    if (item) {\n        const effTemplate = item.effects.getName(\"仙酿\").toObject();\n        for(let i=0; i<stacks; i++) {\n            await game.xjzl.api.effects.addEffect(actor, effTemplate);\n        }\n        ui.notifications.info(`护身破碎，化为 ${stacks} 层仙酿！`);\n    }\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.def_waigong",
+                            "mode": 2,
+                            "value": "5"
+                        },
+                        {
+                            "key": "system.combat.def_neigong",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "酒仙",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "每回合回醉意，免疫醉倒负面。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jiuxian",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenAlcoholTurnStart",
+                            "mode": 2,
+                            "value": "10"
+                        },
+                        {
+                            "key": "flags.xjzl-system.unstable",
+                            "mode": 5,
+                            "value": "false"
+                        },
+                        {
+                            "key": "flags.xjzl-system.attackLevel",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "醉八仙",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>模仿八仙各饮酒醉态而形成的传统拳术，腿走八卦、醉眼朦胧、跌跌撞撞、摇摇摆摆，实际上形醉意不醉，拳醉心不醉，有其独特的手眼身法步。</p><p><strong>需求：</strong>徒手，酒之道</p><p><strong>属性：</strong>刚</p><p><strong>注：</strong>侠士必须处于“醉倒”方可施展《醉八仙》，出招可将对方击倒，且招式伤害+5。</p>",
+            "requirements": "徒手；酒之道",
+            "scripts": [
+                {
+                    "label": "醉倒限制与加成",
+                    "trigger": "attack",
+                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (!zuidao) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"必须处于 [醉倒] 状态才能施展醉八仙！\";\n    return;\n}\n// 加成处理\nargs.flags.damageResult.damage += 5;\nargs.flags.damageResult.breakdown += \"\\n+ 醉倒加成 +5\";",
+                    "active": true
+                },
+                {
+                    "label": "醉倒击倒提示",
+                    "trigger": "hit",
+                    "script": "if (args.isHit) {\n    ui.notifications.info(`${actor.name} 处于醉倒状态，可将 ${args.target.name} 击倒！（请手动执行倒地）`);\n}",
+                    "active": true
+                }
+            ],
+            "moves": [
+                {
+                    "name": "采和拦腰",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>单提敬酒，倒栽悬身，开启架招。格挡成功后，获得一层“醉八仙”，可叠加三层，持续到战斗脱离或解除架招。</p><p><strong>醉八仙：</strong>消耗醉意出招时，每层回复你 5 气血。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。格挡获态自动。消耗醉意回血自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗检查",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\n// 触发回血检测 (因为这里也是消耗醉意出招)\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "格挡-醉八仙",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"醉八仙\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "洞宾提壶",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>翻身提壶，力达千钧，跌撞前方对目标造成 0.5 力量点外功伤害。</p><p>·每存在一层“醉八仙”，招式暴击骰-1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。暴击阈值修正自动。回血联动自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗与回血",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 回血\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n    // 暴击修正\n    args.flags.critThresholdMod += stacks;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "拐李旋膝",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p>旋肘拐膝，醉卧酣眠，倒地并使自身立即回复[酒艺]等级+10 点气血，并获得“醉卧”，持续一回合。</p><p><strong>醉卧：</strong>持续期间受到来自 3 米范围内的攻击后，可不消耗动作双手撑地起身脚踢敌人，对其造成 0.5 力量点外功伤害。</p><p><strong>升级：</strong>回复气血+5，醉卧伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗自动。倒地、回血、获醉卧状态自动。醉卧反击效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗与回血联动",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "效果结算",
+                            "trigger": "hit",
+                            "script": "// 1. 倒地\nconst prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\nif (prone) await game.xjzl.api.effects.addEffect(actor, prone);\n\n// 2. 回血 (基础)\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseHeal = jiuyi + 10 + (lvl - 1) * 5;\nawait actor.applyHealing({amount: baseHeal, type: \"hp\", showScrolling: true});\n\n// 3. 获得醉卧提示Buff\nconst eff = thisItem.effects.getName(\"醉卧\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "钟离抱坛",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>双手抱圆作抱坛跌步状，窝心拱顶双臂下砸，对周围范围目标造成 0.4 力量点外功伤害。</p><p>·每存在一层“醉八仙”，给所有敌人添加 10 点醉意。</p><p><strong>升级：</strong>招式伤害+10，添加的醉意+5，消耗+4。</p>",
+                    "automationNote": "醉意消耗与回血自动。给敌人加醉意自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗与回血",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "灌酒",
+                            "trigger": "hit",
+                            "script": "const zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const alcAdd = 10 + (lvl - 1) * 5;\n    const totalAdd = alcAdd * stacks;\n\n    const targetAlc = args.target.system.resources?.alcohol?.value || 0;\n    await args.target.update({\"system.resources.alcohol.value\": targetAlc + totalAdd});\n    ui.notifications.info(`给 ${args.target.name} 灌入 ${totalAdd} 点醉意！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "果老抛杯",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>醉酒抛杯，仰身踢踹，造成 0.4 力量点外功伤害，击破架招后可击飞目标 1 米。</p><p>自身每存在一层“醉八仙”，可额外击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗与回血自动。击飞距离计算提示自动，执行手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗与回血",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击破击飞",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\n    const stacks = zbx ? (zbx.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    const dist = 1 + stacks;\n    ui.notifications.info(`击破架招！请手动将 ${args.target.name} 击飞 ${dist} 米。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "仙姑献酒",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "gang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "全回合动作",
+                    "description": "<p>现场弯腰饮酒，一醉方休，消耗自身行囊任意一壶美酒获得效果，且额外增加 10 醉意。根据你的酒量，获得“轻灵”，至多三层：</p><p>酒量大于 30，获得一层，持续到脱战。</p><p>酒量大于 50，获得两层，持续到脱战。</p><p>酒量大于 100，获得三层，持续到脱战。</p><p><strong>轻灵：</strong>每层使你的闪避+5。</p><p>·自身成功闪避后，移除所有“轻灵”，每移除一层轻灵，获得一层“醉八仙”状态。</p><p><strong>升级：</strong>再增加 10 点醉意，内力消耗+2。</p>",
+                    "automationNote": "消耗美酒手动。增加醉意、计算轻灵层数自动。闪避移除轻灵并转醉八仙自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "饮酒获益",
+                            "trigger": "hit",
+                            "script": "// 1. 增加醉意\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst alcBonus = 10 + (lvl - 1) * 10;\nconst currentAlc = actor.system.resources.alcohol.value;\nawait actor.update({\"system.resources.alcohol.value\": currentAlc + alcBonus});\n\n// 2. 计算轻灵层数\nconst maxAlc = actor.system.resources.alcohol.max;\nlet stacks = 0;\nif (maxAlc > 100) stacks = 3;\nelse if (maxAlc > 50) stacks = 2;\nelse if (maxAlc > 30) stacks = 1;\n\nif (stacks > 0) {\n    const eff = thisItem.effects.getName(\"轻灵\").toObject();\n    eff.flags[\"xjzl-system\"].maxStacks = 3;\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n    ui.notifications.info(`酒量 ${maxAlc}，获得 ${stacks} 层 [轻灵]`);\n} else {\n    ui.notifications.warn(\"酒量不足 30，未获得轻灵。 (记得手动消耗美酒物品)\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "国舅锁喉",
+                    "type": "counter",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破目标虚招后，可消耗反应动作释放此招，压制对方虚招，踏步至目标面前，扣腕锁喉，对其造成 0.6 力量点外功伤害。</p><p>·每存在一层“醉八仙”，释放距离增加 2 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "醉意消耗与回血自动。距离增加提示自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗与回血",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`当前 [醉八仙] 层数 ${stacks}，施法距离应为 ${2 + stacks * 2} 米。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "湘子吹箫",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>袭胸拽足疯意闹，荡步飘飘醉逍遥，吟诗击拳，对目标造成 0.8 力量点外功伤害。</p><p>·自身存在三层“醉八仙”，给对方额外造成自身醉意数值的气血流失。</p><p>·施展此招后，进入“酒仙”状态，持续到脱战。</p><p><strong>酒仙：</strong>你每回合初获得 10 点醉意，且不受“醉倒”的移动速度减半和命中劣势效果影响。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "醉意消耗自动。额外流失伤害自动。获酒仙自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意消耗",
+                            "trigger": "attack",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 20) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 20点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 20});",
+                            "active": true
+                        },
+                        {
+                            "label": "流失与酒仙",
+                            "trigger": "hit",
+                            "script": "const zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nconst stacks = zbx ? (zbx.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3 && args.isHit) {\n    const dmg = actor.system.resources.alcohol.value;\n    await args.target.applyDamage({\n        amount: dmg,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`三层醉八仙触发！额外造成 ${dmg} 点流失。`);\n}\n\nconst jiuxian = thisItem.effects.getName(\"酒仙\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, jiuxian);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "醉八仙",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "消耗醉意出招回血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zui_ba_xian",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "轻灵",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "增加闪避，闪避后转醉八仙。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "qingling_zui",
+                            "stackable": true,
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "转化醉八仙",
+                                    "trigger": "avoided",
+                                    "active": true,
+                                    "script": "const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n// 移除1层\nawait game.xjzl.api.effects.removeEffect(actor, \"qingling_zui\", 1);\n\n// 获得1层醉八仙\n// 需找到Item\nconst item = await fromUuid(thisEffect.origin);\nif (item) {\n    const eff = item.effects.getName(\"醉八仙\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"闪避成功！轻灵转化为醉八仙。\");\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.dodge",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "醉卧",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "倒地，可反击。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zuiwo",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "酒仙",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "每回合回醉意，免疫醉倒负面。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jiuxian",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenAlcoholTurnStart",
+                            "mode": 2,
+                            "value": "10"
+                        },
+                        {
+                            "key": "flags.xjzl-system.unstable",
+                            "mode": 5,
+                            "value": "false"
+                        },
+                        {
+                            "key": "flags.xjzl-system.attackLevel",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "千锤万棒",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>食神府制作面点或是牛丸时，以擀面杖捶打食材，力大势沉，万棒之下方有万钧之势。</p><p><strong>需求：</strong>棍</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "棍",
+            "moves": [
+                {
+                    "name": "千锤万棒",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "佳肴",
+                    "actionCost": "全回合动作",
+                    "description": "<p>花费三个回合的全回合动作，凝万钧之势，对一个佳肴不停捶打，使该佳肴获得“极品佳肴”，持续到战斗脱离。</p><p><strong>极品佳肴：</strong>该佳肴焕发三丈高的金色光芒，当你食用该佳肴时，获得的美食效果提升 1 倍，然后进行[定力]检定（难度 11），成功无事，失败则感慨万千，闭目流泪，陷入“自闭”十回合。</p><p>·施展该招式捶打期间，你不可以移动。</p><p><strong>升级：</strong>招式施展减少一个回合，内力消耗+1</p>",
+                    "automationNote": "效果纯手动描述。施法过程手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            1
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "火云掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>当年荣华楼成名之战上，周史地以火云掌煎溏心蛋，做成了黯然销魂饭，夺得饕餮盛宴第一名，名震广东。</p><p><strong>需求：</strong>徒手-拳掌</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "徒手-拳掌",
+            "moves": [
+                {
+                    "name": "火云掌",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "食材",
+                    "actionCost": "全回合动作",
+                    "description": "<p>花费三个回合的全回合动作，内气喷涌，掌心如烈焰灼烧，似烧未烧，即刻当场制作并完成一份佳肴（依旧需要进行成功的[烹饪]检定），并且该佳肴获得“极品佳肴”，持续到战斗脱离。</p><p><strong>极品佳肴：</strong>该佳肴焕发三丈高的金色光芒，当你食用该佳肴时，获得的美食效果提升 1 倍，然后进行[定力]检定（难度 11），成功无事，失败则感慨万千，闭目流泪，陷入“自闭”十回合。</p><p>·施展该招式烹饪期间，你可以移动。</p><p><strong>升级：</strong>招式施展减少一个回合，消耗内力+2。</p>",
+                    "automationNote": "效果纯手动描述。施法过程手动。烹饪检定手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2
+                        ],
+                        "rage": [
+                            1
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "酒喷江河",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>白酒镇鬼，黄酒驱邪，混合喷出，可阻挡晦气。</p><p><strong>需求：</strong>《醉梦诀》修炼圆满</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "《醉梦诀》修炼圆满",
+            "moves": [
+                {
+                    "name": "酒喷江河",
+                    "type": "qi",
+                    "actionType": "attack",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "3米",
+                    "targetInfo": "扇形",
+                    "actionCost": "全回合动作",
+                    "description": "<p>将酒含入口中，然后以内力将酒喷出，扇形范围内的所有敌人和其他友方，进行[轻功]检定（难度 11），如果失败则陷入“醉倒”状态，持续一回合。</p><p><strong>升级：</strong>难度+2，醉倒持续回合+1，内力消耗+4。</p>",
+                    "automationNote": "请求检定与施加状态自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "发起检定",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 11 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\nconst zuidao = CONFIG.statusEffects.find(e => e.id === \"zuidao\");\nconst effectData = foundry.utils.deepClone(zuidao);\neffectData.duration = { rounds: rounds };\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"qinggong\",\n    dc: dc,\n    label: \"躲避酒雾\",\n    onFail: effectData\n});",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "人间烟火",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>炊烟袅袅，怡然自得。食神府弟子修炼至高深时，彻悟“食为天”之理。人道将存，不可无食，美食不仅是花红柳绿，酒池肉林，更是繁衍延续，传承之大道，是以酒肉烟火气，最抚凡人心。</p><p><strong>需求：</strong>《灶王神诀》修炼圆满</p><p><strong>效果：</strong>你的[烹饪]、[酒艺]每有 1 级，你的气血、内力上限+1。</p><p>·在战斗中，你可以用次要动作，消耗一份佳肴和一壶酒（而非饮食），有酒也有肉，人生何处快意恩仇，获得一层“烟火气”，持续到战斗脱离。</p><p><strong>烟火气：</strong>你可以消耗一层烟火气，使用主要动作在战斗食用佳肴或美酒。</p><p>·你可以消耗两层烟火气，给一名其他目标（包括敌人）喂佳肴或美酒。</p><p><strong>升级：</strong>烹饪酒艺每级提供的气血内力+1，获得“烟火气”的层数+1</p>",
+            "requirements": "《灶王神诀》修炼圆满",
+            "scripts": [
+                {
+                    "label": "被动属性提升",
+                    "trigger": "passive",
+                    "script": "// 必须遍历所有招式来确定最高等级\nlet maxLvl = 1;\nif (item.system.moves) {\n    for(const m of item.system.moves) {\n        if ((m.computedLevel || 0) > maxLvl) maxLvl = m.computedLevel;\n    }\n}\n\nconst pengren = actor.system.arts.pengren.total || 0;\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nconst multiplier = 1 + (maxLvl - 1);\nconst bonus = (pengren + jiuyi) * multiplier;\n\n// 直接修改 max\nactor.system.resources.hp.bonus += bonus;\nactor.system.resources.mp.bonus += bonus;",
+                    "active": true
+                }
+            ],
+            "moves": [
+                {
+                    "name": "获得烟火气",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>消耗一份佳肴和一壶酒，获得“烟火气”。</p><p><strong>升级：</strong>获得“烟火气”的层数+1。</p>",
+                    "automationNote": "消耗物品手动。获得层数自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得烟火气",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"烟火气\").toObject();\n// 叠加\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nui.notifications.info(`消耗酒肉，获得 ${stacks} 层烟火气！`);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "烟火气",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "消耗层数快速进食或喂食。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yanhuoqi",
+                            "stackable": true
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    }
+]

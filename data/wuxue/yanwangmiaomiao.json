@@ -1,0 +1,1680 @@
+[
+    {
+        "name": "勾魂七杀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>阎王楼杀手夺命刺法，极为凶残，招招毙命，杀气越重，威力越强。</p><p><strong>需求：</strong>匕首</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "匕首",
+            "moves": [
+                {
+                    "name": "夺命狂呼",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，聚气若芒，夺手飞扬，对敌人造成 0.5 力量点外功伤害，若击破架招，为其添加“夺命”，持续三回合。</p><p><strong>夺命：</strong>每次出招后流失 10 点气血、内力。</p><p>·你每有 1 点杀孽，招式虚招值+1。（至多+4）</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破施加夺命自动。杀孽加成自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "杀孽加成",
+                            "trigger": "attack",
+                            "script": "const shanie = actor.system.resources.shanie || 0;\nconst bonus = Math.min(shanie, 4);\nargs.flags.bonusFeint += bonus;",
+                            "active": true
+                        },
+                        {
+                            "label": "施加夺命",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n    ui.notifications.info(`${args.target.name} 被施加 [夺命]`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "夺魂索命",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，锐匕翻飞，劲气乱射，对周围敌人造成 0.4 力量点外功伤害。</p><p>·若有敌人处于 5 米范围的半空中且存在“夺命”，此招可消耗反应动作释放，飞身戳敌于空。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "反应动作施展需手动判定条件。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "亡魂缠身",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，隐器于内，开启架招。格挡成功时给对方添加“夺命”，持续一回合。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡施加夺命自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反击",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    ui.notifications.info(\"格挡成功！反弹 [夺命]\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "吸魂取命",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，选择范围内最多一个存在“夺命”的目标，减少其“夺命”一回合的持续时间，每选择一名目标，你获得 1 点怒气。</p><p><strong>升级：</strong>你可以再多选择一个目标减少夺命，消耗+2。</p>",
+                    "automationNote": "纯手动。请手动调整目标Buff持续时间和自身怒气。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "地狱轮回",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，勾魂之舞，连攻要害，溅血连击。对目标造成 0.7 力量点外功伤害。若目标身上存在“夺命”，可击飞目标 1 米。</p><p>·你每有 1 点杀孽，招式伤害+10。（至多+100）</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "杀孽加伤自动。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "杀孽加伤",
+                            "trigger": "attack",
+                            "script": "const shanie = actor.system.resources.shanie || 0;\nconst bonus = Math.min(shanie * 10, 100);\nif (bonus > 0) {\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 杀孽加成: ${bonus}`;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit",
+                            "script": "const hasDuoming = args.target.effects.some(e => e.name === \"夺命\");\nif (hasDuoming) {\n    ui.notifications.info(`${args.target.name} 身上有 [夺命]，被击飞 1 米。`);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "夺命",
+                    "icon": "icons/svg/blood.svg",
+                    "description": "每次出招后流失气血内力。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "duoming",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "出招流失",
+                                    "trigger": "attack",
+                                    "script": "await actor.applyHealing({ amount: -10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ amount: -10, type: \"mp\", showScrolling: true });\nui.notifications.info(`${actor.name} 因 [夺命] 流失气血内力`);",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "阎王棍",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>阴寒诡异，晦涩难练，十一招中的七招已失传。棍法引巧劲，以封压为主，特立独行，难以捉摸。</p><p><strong>需求：</strong>棍-短棍</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "棍-短棍",
+            "moves": [
+                {
+                    "name": "轮转定魂",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，掀起阴风阵阵，对范围内敌人造成 0.5 内息点内功伤害。若击中无架招目标，则驱散其身上所有持续回合类状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "伤害自动。驱散效果请GM手动删除Buff。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "驱散提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px\"><b>轮转定魂</b> 命中无架招目标！<br>请GM手动驱散 ${args.target.name} 的持续状态。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "阿鼻降难",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，棍棒飞舞，交织成虚网一般，开启架招。成功格挡时，使对方禁足一回合。</p><p>当阿鼻降难被击破时，你的下一次出招无视敌方闪避，并且释放距离提升 20 米。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+                    "automationNote": "格挡禁足自动。被击破后自身BUFF自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡禁足",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        ui.notifications.info(`${args.attacker.name} 被禁足！`);\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "被破增益",
+                            "trigger": "damaged",
+                            "script": "// 防御者视角：架招被击破\nif (args.isBroken) {\n    const buffData = thisItem.effects.getName(\"阿鼻降难-破\").toObject();\n    delete buffData._id;\n    buffData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, buffData);\n    ui.notifications.info(\"阿鼻降难被破，获得反击增益！\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "大热恼",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，棍扫腰腹，内力撕裂内脏，如车崩碎寡，爬肠炙髓。对敌人造成 0.5 内息点内功伤害。</p><p>击破架招时，使目标历经痛苦加刑，投入第十殿，轮回转世，可消耗次要动作施展一次【轮转定魂】。</p><p>·若目标无视世俗，此招虚招对抗时具有优势。</p><p>·若范围内有敌人陷入“走火入魔”，可消耗反应动作对其施展此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "无视世俗优势自动。追击提示手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "世俗优势",
+                            "trigger": "check",
+                            "script": "const attitude = args.target.system.social?.attitude_shisu;\nif (attitude === \"disdain\" || attitude === \"ignore\") { \n    args.flags.feintLevel += 1;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "泰山锥肉",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "地面",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，将内力灌注于棍，奋力插地，入土三分。在周围地面引起阵阵阴气，化为‘热恼地狱’，持续 1 回合。</p><p><strong>热恼地狱：</strong>在其中施展的【大热恼】，不会被“行刑”状态的敌人压制反击。</p><p>·在其中开启【阿鼻降难】成功格挡时，还可使敌方陷入“行刑”，持续一回合。</p><p><strong>升级：</strong>‘热恼地狱’持续回合+1，内力消耗+8。</p>",
+                    "automationNote": "仅提示生成地狱，具体交互需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "生成提示",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nui.notifications.info(`已生成 [热恼地狱] (2米)，持续 ${rounds} 回合。请手动放置模板。`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "卞城枉死",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你即将受到暴击伤害时，你可以消耗反应动作释放此招，引动阴死审判之气，抵挡此次攻击。你的每点恶行值为你提供 1 点减伤（至多 200 点）。</p><p>若你将此次伤害抵消至仅剩 1 点，历经大叫唤地狱，满日转解闹恼地狱，你可以立即不消耗动作施展一次【泰山锥肉】。</p><p><strong>升级：</strong>恶行值提供的减伤上限提高 100 点。</p>",
+                    "automationNote": "请在即将受到暴击前手动施展。会自动应用Buff，Buff会自动计算减伤。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            20,
+                            20,
+                            20,
+                            20
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "应用护盾",
+                            "trigger": "hit",
+                            "script": "const effData = thisItem.effects.getName(\"卞城枉死\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { turns: 1 }; // 仅生效一次攻击\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "望乡还阳",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，只能对无架招目标（包括友军）使用，一棍轻点头颅，内力缓缓注入，为目标回复 1.0 内息点气血（内功命中，但无法暴击），目标每有 1 点侠义值，减少 1 点回复量，若减少到负数，则使目标流失等同于该负数绝对值的气血。</p><p>若目标处于“行刑”状态，目标每有一点侠义值额外减少 1 点回复量。</p><p><strong>升级：</strong>回复气血-20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "治疗/伤害判定完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": -20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 1.0
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "侠义反转",
+                            "trigger": "hit",
+                            "script": "if (args.target.system.martial.stanceActive) {\n    return ui.notifications.warn(\"目标开启了架招，无法生效！\");\n}\n\n// 1. 计算初始回复 (damageResult.damage 此时存储的是内息加成后的基础值)\nlet healAmount = args.damageResult.damage;\n\n// 2. 读取目标侠义\nconst xiayi = args.target.system.social?.xiayi || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ amount: finalValue, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`${args.target.name} 获得 ${finalValue} 治疗`);\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyHealing({ amount: -damage, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`${args.target.name} 因侠义过高流失 ${damage} 气血`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "屏蔽常规伤害",
+                            "trigger": "preDamage",
+                            "script": "args.config.amount = 0;",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "五宫血池",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>自身陷入重伤时（气血不足 50%）方能施展，次要动作，血液流转，鲜血蒸发，短棍引动形成周身血雾，开启架招。你每损失 100 点气血，获得额外 1 点格挡值。格挡成功后，你可以用自身气感与目标的身法进行一次对抗：</p><p>若你对抗成功，鲜血缠绕目标，粘于皮肤之上，使其状如血人，形态可怖，陷入“行刑”状态，持续到战斗脱离。</p><p>若你对抗失败，你的气血逸散，转送阎罗，解除架招，获得 1 点怒气，如果你愿意，你可以消耗反应动作施展一次【阿鼻降难】。</p><p><strong>升级：</strong>格挡值+10，每损失 100 气血获得的额外格挡值+1，内力消耗+4。</p>",
+                    "automationNote": "开启条件手动。血量转化格挡自动。对抗判定手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启条件检查",
+                            "trigger": "attack",
+                            "script": "const hp = system.resources.hp.value;\nconst max = system.resources.hp.max;\nif (hp > max * 0.5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"气血未低于50%，无法施展！\";\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "动态格挡",
+                            "trigger": "passive",
+                            "script": "// 仅当架招激活时生效 (passive 已内置此判断)\nconst hp = actor.system.resources.hp.value;\nconst max = actor.system.resources.hp.max;\nconst lost = Math.max(0, max - hp);\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst ratio = 1 + (lvl - 1);\nconst bonus = Math.floor(lost / 100) * ratio;\n\n// 修改系统格挡值\nactor.system.combat.blockTotal += bonus;",
+                            "active": true
+                        },
+                        {
+                            "label": "对抗提示",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px\"><b>五宫血池</b> 格挡成功！<br>请进行 <b>气感 vs 身法</b> 对抗。<br>胜：施加 [行刑] (手动)<br>负：解除架招并回1怒 (手动)</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "黑绳宋帝",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "4米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，棍舞下盘，轰向双膝，对目标造成 0.7 内息点内功伤害，若目标无架招，且目标的【侠义值+恶行值】低于你的，则目标深陷黑绳地狱，受刮骨，挖眼，倒吊之刑，其本场战斗中的残疾检定，会依次出现 5，6，71，73，之后再进行正常判定。</p><p>若目标格挡成功，则他侠义值、恶行值中较小的那个，减少小（他的神采*0.5）。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "条件判定自动。残疾/数值削减请GM手动操作。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "效果提示",
+                            "trigger": "hit",
+                            "script": "const mySum = (actor.system.social.xiayi || 0) + (actor.system.social.exing || 0);\nconst targetSum = (args.target.system.social.xiayi || 0) + (args.target.system.social.exing || 0);\nconst noStance = !args.target.system.martial.stanceActive;\n\nif (noStance && targetSum < mySum) {\n    ui.notifications.info(\"满足黑绳地狱条件！请GM接管残疾判定。\");\n} else if (!args.isHit) {\n    if (args.finalDamage <= 0) {\n         ui.notifications.info(\"疑似格挡成功，请检查是否需要扣除侠义/恶行。\");\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "楚江剥皮",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可以消耗反应动作施展此招，压制目标虚招，棍如刀削，铺天盖地，避无可避，造成 0.7 内息点内功伤害。</p><p>若对方处于“行刑”状态，则使其立刻进行一次残疾检定。</p><p><strong>升级：</strong>招式伤害+10，增加一次残疾检定，内力消耗+4。</p>",
+                    "automationNote": "检测行刑自动。残疾检定手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "残疾提示",
+                            "trigger": "hit",
+                            "script": "const isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nif (isXingxing) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const count = 1 + (lvl - 1);\n    ui.notifications.info(`目标处于行刑状态！请进行 ${count} 次残疾检定。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "秦广超生",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，以棍虚画一圈，定阴阳善恶，对目标造成 0.6 内息点内功伤害，若击破架招，则根据目标标签产生效果。</p><p>[大侠]目标无法再次开启被击破的架招，持续到战斗结束。</p><p>[大恶]目标施展的外功伤害招式，无法造成暴击，持续到战斗结束。</p><p>[侠士][恶人]：陷入“行刑”状态，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "标签判定复杂，请GM手动应用效果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px\"><b>秦广超生</b> 击破架招！<br>请根据目标标签 [大侠/大恶/侠士/恶人] 应用对应效果。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "十殿定生死",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "10米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，人间生死手中定，棍舞阴曹，对周围敌人造成 0.8 内息点内功伤害。</p><p>·你在本场战斗中每施展过一招不同的《阎王棍》招式，此招招式伤害+20（不包括此招，即最多计算十招）。</p><p><strong>升级：</strong>招式伤害+20，每施展过一招增加的招式伤害+10，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "已用招式计数需手动，请在出招前手动修正伤害。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            16,
+                            32,
+                            48,
+                            64
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": []
+                }
+            ],
+            "effects": [
+                {
+                    "name": "阿鼻降难-破",
+                    "icon": "icons/svg/up.svg",
+                    "description": "下一次出招无视闪避，距离+20米。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "abijiannan_broken",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "无视闪避",
+                                    "trigger": "attack",
+                                    "script": "args.flags.forceHit = true;\nui.notifications.info(\"阿鼻降难效果：本次必中！\");",
+                                    "active": true
+                                },
+                                {
+                                    "label": "消耗",
+                                    "trigger": "hit",
+                                    "script": "await thisEffect.delete();",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "卞城枉死",
+                    "icon": "icons/svg/shield.svg",
+                    "description": "护盾：恶行值减伤。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "biancheng",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "恶行护盾",
+                                    "trigger": "preTake",
+                                    "script": "const exing = actor.system.social.exing || 0;\nconst lvl = 1; \nconst max = 200 + (lvl - 1) * 100;\nconst reduction = Math.min(exing, max);\n\nconst original = args.output.damage;\nconst reduced = Math.max(0, original - reduction);\n\nargs.output.damage = reduced;\nargs.output.bonusDesc.push(`卞城枉死减伤 -${original - reduced}`);\n\nif (reduced === 1) {\n    ui.notifications.info(\"伤害抵消至1点！触发 [泰山锥肉] 追击机会！\");\n}\n",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "蛰伏",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>刺杀秘技，收敛全身气息，等待致命一击。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "蛰伏",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，隐匿身形，你进行一次[潜行]检定，进入“蛰伏”状态，持续到你移动位置或发起攻击或被其他人以[探查]发现你。</p><p><strong>蛰伏：</strong>下一次出招时暴击骰-2。</p><p><strong>升级：</strong>[潜行]检定+1，暴击骰再-1，消耗+2。</p>",
+                    "automationNote": "潜行检定自动。BUFF应用自动。移除条件需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "潜行与BUFF",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1);\nawait actor.rollAttributeTest(\"qianxing\", { bonus: bonus, flavor: \"蛰伏-潜行检定\" });\n\nconst effData = thisItem.effects.getName(\"蛰伏\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\nconst critRed = 2 + (lvl - 1);\neffData.changes[0].value = String(-critRed);\neffData.changes[1].value = String(-critRed);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "蛰伏",
+                    "icon": "icons/svg/eye.svg",
+                    "description": "下一次出招暴击骰减少。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhefu",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "出招后移除",
+                                    "trigger": "attack",
+                                    "script": "await thisEffect.delete();",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "-2"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "-2"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "黑白无常",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>阴阳两界无常律，黑白生死互相依。民间总传说黑无常与白无常同出同隐，同生同死。</p><p><strong>需求：</strong>《无相无常功》修炼圆满</p>",
+            "requirements": "《无相无常功》修炼圆满",
+            "moves": [
+                {
+                    "name": "黑白无常",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "友方",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，选择 1 米内修炼与你不同属性的《无相无常功》至圆满的目标释放此招，对方需要消耗反应动作配合，你们两人心智身形合二为一，占据一格，同时获得“黑白无常”，持续一回合。</p><p><strong>黑白无常：</strong>你与目标背贴背占据一个空格，但依旧按照先攻顺序分别进行自己的回合。</p><p>·双方其中一人移动时，会携带另一人一起移动。</p><p>·双方的移动速度、内外功防御和格挡值变为两人之和。</p><p>·就算占据一个空格，双方依旧是两个目标，敌人攻击该空格时，单体攻击只能选择其中一个人，但覆盖这个空格的范围攻击可以同时选择两个人。</p><p>·当你或目标中的一人陷入濒死，解除“黑白无常”，未濒死人会被挤到周围的任意空格（由他自己决定）。</p><p><strong>升级：</strong>招式动作下降一级（蓄力-主要-次要），施展距离+2，持续回合数+1。</p>",
+                    "automationNote": "合体逻辑无法自动，请手动处理Token位置和属性相加。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": []
+                }
+            ],
+            "effects": []
+        }
+    },
+    {
+        "name": "阎王不死印",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>利用阴阳相生，物极必反的原理，通过真气的快速生死转换达到几乎源源不绝而且不会有回不过气的境界，能够随意在生死二气之间转变切换。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "死气",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "被动",
+                    "description": "<p>每次受伤后，获得等同于受到伤害值一半的“不死气”，获得的不死气可叠加。</p><p>·不死气上限等于你的内力值上限。</p><p>·不死气消耗时，会一次性消耗掉所有不死气。</p><p><strong>需求：</strong>[佛法]等级 5，《魍魉心诀》修炼圆满</p><p><strong>修为：</strong>1000</p>",
+                    "automationNote": "被动自动积累。通过[阎王不死印-被动] AE实现。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "借力",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "反应动作",
+                    "description": "<p>进入战斗时，你可以消耗反应动作，将你的不死气转化为等额的护体真气，持续到战斗脱离。</p><p><strong>需求：</strong>气感 100</p><p><strong>修为：</strong>2000</p>",
+                    "automationNote": "自动读取并消耗不死气转化为护体。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "转化护体",
+                            "trigger": "hit",
+                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nif (current <= 0) return ui.notifications.warn(\"没有不死气！\");\n\nawait actor.applyHealing({ amount: current, type: \"huti\", showScrolling: true });\nawait thisItem.update({\"flags.xjzl-system.undyingQi\": 0});\nui.notifications.info(`消耗 ${current} 不死气转化为护体`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "化劲",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "反应动作",
+                    "description": "<p>受到伤害时，你可以消耗反应动作，使用不死气抵消等额的内功/外功伤害。</p><p><strong>需求：</strong>内息 100</p><p><strong>修为：</strong>2000</p>",
+                    "automationNote": "点击后提示当前不死气数量，请在受击时手动计算减伤。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "查看不死气",
+                            "trigger": "hit",
+                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nui.notifications.info(`当前不死气: ${current}。请在受到伤害时手动消耗 flag 并抵消伤害。`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "化生",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，将不死气转化为生气，打入自己或 1 米内友方体内为其回复等额气血。</p><p><strong>需求：</strong>侠义值 800</p><p><strong>修为：</strong>2000</p>",
+                    "automationNote": "自动读取并消耗不死气转化为治疗量。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "设置治疗量",
+                            "trigger": "calc",
+                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nargs.output.damage = current;\nargs.output.bonusDesc.push(`不死气转化: ${current}`);",
+                            "active": true
+                        },
+                        {
+                            "label": "清空不死气",
+                            "trigger": "hit",
+                            "script": "if (args.isHeal) {\n    await thisItem.update({\"flags.xjzl-system.undyingQi\": 0});\n    ui.notifications.info(\"不死气已清空\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "死煞",
+                    "type": "qi",
+                    "actionType": "attack",
+                    "element": "none",
+                    "damageType": "liushi",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，将不死气转化为死气，使周围 1 米范围内所有敌人流失等值的气血。</p><p><strong>需求：</strong>恶行值 800</p><p><strong>修为：</strong>2000</p>",
+                    "automationNote": "自动读取并消耗不死气转化为流失伤害。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "设置伤害量",
+                            "trigger": "calc",
+                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nargs.output.damage = current;\nargs.output.bonusDesc.push(`不死气转化: ${current}`);",
+                            "active": true
+                        },
+                        {
+                            "label": "清空不死气",
+                            "trigger": "hit",
+                            "script": "await thisItem.update({\"flags.xjzl-system.undyingQi\": 0});\nui.notifications.info(\"不死气已清空\");",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "阎王不死印-被动",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "受伤自动积累不死气。",
+                    "transfer": true,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "undying_seal_passive",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "积累不死气",
+                                    "trigger": "damaged",
+                                    "script": "const damage = args.hpLost + (args.hutiLost || 0);\nif (damage <= 0) return;\nconst gain = Math.floor(damage / 2);\n\nlet current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nconst max = actor.system.resources.mp.max;\nlet newVal = Math.min(current + gain, max);\n\nawait thisItem.update({\"flags.xjzl-system.undyingQi\": newVal});\nui.notifications.info(`不死气 +${gain} (当前: ${newVal})`);",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "喵之令",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>仿他人口号改编用于传教，有些扰民，无甚威力。</p><p><strong>需求：</strong>奇门-喵喵令</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "奇门-喵喵令",
+            "moves": [
+                {
+                    "name": "圣火昭昭",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，猫爪令牌戳，对敌人造成 0.3 内息点内功伤害。命中无架招敌人时，为其添加一层“流血”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "命中施加流血自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加流血",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"bleed_stack\", true);\n    ui.notifications.info(`${args.target.name} 流血了喵！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "圣火耀耀",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，挥舞猫爪令牌，对敌人造成 0.4 内息点内功伤害。若你的速度快于对方，招式必定命中，无法闪避。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "速度判定必中自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "速度必中",
+                            "trigger": "check",
+                            "script": "const mySpeed = actor.system.combat.speedTotal || 0;\nconst targetSpeed = args.target.system.combat.speedTotal || 0;\nif (mySpeed > targetSpeed) {\n    args.flags.forceHit = true;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "凡我弟子",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "special",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，双手靠于胸前向前握拳，开启架招。格挡成功时，对方流失 20 点气血，若他消耗反应动作，大喊“喵呜喵呜”，则不流失气血。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "流失气血自动。若对方喊喵请手动回血或忽略。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡流失",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyHealing({ amount: -20, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`${args.attacker.name} 因 [凡我弟子] 流失 20 气血 (喊喵可免)`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "喵喵喵喵",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "special",
+                    "range": "3米",
+                    "targetInfo": "友方",
+                    "actionCost": "反应动作",
+                    "description": "<p>当范围内一个友方开始回合时，你可以消耗反应动作大喊“喵”，根据你喊出的喵字数量，使他获得对应效果，每个喵字使招式额外消耗 1 怒气。</p><p>喵：你和他互换位置。</p><p>喵喵：获得三层“乘风”，持续到战斗脱离。</p><p>喵喵喵：获得三层“劲力”，持续到战斗脱离。</p><p>喵喵喵喵：你和他移除身上的任意效果。</p><p><strong>升级：</strong>释放距离+2，消耗怒气-1，内力消耗+2。</p>",
+                    "automationNote": "效果均为手动。请在对话框选择效果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            2,
+                            1,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "选择喵效果",
+                            "trigger": "hit",
+                            "script": "const target = args.target;\nconst content = `<div style=\"display:flex; flex-direction:column; gap:5px;\">\n    <button data-action=\"1\">喵 (1怒): 换位</button>\n    <button data-action=\"2\">喵喵 (2怒): 乘风x3</button>\n    <button data-action=\"3\">喵喵喵 (3怒): 劲力x3</button>\n    <button data-action=\"4\">喵喵喵喵 (4怒): 净化</button>\n</div>`;\n\nconst selection = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"喵喵喵喵\" },\n    content: content,\n    ok: { callback: (e, b) => e.submitter.dataset.action }\n});\n\nconst cost = parseInt(selection) || 0;\n// 扣除额外怒气 (基础消耗已在roll时扣除，这里扣额外的)\nif (cost > 0) {\n    await actor.update({ \"system.resources.rage.value\": Math.max(0, actor.system.resources.rage.value - cost) });\n}\n\nif (selection === \"1\") {\n    ui.notifications.info(\"请手动互换位置\");\n} else if (selection === \"2\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"chengfeng\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n} else if (selection === \"3\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"jinli\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n} else if (selection === \"4\") {\n    ui.notifications.info(\"请手动移除双方状态\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": []
+        }
+    },
+    {
+        "name": "声之令",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>喵喵令吹奏时的音色，其实像唢呐。</p><p><strong>需求：</strong>奇门-喵喵令</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "奇门-喵喵令",
+            "moves": [
+                {
+                    "name": "序",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "special",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>凝气于喉准备演奏，开启架招。格挡成功后，下回合施展【奏】时，释放距离+2 米；</p><p><strong>升级：</strong>格挡值+10，释放距离再+2，内力消耗+2。</p>",
+                    "automationNote": "距离增加需手动记忆。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "急",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，十指连奏，引动心神，目标需要进行[定力]检定，成功无事发生，若失败，目标下回合执行的主要动作内容，必须和上回合相同，如果目标在下个自己的回合没有执行上回合内容或无法办到，那么他在回合末流失 50 点气血，且你获得 1 点怒气。</p><p><strong>升级：</strong>难度+3，流失气血+50，消耗+2。</p>",
+                    "automationNote": "定力检定自动。后果完全手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "定力检定",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 11 + (lvl - 1) * 3;\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: dc,\n    label: \"抵抗魔音\"\n});",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "奏",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，口凑于令，吹奏摄人之曲，选择下列五首【律音】中的任意一曲，对范围内所有敌方造成伤害，并触发对应效果：</p><p>【宫·六字开门】安详平稳，吹奏一曲安详之曲，范围内所有敌方陷入“下盘不稳”，持续一回合。</p><p>【商·一枝花】凄楚悲壮，吹奏一曲悲伤之曲，范围内所有敌人陷入“错骨”，持续一回合。</p><p>【角·百鸟朝凤】百鸟和鸣，吹奏一曲生机之曲，为所有友方回复 50 点气血。</p><p>【徵·抬花轿】欢快灵动，吹奏一曲活泼之曲，为范围内所有友方单位添加“花轿”：暴击骰-3，持续一回合。</p><p>【羽·天乐】细腻婉约，吹奏一曲清冷之曲，为所有友方单位移除 1 个人级或地级的状态。</p><p><strong>升级：</strong>伤害+20，气血回复+20，添加的状态持续回合数+1。怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "请在出招时选择曲目。攻击类曲目自动，治疗/辅助类请手动对友方应用。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "选择曲目",
+                            "trigger": "attack",
+                            "script": "const content = `<select name=\"tune\" style=\"width:100%\">\n    <option value=\"gong\">宫 (下盘不稳)</option>\n    <option value=\"shang\">商 (错骨)</option>\n    <option value=\"jue\">角 (回复气血)</option>\n    <option value=\"zhi\">徵 (花轿Buff)</option>\n    <option value=\"yu\">羽 (移除状态)</option>\n</select>`;\nconst tune = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"选择律音\" },\n    content: content,\n    ok: { callback: (e, b) => b.form.elements.tune.value }\n});\n// 暂存选择到 flags 供 hit 使用\nargs.flags.tuneSelection = tune;",
+                            "active": true
+                        },
+                        {
+                            "label": "应用效果",
+                            "trigger": "hit",
+                            "script": "const tune = args.flags.tuneSelection;\nif (tune === \"gong\") {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"unstable\", true);\n} else if (tune === \"shang\") {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"cuogu\", true);\n} else if (tune === \"jue\") {\n    ui.notifications.info(\"角·百鸟朝凤：请手动对友方使用 [应用治疗] (基础50)\");\n} else if (tune === \"zhi\") {\n    ui.notifications.info(\"徵·抬花轿：请手动添加 Buff\");\n} else if (tune === \"yu\") {\n    ui.notifications.info(\"羽·天乐：请手动移除状态\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": []
+        }
+    },
+    {
+        "name": "猫猫神爪",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>模仿猫咪灵动，融汇太极之韵的武学奇技。唯与猫儿朝夕相伴，深解其习性者，方能洞悉此中真谛。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "饿猫猫",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，影闪如电，突袭夺食，对目标造成 0.5 身法点内功伤害。命中无架招目标后进行一个盗窃的[巧手]检定，根据结果，可将对方身上一个对应品级的状态转移给自己。</p><p>巧手结果 10：人级</p><p>巧手结果 15：地级</p><p>巧手结果 25：天级</p><p><strong>升级：</strong>招式伤害+10，[巧手]结果+2，内力消耗+2。</p>",
+                    "automationNote": "伤害自动。巧手检定自动。偷取状态手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "巧手检定",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = (lvl - 1) * 2;\n    await actor.rollAttributeTest(\"qiaoshou\", { bonus: bonus, flavor: \"饿猫猫-盗窃检定\" });\n    ui.notifications.info(\"请根据检定结果手动转移状态。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "爪猫猫",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，真气化爪，疯狂乱抓，对目标造成 0.4 身法点内功伤害，击破目标架招时，目标进行一次[忍耐]检定（难度 15），失败则陷入“走火入魔”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，检定难度+2，内力消耗+2。</p>",
+                    "automationNote": "击破忍耐检定自动。走火入魔自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破检定",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"rennai\",\n        dc: dc,\n        label: \"抵抗走火入魔\",\n        onFail: \"rage\"\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "怂猫猫",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当看破对方虚招时，可消耗反应动作释放此招,压制对方虚招，抽爪回击，使目标流失 20 气血。</p><p>然后大声呼救！使场上任意一个友方的先攻顺序移动到攻击者之后（下一个行动的是该友方）。</p><p><strong>升级：</strong>气血流失+10，内力消耗+2。</p>",
+                    "automationNote": "气血流失自动。修改先攻手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "反击效果",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst loss = 20 + (lvl - 1) * 10;\nawait args.target.applyHealing({ amount: -loss, type: \"hp\", showScrolling: true });\nui.notifications.info(`${args.target.name} 流失 ${loss} 气血。请手动调整友方先攻。`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "躲猫猫",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，步轻如燕，遁形避锋，获得“躲猫猫”，持续三回合。</p><p><strong>躲猫猫：</strong>你的速度+4。当自身是场上移动速度最快（并列第一）的角色时，你无法被招式选中。你对他人造成伤害后，移除躲猫猫。</p><p><strong>升级：</strong>躲猫猫的速度+2，怒气消耗-1，消耗+4。</p>",
+                    "automationNote": "BUFF速度自动。无法选中手动。造成伤害移除自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            5,
+                            4,
+                            3,
+                            2
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "应用BUFF",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst spd = 4 + (lvl - 1) * 2;\n\nconst effData = thisItem.effects.getName(\"躲猫猫\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.changes[0].value = String(spd);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "躲猫猫",
+                    "icon": "icons/svg/mystery-man.svg",
+                    "description": "速度增加，条件性无法选中。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "duomaomao",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "造成伤害移除",
+                                    "trigger": "hit",
+                                    "script": "// 攻击者视角：如果造成了伤害/攻击，移除自己身上的躲猫猫\n// 检查动作类型是否为攻击或实招/虚招\nif (args.type === 'attack' || args.isAttack) {\n    await thisEffect.delete();\n    ui.notifications.info(\"主动攻击，躲猫猫状态解除\");\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "0"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "虎豹猫音",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>喵喵喵喵，大呼小叫，魔音洗脑。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "虎豹猫音",
+                    "type": "qi",
+                    "actionType": "attack",
+                    "element": "none",
+                    "damageType": "mental",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，你一口气说超过 30 个以上的字且带有喵字，范围内听到你说话的敌人需要进行[韧性]检定（难度 10），成功无事，失败陷入“耳鸣”，持续一回合。</p><p><strong>升级：</strong>距离+1，检定难度+1。</p>",
+                    "automationNote": "韧性检定自动。耳鸣自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "韧性检定",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 10 + (lvl - 1);\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"renxing\",\n    dc: dc,\n    label: \"抵抗魔音\",\n    onFail: \"deaf\"\n});",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": []
+        }
+    },
+    {
+        "name": "咫尺天涯",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>猫者，若即若离，虽卧在咫尺，远如隔九关。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "咫尺天涯",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "反应动作",
+                    "description": "<p>当有敌人以你为目标出招时，可消耗反应动作使你与敌人间的距离视为增加 X 米，持续到该回合末。若你这么做，使双方距离超出对方此招的攻击距离时，视为对方的招式未命中。</p><p><strong>升级：</strong>内力消耗-10，怒气-1。</p>",
+                    "automationNote": "输入距离扣除内力自动。判定回避需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            30,
+                            20,
+                            10
+                        ],
+                        "rage": [
+                            3,
+                            2,
+                            1
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "计算消耗",
+                            "trigger": "attack",
+                            "script": "const dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"咫尺天涯\" },\n    content: `<label>增加距离 X 米:</label><input type=\"number\" name=\"val\" value=\"1\">`,\n    ok: { callback: (e, b) => b.form.elements.val.value }\n});\nconst x = parseInt(dialog) || 1;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseCost = (30 - (lvl - 1) * 10);\nconst totalMp = x * baseCost;\n\nconst currentMp = actor.system.resources.mp.value;\nif (currentMp < totalMp) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"内力不足\";\n    return;\n}\n\nawait actor.update({ \"system.resources.mp.value\": currentMp - totalMp });\nui.notifications.info(`消耗 ${totalMp} 内力，距离增加 ${x} 米`);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": []
+        }
+    },
+    {
+        "name": "九死还生",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>传说中猫有九条命，气随血转，九命显神。</p><p><strong>需求：</strong>《九命灵猫经》修炼圆满</p>",
+            "requirements": "《九命灵猫经》修炼圆满",
+            "moves": [
+                {
+                    "name": "九死还生",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "被动",
+                    "description": "<p>你每次受到伤害进行死亡检定时，可以不消耗动作施展此招，凝神止血，逆转轮回，这次死亡检定的结果+10，同时回复 10 点血气内力，清醒过来。然后你获得一层“九命”，至多九层，直到你死亡。</p><p><strong>九命：</strong>叠满九层时，你的死亡检定结果必为 1。</p><p>·九命不会被任何其他内功、物品效果移除，直到死亡才会消散。</p><p><strong>升级：</strong>怒气消耗-1，消耗+8。</p>",
+                    "automationNote": "请在濒死/死亡时手动点击施展。会自动回复状态并添加九命BUFF。九命叠满效果需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            4,
+                            3,
+                            2,
+                            1
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "复活与叠加",
+                            "trigger": "hit",
+                            "script": "// 恢复状态\nawait actor.applyHealing({ amount: 10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ amount: 10, type: \"mp\", showScrolling: true });\nawait actor.toggleStatusEffect(\"dying\", { active: false });\nawait actor.toggleStatusEffect(\"dead\", { active: false });\n\n// 添加九命\nconst effData = thisItem.effects.getName(\"九命\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 检查层数\nconst existing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jiuming\");\nconst stacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 9) {\n    ui.notifications.warn(\"九命已满，回天乏术！\");\n} else {\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(\"九死还生！获得一层 [九命]\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "九命",
+                    "icon": "icons/svg/skull.svg",
+                    "description": "满九层必死。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jiuming",
+                            "stackable": true,
+                            "maxStacks": 9
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    }
+]
