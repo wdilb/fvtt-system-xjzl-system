@@ -2368,7 +2368,7 @@
                         {
                             "label": "击破-封招",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"fengzhao\");\n    ui.notifications.info(`${args.target.name} 被封招！`);\n}",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被封招！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2400,7 +2400,7 @@
                         {
                             "label": "格挡-引劲",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"引劲\").toObject();\n// 动态修改最大层数\nconst stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst maxStacks = 2 + (lvl - 1);\neff.flags[\"xjzl-system\"].maxStacks = maxStacks;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取AE模板\nconst effData = thisItem.effects.getName(\"引劲\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 动态计算最大层数 (基础2 + Lv-1)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst maxStacks = 2 + (lvl - 1);\n\n// 修改 Flags\neffData.flags[\"xjzl-system\"].maxStacks = maxStacks;\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
@@ -2442,7 +2442,7 @@
                         {
                             "label": "引劲击飞提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasYinjin = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinjin\");\n    if (hasYinjin) {\n        ui.notifications.info(`${args.target.name} 被击飞2米`);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const hasYinjin = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinjin\");\n    if (hasYinjin) {\n        ui.notifications.info(`${args.target.name} 被击飞 2 米 (因引劲)`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2484,7 +2484,7 @@
                         {
                             "label": "下盘不稳",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n}",
+                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if(eff) {\n       const data = foundry.utils.deepClone(eff);\n       data.duration = { rounds: 1 };\n       await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2526,7 +2526,7 @@
                         {
                             "label": "生成领域",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"已生成 [炁化太虚] 领域 (3米)，持续 1(+1/Lv) 回合。\");",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst duration = 1 + (lvl - 1);\nui.notifications.info(`已生成 [炁化太虚] 领域 (3米)，持续 ${duration} 回合。`);",
                             "active": true
                         }
                     ]
@@ -2559,7 +2559,7 @@
                         {
                             "label": "应用揽雀尾",
                             "trigger": "hit",
-                            "script": "// 查找并消耗引劲\nconst yinjin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinjin\");\nif (!yinjin) return ui.notifications.warn(\"没有引劲！\");\n\nconst stacks = yinjin.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait yinjin.delete();\n\n// 计算系数\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst blockBonus = (5 + (lvl - 1) * 5) * stacks;\nconst healBonus = (10 + (lvl - 1) * 10) * stacks;\n\nconst eff = thisItem.effects.getName(\"揽雀尾\").toObject();\neff.changes[0].value = String(blockBonus);\neff.flags[\"xjzl-system\"].scriptArgs = { healBonus: healBonus }; // Pass value via flags for script below to read? Or define script here.\n// Better to construct script string dynamically\n\neff.scripts = [\n    {\n        label: \"受击回血\",\n        trigger: \"damaged\",\n        script: `await actor.applyHealing({amount: ${healBonus}, type: 'hp'}); await actor.applyHealing({amount: ${healBonus}, type: 'mp'});`,\n        active: true\n    }\n];\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`消耗 ${stacks} 层引劲，获得揽雀尾！`);",
+                            "script": "// 1. 查找并消耗引劲\nconst yinjin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinjin\");\nif (!yinjin) return ui.notifications.warn(\"未从自身引导劲力(无引劲层数)！\");\n\nconst stacks = yinjin.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait yinjin.delete();\n\n// 2. 计算系数\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst blockBonus = (5 + (lvl - 1) * 5) * stacks;\nconst healBonus = (10 + (lvl - 1) * 10) * stacks;\n\n// 3. 强制刷新：检查身上已有的揽雀尾，如果有则删除，确保新的 healBonus 变量能写入\nconst oldLanquewei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lanquewei\");\nif (oldLanquewei) await oldLanquewei.delete();\n\n// 4. 获取AE模板\nconst effData = thisItem.effects.getName(\"揽雀尾\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 5. 修改数据\neffData.changes[0].value = String(blockBonus);\n// 注入回血变量到 Flag\neffData.flags[\"xjzl-system\"].lanqueweiHeal = healBonus;\neffData.duration = { turns: 1 };\n\nconsole.log(\"XJZL | 施展揽雀尾 - 回血变量:\", healBonus);\n\n// 6. 应用\nawait game.xjzl.api.effects.addEffect(actor, effData);\nui.notifications.info(`消耗 ${stacks} 层引劲，施展揽雀尾！(格挡+${blockBonus}, 受击回+${healBonus})`);",
                             "active": true
                         }
                     ]
@@ -2608,7 +2608,7 @@
                         {
                             "label": "点穴",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"dianxue\");\n    ui.notifications.info(`${args.target.name} 被点穴！`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"neixi\",\n        dc: 20 + (Math.max(1, move.computedLevel || 1) - 1) * 2,\n        label: \"抵抗点穴\",\n        onFail: \"dianxue\"\n    });\n}",
                             "active": true
                         }
                     ]
@@ -2637,7 +2637,15 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "lanquewei",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "受击回血",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "const heal = Number(thisEffect.getFlag('xjzl-system', 'lanqueweiHeal')) || 0;\nif (heal > 0) {\n    await actor.applyHealing({amount: heal, type: 'hp', showScrolling: true});\n    await actor.applyHealing({amount: heal, type: 'mp', showScrolling: true});\n    ui.notifications.info(`${actor.name} 触发揽雀尾：回复 ${heal} 点气血内力`);\n}"
+                                }
+                            ]
                         }
                     },
                     "changes": [

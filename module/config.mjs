@@ -928,7 +928,7 @@ XJZL.statusEffects = [
   // ====================================================
   {
     id: "unstable",
-    name: "XJZL.Status.Unstable", // 下盘不稳
+    name: "XJZL.Status.UnstableName", // 下盘不稳
     description: "XJZL.Status.UnstableDesc",
     img: "icons/svg/falling.svg",
     flags: { "xjzl-system": { slug: "unstable", stackable: false } },
