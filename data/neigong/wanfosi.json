@@ -369,7 +369,7 @@
                         {
                             "label": "掷象神力(领悟)",
                             "trigger": "calc",
-                            "script": "if (args.move.weaponType === 'hidden' || args.item.system.category === 'sanshou') {\n    const tier = args.move.computedTier || args.item.system.tier || 1;\n    const paozhi = args.attacker.system.skills.paozhi.total || 0;\n    if (tier === 1) {\n        args.output.damage += (10 + paozhi);\n        args.output.bonusDesc.push(`释迦神功 +${10+paozhi}`);\n    }\n}",
+                            "script": "if (args.move.weaponType === 'hidden' || args.item?.system?.category === 'sanshou') {\n    const tier = args.move.computedTier || args.item?.system?.tier || 1;\n    const paozhi = actor.system.skills.paozhi.total || 0;\n    if (tier === 1) {\n        args.output.damage += (10 + paozhi);\n        args.output.bonusDesc.push(`释迦神功 +${10+paozhi}`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -389,7 +389,7 @@
                         {
                             "label": "掷象神力(小成)",
                             "trigger": "calc",
-                            "script": "if (args.move.weaponType === 'hidden' || args.item.system.category === 'sanshou') {\n    const tier = args.move.computedTier || args.item.system.tier || 1;\n    const paozhi = args.attacker.system.skills.paozhi.total || 0;\n    if (tier <= 2) {\n        args.output.damage += (20 + paozhi);\n        args.output.bonusDesc.push(`释迦神功 +${20+paozhi}`);\n    }\n}",
+                            "script": "if (args.move.weaponType === 'hidden' || args.item?.system?.category === 'sanshou') {\n    const tier = args.move.computedTier || args.item?.system?.tier || 1;\n    const paozhi = actor.system.skills.paozhi.total || 0;\n    if (tier <= 2) {\n        args.output.damage += (20 + paozhi);\n        args.output.bonusDesc.push(`释迦神功 +${20+paozhi}`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -409,7 +409,7 @@
                         {
                             "label": "掷象神力(圆满)",
                             "trigger": "calc",
-                            "script": "if (args.move.weaponType === 'hidden' || args.item.system.category === 'sanshou') {\n    const paozhi = args.attacker.system.skills.paozhi.total || 0;\n    args.output.damage += (30 + paozhi);\n    args.output.bonusDesc.push(`释迦神功 +${30+paozhi}`);\n}",
+                            "script": "if (args.move.weaponType === 'hidden' || args.item?.system?.category === 'sanshou') {\n    const paozhi = actor.system.skills.paozhi.total || 0;\n    args.output.damage += (30 + paozhi);\n    args.output.bonusDesc.push(`释迦神功 +${30+paozhi}`);\n}",
                             "active": true
                         }
                     ]
@@ -449,7 +449,7 @@
             "sect": "wanfosi",
             "description": "<p>达摩祖师所创，万佛七十二绝技中最难练的十种绝学之一。此功修炼至化境，体外天罡之气护体，灿若黄金，刀枪不入，水火不侵，成为真正的“无坚不摧、万毒不侵、金刚不坏、至刚无敌”。</p>",
             "requirement": "悟性需求: 11",
-            "automationNote": "自动化护盾。受到伤害时若内力充足自动抵扣，并保留保底1点伤害。",
+            "automationNote": "完全自动化。检测到拥有此内功的角色受到内外功伤害且内力>100时，自动扣除自身内力并减免伤害。玩家若需保留内力，请手动修正。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -466,7 +466,7 @@
                         {
                             "label": "金刚护体(1:1)",
                             "trigger": "preTake",
-                            "script": "const mp = args.attacker.system.resources.mp.value;\nif (mp > 100 && ['waigong', 'neigong'].includes(args.type) && args.output.damage > 1) {\n    const damageToAbsorb = args.output.damage - 1;\n    const mpCanPay = mp;\n    const absorb = Math.min(damageToAbsorb, mpCanPay);\n    if (absorb > 0) {\n        args.output.damage -= absorb;\n        await args.attacker.update({'system.resources.mp.value': mp - absorb});\n        ui.notifications.info(`金刚不坏: 消耗 ${absorb} 内力抵消伤害`);\n    }\n}",
+                            "script": "const mp = actor.system.resources.mp.value;\nif (mp > 100 && ['waigong', 'neigong'].includes(args.type) && args.output.damage > 1) {\n    const damageToAbsorb = args.output.damage - 1;\n    // 1:1 抵扣，消耗量 = 伤害量\n    const mpCost = damageToAbsorb;\n    // 检查内力是否足够\n    const finalCost = Math.min(mpCost, mp);\n    const absorb = finalCost;\n    \n    if (absorb > 0) {\n        args.output.damage -= absorb;\n        await actor.update({'system.resources.mp.value': mp - finalCost});\n        ui.notifications.info(`金刚不坏: 消耗 ${finalCost} 内力抵消伤害`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -486,7 +486,7 @@
                         {
                             "label": "金刚护体(1:2)",
                             "trigger": "preTake",
-                            "script": "const mp = args.attacker.system.resources.mp.value;\nif (mp > 100 && ['waigong', 'neigong'].includes(args.type) && args.output.damage > 1) {\n    const damageToAbsorb = args.output.damage - 1;\n    const mpCost = Math.ceil(damageToAbsorb / 2);\n    const finalCost = Math.min(mpCost, mp);\n    const absorb = finalCost * 2;\n    const actualAbsorb = Math.min(damageToAbsorb, absorb);\n    if (actualAbsorb > 0) {\n        args.output.damage -= actualAbsorb;\n        await args.attacker.update({'system.resources.mp.value': mp - finalCost});\n        ui.notifications.info(`金刚不坏: 消耗 ${finalCost} 内力抵消 ${actualAbsorb} 伤害`);\n    }\n}",
+                            "script": "const mp = actor.system.resources.mp.value;\nif (mp > 100 && ['waigong', 'neigong'].includes(args.type) && args.output.damage > 1) {\n    const damageToAbsorb = args.output.damage - 1;\n    // 1:2 抵扣，消耗 = 伤害 / 2 (向上取整)\n    const mpCost = Math.ceil(damageToAbsorb / 2);\n    const finalCost = Math.min(mpCost, mp);\n    const absorb = finalCost * 2;\n    // 确保不抵消超过上限\n    const actualAbsorb = Math.min(damageToAbsorb, absorb);\n    \n    if (actualAbsorb > 0) {\n        args.output.damage -= actualAbsorb;\n        await actor.update({'system.resources.mp.value': mp - finalCost});\n        ui.notifications.info(`金刚不坏: 消耗 ${finalCost} 内力抵消 ${actualAbsorb} 伤害`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -506,7 +506,7 @@
                         {
                             "label": "金刚护体(1:3)",
                             "trigger": "preTake",
-                            "script": "const mp = args.attacker.system.resources.mp.value;\nif (mp > 100 && ['waigong', 'neigong'].includes(args.type) && args.output.damage > 1) {\n    const damageToAbsorb = args.output.damage - 1;\n    const mpCost = Math.ceil(damageToAbsorb / 3);\n    const finalCost = Math.min(mpCost, mp);\n    const absorb = finalCost * 3;\n    const actualAbsorb = Math.min(damageToAbsorb, absorb);\n    if (actualAbsorb > 0) {\n        args.output.damage -= actualAbsorb;\n        await args.attacker.update({'system.resources.mp.value': mp - finalCost});\n        ui.notifications.info(`金刚不坏: 消耗 ${finalCost} 内力抵消 ${actualAbsorb} 伤害`);\n    }\n}",
+                            "script": "const mp = actor.system.resources.mp.value;\nif (mp > 100 && ['waigong', 'neigong'].includes(args.type) && args.output.damage > 1) {\n    const damageToAbsorb = args.output.damage - 1;\n    // 1:3 抵扣\n    const mpCost = Math.ceil(damageToAbsorb / 3);\n    const finalCost = Math.min(mpCost, mp);\n    const absorb = finalCost * 3;\n    const actualAbsorb = Math.min(damageToAbsorb, absorb);\n    \n    if (actualAbsorb > 0) {\n        args.output.damage -= actualAbsorb;\n        await actor.update({'system.resources.mp.value': mp - finalCost});\n        ui.notifications.info(`金刚不坏: 消耗 ${finalCost} 内力抵消 ${actualAbsorb} 伤害`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1032,7 +1032,7 @@
             "sect": "wanfosi",
             "description": "<p>“大觉世尊入涅槃已，其娑罗林东西二双合为一树，南北二双合为一树，垂覆宝床，盖于如来，四枯四荣，即枯即荣即非枯荣一刹那修”苦修此功者，心境于枯荣之间变换，修炼时面部及全身半枯半荣，唯有大成后，觉行圆满。</p>",
             "requirement": "悟性需求: 11",
-            "automationNote": "进战自动添加Buff。Buff内嵌damaged和hit脚本实现吸内/回血逻辑。圆满主动效果需手动调用（可做个宏或Item Macro）。",
+            "automationNote": "进战自动添加Buff。Buff持续时间为永久，脱战后请手动移除。圆满主动效果需手动调用。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1120,7 +1120,7 @@
         "effects": [
             {
                 "name": "半枯",
-                "icon": "icons/svg/skull.svg",
+                "icon": "systems/xjzl-system/assets/icons/neigong/万佛.png",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -1128,7 +1128,7 @@
                         "scripts": [
                             {
                                 "trigger": "damaged",
-                                "script": "if (args.attacker) args.attacker.applyDamage({amount: 10, type:'liushi', isHit:true});",
+                                "script": "if (args.attacker) args.attacker.applyDamage({amount: 10, type:'liushi', isHit:true, ignoreDefense:true});",
                                 "active": true
                             }
                         ]
@@ -1137,7 +1137,7 @@
             },
             {
                 "name": "半荣",
-                "icon": "icons/svg/heal.svg",
+                "icon": "systems/xjzl-system/assets/icons/neigong/万佛.png",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -1154,7 +1154,7 @@
             },
             {
                 "name": "枯荣",
-                "icon": "icons/svg/balance.svg",
+                "icon": "systems/xjzl-system/assets/icons/neigong/万佛.png",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -1162,7 +1162,7 @@
                         "scripts": [
                             {
                                 "trigger": "damaged",
-                                "script": "if (args.attacker) args.attacker.applyDamage({amount: 10, type:'liushi', isHit:true});",
+                                "script": "if (args.attacker) args.attacker.applyDamage({amount: 10, type:'liushi', isHit:true, ignoreDefense:true});",
                                 "active": true
                             },
                             {
@@ -1186,7 +1186,7 @@
             "sect": "wanfosi",
             "description": "<p>万佛七十二绝技中最难练的十种绝学之一。达摩祖师神慧疏朗，闻皆晓悟，广传佛法，最后灭化圆寂于洛滨。此功以宏大佛法悲天悯人，修众生无我，苦乐随缘之境，大成后，渡己渡人，万物皆可渡。</p>",
             "requirement": "悟性需求: 11",
-            "automationNote": "受击叠加渡人层数。消耗层数触发特效需手动（建议做成宏）。距离加成需脚本修改。",
+            "automationNote": "受击自动叠加渡人层数。每层使招式释放距离+1需手动判定。命中目标后移除层数并施加状态需手动操作。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1197,13 +1197,13 @@
                         "qigan": 30,
                         "shencai": 15
                     },
-                    "description": "<p>领悟运功特效：受到招式伤害时获得一层“渡人”，至多叠加五层，持续到战斗脱离。<br>渡人：每层使招式释放距离+1，命中目标后可移除一定层数，为单个受伤目标添加下列中的一个状态...</p>",
+                    "description": "<p>领悟运功特效：受到招式伤害时获得一层“渡人”，至多叠加五层，持续到战斗脱离。</p><p>渡人：每层使招式释放距离+1，命中目标后可移除一定层数，为单个受伤目标添加下列中的一个状态，持续一回合：<br>一层：“下盘不稳”<br>三层：“禁足”<br>五层：“缚身”或“迟滞”<br>八层：“禁实”或“禁虚”<br>十层：“封招”</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "叠加渡人",
                             "trigger": "damaged",
-                            "script": "if (args.attacker) {\n    const effect = thisItem.effects.getName('渡人');\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
+                            "script": "if (args.attacker) {\n    const effect = thisItem.effects.getName('渡人');\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        // 领悟阶段上限5\n        effectData.flags['xjzl-system'].maxStacks = 5;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1217,13 +1217,13 @@
                         "qigan": 60,
                         "shencai": 30
                     },
-                    "description": "<p>小成运功特效：受到招式伤害时获得两层“渡人”，至多叠加五层，持续到战斗脱离。</p>",
+                    "description": "<p>小成运功特效：受到招式伤害时获得两层“渡人”，至多叠加五层，持续到战斗脱离。</p><p>渡人：每层使招式释放距离+1，命中目标后可移除一定层数，为单个受伤目标添加下列中的一个状态，持续一回合：<br>一层：“下盘不稳”<br>三层：“禁足”<br>五层：“缚身”或“迟滞”<br>八层：“禁实”或“禁虚”<br>十层：“封招”</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "叠加渡人(x2)",
                             "trigger": "damaged",
-                            "script": "if (args.attacker) {\n    const effect = thisItem.effects.getName('渡人');\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
+                            "script": "if (args.attacker) {\n    const effect = thisItem.effects.getName('渡人');\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        // 小成阶段上限5\n        effectData.flags['xjzl-system'].maxStacks = 5;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1237,13 +1237,13 @@
                         "qigan": 85,
                         "shencai": 40
                     },
-                    "description": "<p>圆满运功特效：受到招式伤害时获得两层“渡人”，至多叠加十层，持续到战斗脱离。</p><p>修满特效：气血+60，内力+60，内息+10。</p>",
+                    "description": "<p>圆满运功特效：受到招式伤害时获得两层“渡人”，至多叠加十层，持续到战斗脱离。</p><p>渡人：每层使招式释放距离+1，命中目标后可移除一定层数，为单个受伤目标添加下列中的一个状态，持续一回合：<br>一层：“下盘不稳”<br>三层：“禁足”<br>五层：“缚身”或“迟滞”<br>八层：“禁实”或“禁虚”<br>十层：“封招”</p><p>修满特效：气血+60，内力+60，内息+10。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "叠加渡人(x2, Max 10)",
                             "trigger": "damaged",
-                            "script": "if (args.attacker) {\n    const effect = thisItem.effects.getName('渡人');\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        // Stage 3 Override maxStacks\n        effectData.flags['xjzl-system'].maxStacks = 10;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
+                            "script": "if (args.attacker) {\n    const effect = thisItem.effects.getName('渡人');\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        // 圆满阶段上限10\n        effectData.flags['xjzl-system'].maxStacks = 10;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1276,13 +1276,15 @@
                 "name": "渡人",
                 "icon": "icons/svg/angel.svg",
                 "transfer": false,
+                "description": "每层使招式释放距离+1，命中目标后可移除一定层数，为单个受伤目标添加负面状态。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "duren",
                         "stackable": true,
                         "maxStacks": 5
                     }
-                }
+                },
+                "changes": []
             }
         ]
     }
