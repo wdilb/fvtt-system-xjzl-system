@@ -1134,7 +1134,6 @@ export class XJZLActor extends Actor {
 
       element: element
     };
-
     // =====================================================
     // 2. 闪避处理 (Trigger: AVOIDED)
     // =====================================================
@@ -1190,7 +1189,6 @@ export class XJZLActor extends Actor {
     if (config.isCrit && config.applyCritDamage) {
       calculatedDamage = Math.floor(calculatedDamage * 2);
     }
-
     // =====================================================
     // 5. 计算减伤 (Mitigation)
     // 逻辑：伤害 - 防御 - 格挡 - 抗性
@@ -1221,7 +1219,10 @@ export class XJZLActor extends Actor {
     // C. 抗性 (Resistance)
     const resMap = sys.combat.resistances;
     const globalRes = resMap.global.total || 0;
-    const skillRes = isSkill ? (resMap.skill?.total || 0) : 0;
+    let skillRes = 0
+    if (type === "waigong" || type === "neigong") {
+      skillRes = isSkill ? (resMap.skill?.total || 0) : 0;
+    }
     let specificRes = 0;
 
     switch (type) {
@@ -1233,7 +1234,6 @@ export class XJZLActor extends Actor {
       default: specificRes = 0; break;
     }
     const totalRes = globalRes + specificRes + skillRes;
-
     // D. 执行减法
     let reducedDamage = calculatedDamage - defenseVal - blockVal - totalRes;
     reducedDamage = Math.max(1, reducedDamage); // 保底为1
@@ -1851,7 +1851,7 @@ export class XJZLActor extends Actor {
     const calcResult = this._calculateBasicAttackDamage(virtualMove, baseDamage, config, mode, moraleSpent, virtualItem);
 
     if (!calcResult) {
-        return ui.notifications.error("伤害计算失败");
+      return ui.notifications.error("伤害计算失败");
     }
 
     // =====================================================
