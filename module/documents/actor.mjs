@@ -459,27 +459,41 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 架招开启后，应当视为常驻被动效果，直到关闭
     const martial = this.system.martial;
+    // 定义架招作为“背景状态”时允许响应的触发器白名单
+    // 只有在这些时机下，后台架招的脚本才会被收集
+    // 严禁包含 'attack', 'hit', 'calc' 等进攻性时机，防止架招逻辑污染主动攻击
+    const STANCE_BACKGROUND_TRIGGERS = [
+      SCRIPT_TRIGGERS.PASSIVE,
+      SCRIPT_TRIGGERS.AVOIDED,     // 我闪避时
+      SCRIPT_TRIGGERS.PRE_DEFENSE, // 防御计算前
+      SCRIPT_TRIGGERS.PRE_TAKE,    // 扣血前 (护盾)
+      SCRIPT_TRIGGERS.DAMAGED,     // 受伤后 (反伤)
+      SCRIPT_TRIGGERS.DYING,
+      SCRIPT_TRIGGERS.DEATH
+    ];
     // 检查：架招激活 + 有记录的 Move ID + 有记录的 Item ID
     if (martial?.stanceActive && martial?.stance && martial?.stanceItemId) {
+      // 如果当前触发器不在白名单内，直接跳过架招脚本收集
+      // 解决了“开启架招后，普攻也会触发架招attack脚本”的问题
+      if (STANCE_BACKGROUND_TRIGGERS.includes(trigger)) {
+        const wuxueItem = this.items.get(martial.stanceItemId);
+        if (wuxueItem) {
+          // 在该武学中找到对应的招式
+          const stanceMove = wuxueItem.system.moves.find(m => m.id === martial.stance);
 
-      const wuxueItem = this.items.get(martial.stanceItemId);
-
-      if (wuxueItem) {
-        // 在该武学中找到对应的招式
-        const stanceMove = wuxueItem.system.moves.find(m => m.id === martial.stance);
-
-        if (stanceMove && stanceMove.scripts) {
-          stanceMove.scripts.forEach(s => {
-            // 同样检查触发器和开关
-            if (s.trigger === trigger && s.active) {
-              scripts.push({
-                script: s.script,
-                label: s.label || stanceMove.name,
-                source: wuxueItem, // 源头依然归属于该武学物品
-                contextData: stanceMove
-              });
-            }
-          });
+          if (stanceMove && stanceMove.scripts) {
+            stanceMove.scripts.forEach(s => {
+              // 同样检查触发器和开关
+              if (s.trigger === trigger && s.active) {
+                scripts.push({
+                  script: s.script,
+                  label: s.label || stanceMove.name,
+                  source: wuxueItem, // 源头依然归属于该武学物品
+                  contextData: stanceMove
+                });
+              }
+            });
+          }
         }
       }
     }

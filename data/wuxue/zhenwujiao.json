@@ -2826,7 +2826,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>以道入剑，斩出剑光，对目标造成伤害。</p><p>·消耗一层“道”，将自身习武所悟灌注于此招，你每领悟一式武学，该招式伤害+1，至多+100。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "默认计算消耗道的加成。出招时弹窗询问是否消耗，若选择否，则移除加成。",
+                    "automationNote": "预览时自动计算加成。出招时弹窗询问，若拒绝消耗，则从最终伤害中扣除加成。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2851,21 +2851,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "询问消耗",
-                            "trigger": "attack",
-                            "script": "// 重置标记\nawait actor.unsetFlag(\"xjzl-system\", \"temp_wandao_bonus\");\nawait actor.unsetFlag(\"xjzl-system\", \"temp_wandao_optout\");\n\nconst dao = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhenwu_dao\");\n\nif (dao) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"万道归一\" },\n        content: \"<p>是否消耗一层 [道] 以增强伤害？</p>\",\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        // 消耗道，并标记为“已激活加成”\n        // 此时道可能被移除，所以需要Flag告诉Calc脚本继续加伤\n        await game.xjzl.api.effects.removeEffect(actor, \"zhenwu_dao\", 1);\n        await actor.setFlag(\"xjzl-system\", \"temp_wandao_bonus\", true);\n        ui.notifications.info(\"已消耗 [道] 增强剑招\");\n    } else {\n        // 标记为“已拒绝”\n        await actor.setFlag(\"xjzl-system\", \"temp_wandao_optout\", true);\n        ui.notifications.info(\"放弃消耗 [道]\");\n    }\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "万道加伤",
+                            "label": "万道加伤预览",
                             "trigger": "calc",
-                            "script": "// 逻辑：\n// 1. 如果 temp_wandao_bonus 为 true (攻击阶段已确认消耗)，则加伤。\n// 2. 如果 temp_wandao_optout 为 true (攻击阶段已拒绝)，则不加伤。\n// 3. 如果以上都没有 (预览阶段)，只要身上有道，就默认加伤 (Default Yes)。\n\nconst bonusActive = actor.getFlag(\"xjzl-system\", \"temp_wandao_bonus\") === true;\nconst optOut = actor.getFlag(\"xjzl-system\", \"temp_wandao_optout\") === true;\nconst hasDao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhenwu_dao\");\n\nif (bonusActive || (hasDao && !optOut)) {\n    // 统计所有已领悟的招式 (Moves)\n    // 规则：computedLevel >= 1 即为领悟\n    // (注：人级武学 0 修为即为 1 级，符合“学会即领悟”；高阶武学需满足入门门槛才算 1 级)\n    let totalMoves = 0;\n    for (const w of actor.itemTypes.wuxue) {\n        if (w.system.moves) {\n            totalMoves += w.system.moves.filter(m => (m.computedLevel || 0) >= 1).length;\n        }\n    }\n    \n    const bonus = Math.min(totalMoves, 100);\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`万道加伤 +${bonus}`);\n}",
+                            "script": "// 预览逻辑：乐观估计 (Optimistic)\n// 只要身上有道，就默认显示加成后的伤害，展示最大潜力。\nconst hasDao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhenwu_dao\");\nif (hasDao) {\n    let totalMoves = 0;\n    for (const w of actor.itemTypes.wuxue) {\n        if (w.system.moves) {\n            totalMoves += w.system.moves.filter(m => (m.computedLevel || 0) >= 1).length;\n        }\n    }\n    const bonus = Math.min(totalMoves, 100);\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`万道加伤 +${bonus}`);\n}",
                             "active": true
                         },
                         {
-                            "label": "清理标记",
-                            "trigger": "hit_once",
-                            "script": "await actor.unsetFlag(\"xjzl-system\", \"temp_wandao_bonus\");\nawait actor.unsetFlag(\"xjzl-system\", \"temp_wandao_optout\");",
+                            "label": "询问消耗与回滚",
+                            "trigger": "attack",
+                            "script": "const dao = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhenwu_dao\");\n\n// 重新计算一次加成 (因为 attack 无法直接获取 calc 的局部变量)\nlet totalMoves = 0;\nfor (const w of actor.itemTypes.wuxue) {\n    if (w.system.moves) {\n        totalMoves += w.system.moves.filter(m => (m.computedLevel || 0) >= 1).length;\n    }\n}\nconst bonus = Math.min(totalMoves, 100);\n\nif (dao) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"万道归一\" },\n        content: `<p>当前“道”存在，预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗一层 [道] 以生效此加成？</p>`,\n        yes: { label: \"消耗 (保留加成)\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗 (移除加成)\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        // 消耗道\n        await game.xjzl.api.effects.removeEffect(actor, \"zhenwu_dao\", 1);\n        ui.notifications.info(\"已消耗 [道] 增强剑招\");\n    } else {\n        // 拒绝消耗，手动回滚数值\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗道：移除加成 (-${bonus})`;\n        ui.notifications.info(\"放弃消耗 [道]，伤害回落\");\n    }\n}",
                             "active": true
                         }
                     ]
