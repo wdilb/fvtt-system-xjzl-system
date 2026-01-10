@@ -6,8 +6,11 @@ import os
 # 数据文件目录 (请根据实际情况修改)
 TARGET_DIR = "./data/wuxue"
 
-# 定义要替换的旧代码模式 (精确匹配)
-OLD_CODE = "const lvl = Math.max(1, args.move.computedLevel || 1);"
+# 定义要替换的旧代码模式列表
+OLD_CODES = [
+    "const lvl = Math.max(1, args.move.computedLevel || 1);",
+    "const lvl = Math.max(1, move.computedLevel || 1);"
+]
 
 # 定义替换后的新代码模式
 NEW_CODE = (
@@ -62,22 +65,34 @@ def process_file(file_path):
                 trigger = script_obj.get("trigger")
                 script_content = script_obj.get("script", "")
 
-                # 核心判断：触发器是 damaged 且 包含旧代码
-                if trigger == "damaged" and OLD_CODE in script_content:
+                # 核心判断：触发器是 damaged 且 包含任意一种旧代码
+                if trigger == "damaged":
+                    # 检查是否包含任意一种旧代码
+                    contains_old_code = False
+                    matched_code = None
                     
-                    # --- 执行替换 ---
-                    new_content = script_content.replace(OLD_CODE, NEW_CODE)
-                    script_obj["script"] = new_content
+                    for old_code in OLD_CODES:
+                        if old_code in script_content:
+                            contains_old_code = True
+                            matched_code = old_code
+                            break
                     
-                    # --- 详细日志 ---
-                    print(f"  🔧 [修复] 文件: {os.path.basename(file_path)}")
-                    print(f"     武学: {item_name}")
-                    print(f"     招式: {move_name}")
-                    print(f"     脚本: {script_label} (Trigger: damaged)")
-                    print("-" * 40)
-                    
-                    file_modified_count += 1
-                    items_modified = True
+                    # 如果包含旧代码，执行替换
+                    if contains_old_code:
+                        # --- 执行替换 ---
+                        new_content = script_content.replace(matched_code, NEW_CODE)
+                        script_obj["script"] = new_content
+                        
+                        # --- 详细日志 ---
+                        print(f"  🔧 [修复] 文件: {os.path.basename(file_path)}")
+                        print(f"     武学: {item_name}")
+                        print(f"     招式: {move_name}")
+                        print(f"     脚本: {script_label} (Trigger: damaged)")
+                        print(f"     替换模式: {matched_code[:50]}...")
+                        print("-" * 40)
+                        
+                        file_modified_count += 1
+                        items_modified = True
 
     # 只有当文件内容真的发生变化时才写入
     if items_modified:
@@ -119,6 +134,7 @@ def main():
     print(f"📂 扫描文件数: {total_files_scanned}")
     print(f"📝 修改文件数: {files_with_changes}")
     print(f"🔧 修复脚本数: {total_scripts_fixed}")
+    print(f"🔍 搜索模式数: {len(OLD_CODES)}")
     print("="*30)
 
 if __name__ == "__main__":
