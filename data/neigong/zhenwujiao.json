@@ -567,7 +567,7 @@
             "sect": "zhenwujiao",
             "description": "传说中道家独门不传之秘，武学之源。以“道生一，一生二，二生三，三生万物”的理念激发潜能，凝聚先天真气，祛百病、调虚实、治内伤，内劲周而复始生生不息，步入深不可测之化境。",
             "requirement": "悟性 25",
-            "automationNote": "部分自动化。免疫自动；概率双倍治疗需玩家自行投骰判定，圆满阶段双倍治疗自动。",
+            "automationNote": "部分自动化。免疫毒素完全自动；1-2阶段的概率双倍治疗需玩家自行投骰判定后手动修改；圆满阶段双倍治疗完全自动（治疗结算时自动追加一次同等治疗）。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -586,12 +586,6 @@
                             "trigger": "preTake",
                             "active": true,
                             "script": "if (args.type === 'poison') {\n    args.output.abort = true;\n    ui.notifications.info(`${actor.name} 先天真气护体，百毒不侵！`);\n}"
-                        },
-                        {
-                            "label": "概率治疗提示",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isHeal && args.finalAmount > 0) {\n    ui.notifications.info(\"先天诀：请投D20，若<=10，请手动额外回复等量气血。\");\n}"
                         }
                     ]
                 },
@@ -612,12 +606,6 @@
                             "trigger": "preTake",
                             "active": true,
                             "script": "if (args.type === 'poison') {\n    args.output.abort = true;\n    ui.notifications.info(`${actor.name} 先天真气护体，百毒不侵！`);\n}"
-                        },
-                        {
-                            "label": "概率治疗提示",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isHeal && args.finalAmount > 0) {\n    ui.notifications.info(\"先天诀：请投D20，若<=15，请手动额外回复等量气血。\");\n}"
                         }
                     ]
                 },
@@ -643,7 +631,7 @@
                             "label": "稳定双倍治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHeal && args.finalAmount > 0) {\n    ui.notifications.info(\"先天诀生效，双倍治疗！\");\n    await args.target.applyHealing({ amount: args.finalAmount, type: 'hp' });\n}"
+                            "script": "// 仅在应用治疗且数值大于0时触发\nif (args.type === 'heal' && args.finalAmount > 0) {\n    ui.notifications.info(\"先天诀生效，真气流转生生不息！\");\n    // 再次应用一次同等数值的治疗\n    await args.target.applyHealing({ amount: args.finalAmount, type: 'hp' });\n}"
                         }
                     ]
                 }
@@ -706,9 +694,9 @@
                     "scripts": [
                         {
                             "label": "九天护体",
-                            "trigger": "hit_once",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.type === 'attack') {\n    await actor.applyHealing({ amount: 10, type: 'huti' });\n}"
+                            "script": "await actor.applyHealing({ amount: 10, type: 'huti' });"
                         },
                         {
                             "label": "罡气破裂反伤",
@@ -732,9 +720,9 @@
                     "scripts": [
                         {
                             "label": "九天护体",
-                            "trigger": "hit_once",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.type === 'attack') {\n    await actor.applyHealing({ amount: 10, type: 'huti' });\n}"
+                            "script": "await actor.applyHealing({ amount: 10, type: 'huti' });"
                         },
                         {
                             "label": "罡气破裂反伤",
@@ -778,7 +766,7 @@
             "sect": "zhenwujiao",
             "description": "正一道顶级功法，阐述“正以治邪，一以统万”，以道家玄学思想包罗万象，为张天师所创。此功法注重内炼，需静存元神，采日、月、星三光之气纳入己身，炼至大成时天地感召，长生不老。",
             "requirement": "悟性 11",
-            "automationNote": "完全自动化。",
+            "automationNote": "部分自动化。耗内回血完全自动化；“正一”状态需玩家在气血低于50%时手动开启（已内置AE），开启后属性加成与命中施加迟滞完全自动。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -796,7 +784,7 @@
                             "label": "耗内回血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 估算消耗：招式消耗 - 减耗\nconst cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ amount: 5, type: 'hp' });\n}"
+                            "script": "// 估算净消耗：招式消耗 - 减耗\nconst cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\n// 只有确实产生了消耗才回血\nif (cost > 0) {\n    await actor.applyHealing({ amount: 5, type: 'hp' });\n}"
                         }
                     ]
                 },
@@ -837,18 +825,6 @@
                             "trigger": "attack",
                             "active": true,
                             "script": "const cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ amount: 20, type: 'hp' });\n}"
-                        },
-                        {
-                            "label": "正一加持(属性)",
-                            "trigger": "passive",
-                            "active": true,
-                            "script": "if (S.resources.hp.value < (S.resources.hp.max / 2)) {\n    S.combat.block += 10;\n    S.combat.damages.skill.mod += 10;\n}"
-                        },
-                        {
-                            "label": "正一加持(特效)",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (S.resources.hp.value < (S.resources.hp.max / 2) && args.type === 'attack' && args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"chizhi\", true);\n    ui.notifications.info(`${actor.name} 正一显威，使目标迟滞！`);\n}"
                         }
                     ]
                 }
@@ -857,7 +833,7 @@
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",
-                    "value": 80
+                    "value": 100
                 },
                 {
                     "key": "resources.mp.bonus",
@@ -874,7 +850,39 @@
                 "general": 0,
                 "specific": 0
             }
-        }
+        },
+        "effects": [
+            {
+                "name": "正一",
+                "icon": "systems/xjzl-system/assets/icons/neigong/真武.png",
+                "disabled": true,
+                "description": "格挡值和招式伤害提高10点；出招命中目标后，还会为其添加一回合“迟滞”。",
+                "changes": [
+                    {
+                        "key": "system.combat.block",
+                        "mode": 2,
+                        "value": "10"
+                    },
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "scripts": [
+                            {
+                                "label": "正一·迟滞",
+                                "trigger": "hit",
+                                "active": true,
+                                "script": "// 必须是攻击且命中\nif (args.type === 'attack' && args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"chizhi\", true);\n    ui.notifications.info(`${actor.name} 正一显威，使目标迟滞！`);\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     },
     {
         "name": "《混元一气功》",
@@ -886,7 +894,7 @@
             "sect": "zhenwujiao",
             "description": "内外兼修，形、神、气、技合一的惊世功法。在人谓之元精、元气、元神三者合一。纯一不杂为精，融通血脉为气，虚灵活动为神，大成后可无形生形，无质生质，不惧衰老。",
             "requirement": "悟性 11",
-            "automationNote": "部分自动化。格挡成功需手动添加“混元一气”BUFF。",
+            "automationNote": "自动化：格挡成功（架招开启且命中且未被无视）后自动获得增伤BUFF。纳气入体（转命中）需手动操作。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -901,10 +909,10 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "混元一气/纳气入体",
-                            "trigger": "attack",
+                            "label": "混元一气 (领悟)",
+                            "trigger": "damaged",
                             "active": true,
-                            "script": "const buff = actor.effects.getName(\"混元一气\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"纳气入体?\" },\n        content: \"是否消耗混元一气，放弃伤害以提高10点命中？\",\n        yes: { label: \"纳气\" },\n        no: { label: \"仅增伤\" }\n    });\n    \n    if (confirm) {\n        args.flags.bonusHit += 10;\n        args.flags.bonusDamage = -999;\n        ui.notifications.info(\"纳气入体：命中大增，伤害放弃。\");\n    } else {\n        ui.notifications.info(\"混元一气：伤害提升。\");\n    }\n    await buff.delete();\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // 1. 获取特效模板\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        // 2. 克隆数据\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 3. 修改数值 (领悟 +10)\n        // 模板默认是10，这里其实不用改，但为了代码一致性保留逻辑\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 10;\n\n        // 4. 应用\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            canvas.interface.createScrollingText(actor.token.object.center, \"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -921,10 +929,10 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "混元一气/纳气入体",
-                            "trigger": "attack",
+                            "label": "混元一气 (小成)",
+                            "trigger": "damaged",
                             "active": true,
-                            "script": "const buff = actor.effects.getName(\"混元一气\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"纳气入体?\" },\n        content: \"是否消耗混元一气，放弃伤害以提高20点命中？\",\n        yes: { label: \"纳气\" },\n        no: { label: \"仅增伤\" }\n    });\n    if (confirm) {\n        args.flags.bonusHit += 20;\n        args.flags.bonusDamage = -999;\n        ui.notifications.info(\"纳气入体：命中大增，伤害放弃。\");\n    } else {\n        ui.notifications.info(\"混元一气：伤害提升。\");\n    }\n    await buff.delete();\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 修改数值 (小成 +20)\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 20;\n\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            canvas.interface.createScrollingText(actor.token.object.center, \"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -941,10 +949,10 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "混元一气/纳气入体",
-                            "trigger": "attack",
+                            "label": "混元一气 (圆满)",
+                            "trigger": "damaged",
                             "active": true,
-                            "script": "const buff = actor.effects.getName(\"混元一气\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"纳气入体?\" },\n        content: \"是否消耗混元一气，放弃伤害以提高30点命中？\",\n        yes: { label: \"纳气\" },\n        no: { label: \"仅增伤\" }\n    });\n    if (confirm) {\n        args.flags.bonusHit += 30;\n        args.flags.bonusDamage = -999;\n        ui.notifications.info(\"纳气入体：命中大增，伤害放弃。\");\n    } else {\n        ui.notifications.info(\"混元一气：伤害提升。\");\n    }\n    await buff.delete();\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const sourceEffect = thisItem.effects.getName(\"混元一气\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 修改数值 (圆满 +30)\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = 30;\n\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        if (actor.token?.object) {\n            canvas.interface.createScrollingText(actor.token.object.center, \"混元一气\", {\n                fill: \"#00FF00\", stroke: \"#000000\", strokeThickness: 4\n            });\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -974,18 +982,19 @@
         "effects": [
             {
                 "name": "混元一气",
-                "icon": "icons/svg/aura.svg",
-                "description": "下次出招伤害提升。",
+                "icon": "systems/xjzl-system/assets/icons/neigong/真武.png",
+                "description": "下次出招提升招式伤害。可手动移除以换取命中加成。",
                 "changes": [
                     {
                         "key": "system.combat.damages.skill.mod",
                         "mode": 2,
-                        "value": "10"
+                        "value": 10
                     }
                 ],
                 "flags": {
                     "xjzl-system": {
-                        "stackable": false
+                        "stackable": false,
+                        "slug": "hunyuanyiqi"
                     }
                 }
             }
@@ -1030,9 +1039,9 @@
                     "scripts": [
                         {
                             "label": "获得清气",
-                            "trigger": "hit_once",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.type === 'attack') {\n    const effectData = thisItem.effects.getName(\"清气\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "const effectData = thisItem.effects.getName(\"清气\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);"
                         }
                     ]
                 },
@@ -1050,9 +1059,9 @@
                     "scripts": [
                         {
                             "label": "获得清气",
-                            "trigger": "hit_once",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.type === 'attack') {\n    const effectData = thisItem.effects.getName(\"清气\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "const effectData = thisItem.effects.getName(\"清气\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);"
                         },
                         {
                             "label": "施加化力",
