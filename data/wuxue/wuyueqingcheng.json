@@ -1,0 +1,1685 @@
+[
+    {
+        "name": "恒山剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>恒山派多为女子，以剑守身，却常有出其不意之效，招式轻缓，适于女子修炼。</p><p><strong>需求：</strong>剑-单剑</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "剑-单剑",
+            "moves": [
+                {
+                    "name": "敬经奉宝",
+                    "type": "stance",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>以剑御身，凝神而对，开启架招。格挡成功后，获得一层“绵劲”，至多叠加三层，持续到脱战。</p><p><strong>绵劲：</strong>每层使你的柔属性武学招式伤害+5。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "格挡获层自动。绵劲加伤在其他招式中已脚本支持。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-绵劲",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"绵劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "仙府醉月",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>如贵妃醉酒，仰身一刺，对目标造成 0.3 内息点内功伤害，击破目标架招后，回复自身 5 点内力。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破回内自动。绵劲加伤自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破回内",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "绵劲加成",
+                            "trigger": "calc",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mianjin\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`绵劲加伤 +${bonus}`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "仪态万千",
+                    "type": "counter",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，以剑凌厉飞刺，避无可避，对目标造成 0.5 内息点内功伤害，你可以消耗任意层数“绵劲”，每消耗 1 层，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "反应条件手动。爆发消耗自动(出招时弹窗询问)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "爆发提示",
+                            "trigger": "calc",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mianjin\");\nif (buff) {\n    args.output.bonusDesc.push(\"可选: 出招时手动消耗绵劲爆发\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "消耗爆发",
+                            "trigger": "attack",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mianjin\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirm = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"仪态万千 - 爆发\" },\n        content: `<p>当前拥有 ${stacks} 层 [绵劲]。</p><p>请输入要消耗的层数 (每层伤害+10):</p><input type=\"number\" name=\"count\" value=\"0\" min=\"0\" max=\"${stacks}\" style=\"width:100%; box-sizing:border-box;\">`,\n        buttons: [{ action: \"ok\", label: \"确定\", default: true, callback: (event, button) => button.form.elements.count.value }],\n        rejectClose: false\n    });\n    \n    const num = parseInt(confirm) || 0;\n    if (num > 0) {\n        const bonus = num * 10;\n        await game.xjzl.api.effects.removeEffect(actor, \"mianjin\", num);\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 绵劲爆发(${num}层): ${bonus}`;\n        ui.notifications.info(`消耗 ${num} 层绵劲，伤害+${bonus}`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "北岳飞星",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "10米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>凌空而起，飞身一剑（半空中），对一条直线上的第一个敌人造成 0.6 内息点内功伤害。</p><p>·你可以消耗任意层数“绵劲”，每层“绵劲”可额外穿透一个敌人。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "绵劲基础加成自动。穿透效果需玩家手动扣除绵劲层数并手动攻击后续目标。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "绵劲加成",
+                            "trigger": "calc",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mianjin\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`绵劲加伤 +${bonus}`);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "绵劲",
+                    "icon": "icons/magic/water/water-hand-blue.webp",
+                    "description": "每层使你的柔属性武学招式伤害+5。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "mianjin",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "嵩山剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>嵩山派弟子剑法，擅拆招破招，直截了当不作伪。</p><p><strong>需求：</strong>剑-单剑</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑-单剑",
+            "moves": [
+                {
+                    "name": "嵩生岳降",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>以剑求教，开启架招。进入“拆招”状态，持续到战斗脱离或解除架招。</p><p><strong>拆招：</strong>看破值+1，残疾检定结果+1。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "开启自动获拆招。残疾检定加成需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得拆招",
+                            "trigger": "attack",
+                            "script": "const eff = thisItem.effects.getName(\"拆招\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "中门见岳",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>以快打慢，毫不拖泥带水，对目标造成 0.4 力量点外功伤害。当有角色倒地时，你可消耗反应动作施展此招攻击目标。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "倒地反应需玩家手动判断施展。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    }
+                },
+                {
+                    "name": "号令千古",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>剑似长虹，急攻肋下，对目标造成 0.3 力量点外功伤害，击破目标架招后，击倒目标。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破自动击倒(Prone)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破-击倒",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(eff) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 被击倒！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "青松翠柏",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>引一道翠绿真气缠绕剑身，使自己的“拆招”状态变为“破招”状态，持续一回合。</p><p><strong>破招：</strong>你使用反应动作施展的嵩山剑法可以暴击。</p><p><strong>升级：</strong>持续时间+1 回合，内力消耗+2。</p>",
+                    "automationNote": "状态转换自动。破招暴击需玩家在反应出招时手动勾选[是否暴击]。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "拆招转破招",
+                            "trigger": "hit",
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"chaizhao\");\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nconst eff = thisItem.effects.getName(\"破招\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "嵩山三阙",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，剑势冲霄，对目标造成 0.5 力量点外功伤害，击退目标 3 米并使其陷入“禁足”一回合。</p><p><strong>升级：</strong>造成伤害+5，内力消耗+1。</p>",
+                    "automationNote": "禁足自动。击退手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "禁足",
+                            "trigger": "hit",
+                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\nif(eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "力压华山",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>以剑自上而下直劈，开山裂石，对目标造成 0.6 力量点外功伤害。若你存在“拆招”状态，则击倒目标。若你存在“破招”状态，可不消耗动作，额外施展一次【号令千古】。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2，怒气消耗-1。</p>",
+                    "automationNote": "拆招击倒自动。破招追击提示手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "状态特效",
+                            "trigger": "hit",
+                            "script": "const hasChai = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chaizhao\");\nconst hasPo = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pozhao\");\n\nif (hasChai) {\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(`${args.target.name} 被击倒 (因拆招)`);\n}\n\nif (hasPo) {\n    ui.notifications.info(\"触发 [破招]：请手动额外施展一次 [号令千古] (无消耗)。\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "拆招",
+                    "icon": "icons/magic/defensive/shield-barrier-glowing-blue.webp",
+                    "description": "看破值+1，残疾检定结果+1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "chaizhao",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.kanpo",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                },
+                {
+                    "name": "破招",
+                    "icon": "icons/magic/fire/dagger-rune-enchant-flame-green.webp",
+                    "description": "你使用反应动作施展的嵩山剑法可以暴击。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "pozhao",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "泰山剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>以厚重沉稳见长，规矩谨严，朴实无华。</p><p><strong>需求：</strong>剑-单剑</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "剑-单剑",
+            "moves": [
+                {
+                    "name": "万里无云",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>持剑防御，开启架招，当此架招被击破后，第二回合依然可以施展架招，但仅能施展【万里无云】。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "击破后次日限制请玩家手动记忆。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    }
+                },
+                {
+                    "name": "崇山峻岭",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>以剑横扫，对目标造成 0.3 力量点外功伤害，击中格挡中的目标，不会使对手因“格挡成功”而获得武学状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "无视架招特效自动(Identify as IgnoreStance)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "无视架招触发",
+                            "trigger": "check",
+                            "script": "args.flags.ignoreStance = true;",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "安如泰山",
+                    "type": "counter",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，剑壮山河，对目标造成 0.6 力量点外功伤害，然后额外获得 1 个反应动作。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "反应动作需手动管理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    }
+                },
+                {
+                    "name": "泰山北斗",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>剑光闪烁，直刺敌人七大要穴，对目标造成 0.8 力量点外功伤害，并使目标陷入“血流不止”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "流血自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "血流不止",
+                            "trigger": "hit",
+                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"bleed_stack\");\nif(eff) {\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "千幻十三式",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>衡山派高手以走江湖变戏法为生，竟将变戏法的本领渗入武功，变化古怪。</p><p><strong>需求：</strong>剑-单剑，徒手-指法</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑-单剑；徒手-指法",
+            "moves": [
+                {
+                    "name": "云起潇湘",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>一掸袖袍，洒出一阵白雾，开启架招。格挡成功后，为自己添加“莫测”状态，持续到战斗脱离。</p><p><strong>莫测：</strong>你的虚招对抗检定结果+1。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡获莫测自动。莫测加成自动(虚招值+1)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-莫测",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"莫测\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "云山雾绕",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>持剑诡异一刺，角度刁钻，造成 0.4 力量点外功伤害。击破架招时，可消耗反应动作施展【千幻点穴手】（不需要看破虚招便可释放）。</p><p>·可以消耗“莫测”状态，将手中单剑化为白雾，然后使此招虚招值+3。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破提示追击。莫测消耗需手动(计算阶段提示)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "莫测加成",
+                            "trigger": "calc",
+                            "script": "const hasMoce = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (hasMoce) {\n    args.output.bonusDesc.push(\"可选: 手动消耗 [莫测] 使虚招值+3\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "消耗与加成执行",
+                            "trigger": "attack",
+                            "script": "const hasMoce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (hasMoce) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"云山雾绕\" },\n        content: `<p>是否消耗 [莫测] 使虚招值+3？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        await hasMoce.delete();\n        args.flags.bonusFeint += 3;\n        ui.notifications.info(\"已消耗 [莫测]，虚招值+3\");\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击破追击",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"击破架招！可消耗反应动作施展 [千幻点穴手]。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "千幻点穴手",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，单指点向对手大穴，对目标造成 0.6 力量点外功伤害。</p><p>·可消耗“莫测”状态，使目标陷入点穴状态（冲穴难度 10），持续三回合。</p><p><strong>升级：</strong>招式伤害+10，冲穴难度+1，内力消耗+2。</p>",
+                    "automationNote": "消耗莫测点穴自动(弹窗确认)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗点穴",
+                            "trigger": "hit",
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"千幻点穴手\" },\n        content: `<p>是否消耗 [莫测] 施展点穴？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        await moce.delete();\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const dc = 10 + (lvl - 1);\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"neixi\",\n            dc: dc,\n            label: \"抵抗点穴\",\n            onFail: {\n                name: \"点穴\",\n                img: \"icons/svg/target.svg\",\n                duration: { rounds: 3 },\n                changes: [\n                    { key: \"flags.xjzl-system.stun\", mode: 5, value: \"true\" }\n                ]\n            }\n        });\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "百变无常",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双手无形，剑势无常，消耗“莫测”，进入“千幻”，持续一回合。</p><p><strong>千幻：</strong>你选择一套徒手武学，与《千幻十三式》共同施展时无需遵循武学套路切换规则。</p><p><strong>升级：</strong>千幻持续回合+1，消耗+2。</p>",
+                    "automationNote": "消耗莫测自动。套路切换规则需玩家手动执行。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗莫测",
+                            "trigger": "hit",
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    await moce.delete();\n    ui.notifications.info(\"已消耗 [莫测]，获得 [千幻] 状态。\");\n    // 这里可以加一个纯文本Buff提示\n} else {\n    ui.notifications.warn(\"未拥有 [莫测]，无法完全发挥此招。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "寒光如梦",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当被对手反击攻击时，可消耗反应动作施展，消耗“莫测”，压制对手反击，寒光陡闪，如梦如幻，刺向目标胸口，造成 1.0 力量点外功伤害。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "消耗莫测自动(出招检查)。反应条件需手动判断。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 1.0
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗检查",
+                            "trigger": "attack",
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (!moce) {\n    ui.notifications.warn(\"缺少 [莫测] 状态，无法施展！\");\n    args.flags.abort = true;\n} else {\n    await moce.delete();\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "莫测",
+                    "icon": "icons/magic/air/fog-gas-smoke-dense-white.webp",
+                    "description": "虚招对抗检定结果+1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "moce",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.xuzhao",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "衡山五峰剑",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>以衡山五座最高峰命名，威力绝伦，攻守兼备。</p><p><strong>需求：</strong>剑-单剑</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "剑-单剑",
+            "moves": [
+                {
+                    "name": "芙蓉剑",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>轻弹剑身，剑鸣入耳，开启架招，格挡成功后，剑音反噬，使目标陷入“耳鸣”状态，持续一回合。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡施加耳鸣(Deaf)自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-耳鸣",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = CONFIG.statusEffects.find(e => e.id === \"deaf\");\nif (eff && args.attacker) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, data);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "紫盖剑",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>刺出数道剑气，道道音啸，洞穿防御，对目标造成 0.4 内息点内功伤害，若目标“耳鸣”，击破目标架招后，使其耳鸣状态持续到战斗脱离。</p><p>·若有敌人在空中，则可以消耗反应动作，原地斩出剑气攻击。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "延长耳鸣自动。空中反应手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "延长耳鸣",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const deaf = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"deaf\");\n    if (deaf) {\n        await deaf.update({ \"duration.rounds\": null, \"duration.turns\": null });\n        ui.notifications.info(`${args.target.name} 的耳鸣变为永久！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "石廪剑",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>剑扫周围，破空之声伴金铁声噪响，对周围敌人造成 0.4 内息点内功伤害。若击中无架招敌人，击退目标 3 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击退手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    }
+                },
+                {
+                    "name": "天柱剑",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，剑气如炬，澎湃而出，对周围敌人造成 0.6 内息点内功伤害。并且在范围内建立‘听风’，持续两回合。</p><p><strong>听风：</strong>处于其中的友方单位招式伤害+5。</p><p><strong>升级：</strong>招式伤害+10，持续时间+1 回合，消耗+4。</p>",
+                    "automationNote": "听风区域手动(提供AE给玩家手动添加)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    }
+                },
+                {
+                    "name": "祝融剑",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>以剑临天，剑气激荡，对周围敌人造成 0.7 内息点内功伤害。</p><p>·若自身处于‘听风’中，击飞所有敌人 3 米。</p><p>·若敌人拥有“耳鸣”状态，则使敌人头痛欲裂，进行[韧性]检定（难度 14），失败眩晕一回合。</p><p><strong>升级：</strong>招式伤害+20，检定难度+2，内力消耗+8，怒气消耗-1。</p>",
+                    "automationNote": "耳鸣目标眩晕检定自动。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "耳鸣眩晕",
+                            "trigger": "hit",
+                            "script": "const deaf = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"deaf\");\nif (deaf) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 14 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: dc,\n        label: \"抵抗眩晕\",\n        onFail: \"xuanyun\"\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "听风",
+                    "icon": "icons/magic/air/wind-tornado-wall-blue.webp",
+                    "description": "招式伤害+5。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tingfeng",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "松风剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>不知什么时候起，所有剑客第一个学习的剑法，都是松风剑法。如松之劲，如风之迅。</p><p><strong>需求：</strong>剑</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "苍松立",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>开启架招。格挡成功时，获得“苍松”，持续一回合。</p><p><strong>苍松：</strong>《松风剑法》招式伤害+5。</p><p><strong>升级：</strong>格挡值+5，苍松持续回合数+1，消耗+1。</p>",
+                    "automationNote": "格挡获苍松自动。苍松加成自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-苍松",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"苍松\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态计算持续时间\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\neff.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "疾风劲",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>疾风突刺，直刺目标要害，对无架招的目标必然命中，造成 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "无架招必中自动。苍松加成自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "无架招必中",
+                            "trigger": "check",
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    args.flags.forceHit = true;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "苍松加成",
+                            "trigger": "calc",
+                            "script": "const hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"cangsong\");\nif (hasBuff) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"苍松加伤 +5\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "无冤无仇",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作，压制对方虚招，对目标造成 0.5 力量点外功伤害。目标下回合不能使用与本回合相同的武学。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "禁用武学需手动记忆。苍松加成自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "苍松加成",
+                            "trigger": "calc",
+                            "script": "const hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"cangsong\");\nif (hasBuff) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"苍松加伤 +5\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "鸿飞冥冥",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>疾风般刺向敌人肩膀，对其造成 0.6 力量点外功伤害。</p><p>击中无架招的敌人，目标进行一次[角力]对抗，若你获胜，则对方武器脱手落地。</p><p><strong>升级：</strong>招式伤害+10，怒气-1，内力消耗+2。</p>",
+                    "automationNote": "对抗提示自动。苍松加成自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "对抗提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(\"目标无架招，请进行 [角力] 对抗，胜则缴械。\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "苍松加成",
+                            "trigger": "calc",
+                            "script": "const hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"cangsong\");\nif (hasBuff) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"苍松加伤 +5\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "苍松",
+                    "icon": "icons/magic/nature/tree-spirit-green.webp",
+                    "description": "松风剑法伤害+5。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "cangsong",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "青城九打",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>青城派暗器招式，以独门手艺射出飞钉，可惜逐渐失传，只余留半册传承。</p><p><strong>需求：</strong>暗器</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "暗器",
+            "moves": [
+                {
+                    "name": "青蛇噬",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "8米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>自袖口射出一颗带毒飞钉，对目标造成 0.3 身法点外功伤害，击破目标架招时，使此次钉上涂抹的毒素伤害翻倍（如果有）。</p><p><strong>消耗：</strong>暗器*1</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "暗器消耗需手动扣除。毒伤翻倍需手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "毒伤提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"击破架招！若暗器有毒，请手动造成双倍毒素伤害。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "青蜂钉",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>屈指一弹，飞钉直取面门，对目标造成 0.4 身法点外功伤害，击中无架招目标，额外造成 10 点毒素伤害。</p><p><strong>消耗：</strong>暗器*1</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "暗器消耗手动。额外毒伤自动(hit触发)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "额外毒伤",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "青鸟振",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "8米",
+                    "targetInfo": "单体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>连续弹出 7 颗飞钉，如飞鸟振翅，自三个不同方向，击向目标七处大穴，对目标造成 0.6 身法点外功伤害。</p><p>·若击中无架招目标，对方需进行[韧性]检定（难度 12），失败陷入“点穴”状态，[冲穴]难度 12，持续一回合。</p><p><strong>消耗：</strong>暗器*7</p><p><strong>升级：</strong>招式伤害+10，韧性和冲穴难度+1，内力消耗+2，怒气消耗-1。</p>",
+                    "automationNote": "暗器消耗手动。点穴检定自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "点穴检定",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 12 + (lvl - 1);\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: dc,\n        label: \"抵抗点穴\",\n        onFail: \"dianxue\"\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "龙虎剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>相传为天师张陵亲创，具有斩妖治鬼的神妙力量，流传已千馀年，其招式要诀，衍生出青城各套基本功法，又藏于青城派招式当中。</p><p><strong>需求：</strong>剑-双剑</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "剑-双剑",
+            "moves": [
+                {
+                    "name": "龙盘虎踞",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>龙剑退，虎剑立，轻伏身躯，开启架招。格挡成功后，龙剑而出，你可以消耗反应动作施展【蟠龙闪转】攻击目标。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡提示自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡提示",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nui.notifications.info(\"格挡成功！可消耗反应动作施展 [蟠龙闪转]。\");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "蟠龙闪转",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>龙剑闪转，击敌破绽，对目标造成 0.4 力量点外功伤害，击破目标架招时，击飞目标 1 米，并使目标陷入“错骨”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破施加错骨自动。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "错骨",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n    if(eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "龙棘挂血",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>虎剑对刃，龙剑扫颈，造成 0.5 力量点外功伤害，对无架招的目标必然命中。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "无架招必中自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "必中",
+                            "trigger": "check",
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    args.flags.forceHit = true;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "虎慑山林",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破虚招时，消耗反应释放，虎剑挡飞攻击，闪身至目标身前，龙虎向交，绞杀目标手臂。对目标造成 0.6 力量点外功伤害。并进行一次[角力]对抗，获胜则龙虎噬骨，折断目标出招手臂，使目标陷入“骨折”状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "对抗提示自动。骨折需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "对抗提示",
+                            "trigger": "hit",
+                            "script": "ui.notifications.info(\"命中！请进行 [角力] 对抗，胜则施加 [骨折]。\");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "虎翔龙跃",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>龙虎易位，虎攻龙守，险中搏胜，虎剑连斩，剑气飞舞，对目标造成 0.8 力量点外功伤害，对方需进行[韧性]检定（难度 14），失败则剑气透体，眩晕一回合。</p><p><strong>升级：</strong>招式伤害+10，检定难度+3，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "眩晕检定自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "眩晕检定",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 14 + (lvl - 1) * 3;\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"renxing\",\n    dc: dc,\n    label: \"抵抗眩晕\",\n    onFail: \"xuanyun\"\n});",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "摧魂掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>青城派鲜有的阴狠功夫，仅有两式。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "摧心夺命",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>单掌击向目标胸膛，内劲炸裂，对目标造成 0.5 内息点内功伤害，击中无架招目标，使目标流失 15 点内力。</p><p>·此招式若将目标击入濒死，则目标此次的残疾和死亡检定均具有劣势。</p><p>·若有敌人在此招范围内陷入濒死，则你可以消耗反应动作，施展此招，攻击目标，摧心夺命。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "无架招流失内力自动。濒死劣势提示手动。追击手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "流失内力",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyHealing({ amount: -15, type: \"mp\" });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "濒死检查",
+                            "trigger": "hit",
+                            "script": "if (args.isDying) {\n    ui.notifications.info(\"目标进入濒死！此次残疾/死亡检定应为劣势。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "摧心断骨",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双手擒拿，劲气外散，直冲胸膛，对目标造成 0.4 内息点内功伤害。击破架招时，击飞目标 1 米，并使目标陷入“错骨”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破施加错骨自动。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            5,
+                            7,
+                            9,
+                            11
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "错骨",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n    if(eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]

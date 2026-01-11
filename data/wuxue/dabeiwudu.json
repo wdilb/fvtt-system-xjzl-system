@@ -1,0 +1,1254 @@
+[
+    {
+        "name": "如来千叶手",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>大悲寺的入门武学，以快打慢，极强无比。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "千叶折花",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>尺肱折叠，开启架招。架招持续期间，你与 2 米以外的敌人进行的虚招对抗结果+1。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "开启架招自动。距离判断与对抗加成手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "散关囚龙",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>寻找破绽，擒拿敌手，造成伤害，击破架招时，使目标禁足两回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破施加禁足自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破-禁足",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "叶不沾身",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制虚招，弹臂环踢，对其造成伤害，若击中无架招敌人，可踢飞目标手中武器，使其落到目标周围 5 米范围任意空格中。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "伤害自动。踢飞武器及落点手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击落提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(`命中无架招目标！请手动处理击落武器效果 (5米内)。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "禅净妄念",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双掌贯耳，势如破竹，造成伤害，击中无架招目标时，他需要进行[韧性]检定（难度 11），失败则陷入“眩晕”一回合。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "无架招判定自动。检定请求自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "眩晕检定",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 11,\n        label: \"抵抗眩晕\",\n        onFail: {\n            id: \"xuanyun\",\n            name: \"眩晕\",\n            img: \"icons/svg/daze.svg\",\n            changes: [{ key: \"flags.xjzl-system.stun\", mode: 5, value: \"true\" }],\n            duration: { rounds: 1 }\n        }\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "大悲手",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>大悲寺秘传，以悲天悯人为念。招式追求制敌而非杀敌，心有慈悲，无惧如来。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "大慈大悲",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双掌合十，心无杂念，开启架招。成功格挡时，自身和攻击者同时获得一层“悲悯”状态，至多三层，持续到战斗脱离。</p><p><strong>悲悯：</strong>当你获得 3 层悲悯时，移除所有悲悯，然后进行一次[定力]检定（难度 10），失败则陷入“自闭”状态，持续一回合。</p><p>·你进行该次检定时结果+2。</p><p><strong>升级：</strong>格挡值+10，检定结果再+2，内力消耗+2。</p>",
+                    "automationNote": "格挡添加悲悯自动。三层判定与检定请求自动(检定加值需手动修正)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-悲悯",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 1. 定义处理悲悯的函数\nconst handlePeiMin = async (target) => {\n    if (!target) return;\n    const effData = thisItem.effects.getName(\"悲悯\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 添加特效 (管理器会自动叠加)\n    const effect = await game.xjzl.api.effects.addEffect(target, effData);\n    \n    // 检查层数触发判定 (仅针对自身，且仅当刚刚更新了特效时)\n    if (target.uuid === actor.uuid && effect) {\n        const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        if (stacks >= 3) {\n            await effect.delete();\n            // 发起定力检定\n            // 规则：难度10，检定+2。等价于难度8。\n            const lvl = Math.max(1, move.computedLevel || 1);\n            const bonus = 2 + (lvl - 1) * 2;\n            const effectiveDC = 10 - bonus;\n            \n            ui.notifications.info(\"悲悯已满，触发自闭判定！\");\n            await Macros.requestSave({\n                target: target,\n                attacker: target, // 自己对自己\n                type: \"dingli\",\n                dc: effectiveDC,\n                label: \"悲悯爆发-自闭判定\",\n                onFail: \"zibi\"\n            });\n        }\n    }\n};\n\n// 2. 对双方应用\nawait handlePeiMin(actor);\nawait handlePeiMin(args.attacker);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "悲歌易水",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双掌合拍，内力震荡，对敌人造成伤害。若目标无架招，为对方增加一层“悲悯”，自己也获得一层“悲悯”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "命中无架招添加悲悯自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "添加悲悯",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effData = thisItem.effects.getName(\"悲悯\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    await game.xjzl.api.effects.addEffect(actor, effData);\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "云海悲思",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>作悲天悯人状，吟唱大悲咒，对周围敌人造成伤害，击破架招时，减少其 1 点怒气，为其添加“下盘不稳”两回合，再为自己和对方增加一层“悲悯”。</p><p><strong>升级：</strong>额外减少 1 怒气，内力消耗+4。</p>",
+                    "automationNote": "击破扣怒、下盘不稳、添加悲悯自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破效果",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    // 1. 扣怒\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rageLoss = 1 + (lvl - 1);\n    const curRage = args.target.system.resources.rage.value || 0;\n    await args.target.update({\"system.resources.rage.value\": Math.max(0, curRage - rageLoss)});\n    \n    // 2. 下盘不稳\n    const rootEff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (rootEff) {\n        const data = foundry.utils.deepClone(rootEff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    \n    // 3. 悲悯\n    const peimin = thisItem.effects.getName(\"悲悯\").toObject();\n    delete peimin._id;\n    peimin.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, peimin);\n    await game.xjzl.api.effects.addEffect(args.target, peimin);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "衔悲茹恨",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "4米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，掌风奔涌，造成伤害，同时进行一次[角力]对抗，胜利则夺取对方兵器。</p><p>你每有一层“悲悯”，检定结果+1。对方每有一层“悲悯”，检定结果-1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害自动。角力对抗手动，会提示修正值。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            6,
+                            10
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "夺武对抗提示",
+                            "trigger": "hit",
+                            "script": "const selfStacks = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nconst targetStacks = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">衔悲茹恨 - 夺武对抗</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请进行 <b>[角力]</b> 对抗。</p>\n            <p>我方修正: <b>+${selfStacks}</b> (悲悯层数)</p>\n            <p>敌方修正: <b>-${targetStacks}</b> (悲悯层数)</p>\n            <p><i>胜利后请手动处理夺取兵器。</i></p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "泣麟悲凤",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>轻吟佛号，取解脱意，消耗“悲悯”，每消耗一层，本回合施展《大悲手》暴击骰-1。</p><p><strong>升级：</strong>每层使暴击骰再-1，内力消耗+2。</p>",
+                    "automationNote": "消耗悲悯自动。施加暴击修正BUFF自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗悲悯获益",
+                            "trigger": "hit",
+                            "script": "// 1. 消耗悲悯\nconst peimin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\");\nif (!peimin) return ui.notifications.warn(\"无悲悯层数！\");\n\nconst stacks = peimin.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait peimin.delete();\n\n// 2. 计算修正\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst critMod = (1 + (lvl - 1)) * stacks * -1; // 负数更好\n\n// 3. 应用临时BUFF\nconst buffData = {\n    name: \"泣麟悲凤\",\n    icon: move.img,\n    duration: { rounds: 1 },\n    changes: [\n        { key: \"system.combat.crit_waigong\", mode: 2, value: String(critMod) },\n        { key: \"system.combat.crit_neigong\", mode: 2, value: String(critMod) }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(actor, buffData);\nui.notifications.info(`消耗 ${stacks} 层悲悯，暴击骰 ${critMod}`);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "悲痛欲绝",
+                    "type": "qi",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>悲不自胜，忍无可忍，进入“悲怒”状态，持续两回合。</p><p><strong>悲怒：</strong>你施展《大悲手》招式并造成暴击时，额外造成 40 点气血流失。</p><p><strong>升级：</strong>气血流失再+30，怒气消耗-1，消耗+4。</p>",
+                    "automationNote": "获得悲怒状态自动。悲怒的额外伤害自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启悲怒",
+                            "trigger": "hit",
+                            "script": "const eff = thisItem.effects.getName(\"悲怒\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\n\n// 注入伤害数值到 flag\nconst dmg = 40 + (lvl - 1) * 30;\neff.flags[\"xjzl-system\"].beinuDmg = dmg;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "悲悯",
+                    "icon": "icons/magic/light/beam-rays-yellow-orange.webp",
+                    "description": "3层时进行定力检定，失败自闭。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "beimin",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "悲怒",
+                    "icon": "icons/magic/fire/flame-burning-skeleton-explosion.webp",
+                    "description": "大悲手暴击造成流失。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "beinu",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "悲怒触发",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "// args.move 是当前使用的招式\n// 检查是否是大悲手招式 (通过 Item 名字)\n// args.item 是招式所属的物品\nif (args.isCrit && args.item && args.item.name === \"大悲手\") {\n    const dmg = thisEffect.getFlag(\"xjzl-system\", \"beinuDmg\") || 40;\n    // 应用流失\n    await args.target.applyDamage({\n        amount: dmg,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`悲怒触发！额外流失 ${dmg} 气血`);\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "三生衣",
+        "type": "armor",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "type": "top",
+            "quality": 3,
+            "price": 3000,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>此袈裟色泽明艳，上缀金线绣有前生、今生、来生图纹，故称三生衣。</p><p><strong>效果：</strong>内外功防御+4，闪避+4。</p>",
+            "automationNote": "完全自动化。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "三生衣",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "4"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "4"
+                    },
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "4"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "未来佛佛像",
+        "type": "armor",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "type": "necklace",
+            "quality": 2,
+            "price": 400,
+            "quantity": 1,
+            "equipped": false,
+            "description": "<p>吾非弥勒佛，我乃未来佛。</p><p><strong>效果：</strong>自由属性+4。</p>",
+            "automationNote": "完全自动化。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "未来佛佛像",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "transfer": true,
+                "disabled": false,
+                "changes": [
+                    {
+                        "key": "system.stats.freePoints.mod",
+                        "mode": 2,
+                        "value": "4"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "五毒神掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>练功时需用赤蛇，壁虎，蝎子，癞蛤蟆，蜈蚣五毒。此功难学难练，极易中毒，修炼需谨慎。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "五毒俱全",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>毒覆全身，开启架招。格挡成功时，释放毒虫钻入对方衣襟，使对方获得一层“毒物”，最多三层，持续到战斗脱离。</p><p><strong>毒物：</strong>每次主动消耗内力时，每层毒物使自身受到 5 点毒素伤害。</p><p><strong>升级：</strong>格挡值+10，毒物最大层数+1，消耗+2。</p>",
+                    "automationNote": "格挡添加毒物自动。毒物效果自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-毒物",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 动态最大层数\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    effData.flags[\"xjzl-system\"].maxStacks = 3 + (lvl - 1);\n    \n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "毒手尊拳",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>掌击毒砂，对目标造成伤害。若对方无架招，还会送出毒物啃啮目标，使对方获得一层“毒物”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "无架招添加毒物自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "添加毒物",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "心狠手辣",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破对方虚招时，消耗反应动作释放，压制对方虚招，残酷反击，毒气侵敌，对其造成伤害。同时引起蛇虫欢鸣，啃噬躯干，对方每有一层“毒物”，额外受到 10 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，每层毒物伤害+5，消耗+2。</p>",
+                    "automationNote": "毒物额外伤害自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "毒物爆发",
+                            "trigger": "attack",
+                            "script": "// 获取目标\nconst targets = game.user.targets;\nif (targets.size === 1) {\n    const target = targets.first().actor;\n    const duwu = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duwu\");\n    if (duwu) {\n        const stacks = duwu.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const lvl = Math.max(1, args.move.computedLevel || 1);\n        const extraDmg = stacks * (10 + (lvl - 1) * 5);\n        \n        args.flags.damageResult.damage += extraDmg;\n        args.flags.damageResult.breakdown += `\\n+ 毒物爆发: ${extraDmg}`;\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "以毒攻毒",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>至恶至毒，化为己用，双掌持毒齐出，对目标造成伤害，同时使对方获得一层“毒物”，持续到战斗脱离。</p><p>此时对方每有一层“毒物”，你凝毒化血，回复 10 点气血。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，额外给对方添加一层“毒物”，内力消耗+4。</p>",
+                    "automationNote": "添加毒物自动。回血自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "毒物处理",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 升级效果: 额外层数\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const stacksToAdd = 1 + (lvl - 1);\n    \n    // 循环添加 (因为 addEffect 每次加 1 层)\n    for(let i=0; i<stacksToAdd; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n    \n    // 回血逻辑\n    // 重新获取目标身上的层数\n    const duwu = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duwu\");\n    if (duwu) {\n        const currentStacks = duwu.getFlag(\"xjzl-system\", \"stacks\") || 0;\n        const heal = currentStacks * 10;\n        await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "毒物",
+                    "icon": "icons/creatures/invertebrates/scorpion-tail-poison-green.webp",
+                    "description": "消耗内力时受到毒素伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "duwu",
+                            "stackable": true,
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "噬心",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "if (args.move && args.move.currentCost && args.move.currentCost.mp > 0) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = stacks * 5;\n    actor.applyDamage({\n        amount: dmg,\n        type: \"poison\",\n        isHit: true,\n        ignoreDefense: true\n    }).then(res => {\n        ui.notifications.info(`${actor.name} 毒物发作: -${res.finalDamage} HP`);\n    });\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "狂蛇剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>剑招怪异，看起来毫无用处，只有以五毒神剑舞动时才能明白其厉害之处。</p><p><strong>需求：</strong>剑-单剑</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "剑-单剑",
+            "moves": [
+                {
+                    "name": "毒蛇探首",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>天雷惊蛰，万毒乍醒，不消耗速度直线奔向一处空格，对路径上敌人造成伤害。每个路径上的敌人都需要与你进行一次[轻功]对抗，你每胜利一次获得一层“狂蛇”，至多五层，持续到战斗脱离。</p><p><strong>狂蛇：</strong>叠加至五层后，瞬时武器金光流转，你可以选择《狂蛇剑法》或《狂蛇锥》中的一招(绝招以外)不消耗动作释放，然后移除所有狂蛇。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "移动、对抗、添加狂蛇手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "提示信息",
+                            "trigger": "hit",
+                            "script": "ui.notifications.info(\"请与目标进行 [轻功] 对抗。胜利后请手动添加 [狂蛇]。\");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "金蛇狂舞",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>剑蛇如矢，气射四方，对你的东南西北四个方向直线上 3 米内的敌人造成伤害。当命中的目标大于等于 2 个时，获得一层“狂蛇”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "多目标命中获狂蛇自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "狂蛇获取",
+                            "trigger": "hit_once",
+                            "script": "if (args.hitCount >= 2) {\n    const eff = thisItem.effects.getName(\"狂蛇\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"金蛇狂舞命中多人，获得 [狂蛇]！\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "万龙馈影",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>剑影朦胧，寒光逼人。每次格挡成功时，给对方添加一层“蛇瘴”，至多叠加三层，持续到战斗脱离。</p><p><strong>蛇瘴：</strong>每层使你回合初流失 5 点气血。</p><p><strong>升级：</strong>格挡值+10，蛇瘴的每层流失气血再+5，内力消耗+2。</p>",
+                    "automationNote": "格挡添加蛇瘴自动。蛇瘴流失自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-蛇瘴",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nif (args.attacker) {\n    const eff = thisItem.effects.getName(\"蛇瘴\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = -5 - (lvl - 1) * 5;\n    \n    // 修改流失值\n    eff.changes[0].value = String(drain);\n    \n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "龙蛇闪击",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，移舞斩击，对目标造成伤害，并获得一层“狂蛇”，持续到战斗脱离。</p><p>·若目标具有蛇瘴，则移除所有蛇瘴，每移除一层，招式伤害+30。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "吞噬蛇瘴增伤自动。获得狂蛇自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "吞噬蛇瘴",
+                            "trigger": "attack",
+                            "script": "const targets = game.user.targets;\nif (targets.size === 1) {\n    const target = targets.first().actor;\n    const shezhang = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shezhang\");\n    if (shezhang) {\n        const stacks = shezhang.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const bonus = stacks * 30;\n        \n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 吞噬蛇瘴: ${bonus}`;\n        \n        await shezhang.delete();\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "获狂蛇",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"狂蛇\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "毒蛇化龙",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>毒蛟化龙，游剑来回冲击周围敌人，对他们造成伤害。同时进入“狂龙”状态，持续到战斗脱离。</p><p><strong>狂龙：</strong>在你的每回合初，你获得一层“狂蛇”。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1。内力消耗+8。</p>",
+                    "automationNote": "获得狂龙自动。狂龙回合初获狂蛇自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得狂龙",
+                            "trigger": "hit_once",
+                            "script": "const eff = thisItem.effects.getName(\"狂龙\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "狂蛇",
+                    "icon": "icons/creatures/reptiles/snake-cobra-strike-green.webp",
+                    "description": "5层时可免费施展招式。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "kuangshe",
+                            "stackable": true,
+                            "maxStacks": 5
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "蛇瘴",
+                    "icon": "icons/magic/symbols/runes-star-green.webp",
+                    "description": "回合初流失气血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shezhang",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnStart",
+                            "mode": 2,
+                            "value": "-5"
+                        }
+                    ]
+                },
+                {
+                    "name": "狂龙",
+                    "icon": "icons/creatures/reptiles/dragon-horned-blue.webp",
+                    "description": "每回合获得狂蛇。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "kuanglong",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "生成狂蛇",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "const ks = thisItem.effects.getName(\"狂蛇\").toObject();\ndelete ks._id;\nks.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, ks);\nui.notifications.info(\"狂龙生效：获得 1 层狂蛇\");"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "狂蛇锥法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>暗器蜿蜒细长，射出时咻咻发出空气震动，如蛇吐信，中者血流不止。</p><p>注：该套路可以用特制五毒锥施展，其材质特殊而昂贵，一枚一买，而不是通常的一次性 20 枚。</p><p><strong>需求：</strong>暗器-飞镖</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "暗器-飞镖",
+            "moves": [
+                {
+                    "name": "毒蛇吐信",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "15米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>身盘白花，蛇翻红焰，对目标造成伤害。击破架招时，将目标击倒并陷入“禁足”，持续一回合，若目标同时具有蛇瘴，还会为其添加“缚身”，持续三回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "扣除飞镖手动。击破效果自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗提示",
+                            "trigger": "attack",
+                            "script": "ui.notifications.info(\"请手动扣除 1 枚飞镖/五毒锥。\");",
+                            "active": true
+                        },
+                        {
+                            "label": "击破效果",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    // 击倒\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    // 禁足\n    const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (root) {\n        const rd = foundry.utils.deepClone(root);\n        rd.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rd);\n    }\n    \n    // 检查蛇瘴\n    const hasShezhang = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shezhang\");\n    if (hasShezhang) {\n        const fushen = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n        if (fushen) {\n            const fd = foundry.utils.deepClone(fushen);\n            fd.duration = { rounds: 3 };\n            await game.xjzl.api.effects.addEffect(args.target, fd);\n            ui.notifications.info(\"触发蛇瘴追击：缚身！\");\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "蛇隐龙游",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "hidden",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>狂蛇秘法刺激自身，获得“龙游”，持续一回合，并获得一层“狂蛇”，持续到脱战。</p><p><strong>龙游：</strong>闪避+5 点，虚招值+1。</p><p><strong>升级：</strong>龙游的持续回合数+1，虚招值+1。</p>",
+                    "automationNote": "扣除飞镖手动。BUFF获取自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "rage": [
+                            1,
+                            1,
+                            1
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗提示",
+                            "trigger": "attack",
+                            "script": "ui.notifications.info(\"请手动扣除 1 枚飞镖/五毒锥。\");",
+                            "active": true
+                        },
+                        {
+                            "label": "获得BUFF",
+                            "trigger": "hit",
+                            "script": "// 狂蛇\nconst ks = thisItem.effects.getName(\"狂蛇\").toObject();\ndelete ks._id;\nks.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, ks);\n\n// 龙游\nconst ly = thisItem.effects.getName(\"龙游\").toObject();\ndelete ly._id;\nly.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nly.duration = { rounds: 1 + (lvl - 1) };\nly.changes[1].value = String(1 + (lvl - 1)); // 虚招值成长\n\nawait game.xjzl.api.effects.addEffect(actor, ly);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "金光蛇影",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "15米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>盘蛇徘徊，金锥大放，射向目标造成伤害。</p><p>·自身每有一层“狂蛇”，可对目标施展一次普通攻击。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "扣除飞镖手动。狂蛇追击手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗提示",
+                            "trigger": "attack",
+                            "script": "ui.notifications.info(\"请手动扣除 1 枚飞镖/五毒锥。\");",
+                            "active": true
+                        },
+                        {
+                            "label": "追击提示",
+                            "trigger": "hit",
+                            "script": "const ks = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangshe\");\nif (ks) {\n    const stacks = ks.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    ui.notifications.info(`狂蛇追击：当前层数 ${stacks}，请手动追加 ${stacks} 次普通攻击。`);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "狂蛇",
+                    "icon": "icons/creatures/reptiles/snake-cobra-strike-green.webp",
+                    "description": "5层时可免费施展招式。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "kuangshe",
+                            "stackable": true,
+                            "maxStacks": 5
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "龙游",
+                    "icon": "icons/creatures/reptiles/dragon-horned-blue.webp",
+                    "description": "增加闪避和虚招值。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "longyou",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.dodge",
+                            "mode": 2,
+                            "value": "5"
+                        },
+                        {
+                            "key": "system.combat.xuzhao",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "豢养蛊虫",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>蛊族修炼蛊心诀时须以蛊虫相辅，否则难以修炼圆满，豢养不同蛊虫，可使内力附带不同特质。</p><p>·一人只可以选一类蛊虫辅修，否则中蛊而死。</p><p>·在蛊心诀小成时，开始做蛊豢养（详见做蛊），内功圆满那一刻，双手化去该蛊躯体，碾为粉末，吸入体内，你的圆满运功特效“蛊心”获得强化。</p><p><strong>疳蛊-蛊心：</strong>使目标额外流失 5 点内力。</p><p><strong>紫灵蛊-蛊心：</strong>招式命中后回复 5 点气血。</p><p><strong>癫蛊-蛊心：</strong>使目标陷入“错乱”，持续一回合。</p><p><strong>错乱：</strong>自己的每个回合末，朝 D4 随机方向不消耗速度走出一步，然后倒地。</p><p><strong>万蛇蛊-蛊心：</strong>使目标额外受到 5 点毒素伤害。</p><p><strong>金蝎蛊-蛊心：</strong>使目标陷入“脱力”，虚招对抗具有劣势，持续一回合。</p><p><strong>升级：</strong>流失内力、回复气血、毒素伤害+5，错乱、脱力的持续回合+1。</p>",
+            "automationNote": "被动说明，完全手动。",
+            "requirements": "无",
+            "moves": [],
+            "scripts": []
+        }
+    },
+    {
+        "name": "做蛊",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>制蛊方法复杂，步骤众多，对毒虫品种、炼制地点、所耗材料、环境温度、季节时间等都各有要求，一旦出错便会前功尽弃甚至反噬自身。</p><p><strong>效果：</strong>你学会分辨大部分的蛊虫，并得知其习性，知晓做法和其解法。</p><p><strong>制蛊:</strong>每次做蛊时，需花费至少一整天，并消耗对应修为银两，然后进行一次【D20+[毒术]等级】的制蛊检定（难度见蛊虫描述），成功则获得蛊虫，存放在密闭小瓶中，失败则白费修为银两。</p><p><strong>解蛊：</strong>需花费银两购买大量药草奇物配置解药，还要配合特殊的治疗方法。</p>",
+            "automationNote": "技艺检定手动。",
+            "requirements": "无",
+            "moves": [],
+            "scripts": []
+        }
+    },
+    {
+        "name": "掷蛊法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>趁其不备，诡异掷出一道黑影，目标需进行[韧性]检定（难度=制作难度），失败中蛊。</p><p><strong>升级：</strong>投掷距离+1，[韧性]检定难度+1。</p>",
+            "automationNote": "韧性检定手动。",
+            "requirements": "无",
+            "moves": [
+                {
+                    "name": "掷蛊",
+                    "type": "real",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>趁其不备，诡异掷出一道黑影，目标需进行[韧性]检定（难度=制作难度），失败中蛊。</p><p><strong>升级：</strong>投掷距离+1，[韧性]检定难度+1。</p>",
+                    "automationNote": "消耗蛊虫手动。韧性检定手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "淬蛊法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>小憩时，把蛊虫喂在一把武器或者是一枚暗器上，持续十二个时辰，期间用该武器攻击命中时，目标视作被你放蛊，进行[韧性]检定（难度=制作难度），失败中蛊。</p><p>·一把武器同时只能进行一次淬蛊。</p><p><strong>升级：</strong>淬蛊的时间增加十二时辰。</p>",
+            "automationNote": "纯手动描述。",
+            "requirements": "无",
+            "moves": [],
+            "scripts": []
+        }
+    },
+    {
+        "name": "竹篾法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>将下了蛊的竹篾放置于一无人空格处，若有人踏于其上，弹其腿部，目标需进行[韧性]检定（难度=制作难度+2），失败中蛊。</p><p>·经过[探查]（难度 15）可以发现竹篾有蛊。</p><p><strong>升级：</strong>[韧性]检定难度+1，探查难度+1。</p>",
+            "automationNote": "陷阱逻辑手动。",
+            "requirements": "无",
+            "moves": [
+                {
+                    "name": "放置竹篾",
+                    "type": "real",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "3米",
+                    "targetInfo": "地面",
+                    "actionCost": "主要动作",
+                    "description": "<p>放置竹篾陷阱。</p>",
+                    "automationNote": "仅作为动作提示。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "炼毒血",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>苗疆五毒教奇功，以蛊喂食毒药，然后将蛊化入体内，气血中蕴养剧毒，此后血中含毒，常人难近。</p><p><strong>需求：</strong>《驭蛇术》修炼圆满。</p><p><strong>效果：</strong>你选择一种毒药，购买十份，然后每隔三天定时炼化一份。持续一个月后（炼化十份），你的血液充斥此毒，具有毒素效果，你获得“毒血-XX（毒药名）”，该状态无法被其他武功效果移除。</p><p><strong>毒血-XX：</strong>你免疫名为 XX 的毒药。</p><p>·当你为他人添加你的“毒血”效果时，他视作受到 XX 毒药的涂抹或扩散影响，并进行相应检定。</p><p>·只能服用的毒药无法炼化。</p><p><strong>升级：</strong>需要炼化的份数-1。</p>",
+            "automationNote": "手动记录毒血状态。",
+            "requirements": "《驭蛇术》修炼圆满",
+            "moves": [],
+            "scripts": []
+        }
+    }
+]
