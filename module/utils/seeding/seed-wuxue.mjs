@@ -47,6 +47,7 @@ const MULTI_FILE_CONFIG = {
         "beiyuan",        // 北原
         "dongyingxiyang", // 东瀛西洋
         "murongduanshiwuzu", // 慕容段氏巫族
+        "tushou",         // 徒手
         // 以后每增加一个 JSON，只需在这里添加文件名即可
     ],
     // 如果其他门派也变多了，也可以支持：
