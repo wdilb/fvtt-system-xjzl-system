@@ -1155,9 +1155,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     if (e.yinwei) { bonuses.yin += 20; bonuses.rou += 20; }
 
     // 阳跷: 速度+1, 先攻+5, 暴击-1
-    if (e.yangqiao) { bonuses.speed += 1; bonuses.initiative += 5; bonuses.critWaigong -= 1; }
+    if (e.yangqiao) { bonuses.speed += 1; bonuses.initiative += 5; bonuses.critWaigong -= 1; bonuses.critNeigong -= 1; }
     // 阴跷: 速度+1, 闪避+5, 暴击-1
-    if (e.yinqiao) { bonuses.speed += 1; bonuses.dodge += 5; bonuses.critWaigong -= 1; }
+    if (e.yinqiao) { bonuses.speed += 1; bonuses.dodge += 5; bonuses.critWaigong -= 1; bonuses.critNeigong -= 1; }
 
     // --- 生死玄关 ---
     if (x.broken) {
