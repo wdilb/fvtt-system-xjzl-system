@@ -579,20 +579,20 @@
             "category": "wuxue",
             "sect": "wanfosi",
             "tier": 1,
-            "description": "<p>万佛七十二绝技之一，练成后在一根干木旁快劈九九八十一刀，刀刃不损木材丝毫，刀上发出的热力却可将木材点燃生火，故得此名。</p>",
-            "requirements": "刀-单刀，罗汉堂",
-            "automationNote": "引燃/刀木效果完全自动化。",
+            "description": "<p>万佛七十二绝技之一，练成后在一根干木旁快劈九九八十一刀，刀刃不损木材丝毫，刀上发出的热力却可将木材点燃生火，故得此名。</p><p><strong>需求：</strong>刀-单刀，罗汉堂</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "刀-单刀；罗汉堂",
             "moves": [
                 {
                     "name": "钻木取火",
                     "type": "real",
+                    "element": "yang",
                     "damageType": "neigong",
                     "weaponType": "blade",
-                    "element": "yang",
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>刀尖速劈，对敌人造成 0.4 力量点内功伤害。</p><p>若目标身上存在“刀木”，为其添加“引燃”，持续到战斗脱离。</p>",
+                    "description": "<p>刀尖速劈，对敌人造成伤害。</p><p>若目标身上存在“刀木”，为其添加“引燃”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "命中检测刀木并施加引燃自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -614,20 +614,22 @@
                         {
                             "label": "引燃判定",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.target.effects.find(e => e.name === \"刀木\")) {\n    const effect = thisItem.effects.getName(\"引燃\");\n    if (effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}"
+                            "script": "if (args.isHit && args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"daomu\")) {\n    const effect = thisItem.effects.getName(\"引燃\");\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被引燃！`);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
                 {
                     "name": "入木三分",
                     "type": "feint",
+                    "element": "yang",
                     "damageType": "neigong",
                     "weaponType": "blade",
-                    "element": "yang",
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>厉刃刻划，造成 0.3 力量点内功伤害。击破架招时，给目标添加“刀木”状态，持续到战斗脱离。</p><p><b>刀木</b>：受到刀法招式攻击时，敌人的暴击骰-3。</p>",
+                    "description": "<p>厉刃刻划，造成伤害。击破架招时，给目标添加“刀木”状态，持续到战斗脱离。</p><p><strong>刀木：</strong>受到刀法招式攻击时，敌人的暴击骰-3。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破施加刀木自动。刀木易暴击效果自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -649,20 +651,22 @@
                         {
                             "label": "添加刀木",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"刀木\");\n    if (effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}"
+                            "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"刀木\");\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被刻下刀木印记！`);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
                 {
                     "name": "人非草木",
                     "type": "stance",
+                    "element": "yang",
                     "damageType": "neigong",
                     "weaponType": "blade",
-                    "element": "yang",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>抽刀于身，开启架招，成功格挡时，给目标添加“刀木”状态，持续到战斗脱离。</p>",
+                    "description": "<p>抽刀于身，开启架招，成功格挡时，给目标添加“刀木”状态，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "格挡施加刀木自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -678,7 +682,8 @@
                         {
                             "label": "反击刀木",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const effect = thisItem.effects.getName(\"刀木\");\n    if (effect) await game.xjzl.api.effects.addEffect(args.attacker, effect.toObject());\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const effect = thisItem.effects.getName(\"刀木\");\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        ui.notifications.info(`${args.attacker.name} 攻击被格挡，受到刀木印记！`);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -686,13 +691,14 @@
                     "name": "风林火山",
                     "type": "real",
                     "isUltimate": true,
+                    "element": "yang",
                     "damageType": "neigong",
                     "weaponType": "blade",
-                    "element": "yang",
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>刀气挥舞，擦出灼气，对目标造成 0.6 力量点内功伤害。</p><p>若目标身上存在“引燃”状态，招式伤害+20。</p>",
+                    "description": "<p>刀气挥舞，擦出灼气，对目标造成伤害。</p><p>若目标身上存在“引燃”状态，招式伤害+20。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "引燃增伤自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -719,39 +725,48 @@
                         {
                             "label": "引燃增伤",
                             "trigger": "preDamage",
-                            "script": "if (args.target && args.target.effects.find(e => e.name === \"引燃\")) {\n    args.config.amount += 20;\n}"
+                            "script": "if (args.target && args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"ignite\")) {\n    args.config.amount += 20;\n    ui.notifications.info(\"引燃增伤触发！伤害+20\");\n}",
+                            "active": true
                         }
                     ]
                 }
-            ]
+            ],
+            "scripts": []
         },
         "effects": [
             {
                 "name": "刀木",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
-                "description": "受到刀法招式攻击时，暴击骰-3（更难暴击）。",
+                "description": "受到刀法招式攻击时，敌人的暴击骰-3（阈值降低3点，更容易被暴击）。",
+                "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "daomu",
+                        "stackable": false,
                         "scripts": [
                             {
-                                "label": "降低暴击",
+                                "label": "刀法易暴击",
                                 "trigger": "check",
-                                "script": "if (args.move.weaponType === \"blade\") {\n    args.flags.critThresholdMod -= 3;\n}"
+                                "active": true,
+                                "script": "// 这是一个Debuff，挂在目标身上\n// args.attacker 是攻击者，args.move 是攻击招式\nif (args.move && args.move.weaponType === \"blade\") {\n    // 降低暴击阈值 (Base - Mod)，Mod为正数则阈值降低，更容易暴击\n    args.flags.critThresholdMod += 3;\n}"
                             }
                         ]
                     }
-                }
+                },
+                "changes": []
             },
             {
                 "name": "引燃",
                 "icon": "icons/svg/fire.svg",
-                "description": "被点燃。",
+                "description": "被点燃，风林火山伤害增加。",
+                "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "ignite"
+                        "slug": "ignite",
+                        "stackable": false
                     }
-                }
+                },
+                "changes": []
             }
         ]
     },
@@ -3642,10 +3657,18 @@
                     "name": "散业力",
                     "type": "stance",
                     "tier": 2,
-                    "description": "<p>次要动作，刃对胸口，业力乍现，开启架招。格挡成功后，使目标获得一层“业力”，至多九层，持续到战斗脱离。</p><p><b>业力</b>：每层使招式伤害+10，出招后移除业力。</p>",
-                    "actionCost": "次要动作",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
                     "range": "自身",
                     "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，刃对胸口，业力乍现，开启架招。格挡成功后，使目标获得一层“业力”，至多九层，持续到战斗脱离。</p><p><b>业力</b>：每层使招式伤害+10，出招后移除业力。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "开启架招自动。格挡成功给攻击者叠加业力自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -3653,38 +3676,27 @@
                             6
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10
-                    },
-                    "automationNote": "格挡成功后自动给攻击者添加[业力]。",
                     "scripts": [
                         {
                             "label": "散业力-反击",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const yeli = thisItem.effects.getName('业力');\n    if (yeli) await game.xjzl.api.effects.addEffect(args.attacker, yeli.toObject());\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    // 获取Item上的特效模板\n    const yeliTempl = thisItem.effects.getName('业力');\n    if (yeliTempl) {\n        const data = yeliTempl.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        // 调用API添加 (会自动处理叠加)\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        // 飘字提示\n        if (args.attacker.token?.object) {\n             canvas.interface.createScrollingText(args.attacker.token.object.center, \"业力+1\", { fill: \"#5e0000\", stroke: \"#ffffff\", strokeThickness: 4, jitter: 0.25 });\n        }\n    }\n}"
                         }
                     ]
                 },
                 {
                     "name": "断善恶",
                     "type": "real",
-                    "damageType": "neigong",
-                    "element": "yang",
-                    "weaponType": "blade",
                     "tier": 2,
-                    "description": "<p>蓄力动作，善恶之举冥冥已定，刀光如虹，对周围敌人造成0.4力量点内功伤害。若命中目标存在业力，则削减其10点侠义值或恶行值（至少0）。</p><p>·侠义值、恶行值优先消耗其中数值较高的那个，若因此造成目标的侠恶标签产生变化，该目标心若惶惶，陷入定身，持续一回合。</p>",
-                    "actionCost": "蓄力动作",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
                     "range": "1米",
                     "targetInfo": "周围敌人",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12
-                        ]
-                    },
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，善恶之举冥冥已定，刀光如虹，对周围敌人造成0.4力量点内功伤害。若命中目标存在业力，则削减其10点侠义值或恶行值（至少0）。</p><p>·侠义值、恶行值优先消耗其中数值较高的那个，若因此造成目标的侠恶标签产生变化，该目标心若惶惶，陷入定身，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，减侠恶值+10，内力消耗+4。</p>",
+                    "automationNote": "伤害自动。削减侠恶值尝试自动(需GM权限)，若失败则提示手动。定身检测自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3695,13 +3707,19 @@
                             }
                         ]
                     },
-                    "automationNote": "削减侠恶值及定身效果自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
                     "scripts": [
                         {
                             "label": "断善恶-削减侠恶",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst yeLi = target.effects.find(e => e.name === '业力');\nif (yeLi) {\n    const social = target.system.social;\n    let xiayi = social.xiayi || 0;\n    let exing = social.exing || 0;\n    const reduce = 10 + (Math.max(1, args.move.computedLevel || 1) - 1) * 10;\n    \n    const oldLabel = (xiayi >= 100 && exing <= 50) ? 'xia' : (exing >= 100 && xiayi <= 50 ? 'e' : 'none');\n\n    if (xiayi >= exing) {\n        xiayi = Math.max(0, xiayi - reduce);\n        await target.update({'system.social.xiayi': xiayi});\n        ui.notifications.info(`${target.name} 侠义值减少 ${reduce}`);\n    } else {\n        exing = Math.max(0, exing - reduce);\n        await target.update({'system.social.exing': exing});\n        ui.notifications.info(`${target.name} 恶行值减少 ${reduce}`);\n    }\n\n    const newLabel = (xiayi >= 100 && exing <= 50) ? 'xia' : (exing >= 100 && xiayi <= 50 ? 'e' : 'none');\n    if (oldLabel !== newLabel) {\n         await game.xjzl.api.effects.addEffect(target, 'stun');\n         ui.notifications.warn(`${target.name} 侠恶巨变，陷入定身！`);\n    }\n}"
+                            "script": "if (!args.isHit) return;\n\n// 检查目标是否有业力\nconst hasYeLi = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yeli');\nif (hasYeLi) {\n    const target = args.target;\n    const social = target.system.social;\n    let xiayi = social.xiayi || 0;\n    let exing = social.exing || 0;\n    \n    // 计算削减量: 10 + (Lv-1)*10\n    const reduce = 10 + (Math.max(1, args.move.computedLevel || 1) - 1) * 10;\n    \n    // 记录旧标签\n    const getLabel = (x, e) => (x >= 100 && e <= 50) ? 'xia' : (e >= 100 && x <= 50 ? 'e' : 'none');\n    const oldLabel = getLabel(xiayi, exing);\n\n    let msg = \"\";\n    // 尝试更新数据\n    try {\n        if (xiayi >= exing) {\n            xiayi = Math.max(0, xiayi - reduce);\n            await target.update({'system.social.xiayi': xiayi});\n            msg = `${target.name} 侠义值减少 ${reduce}`;\n        } else {\n            exing = Math.max(0, exing - reduce);\n            await target.update({'system.social.exing': exing});\n            msg = `${target.name} 恶行值减少 ${reduce}`;\n        }\n        ui.notifications.info(msg);\n    } catch (err) {\n        ui.notifications.warn(`无法自动修改 ${target.name} 的数据，请GM手动减少 ${reduce} 点较高的一项数值。`);\n    }\n\n    // 检查标签变化 (基于新值)\n    const newLabel = getLabel(xiayi, exing);\n    if (oldLabel !== newLabel) {\n         await game.xjzl.api.effects.toggleStatus(target, 'stun', true);\n         ui.notifications.warn(`${target.name} 侠恶巨变，陷入定身！`);\n         ChatMessage.create({\n             content: `<div class=\"xjzl-chat-card\"><b>${target.name}</b> 因侠恶标签改变 (${oldLabel}->${newLabel})，已陷入 <b>定身</b>。</div>`,\n             speaker: ChatMessage.getSpeaker({actor: actor})\n         });\n    }\n}"
                         }
                     ]
                 },
@@ -3710,10 +3728,18 @@
                     "type": "qi",
                     "actionType": "default",
                     "tier": 2,
-                    "description": "<p>次要动作，口诵真言，引天地生灵共业力，根据周围敌人存在的“业力”总层数，自己获得等量层数的“业力”，至多九层，持续到战斗脱离。</p>",
-                    "actionCost": "次要动作",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "blade",
                     "range": "1米",
                     "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，口诵真言，引天地生灵共业力，根据周围敌人存在的“业力”总层数，自己获得等量层数的“业力”，至多九层，持续到战斗脱离。</p><p><strong>升级：</strong>释放距离+2，内力消耗+2。</p>",
+                    "automationNote": "请自行统计周围敌人的业力总数，并手动给自己添加对应层数的[业力]。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -3721,31 +3747,24 @@
                             6
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "自动统计周围敌人业力并应用到自身。",
-                    "scripts": [
-                        {
-                            "label": "断共己-获取业力",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const tokens = canvas.tokens.placeables.filter(t => t.actor && t.id !== actor.token?.id && canvas.grid.measureDistance(actor.token?.object || {}, t) <= (1 + (args.move.computedLevel-1)*2));\nlet totalStacks = 0;\nfor (const t of tokens) {\n    const yeLi = t.actor.effects.find(e => e.name === '业力');\n    if (yeLi) totalStacks += (yeLi.getFlag('xjzl-system', 'stacks') || 1);\n}\nif (totalStacks > 0) {\n    const effect = thisItem.effects.getName('业力');\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        foundry.utils.setProperty(data, 'flags.xjzl-system.stacks', Math.min(9, totalStacks));\n        await game.xjzl.api.effects.addEffect(actor, data);\n        ui.notifications.info(`${actor.name} 获得 ${Math.min(9, totalStacks)} 层业力`);\n    }\n} else {\n    ui.notifications.warn('周围无业力存在');\n}"
-                        }
-                    ]
+                    "scripts": []
                 },
                 {
                     "name": "断引满",
                     "type": "counter",
-                    "damageType": "neigong",
-                    "element": "yang",
-                    "weaponType": "blade",
                     "tier": 2,
-                    "description": "<p>当你看破对方虚招时，可以消耗反应动作施展，压制目标虚招，业力自生灭，无尽亦无终，对自身周围所有存在“业力”的敌人，造成等同于此次虚招伤害数值（不暴击）的内功伤害。</p>",
-                    "actionCost": "反应动作",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
                     "range": "1米",
                     "targetInfo": "周围敌人",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可以消耗反应动作施展，压制目标虚招，业力自生灭，无尽亦无终，对自身周围所有存在“业力”的敌人，造成等同于此次虚招伤害数值（不暴击）的内功伤害。</p><p><strong>升级：</strong>招式距离+2，内力消耗+4。</p>",
+                    "automationNote": "纯手动。请手动选择目标，并根据虚招伤害修改数值。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -3753,25 +3772,31 @@
                             12
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "手动选择目标，伤害数值需手动输入修正。",
                     "scripts": []
                 },
                 {
                     "name": "金刚斩业",
                     "type": "real",
                     "isUltimate": true,
-                    "damageType": "neigong",
-                    "element": "yang",
-                    "weaponType": "blade",
                     "tier": 3,
-                    "description": "<p>-杀生为护生，斩业非斩人-</p><p>蓄力动作，刀光破空起，对周围敌人造成0.8力量点内功伤害，使具有“业力”的目标战斗脱离。</p><p>·战斗脱离后，怒气归零，相关状态消失。但是由于敌人依旧在场上，若无特殊情况，对方会重新进入战场，投掷先攻，按照结果决定他的行动顺序。</p>",
-                    "actionCost": "蓄力动作",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
                     "range": "3米",
                     "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>-杀生为护生，斩业非斩人-</p><p>蓄力动作，刀光破空起，对周围敌人造成0.8力量点内功伤害，使具有“业力”的目标战斗脱离。</p><p>·战斗脱离后，怒气归零，相关状态消失。但是由于敌人依旧在场上，若无特殊情况，对方会重新进入战场，投掷先攻，按照结果决定他的行动顺序。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "伤害自动。命中带业力目标后，发送卡片提示GM处理战斗脱离。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             16,
@@ -3786,23 +3811,12 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.8
-                            }
-                        ]
-                    },
-                    "automationNote": "战斗脱离、怒气清空等需手动处理。",
                     "scripts": [
                         {
                             "label": "金刚斩业-提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.target.effects.find(e => e.name === '业力')) {\n    ChatMessage.create({content: `${args.target.name} 具有业力，应<b>脱离战斗</b>（怒气归零，状态消失）。请GM手动处理。`});\n}"
+                            "script": "if (args.isHit && args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yeli')) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"background:#333; color:#fff;\"><b>金刚斩业 - 效果触发</b></div>\n            <div style=\"padding:5px;\">\n                <p>目标 <b>${args.target.name}</b> 具有业力。</p>\n                <p style=\"color:red; font-weight:bold;\">请GM执行 [战斗脱离]：</p>\n                <ul>\n                    <li>怒气归零</li>\n                    <li>移除所有Buff/Debuff</li>\n                    <li>重投先攻</li>\n                </ul>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 }
@@ -3810,15 +3824,9 @@
             "effects": [
                 {
                     "name": "业力",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
                     "description": "每层使招式伤害+10，出招后移除业力。",
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ],
+                    "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "yeli",
@@ -3827,13 +3835,20 @@
                             "scripts": [
                                 {
                                     "label": "业力-出招后移除",
-                                    "trigger": "hit",
+                                    "trigger": "preDamage",
                                     "active": true,
-                                    "script": "if (thisEffect) await game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 99);"
+                                    "script": "// 只有造成伤害的主动招式才消耗 (气招buff类通常不算出招)\n// preDamage 在命中且确定造成伤害后触发\nif (thisEffect) {\n    // 发送提示 (数值已经通过changes自动加了)\n    ui.notifications.info(`${actor.name} 消耗业力，本次伤害已包含加成。`);\n    await game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 99);\n}"
                                 }
                             ]
                         }
-                    }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
                 }
             ]
         }
@@ -4050,27 +4065,20 @@
             "category": "wuxue",
             "sect": "wanfosi",
             "tier": 2,
-            "description": "<p>万佛七十二绝技指功真谛。功成后手指坚硬逾钢，铁指开砖如泥，手如钢爪般抓树撕皮，搓石成粉，瞬间致敌于伤残。</p>",
+            "description": "<p>万佛七十二绝技指功真谛。功成后手指坚硬逾钢，铁指开砖如泥，手如钢爪般抓树撕皮，搓石成粉，瞬间致敌于伤残。</p><p><strong>需求：</strong>徒手-指法，达摩院 <strong>属性：</strong>阳</p>",
             "requirements": "徒手-指法，达摩院；属性：阳",
             "moves": [
                 {
                     "name": "乌龙探爪",
                     "type": "real",
-                    "damageType": "waigong",
                     "element": "yang",
+                    "damageType": "waigong",
                     "weaponType": "unarmed",
-                    "tier": 2,
-                    "description": "<p>主要动作，凝力于爪，对敌人造成0.5力量点外功伤害。</p><p>·若有人处于半空状态，你可以消耗反应动作释放此招，原地发出内劲隔空击敌，造成伤害。</p>",
-                    "actionCost": "主要动作",
                     "range": "3米",
                     "targetInfo": "单体",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，凝力于爪，对敌人造成 0.5 力量点外功伤害。</p><p>·若有人处于半空状态，你可以消耗反应动作释放此招，原地发出内劲隔空击敌，造成伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "伤害计算自动。半空反应需手动操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4081,20 +4089,6 @@
                             }
                         ]
                     },
-                    "automationNote": "对空反应需手动。",
-                    "scripts": []
-                },
-                {
-                    "name": "双龙戏珠",
-                    "type": "feint",
-                    "damageType": "waigong",
-                    "element": "yang",
-                    "weaponType": "unarmed",
-                    "tier": 2,
-                    "description": "<p>主要动作，两臂前抓，造成0.4力量点外功伤害。击破对方架招时，将目标击飞三米。</p>",
-                    "actionCost": "主要动作",
-                    "range": "1米",
-                    "targetInfo": "单体",
                     "costs": {
                         "mp": [
                             2,
@@ -4102,6 +4096,19 @@
                             6
                         ]
                     },
+                    "scripts": []
+                },
+                {
+                    "name": "双龙戏珠",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，两臂前抓，造成 0.4 力量点外功伤害。击破对方架招时，将目标击飞三米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破后提示击飞，位移需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4112,24 +4119,37 @@
                             }
                         ]
                     },
-                    "automationNote": "击飞效果需手动处理。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "双龙戏珠-击飞",
+                            "label": "击破提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) ChatMessage.create({content: `${args.target.name} 被击飞3米`});"
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"color:#d35400; font-weight:bold;\">击破效果触发</div>\n            <div>${args.target.name} 被击飞 3 米！</div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 },
                 {
                     "name": "气贯龙爪",
                     "type": "stance",
-                    "tier": 2,
-                    "description": "<p>次要动作，掌心向上，气喷指尖，开启架招。成功格挡时，给目标添加一层“愚钝”，至多三层，持续到战斗脱离。</p><p><b>愚钝</b>：每层使你的虚招对抗-1。</p>",
-                    "actionCost": "次要动作",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
                     "range": "自身",
                     "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，掌心向上，气喷指尖，开启架招。成功格挡时，给目标添加一层“愚钝”，至多三层，持续到战斗脱离。</p><p><strong>愚钝：</strong>每层使你的虚招对抗-1。</p><p><strong>升级：</strong>格挡值+10，额外添加一层，内力消耗+2。</p>",
+                    "automationNote": "格挡成功自动添加[愚钝]。叠加层数随等级增加。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -4137,38 +4157,26 @@
                             6
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10
-                    },
-                    "automationNote": "格挡成功后自动给攻击者添加[愚钝]。",
                     "scripts": [
                         {
-                            "label": "气贯龙爪-反击",
+                            "label": "反击-愚钝",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const yudun = thisItem.effects.getName('愚钝');\n    if (yudun) await game.xjzl.api.effects.addEffect(args.attacker, yudun.toObject());\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\n\n// 升级逻辑：额外添加一层\n// Lv1: 1层, Lv2: 2层, Lv3: 3层\nconst lvl = Math.max(1, move.computedLevel || 1);\n\n// 循环调用以叠加层数\nfor (let i = 0; i < lvl; i++) {\n    await game.xjzl.api.effects.addEffect(args.attacker, \"yudun\");\n}\n\nui.notifications.info(`${args.attacker.name} 触发反击：施加 ${lvl} 层 [愚钝]`);"
                         }
                     ]
                 },
                 {
                     "name": "龙凤朝阳",
                     "type": "counter",
-                    "damageType": "waigong",
                     "element": "yang",
+                    "damageType": "waigong",
                     "weaponType": "unarmed",
-                    "tier": 2,
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制虚招并移动至目标周围空格，直臂抓探，对目标造成0.6力量点外功伤害。</p><p>·同时给对方添加“下盘不稳”，持续三回合。</p>",
-                    "actionCost": "反应动作",
                     "range": "3米",
                     "targetInfo": "单体",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制虚招并移动至目标周围空格，直臂抓探，对目标造成 0.6 力量点外功伤害。</p><p>·同时给对方添加“下盘不稳”，持续三回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中自动施加[下盘不稳](3回合)。移动需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4179,13 +4187,19 @@
                             }
                         ]
                     },
-                    "automationNote": "移动需手动。自动添加下盘不稳。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "龙凤朝阳-下盘不稳",
+                            "label": "施加下盘不稳",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'unstable');\n}"
+                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        // 修正持续时间为3回合\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`已对 ${args.target.name} 施加 [下盘不稳] (3回合)`);\n    }\n}"
                         }
                     ]
                 },
@@ -4193,14 +4207,24 @@
                     "name": "龙行乾坤",
                     "type": "real",
                     "isUltimate": true,
-                    "damageType": "waigong",
                     "element": "yang",
+                    "damageType": "waigong",
                     "weaponType": "unarmed",
-                    "tier": 2,
-                    "description": "<p>主要动作，龙腾移步，神爪探伸，造成0.8力量点外功伤害。</p><p>·若有人处于半空状态，你可以消耗反应动作释放此招，原地发出内劲隔空击敌，造成伤害。</p><p>·若目标存在“愚钝”，将其拉至身边空格击倒。</p>",
-                    "actionCost": "主要动作",
                     "range": "5米",
                     "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，龙腾移步，神爪探伸，造成 0.8 力量点外功伤害。</p><p>·若有人处于半空状态，你可以消耗反应动作释放此招，原地发出内劲隔空击敌，造成伤害。</p><p>·若目标存在“愚钝”，将其拉至身边空格击倒。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "检测[愚钝]并自动施加[倒地]。拉人位移需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -4213,46 +4237,14 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.8
-                            }
-                        ]
-                    },
-                    "automationNote": "拉人需手动。脚本检测愚钝并应用击倒。",
                     "scripts": [
                         {
-                            "label": "龙行乾坤-愚钝检测",
+                            "label": "愚钝追击",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.target.effects.find(e => e.name === '愚钝')) {\n    await game.xjzl.api.effects.addEffect(args.target, 'prone');\n    ChatMessage.create({content: `${args.target.name} 被拉至身边并击倒`});\n}"
+                            "script": "if (args.isHit) {\n    // 检查目标是否有愚钝 (通过 slug 判断)\n    const hasYudun = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yudun\");\n    \n    if (hasYudun) {\n        // 施加倒地 (prone)\n        await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\">\n                <div style=\"color:#c0392b; font-weight:bold;\">绝招特效触发</div>\n                <div>目标身负 [愚钝]，被拉至身边并击倒！</div>\n            </div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
                         }
                     ]
-                }
-            ],
-            "effects": [
-                {
-                    "name": "愚钝",
-                    "img": "icons/svg/daze.svg",
-                    "description": "每层使你的虚招对抗-1。",
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.feintLevel",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yudun",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    }
                 }
             ]
         }
@@ -4677,28 +4669,21 @@
             "category": "wuxue",
             "sect": "wanfosi",
             "tier": 3,
-            "description": "<p>万佛寺普渡众生流传千年的秘藏武学。掌法共分九式，每式皆有【佛器】守护。</p>",
-            "requirements": "徒手，菩提院；属性：阳",
+            "description": "<p>万佛寺普渡众生流传千年的秘藏武学，震古烁今。掌法共分九式，每式皆有【佛器】守护，需内功境界达到撼天动地后方可参透其中佛意并学习修炼。</p><p><strong>需求：</strong>你必须成为万佛寺长老后，方可在寺内参悟佛器投入修为，佛器乃万佛秘宝，不可带出寺院。</p><p><strong>需求：</strong>徒手，菩提院 <strong>属性：</strong>阳</p>",
+            "requirements": "徒手，菩提院",
             "moves": [
                 {
                     "name": "第一式-佛光乍现",
                     "type": "real",
-                    "damageType": "neigong",
                     "element": "yang",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>主要动作，诸法所生，为心所现。掌放光芒对敌人造成0.6力量点内功伤害。若目标无架招，需进行[定力]检定（难度18），失败则走火入魔，持续一回合。</p>",
-                    "actionCost": "主要动作",
                     "range": "10米",
                     "targetInfo": "单体",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ]
-                    },
+                    "actionCost": "主要动作",
+                    "requirements": "需求佛器：十法界珠",
+                    "description": "<p>诸法所生，为心所现。掌放光芒对敌人造成伤害。</p><p>若目标无架招，需进行[定力]检定（难度 18），失败则走火入魔，持续一回合。</p><p>·若有敌人处于半空中，你可以消耗反应动作释放此招，立于原地，拍出神掌伤敌。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "如来加成自动。无架招定力检定自动。半空反应动作需手动判断。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4709,27 +4694,6 @@
                             }
                         ]
                     },
-                    "automationNote": "自动判定无架招并请求检定。",
-                    "scripts": [
-                        {
-                            "label": "佛光乍现-定力检定",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const rage = CONFIG.statusEffects.find(e => e.id === 'rage');\n    await Macros.requestSave({\n        target: args.target,\n        type: 'dingli',\n        dc: 18,\n        label: '抵抗走火入魔',\n        attacker: actor,\n        onFail: rage ? { ...rage, duration: { rounds: 1 } } : null\n    });\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "第二式-佛动山海",
-                    "type": "counter",
-                    "damageType": "neigong",
-                    "element": "yang",
-                    "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，裂地成沟，倒山破海，压制虚招并对目标造成0.7力量点内功伤害，同时将目标击倒。若目标为[恶][邪]，招式伤害提升30点。</p>",
-                    "actionCost": "反应动作",
-                    "range": "5米",
-                    "targetInfo": "单体",
                     "costs": {
                         "mp": [
                             4,
@@ -4738,6 +4702,39 @@
                             16
                         ]
                     },
+                    "scripts": [
+                        {
+                            "label": "如来加成与定力检定",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 如来加成 (命中)\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}"
+                        },
+                        {
+                            "label": "如来加成(伤害)",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push('如来 +5');\n}"
+                        },
+                        {
+                            "label": "无架招检定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    await Macros.requestSave({\n        target: args.target,\n        type: 'dingli',\n        dc: 18,\n        label: '抵抗走火入魔',\n        attacker: actor,\n        onFail: 'rage'\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "第二式-佛动山海",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "requirements": "需求佛器：菩提宝印",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，裂地成沟，倒山破海，压制虚招并对目标造成伤害，同时将目标击倒。</p><p>·若目标为[恶][邪]，招式伤害提升 30 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "如来加成自动。恶邪加伤自动。击倒自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4748,16 +4745,23 @@
                             }
                         ]
                     },
-                    "automationNote": "自动检测恶邪标签增加伤害。击倒效果自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "佛动山海-恶邪加伤",
+                            "label": "如来与恶邪加成",
                             "trigger": "calc",
                             "active": true,
-                            "script": "const target = args.target || Array.from(game.user.targets)[0]?.actor;\nif (target) {\n    const s = target.system.social;\n    const isEvil = (s.exing >= 100 && s.xiayi <= 50);\n    if (isEvil) args.output.damage += 30;\n}"
+                            "script": "// 如来加成\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push('如来 +5');\n}\n\n// 恶邪加成\nconst target = args.move.target || Array.from(game.user.targets)[0]?.actor;\nif (target) {\n    const s = target.system.social;\n    // 恶(>=100) 且 非侠(<=50) 为 邪/恶\n    const isEvil = (s.exing >= 100 && s.xiayi <= 50);\n    if (isEvil) {\n        args.output.damage += 30;\n        args.output.bonusDesc.push('镇压恶邪 +30');\n    }\n}"
                         },
                         {
-                            "label": "佛动山海-击倒",
+                            "label": "击倒",
                             "trigger": "hit",
                             "active": true,
                             "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'prone');\n}"
@@ -4767,22 +4771,15 @@
                 {
                     "name": "第三式-如来叩心",
                     "type": "feint",
-                    "damageType": "neigong",
                     "element": "yang",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>主要动作，结印拍掌，口诵浩瀚梵音，对目标造成0.6力量点内功伤害。击破架招时，使目标陷入“封招”，持续一回合。</p>",
-                    "actionCost": "主要动作",
                     "range": "3米",
                     "targetInfo": "单体",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ]
-                    },
+                    "actionCost": "主要动作",
+                    "requirements": "需求佛器：三藏禅杖",
+                    "description": "<p>结印拍掌，口诵浩瀚梵音，对目标造成伤害。击破架招时，使目标陷入“封招”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "如来加成自动。击破封招自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4793,24 +4790,6 @@
                             }
                         ]
                     },
-                    "automationNote": "击破架招自动添加封招。",
-                    "scripts": [
-                        {
-                            "label": "如来叩心-封招",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isBroken) {\n    const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n    if (fengzhao) await game.xjzl.api.effects.addEffect(args.target, { ...fengzhao, duration: { rounds: 1 } });\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "第四式-佛法无边",
-                    "type": "stance",
-                    "tier": 3,
-                    "description": "<p>次要动作，释放佛力，光华普照，开启架招。成功格挡时获得“如来”，持续三回合。如来：《如来神掌》的命中、招式伤害+5；你的[佛法]检定结果+5。</p>",
-                    "actionCost": "次要动作",
-                    "range": "自身",
-                    "targetInfo": "自身",
                     "costs": {
                         "mp": [
                             4,
@@ -4819,17 +4798,57 @@
                             16
                         ]
                     },
+                    "scripts": [
+                        {
+                            "label": "如来加成",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}"
+                        },
+                        {
+                            "label": "如来加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push('如来 +5');\n}"
+                        },
+                        {
+                            "label": "击破封招",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n    if (eff) await game.xjzl.api.effects.addEffect(args.target, { ...eff, duration: { rounds: 1 } });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "第四式-佛法无边",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "requirements": "需求佛器：四谛法刀",
+                    "description": "<p>释放佛力，光华普照，开启架招。成功格挡时获得“如来”，持续三回合。</p><p><strong>如来：</strong>《如来神掌》的命中、招式伤害+5；你的[佛法]检定结果+5。</p><p><strong>升级：</strong>格挡值+10，如来命中、伤害+5，消耗+4。</p>",
+                    "automationNote": "格挡获如来自动。如来加成通过其他招式脚本实现。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
                     },
-                    "automationNote": "格挡成功后自动获得[如来]。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "佛法无边-如来",
+                            "label": "格挡获如来",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const rulai = thisItem.effects.getName('如来');\n    if (rulai) await game.xjzl.api.effects.addEffect(actor, rulai.toObject());\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst effData = thisItem.effects.getName('如来').toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 动态计算加成虽然不在AE里体现(写在招式里了)，但佛法检定加值可以成长\n// 基础+5，每级再+5? 规则写的是 \"如来命中、伤害+5\"随升级，但没写佛法随升级\n// 既然规则没明确写佛法检定也成长，这里暂保持固定+5，或者根据理解调整\n// 这里只处理AE的添加，持续3回合\neffData.duration = { rounds: 3 };\n\nawait game.xjzl.api.effects.addEffect(actor, effData);"
                         }
                     ]
                 },
@@ -4837,11 +4856,19 @@
                     "name": "第五式-万佛归宗",
                     "type": "qi",
                     "actionType": "default",
-                    "tier": 3,
-                    "description": "<p>蓄力动作，结一切明印，众生皆可成佛，周围5米范围内敌人进行一次气感检定（难度15），失败目标不愿再造杀孽，主动脱离战斗。</p>",
-                    "actionCost": "蓄力动作",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
                     "range": "5米",
                     "targetInfo": "群体",
+                    "actionCost": "蓄力动作",
+                    "requirements": "需求佛器：五蕴伏魔刺",
+                    "description": "<p>结一切明印，众生皆可成佛，周围 5 米范围内敌人进行一次气感检定（难度 15），失败目标不愿再造杀孽，主动脱离战斗，消散所有怒气和相关状态，如果目标依旧与你为敌，则立刻再次进入战斗，他的先攻顺序将调整到最后一位。</p><p>·检定成功则无事发生，且目标一日内无法再被【万佛归宗】动摇。</p><p><strong>升级：</strong>提高检定难度 5 点，内力消耗+8。</p>",
+                    "automationNote": "如来加成自动。自动发起气感检定。脱离战斗、清空怒气、调整先攻需 GM 手动操作。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             8,
@@ -4850,17 +4877,18 @@
                             32
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "自动发起气感检定。脱离战斗需手动。",
                     "scripts": [
                         {
-                            "label": "万佛归宗-检定",
+                            "label": "如来加成",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}"
+                        },
+                        {
+                            "label": "气感检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await Macros.requestSave({\n    target: args.target,\n    type: 'qigan',\n    dc: 15 + (args.move.computedLevel-1)*5,\n    label: '万佛归宗-意志判定',\n    attacker: actor,\n    onFail: null\n});\nui.notifications.info('若检定失败，请GM处理脱离战斗逻辑。');"
+                            "script": "const dc = 15 + (Math.max(1, move.computedLevel || 1) - 1) * 5;\nawait Macros.requestSave({\n    target: args.target,\n    type: 'qigan',\n    dc: dc,\n    label: '万佛归宗-意志判定',\n    attacker: actor,\n    onFail: null // 效果太复杂，手动处理\n});"
                         }
                     ]
                 },
@@ -4868,14 +4896,25 @@
                     "name": "第六式-如来下凡",
                     "type": "real",
                     "isUltimate": true,
-                    "damageType": "neigong",
                     "element": "yang",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>蓄力动作，以泰山压顶之势一掌击出，对10米范围内所有敌人造成1.0力量点内功伤害。若目标为[恶][邪]，需进行[定力]检定（难度18），失败则走火入魔，持续一回合。</p>",
-                    "actionCost": "蓄力动作",
                     "range": "10米",
                     "targetInfo": "群体",
+                    "actionCost": "蓄力动作",
+                    "requirements": "需求佛器：六道慧剑",
+                    "description": "<p>以泰山压顶之势一掌击出，对 10 米范围内所有敌人造成伤害。</p><p>·此招式可凌空释放（跃至半空），释放距离增大至 25 米，俯冲重击地面，招式伤害+20，并击倒范围内所有敌方目标。</p><p>·若目标为[恶][邪]，需进行[定力]检定（难度 18），失败则走火入魔，持续一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "如来加成自动。恶邪检定自动。凌空效果(范围/击倒/加伤)需玩家手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 1.0
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             16,
@@ -4890,35 +4929,44 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 1.0
-                            }
-                        ]
-                    },
-                    "automationNote": "自动检测恶邪并请求检定。",
                     "scripts": [
                         {
-                            "label": "如来下凡-恶邪检定",
+                            "label": "如来加成与恶邪检定",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}"
+                        },
+                        {
+                            "label": "如来加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push('如来 +5');\n}"
+                        },
+                        {
+                            "label": "恶邪检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const s = args.target.system.social;\n    const isEvil = (s.exing >= 100 && s.xiayi <= 50);\n    if (isEvil) {\n        const rage = CONFIG.statusEffects.find(e => e.id === 'rage');\n        await Macros.requestSave({\n            target: args.target,\n            type: 'dingli',\n            dc: 18,\n            label: '抵抗走火入魔',\n            attacker: actor,\n            onFail: rage ? { ...rage, duration: { rounds: 1 } } : null\n        });\n    }\n}"
+                            "script": "if (args.isHit) {\n    const s = args.target.system.social;\n    const isEvil = (s.exing >= 100 && s.xiayi <= 50);\n    if (isEvil) {\n        await Macros.requestSave({\n            target: args.target,\n            type: 'dingli',\n            dc: 18,\n            label: '抵抗走火入魔',\n            attacker: actor,\n            onFail: 'rage'\n        });\n    }\n}"
                         }
                     ]
                 },
                 {
-                    "name": "第七式-迎佛出世",
+                    "name": "第七式-迎佛出世（失传）",
                     "type": "qi",
                     "actionType": "default",
-                    "tier": 3,
-                    "description": "<p>主要动作，双手朝天，拱天卫地。施展此招后，获得“飞升”，持续两回合。</p><p><b>飞升</b>：漂浮于三米高的半空中，无法被击飞、击退、击倒，并获得30点格挡值。你的普通攻击距离+10米，目标在你周围十米范围内移动时，你都可以不消耗动作对其施展《趁虚而入》。</p>",
-                    "actionCost": "主要动作",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
                     "range": "自身",
                     "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "requirements": "需求佛器：七色袈裟（丢失）",
+                    "description": "<p>双手朝天，拱天卫地。施展此招后，腾空一跃，踏步空中，获得“飞升”，持续两回合。</p><p><strong>飞升：</strong>漂浮于三米高的半空中，无法被击飞、击退、击倒，并获得 30 点格挡值。你的普通攻击距离+10 米，目标在你周围十米范围内移动时，你都可以不消耗动作对其施展《趁虚而入》。</p><p><strong>升级：</strong>飞升额外持续一回合，且额外获得 30 点格挡值，内力消耗+4。</p>",
+                    "automationNote": "如来加成自动。获BUFF自动。普攻距离与趁虚而入机会需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -4927,39 +4975,33 @@
                             16
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "自动应用[飞升]。趁虚而入逻辑需手动关注。",
                     "scripts": [
                         {
-                            "label": "迎佛出世-飞升",
+                            "label": "如来加成",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const feisheng = thisItem.effects.getName('飞升');\nif (feisheng) {\n    const dur = 2 + (args.move.computedLevel-1);\n    const extraBlock = (args.move.computedLevel-1) * 30;\n    const data = feisheng.toObject();\n    data.duration.rounds = dur;\n    const blockChange = data.changes.find(c => c.key === 'system.combat.block');\n    if (blockChange) blockChange.value = String(30 + extraBlock);\n    await game.xjzl.api.effects.addEffect(actor, data);\n}"
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}"
+                        },
+                        {
+                            "label": "应用飞升",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const feisheng = thisItem.effects.getName('飞升');\nif (feisheng) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 2 + (lvl - 1);\n    const extraBlock = (lvl - 1) * 30;\n    \n    const data = feisheng.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    data.duration = { rounds: rounds };\n    \n    // 动态修改格挡值\n    data.changes[0].value = String(30 + extraBlock);\n    \n    await game.xjzl.api.effects.addEffect(actor, data);\n}"
                         }
                     ]
                 },
                 {
-                    "name": "第八式-超度众生",
+                    "name": "第八式-超度众生（失传）",
                     "type": "real",
-                    "damageType": "neigong",
                     "element": "yang",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>全回合动作，佛光汹涌澎湃，荡涤天地。对范围内所有敌人造成0.4力量+0.4内息点内功伤害，并将所有无架招敌人击倒，并添加“封招”持续一回合。</p>",
-                    "actionCost": "全回合动作",
                     "range": "10米",
                     "targetInfo": "群体",
-                    "costs": {
-                        "mp": [
-                            10,
-                            20,
-                            30,
-                            40
-                        ]
-                    },
+                    "actionCost": "全回合动作",
+                    "requirements": "需求佛器：如来真经（丢失）",
+                    "description": "<p>佛光汹涌澎湃，荡涤天地。对范围内所有敌人造成伤害，并将所有无架招敌人击倒，并添加“封招”持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+10。</p>",
+                    "automationNote": "如来加成自动。无架招击倒封招自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4974,28 +5016,62 @@
                             }
                         ]
                     },
-                    "automationNote": "自动检测无架招并应用击倒封招。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "超度众生-控制",
+                            "label": "如来加成",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}"
+                        },
+                        {
+                            "label": "如来加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push('如来 +5');\n}"
+                        },
+                        {
+                            "label": "无架招控制",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const prone = CONFIG.statusEffects.find(e => e.id === 'prone');\n    const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n    if (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n    if (fengzhao) await game.xjzl.api.effects.addEffect(args.target, { ...fengzhao, duration: { rounds: 1 } });\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, 'prone');\n    \n    const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n    if (fengzhao) {\n        const d = foundry.utils.deepClone(fengzhao);\n        d.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, d);\n    }\n}"
                         }
                     ]
                 },
                 {
-                    "name": "最终式-我佛慈悲",
+                    "name": "最终式-我佛慈悲（失传）",
                     "type": "real",
                     "isUltimate": true,
-                    "damageType": "neigong",
                     "element": "yang",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>主要动作，天外有天，浩瀚无边。你扣除自身全部气血和内力（至少500），进行一次无其他加值的死亡检定。无论你是否死亡，都将立即超度在场所有敌方，对他们造成0.9力量+0.9内息点内功伤害。如果目标因此而陷入濒死，且标签为【大恶】或【极恶】，则直接进行死亡检定。</p>",
-                    "actionCost": "主要动作",
                     "range": "10米",
                     "targetInfo": "群体",
+                    "actionCost": "主要动作",
+                    "requirements": "需求佛器：佛祖舍利（丢失）",
+                    "description": "<p>天外有天，浩瀚无边，双手合十，身心清净，为佛默祷，无数光芒自你身心之中散发。</p><p>你扣除自身全部气血和内力（气血内力至少大于 500），进行一次无其他加值的死亡检定。</p><p>无论你是否死亡，都将立即超度在场所有敌方，对他们造成伤害。</p><p>·如果目标因此而陷入濒死，且标签为【大恶】或【极恶】，则直接进行死亡检定。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，气血内力消耗-100。</p>",
+                    "automationNote": "如来加成自动。自杀死检自动。大恶极恶(恶行>=500,侠义<100)敌方死检自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.9
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.9
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             0,
@@ -5010,33 +5086,24 @@
                             7
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.9
-                            },
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.9
-                            }
-                        ]
-                    },
-                    "automationNote": "自杀逻辑、敌方死亡检定需脚本支持。",
                     "scripts": [
                         {
-                            "label": "我佛慈悲-献祭",
+                            "label": "如来加成与献祭",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const hp = actor.system.resources.hp.value;\nconst mp = actor.system.resources.mp.value;\nif (hp + mp < 500) {\n    ui.notifications.warn('气血内力总和不足500，无法施展');\n    args.flags.abort = true;\n    return;\n}\nawait actor.update({'system.resources.hp.value': 0, 'system.resources.mp.value': 0});\nawait ChatCardManager._rollDeathSave(actor);"
+                            "script": "// 如来加成\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}\n\n// 献祭判定\nconst hp = actor.system.resources.hp.value;\nconst mp = actor.system.resources.mp.value;\n// 计算需求: 基础500, 每级-100\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst req = Math.max(100, 500 - (lvl - 1) * 100);\n\nif (hp + mp < req) {\n    ui.notifications.warn(`气血内力总和不足 ${req}，无法施展`);\n    args.flags.abort = true;\n    return;\n}\n\nawait actor.update({'system.resources.hp.value': 0, 'system.resources.mp.value': 0});\nawait ChatCardManager._rollDeathSave(actor);"
                         },
                         {
-                            "label": "我佛慈悲-超度",
+                            "label": "如来加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push('如来 +5');\n}"
+                        },
+                        {
+                            "label": "大恶死检",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isDying) {\n    ui.notifications.info(`${args.target.name} 濒死，请GM判断是否直接进行死亡检定(大恶极恶)`);\n}"
+                            "script": "if (args.isDying) {\n    const s = args.target.system.social;\n    // 大恶: 恶行>=500 且 侠义<100\n    if (s.exing >= 500 && s.xiayi < 100) {\n        ui.notifications.info(`${args.target.name} 罪孽深重，强制进行死亡检定！`);\n        await ChatCardManager._rollDeathSave(args.target);\n    }\n}"
                         }
                     ]
                 }
@@ -5044,39 +5111,41 @@
             "effects": [
                 {
                     "name": "如来",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
                     "description": "如来神掌命中/伤害+5，佛法+5。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wanfosi_rulai",
+                            "stackable": false
+                        }
+                    },
                     "changes": [
                         {
                             "key": "system.arts.fofa.checkMod",
                             "mode": 2,
                             "value": "5"
                         }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "rulai",
-                            "stackable": false
-                        }
-                    }
+                    ]
                 },
                 {
                     "name": "飞升",
-                    "img": "icons/svg/wing.svg",
+                    "icon": "icons/svg/wing.svg",
                     "description": "漂浮半空，免疫击飞/击退/击倒，格挡+30，普攻距离+10。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "feisheng",
+                            "stackable": false
+                        }
+                    },
                     "changes": [
                         {
                             "key": "system.combat.block",
                             "mode": 2,
                             "value": "30"
                         }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "feisheng",
-                            "stackable": false
-                        }
-                    }
+                    ]
                 }
             ]
         }
@@ -5089,18 +5158,25 @@
             "category": "sanshou",
             "sect": "wanfosi",
             "tier": 3,
-            "description": "<p>如来神掌源于释迦牟尼一生所悟的大智大慧，但后人依靠佛器参悟如来神掌时，始终缺其原始真韵。更有传闻说施展印诀后，如来神掌方显真正威力。</p>",
-            "requirements": "徒手-指法，达摩院；属性：阳",
+            "description": "<p>如来神掌源于释迦牟尼一生所悟的大智大慧，但后人依靠佛器参悟如来神掌时，始终缺其原始真韵，只得其形，不得其神。更有传闻说施展印诀后，如来神掌方显真正威力，可佛祖典籍却又没有留下相关记载，仅余众僧每日坐于佛像之下，苦苦参悟。</p><p>需求：你必须成为万佛寺长老后，方可在寺内参悟佛器投入修为，佛器乃万佛秘宝，不可带出寺院。</p><p><strong>需求：</strong>徒手-指法，达摩院</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "徒手-指法；达摩院",
             "moves": [
                 {
-                    "name": "禅定印",
+                    "name": "禅定印（失传）",
                     "type": "qi",
                     "actionType": "default",
-                    "tier": 3,
-                    "description": "<p>次要动作，如果你已开启佛门架招，你移除视野范围内一个目标的状态（下盘不稳、倒地、禁足、缚身、封招、点穴、眩晕、自闭）。</p>",
-                    "actionCost": "次要动作",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
                     "range": "自身",
                     "targetInfo": "单体",
+                    "actionCost": "次要动作",
+                    "description": "<p><strong>需求佛器：</strong>五蕴伏魔刺</p><p>次要动作，双掌向上，拇指相触，使心神平静。如果你已开启佛门架招，你移除视野范围内一个目标的状态（下盘不稳、倒地、禁足、缚身、封招、点穴、眩晕、自闭）。</p><p><strong>升级：</strong>每次休整后，【禅定印】使用次数+1。</p>",
+                    "automationNote": "纯手动。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             0,
@@ -5109,46 +5185,24 @@
                             0
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "移除状态需手动。",
                     "scripts": []
                 },
                 {
-                    "name": "与愿印",
+                    "name": "与愿印（失传）",
                     "type": "qi",
                     "actionType": "default",
-                    "tier": 3,
-                    "description": "<p>次要动作，下次施展佛门招式时，自身可以选择获得以下一个效果：1.吸血 2.状态延长 3.必中 4.检定+3。</p>",
-                    "actionCost": "次要动作",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
                     "range": "自身",
                     "targetInfo": "自身",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "需手动记录选择并应用下一次效果。",
-                    "scripts": []
-                },
-                {
-                    "name": "无畏印",
-                    "type": "qi",
-                    "actionType": "default",
-                    "tier": 3,
-                    "description": "<p>次要动作，选择范围内一个目标获得“无畏”：目标下一次受到招式攻击时，只承受50%的伤害，而你自己流失与他受到伤害相同数值的气血。</p>",
                     "actionCost": "次要动作",
-                    "range": "20米",
-                    "targetInfo": "单体",
+                    "description": "<p><strong>需求佛器：</strong>如来真经（丢失）</p><p>次要动作，指尖下垂，手掌朝外，实现众生祈求。下次施展佛门招式时，自身可以选择获得以下一个效果：</p><ol><li>可将单体招式的伤害转化为对目标的气血回复，数值为伤害的一半(不可暴击)；</li><li>异常和增益状态额外持续一个回合；</li><li>必定命中，但依然要投掷攻击骰判定暴击；</li><li>招式检定提高 3 点。</li></ol><p><strong>升级：</strong>每次休整后，【与愿印】使用次数+1。</p>",
+                    "automationNote": "出招选择效果，获得对应描述性BUFF。具体效果手动执行。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             0,
@@ -5157,79 +5211,31 @@
                             0
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "提供[无畏]AE，分摊伤害逻辑需手动。",
-                    "scripts": []
-                },
-                {
-                    "name": "说法印",
-                    "type": "qi",
-                    "actionType": "default",
-                    "tier": 3,
-                    "description": "<p>次要动作，你获得“说法”：你的虚招对抗+2，在你施展完一式佛门招式之后消失。</p>",
-                    "actionCost": "次要动作",
-                    "range": "自身",
-                    "targetInfo": "自身",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
-                    "automationNote": "自动应用说法BUFF。",
                     "scripts": [
                         {
-                            "label": "说法印-添加说法",
+                            "label": "选择愿力",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const shuofa = thisItem.effects.getName('说法');\nif (shuofa) {\n    const data = shuofa.toObject();\n    data.changes[0].value = String(2 + (args.move.computedLevel-1));\n    await game.xjzl.api.effects.addEffect(actor, data);\n}"
+                            "script": "const dialogId = `yuyuan-${foundry.utils.randomID()}`;\nconst content = `\n    <div style=\"text-align:center;\">\n        <p>请选择【与愿印】的加持效果：</p>\n        <hr>\n    </div>\n`;\n\nnew foundry.applications.api.DialogV2({\n    window: { title: \"与愿印\", icon: \"fas fa-hand-holding-heart\" },\n    content: content,\n    buttons: [\n        { action: \"heal\", label: \"1. 伤害转治疗\", icon: \"fas fa-heart\", callback: () => applyBuff(\"与愿-慈悲\", \"伤害转为50%治疗 (手动)\") },\n        { action: \"extend\", label: \"2. 状态延长\", icon: \"fas fa-hourglass-half\", callback: () => applyBuff(\"与愿-恒常\", \"状态持续时间+1回合 (手动)\") },\n        { action: \"hit\", label: \"3. 必定命中\", icon: \"fas fa-bullseye\", callback: () => applyBuff(\"与愿-必中\", \"下一次攻击必定命中 (手动)\") },\n        { action: \"bonus\", label: \"4. 检定+3\", icon: \"fas fa-plus-circle\", callback: () => applyBuff(\"与愿-加持\", \"招式检定+3 (手动)\") }\n    ]\n}).render(true);\n\nasync function applyBuff(name, desc) {\n    const effectData = {\n        name: name,\n        icon: item.img,\n        description: desc,\n        flags: { \"xjzl-system\": { slug: \"yuyuan_buff\", stackable: false } },\n        changes: []\n    };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(`已获得：${name}`);\n}"
                         }
                     ]
                 },
                 {
-                    "name": "降魔印",
+                    "name": "无畏印（失传）",
                     "type": "qi",
                     "actionType": "default",
-                    "tier": 3,
-                    "description": "<p>次要动作，你下一次施展佛门武学时，招式伤害提升悟性*1的数值。</p>",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "20米",
+                    "targetInfo": "单体",
                     "actionCost": "次要动作",
-                    "range": "自身",
-                    "targetInfo": "自身",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
+                    "description": "<p><strong>需求佛器：</strong>七色袈裟（丢失）</p><p>次要动作，手指舒展，掌心向外，救人于水火。选择范围内一个目标获得“无畏”：目标下一次受到招式攻击时，只承受 50%的伤害，而你自己流失与他受到伤害相同数值的气血。</p><p>无畏持续到战斗脱离。</p><p><strong>升级：</strong>目标承受的伤害减少 10%。</p>",
+                    "automationNote": "自动施加无畏BUFF。BUFF生效一次后自动移除。伤害转移逻辑自动。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
                     },
-                    "automationNote": "手动应用伤害加成。",
-                    "scripts": []
-                },
-                {
-                    "name": "法界虚空金刚印",
-                    "type": "real",
-                    "damageType": "waigong",
-                    "element": "yang",
-                    "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>主要动作，对目标造成0.7力量点外功伤害。若你运行佛门内功，招式必定造成暴击。</p>",
-                    "actionCost": "主要动作",
-                    "range": "5米",
-                    "targetInfo": "单体",
                     "costs": {
                         "mp": [
                             0,
@@ -5238,6 +5244,92 @@
                             0
                         ]
                     },
+                    "scripts": [
+                        {
+                            "label": "施加无畏",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 1. 计算减伤比例 (基础0.5, 每级+0.1, 即承受更少)\n// Lv1: 承受 0.5\n// Lv2: 承受 0.4\n// Lv3: 承受 0.3\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst damageTakenRatio = Math.max(0, 0.5 - (lvl - 1) * 0.1);\n\n// 2. 获取并配置 AE\nconst eff = thisItem.effects.getName(\"无畏\").toObject();\ndelete eff._id;\neff.origin = actor.uuid; // 关键：标记来源是施法者(高僧)，用于后续扣血\n\n// 3. 将比例写入 Flag，供 AE 脚本读取\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.wuweiRatio\", damageTakenRatio);\n\n// 4. 应用\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nui.notifications.info(`${args.target.name} 获得无畏印加持 (承受 ${(damageTakenRatio*100).toFixed(0)}% 伤害)`);"
+                        }
+                    ]
+                },
+                {
+                    "name": "说法印（失传）",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p><strong>需求佛器：</strong>三藏禅杖</p><p>次要动作，双指相捻作环，其余手指舒散，宛若讲解佛法。你获得“说法”：你的虚招对抗+2，在你施展完一式佛门招式之后消失。</p><p><strong>升级：</strong>“说法”的虚招对抗值+1。</p>",
+                    "automationNote": "获得说法BUFF。BUFF移除需手动。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得说法",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"说法\").toObject();\n// 基础2 + (Lv-1)\nconst bonus = 2 + (Math.max(1, move.computedLevel || 1) - 1);\neff.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                        }
+                    ]
+                },
+                {
+                    "name": "降魔印（失传）",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p><strong>需求佛器：</strong>十法界珠</p><p>次要动作，右手覆膝，指尖朝地，佛化虚影，加持吾身。你下一次施展佛门武学时，招式伤害提升悟性*1 的数值。</p><p><strong>升级：</strong>招式伤害额外提升悟性*1。</p>",
+                    "automationNote": "获得降魔BUFF。下一次佛门招式自动增伤并消耗BUFF。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得降魔",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"降魔\").toObject();\n// 写入 Flag：倍率 (基础1 + Lv-1 -> Lv1=1倍, Lv2=2倍)\nconst multiplier = 1 + (Math.max(1, move.computedLevel || 1) - 1);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.xiangmoMult\", multiplier);\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                        }
+                    ]
+                },
+                {
+                    "name": "法界虚空金刚印（失传）",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p><strong>需求佛器：</strong>六道慧剑</p><p>主要动作，双手合于胸前，拇指中指触碰，击出掌风，对目标造成伤害。</p><p>若你运行佛门内功，招式必定造成暴击。</p><p><strong>升级：</strong>招式伤害+10，休整后招式使用次数+1。</p>",
+                    "automationNote": "自动检测佛门内功并触发必暴击。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -5248,17 +5340,6 @@
                             }
                         ]
                     },
-                    "automationNote": "需手动确认是否运行佛门内功以触发暴击。",
-                    "scripts": []
-                },
-                {
-                    "name": "如意千手观音印",
-                    "type": "stance",
-                    "tier": 3,
-                    "description": "<p>主要动作，开启架招，立即获得2点怒气，同时进入“千手观音”姿态，持续到被击破架招或者战斗脱离。</p><p><b>千手观音</b>：你无需遵循武学套路切换调息的规则。</p>",
-                    "actionCost": "主要动作",
-                    "range": "自身",
-                    "targetInfo": "自身",
                     "costs": {
                         "mp": [
                             0,
@@ -5267,14 +5348,41 @@
                             0
                         ]
                     },
+                    "scripts": [
+                        {
+                            "label": "佛门必暴",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const neigongId = actor.system.martial.active_neigong;\nif (neigongId) {\n    const ng = actor.items.get(neigongId);\n    // 检测内功门派或名称\n    if (ng && (ng.system.sect === 'wanfosi' || ng.name.includes('佛'))) {\n        args.flags.critThresholdMod += 20; // 确保必暴\n        ui.notifications.info(\"佛光普照，金刚怒目！(必定暴击)\");\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "如意千手观音印（失传）",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p><strong>需求佛器：</strong>四谛法刀</p><p>主要动作，手腕交叉于胸，五指掌心朝外，开启架招，立即获得 2 点怒气，同时进入“千手观音”姿态，持续到被击破架招或者战斗脱离。</p><p><strong>千手观音：</strong>你无需遵循武学套路切换调息的规则。</p><p><strong>升级：</strong>格挡值+10，休整后招式使用次数+1。</p>",
+                    "automationNote": "开启自动回怒。调息规则手动忽略。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
                     },
-                    "automationNote": "开启时自动回怒。",
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "千手观音-回怒",
+                            "label": "开启回怒",
                             "trigger": "attack",
                             "active": true,
                             "script": "await actor.update({'system.resources.rage.value': Math.min(10, actor.system.resources.rage.value + 2)});"
@@ -5282,24 +5390,16 @@
                     ]
                 },
                 {
-                    "name": "降世不动明王印",
+                    "name": "降世不动明王印（失传）",
                     "type": "feint",
-                    "damageType": "waigong",
                     "element": "yang",
+                    "damageType": "waigong",
                     "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>主要动作，罡风四散，对周围至多2个目标造成0.7力量点外功伤害。击破架招后，使目标陷入眩晕，持续一回合。</p>",
-                    "actionCost": "主要动作",
                     "range": "5米",
                     "targetInfo": "至多2目标",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
+                    "actionCost": "主要动作",
+                    "description": "<p><strong>需求佛器：</strong>三藏禅杖</p><p>主要动作，十指交叉于前，旋身缓往外推，罡风四散，对周围至多 2 个目标造成伤害。</p><p>击破架招后，使目标陷入眩晕，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，休整后招式使用次数+1。</p>",
+                    "automationNote": "击破施加眩晕自动。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -5310,28 +5410,45 @@
                             }
                         ]
                     },
-                    "automationNote": "击破架招自动添加眩晕。",
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "不动明王-眩晕",
+                            "label": "击破-眩晕",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, 'xuanyun');\n}"
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'xuanyun', true);\n    ui.notifications.info(`${args.target.name} 陷入眩晕！`);\n}"
                         }
                     ]
                 },
                 {
-                    "name": "天鼓雷音如来印",
+                    "name": "天鼓雷音如来印（失传）",
                     "type": "real",
                     "isUltimate": true,
-                    "damageType": "waigong",
                     "element": "yang",
+                    "damageType": "waigong",
                     "weaponType": "unarmed",
-                    "tier": 3,
-                    "description": "<p>蓄力动作，向周围敌人打出寂灭之掌，造成1.0力量点外功伤害。同时自身获得“佛印”状态：提升所有佛门武学招式伤害30点，持续到战斗脱离。</p>",
-                    "actionCost": "蓄力动作",
                     "range": "5米",
                     "targetInfo": "群体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p><strong>需求：</strong>佛祖舍利（丢失）</p><p>蓄力动作，掌心向上摊开，小指中指触碰，向周围敌人打出寂灭之掌，造成伤害。</p><p>同时自身获得“佛印”状态：提升所有佛门武学招式伤害 30 点，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，佛印提升伤害+10 点。</p>",
+                    "automationNote": "自动获得佛印BUFF。⚠️ 次数限制：休整后1次（需玩家手动记录）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 1.0
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             0,
@@ -5346,23 +5463,12 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 1.0
-                            }
-                        ]
-                    },
-                    "automationNote": "自动添加佛印BUFF。",
                     "scripts": [
                         {
-                            "label": "如来印-佛印BUFF",
+                            "label": "获得佛印",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const foyin = thisItem.effects.getName('佛印');\nif (foyin) {\n    const data = foyin.toObject();\n    data.changes[0].value = String(30 + (args.move.computedLevel-1)*10);\n    await game.xjzl.api.effects.addEffect(actor, data);\n}"
+                            "script": "const eff = thisItem.effects.getName(\"佛印\").toObject();\n// 基础30 + (Lv-1)*10\nconst bonus = 30 + (Math.max(1, move.computedLevel || 1) - 1) * 10;\neff.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 }
@@ -5370,51 +5476,103 @@
             "effects": [
                 {
                     "name": "说法",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
-                    "description": "虚招对抗+2。",
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.feintLevel",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ],
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
+                    "description": "虚招对抗能力提升。",
+                    "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "shuofa",
                             "stackable": false
                         }
-                    }
-                },
-                {
-                    "name": "佛印",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
-                    "description": "佛门招式伤害+30。",
+                    },
                     "changes": [
                         {
-                            "key": "system.combat.damages.skill.mod",
+                            "key": "flags.xjzl-system.feintLevel",
                             "mode": 2,
-                            "value": "30"
+                            "value": "2"
                         }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "foyin",
-                            "stackable": false
-                        }
-                    }
+                    ]
                 },
                 {
                     "name": "无畏",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
-                    "description": "下次受到伤害只承受50%，施法者承受等量流失。",
-                    "changes": [],
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
+                    "description": "下一次受击减伤，并将伤害转移给施法者。",
+                    "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "wuwei",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "无畏-减伤",
+                                    "trigger": "preTake",
+                                    "active": true,
+                                    "script": "// 读取施法时计算好的比例 (如 0.5)\nconst ratio = Number(thisEffect.getFlag('xjzl-system', 'wuweiRatio')) || 0.5;\n\n// 减伤\nargs.output.damage = Math.floor(args.output.damage * ratio);\n\n// 提示\nargs.output.bonusDesc = args.output.bonusDesc || [];\nargs.output.bonusDesc.push(`无畏印护体 (承受 ${(ratio*100).toFixed(0)}%)`);"
+                                },
+                                {
+                                    "label": "无畏-转移与移除",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "// 1. 找到施法者 (origin)\nlet caster = null;\nif (thisEffect.origin) {\n    caster = fromUuidSync(thisEffect.origin);\n    if (caster && caster instanceof Item) caster = caster.actor;\n    if (caster && caster instanceof Actor) {}\n    else caster = null;\n}\n\n// 2. 转移伤害\nif (caster) {\n    // 转移量 = 实际掉血量 (hpLost) ? \n    // 规则说: \"流失与他受到伤害相同数值的气血\"\n    // 这里的\"受到伤害\"通常指实际扣的血。如果护盾挡了，应该不算。\n    const amount = args.hpLost;\n    if (amount > 0) {\n        // 对高僧造成流失伤害 (无视防御)\n        caster.applyDamage({\n            amount: amount,\n            type: 'liushi',\n            ignoreDefense: true,\n            ignoreBlock: true\n        });\n        ui.notifications.info(`${actor.name} 的伤害已转移给 ${caster.name}！`);\n    }\n} else {\n    ui.notifications.warn(\"无畏印无法找到施法者，伤害未转移。请手动扣除高僧气血。\");\n}\n\n// 3. 移除自己 (生效一次后消失)\nawait thisEffect.delete();"
+                                }
+                            ]
                         }
-                    }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "降魔",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
+                    "description": "下一次佛门招式伤害提升。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xiangmo",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "降魔-计算加成",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "// 检查是否佛门 (wanfosi)\nif (args.move.sect === 'wanfosi' || args.item.system.sect === 'wanfosi') {\n    const wuxing = actor.system.stats.wuxing.total;\n    const mult = Number(thisEffect.getFlag('xjzl-system', 'xiangmoMult')) || 1;\n    const bonus = wuxing * mult;\n    \n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`降魔加成 +${bonus}`);\n}"
+                                },
+                                {
+                                    "label": "降魔-消耗",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "// 出招即消耗 (仅限佛门)\nif (args.move.sect === 'wanfosi' || args.item.system.sect === 'wanfosi') {\n    await thisEffect.delete();\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "佛印",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/万佛.png",
+                    "description": "佛门招式伤害提升。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "foyin",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "佛印-加伤",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "if (args.move.sect === 'wanfosi' || args.item.system.sect === 'wanfosi') {\n    // 读取 AE 的 change 值作为加成 (因为 change 已经被 calculateChanges 处理过了)\n    // 或者简单点，直接读 mode 2 的值\n    // 这里我们用了系统原生的 changes，所以不需要脚本再加一遍数值，否则会双倍。\n    // 修正：calc 脚本只负责显示描述，数值由 changes 处理。\n    // 但等等，combat.damages.skill.mod 是全局的，如果只加成佛门，必须用脚本判门派！\n    // 所以 AE 的 changes 应该留空，全靠脚本加。\n    \n    // 重新设计：changes 为空，用脚本加。\n    const bonus = Number(thisEffect.changes[0]?.value) || 30; // 借用 changes 字段存数值，但不让系统自动应用\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`佛印加成 +${bonus}`);\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 0,
+                            "value": "30"
+                        }
+                    ]
                 }
             ]
         }
