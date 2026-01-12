@@ -52,6 +52,8 @@ const MULTI_FILE_CONFIG = {
         "daofa",          // 刀法
         "gunfa",          // 棍法
         "bishou",         // 匕首
+        "anqi",           // 暗器
+        "qimen",          // 奇门
         // 以后每增加一个 JSON，只需在这里添加文件名即可
     ],
     // 如果其他门派也变多了，也可以支持：
