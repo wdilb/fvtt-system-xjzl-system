@@ -55,6 +55,7 @@ const MULTI_FILE_CONFIG = {
         "anqi",           // 暗器
         "qimen",          // 奇门
         "yueqi",          // 乐器
+        "sanshou",        // 散手
         // 以后每增加一个 JSON，只需在这里添加文件名即可
     ],
     // 如果其他门派也变多了，也可以支持：
