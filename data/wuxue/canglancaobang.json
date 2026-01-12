@@ -385,7 +385,7 @@
                             "label": "感应乏力获护体",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 扫描场景所有 Actor\nlet totalFali = 0;\ncanvas.tokens.placeables.forEach(t => {\n    if (t.actor) {\n        const fali = t.actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fali\");\n        if (fali) {\n            totalFali += (fali.getFlag(\"xjzl-system\", \"stacks\") || 1);\n        }\n    }\n});\n\nif (totalFali > 0) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const huti = totalFali * (5 + (lvl - 1) * 5);\n    await actor.applyHealing({amount: huti, type: \"huti\", showScrolling: true});\n    ui.notifications.info(`感应到战场 ${totalFali} 层乏力，获得 ${huti} 护体`);\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 扫描场景所有 Actor\nlet totalFali = 0;\ncanvas.tokens.placeables.forEach(t => {\n    if (t.actor) {\n        const fali = t.actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fali\");\n        if (fali) {\n            totalFali += (fali.getFlag(\"xjzl-system\", \"stacks\") || 1);\n        }\n    }\n});\n\nif (totalFali > 0) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const huti = totalFali * (5 + (lvl - 1) * 5);\n    await actor.applyHealing({amount: huti, type: \"huti\", showScrolling: true});\n    ui.notifications.info(`感应到战场 ${totalFali} 层乏力，获得 ${huti} 护体`);\n}"
                         }
                     ]
                 },
@@ -597,7 +597,7 @@
                             "label": "格挡触发提示",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = 5 + (Math.max(1, move.computedLevel||1) - 1) * 5;\nif (mode === \"sky\") {\n    ui.notifications.info(`格挡成功(穹苍): 下一击需手动附加 ${val} 流失`);\n} else {\n    ui.notifications.info(`格挡成功(重溟): 下一击需手动回复 ${val} 内力`);\n}"
+                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (!Macros.checkStance(actor, args)) return;\nconst mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = 5 + (Math.max(1, lvl||1) - 1) * 5;\nif (mode === \"sky\") {\n    ui.notifications.info(`格挡成功(穹苍): 下一击需手动附加 ${val} 流失`);\n} else {\n    ui.notifications.info(`格挡成功(重溟): 下一击需手动回复 ${val} 内力`);\n}"
                         }
                     ]
                 },

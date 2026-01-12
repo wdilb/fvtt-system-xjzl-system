@@ -485,7 +485,7 @@
                         {
                             "label": "反击下盘不稳",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const rounds = 1 + (args.move.computedLevel >= 2 ? 1 : 0);\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n    }\n}",
+                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (Macros.checkStance(actor, args) && args.attacker) {\n    const rounds = 1 + (lvl >= 2 ? 1 : 0);\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -792,7 +792,7 @@
                         {
                             "label": "格挡获得金刚",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName(\"金刚\");\n    if (effect) {\n        const data = effect.toObject();\n        // 升级：金刚持续回合数+1 (Lv1=1, Lv2=2, Lv3=3)\n        data.duration.rounds = args.move.computedLevel;\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n}"
+                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName(\"金刚\");\n    if (effect) {\n        const data = effect.toObject();\n        // 升级：金刚持续回合数+1 (Lv1=1, Lv2=2, Lv3=3)\n        data.duration.rounds = lvl;\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n}"
                         }
                     ]
                 },
@@ -1577,7 +1577,7 @@
                         {
                             "label": "反击拉扯提示",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const dist = 2 + (lvl - 1);\n    ui.notifications.info(`力按千斤：可拉扯 ${args.attacker.name} ${dist} 米。(需手动处理)`);\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const dist = 2 + (lvl - 1);\n    ui.notifications.info(`力按千斤：可拉扯 ${args.attacker.name} ${dist} 米。(需手动处理)`);\n}"
                         }
                     ]
                 },
@@ -2149,7 +2149,7 @@
                         {
                             "label": "架招：戒刀反震",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const attSocial = args.attacker.system.social || {};\n    const isXia = (attSocial.xiayi >= 100 && attSocial.exing <= 50);\n    const isE = (attSocial.exing >= 100 && attSocial.xiayi <= 50);\n    if (isXia || isE) {\n        const dmg = 10 + (args.move.computedLevel - 1) * 10;\n        await args.attacker.applyDamage({\n            amount: dmg,\n            type: \"mental\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(\"无相戒刀直指人心，造成精神伤害！\");\n    }\n}"
+                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (Macros.checkStance(actor, args) && args.attacker) {\n    const attSocial = args.attacker.system.social || {};\n    const isXia = (attSocial.xiayi >= 100 && attSocial.exing <= 50);\n    const isE = (attSocial.exing >= 100 && attSocial.xiayi <= 50);\n    if (isXia || isE) {\n        const dmg = 10 + (lvl - 1) * 10;\n        await args.attacker.applyDamage({\n            amount: dmg,\n            type: \"mental\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(\"无相戒刀直指人心，造成精神伤害！\");\n    }\n}"
                         }
                     ]
                 },
