@@ -4,6 +4,7 @@
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { rollDisabilityTable } from "../utils/utils.mjs";
+import { ActiveEffectManager } from "./active-effect-manager.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 export class ChatCardManager {
@@ -1854,20 +1855,35 @@ export class ChatCardManager {
                 // 标准化为数组
                 const effectsData = Array.isArray(flags.onFail) ? flags.onFail : [flags.onFail];
 
-                // 确保 origin 指向该消息，方便回溯
-                const finalEffects = effectsData.map(e => ({
-                    ...e,
-                    origin: message.uuid,
-                    disabled: false
-                }));
+                // 用于收集成功应用的名字，显示在卡片上
+                const appliedNames = [];
 
-                await actor.createEmbeddedDocuments("ActiveEffect", finalEffects);
+                // 使用管理器逐个添加，自动处理本地化、叠层和刷新
+                for (const e of effectsData) {
+                    // 准备数据
+                    const effectData = {
+                        ...e,
+                        origin: message.uuid, // 标记来源为这条消息
+                        disabled: false
+                    };
+
+                    // 调用核心管理器
+                    // Manager 内部会自动执行: if (name) name = localize(name)
+                    // 也会自动处理 Stack 逻辑
+                    const createdEffect = await ActiveEffectManager.addEffect(actor, effectData);
+
+                    if (createdEffect) {
+                        appliedNames.push(createdEffect.name); // 使用最终生成的特效名字
+                    }
+                }
 
                 // 在卡片上追加一行小字
-                const appliedLabel = game.i18n.localize("XJZL.UI.Chat.RequestSave.EffectApplied");
-                resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(0,0,0,0.05); border-radius:4px;">
-                    ${appliedLabel}: <b>${finalEffects.map(e => e.name).join(", ")}</b>
-                </div>`;
+                if (appliedNames.length > 0) {
+                    const appliedLabel = game.i18n.localize("XJZL.UI.Chat.RequestSave.EffectApplied");
+                    resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(0,0,0,0.05); border-radius:4px;">
+                        ${appliedLabel}: <b>${appliedNames.join(", ")}</b>
+                    </div>`;
+                }
             }
         }
 
