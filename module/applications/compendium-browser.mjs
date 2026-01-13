@@ -1,38 +1,38 @@
 /**
  * ==============================================================================
- *  XJZL 合集包浏览器 (Compendium Browser)
- * ==============================================================================
- *  功能：
- *  1. 快速加载系统相关的 Item 合集包索引。
- *  2. 提供基于 ApplicationV2 的筛选界面。
- *  3. 提供 API 供宏调用进行随机战利品生成。
+ *  ⚔️ XJZL 江湖万卷阁 (Compendium Browser)
  * ==============================================================================
  */
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
+const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(ApplicationV2) {
 
     constructor(options) {
         super(options);
 
-        // 本地数据缓存 (清洗后的索引)
-        // 结构: { "weapon": [ItemIndex, ...], "neigong": [ItemIndex, ...] }
+        // --- 数据缓存 ---
+        // 结构: { "weapon": [ItemIndex, ...], "wuxue": [ItemIndex, ...] }
         this.cachedData = {};
 
-        // 标记是否已加载
+        // --- 状态标记 ---
         this.isLoaded = false;
 
-        // 内部 UI 状态
+        // --- UI 状态 ---
         this.browserState = {
-            activeTab: "weapon", // 默认显示武器
+            activeTab: "weapon", // 当前激活的标签页
             searchQuery: "",     // 搜索关键词
-            filters: {}          // 预留给下一阶段
+            filters: {}          // 筛选条件 { key: Set(values) }
         };
+
+        // --- 性能优化：防抖搜索 ---
+        // 避免用户每输入一个字符就重绘一次，延迟 300ms 执行
+        this._debouncedSearch = foundry.utils.debounce(this._performSearch.bind(this), 300);
     }
 
     /**
-     * V13 标准配置
+     * ✅ V13 标准应用配置
      */
     static DEFAULT_OPTIONS = {
         tag: "div",
@@ -48,7 +48,6 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             resizable: true
         },
         actions: {
-            // 预留给后续 UI 交互
             refresh: XJZLCompendiumBrowser.prototype.refreshData,
             changeTab: XJZLCompendiumBrowser.prototype._onChangeTab,
             openSheet: XJZLCompendiumBrowser.prototype._onOpenSheet,
@@ -58,14 +57,13 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     };
 
     static PARTS = {
-        // 我们稍后在第二阶段再写模板，现在先留空或者写个占位
         main: {
             template: "systems/xjzl-system/templates/apps/compendium-browser.hbs",
-            scrollable: [".xjzl-cb-sidebar"]
+            scrollable: [".xjzl-cb-sidebar", ".xjzl-cb-content"] // 允许侧边栏和内容区独立滚动
         }
     };
 
-    // 定义所有可用的 Tabs (对应 Item Type)
+    // 📋 定义所有可用的 Tabs (对应 Item Type)
     static TABS = [
         { id: "weapon", label: "武器", icon: "fas fa-sword" },
         { id: "armor", label: "防具", icon: "fas fa-tshirt" },
@@ -78,55 +76,42 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     ];
 
     /**
-     * ==========================================================
-     *  核心逻辑：索引配置
-     *  这里定义了我们不想加载完整 Document 就能读取到的字段
-     * ==========================================================
+     * ⚡ 核心索引字段配置
+     * 定义我们需要从数据库中预加载哪些字段。
+     * ⚠️ 注意：尽量不要索引大文本(如 description HTML)，会消耗大量内存。
      */
     static INDEX_FIELDS = [
         "img",
-        "system.description", // 简略描述（虽然是HTML，但有时候搜索需要）
+        // "system.description", // 暂时关闭描述索引，除非确实需要搜索全文
 
-        // --- 通用/装备类 (Weapon, Armor, Misc, Consumable, Qizhen) ---
+        // --- 通用/装备类 ---
         "system.quantity",
         "system.price",
         "system.quality", // 品质 (0-4)
-        "system.type",    // 类型 (sword/head/medicine...)
-        "system.subtype", // 武器子类型
-        "system.tier",    // 内功/武学品阶 (1-3)
+        "system.type",    // 类型
+        "system.subtype", // 子类型
+        "system.tier",    // 品阶 (1-3)
 
-        // --- 武学/内功类 (Wuxue, Neigong) ---
+        // --- 武学/内功类 ---
         "system.sect",     // 门派
-        "system.element",  // 五行属性(仅用于内功，武学的不在system下面)
-        "system.category", // 武学分类 (武学/轻功/阵法)
-        "system.moves",  // 用于武学招式判定
+        "system.element",  // 五行
+        "system.category", // 分类
+        "system.moves",    // 招式列表 (用于深度筛选)
 
-        // --- 技艺书 (ArtBook) ---
-        "system.artType"   // 技艺类型
+        // --- 技艺书 ---
+        "system.artType"
     ];
 
     /**
-     * 筛选器配置定义
-     * key: Tab ID
-     * filters: 数组，包含具体的筛选字段配置
+     * ⚙️ 筛选器配置定义
+     * 用于生成左侧的筛选 UI
      */
     get filterConfig() {
         const C = CONFIG.XJZL;
 
-        const elementOptions = {
-            taiji: "太极",
-            yin: "阴",
-            yang: "阳",
-            gang: "刚",
-            rou: "柔",
-            none: "无"
-        };
-
-        const neigongElementOptions = {
-            taiji: "太极",
-            yin: "阴柔",
-            yang: "阳刚"
-        };
+        // 辅助对象：本地化选项
+        const elementOptions = { taiji: "太极", yin: "阴", yang: "阳", gang: "刚", rou: "柔", none: "无" };
+        const neigongElementOptions = { taiji: "太极", yin: "阴柔", yang: "阳刚" };
 
         return {
             weapon: [
@@ -152,7 +137,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 { key: "category", label: "武学类别", type: "checkbox", options: C.wuxueCategories },
                 { key: "tier", label: "武学品阶", type: "checkbox", options: C.tiers },
                 { key: "element", label: "武学属性", type: "checkbox", options: elementOptions },
-                { key: "damageType", label: "伤害类型", type: "checkbox", options: C.damageTypes }
+                { key: "damageType", label: "伤害类型", type: "checkbox", options: C.damageTypes },
+                { key: "weaponType", label: "兵器要求", type: "checkbox", options: C.weaponTypes }
             ],
             neigong: [
                 { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
@@ -165,51 +151,79 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         };
     }
 
+    /* -------------------------------------------- */
+    /*  数据加载与缓存 (Data Loading)               */
+    /* -------------------------------------------- */
+
     /**
-     * 数据加载函数
-     * 遍历所有合集包，提取符合 XJZL 系统要求的物品
-     * 并按 Item Type 分类存储到 this.cachedData
+     * 📥 数据加载主函数
+     * 遍历所有合集包，构建内存索引
+     * 使用 Promise.all 并发加载所有合集包索引，大幅提升启动速度。
      */
     async loadData() {
         ui.notifications.info("正在编纂江湖图谱...");
-        console.log("XJZL Browser | 开始索引...");
+        const startTime = performance.now(); // 性能计时开始
 
-        // 初始化空容器
+        // 1. 初始化容器
         const tempCache = {};
-        // 根据 TABS 初始化数组，防止 undefined
         XJZLCompendiumBrowser.TABS.forEach(t => tempCache[t.id] = []);
 
-        for (const pack of game.packs) {
-            if (pack.metadata.type !== "Item") continue;
-            // 暂时放宽限制，或者确认为 "xjzl-system"
-            if (pack.metadata.system !== "xjzl-system") continue;
+        // 2. 筛选需要加载的包 (先过滤，不执行)
+        const targetPacks = game.packs.filter(p =>
+            p.metadata.type === "Item" &&
+            p.metadata.system === "xjzl-system"
+        );
 
-            const index = await pack.getIndex({ fields: XJZLCompendiumBrowser.INDEX_FIELDS });
+        console.log(`XJZL Browser | 开始并行索引 ${targetPacks.length} 个合集包...`);
 
-            for (const entry of index) {
-                if (tempCache[entry.type]) {
-                    // 注入 UUID 以便拖拽和打开
-                    entry.uuid = entry.uuid || `Compendium.${pack.collection}.${entry._id}`;
-                    // 注入 Pack Label 方便显示来源
-                    entry.packLabel = pack.metadata.label;
-                    tempCache[entry.type].push(entry);
+        // 3. 定义单个包的加载逻辑
+        // 这个函数是异步的，但不会阻塞主线程
+        const loadPackIndex = async (pack) => {
+            try {
+                // 并行关键点：这里的 await 不会阻塞其他 pack 的执行
+                const index = await pack.getIndex({ fields: XJZLCompendiumBrowser.INDEX_FIELDS });
+
+                // 将数据填入临时缓存
+                for (const entry of index) {
+                    // 只记录我们关心的 Item 类型 (在 TABS 中定义的)
+                    if (tempCache[entry.type]) {
+                        // 预处理数据
+                        // 如果 uuid 不存在 (某些旧版本核心)，手动补全
+                        entry.uuid = entry.uuid || `Compendium.${pack.collection}.${entry._id}`;
+                        entry.packLabel = pack.metadata.label;
+
+                        // JS 的数组 push 操作是同步的，不会在 Promise.all 中发生竞争条件
+                        tempCache[entry.type].push(entry);
+                    }
                 }
+            } catch (err) {
+                console.error(`XJZL Browser | 加载合集包 [${pack.metadata.label}] 失败:`, err);
+                // 这里 catch 住错误，防止一个包损坏导致整个浏览器打不开
             }
-        }
+        };
 
+        // 4. 并发执行所有任务
+        // map 返回一组 Promise，Promise.all 等待它们全部完成
+        await Promise.all(targetPacks.map(pack => loadPackIndex(pack)));
+
+        // 5. 完成并赋值
         this.cachedData = tempCache;
         this.isLoaded = true;
-        console.log("XJZL Browser | 索引完成。", this.cachedData);
+
+        const endTime = performance.now();
+        console.log(`XJZL Browser | 索引完成，共加载 ${this._getTotalCount()} 个物品。耗时: ${(endTime - startTime).toFixed(2)}ms`);
 
         ui.notifications.info("图谱编纂完成。");
 
-        // 只有当窗口已打开时，才重绘以显示新数据
         if (this.rendered) this.render();
     }
 
+    /**
+     * 🔄 强制刷新数据
+     */
     async refreshData() {
         this.isLoaded = false;
-        this.render(); // 先重绘显示 Loading 状态
+        this.render(); // 显示 Loading 状态
         await this.loadData();
     }
 
@@ -217,71 +231,60 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /*  事件处理 (Event Handlers)                   */
     /* -------------------------------------------- */
 
-    // 监听 Tab 切换：切换时重置筛选
     _onChangeTab(event, target) {
         const newTab = target.dataset.tab;
         if (newTab && newTab !== this.browserState.activeTab) {
             this.browserState.activeTab = newTab;
-            this.browserState.searchQuery = ""; // 切换 Tab 清空搜索
-            this.browserState.filters = {};     // 切换 Tab 清空筛选
+            // 切换 Tab 时，体验上最好保留搜索词，但重置筛选器
+            this.browserState.filters = {};
             this.render();
         }
     }
 
-    // 监听搜索框输入 (带防抖建议，这里简化直接处理)
     _onSearch(event) {
         event.preventDefault();
-        const input = event.target.value.trim();
-        if (input !== this.browserState.searchQuery) {
-            this.browserState.searchQuery = input;
+        // 触发防抖函数
+        this._debouncedSearch(event.target.value.trim());
+    }
+
+    // 实际执行搜索逻辑（被防抖调用）
+    _performSearch(query) {
+        if (query !== this.browserState.searchQuery) {
+            this.browserState.searchQuery = query;
             this.render();
         }
     }
 
-    /**
-     * 点击物品卡片打开详情页
-     * 性能最佳：按需加载完整文档
-     */
     async _onOpenSheet(event, target) {
-        // 阻止冒泡，防止拖拽时意外触发
-        event.stopPropagation();
-
+        event.stopPropagation(); // 防止触发卡片的拖拽事件
         const uuid = target.dataset.uuid;
         if (!uuid) return;
 
         try {
-            // fromUuid 是异步的，会从数据库或缓存拉取完整 Item
             const item = await fromUuid(uuid);
-            if (item) {
-                item.sheet.render(true);
-            } else {
-                ui.notifications.warn("无法找到该物品，可能已被删除。");
-            }
+            if (item) item.sheet.render(true);
+            else ui.notifications.warn("无法找到该物品，可能已被删除。");
         } catch (err) {
             console.error("XJZL Browser | Open Sheet Error:", err);
         }
     }
 
-    // 监听复选框变化
     _onFilterChange(event) {
         const target = event.target;
-        const filterKey = target.dataset.filter; // e.g., "type"
-        const value = target.value;              // e.g., "sword"
+        const filterKey = target.dataset.filter;
+        const value = target.value;
         const isChecked = target.checked;
 
-        // 初始化该字段的 Set
+        // 懒初始化 Set
         if (!this.browserState.filters[filterKey]) {
             this.browserState.filters[filterKey] = new Set();
         }
 
-        if (isChecked) {
-            this.browserState.filters[filterKey].add(value);
-        } else {
-            this.browserState.filters[filterKey].delete(value);
-            // 如果空了，清理掉 key
-            if (this.browserState.filters[filterKey].size === 0) {
-                delete this.browserState.filters[filterKey];
-            }
+        const filterSet = this.browserState.filters[filterKey];
+        if (isChecked) filterSet.add(value);
+        else {
+            filterSet.delete(value);
+            if (filterSet.size === 0) delete this.browserState.filters[filterKey];
         }
 
         this.render();
@@ -293,71 +296,79 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
-    // 为了绑定 input 事件，我们需要覆盖 render 后的 hook
-    // AppV2 中使用 _onRender
+    /**
+     * 覆盖 AppV2 的渲染后钩子，用于绑定搜索框
+     */
     _onRender(context, options) {
         super._onRender(context, options);
 
-        // 绑定搜索框
+        // 1. 绑定搜索框
         const searchInput = this.element.querySelector("input[name='search']");
         if (searchInput) {
             searchInput.addEventListener("input", this._onSearch.bind(this));
         }
 
-        // 绑定筛选复选框
+        // 2. 绑定筛选复选框
+        // 也可以优化为事件委托，但这里数量不多，暂时维持原样或统一优化均可
         const checkboxes = this.element.querySelectorAll(".xjzl-filter-checkbox");
         checkboxes.forEach(cb => {
             cb.addEventListener("change", this._onFilterChange.bind(this));
         });
+
+        // 3. 使用事件委托绑定拖拽
+        // 不再遍历所有卡片，而是直接监听整个窗口的 dragstart
+        // 这样无论显示多少个物品，性能开销都是恒定的
+        this.element.addEventListener("dragstart", this._onDragStart.bind(this));
+    }
+
+    /**
+     * 处理拖拽
+     * 把 dataset 里的 JSON 数据写入浏览器传输层
+     */
+    _onDragStart(event) {
+        // 使用 .closest() 查找最近的带有拖拽数据的父元素
+        // 这样即使用户拖动的是卡片里的图片或文字，也能正确找到卡片容器
+        const card = event.target.closest("[data-drag-data]");
+
+        if (!card) return; // 如果拖动的不是卡片，忽略
+
+        const dragData = card.dataset.dragData;
+        if (dragData) {
+            event.dataTransfer.setData("text/plain", dragData);
+            event.dataTransfer.effectAllowed = "copy";
+        }
     }
 
     /* -------------------------------------------- */
-    /*  数据准备 (Context)                          */
+    /*  数据准备 (Context Preparation)              */
     /* -------------------------------------------- */
 
     async _prepareContext(options) {
         const activeTab = this.browserState.activeTab;
         const rawItems = this.cachedData[activeTab] || [];
 
-        // 1. 执行过滤
+        // 1. 执行内存过滤
         const filteredItems = this._filterItems(rawItems);
 
-        // 2. 分页/裁剪
+        // 2. 分页/裁剪 (前端性能优化)
+        // 即使有 5000 个物品，也只渲染前 100 个，防止 DOM 爆炸
         const totalCount = filteredItems.length;
         const displayLimit = 100;
         const displayItems = filteredItems.slice(0, displayLimit);
 
-        // 3. 准备筛选器 UI 数据
+        // 3. 构建筛选器 UI 数据
         const currentFilters = this.browserState.filters;
         const filterConfigs = this.filterConfig[activeTab] || [];
 
-        // 在这里进行本地化翻译
         const filtersUI = filterConfigs.map(config => {
             const activeSet = currentFilters[config.key];
-
-            // 将 options 对象转换为数组，并翻译 label
-            const options = Object.entries(config.options).map(([val, labelKey]) => {
-                return {
-                    val: val,
-                    // 如果 labelKey 是本地化字符串，翻译它；否则直接显示 (兼容硬编码)
-                    label: game.i18n.localize(labelKey),
-                    checked: activeSet ? activeSet.has(val.toString()) : false
-                };
-            });
-
-            // 如果想让选项按中文首字母排序，可以在这里 .sort()
-            // options.sort((a, b) => a.label.localeCompare(b.label, "zh"));
-
+            const options = Object.entries(config.options).map(([val, labelKey]) => ({
+                val: val,
+                label: game.i18n.localize(labelKey),
+                checked: activeSet ? activeSet.has(val.toString()) : false
+            }));
             return { ...config, options };
         });
-
-        // 4. 传递品质枚举给前端 (用于颜色类名)
-        const qualityMap = {};
-        if (CONFIG.XJZL.qualities) {
-            for (const [k, v] of Object.entries(CONFIG.XJZL.qualities)) {
-                qualityMap[k] = game.i18n.localize(v);
-            }
-        }
 
         return {
             isLoaded: this.isLoaded,
@@ -369,81 +380,78 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             isClipped: totalCount > displayLimit,
             searchQuery: this.browserState.searchQuery,
             filterList: filtersUI,
-            qualities: qualityMap
+            // 传递简单的映射表给 HBS，减少模板逻辑
+            qualities: CONFIG.XJZL.qualities ? Object.fromEntries(
+                Object.entries(CONFIG.XJZL.qualities).map(([k, v]) => [k, game.i18n.localize(v)])
+            ) : {}
         };
     }
 
-    /**
-     * ==========================================================
-     *  随机化引擎 (Randomizer Engine)
-     * ==========================================================
-     */
+    /* -------------------------------------------- */
+    /*  核心功能：随机化引擎 (Randomizer)           */
+    /* -------------------------------------------- */
 
     /**
-     * 核心 API：从指定范围随机抽取物品
-     * @param {Object} options 配置项
-     * @param {string} [options.tab] 指定的大类 (默认当前 Tab)
-     * @param {Object} [options.filters] 指定筛选条件 (默认使用当前 UI 的筛选状态)
+     * 🎲 核心 API：从指定范围随机抽取物品
+     * 
+     * @param {Object} options
+     * @param {string} [options.tab] 指定大类
+     * @param {Object} [options.filters] 指定筛选条件
      * @param {number} [options.amount=1] 抽取数量
-     * @param {boolean} [options.weighted=true] 是否启用权重 (高品质概率低)
-     * @param {boolean} [options.create=false] 是否直接创建 Item 实体 (true返回Document, false返回索引数据)
-     * @returns {Promise<Array>} 返回抽中的物品数据数组
+     * @param {boolean} [options.weighted=true] 是否启用权重
+     * @param {Object} [options.customWeights] 自定义权重表 {等级: 权重}
      */
     async randomize(options = {}) {
-        // 1. 确定数据源 (Tab)
         const tab = options.tab || this.browserState.activeTab;
         const rawItems = this.cachedData[tab] || [];
-
-        // 2. 确定筛选条件
-        // 如果 API 调用没传 filters，就用当前浏览器 UI 上的筛选状态
-        // 这一点非常方便 GM：先在界面选好范围，然后点随机
         const filters = options.filters || this.browserState.filters;
 
-        // 临时构造一个 context 来复用 _filterItems 逻辑
-        // 我们需要把 filters 传进去，但 _filterItems 目前是读 this.browserState 的
-        // 为了复用，我们稍微改造一下 _filterItems 或者在这里手动模拟
-        // 最简单的办法：临时修改 state 然后改回来，或者让 _filterItems 接受参数
-        // 建议方案：重构 _filterItems 接受参数 (见下文修改)
-        const pool = this._filterItems(rawItems, filters, ""); // 搜索词传空，通常随机不需要匹配搜索词，除非你也想
+        // 1. 获取过滤后的候选池
+        const pool = this._filterItems(rawItems, filters, "");
 
         if (pool.length === 0) {
             ui.notifications.warn(`在分类 [${tab}] 中找不到符合当前筛选条件的物品。`);
             return [];
         }
 
-        // 3. 执行抽取
-        const results = [];
         const amount = options.amount || 1;
-        const useWeight = options.weighted ?? true; // 默认开启权重
+        const useWeight = options.weighted ?? true;
 
-        // 权重配置表 (可根据需求调整)
-        const qualityWeights = {
-            0: 100, // 凡品 (最常见)
-            1: 50,  // 良品
-            2: 20,  // 上品
-            3: 5,   // 极品
-            4: 1    // 绝世 (极罕见)
-        };
+        // 2. 准备权重配置
+        const tierWeights = options.customWeights || { 1: 100, 2: 20, 3: 5 }; // 人/地/天
+        const qualityWeights = options.customWeights || { 0: 100, 1: 60, 2: 30, 3: 10, 4: 2 }; // 凡~玉
 
+        const results = [];
+
+        // 3. 执行抽取
         for (let i = 0; i < amount; i++) {
             let selected;
 
             if (useWeight) {
-                // --- 加权随机算法 ---
-                // A. 计算总权重
+                // === 加权随机算法 ===
                 let totalWeight = 0;
+
+                // [性能注意] 这里的 map 在 pool 很大时有消耗
+                // 但为了动态权重判定 (Tier vs Quality) 是必要的
                 const poolWithWeights = pool.map(item => {
-                    // 获取品质，默认0
-                    const q = item.system.quality ?? 0;
-                    const w = qualityWeights[q] || 10;
+                    let w = 10;
+                    const sys = item.system;
+
+                    // 智能判断使用哪套权重
+                    if (item.type === "wuxue" || item.type === "neigong") {
+                        const t = sys.tier ?? 1;
+                        w = tierWeights[t] || 10;
+                    } else {
+                        const q = sys.quality ?? 0;
+                        w = qualityWeights[q] || 10;
+                    }
+
                     totalWeight += w;
                     return { item, weight: w };
                 });
 
-                // B. 随机数游标
+                // 游标法选择
                 let random = Math.random() * totalWeight;
-
-                // C. 寻找落点
                 for (const entry of poolWithWeights) {
                     random -= entry.weight;
                     if (random <= 0) {
@@ -451,352 +459,276 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                         break;
                     }
                 }
-                // 兜底 (理论上不会触发)
+                // 兜底
                 if (!selected) selected = poolWithWeights[poolWithWeights.length - 1].item;
 
             } else {
-                // --- 纯随机 ---
+                // === 纯随机 ===
                 const idx = Math.floor(Math.random() * pool.length);
                 selected = pool[idx];
             }
 
-            // 深拷贝一份数据，避免引用问题
+            // 深拷贝防止污染索引缓存
             results.push(foundry.utils.deepClone(selected));
         }
 
-        console.log(`XJZL Randomizer | 从 ${pool.length} 个物品中抽取了 ${results.length} 个`, results);
-
-        // 4. 后处理 (如果需要创建实体)
-        if (options.create) {
-            // 这一步通常由调用者处理 (比如 createEmbeddedDocuments)，这里只负责返回数据
-            // 但为了方便，如果传了 create，我们返回 Promise.all(fromUuid)
-            const docs = await Promise.all(results.map(r => fromUuid(r.uuid)));
-            return docs;
-        }
-
+        console.log(`XJZL Randomizer | 抽取结果:`, results);
         return results;
     }
 
     /**
-     * UI 响应：点击侧边栏底部的“随机抽取”按钮
+     * 🎲 UI 响应：打开随机抽取设置窗口
      */
     async _onRandomizeClick(event) {
         event.preventDefault();
+        const { DialogV2 } = foundry.applications.api;
 
-        // 简单的 Dialog 询问
-        // 使用 V13/V12 推荐的 Dialog 构造，或者简单的 Dialog 类
+        const activeTab = this.browserState.activeTab;
+        const rawItems = this.cachedData[activeTab] || [];
+
+        // 实时计算当前筛选下的数量 (Single Source of Truth)
+        const currentPool = this._filterItems(rawItems);
+        const count = currentPool.length;
+
+        if (count === 0) {
+            return ui.notifications.warn("当前列表为空，无法进行随机抽取。");
+        }
+
+        // 1. 动态生成权重配置 HTML
+        let weightHtml = "";
+        let isTierSystem = false; // true=人地天, false=凡铜银金玉
+
+        if (["wuxue", "neigong"].includes(activeTab)) {
+            isTierSystem = true;
+            const defaults = { 1: 100, 2: 20, 3: 5 };
+            // 使用 Grid 布局整齐排列输入框
+            weightHtml = `
+                <div class="weight-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 5px;">
+                    ${this._buildWeightInput("人级", "w_1", defaults[1], "#666")}
+                    ${this._buildWeightInput("地级", "w_2", defaults[2], "#8d6e63")}
+                    ${this._buildWeightInput("天级", "w_3", defaults[3], "#d4af37")}
+                </div>`;
+        } else {
+            isTierSystem = false;
+            const defaults = { 0: 100, 1: 60, 2: 30, 3: 10, 4: 2 };
+            weightHtml = `
+                <div class="weight-grid" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 5px;">
+                    ${this._buildWeightInput("凡", "w_0", defaults[0], "#666")}
+                    ${this._buildWeightInput("铜", "w_1", defaults[1], "#8d6e63")}
+                    ${this._buildWeightInput("银", "w_2", defaults[2], "#95a5a6")}
+                    ${this._buildWeightInput("金", "w_3", defaults[3], "#d4af37")}
+                    ${this._buildWeightInput("玉", "w_4", defaults[4], "#2ecc71")}
+                </div>`;
+        }
+
         const content = `
-            <form>
-                <div class="form-group">
-                    <label>抽取数量</label>
-                    <input type="number" name="amount" value="1" min="1" max="50" autofocus>
-                </div>
-                <div class="form-group">
-                    <label>基于品质加权</label>
-                    <div class="form-fields">
-                         <input type="checkbox" name="weighted" checked>
-                         <span class="notes"> (凡品概率高，绝世概率低)</span>
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <div style="flex: 1;">
+                    <label style="font-weight:bold; font-size:0.9em;">抽取数量</label>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <i class="fas fa-cubes" style="color:#555;"></i>
+                        <input type="number" name="amount" value="1" min="1" max="50">
                     </div>
                 </div>
-                <hr>
-                <p class="notes">将从当前显示的 <strong>${this._lastDisplayCount || "若干"}</strong> 个物品中抽取。</p>
-            </form>
+                <div style="flex: 1.5;">
+                    <label style="font-weight:bold; font-size:0.9em;">发送者身份</label>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        <i class="fas fa-user-secret" style="color:#555;"></i>
+                        <input type="text" name="alias" value="江湖奇遇" placeholder="默认: 江湖奇遇">
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                 <label style="font-weight:bold; font-size:0.9em;">卡片标题</label>
+                 <input type="text" name="title" value="随机结果" placeholder="默认: 随机结果">
+            </div>
+
+            <div style="border: 1px solid #ccc; padding: 10px; border-radius: 4px; background: rgba(0,0,0,0.02);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <label style="font-weight:bold;"><i class="fas fa-balance-scale"></i> 权重配置</label>
+                </div>
+                ${weightHtml}
+            </div>
+
+            <p class="notes" style="margin-top:15px; font-size:0.85em; color:#666; text-align:center;">
+                将在当前显示的 <strong>${count}</strong> 个物品中进行随机。
+            </p>
         `;
 
-        new Dialog({
-            title: "随机战利品生成",
+        // 2. 显示 V2 对话框
+        const result = await DialogV2.wait({
+            window: { title: "🎲 随机战利品生成", icon: "fas fa-dice-d20", resizable: false },
             content: content,
-            buttons: {
-                draw: {
-                    icon: '<i class="fas fa-dice-d20"></i>',
-                    label: "开始抽取",
-                    callback: async (html) => {
-                        const amount = parseInt(html.find('[name="amount"]').val());
-                        const weighted = html.find('[name="weighted"]').is(":checked");
+            buttons: [{
+                action: "ok",
+                label: "抽取",
+                icon: "fas fa-check",
+                class: "default",
+                callback: (event, button, dialog) => {
+                    const form = button.form;
 
-                        // 调用 API
-                        const results = await this.randomize({
-                            amount,
-                            weighted
-                        });
+                    // 获取基础参数
+                    const amount = parseInt(form.elements.amount.value) || 1;
+                    const alias = form.elements.alias.value.trim() || "江湖奇遇";
+                    const title = form.elements.title.value.trim() || "随机结果";
 
-                        if (results.length > 0) {
-                            this._generateLootChatCard(results);
+                    // 获取权重
+                    const customWeights = {};
+                    if (isTierSystem) {
+                        customWeights[1] = parseInt(form.elements.w_1.value) || 0;
+                        customWeights[2] = parseInt(form.elements.w_2.value) || 0;
+                        customWeights[3] = parseInt(form.elements.w_3.value) || 0;
+                    } else {
+                        for (let i = 0; i <= 4; i++) {
+                            customWeights[i] = parseInt(form.elements[`w_${i}`].value) || 0;
                         }
                     }
+
+                    return { amount, alias, title, customWeights };
                 }
-            },
-            default: "draw"
-        }).render(true);
-    }
-
-    /**
-     * 生成聊天卡片，展示随机结果，并允许拖拽
-     */
-    async _generateLootChatCard(items) {
-        // 构建简单的 HTML 列表
-        let listHtml = `<ul class="xjzl-loot-list" style="list-style:none; padding:0; margin:0;">`;
-
-        for (const item of items) {
-            // 获取品质颜色 (硬编码颜色或读取配置)
-            const q = item.system.quality ?? 0;
-            const colors = ["#9e9e9e", "#4caf50", "#2196f3", "#9c27b0", "#ff9800"];
-            const color = colors[q] || "#9e9e9e";
-
-            listHtml += `
-            <li class="flexrow" style="align-items:center; margin-bottom:4px; background:rgba(0,0,0,0.1); padding:4px; border-radius:4px;">
-                <img src="${item.img}" width="24" height="24" style="border:1px solid ${color}; margin-right:8px;"/>
-                <a class="content-link" data-uuid="${item.uuid}" style="color:${color}; font-weight:bold;">${item.name}</a>
-            </li>`;
-        }
-        listHtml += `</ul>`;
-
-        const content = `
-            <div class="xjzl-chat-card">
-                <h3 style="border-bottom:1px solid #555; padding-bottom:5px;">🎲 随机结果</h3>
-                ${listHtml}
-                <p style="font-size:0.8em; color:#777; margin-top:5px; text-align:center;">拖拽物品名即可拾取</p>
-            </div>
-        `;
-
-        ChatMessage.create({
-            content: content,
-            speaker: ChatMessage.getSpeaker({ alias: "江湖天道" })
+            }],
+            close: () => null
         });
+
+        if (result) {
+            const items = await this.randomize({
+                amount: result.amount,
+                weighted: true,
+                customWeights: result.customWeights
+            });
+
+            if (items.length > 0) {
+                // 传递 alias 和 title 给生成函数
+                this._generateLootChatCard(items, {
+                    alias: result.alias,
+                    title: result.title
+                });
+            }
+        }
+    }
+
+    // 辅助：生成权重输入框 HTML
+    _buildWeightInput(label, name, val, color) {
+        return `
+            <div style="text-align: center;">
+                <label style="font-size:0.8em; color:${color}; font-weight:bold;">${label}</label>
+                <input type="number" name="${name}" value="${val}" min="0" style="text-align:center; padding:2px;">
+            </div>`;
     }
 
     /**
-     * ==========================================================
-     *  随机化引擎 (Randomizer Engine)
-     * ==========================================================
-     */
-
-    /**
-     * 核心 API：从指定范围随机抽取物品
+     * 🃏 生成美化版战利品卡片
+     * @param {Array} items 物品列表
      * @param {Object} options 配置项
-     * @param {string} [options.tab] 指定的大类 (默认当前 Tab)
-     * @param {Object} [options.filters] 指定筛选条件 (默认使用当前 UI 的筛选状态)
-     * @param {number} [options.amount=1] 抽取数量
-     * @param {boolean} [options.weighted=true] 是否启用权重 (高品质概率低)
-     * @param {boolean} [options.create=false] 是否直接创建 Item 实体 (true返回Document, false返回索引数据)
-     * @returns {Promise<Array>} 返回抽中的物品数据数组
+     * @param {string} [options.alias="江湖天道"] 发送者名称
      */
-    async randomize(options = {}) {
-        // 1. 确定数据源 (Tab)
-        const tab = options.tab || this.browserState.activeTab;
-        const rawItems = this.cachedData[tab] || [];
+    async _generateLootChatCard(items, options = {}) {
+        // 获取自定义别名，默认为“江湖奇遇”
+        const alias = options.alias || "江湖奇遇";
 
-        // 2. 确定筛选条件
-        // 如果 API 调用没传 filters，就用当前浏览器 UI 上的筛选状态
-        // 这一点非常方便 GM：先在界面选好范围，然后点随机
-        const filters = options.filters || this.browserState.filters;
+        const renderData = {
+            title: options.title || "随机结果", // 也可以自定义标题
+            items: items.map(i => {
+                const sys = i.system;
+                let colorClass = "";
+                let label = "";
 
-        // 临时构造一个 context 来复用 _filterItems 逻辑
-        // 我们需要把 filters 传进去，但 _filterItems 目前是读 this.browserState 的
-        // 为了复用，我们稍微改造一下 _filterItems 或者在这里手动模拟
-        // 最简单的办法：临时修改 state 然后改回来，或者让 _filterItems 接受参数
-        // 建议方案：重构 _filterItems 接受参数 (见下文修改)
-        const pool = this._filterItems(rawItems, filters, ""); // 搜索词传空，通常随机不需要匹配搜索词，除非你也想
+                if (i.type === "wuxue" || i.type === "neigong") {
+                    const t = sys.tier ?? 1;
+                    colorClass = `tier-${t}`;
+                    label = { 1: "人", 2: "地", 3: "天" }[t] || "未知";
+                } else {
+                    const q = sys.quality ?? 0;
+                    colorClass = `quality-${q}`;
+                    label = { 0: "凡", 1: "铜", 2: "银", 3: "金", 4: "玉" }[q] || "凡";
+                }
 
-        if (pool.length === 0) {
-            ui.notifications.warn(`在分类 [${tab}] 中找不到符合当前筛选条件的物品。`);
-            return [];
-        }
-
-        // 3. 执行抽取
-        const results = [];
-        const amount = options.amount || 1;
-        const useWeight = options.weighted ?? true; // 默认开启权重
-
-        // 权重配置表 (可根据需求调整)
-        const qualityWeights = {
-            0: 100, // 凡品 (最常见)
-            1: 50,  // 良品
-            2: 20,  // 上品
-            3: 5,   // 极品
-            4: 1    // 绝世 (极罕见)
+                return {
+                    uuid: i.uuid,
+                    name: i.name,
+                    img: i.img,
+                    type: i.type,
+                    colorClass: colorClass,
+                    label: label
+                };
+            })
         };
 
-        for (let i = 0; i < amount; i++) {
-            let selected;
-
-            if (useWeight) {
-                // --- 加权随机算法 ---
-                // A. 计算总权重
-                let totalWeight = 0;
-                const poolWithWeights = pool.map(item => {
-                    // 获取品质，默认0
-                    const q = item.system.quality ?? 0;
-                    const w = qualityWeights[q] || 10;
-                    totalWeight += w;
-                    return { item, weight: w };
-                });
-
-                // B. 随机数游标
-                let random = Math.random() * totalWeight;
-
-                // C. 寻找落点
-                for (const entry of poolWithWeights) {
-                    random -= entry.weight;
-                    if (random <= 0) {
-                        selected = entry.item;
-                        break;
-                    }
-                }
-                // 兜底 (理论上不会触发)
-                if (!selected) selected = poolWithWeights[poolWithWeights.length - 1].item;
-
-            } else {
-                // --- 纯随机 ---
-                const idx = Math.floor(Math.random() * pool.length);
-                selected = pool[idx];
-            }
-
-            // 深拷贝一份数据，避免引用问题
-            results.push(foundry.utils.deepClone(selected));
-        }
-
-        console.log(`XJZL Randomizer | 从 ${pool.length} 个物品中抽取了 ${results.length} 个`, results);
-
-        // 4. 后处理 (如果需要创建实体)
-        if (options.create) {
-            // 这一步通常由调用者处理 (比如 createEmbeddedDocuments)，这里只负责返回数据
-            // 但为了方便，如果传了 create，我们返回 Promise.all(fromUuid)
-            const docs = await Promise.all(results.map(r => fromUuid(r.uuid)));
-            return docs;
-        }
-
-        return results;
-    }
-
-    /**
-     * UI 响应：点击侧边栏底部的“随机抽取”按钮
-     */
-    async _onRandomizeClick(event) {
-        event.preventDefault();
-
-        // 简单的 Dialog 询问
-        // 使用 V13/V12 推荐的 Dialog 构造，或者简单的 Dialog 类
-        const content = `
-            <form>
-                <div class="form-group">
-                    <label>抽取数量</label>
-                    <input type="number" name="amount" value="1" min="1" max="50" autofocus>
-                </div>
-                <div class="form-group">
-                    <label>基于品质加权</label>
-                    <div class="form-fields">
-                         <input type="checkbox" name="weighted" checked>
-                         <span class="notes"> (凡品概率高，绝世概率低)</span>
-                    </div>
-                </div>
-                <hr>
-                <p class="notes">将从当前显示的 <strong>${this._lastDisplayCount || "若干"}</strong> 个物品中抽取。</p>
-            </form>
-        `;
-
-        new Dialog({
-            title: "随机战利品生成",
-            content: content,
-            buttons: {
-                draw: {
-                    icon: '<i class="fas fa-dice-d20"></i>',
-                    label: "开始抽取",
-                    callback: async (html) => {
-                        const amount = parseInt(html.find('[name="amount"]').val());
-                        const weighted = html.find('[name="weighted"]').is(":checked");
-
-                        // 调用 API
-                        const results = await this.randomize({
-                            amount,
-                            weighted
-                        });
-
-                        if (results.length > 0) {
-                            this._generateLootChatCard(results);
-                        }
-                    }
-                }
-            },
-            default: "draw"
-        }).render(true);
-    }
-
-    /**
-     * 生成聊天卡片，展示随机结果，并允许拖拽
-     */
-    async _generateLootChatCard(items) {
-        // 构建简单的 HTML 列表
-        let listHtml = `<ul class="xjzl-loot-list" style="list-style:none; padding:0; margin:0;">`;
-
-        for (const item of items) {
-            // 获取品质颜色 (硬编码颜色或读取配置)
-            const q = item.system.quality ?? 0;
-            const colors = ["#9e9e9e", "#4caf50", "#2196f3", "#9c27b0", "#ff9800"];
-            const color = colors[q] || "#9e9e9e";
-
-            listHtml += `
-            <li class="flexrow" style="align-items:center; margin-bottom:4px; background:rgba(0,0,0,0.1); padding:4px; border-radius:4px;">
-                <img src="${item.img}" width="24" height="24" style="border:1px solid ${color}; margin-right:8px;"/>
-                <a class="content-link" data-uuid="${item.uuid}" style="color:${color}; font-weight:bold;">${item.name}</a>
-            </li>`;
-        }
-        listHtml += `</ul>`;
-
-        const content = `
-            <div class="xjzl-chat-card">
-                <h3 style="border-bottom:1px solid #555; padding-bottom:5px;">🎲 随机结果</h3>
-                ${listHtml}
-                <p style="font-size:0.8em; color:#777; margin-top:5px; text-align:center;">拖拽物品名即可拾取</p>
-            </div>
-        `;
+        const content = await renderTemplate("systems/xjzl-system/templates/chat/loot-card.hbs", renderData);
 
         ChatMessage.create({
+            user: game.user.id,
+            speaker: ChatMessage.getSpeaker({ alias: alias }), // 使用参数
             content: content,
-            speaker: ChatMessage.getSpeaker({ alias: "江湖天道" })
+            flags: { "xjzl-system": { type: "loot-card" } }
         });
     }
 
+    /* -------------------------------------------- */
+    /*  内存过滤逻辑 (Filtering Logic)              */
+    /* -------------------------------------------- */
+
     /**
-     * 如果没传 filters/query，则使用 this.browserState (向后兼容 UI 调用)
+     * ⚡ 高性能内存过滤器
+     * 优化点：将 Object.entries 移出循环，复杂度从 O(N*M) 降为 O(N)
      */
     _filterItems(items, filters = null, query = null) {
-        // 1. 参数归一化
+        // 1. 准备过滤条件
         const activeFilters = filters || this.browserState.filters;
         const activeQuery = (query !== null ? query : this.browserState.searchQuery).toLowerCase();
+
+        // [性能优化] 预处理筛选器，避免在循环中重复调用 Object.entries
+        // 只保留有内容的 Set
+        const activeFilterEntries = Object.entries(activeFilters).filter(([k, v]) => v && v.size > 0);
+        const hasFilters = activeFilterEntries.length > 0;
+        const hasQuery = !!activeQuery;
+
+        // 如果没有筛选条件，直接返回 (最快路径)
+        if (!hasQuery && !hasFilters) return items;
 
         return items.filter(item => {
             const system = item.system;
 
-            // --- 搜索逻辑 ---
-            if (activeQuery) {
-                if (!item.name.toLowerCase().includes(activeQuery)) {
-                    return false;
-                }
+            // 1. 文本搜索 (名称)
+            if (hasQuery) {
+                if (!item.name.toLowerCase().includes(activeQuery)) return false;
             }
 
-            // --- 筛选逻辑 ---
-            for (const [key, activeSet] of Object.entries(activeFilters)) {
-                if (!activeSet || activeSet.size === 0) continue;
+            // 2. 属性匹配
+            if (hasFilters) {
+                for (const [key, activeSet] of activeFilterEntries) {
 
-                // 特殊处理：武学招式判定 (保持原逻辑)
-                if (item.type === "wuxue" && (key === "element" || key === "damageType")) {
-                    const moves = system.moves || [];
-                    const hasMatch = moves.some(move => {
-                        const val = move[key];
-                        return val && activeSet.has(val.toString());
-                    });
-                    if (!hasMatch) return false;
-                    continue;
+                    // 特殊逻辑：武学招式判定
+                    // 检查该武学的 moves 数组中是否有任意一个招式符合筛选条件
+                    if (item.type === "wuxue" && ["element", "damageType", "weaponType"].includes(key)) {
+                        const moves = system.moves || [];
+                        // some() 一旦找到即停止，性能尚可
+                        const hasMatch = moves.some(move => {
+                            const val = move[key];
+                            return val && activeSet.has(val.toString());
+                        });
+                        if (!hasMatch) return false;
+                        continue;
+                    }
+
+                    // 常规逻辑：直接比对 system 属性
+                    // 注意数据类型转换 (toString) 以匹配 Set 中的 key
+                    let itemValue = system[key];
+                    if (itemValue === undefined || itemValue === null) return false;
+
+                    if (!activeSet.has(itemValue.toString())) return false;
                 }
-
-                // 常规属性判定
-                let itemValue = system[key];
-                if (itemValue === undefined || itemValue === null) return false;
-                if (!activeSet.has(itemValue.toString())) return false;
             }
 
             return true;
         });
+    }
+
+    /**
+     * 辅助方法：统计总数
+     */
+    _getTotalCount() {
+        return Object.values(this.cachedData).reduce((acc, arr) => acc + arr.length, 0);
     }
 }

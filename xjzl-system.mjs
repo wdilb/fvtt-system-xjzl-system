@@ -637,6 +637,30 @@ Hooks.on("updateCombat", async (combat, updateData, context) => {
 });
 
 /**
+ * 监听聊天消息渲染钩子
+ * 用于修复自定义 Loot Card 的拖拽功能
+ */
+Hooks.on("renderChatMessageHTML", (message, html) => {
+  // html 参数现在直接就是 HTMLElement，不需要 jQuery 转换
+
+  // 使用事件委托
+  // 我们只给这一条消息的容器绑定一个监听器
+  html.addEventListener("dragstart", (event) => {
+    // 检查被拖动的元素是不是我们的 loot-item
+    const target = event.target.closest(".loot-item[draggable='true']");
+
+    if (target && target.dataset.dragData) {
+      // 写入拖拽数据
+      event.dataTransfer.setData("text/plain", target.dataset.dragData);
+      event.dataTransfer.effectAllowed = "copy";
+
+      // 阻止事件冒泡（可选，但在聊天栏里通常是个好习惯）
+      event.stopPropagation();
+    }
+  });
+});
+
+/**
  * 监听战斗人员创建 (进入战斗)
  */
 Hooks.on("createCombatant", async (combatant, options, userId) => {
@@ -836,6 +860,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/chat/heal-card.hbs", //伤害卡片
     "systems/xjzl-system/templates/chat/defend-result.hbs", //看破结果
     "systems/xjzl-system/templates/chat/request-save.hbs", //属性判定
+    "systems/xjzl-system/templates/chat/loot-card.hbs", //随机抽取卡片
     //应用窗口
     "systems/xjzl-system/templates/apps/damage-tool.hbs", //伤害工具
     "systems/xjzl-system/templates/apps/roll-config.hbs", //roll设置窗口
