@@ -422,7 +422,7 @@ export class ChatCardManager {
             if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
 
             // 异步更新消息 (持久化 D2)
-            await ChatCardManager._safeUpdateMessage(originMsg, { "flags.xjzl-system.supplementalDie": d2 });
+            await ChatCardManager._safeUpdateMessage(message, { "flags.xjzl-system.supplementalDie": d2 });
         }
 
         // =====================================================
@@ -605,8 +605,9 @@ export class ChatCardManager {
         }));
         // 使用 setFlag 是原子操作，它会自动触发 update
         // 这一步之后，下次再调用这个函数，就会在第 0 步直接返回这个 results
-        await message.setFlag("xjzl-system", "finalResolvedHit", resultsArray);
-
+        await ChatCardManager._safeUpdateMessage(message, {
+            "flags.xjzl-system.finalResolvedHit": resultsArray
+        });
         return results;
     }
 
