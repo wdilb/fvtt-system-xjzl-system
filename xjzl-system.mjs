@@ -35,7 +35,7 @@ import { XJZLGeneralItemSheet } from "./module/sheets/general-item-sheet.mjs";
 import { XJZLArtBookSheet } from "./module/sheets/art-book-sheet.mjs";
 import { XJZLPersonalitySheet } from "./module/sheets/personality-sheet.mjs";
 import { XJZLBackgroundSheet } from "./module/sheets/background-sheet.mjs";
-import {XJZLActiveEffectConfig} from "./module/sheets/active-effect-config.mjs";
+import { XJZLActiveEffectConfig } from "./module/sheets/active-effect-config.mjs";
 
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
@@ -46,6 +46,7 @@ import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
 import { EffectSelectionDialog } from "./module/applications/effect-selection-dialog.mjs";
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
+import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -363,12 +364,24 @@ Hooks.once("ready", async function () {
   // 注意：防止重复定义，先判断是否存在
   if (!game.xjzl) game.xjzl = {};
 
+  // --- 实例化合集浏览器 ---
+  const compendiumBrowser = new XJZLCompendiumBrowser();
+  // 自动开始构建索引
+  compendiumBrowser.loadData();
+
   // 2. 挂载通用 API (所有玩家可用)
   game.xjzl = {
     api: {
       // 将来可能有其他 API，所以这里放 effects 子命名空间
       effects: ActiveEffectManager //这样就可以调用 game.xjzl.api.effects.addEffect
     }
+  };
+
+  // --- 挂载浏览器到全局对象 ---
+  game.xjzl.compendiumBrowser = compendiumBrowser;
+  // 同时也可以把类定义挂载出去，方便宏继承扩展
+  game.xjzl.applications = {
+    XJZLCompendiumBrowser
   };
 
   // 3. 挂载 GM 专用 API (生成器)
@@ -537,6 +550,31 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
 
     icon.replaceWith(newIcon);
   });
+});
+
+/**
+ * 渲染物品目录侧边栏钩子
+ * 用于注入 "江湖万卷阁" 按钮
+ */
+Hooks.on("renderItemDirectory", (app, html, data) => {
+  // 1. 创建按钮元素
+  // 使用 flex 布局让它看起来像原生按钮
+  const button = $(`
+    <button class="xjzl-browser-btn" style="min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;">
+      <i class="fas fa-book-open"></i> 江湖万卷阁
+    </button>
+  `);
+
+  // 2. 绑定点击事件
+  button.on("click", (ev) => {
+    ev.preventDefault();
+    // 调用我们在 ready 中挂载的单例
+    game.xjzl.compendiumBrowser.render(true);
+  });
+
+  // 3. 插入到界面中
+  // 插入到 .header-actions (创建物品按钮所在的容器) 的下方
+  html.find(".header-actions").after(button);
 });
 
 /**
@@ -795,6 +833,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/effect-selection.hbs", //特效选择
     "systems/xjzl-system/templates/apps/attribute-test-config.hbs", //属性检定设置窗口
     "systems/xjzl-system/templates/apps/modifier-picker.hbs", //属性修正选择器
+    "systems/xjzl-system/templates/apps/compendium-browser.hbs", // 合集浏览器
     //暂停按钮的界面
     "systems/xjzl-system/templates/system/pause.hbs",
   ];
