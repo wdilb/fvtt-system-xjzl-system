@@ -58,7 +58,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
     static PARTS = {
         // 我们稍后在第二阶段再写模板，现在先留空或者写个占位
-        main: { template: "systems/xjzl-system/templates/apps/compendium-browser.hbs" }
+        main: { template: "systems/xjzl-system/templates/apps/compendium-browser.hbs",
+            scrollable: [".xjzl-cb-sidebar"] }
     };
 
     // 定义所有可用的 Tabs (对应 Item Type)
