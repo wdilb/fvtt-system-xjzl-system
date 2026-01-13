@@ -93,9 +93,9 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         // --- 武学/内功类 (Wuxue, Neigong) ---
         "system.sect",     // 门派
-        "system.element",  // 五行属性
+        "system.element",  // 五行属性(仅用于内功，武学的不在system下面)
         "system.category", // 武学分类 (武学/轻功/阵法)
-        "system.damageType", // 伤害类型
+        "system.moves",  // 用于武学招式判定
 
         // --- 技艺书 (ArtBook) ---
         "system.artType"   // 技艺类型
@@ -116,6 +116,12 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             gang: "刚",
             rou: "柔",
             none: "无"
+        };
+
+        const neigongElementOptions = {
+            taiji: "太极",
+            yin: "阴柔",
+            yang: "阳刚"
         };
 
         return {
@@ -147,7 +153,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             neigong: [
                 { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
                 { key: "tier", label: "内功品阶", type: "checkbox", options: C.tiers },
-                { key: "element", label: "内功属性", type: "checkbox", options: elementOptions }
+                { key: "element", label: "内功属性", type: "checkbox", options: neigongElementOptions }
             ],
             art_book: [
                 { key: "artType", label: "技艺类型", type: "checkbox", options: C.arts }
@@ -228,7 +234,31 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         }
     }
 
-    // 【新增】监听复选框变化
+    /**
+     * 点击物品卡片打开详情页
+     * 性能最佳：按需加载完整文档
+     */
+    async _onOpenSheet(event, target) {
+        // 阻止冒泡，防止拖拽时意外触发
+        event.stopPropagation();
+
+        const uuid = target.dataset.uuid;
+        if (!uuid) return;
+
+        try {
+            // fromUuid 是异步的，会从数据库或缓存拉取完整 Item
+            const item = await fromUuid(uuid);
+            if (item) {
+                item.sheet.render(true);
+            } else {
+                ui.notifications.warn("无法找到该物品，可能已被删除。");
+            }
+        } catch (err) {
+            console.error("XJZL Browser | Open Sheet Error:", err);
+        }
+    }
+
+    // 监听复选框变化
     _onFilterChange(event) {
         const target = event.target;
         const filterKey = target.dataset.filter; // e.g., "type"
@@ -361,6 +391,23 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             // filters 结构: { "quality": Set(2) { "3", "4" }, "type": Set(1) { "sword" } }
             for (const [key, activeSet] of Object.entries(filters)) {
                 if (!activeSet || activeSet.size === 0) continue;
+
+                // === 特殊处理：武学的 element 和 damageType ===
+                if (item.type === "wuxue" && (key === "element" || key === "damageType")) {
+                    // 逻辑：只要招式列表中，有任意一个招式 (some) 符合筛选集中的任意一个值 (has)，即保留
+                    // system.moves 可能是 undefined (如果是空武学)
+                    const moves = system.moves || [];
+
+                    // 检查该武学的所有招式中，是否存在一个招式的 [key] 包含在 activeSet 里
+                    const hasMatch = moves.some(move => {
+                        // move.element 或 move.damageType
+                        const val = move[key];
+                        return val && activeSet.has(val.toString());
+                    });
+
+                    if (!hasMatch) return false;
+                    continue; // 这一项检查通过，继续检查下一个 filter
+                }
 
                 // 从 item.system 中取值
                 // 注意：我们的 index 只索引了 item.system.*，所以直接取 system[key]
