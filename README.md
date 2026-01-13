@@ -163,7 +163,7 @@ await Macros.requestSave({
 | **`S`** | `Object` | `system` 的简写别名。例如 `S.stats.liliang.total`。 |
 | **`thisItem`** | `Item` \| `Effect` | **脚本的物理位置**。<br>指向**这段脚本存放的地方**。如果脚本写在“金蛇剑”里，它是金蛇剑；如果脚本写在“中毒”BUFF里，它是中毒BUFF。 |
 | **`thisEffect`** | `ActiveEffect` | **脚本宿主特效指针**。<br>仅当脚本挂载在 Active Effect 上时存在。|
-| **`item`** | `Item` | **动作来源物品**。<br>**注意区别**: 当你挥剑攻击时，`item` 是这把剑。<br>如果你身上的“中毒”BUFF在此时触发脚本，`thisItem` 是BUFF，而 `item` 依然是那把剑。<br>*注: 普通攻击时，这是一个包含虚拟招式数据的对象。* |
+| **`item`** | `Item` | 由 `roll()` 或 `_applyDamage` 通过 `context` 传入。 | **仅限主动时机**<br>(`attack`, `hit`, `calc`, `check`) | **动作的发起源**。<br>仅指武学，因为全部的动作由武学主动发起，注意不是招式。<br>❌ **在被动/防御/回合结算时 (`damaged`, `turnStart`) 为 `undefined`。** |
 | **`move`** | `Object` | **当前正在施展的招式数据**。<br>✅ **主动出招时** (`attack`, `hit`, `calc`, `check`): 指向**你正在使用**的那一招。<br>> **⚠️ 重要**: 即使脚本写在**内功、装备或BUFF**上，只要是因为你出招而触发，这里读取到的就是你**手里那一招**的数据（例如：用“太极剑”出招触发了身上“纯阳内功”的脚本，这里的 `move` 就是“太极剑”）。<br>💡 **被动时** (`passive`): 仅当脚本写在**招式内部**时，指向该招式自身；写在其他地方（如内功/装备）为 `undefined`。<br>❌ **受击/防御时(avoided、preDefense、preTake、damaged)**: **`undefined`**。 |
 | **`trigger`** | `String` | **当前触发时机**。例如 `"attack"`, `"hit"`, `"damaged"`。用于在同一脚本中处理多重逻辑。 |
 | **`Macros`** | `Class` | **系统工具箱**。提供 `requestSave` (发起检定), `checkStance` (架招判断) 等静态方法。 |
