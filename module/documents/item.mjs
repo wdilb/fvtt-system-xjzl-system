@@ -1198,67 +1198,101 @@ export class XJZLItem extends Item {
   async _promptRollConfiguration(move, effectiveMode = "attack") {
     if (move.type === "stance") return {};
 
-    // 1. 生成唯一 ID
     const formId = `roll-config-${foundry.utils.randomID()}`;
 
-    // 2. 准备模板数据
-
-    // - 治疗模式(heal): 需要数值(damage)，不需要检定(attack)
-    // - 攻击模式(attack): 需要数值，只有内外功需要检定
-    // - Buff模式: 理论上不需要弹窗，或者只需要极其简单的确认（这里保留逻辑以防万一）
-
+    // 1. 准备初始状态
     const isHeal = effectiveMode === "heal";
     const isAttack = effectiveMode === "attack";
-    // 只有攻击模式，且伤害类型为内外功时，才显示“攻击修正”输入框
-    const damageType = move.damageType || "waigong";
-    const needsAttack = isAttack && ["waigong", "neigong"].includes(damageType);
-    // 治疗和攻击都需要显示“数值修正”输入框
-    const needsDamage = isHeal || isAttack;
+    const currentDamageType = move.damageType || "waigong";
 
-    // 只有非反击类的攻击招式可以暴击 (治疗也不可以暴击)
+    // 初始显隐逻辑
+    const needsAttack = isAttack && move.type !== "counter" && ["waigong", "neigong"].includes(currentDamageType);
+    const needsDamage = isHeal || isAttack;
     const canCrit = isAttack && move.type !== "counter";
+
+    // 准备下拉框选项
+    const moveTypes = {
+      real: "实招",
+      feint: "虚招",
+      counter: "反击"
+    };
+
+    // 过滤掉不需要显示的伤害类型(如果需要)或者直接使用全局配置
+    // 假设 XJZL.damageTypes 全局存在
+    const damageTypes = XJZL.damageTypes;
 
     const context = {
       formId: formId,
+      // 下拉框数据
+      moveTypes: moveTypes,
+      damageTypes: damageTypes,
+      currentMoveType: move.type,
+      currentDamageType: currentDamageType,
+      // 初始状态控制 (用于 Handlebars 里的 display: none)
       needsAttack: needsAttack,
-      isFeint: move.type === "feint", // 只有虚招才显示虚招修正
+      isFeint: move.type === "feint",
       needsDamage: needsDamage,
-      isHeal: isHeal, // 传给模板，用于改变 Label (如 "伤害修正" -> "治疗修正")
-      isCounter: move.type === "counter",
+      isHeal: isHeal,
       canCrit: canCrit
     };
 
-    // 3. 渲染 HTML
     const content = await renderTemplate("systems/xjzl-system/templates/apps/roll-config.hbs", context);
 
-    // 4. 使用 DialogV2.wait
     return foundry.applications.api.DialogV2.wait({
       window: { title: `施展: ${move.name}`, icon: isHeal ? "fas fa-heart" : "fas fa-dice" },
       content: content,
 
-      // 使用 ID 查找，忽略回调参数
       render: (event) => {
         const root = document.getElementById(formId);
-        if (!root) return; // 安全检查
+        if (!root) return;
 
-        // 使用事件委托处理点击
+        // --- 动态显隐逻辑 ---
+        const refreshUI = () => {
+          const mType = root.querySelector('[name="overrideMoveType"]').value;
+          const dType = root.querySelector('[name="overrideDamageType"]').value;
+
+          // 辅助函数：强制设置显示/隐藏，防止 CSS !important 干扰
+          const setVisible = (el, isVisible, displayType = "block") => {
+            if (!el) return;
+            if (isVisible) {
+              el.style.removeProperty("display"); // 先移除，尝试恢复默认
+              el.style.setProperty("display", displayType, "important"); // 强制显示
+            } else {
+              el.style.setProperty("display", "none", "important"); // 强制隐藏
+            }
+          };
+
+          // 1. 虚招板块: 只有类型是 feint 才显示
+          const feintSection = root.querySelector('[data-section="feint"]');
+          setVisible(feintSection, mType === "feint", "block");
+
+          // 2. 攻击板块: 只有是外功/内功且不是反击 才显示
+          const needsAtk = (mType !== "counter") && ["waigong", "neigong"].includes(dType);
+          const atkSection = root.querySelector('[data-section="attack"]');
+          setVisible(atkSection, needsAtk, "block");
+
+          // 3. 暴击板块: 反击不能暴击
+          const critSection = root.querySelector('[data-section="crit"]');
+          setVisible(critSection, mType !== "counter", "flex");
+        };
+
+        // 绑定 Change 事件
+        root.querySelector('[name="overrideMoveType"]').addEventListener("change", refreshUI);
+        root.querySelector('[name="overrideDamageType"]').addEventListener("change", refreshUI);
+        // -------------------------
+        refreshUI();
+        // 点击计数器事件委托
         root.addEventListener("click", (event) => {
           const btn = event.target.closest("button[data-action]");
           if (!btn) return;
-
           event.preventDefault();
-
           const action = btn.dataset.action;
           const targetName = btn.dataset.target;
-
           const input = root.querySelector(`input[name="${targetName}"]`);
           if (!input) return;
-
           let val = parseInt(input.value) || 0;
-
           if (action === "increase") val++;
           else if (action === "decrease") val--;
-
           input.value = val;
         });
       },
@@ -1269,22 +1303,21 @@ export class XJZLItem extends Item {
         icon: "fas fa-check",
         default: true,
         callback: (event, button, dialog) => {
-          // 同样使用 ID 获取数据，绝对稳健
           const root = document.getElementById(formId);
-          if (!root) return {}; // 容错
+          if (!root) return {};
 
-          // 手动构建数据，不依赖 FormData 自动解析（因为 root 可能不是 form 标签，只是个 div）
-          // 但为了方便，我们可以临时构造 FormData 也是可以的，或者直接 querySelector
-
-          // 辅助取值函数
           const getVal = (name) => {
             const el = root.querySelector(`[name="${name}"]`);
             if (!el) return 0;
             if (el.type === "checkbox") return el.checked;
-            return el.value;
+            return el.value; // select 也是 value
           };
 
           return {
+            // 获取覆写的值
+            overrideMoveType: getVal("overrideMoveType"),
+            overrideDamageType: getVal("overrideDamageType"),
+
             bonusAttack: parseInt(getVal("bonusAttack")) || 0,
             bonusFeint: parseInt(getVal("bonusFeint")) || 0,
             bonusDamage: parseInt(getVal("bonusDamage")) || 0,
@@ -1296,7 +1329,6 @@ export class XJZLItem extends Item {
           };
         }
       }],
-
       rejectClose: false,
       close: () => null
     });
@@ -1322,19 +1354,55 @@ export class XJZLItem extends Item {
         return;
       }
 
-      const move = this.system.moves.find(m => m.id === moveId);
-      if (!move) {
-        ui.notifications.error("未找到招式数据。");
-        return;
-      }
+      const originalMove = this.system.moves.find(m => m.id === moveId);
+      if (!originalMove) { ui.notifications.error("未找到招式数据。"); return; }
 
-      // 提前定义 damageType，确保后续作用域可访问
-      // 如果选了 'none'，这里就是 'none'
-      const damageType = move.damageType || "waigong";
+      // 浅拷贝 move 对象
+      // 避免因为修改 move.type 而污染 Actor 身上存储的原始数据
+      // 我们在这个函数生命周期内使用的是这个副本
+      const move = { ...originalMove };
+
       // =====================================================
       // 0. 确定生效模式 (Effective Mode)
       // =====================================================
-      let effectiveMode = "attack"; // 默认为攻击 (Real/Feint/Counter)
+      // 预计算 effectiveMode 仅为了传给弹窗做初始显示
+      // (后面应用了 override 之后会重新判断一次逻辑)
+      let initialEffectiveMode = "attack";
+      if (move.type === "stance") initialEffectiveMode = "buff";
+      else if (move.type === "qi") {
+        const at = move.actionType || "default";
+        if (at === "heal") initialEffectiveMode = "heal";
+        else if (at === "attack") initialEffectiveMode = "attack";
+        else initialEffectiveMode = "buff"; //default视为buff
+      }
+
+      // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
+      // 保留 targets 仅用于记录 Chat Message 的 flags，不传给脚本
+      const targets = options.targets || Array.from(game.user.targets);
+      // === 玩家配置弹窗 (Dialog) ===
+      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0, isFree: false, isDesperate: false };
+      // 架招不需要弹窗，Buff类气招如果没选目标也不弹窗
+      // 但如果是 heal/attack 类气招，即使没选目标也可能需要弹窗调数值
+      const needsDialog = initialEffectiveMode !== "buff";
+
+      if (!options.skipDialog && needsDialog) {
+        const dialogResult = await this._promptRollConfiguration(move, initialEffectiveMode);
+        if (!dialogResult) return;
+        config = dialogResult;
+
+        // 应用配置覆写
+        // 如果弹窗返回了新的类型，覆盖当前副本的属性
+        if (config.overrideMoveType) move.type = config.overrideMoveType;
+        if (config.overrideDamageType) move.damageType = config.overrideDamageType;
+      }
+
+      // 重新定义 damageType，确保后续逻辑使用的是覆写后的值
+      const damageType = move.damageType || "waigong";
+
+      // =====================================================
+      // 0.5 重新确定生效模式 (Effective Mode) - 基于覆写后的 move.type
+      // =====================================================
+      let effectiveMode = "attack";
 
       if (move.type === "stance") {
         effectiveMode = "buff";
@@ -1343,7 +1411,7 @@ export class XJZLItem extends Item {
         const at = move.actionType || "default";
         if (at === "heal") effectiveMode = "heal";
         else if (at === "attack") effectiveMode = "attack";
-        else effectiveMode = "buff"; // default 视为 buff
+        else effectiveMode = "buff";
       }
 
       // =====================================================
@@ -1379,23 +1447,7 @@ export class XJZLItem extends Item {
       // =====================================================
       // 2. 准备上下文与目标
       // =====================================================
-      // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
-      // 保留 targets 仅用于记录 Chat Message 的 flags，不传给脚本
-      const targets = options.targets || Array.from(game.user.targets);
-
-      // === 玩家配置弹窗 (Dialog) ===
-      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0, isFree: false, isDesperate: false };
-
-      // 架招不需要弹窗，Buff类气招如果没选目标也不弹窗
-      // 但如果是 heal/attack 类气招，即使没选目标也可能需要弹窗调数值
-      const needsDialog = effectiveMode !== "buff";
-
-      if (!options.skipDialog && needsDialog) {
-        //  传入 effectiveMode
-        const dialogResult = await this._promptRollConfiguration(move, effectiveMode);
-        if (!dialogResult) return;
-        config = dialogResult;
-      }
+      //这一块的逻辑移动到了前面，因为我们现在允许修改招式类型，必须放到招式封锁前面才行
 
       // =====================================================
       // 3. 资源消耗检查 (Resource Check)
