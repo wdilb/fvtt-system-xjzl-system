@@ -1,7 +1,7 @@
 <div class="xjzl-cb-root">
-
     {{#if isLoaded}}
-    <!-- 1. 顶部 Tab 导航 -->
+
+    <!-- 1. 导航栏 -->
     <nav class="xjzl-cb-nav">
         {{#each tabs}}
         <button type="button" class="xjzl-cb-tab-btn {{#if (eq ../activeTab this.id)}}active{{/if}}"
@@ -10,69 +10,87 @@
         </button>
         {{/each}}
 
-        <!-- 刷新按钮 (靠右) -->
-        <button type="button" data-action="refresh" class="xjzl-cb-tab-btn" style="margin-left: auto;" title="重新读取索引">
+        <button type="button" data-action="refresh" class="xjzl-cb-tab-btn" style="margin-left: auto;" title="刷新数据">
             <i class="fas fa-sync-alt"></i>
         </button>
     </nav>
 
     <div class="xjzl-cb-body">
-        <!-- 2. 左侧：筛选器 (Phase 3 开发重点) -->
+
+        <!-- 2. 左侧筛选栏 -->
         <aside class="xjzl-cb-sidebar">
+            <!-- 搜索框 -->
+            <div class="xjzl-cb-search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" name="search" value="{{searchQuery}}" placeholder="搜索名称..." autocomplete="off">
+                {{#if searchQuery}}
+                <a data-action="resetFilters" title="清除"><i class="fas fa-times"></i></a>
+                {{/if}}
+            </div>
+
             <div class="xjzl-cb-filter-header">
-                <i class="fas fa-filter"></i> 筛选条件
+                <span><i class="fas fa-filter"></i> 筛选</span>
+                <a class="reset-link" data-action="resetFilters">重置</a>
             </div>
 
-            <!-- 这里暂时放一个搜索框 -->
-            <div class="form-group">
-                <label>名称搜索</label>
-                <input type="text" name="search" placeholder="输入名称..." disabled title="下一阶段实现"
-                    style="width:100%; background:#111; color:#fff; border:1px solid #444; padding:4px;">
-            </div>
-
-            <div class="xjzl-cb-placeholder">
-                <p>高级筛选功能<br>正在施工中...</p>
-                <p><i class="fas fa-wrench" style="font-size: 2em; color: #444;"></i></p>
+            <!-- 动态生成筛选器 -->
+            <div class="xjzl-cb-filters-list">
+                {{#each filterList}}
+                <div class="filter-group">
+                    <div class="filter-title">{{this.label}}</div>
+                    <div class="filter-options">
+                        {{#each this.options}}
+                        <label class="checkbox-label {{#if this.checked}}checked{{/if}}">
+                            <input type="checkbox" class="xjzl-filter-checkbox" data-filter="{{../key}}"
+                                value="{{this.val}}" {{checked this.checked}}>
+                            {{this.label}}
+                        </label>
+                        {{/each}}
+                    </div>
+                </div>
+                {{else}}
+                <p class="no-filters">当前分类无高级筛选</p>
+                {{/each}}
             </div>
         </aside>
 
-        <!-- 3. 右侧：结果展示 -->
+        <!-- 3. 右侧结果 -->
         <main class="xjzl-cb-content">
-            <!-- 统计条 -->
             <div class="xjzl-cb-stats-bar">
-                <span>
-                    共找到 <strong>{{totalCount}}</strong> 件物品
-                    {{#if isClipped}}
-                    <span style="color: #ff6400;">(为保障性能，仅显示前 {{displayCount}} 件，请使用筛选)</span>
-                    {{/if}}
+                <span>共找到 <strong>{{totalCount}}</strong> 件物品
+                    {{#if isClipped}}<span class="warning">(仅显示前 {{displayCount}} 件)</span>{{/if}}
                 </span>
             </div>
 
-            <!-- 物品网格 -->
             <div class="xjzl-cb-grid">
                 {{#each items}}
                 <div class="xjzl-cb-card" data-uuid="{{this.uuid}}" data-action="openSheet"
                     data-quality="{{this.system.quality}}" draggable="true"
                     data-drag-data='{ "type": "Item", "uuid": "{{this.uuid}}" }'>
 
-                    <img src="{{this.img}}" alt="{{this.name}}" />
-                    <div class="xjzl-cb-card-name">{{this.name}}</div>
-
-                    <!-- 如果有 Pack 来源，显示一下 -->
-                    {{#if this.packLabel}}
-                    <div class="xjzl-cb-pack-label">{{this.packLabel}}</div>
-                    {{/if}}
+                    <img src="{{this.img}}" loading="lazy" />
+                    <div class="xjzl-cb-card-info">
+                        <div class="name">{{this.name}}</div>
+                        {{#if this.packLabel}}
+                        <div class="source">{{this.packLabel}}</div>
+                        {{/if}}
+                    </div>
                 </div>
                 {{/each}}
+
+                {{#unless totalCount}}
+                <div class="no-results">
+                    <p>没有找到符合条件的物品。</p>
+                </div>
+                {{/unless}}
             </div>
         </main>
     </div>
 
     {{else}}
-    <!-- Loading 界面 -->
     <div class="xjzl-cb-loading">
-        <i class="fas fa-circle-notch fa-spin fa-3x" style="color: #ff6400;"></i>
-        <p>正在读取江湖图谱，请稍候...</p>
+        <i class="fas fa-circle-notch fa-spin fa-3x"></i>
+        <p>正在读取江湖图谱...</p>
     </div>
     {{/if}}
 </div>

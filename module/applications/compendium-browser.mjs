@@ -24,7 +24,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         this.isLoaded = false;
 
         // 内部 UI 状态
-        this.browserState  = {
+        this.browserState = {
             activeTab: "weapon", // 默认显示武器
             searchQuery: "",     // 搜索关键词
             filters: {}          // 预留给下一阶段
@@ -37,10 +37,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     static DEFAULT_OPTIONS = {
         tag: "div",
         id: "xjzl-compendium-browser",
-        classes: ["xjzl-window", "compendium-browser", "theme-dark"],
+        classes: ["compendium-browser", "theme-dark"],
         position: {
-            width: 900,
-            height: 700
+            width: 950,
+            height: 750
         },
         window: {
             title: "📖 江湖万卷阁",
@@ -51,7 +51,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             // 预留给后续 UI 交互
             refresh: XJZLCompendiumBrowser.prototype.refreshData,
             changeTab: XJZLCompendiumBrowser.prototype._onChangeTab,
-            openSheet: XJZLCompendiumBrowser.prototype._onOpenSheet
+            openSheet: XJZLCompendiumBrowser.prototype._onOpenSheet,
+            resetFilters: XJZLCompendiumBrowser.prototype._onResetFilters
         }
     };
 
@@ -98,6 +99,48 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         // --- 技艺书 (ArtBook) ---
         "system.artType"   // 技艺类型
     ];
+
+    /**
+     * 筛选器配置定义
+     * key: Tab ID
+     * filters: 数组，包含具体的筛选字段配置
+     */
+    get filterConfig() {
+        // 使用 getter 以便能动态读取 CONFIG.XJZL
+        const C = CONFIG.XJZL || {};
+
+        return {
+            weapon: [
+                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() },
+                { key: "type", label: "武器类型", type: "checkbox", options: C.weaponTypes || { sword: "剑", blade: "刀" } }
+            ],
+            armor: [
+                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() },
+                { key: "type", label: "部位", type: "checkbox", options: C.armorTypes || { head: "头部", top: "上装" } }
+            ],
+            consumable: [
+                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() },
+                { key: "type", label: "分类", type: "checkbox", options: C.consumableTypes || { medicine: "药品", food: "食物" } }
+            ],
+            wuxue: [
+                { key: "tier", label: "品阶", type: "checkbox", options: { 1: "人级", 2: "地级", 3: "天级" } },
+                { key: "element", label: "五行", type: "checkbox", options: { taiji: "太极", yin: "阴柔", yang: "阳刚" } },
+                { key: "sect", label: "门派", type: "checkbox", options: C.sects || { shaolin: "少林", wudang: "武当" } }
+            ],
+            neigong: [
+                { key: "tier", label: "品阶", type: "checkbox", options: { 1: "人级", 2: "地级", 3: "天级" } },
+                { key: "element", label: "五行", type: "checkbox", options: { taiji: "太极", yin: "阴柔", yang: "阳刚" } }
+            ],
+            // 其他 Tab 如果不需要特定筛选，可以留空
+            misc: [
+                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() }
+            ]
+        };
+    }
+
+    _getQualityOptions() {
+        return { 0: "凡品", 1: "良品", 2: "上品", 3: "极品", 4: "绝世" };
+    }
 
     /**
      * 数据加载函数
@@ -148,21 +191,77 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     }
 
     /* -------------------------------------------- */
-    /*  交互动作 (Actions)                          */
+    /*  事件处理 (Event Handlers)                   */
     /* -------------------------------------------- */
 
+    // 监听 Tab 切换：切换时重置筛选
     _onChangeTab(event, target) {
         const newTab = target.dataset.tab;
-        if (newTab && newTab !== this.browserState .activeTab) {
-            this.browserState .activeTab = newTab;
-            this.render(); // 重绘界面
+        if (newTab && newTab !== this.browserState.activeTab) {
+            this.browserState.activeTab = newTab;
+            this.browserState.searchQuery = ""; // 切换 Tab 清空搜索
+            this.browserState.filters = {};     // 切换 Tab 清空筛选
+            this.render();
         }
     }
 
-    async _onOpenSheet(event, target) {
-        const uuid = target.dataset.uuid;
-        const doc = await fromUuid(uuid);
-        if (doc) doc.sheet.render(true);
+    // 监听搜索框输入 (带防抖建议，这里简化直接处理)
+    _onSearch(event) {
+        event.preventDefault();
+        const input = event.target.value.trim();
+        if (input !== this.browserState.searchQuery) {
+            this.browserState.searchQuery = input;
+            this.render();
+        }
+    }
+
+    // 【新增】监听复选框变化
+    _onFilterChange(event) {
+        const target = event.target;
+        const filterKey = target.dataset.filter; // e.g., "type"
+        const value = target.value;              // e.g., "sword"
+        const isChecked = target.checked;
+
+        // 初始化该字段的 Set
+        if (!this.browserState.filters[filterKey]) {
+            this.browserState.filters[filterKey] = new Set();
+        }
+
+        if (isChecked) {
+            this.browserState.filters[filterKey].add(value);
+        } else {
+            this.browserState.filters[filterKey].delete(value);
+            // 如果空了，清理掉 key
+            if (this.browserState.filters[filterKey].size === 0) {
+                delete this.browserState.filters[filterKey];
+            }
+        }
+
+        this.render();
+    }
+
+    _onResetFilters() {
+        this.browserState.searchQuery = "";
+        this.browserState.filters = {};
+        this.render();
+    }
+
+    // 为了绑定 input 事件，我们需要覆盖 render 后的 hook
+    // AppV2 中使用 _onRender
+    _onRender(context, options) {
+        super._onRender(context, options);
+
+        // 绑定搜索框
+        const searchInput = this.element.querySelector("input[name='search']");
+        if (searchInput) {
+            searchInput.addEventListener("input", this._onSearch.bind(this));
+        }
+
+        // 绑定筛选复选框
+        const checkboxes = this.element.querySelectorAll(".xjzl-filter-checkbox");
+        checkboxes.forEach(cb => {
+            cb.addEventListener("change", this._onFilterChange.bind(this));
+        });
     }
 
     /* -------------------------------------------- */
@@ -170,34 +269,86 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /* -------------------------------------------- */
 
     async _prepareContext(options) {
-        const activeTab = this.browserState .activeTab;
+        const activeTab = this.browserState.activeTab;
+        const rawItems = this.cachedData[activeTab] || [];
 
-        // 获取当前 Tab 的所有物品
-        let items = this.cachedData[activeTab] || [];
+        // 1. 执行过滤
+        const filteredItems = this._filterItems(rawItems);
 
-        // --- 简单的预处理 ---
-        // (下一阶段我们会在这里加入复杂的 filterItems 逻辑)
+        // 2. 分页/裁剪 (性能优化)
+        const totalCount = filteredItems.length;
+        const displayLimit = 100; // 调小一点，保证 UI 响应速度
+        const displayItems = filteredItems.slice(0, displayLimit);
 
-        // 性能保护：如果还没筛选，且数量超过 200，只显示前 200 个
-        // 防止一次性渲染几千个 DOM 卡死
-        const totalCount = items.length;
-        const displayLimit = 200;
-        const isClipped = items.length > displayLimit;
+        // 3. 准备筛选器 UI 数据
+        // 我们需要把当前的选中状态传给 handlebars
+        const currentFilters = this.browserState.filters;
+        const filterConfigs = this.filterConfig[activeTab] || [];
 
-        if (isClipped) {
-            items = items.slice(0, displayLimit);
-        }
+        // 处理配置，加上 isChecked 状态
+        const filtersUI = filterConfigs.map(config => {
+            const activeSet = currentFilters[config.key];
+            const options = Object.entries(config.options).map(([val, label]) => {
+                return {
+                    val,
+                    label,
+                    checked: activeSet ? activeSet.has(val.toString()) : false
+                };
+            });
+            return { ...config, options };
+        });
 
         return {
             isLoaded: this.isLoaded,
             tabs: XJZLCompendiumBrowser.TABS,
             activeTab: activeTab,
-            items: items,
+            items: displayItems, // 只传裁剪后的
             totalCount: totalCount,
-            displayCount: items.length,
-            isClipped: isClipped,
-            // 传递品质枚举给前端做颜色区分 (可选)
-            qualities: { 0: "common", 1: "uncommon", 2: "rare", 3: "epic", 4: "legendary" }
+            displayCount: displayItems.length,
+            isClipped: totalCount > displayLimit,
+            searchQuery: this.browserState.searchQuery,
+            filterList: filtersUI // 传递给左侧栏
         };
+    }
+
+    /**
+     * 内存过滤逻辑
+     */
+    _filterItems(items) {
+        const query = this.browserState.searchQuery.toLowerCase();
+        const filters = this.browserState.filters; // Object of Sets
+
+        return items.filter(item => {
+            const system = item.system;
+
+            // 1. 搜索词匹配 (匹配 名称 或 描述)
+            if (query) {
+                // 如果描述存在且为字符串，也纳入搜索；否则只搜名字
+                const desc = (typeof system.description === 'string') ? system.description : "";
+                if (!item.name.toLowerCase().includes(query) /*&& !desc.includes(query)*/) {
+                    return false;
+                }
+            }
+
+            // 2. 动态条件匹配
+            // filters 结构: { "quality": Set(2) { "3", "4" }, "type": Set(1) { "sword" } }
+            for (const [key, activeSet] of Object.entries(filters)) {
+                if (!activeSet || activeSet.size === 0) continue;
+
+                // 从 item.system 中取值
+                // 注意：我们的 index 只索引了 item.system.*，所以直接取 system[key]
+                let itemValue = system[key];
+
+                // 特殊处理：有些值可能是数字，Set 里存的是字符串，需要转换比较
+                if (itemValue === undefined || itemValue === null) return false; // 没这个属性直接过滤掉
+
+                // 简单转为 string 比较
+                if (!activeSet.has(itemValue.toString())) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
     }
 }
