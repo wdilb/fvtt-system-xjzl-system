@@ -112,8 +112,8 @@ const processMoves = (rawMoves, bookReqs = "", defaultTier = null) => {
             img: m.img || "icons/svg/sword.svg",
             type: m.type || "real", // real, feint, qi, stance, counter
             element: m.element || "none", // taiji, yin, yang...
-            damageType: m.damageType || "waigong",
-            weaponType: m.weaponType || "unarmed",
+            damageType: m.damageType || "none",
+            weaponType: m.weaponType || "none",
 
             // 2. 描述与显示
             description: m.description || "",
