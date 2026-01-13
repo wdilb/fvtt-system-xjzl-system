@@ -60,7 +60,7 @@
                             "label": "提按端挤",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst healAmount = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ amount: healAmount, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });"
+                            "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst totalHeal = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ amount: totalHeal, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
                         }
                     ]
                 },
@@ -250,16 +250,19 @@
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 2,
-            "description": "百草阁回春绝技，施展时如春风化雨，润泽心田。",
+            "description": "<p>百草阁回春绝技，施展时如春风化雨，润泽心田。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
             "requirements": "徒手",
             "moves": [
                 {
                     "name": "好雨知时节",
                     "type": "qi",
                     "actionType": "heal",
-                    "range": "1",
-                    "description": "主要动作，雪中送炭，封住伤患之处，减轻伤势，回复目标 0.4 内息点气血。（无法造成暴击）<br>·每有一级[疗伤]，提高 1 点气血回复。",
-                    "automationNote": "完全自动化：基于施法者内息和疗伤技能计算回复量。",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>雪中送炭，封住伤患之处，减轻伤势，回复目标气血。（无法造成暴击）</p><p>·每有一级[疗伤]，提高 1 点气血回复。</p><p><strong>升级：</strong>增加 10 点气血回复，内力消耗+2。</p>",
+                    "automationNote": "完全自动化：使用脚本计算内息和疗伤加成。",
                     "costs": {
                         "mp": [
                             2,
@@ -269,14 +272,15 @@
                         ]
                     },
                     "calculation": {
-                        "base": 0
+                        "base": 0,
+                        "growth": 0
                     },
                     "scripts": [
                         {
-                            "label": "好雨知时节",
+                            "label": "治疗计算",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\n// 基础 + 升级\nconst flatBonus = (lvl - 1) * 10;\n\n// 公式: 0.4 * 内息 + 疗伤 + 升级加值\nconst healAmount = Math.floor(0.4 * neixi) + liaoshang + flatBonus;\n\nawait args.target.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });"
+                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\n// 升级加成: Lv1=0, Lv2=10\nconst growthBonus = (lvl - 1) * 10;\n\n// 公式: 0.4 * 内息 + 疗伤 + 升级加值\nconst totalHeal = Math.floor(0.4 * neixi) + liaoshang + growthBonus;\n\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
                         }
                     ]
                 },
@@ -284,9 +288,12 @@
                     "name": "当春乃发生",
                     "type": "qi",
                     "actionType": "default",
-                    "range": "1",
-                    "description": "主要动作，左手状若拈花，右手指尖连点，给目标添加“春雨”状态，持续到战斗脱离。<br>春雨：下次出招时，提升 0.4 内息点伤害。<br>·此招中的内息是施展本招式者的内息属性。",
-                    "automationNote": "完全自动化：快照施法者内息，创建携带增伤脚本的 Buff。",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>左手状若拈花，右手指尖连点，给目标添加“春雨”状态，持续到战斗脱离。</p><p><strong>春雨：</strong>下次出招时，提升伤害。</p><p>·此招中的内息是施展本招式者的内息属性。</p><p><strong>升级：</strong>春雨的伤害增加 10 点。内力消耗+2。</p>",
+                    "automationNote": "完全自动化：快照施法者属性，赋予一次性增伤Buff。",
                     "costs": {
                         "mp": [
                             2,
@@ -297,19 +304,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "当春乃发生",
+                            "label": "施加春雨",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\n\nconst flatBonus = (lvl - 1) * 10;\nconst damageBoost = Math.floor(0.4 * neixi) + flatBonus;\n\n// 动态创建特效\nconst effectData = {\n    name: \"春雨\",\n    icon: args.item.img,\n    description: `下次出招伤害 +${damageBoost}`,\n    flags: { \"xjzl-system\": { \"stackable\": true } }, // 允许叠加\n    changes: [] // 数值通过脚本实现\n};\n\n// 将脚本直接注入到 AE 中\n// 这个脚本在 CALC 阶段运行，增加伤害，并删除自身 (一次性)\neffectData.flags[\"xjzl-system\"].scripts = [{\n    label: \"春雨增伤\",\n    trigger: \"calc\",\n    active: true,\n    script: `\n        args.output.damage += ${damageBoost};\n        args.output.bonusDesc.push(\"春雨 +${damageBoost}\");\n        // 下次出招消耗掉\n        await thisEffect.delete();\n    `\n}];\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\n\n// 升级加成\nconst growthBonus = (lvl - 1) * 10;\n// 伤害加成: 0.4 * 内息 + 升级\nconst damageBoost = Math.floor(0.4 * neixi) + growthBonus;\n\n// 动态创建特效\nconst effectData = {\n    name: \"春雨\",\n    icon: args.item.img,\n    description: `下次出招伤害 +${damageBoost}`,\n    flags: { \"xjzl-system\": { \"stackable\": true } },\n    changes: []\n};\n\n// 注入一次性增伤脚本\neffectData.flags[\"xjzl-system\"].scripts = [{\n    label: \"春雨生效\",\n    trigger: \"calc\",\n    active: true,\n    script: `\n        args.output.damage += ${damageBoost};\n        args.output.bonusDesc.push(\"春雨 +${damageBoost}\");\n        await thisEffect.delete();\n    `\n}];\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ]
                 },
                 {
                     "name": "随风潜入夜",
                     "type": "stance",
+                    "weaponType": "unarmed",
                     "range": "自身",
-                    "description": "次要动作，双手如绵绵细雨般展开，开启架招。获得“随风潜入夜”，持续到脱战或被击破架招。<br>随风潜入夜：5 米范围内的队友每次进行残疾检定时，获得 1 点怒气。",
-                    "automationNote": "手动：开启架招后，请提醒队友在进行残疾检定时手动增加怒气。",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双手如绵绵细雨般展开，开启架招。获得“随风潜入夜”，持续到脱战或被击破架招。</p><p><strong>随风潜入夜：</strong>5 米范围内的队友每次进行残疾检定时，获得 1 点怒气。</p><p><strong>升级：</strong>格挡值+10，随风潜入夜的范围提高 5 米，内力消耗+2。</p>",
+                    "automationNote": "范围与怒气回复需手动处理。",
                     "costs": {
                         "mp": [
                             2,
@@ -319,7 +329,7 @@
                         ]
                     },
                     "calculation": {
-                        "base": 10,
+                        "base": 0,
                         "growth": 10
                     },
                     "scripts": []
@@ -329,9 +339,12 @@
                     "type": "qi",
                     "isUltimate": true,
                     "actionType": "heal",
-                    "range": "5",
-                    "description": "蓄力动作，体内内力迸发，如春雨般滋润万物。为周围队友回复 0.4 内息点气血。（无法造成暴击）<br>·每有一级[疗伤]，提高 1 点气血回复。",
-                    "automationNote": "完全自动化：需手动选中所有目标。",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>体内内力迸发，如春雨般滋润万物。为周围队友回复气血。（无法造成暴击）</p><p>·每有一级[疗伤]，提高 1 点气血回复。</p><p><strong>升级：</strong>回复气血+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "完全自动化：需手动选中所有受益目标。",
                     "costs": {
                         "mp": [
                             8,
@@ -346,12 +359,16 @@
                             4
                         ]
                     },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "scripts": [
                         {
-                            "label": "润物细无声",
+                            "label": "群体治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\nconst flatBonus = (lvl - 1) * 20;\n\nconst healAmount = Math.floor(0.4 * neixi) + liaoshang + flatBonus;\n\nawait args.target.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });"
+                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\n// 升级加成: Lv1=0, Lv2=20\nconst growthBonus = (lvl - 1) * 20;\n\nconst totalHeal = Math.floor(0.4 * neixi) + liaoshang + growthBonus;\n\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
                         }
                     ]
                 }
@@ -636,7 +653,7 @@
                             "label": "疗伤与加势",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 获取目标\nconst targets = Array.from(game.user.targets).map(t => t.actor);\nif (targets.length === 0) return ui.notifications.warn('未选择目标');\n\n// 1. 医术检定\nconst roll = await actor.rollAttributeTest('yishu', { dc: 15 });\nif (roll.total >= 15) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const healAmount = roll.total + (lvl - 1) * 5;\n    \n    for (const t of targets) {\n        // 应用治疗\n        await t.applyHealing({ amount: healAmount, type: 'hp', showScrolling: true });\n        await t.applyHealing({ amount: healAmount, type: 'mp', showScrolling: true });\n        \n        // 2. 添加 X势\n        const weapon = t.itemTypes.weapon.find(w => w.system.equipped);\n        if (weapon) {\n            const wType = weapon.system.type;\n            const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType]);\n            const effectData = {\n                name: `${wLabel}势`,\n                icon: 'icons/svg/upgrade.svg',\n                description: `使用${wLabel}时命中+10`,\n                changes: [\n                    { key: `system.combat.hit_waigong`, mode: 2, value: 10 }\n                ],\n                flags: { 'xjzl-system': { stackable: true } }\n            };\n            await game.xjzl.api.effects.addEffect(t, effectData);\n        }\n    }\n    ui.notifications.info(`医术检定成功！回复 ${healAmount} 点。`);\n} else {\n    ui.notifications.warn('医术检定失败。');\n}\nargs.flags.autoApplied = true;"
+                            "script": "// 获取目标\nconst targets = Array.from(game.user.targets).map(t => t.actor);\nif (targets.length === 0) return ui.notifications.warn('未选择目标');\n\n// 1. 医术检定\nconst roll = await actor.rollAttributeTest('yishu', { dc: 15 });\nif (roll.total >= 15) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const totalHeal = roll.total + (lvl - 1) * 5;\n    \n    for (const t of targets) {\n        // 应用治疗\n        await t.applyHealing({ amount: totalHeal, type: 'hp', showScrolling: true });\n        await t.applyHealing({ amount: totalHeal, type: 'mp', showScrolling: true });\n        \n        // 2. 添加 X势\n        const weapon = t.itemTypes.weapon.find(w => w.system.equipped);\n        if (weapon) {\n            const wType = weapon.system.type;\n            const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType]);\n            const effectData = {\n                name: `${wLabel}势`,\n                icon: 'icons/svg/upgrade.svg',\n                description: `使用${wLabel}时命中+10`,\n                changes: [\n                    { key: `system.combat.hit_waigong`, mode: 2, value: 10 }\n                ],\n                flags: { 'xjzl-system': { stackable: true } }\n            };\n            await game.xjzl.api.effects.addEffect(t, effectData);\n        }\n    }\n    ui.notifications.info(`医术检定成功！回复 ${totalHeal} 点。`);\n} else {\n    ui.notifications.warn('医术检定失败。');\n}\nargs.flags.autoApplied = true;"
                         }
                     ]
                 },
@@ -747,101 +764,101 @@
         }
     },
     {
-    "name": "颐养生机",
-    "type": "wuxue",
-    "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-    "system": {
-        "category": "sanshou",
-        "sect": "baicaoge",
-        "tier": 1,
-        "description": "<p>百草谷环境怡人，是调养身体绝佳之地，即便无病在此居住，亦可增强体质、预防疾病。重病伤残之人，可前来花费一定时间金钱疗养，恢复健康。</p>",
-        "moves": [
-            {
-                "name": "颐养生机",
-                "type": "qi",
-                "range": "特殊",
-                "tier": 1,
-                "description": "<p>百草谷环境怡人，是调养身体绝佳之地，即便无病在此居住，亦可增强体质、预防疾病。重病伤残之人，可前来花费一定时间金钱疗养，恢复健康。<br>·你可以将病人带往百草阁治疗残疾，你治疗目标期间，不可离开百草阁，治疗完成后，百草阁收取诊金的 10%会作为奖励给予你。<br>升级：疗程时间缩短 25%，诊金价格提升 20%。</p>",
-                "automationNote": "完全手动，RP向技能。",
-                "weaponType": "none"
-            }
-        ]
-    }
-},
-{
-    "name": "八脉交会",
-    "type": "wuxue",
-    "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-    "system": {
-        "category": "sanshou",
-        "sect": "baicaoge",
-        "tier": 2,
-        "description": "<p>你明了自身十二正经、奇经八脉的所有经络走向和要穴位置，并知晓正经奇经相交的八个穴位。</p>",
-        "moves": [
-            {
-                "name": "八脉交会",
-                "type": "qi",
-                "range": "自身",
-                "tier": 2,
-                "requirements": "《博脉心法》修炼圆满",
-                "description": "<p>你明了自身十二正经、奇经八脉的所有经络走向和要穴位置，并知晓正经奇经相交的八个穴位（称为交经八穴）。<br>·在你打通十二正经后，可以进行休整并花费 1000 修为，直接开启该经脉上的交经八穴，并获得与对应奇经八脉循环相通的属性加成。<br>·交经八穴并非武道穴位，不可服食奇珍。<br>·若你已同时打通交经八穴连通的正经和奇经，则无需休整和修为，直接开启该穴位。<br>后溪穴：自由属性+5<br>列缺穴：自由属性+5<br>公孙穴：气血上限+20<br>足临泣穴：格挡值+10<br>外关穴：施展阳、刚属性武学，招式伤害+5<br>内关穴：施展阴、柔属性武学，招式伤害+5<br>申脉穴：速度+2<br>照海穴：先攻+2<br>升级：开启交经八穴所需修为减少 500。</p>",
-                "automationNote": "请玩家使用手动修正器去修正属性。",
-                "weaponType": "none"
-            }
-        ]
-    }
-},
-{
-    "name": "开脉针法",
-    "type": "wuxue",
-    "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-    "system": {
-        "category": "sanshou",
-        "sect": "baicaoge",
-        "tier": 2,
-        "description": "<p>百草阁弟子以自身为本，以针渡人，你可以灌注内力辅助他人打通十二正经。</p>",
-        "moves": [
-            {
-                "name": "开脉针法",
-                "type": "qi",
-                "range": "接触",
-                "tier": 2,
-                "description": "<p>百草阁弟子以自身为本，以针渡人，你可以灌注内力辅助他人打通十二正经。<br>通经<br>花费休整，为目标配置药浴，等其洗沐过后，施针帮助目标打通一条经脉（无需对方修炼内功）。<br>·药浴所需的药材非常昂贵，需大量银两采买。<br>·你只能帮助对方打通自己已经打通的经脉，且双方都需要耗费修为，尤其是施针之人。<br>消耗银两和修为如下：<br>通脉<br>花费休整和 1000 修为，将目标一条经脉中服食的奇珍挑散，目标失去该奇珍效果。<br>升级：通经中药浴的花费减少 20%。</p>",
-                "automationNote": "完全手动处理资源消耗和经脉开启。",
-                "weaponType": "none"
-            }
-        ]
-    }
-},
-{
-    "name": "尝百草",
-    "type": "wuxue",
-    "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-    "system": {
-        "category": "sanshou",
-        "sect": "baicaoge",
-        "tier": 3,
-        "description": "<p>百草阁弟子秉持炎帝之志，跋山涉水，行遍大地，每遇自身未见过之根、茎、叶、花、果亦或是药物毒药，皆口尝而身试之。</p>",
-        "moves": [
-            {
-                "name": "尝百草",
-                "type": "qi",
-                "range": "自身",
-                "tier": 3,
-                "requirements": "《神农本草功》修炼圆满",
-                "description": "<p>百草阁弟子秉持炎帝之志，跋山涉水，行遍大地，每遇自身未见过之根、茎、叶、花、果亦或是药物毒药，皆口尝而身试之，来辨别药性，并详细记载流传。<br>辨药<br>你可以通过小心地触摸、嗅闻、舔舐来辨别一种药物或毒药的作用，不会影响该药的药性，自身也不会受到该药的效果影响。<br>·制作经过辨药的药物或毒药时，检定结果+1。<br>入药<br>你每制作成功一种新的药物或毒药，获得一层“百草”，至多一百层，不会被其他效果移除。<br>百草：每层使你的气血、内力上限+1。<br>化药<br>类型：气招<br>距离：1<br>消耗：100<br>花费小憩，你盘坐并口服一种药物或毒药，获得相应效果，同时消耗 100 点内力吸取药力存于丹田，你获得“化药-药物名称”状态，持续一天。<br>化药-药物名称：当你对距离 1 米的贴身目标出招时，可以移除此状态，内力化药，灌注入目标体内，目标视作口服了该种药物或毒药。<br>升级：辨药的检定结果+1，化药消耗的内力-30。</p>",
-                "automationNote": "完全手动。请玩家自行记录“百草”层数并手动修正属性。化药效果请手动处理。",
-                "weaponType": "none",
-                "costs": {
-                    "mp": [
-                        100,
-                        100,
-                        100,
-                        100
-                    ]
+        "name": "颐养生机",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "baicaoge",
+            "tier": 1,
+            "description": "<p>百草谷环境怡人，是调养身体绝佳之地，即便无病在此居住，亦可增强体质、预防疾病。重病伤残之人，可前来花费一定时间金钱疗养，恢复健康。</p>",
+            "moves": [
+                {
+                    "name": "颐养生机",
+                    "type": "qi",
+                    "range": "特殊",
+                    "tier": 1,
+                    "description": "<p>百草谷环境怡人，是调养身体绝佳之地，即便无病在此居住，亦可增强体质、预防疾病。重病伤残之人，可前来花费一定时间金钱疗养，恢复健康。<br>·你可以将病人带往百草阁治疗残疾，你治疗目标期间，不可离开百草阁，治疗完成后，百草阁收取诊金的 10%会作为奖励给予你。<br>升级：疗程时间缩短 25%，诊金价格提升 20%。</p>",
+                    "automationNote": "完全手动，RP向技能。",
+                    "weaponType": "none"
                 }
-            }
-        ]
+            ]
+        }
+    },
+    {
+        "name": "八脉交会",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "baicaoge",
+            "tier": 2,
+            "description": "<p>你明了自身十二正经、奇经八脉的所有经络走向和要穴位置，并知晓正经奇经相交的八个穴位。</p>",
+            "moves": [
+                {
+                    "name": "八脉交会",
+                    "type": "qi",
+                    "range": "自身",
+                    "tier": 2,
+                    "requirements": "《博脉心法》修炼圆满",
+                    "description": "<p>你明了自身十二正经、奇经八脉的所有经络走向和要穴位置，并知晓正经奇经相交的八个穴位（称为交经八穴）。<br>·在你打通十二正经后，可以进行休整并花费 1000 修为，直接开启该经脉上的交经八穴，并获得与对应奇经八脉循环相通的属性加成。<br>·交经八穴并非武道穴位，不可服食奇珍。<br>·若你已同时打通交经八穴连通的正经和奇经，则无需休整和修为，直接开启该穴位。<br>后溪穴：自由属性+5<br>列缺穴：自由属性+5<br>公孙穴：气血上限+20<br>足临泣穴：格挡值+10<br>外关穴：施展阳、刚属性武学，招式伤害+5<br>内关穴：施展阴、柔属性武学，招式伤害+5<br>申脉穴：速度+2<br>照海穴：先攻+2<br>升级：开启交经八穴所需修为减少 500。</p>",
+                    "automationNote": "请玩家使用手动修正器去修正属性。",
+                    "weaponType": "none"
+                }
+            ]
+        }
+    },
+    {
+        "name": "开脉针法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "baicaoge",
+            "tier": 2,
+            "description": "<p>百草阁弟子以自身为本，以针渡人，你可以灌注内力辅助他人打通十二正经。</p>",
+            "moves": [
+                {
+                    "name": "开脉针法",
+                    "type": "qi",
+                    "range": "接触",
+                    "tier": 2,
+                    "description": "<p>百草阁弟子以自身为本，以针渡人，你可以灌注内力辅助他人打通十二正经。<br>通经<br>花费休整，为目标配置药浴，等其洗沐过后，施针帮助目标打通一条经脉（无需对方修炼内功）。<br>·药浴所需的药材非常昂贵，需大量银两采买。<br>·你只能帮助对方打通自己已经打通的经脉，且双方都需要耗费修为，尤其是施针之人。<br>消耗银两和修为如下：<br>通脉<br>花费休整和 1000 修为，将目标一条经脉中服食的奇珍挑散，目标失去该奇珍效果。<br>升级：通经中药浴的花费减少 20%。</p>",
+                    "automationNote": "完全手动处理资源消耗和经脉开启。",
+                    "weaponType": "none"
+                }
+            ]
+        }
+    },
+    {
+        "name": "尝百草",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "baicaoge",
+            "tier": 3,
+            "description": "<p>百草阁弟子秉持炎帝之志，跋山涉水，行遍大地，每遇自身未见过之根、茎、叶、花、果亦或是药物毒药，皆口尝而身试之。</p>",
+            "moves": [
+                {
+                    "name": "尝百草",
+                    "type": "qi",
+                    "range": "自身",
+                    "tier": 3,
+                    "requirements": "《神农本草功》修炼圆满",
+                    "description": "<p>百草阁弟子秉持炎帝之志，跋山涉水，行遍大地，每遇自身未见过之根、茎、叶、花、果亦或是药物毒药，皆口尝而身试之，来辨别药性，并详细记载流传。<br>辨药<br>你可以通过小心地触摸、嗅闻、舔舐来辨别一种药物或毒药的作用，不会影响该药的药性，自身也不会受到该药的效果影响。<br>·制作经过辨药的药物或毒药时，检定结果+1。<br>入药<br>你每制作成功一种新的药物或毒药，获得一层“百草”，至多一百层，不会被其他效果移除。<br>百草：每层使你的气血、内力上限+1。<br>化药<br>类型：气招<br>距离：1<br>消耗：100<br>花费小憩，你盘坐并口服一种药物或毒药，获得相应效果，同时消耗 100 点内力吸取药力存于丹田，你获得“化药-药物名称”状态，持续一天。<br>化药-药物名称：当你对距离 1 米的贴身目标出招时，可以移除此状态，内力化药，灌注入目标体内，目标视作口服了该种药物或毒药。<br>升级：辨药的检定结果+1，化药消耗的内力-30。</p>",
+                    "automationNote": "完全手动。请玩家自行记录“百草”层数并手动修正属性。化药效果请手动处理。",
+                    "weaponType": "none",
+                    "costs": {
+                        "mp": [
+                            100,
+                            100,
+                            100,
+                            100
+                        ]
+                    }
+                }
+            ]
+        }
     }
-}
 ]
