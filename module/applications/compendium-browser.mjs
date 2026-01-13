@@ -95,6 +95,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         "system.sect",     // 门派
         "system.element",  // 五行属性
         "system.category", // 武学分类 (武学/轻功/阵法)
+        "system.damageType", // 伤害类型
 
         // --- 技艺书 (ArtBook) ---
         "system.artType"   // 技艺类型
@@ -106,40 +107,52 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
      * filters: 数组，包含具体的筛选字段配置
      */
     get filterConfig() {
-        // 使用 getter 以便能动态读取 CONFIG.XJZL
-        const C = CONFIG.XJZL || {};
+        const C = CONFIG.XJZL;
+
+        const elementOptions = {
+            taiji: "太极",
+            yin: "阴",
+            yang: "阳",
+            gang: "刚",
+            rou: "柔",
+            none: "无"
+        };
 
         return {
             weapon: [
-                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() },
-                { key: "type", label: "武器类型", type: "checkbox", options: C.weaponTypes || { sword: "剑", blade: "刀" } }
+                { key: "type", label: "武器类型", type: "checkbox", options: C.weaponTypes },
+                { key: "quality", label: "品质", type: "checkbox", options: C.qualities },
             ],
             armor: [
-                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() },
-                { key: "type", label: "部位", type: "checkbox", options: C.armorTypes || { head: "头部", top: "上装" } }
+                { key: "type", label: "防具部位", type: "checkbox", options: C.armorTypes },
+                { key: "quality", label: "品质", type: "checkbox", options: C.qualities }
             ],
             consumable: [
-                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() },
-                { key: "type", label: "分类", type: "checkbox", options: C.consumableTypes || { medicine: "药品", food: "食物" } }
+                { key: "type", label: "分类", type: "checkbox", options: C.consumableTypes },
+                { key: "quality", label: "品质", type: "checkbox", options: C.qualities }
+            ],
+            misc: [
+                { key: "quality", label: "品质", type: "checkbox", options: C.qualities }
+            ],
+            qizhen: [
+                { key: "quality", label: "品质", type: "checkbox", options: C.qualities }
             ],
             wuxue: [
-                { key: "tier", label: "品阶", type: "checkbox", options: { 1: "人级", 2: "地级", 3: "天级" } },
-                { key: "element", label: "五行", type: "checkbox", options: { taiji: "太极", yin: "阴柔", yang: "阳刚" } },
-                { key: "sect", label: "门派", type: "checkbox", options: C.sects || { shaolin: "少林", wudang: "武当" } }
+                { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
+                { key: "category", label: "武学类别", type: "checkbox", options: C.wuxueCategories },
+                { key: "tier", label: "武学品阶", type: "checkbox", options: C.tiers },
+                { key: "element", label: "武学属性", type: "checkbox", options: elementOptions },
+                { key: "damageType", label: "伤害类型", type: "checkbox", options: C.damageTypes }
             ],
             neigong: [
-                { key: "tier", label: "品阶", type: "checkbox", options: { 1: "人级", 2: "地级", 3: "天级" } },
-                { key: "element", label: "五行", type: "checkbox", options: { taiji: "太极", yin: "阴柔", yang: "阳刚" } }
+                { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
+                { key: "tier", label: "内功品阶", type: "checkbox", options: C.tiers },
+                { key: "element", label: "内功属性", type: "checkbox", options: elementOptions }
             ],
-            // 其他 Tab 如果不需要特定筛选，可以留空
-            misc: [
-                { key: "quality", label: "品质", type: "checkbox", options: this._getQualityOptions() }
+            art_book: [
+                { key: "artType", label: "技艺类型", type: "checkbox", options: C.arts }
             ]
         };
-    }
-
-    _getQualityOptions() {
-        return { 0: "凡品", 1: "良品", 2: "上品", 3: "极品", 4: "绝世" };
     }
 
     /**
@@ -275,42 +288,56 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         // 1. 执行过滤
         const filteredItems = this._filterItems(rawItems);
 
-        // 2. 分页/裁剪 (性能优化)
+        // 2. 分页/裁剪
         const totalCount = filteredItems.length;
-        const displayLimit = 100; // 调小一点，保证 UI 响应速度
+        const displayLimit = 100;
         const displayItems = filteredItems.slice(0, displayLimit);
 
         // 3. 准备筛选器 UI 数据
-        // 我们需要把当前的选中状态传给 handlebars
         const currentFilters = this.browserState.filters;
         const filterConfigs = this.filterConfig[activeTab] || [];
 
-        // 处理配置，加上 isChecked 状态
+        // 在这里进行本地化翻译
         const filtersUI = filterConfigs.map(config => {
             const activeSet = currentFilters[config.key];
-            const options = Object.entries(config.options).map(([val, label]) => {
+
+            // 将 options 对象转换为数组，并翻译 label
+            const options = Object.entries(config.options).map(([val, labelKey]) => {
                 return {
-                    val,
-                    label,
+                    val: val,
+                    // 如果 labelKey 是本地化字符串，翻译它；否则直接显示 (兼容硬编码)
+                    label: game.i18n.localize(labelKey),
                     checked: activeSet ? activeSet.has(val.toString()) : false
                 };
             });
+
+            // 如果想让选项按中文首字母排序，可以在这里 .sort()
+            // options.sort((a, b) => a.label.localeCompare(b.label, "zh"));
+
             return { ...config, options };
         });
+
+        // 4. 传递品质枚举给前端 (用于颜色类名)
+        const qualityMap = {};
+        if (CONFIG.XJZL.qualities) {
+            for (const [k, v] of Object.entries(CONFIG.XJZL.qualities)) {
+                qualityMap[k] = game.i18n.localize(v);
+            }
+        }
 
         return {
             isLoaded: this.isLoaded,
             tabs: XJZLCompendiumBrowser.TABS,
             activeTab: activeTab,
-            items: displayItems, // 只传裁剪后的
+            items: displayItems,
             totalCount: totalCount,
             displayCount: displayItems.length,
             isClipped: totalCount > displayLimit,
             searchQuery: this.browserState.searchQuery,
-            filterList: filtersUI // 传递给左侧栏
+            filterList: filtersUI,
+            qualities: qualityMap
         };
     }
-
     /**
      * 内存过滤逻辑
      */
