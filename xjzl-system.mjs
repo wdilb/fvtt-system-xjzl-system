@@ -555,7 +555,6 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
 /**
  * 渲染物品目录侧边栏钩子
  * 用于注入 "江湖万卷阁" 按钮
- * 修复：V13 使用原生 HTMLElement，不再支持 jQuery 的 .find()
  */
 Hooks.on("renderItemDirectory", (app, html, data) => {
   // 1. V13 兼容性处理：确保获取原生 DOM 元素

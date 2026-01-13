@@ -24,7 +24,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         this.isLoaded = false;
 
         // 内部 UI 状态
-        this.state = {
+        this.browserState  = {
             activeTab: "weapon", // 默认显示武器
             searchQuery: "",     // 搜索关键词
             filters: {}          // 预留给下一阶段
@@ -153,8 +153,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
     _onChangeTab(event, target) {
         const newTab = target.dataset.tab;
-        if (newTab && newTab !== this.state.activeTab) {
-            this.state.activeTab = newTab;
+        if (newTab && newTab !== this.browserState .activeTab) {
+            this.browserState .activeTab = newTab;
             this.render(); // 重绘界面
         }
     }
@@ -170,7 +170,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /* -------------------------------------------- */
 
     async _prepareContext(options) {
-        const activeTab = this.state.activeTab;
+        const activeTab = this.browserState .activeTab;
 
         // 获取当前 Tab 的所有物品
         let items = this.cachedData[activeTab] || [];
