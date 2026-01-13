@@ -22,6 +22,13 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         // 标记是否已加载
         this.isLoaded = false;
+
+        // 内部 UI 状态
+        this.state = {
+            activeTab: "weapon", // 默认显示武器
+            searchQuery: "",     // 搜索关键词
+            filters: {}          // 预留给下一阶段
+        };
     }
 
     /**
@@ -32,17 +39,19 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         id: "xjzl-compendium-browser",
         classes: ["xjzl-window", "compendium-browser", "theme-dark"],
         position: {
-            width: 800,
+            width: 900,
             height: 700
         },
         window: {
-            title: "📖 江湖万卷楼 (合集浏览器)",
+            title: "📖 江湖万卷阁",
             icon: "fas fa-book-open",
             resizable: true
         },
         actions: {
             // 预留给后续 UI 交互
-            refresh: XJZLCompendiumBrowser.prototype.refreshData
+            refresh: XJZLCompendiumBrowser.prototype.refreshData,
+            changeTab: XJZLCompendiumBrowser.prototype._onChangeTab,
+            openSheet: XJZLCompendiumBrowser.prototype._onOpenSheet
         }
     };
 
@@ -50,6 +59,18 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         // 我们稍后在第二阶段再写模板，现在先留空或者写个占位
         main: { template: "systems/xjzl-system/templates/apps/compendium-browser.hbs" }
     };
+
+    // 定义所有可用的 Tabs (对应 Item Type)
+    static TABS = [
+        { id: "weapon", label: "武器", icon: "fas fa-sword" },
+        { id: "armor", label: "防具", icon: "fas fa-tshirt" },
+        { id: "consumable", label: "消耗品", icon: "fas fa-flask" },
+        { id: "misc", label: "杂物", icon: "fas fa-box-open" },
+        { id: "qizhen", label: "奇珍", icon: "fas fa-gem" },
+        { id: "wuxue", label: "武学", icon: "fas fa-fist-raised" },
+        { id: "neigong", label: "内功", icon: "fas fa-yin-yang" },
+        { id: "art_book", label: "技艺", icon: "fas fa-book" },
+    ];
 
     /**
      * ==========================================================
@@ -84,84 +105,99 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
      * 并按 Item Type 分类存储到 this.cachedData
      */
     async loadData() {
-        console.log("XJZL Browser | 开始加载合集包索引...");
+        ui.notifications.info("正在编纂江湖图谱...");
+        console.log("XJZL Browser | 开始索引...");
 
-        // 1. 初始化容器
-        this.cachedData = {
-            weapon: [],
-            armor: [],
-            consumable: [],
-            misc: [],
-            qizhen: [],
-            neigong: [],
-            wuxue: [],
-            art_book: [],
-            background: [],
-            personality: []
-        };
+        // 初始化空容器
+        const tempCache = {};
+        // 根据 TABS 初始化数组，防止 undefined
+        XJZLCompendiumBrowser.TABS.forEach(t => tempCache[t.id] = []);
 
-        // 2. 遍历游戏中的所有包
         for (const pack of game.packs) {
-            // 过滤1：必须是 Item 类型
             if (pack.metadata.type !== "Item") continue;
-
-            // 过滤2：我们只看本系统的包
+            // 暂时放宽限制，或者确认为 "xjzl-system"
             if (pack.metadata.system !== "xjzl-system") continue;
 
-            console.log(`XJZL Browser | 正在索引: ${pack.metadata.label} (${pack.collection})`);
-
-            // 3. 核心步骤：获取索引
-            // getIndex 会去数据库只捞取我们定义的 fields，速度极快
             const index = await pack.getIndex({ fields: XJZLCompendiumBrowser.INDEX_FIELDS });
 
-            // 4. 将索引数据分类装填
             for (const entry of index) {
-                // entry 包含: _id, name, img, type, uuid, system: {...}
-
-                // 确保是我们系统定义的数据类型
-                if (this.cachedData.hasOwnProperty(entry.type)) {
-                    // 为了方便后续筛选，我们将 uuid 和 pack 来源直接注入到对象里
-                    // entry 已经有了 uuid，但为了保险起见再注入一次
+                if (tempCache[entry.type]) {
+                    // 注入 UUID 以便拖拽和打开
                     entry.uuid = entry.uuid || `Compendium.${pack.collection}.${entry._id}`;
-
-                    // 存入内存
-                    this.cachedData[entry.type].push(entry);
+                    // 注入 Pack Label 方便显示来源
+                    entry.packLabel = pack.metadata.label;
+                    tempCache[entry.type].push(entry);
                 }
             }
         }
 
+        this.cachedData = tempCache;
         this.isLoaded = true;
-        console.log("XJZL Browser | 索引构建完成:", this.cachedData);
+        console.log("XJZL Browser | 索引完成。", this.cachedData);
 
-        // 如果窗口开着，刷新它
-        this.render(true);
+        ui.notifications.info("图谱编纂完成。");
+
+        // 只有当窗口已打开时，才重绘以显示新数据
+        if (this.rendered) this.render();
     }
 
-    /**
-     * 重新加载数据（用户点击刷新按钮时）
-     */
     async refreshData() {
         this.isLoaded = false;
+        this.render(); // 先重绘显示 Loading 状态
         await this.loadData();
     }
 
-    /**
-     * 辅助：统计总数
-     */
-    _getTotalCount() {
-        return Object.values(this.cachedData).reduce((acc, arr) => acc + arr.length, 0);
+    /* -------------------------------------------- */
+    /*  交互动作 (Actions)                          */
+    /* -------------------------------------------- */
+
+    _onChangeTab(event, target) {
+        const newTab = target.dataset.tab;
+        if (newTab && newTab !== this.state.activeTab) {
+            this.state.activeTab = newTab;
+            this.render(); // 重绘界面
+        }
     }
 
-    /**
-     * 准备渲染数据
-     */
+    async _onOpenSheet(event, target) {
+        const uuid = target.dataset.uuid;
+        const doc = await fromUuid(uuid);
+        if (doc) doc.sheet.render(true);
+    }
+
+    /* -------------------------------------------- */
+    /*  数据准备 (Context)                          */
+    /* -------------------------------------------- */
+
     async _prepareContext(options) {
+        const activeTab = this.state.activeTab;
+
+        // 获取当前 Tab 的所有物品
+        let items = this.cachedData[activeTab] || [];
+
+        // --- 简单的预处理 ---
+        // (下一阶段我们会在这里加入复杂的 filterItems 逻辑)
+
+        // 性能保护：如果还没筛选，且数量超过 200，只显示前 200 个
+        // 防止一次性渲染几千个 DOM 卡死
+        const totalCount = items.length;
+        const displayLimit = 200;
+        const isClipped = items.length > displayLimit;
+
+        if (isClipped) {
+            items = items.slice(0, displayLimit);
+        }
+
         return {
             isLoaded: this.isLoaded,
-            // 暂时只传数量，用于 Phase 1 测试
-            counts: Object.fromEntries(
-                Object.entries(this.cachedData).map(([k, v]) => [k, v.length])
-            )
+            tabs: XJZLCompendiumBrowser.TABS,
+            activeTab: activeTab,
+            items: items,
+            totalCount: totalCount,
+            displayCount: items.length,
+            isClipped: isClipped,
+            // 传递品质枚举给前端做颜色区分 (可选)
+            qualities: { 0: "common", 1: "uncommon", 2: "rare", 3: "epic", 4: "legendary" }
         };
     }
 }

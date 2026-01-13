@@ -555,26 +555,37 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
 /**
  * 渲染物品目录侧边栏钩子
  * 用于注入 "江湖万卷阁" 按钮
+ * 修复：V13 使用原生 HTMLElement，不再支持 jQuery 的 .find()
  */
 Hooks.on("renderItemDirectory", (app, html, data) => {
-  // 1. 创建按钮元素
-  // 使用 flex 布局让它看起来像原生按钮
-  const button = $(`
-    <button class="xjzl-browser-btn" style="min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;">
-      <i class="fas fa-book-open"></i> 江湖万卷阁
-    </button>
-  `);
+  // 1. V13 兼容性处理：确保获取原生 DOM 元素
+  const element = html instanceof HTMLElement ? html : html[0];
 
-  // 2. 绑定点击事件
-  button.on("click", (ev) => {
+  // 2. 查找插入点 (.header-actions)
+  const headerActions = element.querySelector(".header-actions");
+  if (!headerActions) return;
+
+  // 3. 创建按钮 (使用原生 DOM API)
+  const button = document.createElement("button");
+  button.type = "button"; // 防止意外提交表单
+  button.className = "xjzl-browser-btn";
+  // 直接写内联样式，或者你在 css 文件里写类名
+  button.style.cssText = "min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;";
+  button.innerHTML = '<i class="fas fa-book-open"></i> 江湖万卷阁';
+
+  // 4. 绑定点击事件
+  button.addEventListener("click", (ev) => {
     ev.preventDefault();
     // 调用我们在 ready 中挂载的单例
-    game.xjzl.compendiumBrowser.render(true);
+    if (game.xjzl?.compendiumBrowser) {
+      game.xjzl.compendiumBrowser.render(true);
+    } else {
+      ui.notifications.warn("江湖万卷阁尚未初始化，请稍候...");
+    }
   });
 
-  // 3. 插入到界面中
-  // 插入到 .header-actions (创建物品按钮所在的容器) 的下方
-  html.find(".header-actions").after(button);
+  // 5. 插入到界面中 (headerActions 之后)
+  headerActions.after(button);
 });
 
 /**
