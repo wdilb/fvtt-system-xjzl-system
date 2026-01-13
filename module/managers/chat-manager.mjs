@@ -5,6 +5,7 @@
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { rollDisabilityTable } from "../utils/utils.mjs";
 import { ActiveEffectManager } from "./active-effect-manager.mjs";
+import { xjzlSocket } from "../socket.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 export class ChatCardManager {
@@ -421,7 +422,7 @@ export class ChatCardManager {
             if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
 
             // 异步更新消息 (持久化 D2)
-            await message.update({ "flags.xjzl-system.supplementalDie": d2 });
+            await ChatCardManager._safeUpdateMessage(originMsg, { "flags.xjzl-system.supplementalDie": d2 });
         }
 
         // =====================================================
@@ -810,7 +811,7 @@ export class ChatCardManager {
 
         // 执行一次性更新
         if (!foundry.utils.isEmpty(updateData)) {
-            await message.update(updateData);
+            await ChatCardManager._safeUpdateMessage(message, updateData);
         }
     }
 
@@ -860,7 +861,7 @@ export class ChatCardManager {
                     btn.style.color = "#999";
                     btn.style.cursor = "not-allowed";
                     btn.innerText = "已检定";
-                    await message.update({ content: div.innerHTML });
+                    await ChatCardManager._safeUpdateMessage(message, { content: div.innerHTML });
                 }
                 return ui.notifications.warn(`${displayName} 已经进行过对抗了。`);
             }
@@ -1047,7 +1048,7 @@ export class ChatCardManager {
         // 将结果写入原始攻击消息的 Flags 中
         // 这样后续应用伤害时，就能查到 "broken" 或 "resisted" 状态
         const resultValue = isBroken ? "broken" : "resisted";
-        await originMsg.update({
+        await ChatCardManager._safeUpdateMessage(originMsg, {
             [`flags.xjzl-system.feintResults.${safeKey}`]: resultValue
         });
 
@@ -1069,7 +1070,7 @@ export class ChatCardManager {
             btnContainer.outerHTML = resultHtml;
 
             // 更新聊天消息内容
-            await message.update({ content: div.innerHTML });
+            await ChatCardManager._safeUpdateMessage(message, { content: div.innerHTML });
         } else {
             // 保底方案：如果因为模板变更找不到容器，则发送一条新消息
             console.warn("XJZL | 无法定位防御按钮进行原地更新，发送新卡片。");
@@ -1500,7 +1501,7 @@ export class ChatCardManager {
         //     `<div style="text-align:center; color:#888; border:1px solid #ccc; padding:5px; background:#eee;">已撤销</div>`
         // );
 
-        // await message.update({
+        // await ChatCardManager._safeUpdateMessage(message, {
         //     content: content,
         //     "flags.xjzl-system.isUndone": true
         // });
@@ -1520,7 +1521,7 @@ export class ChatCardManager {
             undoBtn.replaceWith(replacement);
 
             // 更新消息
-            await message.update({
+            await ChatCardManager._safeUpdateMessage(message, {
                 content: div.innerHTML,
                 "flags.xjzl-system.isUndone": true
             });
@@ -1910,7 +1911,7 @@ export class ChatCardManager {
         if (btnContainer) {
             btnContainer.outerHTML = resultBlock;
             // 4. 更新消息
-            await message.update({ content: div.innerHTML });
+            await ChatCardManager._safeUpdateMessage(message, { content: div.innerHTML });
         } else {
             console.error("XJZL | 无法在卡片中找到 .card-buttons 容器");
         }
@@ -2085,7 +2086,7 @@ export class ChatCardManager {
             btn.innerHTML = `<i class="fas fa-check"></i> ${game.i18n.localize("XJZL.UI.Chat.MoveCard.TargetSelected") || "已应用"}`;
 
             // 更新回消息中
-            await message.update({ content: div.innerHTML });
+            await ChatCardManager._safeUpdateMessage(message, { content: div.innerHTML });
         }
     }
 
@@ -2225,10 +2226,27 @@ export class ChatCardManager {
 
             btn.parentNode.replaceWith(replacement);
 
-            await message.update({
+            await ChatCardManager._safeUpdateMessage(message, {
                 content: div.innerHTML,
                 "flags.xjzl-system.isCostRefunded": true
             });
+        }
+    }
+
+    /**
+     * 自动判断权限的消息更新方法
+     * @param {ChatMessage} message 目标消息文档
+     * @param {Object} updates 更新数据
+     */
+    static async _safeUpdateMessage(message, updates) {
+        if (!message) return;
+
+        if (game.user.isGM || message.isAuthor) {
+            // 修正：这里应该调用消息原本的 update 方法，而不是递归调用自己
+            return await message.update(updates);
+        } else {
+            // 委托 GM 更新
+            return await xjzlSocket.executeAsGM("updateDocument", message.uuid, updates);
         }
     }
 }

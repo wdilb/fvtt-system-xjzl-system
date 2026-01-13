@@ -47,6 +47,7 @@ import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
 import { EffectSelectionDialog } from "./module/applications/effect-selection-dialog.mjs";
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
+import { setupSocket } from "./module/socket.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -346,6 +347,11 @@ Hooks.once("init", async function () {
     default: 10, // 默认每 10 点溢出伤害扣 1 体力
     requiresReload: false
   });
+});
+
+// 在 Hooks.once("init") 之后的合适位置，添加这个钩子
+Hooks.once("socketlib.ready", () => {
+  setupSocket();
 });
 
 /* -------------------------------------------- */

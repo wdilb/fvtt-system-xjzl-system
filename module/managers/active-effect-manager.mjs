@@ -1,5 +1,6 @@
 // module/managers/active-effect-manager.mjs
 import { XJZLActiveEffect } from "../documents/active-effect.mjs";
+import { xjzlSocket } from "../socket.mjs";
 export class ActiveEffectManager {
 
     /**
@@ -10,6 +11,9 @@ export class ActiveEffectManager {
      */
     static async addEffect(actor, effectDataOrId) {
         if (!actor || !effectDataOrId) return;
+
+        // [权限拦截]
+        if (!actor.isOwner) return await xjzlSocket.executeAsGM("addEffect", actor.uuid, effectDataOrId);
 
         let effectData;
         // =====================================================
@@ -246,6 +250,8 @@ export class ActiveEffectManager {
      */
     static async removeEffect(actor, targetId, amount = 1) {
         if (!actor || !targetId) return;
+        // [权限拦截]
+        if (!actor.isOwner) return await xjzlSocket.executeAsGM("removeEffect", actor.uuid, targetId, amount);
 
         // 1. 查找特效 (支持 ID 或 Slug)
         const effect = actor.effects.get(targetId) ||

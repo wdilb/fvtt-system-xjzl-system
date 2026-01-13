@@ -3,6 +3,7 @@
  */
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
+import { xjzlSocket } from "../socket.mjs";
 
 // 将构造器缓存在模块作用域，避免每次 runScripts 重复创建
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
@@ -597,6 +598,9 @@ export class XJZLActor extends Actor {
       Macros: XJZLMacros  // 脚本里可以用 Macros.requestSave(...)
     };
 
+    // 为无权限对象注入 Socket 代理，保证旧脚本完美兼容
+    this._proxifySandbox(sandbox);
+
     // 3. 决定执行模式 (同步/异步)
     // Passive 和 Calc 和 CHECK 必须同步运行，不能 await，否则会阻塞数据计算
     const isSync = [SCRIPT_TRIGGERS.PASSIVE, SCRIPT_TRIGGERS.CALC, SCRIPT_TRIGGERS.CHECK].includes(trigger);
@@ -1046,6 +1050,15 @@ export class XJZLActor extends Actor {
    * @returns {Object} 结算结果
    */
   async applyDamage(data) {
+    // [权限拦截]
+    if (!this.isOwner) {
+      const socketData = { ...data };
+      if (data.attacker) {
+        socketData.attackerUuid = data.attacker.uuid;
+        delete socketData.attacker; // 剔除复杂对象
+      }
+      return await xjzlSocket.executeAsGM("applyDamage", this.uuid, socketData);
+    }
 
     // =====================================================
     // 0. 野兽/怪物特化逻辑 (Creature Logic)
@@ -1545,6 +1558,8 @@ export class XJZLActor extends Actor {
    * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
    */
   async applyHealing(data) {
+    // [权限拦截]
+    if (!this.isOwner) return await xjzlSocket.executeAsGM("applyHealing", this.uuid, data);
     const { amount = 0, type = "hp", showScrolling = true } = data;
 
     // 允许负数，只拦截 0
@@ -2685,5 +2700,25 @@ export class XJZLActor extends Actor {
       content: content,
       type: CONST.CHAT_MESSAGE_TYPES.OTHER
     });
+  }
+
+  // ======= 添加代理工厂方法 =======
+  _proxifySandbox(sandbox) {
+    for (const [key, value] of Object.entries(sandbox)) {
+      if (value instanceof foundry.abstract.Document && !value.isOwner) {
+        // 劫持 update
+        value.update = async (data, context) => {
+          return await xjzlSocket.executeAsGM("updateDocument", value.uuid, data, context);
+        };
+        // 劫持 createEmbeddedDocuments
+        value.createEmbeddedDocuments = async (type, data, context) => {
+          return await xjzlSocket.executeAsGM("createEmbedded", value.uuid, type, data, context);
+        };
+        // 劫持 deleteEmbeddedDocuments
+        value.deleteEmbeddedDocuments = async (type, ids, context) => {
+          return await xjzlSocket.executeAsGM("deleteEmbedded", value.uuid, type, ids, context);
+        };
+      }
+    }
   }
 }
