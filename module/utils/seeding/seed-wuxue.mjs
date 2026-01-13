@@ -62,6 +62,11 @@ const MULTI_FILE_CONFIG = {
     // "gaibang": ["gaibang_low", "gaibang_high"]
 };
 
+// 额外的数据文件
+const EXTRA_FILES = [
+    "qinggong", // 轻功
+];
+
 /**
  * 辅助函数：处理招式列表 (Moves Processing)
  * 将 JSON 中的简略数据转换为符合 WuxueDataModel 的完整结构
@@ -188,7 +193,13 @@ export async function seedWuxue() {
             // 否则，按默认规则：门派Key.json
             filesToFetch.push(`systems/xjzl-system/data/wuxue/${sect}.json`);
         }
-
+        // 借用“江湖势力”的循环，顺便把额外文件加载了
+        // 这样既不需要写第二遍 fetch 代码，也不会重复加载
+        if (sect === "jianghushili" && typeof EXTRA_FILES !== "undefined") {
+            const extraPaths = EXTRA_FILES.map(f => `systems/xjzl-system/data/wuxue/${f}.json`);
+            filesToFetch.push(...extraPaths);
+            console.log(`XJZL Seeder | 追加加载额外文件: ${EXTRA_FILES.join(", ")}`);
+        }
         for (const filePath of filesToFetch) {
             try {
                 const response = await fetch(filePath);
