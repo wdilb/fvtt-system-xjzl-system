@@ -9,6 +9,7 @@ import { seedWeapons } from "./seed-weapons.mjs";
 import { seedQizhen } from "./seed-qizhen.mjs";
 import { seedNeigong } from "./seed-neigong.mjs";
 import { seedWuxue } from "./seed-wuxue.mjs";
+import { seedMacros } from "./seed-macros.mjs";
 
 const { DialogV2 } = foundry.applications.api;
 
@@ -23,6 +24,7 @@ export const SeedingManager = {
     qizhen: seedQizhen,
     neigong: seedNeigong,
     wuxue: seedWuxue,
+    macros: seedMacros,
 
     /**
      * 一键生成所有 (全量重置)
@@ -46,6 +48,7 @@ export const SeedingManager = {
             await this.qizhen();
             await this.neigong();
             await this.wuxue();
+            await this.macros();
             ui.notifications.info("XJZL | 全量种子数据生成完成。");
         }
     }
