@@ -65,6 +65,7 @@ const MULTI_FILE_CONFIG = {
 // 额外的数据文件
 const EXTRA_FILES = [
     "qinggong", // 轻功
+    "yuepu",    // 乐谱
 ];
 
 /**
