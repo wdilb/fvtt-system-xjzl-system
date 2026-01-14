@@ -31,7 +31,8 @@
                             "active": true,
                             "script": "if (!args.target) return;\n\n// 1. 移除状态\nconst effectsToRemove = args.target.effects.filter(e => \n    e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"root\"\n).map(e => e.id);\n\nif (effectsToRemove.length > 0) {\n    await args.target.deleteEmbeddedDocuments(\"ActiveEffect\", effectsToRemove);\n    ui.notifications.info(`${args.target.name} 的下盘不稳/禁足状态已移除。`);\n}\n\n// 2. 添加乘风\n// 计算层数: 基础1 + 升级\nconst lvl = args.move.computedLevel;\nconst stacksToAdd = 1 + (lvl - 1);\n\nconst chengfengData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\nchengfengData.name = \"乘风\";\n\n// 循环添加多次以叠加层数\nfor (let i = 0; i < stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
                         }
-                    ]
+                    ],
+                    "weaponType": "unarmed"
                 },
                 {
                     "name": "提按端挤",
@@ -62,7 +63,8 @@
                             "active": true,
                             "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst totalHeal = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ amount: totalHeal, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
                         }
-                    ]
+                    ],
+                    "weaponType": "unarmed"
                 },
                 {
                     "name": "手摸心会",
@@ -85,7 +87,8 @@
                             "active": true,
                             "script": "const lvl = args.move.computedLevel;\nconst bonus = 5 + (lvl - 1) * 5;\n\nconst effectData = {\n    name: \"坚骨\",\n    icon: args.item.img,\n    description: `下一次投掷残疾检定时，结果+${bonus}。`,\n    changes: [] // 纯提示\n};\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
-                    ]
+                    ],
+                    "weaponType": "unarmed"
                 },
                 {
                     "name": "拔伸牵引",
@@ -116,7 +119,8 @@
                             "active": true,
                             "script": "if (args.isHit) {\n    const lvl = args.move.computedLevel;\n    const durationRounds = 5 + (lvl - 1) * 5;\n\n    const painData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pain\"));\n    painData.duration = { rounds: durationRounds };\n\n    await game.xjzl.api.effects.addEffect(args.target, painData);\n}"
                         }
-                    ]
+                    ],
+                    "weaponType": "unarmed"
                 }
             ]
         }
@@ -414,7 +418,8 @@
                             "active": true,
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 养血 (持续3+lvl-1回合)\n    const duration = 3 + (lvl - 1);\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    yangxueData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, yangxueData);\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const heal = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
-                    ]
+                    ],
+                    "weaponType": "hidden"
                 },
                 {
                     "name": "理肺气针",
@@ -444,7 +449,8 @@
                             "active": true,
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 聚气 (5MP, 持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const juqiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"juqi\"));\n    juqiData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, juqiData);\n} else {\n    // 大针: 瞬间回蓝 (15 + (lvl-1)*5)\n    const heal = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: heal, type: \"mp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
-                    ]
+                    ],
+                    "weaponType": "hidden"
                 },
                 {
                     "name": "生肾水针",
@@ -474,7 +480,8 @@
                             "active": true,
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 每回合加护体\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"生肾水针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 5 点护体真气。\",\n        flags: { \"xjzl-system\": { \"stackable\": true, scripts: [{\n            trigger: \"turnStart\",\n            active: true,\n            script: \"await actor.applyHealing({ amount: 5, type: 'huti', showScrolling: true });\"\n        }] } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间加护体 (15 + (lvl-1)*5)\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
-                    ]
+                    ],
+                    "weaponType": "hidden"
                 },
                 {
                     "name": "养肝精针",
@@ -504,7 +511,8 @@
                             "active": true,
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 回怒 (持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"养肝精针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 1 怒气。\",\n        changes: [{ key: \"flags.xjzl-system.regenRageTurnStart\", mode: 2, value: 1 }]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间回怒 (数值固定1)\n    await args.target.applyHealing({ amount: 1, type: \"rage\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
-                    ]
+                    ],
+                    "weaponType": "hidden"
                 },
                 {
                     "name": "护心火针",
@@ -528,7 +536,8 @@
                             4
                         ]
                     },
-                    "scripts": []
+                    "scripts": [],
+                    "weaponType": "hidden"
                 }
             ]
         }
