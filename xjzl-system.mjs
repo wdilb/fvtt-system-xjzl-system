@@ -48,11 +48,12 @@ import { EffectSelectionDialog } from "./module/applications/effect-selection-di
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 import { setupSocket } from "./module/socket.mjs";
+import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
 
-import { XJZLPause } from "./module/pause.js";
+import { XJZLPause } from "./module/pause.mjs";
 
 /* -------------------------------------------- */
 /*  Init Hook (初始化钩子)                       */
@@ -66,6 +67,8 @@ Hooks.once("init", async function () {
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
+  //替换系统的测量模板
+  CONFIG.MeasuredTemplate.objectClass = MySystemMeasuredTemplate;
 
   // 替换FVTT自带的一定距离计算方式
   const SquareGrid = foundry.grid.SquareGrid;

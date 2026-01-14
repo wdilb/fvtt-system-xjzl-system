@@ -1,4 +1,4 @@
-// module/pause.js
+// module/pause.mjs
 const GamePause = foundry.applications.ui.GamePause;
 
 export class XJZLPause extends GamePause {
@@ -6,7 +6,7 @@ export class XJZLPause extends GamePause {
         // 1. 先执行父类渲染
         await super._onRender(context, options);
 
-        // 【优化】如果当前并不是暂停状态（比如是取消暂停的过程），直接退出，不改字
+        // 如果当前并不是暂停状态（比如是取消暂停的过程），直接退出，不改字
         if (!game.paused) return;
 
         // 2. 找到容器
