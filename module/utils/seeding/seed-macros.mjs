@@ -13,7 +13,7 @@ export async function seedMacros() {
     // value: 生成的文件夹名称
     const fileMap = {
         "gm": "GM工具",
-        "utility": "调试与修复",
+        "utility": "实用工具",
         "loot": "随机战利品"
     };
 
