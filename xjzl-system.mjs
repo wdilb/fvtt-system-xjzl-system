@@ -711,49 +711,50 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
 // });
 
 /**
- * 监听 Token 移动，处理模板跟随token移动
+ * 侠界之旅 - 模板跟随系统 (Sticky Templates)
  */
 Hooks.on("updateToken", (tokenDoc, changes, context, userId) => {
-  // 1. 只有 X 或 Y 发生变化时才处理
+  // 1. 只在有位置变化时触发
   if (!changes.x && !changes.y) return;
 
-  // 2. 只有当前客户端（操作者）负责更新
-  // 避免所有玩家同时向服务器发送更新请求
+  // 2. 只有当前操作 Token 的用户才负责更新模板 (防止多人重复更新)
   if (game.user.id !== userId) return;
 
-  // 3. 查找当前场景中，标记了要跟随这个 Token 的模板
+  // 3. 准备数据
   const scene = tokenDoc.parent;
   if (!scene) return;
 
-  const templatesToUpdate = [];
+  // V13 API: 获取 Grid 像素大小
+  const gridSize = canvas.grid.size;
 
-  // 遍历所有模板
+  // 计算 Token 移动后的新中心点
+  // 注意：tokenDoc 是数据文档，x/y 是左上角坐标
+  const newX = (changes.x ?? tokenDoc.x);
+  const newY = (changes.y ?? tokenDoc.y);
+
+  const tokenCenterX = newX + (tokenDoc.width * gridSize) / 2;
+  const tokenCenterY = newY + (tokenDoc.height * gridSize) / 2;
+
+  // 4. 查找并更新模板
+  // 过滤出当前场景中，flag 标记了 attachedToken 等于该 Token ID 的模板
+  const updates = [];
+
   scene.templates.forEach(t => {
-    // 获取 Flags (兼容你的命名习惯)
-    const attachedTokenId = t.flags?.xjzl?.attachedToken || t.flags?.mySystem?.attachedToken;
+    // 检查 flag (兼容之前的两种写法)
+    const attachedId = t.flags?.xjzl?.attachedToken || t.flags?.mySystem?.attachedToken;
 
-    if (attachedTokenId === tokenDoc.id) {
-      // 计算中心点偏移
-      // 我们希望模板中心 = Token 中心
-
-      const gridSize = scene.grid.size;
-      const tokenCenter = {
-        x: tokenDoc.x + (tokenDoc.width * gridSize) / 2,
-        y: tokenDoc.y + (tokenDoc.height * gridSize) / 2
-      };
-
-      // 准备更新数据
-      templatesToUpdate.push({
+    if (attachedId === tokenDoc.id) {
+      updates.push({
         _id: t.id,
-        x: tokenCenter.x,
-        y: tokenCenter.y
+        x: tokenCenterX,
+        y: tokenCenterY
       });
     }
   });
 
-  // 4. 批量更新 (性能更优)
-  if (templatesToUpdate.length > 0) {
-    scene.updateEmbeddedDocuments("MeasuredTemplate", templatesToUpdate);
+  // 5. 提交更新
+  if (updates.length > 0) {
+    scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
   }
 });
 /* -------------------------------------------- */
