@@ -542,7 +542,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
   if (templateLayer) {
     const aoeBtn = {
       name: "xjzl-aoe",
-      title: "创建自定义效果区域",
+      title: "创建效果区域（距离计算按照侠界之旅规则）",
       icon: "fas fa-bullseye",
       visible: true,
       button: true, // 关键：这是点击型按钮
