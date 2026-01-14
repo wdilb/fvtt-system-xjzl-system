@@ -163,8 +163,8 @@ await Macros.requestSave({
 | **`S`** | `Object` | `system` 的简写别名。例如 `S.stats.liliang.total`。 |
 | **`thisItem`** | `Item` \| `Effect` | **脚本的物理位置**。<br>指向**这段脚本存放的地方**。如果脚本写在“金蛇剑”里，它是金蛇剑；如果脚本写在“中毒”BUFF里，它是中毒BUFF。 |
 | **`thisEffect`** | `ActiveEffect` | **脚本宿主特效指针**。<br>仅当脚本挂载在 Active Effect 上时存在。|
-| **`item`** | `Item` | 由 `roll()` 或 `_applyDamage` 通过 `context` 传入。  **仅限主动时机**<br>(`attack`, `hit`, `calc`, `check`)  **动作的发起源**。<br>仅指武学，因为全部的动作由武学主动发起，注意不是招式。<br>❌ **在被动/防御/回合结算时 (`damaged`, `turnStart`) 为 `undefined`。** |
-| **`move`** | `Object` | **当前正在施展的招式数据**。<br>✅ **主动出招时** (`attack`, `hit`, `calc`, `check`): 指向**你正在使用**的那一招。<br>> **⚠️ 重要**: 即使脚本写在**内功、装备或BUFF**上，只要是因为你出招而触发，这里读取到的就是你**手里那一招**的数据（例如：用“太极剑”出招触发了身上“纯阳内功”的脚本，这里的 `move` 就是“太极剑”）。<br>💡 **被动时** (`passive`): 仅当脚本写在**招式内部**时，指向该招式自身；写在其他地方（如内功/装备）为 `undefined`。<br>❌ **受击/防御时(avoided、preDefense、preTake、damaged)**: **`undefined`**。 |
+| **`item`** | `Item` | 由 `roll()` 或 `_applyDamage` 通过 `context` 传入。  **主动时机**<br>(`attack`, `hit`, `calc`, `check`)  **动作的发起源**。<br>仅指武学，因为全部的动作由武学主动发起，注意不是招式。<br>🛡️ **受击防御时** (`damaged`, `preTake`, `preDefense`, `avoided`): 敌人的武学。<br>❌ **在回合结算时 (`turnStart`) 为 `undefined`。** |
+| **`move`** | `Object` | **当前正在施展的招式数据**。<br>✅ **主动出招时** (`attack`, `hit`, `calc`, `check`): 指向**你正在使用**的那一招。<br>> **⚠️ 重要**: 即使脚本写在**内功、装备或BUFF**上，只要是因为你出招而触发，这里读取到的就是你**手里那一招**的数据（例如：用“太极剑”出招触发了身上“纯阳内功”的脚本，这里的 `move` 就是“太极剑”）。<br>💡 **被动时** (`passive`): 仅当脚本写在**招式内部**时，指向该招式自身；写在其他地方（如内功/装备）为 `undefined`。<br>🛡️ **受击防御时** (`damaged`, `preTake`, `preDefense`, `avoided`): 指向 **敌人** 用来打你的招式。<br>*(若需在防御时获取自己当前架招的等级，请通过 `actor.system.martial.stance` 反查)* <br>❌ **在回合结算时 (`turnStart`) 为 `undefined`。**|
 | **`trigger`** | `String` | **当前触发时机**。例如 `"attack"`, `"hit"`, `"damaged"`。用于在同一脚本中处理多重逻辑。 |
 | **`Macros`** | `Class` | **系统工具箱**。提供 `requestSave` (发起检定), `checkStance` (架招判断) 等静态方法。 |
 | **`console`** | `Console` | 浏览器控制台，用于 `console.log(args)` 调试。 |
@@ -263,6 +263,8 @@ await Macros.requestSave({
 *   **时机**: 判定为**未命中**时触发。
 *   **用途**: 闪避后的副作用 (如“凌波微步：闪避回蓝”)。
 *   **参数 (`args`)**:
+    *   `move` (Object): 攻击者的招式数据。
+    *   `item` (Item): 攻击者的武学数据。
     *   `attacker` (Actor): 攻击者。
     *   `target` (Actor): 防御者 (自己)。
     *   `type` (String): 伤害类型。
@@ -274,6 +276,8 @@ await Macros.requestSave({
 *   **时机**: 命中后，但在计算防御减伤、抗性之前。
 *   **用途**: 防御者最后修改攻击属性的机会 (如“金钟罩：免疫暴击”、“软猬甲：无视穿透”)。
 *   **参数 (`args`)**:
+    *   `move` (Object): 攻击者的招式数据。
+    *   `item` (Item): 攻击者的武学数据。
     *   `attacker` (Actor): 攻击者。
     *   `target` (Actor): 防御者。
     *   `type` (String): 伤害类型。
@@ -290,6 +294,8 @@ await Macros.requestSave({
 *   **时机**: 防御、格挡、抗性全部计算完毕，即将扣血前。
 *   **用途**: 实现**护盾 (Shields)**、伤害吸收、完全免疫。
 *   **参数 (`args`)**:
+    *   `move` (Object): 攻击者的招式数据。
+    *   `item` (Item): 攻击者的武学数据。
     *   `attacker` (Actor), `target` (Actor)。
     *   `type` (String), `baseDamage` (Number)。
     *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
@@ -304,6 +310,8 @@ await Macros.requestSave({
 *   **时机**: 气血/护体/内力已经扣除完毕，数据库已更新。
 *   **用途**: 实现**反伤 (Thorns)**、受击回怒、受击触发 Buff。
 *   **参数 (`args`)**:
+    *   `move` (Object): 攻击者的招式数据。
+    *   `item` (Item): 攻击者的武学数据。
     *   `attacker` (Actor), `target` (Actor)。
     *   `finalDamage` (Number): 护盾计算后的理论应扣伤害。
     *   `hpLost` (Number): **实际**扣除的气血。
@@ -723,6 +731,10 @@ if (!args.attacker || args.attacker.uuid === actor.uuid) return;
 // 2. 防乒乓机制 (Ping-Pong Protection)
 // 检查攻击者身上是否有“正在承受反伤”的临时标记
 if (args.attacker.isReceivingReflection) return;
+
+// 判定招式类型 (利用 args.move)
+// 仅反弹 外功 (waigong) 伤害
+if (args.move.damageType !== "waigong") return;
 
 // 3. 距离检测 (V13 标准写法)
 const t1 = actor.token?.object || actor.getActiveTokens()[0];
