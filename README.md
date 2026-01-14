@@ -94,7 +94,7 @@
 
 ## 🚀 安装指南 (Installation)
 
-本系统支持通过 Foundry VTT 官方界面自动安装（推荐），也支持手动安装。
+本系统支持通过 Releases 下载安装，也支持手动安装。
 
 ### 📦 方式一：Releases 下载安装
 
