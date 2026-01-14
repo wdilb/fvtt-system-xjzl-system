@@ -243,7 +243,7 @@
             "element": "taiji",
             "description": "<p>擎天门横练功法，与金钟罩齐名，修炼之人需本身体格健硕，再辅以药液淬炼躯干，大成者肉身不惧刀剑，举手投足间开砖裂石，但若童子身破，其功立破。</p>",
             "requirement": "悟性需求: 4",
-            "automationNote": "童子身需GM监管(破身请手动关闭AE或重置内功)。刀剑减伤判定基于攻击者当前装备的武器类型。反伤已做防死循环处理。",
+            "automationNote": "完全自动化。童子身需GM监管(破身请手动关闭AE或重置内功)。刀剑减伤精准判定招式类型。反伤已做防死循环处理。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -280,7 +280,7 @@
                             "label": "横练功-暴击反伤",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.isCrit && args.attacker) {\n    // 防死循环检查：如果攻击者正在承受反伤，则不再触发\n    if (args.attacker.isReceivingReflection) return;\n    \n    // 标记攻击者正在被反伤\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({\n            type: 'liushi',\n            amount: 5,\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`${actor.name} 触发横练功反震！`);\n    } finally {\n        // 清除标记\n        args.attacker.isReceivingReflection = false;\n    }\n}"
+                            "script": "if (args.isCrit && args.attacker) {\n    if (args.attacker.isReceivingReflection) return;\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({\n            type: 'liushi',\n            amount: 5,\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`${actor.name} 触发横练功反震！`);\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}"
                         }
                     ]
                 },
@@ -312,7 +312,7 @@
                             "label": "横练功-刀剑减伤",
                             "trigger": "preTake",
                             "active": true,
-                            "script": "if (args.move && (args.move.weaponType === 'sword' || args.move.weaponType === 'blade')) {\n    args.output.damage = Math.max(0, args.output.damage - 10);\n    if (actor.token?.object) {\n        canvas.interface.createScrollingText(actor.token.object.center, \"横练减伤\", { fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4 });\n    }\n}"
+                            "script": "// 完美逻辑：直接检查攻击招式的武器类型\nif (args.move) {\n    const wType = args.move.weaponType;\n    if (wType === 'sword' || wType === 'blade') {\n        args.output.damage = Math.max(0, args.output.damage - 10);\n        if (actor.token?.object) {\n            canvas.interface.createScrollingText(\n                actor.token.object.center, \n                \"横练减伤\", \n                { fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4 }\n            );\n        }\n    }\n}"
                         }
                     ]
                 }
