@@ -774,54 +774,73 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
  * 监听 Token 移动，处理“粘性”模板
  */
 Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
-  // 1. 只有坐标变了才动
+  // 1. 没有位移、非当前用户、场景未准备好，直接退出
+  if (!canvas.ready) return;
   if (!change.x && !change.y) return;
   if (game.user.id !== userId) return;
 
   const scene = tokenDoc.parent;
   if (!scene) return;
 
-  // 2. 找到要跟随的模板
-  const templates = scene.templates.filter(t =>
-    t.getFlag("xjzl-system", "sourceToken") === tokenDoc.id &&
-    t.getFlag("xjzl-system", "sticky") === true
-  );
+  // 2. 场景里根本没有模板，直接退出 (避免无意义遍历)
+  // V13 Collection 使用 .size
+  if (scene.templates.size === 0) return;
 
-  if (templates.length === 0) return;
-
-  // 3. 计算 Token 的新中心点 (V13 兼容写法)
-  // change.x 是新的 x，如果没有变则用 tokenDoc.x
+  // 3. 预计算 Token 新中心点
+  const gridSize = canvas.grid.size;
+  // 使用 ?? 运算符处理 0 的情况
   const newX = change.x ?? tokenDoc.x;
   const newY = change.y ?? tokenDoc.y;
+  
+  const targetCenterX = newX + (tokenDoc.width * gridSize) / 2;
+  const targetCenterY = newY + (tokenDoc.height * gridSize) / 2;
 
-  // V13 获取 grid size 的方法: canvas.grid.size
-  const gridSize = canvas.grid.size;
+  // 4. 单次遍历查找并构建更新数据
+  const updates = [];
+  
+  // V13 推荐直接遍历 Collection
+  for (const t of scene.templates) {
+    // 快速检查 Flag
+    const flags = t.flags["xjzl-system"]; // 直接访问属性比 getFlag 稍微快一点点
+    if (!flags || flags.sourceToken !== tokenDoc.id || flags.sticky !== true) continue;
 
-  // tokenDoc.width 是占据的格子数 (如 1)
-  const centerX = newX + (tokenDoc.width * gridSize) / 2;
-  const centerY = newY + (tokenDoc.height * gridSize) / 2;
+    // 检查是否真的需要更新
+    // 如果位置差异小于 1 像素，视为未移动，跳过数据库更新
+    if (Math.abs(t.x - targetCenterX) < 1 && Math.abs(t.y - targetCenterY) < 1) continue;
 
-  const updates = templates.map(t => ({
-    _id: t.id,
-    x: centerX, // 模板的 x,y 设为 Token 中心
-    y: centerY
-  }));
+    updates.push({
+      _id: t.id,
+      x: targetCenterX,
+      y: targetCenterY
+    });
+  }
 
-  scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
+  // 5. 批量提交
+  if (updates.length > 0) {
+    scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
+  }
 });
 
-// 处理 Token 删除时，顺便删除关联的模板
+/**
+ * 处理 Token 删除
+ */
 Hooks.on("deleteToken", (tokenDoc, options, userId) => {
   if (game.user.id !== userId) return;
-
+  
   const scene = tokenDoc.parent;
-  const templatesToDelete = scene.templates.filter(t =>
-    t.getFlag("xjzl-system", "sourceToken") === tokenDoc.id &&
-    t.getFlag("xjzl-system", "autoDelete") === true // 可选：是否随 Token 死亡消失
-  ).map(t => t.id);
+  if (!scene || scene.templates.size === 0) return;
 
-  if (templatesToDelete.length > 0) {
-    scene.deleteEmbeddedDocuments("MeasuredTemplate", templatesToDelete);
+  const idsToDelete = [];
+
+  for (const t of scene.templates) {
+    const flags = t.flags["xjzl-system"];
+    if (flags && flags.sourceToken === tokenDoc.id && flags.autoDelete === true) {
+      idsToDelete.push(t.id);
+    }
+  }
+
+  if (idsToDelete.length > 0) {
+    scene.deleteEmbeddedDocuments("MeasuredTemplate", idsToDelete);
   }
 });
 
