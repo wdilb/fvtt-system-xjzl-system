@@ -1,0 +1,1142 @@
+[
+    {
+        "name": "粗浅功夫",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>粗浅功夫不粗浅，练得精深，堪比上乘武功。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "扎马步",
+                    "type": "stance",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，平扎马步，开启架招。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "扫堂腿",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，佯攻上路，实扫下盘，对敌人造成 0.3 力量点外功伤害，击破架招时，将其击倒。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破击倒",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "猛推山",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，双手十字，猛势推出，造成 0.4 力量点外功伤害；若目标“下盘不稳”，招式伤害+10，且将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "不稳加伤与击飞提示",
+                            "trigger": "preDamage",
+                            "script": "const hasStatus = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (hasStatus) {\n    args.config.amount += 10;\n    ui.notifications.info(\"目标下盘不稳：伤害+10，请手动击飞1米！\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "高声打",
+                    "type": "qi",
+                    "actionType": "default",
+                    "element": "rou",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，呼出胸中气，爆喝一声，本回合《粗浅功夫》的招式伤害提升 5 点，自身移动速度+1。</p><p><strong>升级：</strong>招式伤害+5，速度额外+1，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            1,
+                            1,
+                            1
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "应用高声打",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst speedBonus = 1 + (lvl - 1);\n\nconst effData = thisItem.effects.getName(\"高声打\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { rounds: 1 };\n\n// 动态修改数值\neffData.changes[0].value = String(dmgBonus);\neffData.changes[1].value = String(speedBonus);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "倒步踢",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，三冲拳，双脚连环，对目标造成 0.6 力量点外功伤害。给目标添加“下盘不稳”，持续三回合。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加下盘不稳",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "高声打",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "招式伤害与速度提升。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "gaoshengda",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.waigong.mod",
+                            "mode": 2,
+                            "value": "5"
+                        },
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "寻常剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>招式简单但适合技击，威力不俗，常反败为胜。</p><p><strong>需求：</strong>剑</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "劈剑",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，臂与剑成一条直线，对目标造成 0.4 力量点外功伤害。</p><p>·若目标无架招，招式暴击骰-1。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "暴击修正",
+                            "trigger": "check",
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    args.flags.critThresholdMod += 1;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "架剑",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，立剑向上托举，高过头顶，开启架招。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "刺剑",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，臂由屈而伸，力达剑尖，对目标造成 0.3 力量点外功伤害，击破架招时，招式伤害+5。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破加伤",
+                            "trigger": "preDamage",
+                            "script": "if (args.outcome.isBroken) {\n    args.config.amount += 5;\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "崩剑",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作施展此招，压制对方虚招。手腕下沉，剑尖向上点啄，对其造成 0.5 力量点外功伤害，再不消耗速度朝任意方向移动 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "移动手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "移动提示",
+                            "trigger": "hit",
+                            "script": "ui.notifications.info(\"崩剑命中：请手动朝任意方向移动1米 (不消耗速度)。\");",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "百折不挠",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，凝心静气，携坚强之意举剑刺出，对目标造成 0.6 力量点外功伤害，同时：</p><p>若他此次战斗中曾对你造成伤害，招式伤害+10。</p><p>若他此次战斗中击破过你的架招，招式伤害+10。</p><p>若他此次战斗中曾将你打入濒死，招式伤害+10。</p><p>·以上三种情况的伤害提升可叠加。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "伤害加成手动修正。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "平凡刀法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>套路结构简单而严谨，剽悍雄健，大劈大砍。</p><p><strong>需求：</strong>刀</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "刀",
+            "moves": [
+                {
+                    "name": "砍刀",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，由上向下，抡臂猛砍，对目标造成 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "抱刀",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，刀背贴于左臂，向前平举，开启架招。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "斩刀",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，力达刀刃，臂伸直斩击目标造成 0.3 力量点外功伤害，击破架招时，给对方添加一层“流血”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破流血",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n    ui.notifications.info(`${args.target.name} 流血不止！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "撩刀",
+                    "type": "counter",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作施展此招，压制对方虚招。外旋朝上，刀身撩出对目标造成 0.5 力量点外功伤害。这一招无视对方防御。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "无视防御",
+                            "trigger": "check",
+                            "script": "args.flags.ignoreDefense = true;",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "披荆斩棘",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "2米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，转身重劈，对前方直线路径内的敌人造成 0.5 力量点外功伤害。</p><p>·如果目标处于“流血”，额外流失 10 点气血。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "流血加伤",
+                            "trigger": "preDamage",
+                            "script": "const hasBleed = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\");\nif (hasBleed) {\n    args.config.amount += 10;\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "一般棍法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>普通的棍法套路，练起来呼呼生风，节奏生动。</p><p><strong>需求：</strong>棍</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "棍",
+            "moves": [
+                {
+                    "name": "劈棍",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，两手握棍，弓步下劈，对目标造成 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "持棍",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，两脚前后开立，两手满把握棍，开启架招。格挡 1 米内的攻击成功后，击退目标 1 米。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "击退手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击退提示",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"格挡成功！若攻击者在1米内，请手动将其击退1米。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "戳棍",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，左手滑握，右手前戳，对目标造成 0.3 力量点外功伤害，击破架招时，将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ui.notifications.info(`${args.target.name} 被击破架招，请手动将其击飞 1 米！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "抡棍",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作施展此招，压制对方虚招。握住棍把，平抡一周，对周围敌人造成 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    }
+                },
+                {
+                    "name": "舞花步劈",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，身随步转，左右舞花下劈，对周围敌人造成 0.5 力量点外功伤害，并击退敌人 1 米。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "击退手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击退提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    ui.notifications.info(`${args.target.name} 命中，请手动将其击退 1 米。`);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "常见刺法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>常见防身套路，将尖刃藏于身上，以备不时之需。</p><p><strong>需求：</strong>匕首</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "匕首",
+            "moves": [
+                {
+                    "name": "割刺",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，紧握匕首，迅速横划，对目标造成 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "格刺",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，反握匕首，站立对敌，开启架招。格挡 1 米内的攻击成功后，使对方流失 5 点气血。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反伤",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    await args.attacker.applyHealing({amount: -5, type: 'hp'});\n    ui.notifications.info(`格挡反刺！${args.attacker.name} 流失 5 点气血。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "斜刺",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，躬身斜上，捅刺其腹部，对目标造成 0.3 力量点外功伤害，击破架招时，为其添加一层“流血”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破流血",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n    ui.notifications.info(`${args.target.name} 流血！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "剜刺",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作施展此招，压制对方虚招。刺击目标，弯转尖刃，对其造成 0.5 力量点外功伤害，并使其陷入“下盘不稳”，持续三回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "下盘不稳",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "抹刺",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，匕首直刺，腕动横抹，对目标造成 0.6 力量点外功伤害。</p><p>·若目标无架招，招式暴击骰-3。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "暴击修正",
+                            "trigger": "check",
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    args.flags.critThresholdMod += 3;\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "简易掷法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>最简单的暗器练法，从甩路边的小石子练起。</p><p>注：该武学可以用身法属性代替力量造成伤害。</p><p><strong>需求：</strong>暗器</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "暗器",
+            "moves": [
+                {
+                    "name": "挥掷",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，曲臂于胸，用力挥出暗器对目标造成 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "需手动扣除暗器数量。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "夹指",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，四指并拢，食指中指暗中夹住暗器，开启架招。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "需手动扣除暗器数量。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    }
+                },
+                {
+                    "name": "甩掷",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，抬手举高，向下甩出暗器对目标造成 0.3 力量点外功伤害，击破架招时，为其添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "需手动扣除暗器数量。完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破禁足",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "弹掷",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作施展此招，压制对方虚招。手指弹射暗器，对其造成 0.5 力量点外功伤害，并将其击倒。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "需手动扣除暗器数量。完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加倒地",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "旋掷",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "hidden",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，手腕发劲，旋转发出暗器，对目标造成 0.6 力量点外功伤害。</p><p>·若目标距离你 3 米以内，招式伤害+10 点。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "需手动扣除暗器数量。完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shenfa",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "距离检测加伤",
+                            "trigger": "preDamage",
+                            "script": "const t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.target.token?.object || args.target.getActiveTokens()[0];\nif (t1 && t2) {\n    const dist = canvas.grid.measurePath([t1.center, t2.center]).distance;\n    if (dist <= 3) {\n        args.config.amount += 10;\n        ui.notifications.info(\"近距离投掷，伤害+10！\");\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+]

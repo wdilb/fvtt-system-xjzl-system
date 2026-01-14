@@ -56,6 +56,7 @@ const MULTI_FILE_CONFIG = {
         "qimen",          // 奇门
         "yueqi",          // 乐器
         "sanshou",        // 散手
+        "putong",         // 普通传承
         // 以后每增加一个 JSON，只需在这里添加文件名即可
     ],
     // 如果其他门派也变多了，也可以支持：
