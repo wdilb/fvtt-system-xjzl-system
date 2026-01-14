@@ -711,52 +711,60 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
 // });
 
 /**
- * 侠界之旅 - 模板跟随系统 (Sticky Templates)
+ * 监听 Token 移动，处理“粘性”模板
  */
-Hooks.on("updateToken", (tokenDoc, changes, context, userId) => {
-  // 1. 只在有位置变化时触发
-  if (!changes.x && !changes.y) return;
-
-  // 2. 只有当前操作 Token 的用户才负责更新模板 (防止多人重复更新)
+Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
+  // 1. 只有坐标变了才动
+  if (!change.x && !change.y) return;
   if (game.user.id !== userId) return;
 
-  // 3. 准备数据
   const scene = tokenDoc.parent;
   if (!scene) return;
 
-  // V13 API: 获取 Grid 像素大小
+  // 2. 找到要跟随的模板
+  const templates = scene.templates.filter(t =>
+    t.getFlag("xjzl-system", "sourceToken") === tokenDoc.id &&
+    t.getFlag("xjzl-system", "sticky") === true
+  );
+
+  if (templates.length === 0) return;
+
+  // 3. 计算 Token 的新中心点 (V13 兼容写法)
+  // change.x 是新的 x，如果没有变则用 tokenDoc.x
+  const newX = change.x ?? tokenDoc.x;
+  const newY = change.y ?? tokenDoc.y;
+
+  // V13 获取 grid size 的方法: canvas.grid.size
   const gridSize = canvas.grid.size;
 
-  // 计算 Token 移动后的新中心点
-  // 注意：tokenDoc 是数据文档，x/y 是左上角坐标
-  const newX = (changes.x ?? tokenDoc.x);
-  const newY = (changes.y ?? tokenDoc.y);
+  // tokenDoc.width 是占据的格子数 (如 1)
+  const centerX = newX + (tokenDoc.width * gridSize) / 2;
+  const centerY = newY + (tokenDoc.height * gridSize) / 2;
 
-  const tokenCenterX = newX + (tokenDoc.width * gridSize) / 2;
-  const tokenCenterY = newY + (tokenDoc.height * gridSize) / 2;
+  const updates = templates.map(t => ({
+    _id: t.id,
+    x: centerX, // 模板的 x,y 设为 Token 中心
+    y: centerY
+  }));
 
-  // 4. 查找并更新模板
-  // 过滤出当前场景中，flag 标记了 attachedToken 等于该 Token ID 的模板
-  const updates = [];
+  scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
+});
 
-  scene.templates.forEach(t => {
-    // 检查 flag (兼容之前的两种写法)
-    const attachedId = t.flags?.xjzl?.attachedToken || t.flags?.mySystem?.attachedToken;
+// 处理 Token 删除时，顺便删除关联的模板
+Hooks.on("deleteToken", (tokenDoc, options, userId) => {
+  if (game.user.id !== userId) return;
 
-    if (attachedId === tokenDoc.id) {
-      updates.push({
-        _id: t.id,
-        x: tokenCenterX,
-        y: tokenCenterY
-      });
-    }
-  });
+  const scene = tokenDoc.parent;
+  const templatesToDelete = scene.templates.filter(t =>
+    t.getFlag("xjzl-system", "sourceToken") === tokenDoc.id &&
+    t.getFlag("xjzl-system", "autoDelete") === true // 可选：是否随 Token 死亡消失
+  ).map(t => t.id);
 
-  // 5. 提交更新
-  if (updates.length > 0) {
-    scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
+  if (templatesToDelete.length > 0) {
+    scene.deleteEmbeddedDocuments("MeasuredTemplate", templatesToDelete);
   }
 });
+
 /* -------------------------------------------- */
 /*  辅助函数                                    */
 /* -------------------------------------------- */
