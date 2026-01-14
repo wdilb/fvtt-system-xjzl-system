@@ -1,132 +1,117 @@
 /**
- * 侠界之旅 - 自定义测量模板
+ * 侠界之旅 - 自定义测量模板 (V13 修正版)
  */
-export class XJZLMeasuredTemplate extends foundry.canvas.placeables.MeasuredTemplate {
 
-    /**
-     * 初始化绘制
-     */
+// V13 中，MeasuredTemplate 被移动到了 foundry.canvas.placeables 命名空间下
+const MeasuredTemplate = foundry.canvas.placeables.MeasuredTemplate;
+
+export class XJZLMeasuredTemplate extends MeasuredTemplate {
+
+    /* -------------------------------------------- */
+    /*  渲染层：显示名字                            */
+    /* -------------------------------------------- */
+
     async _draw() {
-        await super._draw(); // 先画父类的东西
+        await super._draw();
 
-        // 创建文字对象
-        if (!this.labelName) {
-            this.labelName = this.addChild(new PIXI.Text("", {
-                fontFamily: "Signika",
-                fontWeight: "bold",
-                fontSize: 48,           // 字体再调大一点
-                fill: "#FFFFFF",        // 纯白
-                stroke: "#000000",      // 黑色描边
-                strokeThickness: 6,
-                align: "center",
-                dropShadow: true,
-                dropShadowColor: "#000000",
-                dropShadowBlur: 4,
-                dropShadowAngle: Math.PI / 6,
-                dropShadowDistance: 2,
-            }));
+        // 创建文本对象
+        this.labelDetails = this.addChild(new PIXI.Text("", {
+            fontFamily: "Signika",
+            fontSize: 24,
+            fill: "#FFFFFF",
+            stroke: "#000000",
+            strokeThickness: 4,
+            align: "center",
+            fontWeight: "bold"
+        }));
 
-            this.labelName.anchor.set(0.5, 0.5);
-            // 开启排序
-            this.sortableChildren = true;
-            this.labelName.zIndex = 9999;
-        }
+        this.labelDetails.visible = false;
+        // 确保文字层级在最上面
+        this.labelDetails.zIndex = 10;
     }
 
-    /**
-     * 刷新逻辑
-     */
     _refresh() {
-        super._refresh(); // 父类刷新形状
+        super._refresh();
 
-        // 1. 获取 Flag
-        const flags = this.document.flags;
-
-        // Debug: 把所有 flag 打印出来看看，到底存哪了
-        console.log("XJZL Debug | Flags:", flags);
-
-        // 尝试读取 xjzl-system (这是你的系统真正ID)
-        // 兼容之前的 xjzl
-        const labelText = flags?.["xjzl-system"]?.label || flags?.xjzl?.label || ""
-
-        // 2. 调试日志 (请在控制台查看)
+        const labelText = this.document.getFlag("xjzl-system", "label");
         if (labelText) {
-            console.log(`XJZL | 正在刷新模板，检测到名字: "${labelText}"`);
-        }
+            this.labelDetails.text = labelText;
+            this.labelDetails.visible = true;
 
-        if (this.labelName) {
-            // 设置内容
-            this.labelName.text = labelText;
-            this.labelName.visible = !!labelText;
-
-            if (labelText) {
-                // 3. 坐标修正
-                // 在 V13 中，Template (0,0) 即为原点
-                // 圆形：原点即圆心
-                if (this.document.t === "circle") {
-                    this.labelName.position.set(0, 0);
-                } else if (this.ray) {
-                    this.labelName.position.set(this.ray.dx / 2, this.ray.dy / 2);
-                }
-
-                // 4. 强制置顶
-                // 为了防止被 super._refresh() 重绘的图形覆盖，
-                // 我们在刷新的一刻，把 labelName 重新移到 children 数组的最后面 (Top)
-                this.addChild(this.labelName);
-            }
+            // 这里的 position 是相对于 Template 自身的 (0,0 就是中心)
+            this.labelDetails.position.set(0, 0);
+            this.labelDetails.anchor.set(0.5, 0.5);
+        } else {
+            this.labelDetails.visible = false;
         }
     }
 
-    /**
-     * 1-2-2-2 高亮算法 (V13)
-     */
+    /* -------------------------------------------- */
+    /*  核心逻辑：自定义 V13 高亮算法               */
+    /* -------------------------------------------- */
+
     _getGridHighlightPositions() {
-        if (this.document.t !== "circle") return super._getGridHighlightPositions();
+        // 只有圆形才使用我们的自定义格子逻辑，其他的(锥形、射线)还是用系统的几何计算比较好
+        if (this.document.t !== "circle") {
+            return super._getGridHighlightPositions();
+        }
 
-        // 兼容 V13 isHexagonal
         const grid = canvas.grid;
-        if (grid.isHexagonal) return super._getGridHighlightPositions();
-
         const d = canvas.dimensions;
         const { x, y, distance } = this.document;
 
-        // V13 API
-        const centerOffset = grid.getOffset({ x, y });
-        const centerI = centerOffset.i;
-        const centerJ = centerOffset.j;
+        // 1. 获取模板中心所在的 网格坐标 (i, j)
+        // getOffset 替代了 getGridPositionFromPixels
+        const originOffset = grid.getOffset({ x, y });
 
-        // 计算半径 (按你的设定，distance 就是格子数，所以 distance / 1 = 格子数)
-        // 假设你的 d.distance 是 1。如果 d.distance 是 5，这里就是 distance/5。
-        // 为了稳妥，直接用 distance / d.distance
-        const gridRadius = Math.ceil(distance / d.distance);
+        // 2. 为了保证计算精确，我们将起点强制修正为“该格子的正中心”
+        // 这样避免因为鼠标点击位置稍微偏了一点点，导致距离计算跨格
+        const originCenter = grid.getCenterPoint(originOffset);
 
-        const positions = [];
+        // 3. 计算遍历范围 (格子数)
+        // distance 是尺数 (如 30)，d.distance 是每格尺数 (如 5)
+        // 我们多遍历一圈，确保边缘格子被包含，然后在循环内筛选
+        const rangeGrid = Math.ceil(distance / d.distance);
 
-        for (let i = -gridRadius; i <= gridRadius; i++) {
-            for (let j = -gridRadius; j <= gridRadius; j++) {
-                const dx = Math.abs(i);
-                const dy = Math.abs(j);
+        const highlights = [];
 
-                // 1-2-2-2 逻辑
-                const diagonalSteps = Math.min(dx, dy);
-                const straightSteps = Math.abs(dy - dx);
+        // 4. 遍历以中心为原点的正方形区域
+        for (let i = -rangeGrid; i <= rangeGrid; i++) {
+            for (let j = -rangeGrid; j <= rangeGrid; j++) {
 
-                let gridCost = straightSteps;
-                if (diagonalSteps > 0) {
-                    gridCost += (2 * diagonalSteps - 1);
-                }
+                // 目标格子的网格坐标
+                const targetOffset = { i: originOffset.i + i, j: originOffset.j + j };
 
-                const totalDistance = gridCost * d.distance;
+                // 目标格子的像素中心点 (V13 API: getCenterPoint)
+                const targetCenter = grid.getCenterPoint(targetOffset);
 
-                if (totalDistance <= distance) {
-                    const targetI = centerI + i;
-                    const targetJ = centerJ + j;
-                    const dest = grid.getTopLeftPoint({ i: targetI, j: targetJ });
+                // 5. 调用你的自定义 measurePath
+                // 你的 measurePath 期望的是像素点数组
+                const waypoints = [
+                    { x: originCenter.x, y: originCenter.y },
+                    { x: targetCenter.x, y: targetCenter.y }
+                ];
 
-                    positions.push({ x: dest.x, y: dest.y, color: this.document.fillColor });
+                // 调用 Grid 的 measurePath (它会去调你在 init 里重写的 SquareGrid.prototype.measurePath)
+                const result = grid.measurePath(waypoints);
+
+                // 6. 判定
+                // 使用 <= distance。加个微小的 epsilon (0.01) 防止浮点数精度误差
+                if (result.distance <= distance + 0.01) {
+                    // V13 需要返回 {x, y, color}，这里的 x,y 是像素坐标
+                    // 注意：highlight grid 还是需要左上角坐标或者中心坐标，V13 内部会自动处理
+                    // 我们直接给 grid 计算出的左上角最稳妥，或者直接传 targetCenter 也行，
+                    // 但为了兼容 _getGridHighlightPositions 的预期返回，通常是 Grid 对象的坐标点。
+                    // 最安全的做法是将 grid offset 转换回 point。
+
+                    // 获取该格子的左上角 (用于绘制高亮块)
+                    const targetTopLeft = grid.getTopLeftPoint(targetOffset);
+
+                    highlights.push({ x: targetTopLeft.x, y: targetTopLeft.y });
                 }
             }
         }
-        return positions;
+
+        return highlights;
     }
 }
