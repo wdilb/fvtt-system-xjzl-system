@@ -1161,9 +1161,9 @@ XJZL.statusEffects = [
     description: "XJZL.Status.DyingDesc",
     img: "icons/svg/down.svg", // 向下的箭头或倒地人影
     flags: { "xjzl-system": { slug: "dying", stackable: false } },
-    changes: [
-      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
-    ]
+    // changes: [
+    //   { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+    // ]
   },
   {
     id: "dead",
@@ -1171,9 +1171,9 @@ XJZL.statusEffects = [
     description: "XJZL.Status.DeadDesc",
     img: "icons/svg/skull.svg",
     flags: { "xjzl-system": { slug: "dead", stackable: false } },
-    changes: [
-      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
-    ]
+    // changes: [
+    //   { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+    // ]
   }
 ];
 
