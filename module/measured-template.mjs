@@ -26,10 +26,12 @@ export class XJZLMeasuredTemplate extends MeasuredTemplate {
             }));
             this.labelDetails.zIndex = 100;
             this.labelDetails.anchor.set(0.5, 0.5);
+            // V13 (PixiJS 7+) 使用 eventMode。设置为 'none' 表示忽略所有交互事件，
+            // 鼠标点击会直接“穿透”文字，点到下面的 Control Icon。
+            this.labelDetails.eventMode = "none";
 
-            // 启用剔除和分辨率优化
-            this.labelDetails.cullable = true;
-            // resolution 根据需要设为 1 或 2，V13 默认处理较好，不强制设
+            // 兼容旧版写法 (双重保险)
+            this.labelDetails.interactive = false;
         }
     }
 
@@ -46,7 +48,7 @@ export class XJZLMeasuredTemplate extends MeasuredTemplate {
         if (labelText) {
             this.labelDetails.text = labelText;
             this.labelDetails.visible = true;
-            this.labelDetails.position.set(0, 0);
+            this.labelDetails.position.set(0, -30); //稍微上移一点，不要挡住我们的交互点
         } else {
             this.labelDetails.visible = false;
         }
