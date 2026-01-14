@@ -1285,7 +1285,9 @@ export class ChatCardManager {
                 ignoreDefense: damageConfig.ignoreDefense, //无视内外功防御
                 ignoreStance: damageConfig.ignoreStance,  //无视架招
                 isSkill: isSkillDamage,
-                element: damageConfig.element
+                element: damageConfig.element,
+                move: move, 
+                item: item
             });
 
             // 统计数据更新为该目标发送独立伤害卡片 (仅命中时)
@@ -1617,7 +1619,9 @@ export class ChatCardManager {
                 ignoreDefense: damageConfig.ignoreDefense,
                 ignoreStance: damageConfig.ignoreStance,
                 isSkill: isSkillDamage,
-                element: damageConfig.element
+                element: damageConfig.element,
+                move: move,
+                item: item
             });
 
             if (isHit) {

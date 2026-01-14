@@ -241,9 +241,9 @@
             "sect": "qingtianmen",
             "tier": 2,
             "element": "taiji",
-            "description": "擎天门横练功法，与金钟罩齐名，修炼之人需本身体格健硕，再辅以药液淬炼躯干，大成者肉身不惧刀剑，举手投足间开砖裂石，但若童子身破，其功立破。",
+            "description": "<p>擎天门横练功法，与金钟罩齐名，修炼之人需本身体格健硕，再辅以药液淬炼躯干，大成者肉身不惧刀剑，举手投足间开砖裂石，但若童子身破，其功立破。</p>",
             "requirement": "悟性需求: 4",
-            "automationNote": "童子身状态需GM监管；反伤与减伤自动化",
+            "automationNote": "童子身需GM监管(破身请手动关闭AE或重置内功)。刀剑减伤判定基于攻击者当前装备的武器类型。反伤已做防死循环处理。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -267,7 +267,7 @@
                         "qigan": 8,
                         "shencai": 8
                     },
-                    "description": "小成运功特效：你的格挡值+5。\n当你受到暴击时，攻击者受到5点气血流失。",
+                    "description": "<p>小成运功特效：你的格挡值+5。<br>当你受到暴击时，攻击者受到5点气血流失。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
@@ -280,7 +280,7 @@
                             "label": "横练功-暴击反伤",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.isCrit && args.attacker) {\n    if (args.attacker.temp_isReflecting) return;\n    actor.temp_isReflecting = true;\n    try {\n        await args.attacker.applyDamage({\n            type: 'liushi',\n            amount: 5,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`${actor.name} 触发横练功反震！`);\n    } finally {\n        delete actor.temp_isReflecting;\n    }\n}"
+                            "script": "if (args.isCrit && args.attacker) {\n    // 防死循环检查：如果攻击者正在承受反伤，则不再触发\n    if (args.attacker.isReceivingReflection) return;\n    \n    // 标记攻击者正在被反伤\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({\n            type: 'liushi',\n            amount: 5,\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`${actor.name} 触发横练功反震！`);\n    } finally {\n        // 清除标记\n        args.attacker.isReceivingReflection = false;\n    }\n}"
                         }
                     ]
                 },
@@ -293,7 +293,7 @@
                         "qigan": 12,
                         "shencai": 12
                     },
-                    "description": "圆满运功特效：你的格挡值+10。\n当你受到暴击时，攻击者受到10点气血流失。\n当你被剑法、刀法招式攻击时减免10点伤害。\n·若你已非童子之身，即便将该内功修炼至圆满，也仅生效小成运功特效。\n修满特效：修满[永久]：气血+50，内力+10。",
+                    "description": "<p>圆满运功特效：你的格挡值+10。<br>当你受到暴击时，攻击者受到10点气血流失。<br>当你被剑法、刀法招式攻击时减免10点伤害。<br>·若你已非童子之身，即便将该内功修炼至圆满，也仅生效小成运功特效。<br>修满特效：修满[永久]：气血+50，内力+10。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
@@ -306,7 +306,7 @@
                             "label": "横练功-暴击反伤",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.isCrit && args.attacker) {\n    if (args.attacker.temp_isReflecting) return;\n    actor.temp_isReflecting = true;\n    try {\n        await args.attacker.applyDamage({\n            type: 'liushi',\n            amount: 10,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`${actor.name} 触发横练功反震！`);\n    } finally {\n        delete actor.temp_isReflecting;\n    }\n}"
+                            "script": "if (args.isCrit && args.attacker) {\n    if (args.attacker.isReceivingReflection) return;\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({\n            type: 'liushi',\n            amount: 10,\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`${actor.name} 触发横练功反震！`);\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}"
                         },
                         {
                             "label": "横练功-刀剑减伤",
@@ -317,7 +317,7 @@
                     ]
                 }
             },
-            "masteryEffect": "修满[永久]：气血+50，内力+10。",
+            "masteryEffect": "<p>修满[永久]：气血+50，内力+10。</p>",
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",

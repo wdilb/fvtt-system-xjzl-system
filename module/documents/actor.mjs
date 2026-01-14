@@ -1144,7 +1144,9 @@ export class XJZLActor extends Actor {
       attacker = null,    // 攻击者 Actor
       isHit = true,       // 是否命中
       isBroken = false,   // 是否被破防 (状态，不可逆)
-      isSkill = true      // false表示普通攻击
+      isSkill = true,     // false表示普通攻击
+      move = null,
+      item = null
     } = data;
 
     // [关键] 构建可配置对象 (Mutable Config)
@@ -1171,6 +1173,8 @@ export class XJZLActor extends Actor {
         type: type,
         baseDamage: amount,
         isCrit: config.isCrit, // 虽然未命中，但把暴击意图传过去也无妨
+        move: move,
+        item: item,
         outcome: { isHit: false, isBroken: isBroken } // 只读结果
       };
 
@@ -1199,7 +1203,8 @@ export class XJZLActor extends Actor {
       type: type,
       baseDamage: amount, // 原始面板伤害
       element: config.element,
-
+      move: move,
+      item: item,
       // 允许修改的配置 (包括 isCrit)
       config: config
     };
@@ -1280,6 +1285,8 @@ export class XJZLActor extends Actor {
 
       isCrit: config.isCrit,     // 使用最终确定的暴击状态
       isBroken: isBroken,
+      move: move,
+      item: item,
       config: config,            // 传入配置备查
 
       // 允许修改的输出对象
@@ -1473,7 +1480,9 @@ export class XJZLActor extends Actor {
 
       isCrit: config.isCrit,    // 使用最终暴击状态
       isDying: isDying,
-      isDead: isDead
+      isDead: isDead,
+      move: move,
+      item: item
     };
 
     await this.runScripts(SCRIPT_TRIGGERS.DAMAGED, damagedContext);
