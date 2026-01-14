@@ -1011,7 +1011,9 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/effect-selection.hbs", //特效选择
     "systems/xjzl-system/templates/apps/attribute-test-config.hbs", //属性检定设置窗口
     "systems/xjzl-system/templates/apps/modifier-picker.hbs", //属性修正选择器
-    "systems/xjzl-system/templates/apps/compendium-browser.hbs", // 合集浏览器
+    "systems/xjzl-system/templates/apps/compendiumbrowser/content.hbs", // 合集浏览器
+    "systems/xjzl-system/templates/apps/compendiumbrowser/navigation.hbs", // 合集浏览器
+    "systems/xjzl-system/templates/apps/compendiumbrowser/sidebar.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     //暂停按钮的界面
     "systems/xjzl-system/templates/system/pause.hbs",
