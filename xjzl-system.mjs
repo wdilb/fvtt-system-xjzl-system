@@ -791,13 +791,13 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
   // 使用 ?? 运算符处理 0 的情况
   const newX = change.x ?? tokenDoc.x;
   const newY = change.y ?? tokenDoc.y;
-  
+
   const targetCenterX = newX + (tokenDoc.width * gridSize) / 2;
   const targetCenterY = newY + (tokenDoc.height * gridSize) / 2;
 
   // 4. 单次遍历查找并构建更新数据
   const updates = [];
-  
+
   // V13 推荐直接遍历 Collection
   for (const t of scene.templates) {
     // 快速检查 Flag
@@ -826,7 +826,7 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
  */
 Hooks.on("deleteToken", (tokenDoc, options, userId) => {
   if (game.user.id !== userId) return;
-  
+
   const scene = tokenDoc.parent;
   if (!scene || scene.templates.size === 0) return;
 
@@ -841,6 +841,130 @@ Hooks.on("deleteToken", (tokenDoc, options, userId) => {
 
   if (idsToDelete.length > 0) {
     scene.deleteEmbeddedDocuments("MeasuredTemplate", idsToDelete);
+  }
+});
+
+/**
+ * 监听宏栏放置事件 (Hotbar Drop Hook)
+ */
+/**
+ * 1. 同步钩子：负责拦截
+ * 只要是 Item，立刻告诉 Foundry "你不许动，放着我来"，然后调用异步处理函数。
+ */
+Hooks.on("hotbarDrop", (bar, data, slot) => {
+
+  // 只拦截 Item 类型，且必须包含 UUID
+  if (data.type === "Item" && data.uuid) {
+    // 不加 await，直接触发异步逻辑
+    handleSystemMacro(data, slot);
+
+    // 立刻返回 false，阻止 Foundry 生成默认宏
+    return false;
+  }
+
+  // 其他类型（如 Actor, Journal）放行
+  return true;
+});
+
+/**
+ * 2. 异步处理函数：负责脏活累活
+ */
+async function handleSystemMacro(data, slot) {
+  try {
+    const uuid = data.uuid;
+    // 从 data.data 中获取信息，避免查询数据库
+    // 注意：item.toObject() 产生的数据结构中，type 在顶层
+    const itemData = data.data || {};
+
+    let name = data.name || itemData.name || "未命名";
+    let img = itemData.img || "icons/svg/item-bag.svg";
+    let command = "";
+
+    // === 逻辑分流 ===
+
+    // A. 招式 (Move)
+    if (data.moveId) {
+      command = `
+// 招式宏: ${name}
+const item = await fromUuid("${uuid}");
+if (!item) return ui.notifications.warn("原物品已丢失");
+if (typeof item.roll === "function") {
+    await item.roll("${data.moveId}");
+} else {
+    ui.notifications.error("该物品无法执行招式，请检查系统版本或重新创建宏。");
+}
+`;
+    }
+    // B. 消耗品 (Consumable)
+    // 检查 itemData.type (对应 item.type)
+    else if (itemData.type === "consumable") {
+      command = `
+// 物品宏: ${name}
+const item = await fromUuid("${uuid}");
+if (!item) return ui.notifications.warn("原物品已丢失");
+if (typeof item.use === "function") {
+    await item.use();
+} else {
+    ui.notifications.error("该物品无法执行招式，请检查系统版本或重新创建宏。");
+}
+`;
+    }
+    // C. 其他物品 (发送详情)
+    else {
+      command = `
+// 物品展示宏: ${name}
+const item = await fromUuid("${uuid}");
+if (item) item.postToChat();
+`;
+    }
+
+    // === 创建宏 ===
+
+    // 查重：找一个名字、指令都一样，且属于当前玩家的宏
+    let macro = game.macros.find(m =>
+      m.name === name &&
+      m.command === command &&
+      m.isOwner
+    );
+
+    if (!macro) {
+      macro = await Macro.create({
+        name: name,
+        type: "script",
+        img: img,
+        command: command,
+        flags: { "xjzl.macro": true }
+      });
+    }
+
+    // 分配
+    await game.user.assignHotbarMacro(macro, slot);
+    console.log("XJZL | 宏创建成功:", name);
+
+  } catch (err) {
+    console.error("XJZL | 宏创建失败:", err);
+    ui.notifications.error("宏创建失败，请按F12查看控制台报错");
+  }
+}
+
+/**
+ * 在物品创建前进行预处理
+ * 用于解决从角色身上拖拽已装备物品到物品栏时，状态依然是"已装备"的问题
+ */
+Hooks.on("preCreateItem", (item, data, options, userId) => {
+  // 1. 检查这个物品是否是“世界物品” (即没有嵌入在 Actor 中)
+  // isEmbedded 是 V10+ 的属性，或者检查 !item.parent
+  if (!item.parent) {
+
+    // 2. 检查它是否有装备状态
+    if (item.system.equipped === true) {
+      // 3. 强制覆写数据源，将其设为未装备
+      // updateSource 修改的是即将写入数据库的原始数据
+      item.updateSource({ "system.equipped": false });
+
+      // 如果有其他的状态需要重置（比如 buff激活、内功运行），也可以在这里加
+      // item.updateSource({ "system.active": false }); 
+    }
   }
 });
 

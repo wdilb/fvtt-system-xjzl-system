@@ -26,8 +26,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         },
         // 拖拽配置，用于wuxue自定义排序
         dragDrop: [{
+            // 排序的拖拽
             dragSelector: ".wuxue-group[draggable='true']",
             dropSelector: ".wuxue-list"
+        }, {
+            // 针对招式卡片和物品卡片的拖拽监听
+            dragSelector: ".move-card, .item-grid-card",
+            dropSelector: null
         }],
         actions: {
             // --- 核心切换 ---
@@ -1073,6 +1078,34 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 this._onSearchCultivation(event, event.target);
             });
         }
+
+        // =====================================================
+        // 手动绑定拖拽事件 (Drag & Drop fix)
+        // =====================================================
+        // 1. 选取所有需要拖拽的元素类名
+        //    注意：不要包含 .wuxue-group，因为你在 HTML 里写了 ondragstart 内联代码处理排序，我们避开它以免冲突
+        const dragSelectors = [
+            ".move-card",         // 招式
+            ".item-grid-card",    // 物品/消耗品
+            ".neigong-card",      // 内功 (可选，如果你想让他也能拖到物品栏备份)
+            ".art-book-card"      // 技艺书 (可选)
+        ];
+
+        // 2. 遍历并绑定
+        dragSelectors.forEach(selector => {
+            const elements = html.querySelectorAll(selector);
+            elements.forEach(el => {
+                // 强制确保有 draggable 属性 (双重保险)
+                el.setAttribute("draggable", "true");
+
+                // 移除旧的监听器 (防止重绘多次绑定，虽说 AppV2 重绘是替换节点，但好习惯)
+                el.removeEventListener("dragstart", this._onDragStart);
+
+                // 绑定我们自己的处理函数
+                // bind(this) 确保在 _onDragStart 里能用 this.actor
+                el.addEventListener("dragstart", this._onDragStart.bind(this));
+            });
+        });
     }
 
     /**
@@ -1271,6 +1304,49 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // C. 默认逻辑 (创建新物品)
         // =====================================================
         return super._onDropItem(event, data);
+    }
+
+    /**
+     * 处理拖拽开始，打包数据
+     */
+    _onDragStart(event) {
+        // 1. 停止冒泡
+        // 防止触发外层 .wuxue-group 的排序拖拽逻辑
+        if (this._isSorting && event.target.classList.contains("wuxue-group")) return;
+        event.stopPropagation();
+
+        const el = event.currentTarget;
+        const itemId = el.dataset.itemId;
+
+        // 如果没有 ID，不管
+        if (!itemId) return;
+
+        const item = this.actor.items.get(itemId);
+        if (!item) return;
+
+        // 2. 构建标准 Foundry 拖拽数据
+        const dragData = {
+            type: "Item",       // 必须是 "Item"
+            uuid: item.uuid,    // 核心功能（复制/宏）全靠这个 UUID
+            data: item.toObject() // 兼容性数据，以防某些模块需要完整数据
+        };
+
+        // 3. 特殊处理：如果是招式 (Move)
+        // 我们在数据里夹带私货 moveId，这样主程序的 Hook 就能识别它是招式而不是书
+        if (el.dataset.moveId) {
+            dragData.moveId = el.dataset.moveId;
+            dragData.name = el.dataset.name || item.name; // 用于宏的名字
+        }
+
+        // 4. 将数据写入浏览器事件
+        event.dataTransfer.setData("text/plain", JSON.stringify(dragData));
+
+        const iconImg = el.querySelector("img"); // 尝试在卡片里找图片元素
+        if (iconImg) {
+            // 设置拖拽图像：图像元素, X偏移, Y偏移
+            // 25, 25 意味着鼠标指针位于图标中心
+            event.dataTransfer.setDragImage(iconImg, 25, 25);
+        }
     }
 
     /* -------------------------------------------- */
@@ -1910,9 +1986,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     async _onDrop(event) {
         event.preventDefault();
 
-        // -----------------------------------------------------
-        // 1. 数据解析 (Data Parsing)
-        // -----------------------------------------------------
+        // 1. 数据解析
         let data;
         try {
             data = JSON.parse(event.dataTransfer.getData("text/plain"));
@@ -1922,62 +1996,51 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
         if (data.type !== "Item") return super._onDrop(event, data);
 
-        // -----------------------------------------------------
-        // 2. 身份识别 (Identity Check)
-        // -----------------------------------------------------
-        // A. 先尝试解析出 ID
+        // 2. 身份识别 (获取 sourceItem 对象)
+        // [修复点] 这里必须定义 sourceItem 变量，供后续排序逻辑使用
         let sourceItem = null;
-        let isInternal = false;
-
         if (data.uuid) {
-            // V13 UUID 格式通常是 "Actor.ID.Item.ID" 或 "Item.ID"
-            // 取最后一部分作为 ID
-            const sourceId = data.uuid.split(".").pop();
-
-            // B. 直接在当前 Actor 的缓存集合里找 (同步操作，不需要 await)
-            sourceItem = this.actor.items.get(sourceId);
-
-            // 如果能找到，说明肯定是我自己的物品
-            if (sourceItem) isInternal = true;
+            sourceItem = await fromUuid(data.uuid);
         }
 
-        // -----------------------------------------------------
-        // 3. 核心分流 (Logic Branching)
-        // -----------------------------------------------------
+        // 判断是否是“内部物品” (即物品属于当前 Actor)
+        const isInternal = sourceItem && (sourceItem.parent === this.actor);
 
-        // 【情况 A：外来物品】(本地找不到，或者是空的) -> 交给父类去创建/处理
+        // 3. 核心分流
+
+        // 【情况 A：外来物品】-> 交给父类创建
         if (!isInternal) {
             return super._onDrop(event, data);
         }
 
         // 【情况 B：内部物品】-> 检查排序开关
+        // 如果没有开启排序模式，直接禁止操作！防止自我复制
         if (!this._isSorting) {
-            return super._onDrop(event, data); // 甚至可以直接 return false; 阻断一切
+            return false;
         }
 
         // -----------------------------------------------------
-        // 4. 自定义排序逻辑 (Custom Sorting)
+        // 4. 自定义排序逻辑 (Sorting Logic)
         // -----------------------------------------------------
 
         // A. 锁定目标位置
         const targetRow = event.target.closest(".wuxue-group");
-        if (!targetRow) return super._onDrop(event, data); // 没拖对位置
+        if (!targetRow) return false; // 没拖对位置
 
         // B. 目标检查
         const targetId = targetRow.dataset.itemId;
-        if (!targetId || targetId === sourceItem.id) return false; // 拖给自己
-
-        const targetItem = this.actor.items.get(targetId);
-        if (!targetItem) return;
+        // 如果没有 sourceItem (理论上不可能走到这) 或者拖到了自己身上，退出
+        if (!sourceItem || !targetId || targetId === sourceItem.id) return false;
 
         // C. 获取兄弟列表
+        // [修复点] 现在 sourceItem 是有定义的，可以安全访问 type 属性
         const siblings = this.actor.itemTypes[sourceItem.type]
             .filter(i => i.id !== sourceItem.id)
             .sort((a, b) => (a.sort || 0) - (b.sort || 0));
 
         // D. 计算位置
         const targetIndex = siblings.findIndex(i => i.id === targetId);
-        if (targetIndex === -1) return;
+        if (targetIndex === -1) return; // 目标不在列表里（比如跨类型拖拽了）
 
         const box = targetRow.getBoundingClientRect();
         const midPoint = box.top + box.height / 2;
