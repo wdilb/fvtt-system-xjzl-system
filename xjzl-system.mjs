@@ -524,44 +524,62 @@ Hooks.on('getSceneControlButtons', (controls) => {
   }
 
   // 3·注入 AOE Creator 按钮 
-  const templateLayer = controls.find(c => c.name === "templates");
+  // 1. 查找 templates 层级 (测量工具在代码里叫 templates)
+  let templateLayer = null;
+
+  // 仿照你处理 tokenLayer 的方式
+  if (controls.templates) {
+    templateLayer = controls.templates;
+  }
+  else if (controls instanceof Map && controls.has('templates')) {
+    templateLayer = controls.get('templates');
+  }
+  else if (Array.isArray(controls)) {
+    templateLayer = controls.find(c => c.name === "templates");
+  }
 
   // 2. 注入按钮
   if (templateLayer) {
-    // 定义我们的工具按钮
     const aoeBtn = {
       name: "xjzl-aoe",
-      title: "创建自定义效果区域", // 鼠标悬停提示
-      icon: "fas fa-bullseye",    // 图标
+      title: "创建自定义效果区域", // 建议后续在 zh-cn.json 中添加 key: XJZL.UI.AOECreator.Title
+      icon: "fas fa-bullseye",
       visible: true,
-      button: true,  // 【关键】设为 true 表示这是一个一次性点击按钮，而不是切换到某种画图模式
+      button: true, // 关键：这是点击型按钮
       onClick: () => {
-        // 单例模式：防止打开多个窗口
-        // 这里假设你已经把 AOECreator 挂载到了 game.xjzl.applications 或直接 import 了
-        // 如果是直接 import 的类：
+        // 确保 AOECreator 已经在文件顶部 import
         const existingApp = Object.values(ui.windows).find(
           (app) => app.options.id === "xjzl-aoe-creator"
         );
-
         if (existingApp) {
           existingApp.render(true, { focus: true });
         } else {
-          // 确保 AOECreator 已经被 import
           new AOECreator().render(true);
         }
       }
     };
 
-    // 3. 添加到 tools 数组中
-    // 为了安全起见，检查一下 tools 是否存在
-    if (!templateLayer.tools) templateLayer.tools = [];
+    const tools = templateLayer.tools;
 
-    // 防止重复添加 (热重载时可能发生)
-    const existingBtnIndex = templateLayer.tools.findIndex(t => t.name === "xjzl-aoe");
-    if (existingBtnIndex > -1) {
-      templateLayer.tools[existingBtnIndex] = aoeBtn; // 替换旧的
-    } else {
-      templateLayer.tools.push(aoeBtn); // 添加新的
+    // 3. 处理 tools 集合 (严格仿照你原本的 tools 处理逻辑)
+
+    // 情况 A: Map 结构
+    if (tools instanceof Map) {
+      if (!tools.has('xjzl-aoe')) {
+        tools.set('xjzl-aoe', aoeBtn);
+      }
+    }
+    // 情况 B: 数组结构
+    else if (Array.isArray(tools)) {
+      if (!tools.some(t => t.name === 'xjzl-aoe')) {
+        tools.push(aoeBtn);
+      }
+    }
+    // 情况 C: 普通对象结构 (Object)
+    else if (tools) {
+      if (!tools['xjzl-aoe']) {
+        templateLayer.tools['xjzl-aoe'] = aoeBtn;
+      }
     }
   }
 });
