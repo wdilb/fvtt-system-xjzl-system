@@ -21,7 +21,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，抽身换影，乘势借力，进入“十八跌”状态，持续到战斗结束或者切换武学套路。</p><p><strong>十八跌：</strong>自身闪避+5，每次闪避成功后，下一次出招伤害增加 5 点（此效果重复闪避时不叠加）。</p><p><strong>升级:</strong>闪避成功后伤害再增加 5 点，内力消耗+1。</p>",
-                    "automationNote": "应用获得BUFF。闪避后增伤全自动（通过脚本监听 avoided 触发）。",
+                    "automationNote": "应用获得BUFF。BUFF内含监听脚本：闪避后自动获得增伤BUFF。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -37,7 +37,7 @@
                         {
                             "label": "获得十八跌",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"十八跌\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "// 1. 计算增伤数值 (基础5 + 成长5)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = 5 + (lvl - 1) * 5;\n\n// 2. 获取特效模板\nconst eff = thisItem.effects.getName(\"十八跌\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 3. 将计算好的增伤数值存入 Flag，供后续脚本使用\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.storedBonus\", bonus);\n\n// 4. 应用\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -145,9 +145,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "命中击倒",
+                            "label": "命中击倒与提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(\"目标被抛飞并倒地（请手动处理位移）。\");\n    \n    const hasShiba = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shibadie\");\n    if (hasShiba) {\n        ChatMessage.create({\n             content: `<div class=\"xjzl-chat-card\"><p><b>十八跌检测：</b></p><p>若本次攻击是闪避反击，请手动消耗 [十八跌] 状态，并给目标添加 [缴械]。</p></div>`,\n             speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
+                            "script": "if (args.isHit) {\n    // 1. 自动击倒\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(\"目标被抛飞并倒地（请手动处理位移）。\");\n    \n    // 2. 十八跌检测提示\n    const hasShiba = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shibadie\");\n    if (hasShiba) {\n        ChatMessage.create({\n             content: `<div class=\"xjzl-chat-card\"><p><b>十八跌检测：</b></p><p>若本次攻击是闪避反击，请手动消耗 [十八跌] 状态，并给目标添加 [缴械]。</p></div>`,\n             speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -157,7 +157,7 @@
                 {
                     "name": "十八跌",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "description": "闪避增加，闪避后增伤。",
+                    "description": "闪避增加，闪避后下一次伤害增加。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -165,10 +165,10 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "闪避触发",
+                                    "label": "闪避触发增伤",
                                     "trigger": "avoided",
                                     "active": true,
-                                    "script": "// 闪避成功，给自身添加借力BUFF\nconst item = actor.items.find(i => i.name === \"沾衣十八跌\");\nif (item) {\n    const buff = item.effects.getName(\"借力\").toObject();\n    delete buff._id;\n    buff.origin = item.uuid;\n    // 计算伤害加成: 5 + (Lv-1)*5\n    // 这里的 Lv 需要取 抽身换影 的等级\n    const move = item.system.moves.find(m => m.name === \"抽身换影\");\n    const lvl = Math.max(1, move?.computedLevel || 1);\n    const bonus = 5 + (lvl - 1) * 5;\n    \n    buff.changes[0].value = String(bonus);\n    await game.xjzl.api.effects.addEffect(actor, buff);\n    ui.notifications.info(\"十八跌：闪避成功，蓄势待发！\");\n}"
+                                    "script": "// 1. 通过 origin 反查源物品 (比 name 查找更稳健)\n// thisEffect.origin 指向的是施加该状态的 Item UUID\nconst originItem = await fromUuid(thisEffect.origin);\nif (!originItem) return;\n\n// 2. 读取之前存入的增伤数值 (Flag)\nconst bonus = thisEffect.getFlag(\"xjzl-system\", \"storedBonus\") || 5;\n\n// 3. 获取“借力”模板并应用\nconst buff = originItem.effects.getName(\"借力\").toObject();\ndelete buff._id;\nbuff.origin = originItem.uuid;\nbuff.changes[0].value = String(bonus);\n\nawait game.xjzl.api.effects.addEffect(actor, buff);\nui.notifications.info(\"十八跌：闪避成功，蓄势待发！\");"
                                 }
                             ]
                         }
@@ -195,7 +195,7 @@
                                     "label": "消耗借力",
                                     "trigger": "attack",
                                     "active": true,
-                                    "script": "// 仅在攻击时消耗\nawait thisEffect.delete();"
+                                    "script": "await thisEffect.delete();"
                                 }
                             ]
                         }
@@ -1046,7 +1046,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，提地擎天，撂手单炮，对目标造成伤害。若命中无架招目标，则将目标击飞 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "description": "<p>提地擎天，撂手单炮，对目标造成伤害。若命中无架招目标，则将目标击飞 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
                     "automationNote": "击飞手动提示。",
                     "calculation": {
                         "base": 0,
@@ -1083,7 +1083,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，十字闯步，抓臂冲拳，对目标造成伤害，若击破架招，将目标击倒。</p><p>·若目标架招为徒手招式，虚招值+2。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "description": "<p>十字闯步，抓臂冲拳，对目标造成伤害，若击破架招，将目标击倒。</p><p>·若目标架招为徒手招式，虚招值+2。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
                     "automationNote": "击破击倒自动。克制徒手架招自动判定。",
                     "calculation": {
                         "base": 0,
@@ -1112,7 +1112,7 @@
                         {
                             "label": "克制徒手",
                             "trigger": "check",
-                            "script": "if (args.target) {\n    const stanceId = args.target.system.martial.stance;\n    if (stanceId) {\n        // 查找对方架招物品\n        const item = args.target.items.get(args.target.system.martial.stanceItemId);\n        const move = item?.system.moves.find(m => m.id === stanceId);\n        if (move?.weaponType === \"unarmed\") {\n            args.flags.grantFeint += 2;\n        }\n    }\n}",
+                            "script": "if (args.target) {\n    const stanceId = args.target.system.martial.stance;\n    if (stanceId) {\n        // 使用 targetStanceItem 避免与全局 item 冲突\n        const targetStanceItem = args.target.items.get(args.target.system.martial.stanceItemId);\n        if (targetStanceItem) {\n            const moveData = targetStanceItem.system.moves.find(m => m.id === stanceId);\n            if (moveData?.weaponType === \"unarmed\") {\n                args.flags.grantFeint += 2;\n            }\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1126,7 +1126,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>次要动作，双手抱拳，迎面扳手，开启架招。</p><p>格挡成功后获得一层“蓄劲”，至多三层，持续到脱战。</p><p><strong>蓄劲：</strong>每层使你暴击骰-1。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "description": "<p>双手抱拳，迎面扳手，开启架招。</p><p>格挡成功后获得一层“蓄劲”，至多三层，持续到脱战。</p><p><strong>蓄劲：</strong>每层使你暴击骰-1。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
                     "automationNote": "格挡获劲自动。",
                     "calculation": {
                         "base": 0,
@@ -1195,7 +1195,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，上步横靠身连进，长短拳循环无端，对目标造成伤害。若你以此招在切磋比武将对手击败，对手对你的好感上升 10 点。（仅一次）</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "description": "<p>上步横靠身连进，长短拳循环无端，对目标造成伤害。若你以此招在切磋比武将对手击败，对手对你的好感上升 10 点。（仅一次）</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
                     "automationNote": "好感度需DM手动处理。",
                     "calculation": {
                         "base": 0,
@@ -6589,7 +6589,7 @@
                         {
                             "label": "获得冰泪",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"冰泪\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"冰泪\").toObject();\n// 关键：显式写入来源，以便后续脚本能找到源物品\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -6714,7 +6714,7 @@
                                     "label": "施加回雪",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "// 仅攻击命中且造成伤害时触发\nif (args.type === 'attack' && args.isHit && args.finalDamage > 0) {\n    const huixue = actor.items.find(i => i.name === \"洛神赋\")?.effects.getName(\"回雪\");\n    if (!huixue) return;\n    \n    // 检查目标现有层数\n    const targetEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huixue\");\n    const currentStacks = targetEff ? (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    \n    if (currentStacks >= 2) {\n        // 爆层逻辑\n        if (targetEff) await targetEff.delete();\n        \n        // 计算流失量 (基础10 + 升级)\n        const item = actor.items.find(i => i.name === \"洛神赋\");\n        const moveData = item.system.moves.find(m => m.name === \"凝泪成雪\");\n        const lvl = Math.max(1, moveData?.computedLevel || 1);\n        const loss = 10 + (lvl - 1) * 10;\n        \n        await args.target.applyDamage({amount: loss, type: \"liushi\", attacker: actor, isHit: true});\n        \n        // 禁足1回合\n        const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if (root) {\n            const rootData = foundry.utils.deepClone(root);\n            rootData.duration = {rounds: 1};\n            await game.xjzl.api.effects.addEffect(args.target, rootData);\n        }\n        ui.notifications.info(`${args.target.name} 回雪爆发！流失 ${loss} 气血并禁足。`);\n    } else {\n        // 正常叠加\n        const effData = huixue.toObject();\n        delete effData._id;\n        effData.origin = thisEffect.origin;\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n}"
+                                    "script": "// 仅攻击命中且造成伤害时触发\nif (args.type === 'attack' && args.isHit && args.finalDamage > 0) {\n    // 1. 获取源物品 (优先通过 UUID，回退到名称查找)\n    let sourceItem = await fromUuid(thisEffect.origin);\n    if (!sourceItem) sourceItem = actor.items.find(i => i.name === \"洛神赋\");\n    if (!sourceItem) return;\n    \n    // 2. 获取回雪模板\n    const huixue = sourceItem.effects.getName(\"回雪\");\n    if (!huixue) return;\n    \n    // 3. 检查目标现有层数\n    const targetEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huixue\");\n    const currentStacks = targetEff ? (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    \n    if (currentStacks >= 2) {\n        // === 爆层逻辑 (3层) ===\n        if (targetEff) await targetEff.delete();\n        \n        // 计算流失量 (基础10 + 升级)\n        const moveData = sourceItem.system.moves.find(m => m.name === \"凝泪成雪\");\n        const lvl = Math.max(1, moveData?.computedLevel || 1);\n        const loss = 10 + (lvl - 1) * 10;\n        \n        // 应用流失伤害\n        await args.target.applyDamage({amount: loss, type: \"liushi\", attacker: actor, isHit: true});\n        \n        // 禁足1回合\n        const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if (root) {\n            const rootData = foundry.utils.deepClone(root);\n            rootData.duration = {rounds: 1};\n            await game.xjzl.api.effects.addEffect(args.target, rootData);\n        }\n        ui.notifications.info(`${args.target.name} 回雪爆发！流失 ${loss} 气血并禁足。`);\n    } else {\n        // === 正常叠加 ===\n        const effData = huixue.toObject();\n        delete effData._id;\n        effData.origin = sourceItem.uuid; // 传递源头 UUID\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n}"
                                 }
                             ]
                         }
@@ -8561,7 +8561,7 @@
                         {
                             "label": "击飞提示",
                             "trigger": "hit",
-                            "script": "const unstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (args.isHit && unstable) {\n    ui.notifications.info(`${args.target.name} 下盘不稳，被击飞 1 米！`);\n}",
+                            "script": "// 优化：直接读取系统计算好的状态Flags\nif (args.isHit && args.target.xjzlStatuses.unstable) {\n    ui.notifications.info(`${args.target.name} 下盘不稳，被击飞 1 米！`);\n}",
                             "active": true
                         }
                     ]
@@ -8704,7 +8704,7 @@
                         {
                             "label": "黑暗",
                             "trigger": "hit",
-                            "script": "const isBlind = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"blind\");\nif (isBlind) {\n    const eff = thisItem.effects.getName(\"黑暗\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 陷入永久黑暗！`);\n}",
+                            "script": "// 优化：直接读取系统计算好的状态Flags\nif (args.target.xjzlStatuses.blind) {\n    const eff = thisItem.effects.getName(\"黑暗\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 陷入永久黑暗！`);\n}",
                             "active": true
                         }
                     ]
@@ -8725,7 +8725,7 @@
                                     "label": "暗掌触发",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "if (args.type === \"attack\" && args.isHit) {\n    // 消耗暗掌\n    await thisEffect.delete();\n    \n    // 计算额外伤害\n    const item = actor.items.find(i => i.name === \"灭神掌\");\n    const moveData = item.system.moves.find(m => m.name === \"暗无天日\");\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const extra = 5 + (lvl - 1) * 5;\n    \n    await args.target.applyDamage({amount: extra, type: \"mental\", attacker: actor, isHit: true});\n    \n    // 施加目盲\n    const blind = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if (blind) {\n        const data = foundry.utils.deepClone(blind);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    ui.notifications.info(`暗掌触发：${extra} 精神伤害 + 目盲`);\n}"
+                                    "script": "// 修正：直接使用 thisItem，无需遍历查找\nif (args.type === \"attack\" && args.isHit) {\n    // 消耗暗掌\n    await thisEffect.delete();\n    \n    // 计算额外伤害\n    // 从 thisItem (武学书) 中查找 \"暗无天日\" 招式的数据来计算等级\n    const moveData = thisItem.system.moves.find(m => m.name === \"暗无天日\");\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const extra = 5 + (lvl - 1) * 5;\n    \n    await args.target.applyDamage({amount: extra, type: \"mental\", attacker: actor, isHit: true});\n    \n    // 施加目盲\n    const blind = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if (blind) {\n        const data = foundry.utils.deepClone(blind);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    ui.notifications.info(`暗掌触发：${extra} 精神伤害 + 目盲`);\n}"
                                 }
                             ]
                         }

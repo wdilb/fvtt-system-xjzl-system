@@ -1854,7 +1854,7 @@
                     "targetInfo": "自身",
                     "actionCost": "全回合动作",
                     "description": "<p>向月共饮，扬臂饮尽壶中酒，消耗自身行囊任意一壶美酒获得效果，且额外增加 10 醉意。根据你的酒量，获得“护身”，至多三层：</p><p>酒量大于 30，获得一层，持续到脱战。</p><p>酒量大于 50，获得两层，持续到脱战。</p><p>酒量大于 100，获得三层，持续到脱战。</p><p><strong>护身：</strong>每层增加内外功防御 5 点。</p><p>·自身受到内外功伤害后，移除所有“护身”，每移除一层护身，获得一层“仙酿”状态。</p><p><strong>升级：</strong>再增加 10 点醉意，内力消耗+2。</p>",
-                    "automationNote": "消耗美酒手动。增加醉意、计算护身层数自动。受击移除护身并转仙酿自动。",
+                    "automationNote": "消耗美酒手动。增加醉意、计算护身层数自动。受击移除护身并转仙酿手动提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1886,7 +1886,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>颠颠倒倒，肆意挥剑，月光难泄，剑影难窥，不消耗速度突进至目标身前，对目标及其 1 米内所有敌人造成 0.7 内息点内功伤害。</p><p>·可以消耗自身与目标的“仙酿”状态，每合计消耗一层“仙酿”，招式伤害+5，若合计消耗层数大于等于 5 层，则此招必定命中。</p><p>·施展此招后，进入“酒仙”状态，持续到脱战。</p><p><strong>酒仙：</strong>你每回合初获得 10 点醉意，且不受“醉倒”的移动速度减半和命中劣势效果影响。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "醉意消耗自动。仙酿统计与消耗、伤害加成、必中判定全自动。酒仙状态自动。突进手动。",
+                    "automationNote": "醉意消耗自动。仙酿消耗采用手动弹窗输入总层数。酒仙状态自动。突进手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1919,7 +1919,7 @@
                         {
                             "label": "仙酿爆发与酒仙",
                             "trigger": "attack",
-                            "script": "// 1. 统计全场仙酿\nlet totalStacks = 0;\nconst selfEff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nif (selfEff) totalStacks += (selfEff.getFlag(\"xjzl-system\", \"stacks\") || 1);\n\n// 注意：game.user.targets 是 Set\nconst targets = Array.from(game.user.targets);\nfor (const t of targets) {\n    const tActor = t.actor;\n    if (tActor) {\n        const tEff = tActor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\n        if (tEff) totalStacks += (tEff.getFlag(\"xjzl-system\", \"stacks\") || 1);\n    }\n}\n\nif (totalStacks > 0) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"何处人间\" },\n        content: `<p>全场共有 <b>${totalStacks}</b> 层 [仙酿]。</p><p>是否全部消耗以增强威力？</p><p>效果：每层伤害+5。若>=5层，必定命中。</p>`,\n        yes: { label: \"全部消耗\" },\n        no: { label: \"不消耗\" }\n    });\n\n    if (confirm) {\n        // 效果\n        const dmgBonus = totalStacks * 5;\n        args.flags.damageResult.damage += dmgBonus;\n        args.flags.damageResult.breakdown += `\\n+ 仙酿消耗(${totalStacks})：+${dmgBonus}`;\n        \n        if (totalStacks >= 5) {\n            args.flags.forceHit = true;\n            ui.notifications.info(\"酒意滔天，此剑必中！\");\n        }\n\n        // 移除\n        if (selfEff) await selfEff.delete();\n        for (const t of targets) {\n            const tActor = t.actor;\n            if (tActor) {\n                const tEff = tActor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\n                if (tEff) await tEff.delete();\n            }\n        }\n    }\n}\n\n// 获得酒仙\nconst jiuxian = thisItem.effects.getName(\"酒仙\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, jiuxian);",
+                            "script": "// 1. 弹出输入框询问全场总层数 (避免遍历遍历全场Token)\nconst confirm = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"何处人间 - 仙酿爆发\" },\n    content: `<p>请统计场上所有单位(含自身)的 [仙酿] 总层数：</p><input type='number' name='stacks' value='0' style='text-align:center;' autofocus/>`,\n    ok: {\n        label: \"确定消耗\",\n        callback: (event, button) => new FormData(button.form).get(\"stacks\")\n    }\n});\n\nconst totalStacks = parseInt(confirm) || 0;\n\nif (totalStacks > 0) {\n    // 效果\n    const dmgBonus = totalStacks * 5;\n    args.flags.damageResult.damage += dmgBonus;\n    args.flags.damageResult.breakdown += `\\n+ 仙酿消耗(${totalStacks}): +${dmgBonus}`;\n    \n    if (totalStacks >= 5) {\n        args.flags.forceHit = true;\n        ui.notifications.info(\"酒意滔天，此剑必中！\");\n    }\n    // 提示手动移除\n    ui.notifications.info(\"伤害已加成。请手动移除场上相关单位的 [仙酿] 状态。\", {permanent: true});\n}\n\n// 获得酒仙\nconst jiuxian = thisItem.effects.getName(\"酒仙\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, jiuxian);",
                             "active": true
                         }
                     ]
@@ -1949,7 +1949,7 @@
                 {
                     "name": "护身",
                     "icon": "icons/magic/defensive/shield-barrier-glowing-blue.webp",
-                    "description": "增加防御。受击转仙酿。",
+                    "description": "增加防御。受击后移除并提示转仙酿。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1958,10 +1958,10 @@
                             "maxStacks": 3,
                             "scripts": [
                                 {
-                                    "label": "转化仙酿",
+                                    "label": "转化提示",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "if (['waigong', 'neigong'].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 移除护身\n    await thisEffect.delete();\n    \n    // 添加等量仙酿\n    // 我们需要找到源Item来获取仙酿模板，但这里 active effect 的 origin 只是 uuid string\n    // 简便方法：直接用名称查找\n    const item = await fromUuid(thisEffect.origin);\n    if (item) {\n        const effTemplate = item.effects.getName(\"仙酿\").toObject();\n        for(let i=0; i<stacks; i++) {\n            await game.xjzl.api.effects.addEffect(actor, effTemplate);\n        }\n        ui.notifications.info(`护身破碎，化为 ${stacks} 层仙酿！`);\n    }\n}"
+                                    "script": "if (['waigong', 'neigong'].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 移除护身\n    await thisEffect.delete();\n    // 提示手动添加，避免去源物品查找\n    ui.notifications.info(`护身破碎！请手动给自己添加 ${stacks} 层 [仙酿]。`, {permanent: false});\n}"
                                 }
                             ]
                         }
@@ -2244,7 +2244,7 @@
                     "targetInfo": "自身",
                     "actionCost": "全回合动作",
                     "description": "<p>现场弯腰饮酒，一醉方休，消耗自身行囊任意一壶美酒获得效果，且额外增加 10 醉意。根据你的酒量，获得“轻灵”，至多三层：</p><p>酒量大于 30，获得一层，持续到脱战。</p><p>酒量大于 50，获得两层，持续到脱战。</p><p>酒量大于 100，获得三层，持续到脱战。</p><p><strong>轻灵：</strong>每层使你的闪避+5。</p><p>·自身成功闪避后，移除所有“轻灵”，每移除一层轻灵，获得一层“醉八仙”状态。</p><p><strong>升级：</strong>再增加 10 点醉意，内力消耗+2。</p>",
-                    "automationNote": "消耗美酒手动。增加醉意、计算轻灵层数自动。闪避移除轻灵并转醉八仙自动。",
+                    "automationNote": "消耗美酒手动。增加醉意、计算轻灵层数自动。闪避移除轻灵并转醉八仙手动提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2379,10 +2379,10 @@
                             "maxStacks": 3,
                             "scripts": [
                                 {
-                                    "label": "转化醉八仙",
+                                    "label": "转化提示",
                                     "trigger": "avoided",
                                     "active": true,
-                                    "script": "const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n// 移除1层\nawait game.xjzl.api.effects.removeEffect(actor, \"qingling_zui\", 1);\n\n// 获得1层醉八仙\n// 需找到Item\nconst item = await fromUuid(thisEffect.origin);\nif (item) {\n    const eff = item.effects.getName(\"醉八仙\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"闪避成功！轻灵转化为醉八仙。\");\n}"
+                                    "script": "const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait thisEffect.delete();\nui.notifications.info(`闪避成功！轻灵已移除。请手动添加 ${stacks} 层 [醉八仙]。`, {permanent: false});"
                                 }
                             ]
                         }
