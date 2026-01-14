@@ -49,6 +49,7 @@ import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包�
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 import { setupSocket } from "./module/socket.mjs";
 import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
+import { AOECreator } from "./module/applications/aoe-creator.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -521,6 +522,54 @@ Hooks.on('getSceneControlButtons', (controls) => {
       }
     }
   }
+
+  // 3·注入 AOE Creator 按钮 
+
+  // 1. 查找测量工具层级 (measure)
+  let measureLayer = null;
+
+  // 兼容 V13 的多种数据结构
+  if (controls.measure) {
+    measureLayer = controls.measure;
+  } else if (controls instanceof Map && controls.has("measure")) {
+    measureLayer = controls.get("measure");
+  } else if (Array.isArray(controls)) {
+    measureLayer = controls.find(c => c.name === "measure");
+  }
+
+  // 2. 注入按钮
+  if (measureLayer) {
+    const aoeBtn = {
+      name: "xjzl-aoe",
+      title: "创建自定义效果区域", // 记得去 zh-cn.json 加这个 Key，或者直接写中文
+      icon: "fas fa-bullseye",
+      visible: true,
+      button: true, // 点击按钮模式，不是切换工具
+      onClick: () => {
+        // 单例模式：防止打开多个窗口
+        const existingApp = Object.values(ui.windows).find(
+          (app) => app.options.id === "xjzl-aoe-creator"
+        );
+        if (existingApp) {
+          existingApp.render(true, { focus: true });
+        } else {
+          new AOECreator().render(true);
+        }
+      }
+    };
+
+    // 处理 tools 集合的类型 (Array vs Map vs Object)
+    const tools = measureLayer.tools;
+
+    if (tools instanceof Map) {
+      if (!tools.has("xjzl-aoe")) tools.set("xjzl-aoe", aoeBtn);
+    } else if (Array.isArray(tools)) {
+      if (!tools.some(t => t.name === "xjzl-aoe")) tools.push(aoeBtn);
+    } else if (tools && !tools["xjzl-aoe"]) {
+      // Object 结构
+      measureLayer.tools["xjzl-aoe"] = aoeBtn;
+    }
+  }
 });
 
 /* -------------------------------------------- */
@@ -933,6 +982,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/attribute-test-config.hbs", //属性检定设置窗口
     "systems/xjzl-system/templates/apps/modifier-picker.hbs", //属性修正选择器
     "systems/xjzl-system/templates/apps/compendium-browser.hbs", // 合集浏览器
+    "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     //暂停按钮的界面
     "systems/xjzl-system/templates/system/pause.hbs",
   ];
