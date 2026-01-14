@@ -81,6 +81,15 @@
 <img width="1927" height="1307" alt="7" src="https://github.com/user-attachments/assets/34760172-169e-4cc2-a55c-a3cdade0df4c" />
 </details>
 
+### 合集包浏览器 (CompendiumBrowser)
+*因为合集包数据量庞大，添加了专用浏览器，还包含在筛选条件下随机抽取的功能。*
+<details>
+<summary><strong>点击展开：合集包浏览器界面</strong></summary>
+<br>
+<img width="1652" height="1295" alt="072314fc-7f72-44c2-886a-79b6f572e068" src="https://github.com/user-attachments/assets/74576832-b4fb-450e-8d88-951fc414a4c7" />
+<img width="1197" height="859" alt="image" src="https://github.com/user-attachments/assets/1ccf063d-926c-4813-a744-289b74ce8b9d" />
+</details>
+
 ---
 
 ## 🚀 安装指南 (Installation)
