@@ -68,7 +68,7 @@ Hooks.once("init", async function () {
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
   //替换系统的测量模板
-  CONFIG.MeasuredTemplate.objectClass = MySystemMeasuredTemplate;
+  CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
 
   // 替换FVTT自带的一定距离计算方式
   const SquareGrid = foundry.grid.SquareGrid;
@@ -710,6 +710,52 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
 //   }
 // });
 
+/**
+ * 监听 Token 移动，处理模板跟随token移动
+ */
+Hooks.on("updateToken", (tokenDoc, changes, context, userId) => {
+  // 1. 只有 X 或 Y 发生变化时才处理
+  if (!changes.x && !changes.y) return;
+
+  // 2. 只有当前客户端（操作者）负责更新
+  // 避免所有玩家同时向服务器发送更新请求
+  if (game.user.id !== userId) return;
+
+  // 3. 查找当前场景中，标记了要跟随这个 Token 的模板
+  const scene = tokenDoc.parent;
+  if (!scene) return;
+
+  const templatesToUpdate = [];
+
+  // 遍历所有模板
+  scene.templates.forEach(t => {
+    // 获取 Flags (兼容你的命名习惯)
+    const attachedTokenId = t.flags?.xjzl?.attachedToken || t.flags?.mySystem?.attachedToken;
+
+    if (attachedTokenId === tokenDoc.id) {
+      // 计算中心点偏移
+      // 我们希望模板中心 = Token 中心
+
+      const gridSize = scene.grid.size;
+      const tokenCenter = {
+        x: tokenDoc.x + (tokenDoc.width * gridSize) / 2,
+        y: tokenDoc.y + (tokenDoc.height * gridSize) / 2
+      };
+
+      // 准备更新数据
+      templatesToUpdate.push({
+        _id: t.id,
+        x: tokenCenter.x,
+        y: tokenCenter.y
+      });
+    }
+  });
+
+  // 4. 批量更新 (性能更优)
+  if (templatesToUpdate.length > 0) {
+    scene.updateEmbeddedDocuments("MeasuredTemplate", templatesToUpdate);
+  }
+});
 /* -------------------------------------------- */
 /*  辅助函数                                    */
 /* -------------------------------------------- */
