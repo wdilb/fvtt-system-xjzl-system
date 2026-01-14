@@ -524,50 +524,44 @@ Hooks.on('getSceneControlButtons', (controls) => {
   }
 
   // 3·注入 AOE Creator 按钮 
-
-  // 1. 查找测量工具层级 (measure)
-  let measureLayer = null;
-
-  // 兼容 V13 的多种数据结构
-  if (controls.measure) {
-    measureLayer = controls.measure;
-  } else if (controls instanceof Map && controls.has("measure")) {
-    measureLayer = controls.get("measure");
-  } else if (Array.isArray(controls)) {
-    measureLayer = controls.find(c => c.name === "measure");
-  }
+  const templateLayer = controls.find(c => c.name === "templates");
 
   // 2. 注入按钮
-  if (measureLayer) {
+  if (templateLayer) {
+    // 定义我们的工具按钮
     const aoeBtn = {
       name: "xjzl-aoe",
-      title: "创建自定义效果区域", // 记得去 zh-cn.json 加这个 Key，或者直接写中文
-      icon: "fas fa-bullseye",
+      title: "创建自定义效果区域", // 鼠标悬停提示
+      icon: "fas fa-bullseye",    // 图标
       visible: true,
-      button: true, // 点击按钮模式，不是切换工具
+      button: true,  // 【关键】设为 true 表示这是一个一次性点击按钮，而不是切换到某种画图模式
       onClick: () => {
         // 单例模式：防止打开多个窗口
+        // 这里假设你已经把 AOECreator 挂载到了 game.xjzl.applications 或直接 import 了
+        // 如果是直接 import 的类：
         const existingApp = Object.values(ui.windows).find(
           (app) => app.options.id === "xjzl-aoe-creator"
         );
+
         if (existingApp) {
           existingApp.render(true, { focus: true });
         } else {
+          // 确保 AOECreator 已经被 import
           new AOECreator().render(true);
         }
       }
     };
 
-    // 处理 tools 集合的类型 (Array vs Map vs Object)
-    const tools = measureLayer.tools;
+    // 3. 添加到 tools 数组中
+    // 为了安全起见，检查一下 tools 是否存在
+    if (!templateLayer.tools) templateLayer.tools = [];
 
-    if (tools instanceof Map) {
-      if (!tools.has("xjzl-aoe")) tools.set("xjzl-aoe", aoeBtn);
-    } else if (Array.isArray(tools)) {
-      if (!tools.some(t => t.name === "xjzl-aoe")) tools.push(aoeBtn);
-    } else if (tools && !tools["xjzl-aoe"]) {
-      // Object 结构
-      measureLayer.tools["xjzl-aoe"] = aoeBtn;
+    // 防止重复添加 (热重载时可能发生)
+    const existingBtnIndex = templateLayer.tools.findIndex(t => t.name === "xjzl-aoe");
+    if (existingBtnIndex > -1) {
+      templateLayer.tools[existingBtnIndex] = aoeBtn; // 替换旧的
+    } else {
+      templateLayer.tools.push(aoeBtn); // 添加新的
     }
   }
 });
