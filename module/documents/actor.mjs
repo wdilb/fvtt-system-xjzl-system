@@ -2202,51 +2202,95 @@ export class XJZLActor extends Actor {
    * [内部] 普攻配置弹窗
    */
   async _promptBasicAttackConfig(weaponName) {
-    // 1. 生成唯一 ID，防止 DOM 冲突
+    // 1. 生成唯一 ID
     const formId = `roll-config-${foundry.utils.randomID()}`;
 
-    // 2. 准备模板数据 (复用 roll-config.hbs)
-    const context = {
-      formId: formId,
-      needsAttack: true,  // 普攻必检定
-      isFeint: false,     // 普攻非虚招
-      needsDamage: true,  // 普攻必有伤害
-      isCounter: false,
-      canCrit: true       // 普攻可暴击
+    // 2. 准备基础数据
+    // 必须提供 selectOptions 所需的列表，否则 Handlebars 会报错
+    const moveTypes = {
+      real: "实招", // 普攻只能是实招
     };
 
+    // 假设全局配置中有伤害类型，如果没有则使用默认兜底
+    const damageTypes = { waigong: "外功", neigong: "内功" };
+
+    // 3. 准备模板上下文
+    const context = {
+      formId: formId,
+      // --- 关键修复：传入下拉框数据 ---
+      moveTypes: moveTypes,
+      damageTypes: damageTypes,
+
+      // 默认选中状态
+      currentMoveType: "real",    // 普攻默认为实招
+      currentDamageType: "waigong", // 默认外功
+
+      // 初始显隐控制
+      needsAttack: true,  // 实招默认显示攻击
+      isFeint: false,     // 实招默认不显示虚招
+      needsDamage: true,  // 普攻需要伤害
+      isHeal: false,
+      canCrit: true,      // 普攻可暴击
+
+      // 额外标记（可选，用于在模板里显示武器名，需要修改hbs支持，或者如下方通过title显示）
+      weaponName: weaponName
+    };
+
+    // 4. 渲染模板
     const content = await renderTemplate("systems/xjzl-system/templates/apps/roll-config.hbs", context);
 
-    // 3. 额外注入：伤害类型的选择 (因为通用模板里没有这个下拉框)
-    // 我们将其插入到模板生成的 HTML 顶部
-    const extraContent = `
-      <div class="xjzl-rc-row" style="margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #ccc;">
-          <label class="xjzl-rc-label">使用武器</label>
-          <div style="text-align: right; font-weight: bold;">${weaponName}</div>
-      </div>
-      <div class="xjzl-rc-row">
-          <label class="xjzl-rc-label">伤害类型</label>
-          <select name="damageType" style="width: 50%; text-align: center;">
-            <option value="waigong">外功 (Waigong)</option>
-            <option value="neigong">内功 (Neigong)</option>
-          </select>
-      </div>
-    `;
+    // 注意：不再需要 extraContent 的字符串替换 Hack，因为新的 HBS 顶部已经包含了伤害类型选择器
 
-    // 简单的字符串拼接，将额外选项插在 root div 开始标签之后
-    // 注意：roll-config.hbs 的第一行是 <div id="{{formId}}" class="xjzl-rc-root">
-    const finalContent = content.replace('class="xjzl-rc-root">', `class="xjzl-rc-root">${extraContent}`);
-
-    // 4. 调用 DialogV2
+    // 5. 调用 DialogV2
     return foundry.applications.api.DialogV2.wait({
-      window: { title: "普通攻击配置", icon: "fas fa-fist-raised" },
-      content: finalContent,
+      window: {
+        title: `普通攻击配置 (${weaponName})`, // 将武器名显示在标题更合适
+        icon: "fas fa-fist-raised"
+      },
+      content: content,
 
-      // --- 关键：挂载按钮监听 ---
       render: (event) => {
         const root = document.getElementById(formId);
         if (!root) return;
 
+        // --- 复用显隐逻辑 (Copied from _promptRollConfiguration) ---
+        // 这是为了当用户在普攻界面依然想切换成“虚招”时，界面能正确响应
+        const refreshUI = () => {
+          const mType = root.querySelector('[name="overrideMoveType"]').value;
+          const dType = root.querySelector('[name="overrideDamageType"]').value;
+
+          const setVisible = (el, isVisible, displayType = "block") => {
+            if (!el) return;
+            if (isVisible) {
+              el.style.removeProperty("display");
+              el.style.setProperty("display", displayType, "important");
+            } else {
+              el.style.setProperty("display", "none", "important");
+            }
+          };
+
+          // 1. 虚招板块
+          const feintSection = root.querySelector('[data-section="feint"]');
+          setVisible(feintSection, mType === "feint", "block");
+
+          // 2. 攻击板块 (实招且非反击)
+          const needsAtk = (mType !== "counter") && ["waigong", "neigong"].includes(dType);
+          const atkSection = root.querySelector('[data-section="attack"]');
+          setVisible(atkSection, needsAtk, "block");
+
+          // 3. 暴击板块
+          const critSection = root.querySelector('[data-section="crit"]');
+          setVisible(critSection, mType !== "counter", "flex");
+        };
+
+        // 绑定监听
+        root.querySelector('[name="overrideMoveType"]').addEventListener("change", refreshUI);
+        root.querySelector('[name="overrideDamageType"]').addEventListener("change", refreshUI);
+
+        // 初始化一次 UI 状态
+        refreshUI();
+
+        // 按钮点击监听 (计数器)
         root.addEventListener("click", (e) => {
           const btn = e.target.closest("button[data-action]");
           if (!btn) return;
@@ -2282,11 +2326,17 @@ export class XJZLActor extends Actor {
           };
 
           return {
-            damageType: getVal("damageType"), // 获取上面的额外字段
+            // 从 HBS 的新字段 overrideDamageType 获取值，并赋给 damageType
+            damageType: getVal("overrideDamageType"),
+
             bonusAttack: parseInt(getVal("bonusAttack")) || 0,
             bonusDamage: parseInt(getVal("bonusDamage")) || 0,
             manualAttackLevel: parseInt(getVal("manualAttackLevel")) || 0,
-            canCrit: getVal("canCrit") !== false // 默认为 true
+            canCrit: getVal("canCrit") !== false,
+
+            // 如果你希望普攻也能临时变更为虚招，可以在这里获取 overrideMoveType
+            // 但目前的 rollBasicAttack 逻辑似乎只处理 basic，这里仅作兼容
+            isFeint: getVal("overrideMoveType") === "feint"
           };
         }
       }],
