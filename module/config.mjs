@@ -417,6 +417,7 @@ XJZL.hobbies = {
     "clothes": "XJZL.Hobbies.Clothes", // 喜好华服
     "jewelry": "XJZL.Hobbies.Jewelry", // 喜好首饰
     "wxManual": "XJZL.Hobbies.WxManual",   // 喜好秘籍
+    "sqManual": "XJZL.Hobbies.SqManual",   // 喜好秘籍
     "ngManual": "XJZL.Hobbies.NgManual",   // 喜好秘籍
     "jyManual": "XJZL.Hobbies.JyManual",   // 喜好秘籍
     "qizhen": "XJZL.Hobbies.Qizhen",   // 喜好奇珍
