@@ -1,27 +1,45 @@
 import json
 import os
+import sys
+
+def get_script_dir():
+    """获取脚本文件所在的绝对路径"""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
 
 def calculate_next_value(values):
     """
-    根据前三个值计算等差数列的第四个值
+    根据列表最后两个值计算等差数列的下一个值
     """
-    if not isinstance(values, list) or len(values) != 3:
+    if not isinstance(values, list) or len(values) < 2:
         return None
     # 确保列表里是数字
     if not all(isinstance(x, (int, float)) for x in values):
         return None
 
-    # 计算差值 (第三个减第二个)
-    diff = values[2] - values[1]
-    next_val = values[2] + diff
+    # 取最后两个数计算差值
+    last_val = values[-1]
+    prev_val = values[-2]
+    
+    diff = last_val - prev_val
+    next_val = last_val + diff
+    
+    # 保持类型一致（如果是整数就保持整数）
+    if isinstance(last_val, int) and isinstance(prev_val, int):
+        return int(next_val)
     return next_val
 
 def fix_json_files():
-    current_dir = os.getcwd()
+    current_dir = get_script_dir()
+    print(f"正在扫描目录: {current_dir}")
+    
     json_files = [f for f in os.listdir(current_dir) if f.endswith('.json')]
     
     if not json_files:
         print("当前目录下没有找到json文件。")
+        input("按回车键退出...")
         return
 
     print(f"找到 {len(json_files)} 个JSON文件，开始处理...\n")
@@ -47,7 +65,7 @@ def fix_json_files():
                     item_name = item.get("name", "未知武学")
                     
                     for move in moves:
-                        # === 关键修改逻辑 ===
+                        # === Tier 判定逻辑 ===
                         # 优先读取招式(move)里的 tier，如果没有则使用父级(system)的 tier
                         move_specific_tier = move.get("tier")
                         
@@ -59,6 +77,9 @@ def fix_json_files():
                         else:
                             current_tier = int(parent_tier)
                         # ===================
+                        
+                        # 确定目标长度：Tier 3 需要 4 个，其他 Tier 需要 3 个
+                        target_len = 4 if current_tier == 3 else 3
 
                         costs = move.get("costs", {})
                         move_name = move.get("name", "未知招式")
@@ -67,25 +88,35 @@ def fix_json_files():
                         for cost_type in list(costs.keys()):
                             values = costs[cost_type]
                             
+                            # 跳过非列表或空列表
                             if not isinstance(values, list):
                                 continue
-
-                            # === 情况 1: 最终判定 Tier 为 3，补全到 4 个 ===
-                            if current_tier == 3:
-                                if len(values) == 3:
-                                    next_val = calculate_next_value(values)
-                                    if next_val is not None:
-                                        print(f"  [补全] 文件:{filename} | {item_name}-{move_name} | {cost_type}")
-                                        print(f"        Tier判定:{current_tier}(Move优先) | 原数据: {values} -> 增加: {next_val}")
-                                        values.append(next_val)
-                                        is_modified = True
                             
-                            # === 情况 2: 最终判定 Tier 不是 3，截断为 3 个 ===
-                            else:
-                                if len(values) > 3:
-                                    print(f"  [截断] 文件:{filename} | {item_name}-{move_name} | {cost_type}")
-                                    print(f"        Tier判定:{current_tier}(Move优先) | 原数据: {values} -> 截断为: {values[:3]}")
-                                    costs[cost_type] = values[:3]
+                            original_values = list(values) # 备份用于打印日志
+                            current_len = len(values)
+
+                            # === 情况 A: 数据过多，需要截断 ===
+                            if current_len > target_len:
+                                print(f"  [截断] 文件:{filename} | {item_name}-{move_name} | {cost_type}")
+                                print(f"        Tier:{current_tier} -> 目标长度:{target_len} | 原: {original_values} -> 新: {values[:target_len]}")
+                                costs[cost_type] = values[:target_len]
+                                is_modified = True
+                            
+                            # === 情况 B: 数据过少，需要补全 (只要>=2个就能补) ===
+                            elif current_len < target_len and current_len >= 2:
+                                # 循环补全直到达到目标长度
+                                temp_values = list(values)
+                                while len(temp_values) < target_len:
+                                    next_val = calculate_next_value(temp_values)
+                                    if next_val is None:
+                                        break
+                                    temp_values.append(next_val)
+                                
+                                # 只有当成功补全到目标长度才应用修改
+                                if len(temp_values) == target_len:
+                                    print(f"  [补全] 文件:{filename} | {item_name}-{move_name} | {cost_type}")
+                                    print(f"        Tier:{current_tier} -> 目标长度:{target_len} | 原: {original_values} -> 新: {temp_values}")
+                                    costs[cost_type] = temp_values
                                     is_modified = True
 
             if is_modified:
