@@ -542,12 +542,11 @@ Hooks.on('getSceneControlButtons', (controls) => {
   if (templateLayer) {
     const aoeBtn = {
       name: "xjzl-aoe",
-      title: "创建自定义效果区域", // 建议后续在 zh-cn.json 中添加 key: XJZL.UI.AOECreator.Title
+      title: "创建自定义效果区域",
       icon: "fas fa-bullseye",
       visible: true,
       button: true, // 关键：这是点击型按钮
-      onClick: () => {
-        // 确保 AOECreator 已经在文件顶部 import
+      onChange: () => {
         const existingApp = Object.values(ui.windows).find(
           (app) => app.options.id === "xjzl-aoe-creator"
         );

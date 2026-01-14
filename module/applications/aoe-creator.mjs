@@ -15,7 +15,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
   static DEFAULT_OPTIONS = {
     tag: "form",
     id: "xjzl-aoe-creator",
-    classes: ["xjzl-window", "aoe-creator"],
+    classes: ["aoe-creator"],
     position: {
       width: 320,
       height: "auto"
