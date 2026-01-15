@@ -131,17 +131,25 @@
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 1,
-            "description": "百草阁针刺手法，出自《针灸大全》，叙述龙虎龟凤飞经走气四大法，简明扼要。",
+            "description": "<p>百草阁针刺手法，出自《针灸大全》，叙述龙虎龟凤飞经走气四大法，简明扼要。</p><p><strong>需求：</strong>暗器-针</p><p><strong>属性：</strong>太极</p>",
             "requirements": "暗器-针",
             "moves": [
                 {
                     "name": "青龙摆尾",
                     "type": "qi",
                     "actionType": "heal",
+                    "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "hidden",
-                    "range": "1",
-                    "description": "主要动作，针尖刺向病所，如扶船舵，左右拨动，为其添加 10 点护体真气，持续到战斗脱离。<br>·每有一级[疗伤]，提高 1 点护体真气。<br>·每有一级[医术]，提高 2 点护体真气。",
-                    "automationNote": "自动计算并添加护体真气。",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>针尖刺向病所，如扶船舵，左右拨动，为其添加 10 点护体真气，持续到战斗脱离。</p><p>·每有一级[疗伤]，提高 1 点护体真气。</p><p>·每有一级[医术]，提高 2 点护体真气。</p><p><strong>消耗：</strong>1，暗器-针*1</p><p><strong>升级：</strong>额外添加 5 护体真气，内力消耗+1。</p>",
+                    "automationNote": "护体计算自动。暗器消耗手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             1,
@@ -153,8 +161,8 @@
                         {
                             "label": "青龙摆尾",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst base = 10 + (lvl - 1) * 5;\n\n// 获取技能等级\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\nconst yishu = args.attacker.system.arts.yishu.total || 0;\n\nconst total = base + liaoshang * 1 + yishu * 2;\n\nawait args.target.applyHealing({ amount: total, type: \"huti\", showScrolling: true });"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst base = 10 + (lvl - 1) * 5;\n\n// 获取技能/技艺等级\nconst liaoshang = actor.system.skills.liaoshang.total || 0;\nconst yishu = actor.system.arts.yishu.total || 0;\n\nconst total = base + liaoshang * 1 + yishu * 2;\n\nawait args.target.applyHealing({ amount: total, type: \"huti\", showScrolling: true });",
+                            "active": true
                         }
                     ]
                 },
@@ -162,10 +170,18 @@
                     "name": "白虎摇头",
                     "type": "qi",
                     "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "hidden",
-                    "range": "1",
-                    "description": "主要动作，将针捻入，似手摇铃，退方进圆，给自身和目标添加一层“延展”状态，最多三层，持续到战斗脱离。<br>延展：每层使你招式释放距离+1。",
-                    "automationNote": "完全自动化：给双方添加延展。",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>将针捻入，似手摇铃，退方进圆，给自身和目标添加一层“延展”状态，最多三层，持续到战斗脱离。</p><p><strong>延展：</strong>每层使你招式释放距离+1。</p><p><strong>消耗：</strong>1，暗器-针*1</p><p><strong>升级：</strong>可额外添加一层延展，内力消耗+1。</p>",
+                    "automationNote": "BUFF添加自动。暗器消耗手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             1,
@@ -177,18 +193,26 @@
                         {
                             "label": "白虎摇头",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const lvl = args.move.computedLevel;\n// 升级额外添加一层，即 1级+1层，2级+2层...\nconst stacks = 1 + (lvl - 1);\n\nconst yanzhanData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yanzhan\"));\n\n// 循环给目标添加\nfor (let i = 0; i < stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, yanzhanData);\n}\n\n// 循环给自身添加\nfor (let i = 0; i < stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.attacker, yanzhanData);\n}"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 基础1层，升级额外加1层 -> Lv1=1, Lv2=2, Lv3=3\nconst stacks = 1 + (lvl - 1);\n\nconst yanzhanData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yanzhan\"));\n\n// 一次性添加指定层数\nawait game.xjzl.api.effects.addEffect(args.target, yanzhanData, stacks);\nawait game.xjzl.api.effects.addEffect(actor, yanzhanData, stacks);",
+                            "active": true
                         }
                     ]
                 },
                 {
                     "name": "苍龟探穴",
                     "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
                     "weaponType": "hidden",
                     "range": "自身",
-                    "description": "次要动作，指捏毫针，开启架招。格挡成功时，针刺自身穴位，多向透刺，逐渐加深，为自身添加一层“养血”，至多三层，持续到脱战或解除架招。<br>养血：每层使你回合末回复 10 点气血。",
-                    "automationNote": "完全自动化：受伤后若有格挡值生效，则获得养血。",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>指捏毫针，开启架招。格挡成功时，针刺自身穴位，多向透刺，逐渐加深，为自身添加一层“养血”，至多三层，持续到脱战或解除架招。</p><p><strong>养血：</strong>每层使你回合末回复 10 点气血。</p><p><strong>消耗：</strong>1，暗器-针*1</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "开启自动。反击获养血自动。暗器消耗手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
                     "costs": {
                         "mp": [
                             1,
@@ -196,28 +220,31 @@
                             3
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 5
-                    },
                     "scripts": [
                         {
                             "label": "苍龟探穴反击",
                             "trigger": "damaged",
-                            "active": true,
-                            "script": "// 检查架招条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 检查是否有格挡值 (被动格挡也算)\nconst blockValue = system.combat.blockTotal || 0;\nif (blockValue > 0) {\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    await game.xjzl.api.effects.addEffect(actor, yangxueData);\n}"
+                            "script": "// 检查架招条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 检查是否有格挡值 (被动格挡也算)\nconst blockValue = system.combat.blockTotal || 0;\nif (blockValue > 0) {\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    // 限制最大层数3\n    foundry.utils.setProperty(yangxueData, \"flags.xjzl-system.maxStacks\", 3);\n    await game.xjzl.api.effects.addEffect(actor, yangxueData);\n}",
+                            "active": true
                         }
                     ]
                 },
                 {
                     "name": "赤凤迎源",
                     "type": "real",
-                    "weaponType": "hidden",
                     "isUltimate": true,
-                    "range": "1",
+                    "element": "taiji",
                     "damageType": "waigong",
-                    "description": "主要动作，展翅之仪，入针到底，提到表层，一捻一放，为自身和目标添加“连击”，持续到战斗脱离。<br>连击：你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。",
-                    "automationNote": "命中后给双方添加连击状态。",
+                    "weaponType": "hidden",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>展翅之仪，入针到底，提到表层，一捻一放，为自身和目标添加“连击”，持续到战斗脱离。</p><p><strong>连击：</strong>你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。</p><p><strong>消耗：</strong>2，怒气 5，暗器-针*1</p><p><strong>升级：</strong>怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "连击BUFF自动。暗器消耗手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -234,8 +261,8 @@
                         {
                             "label": "赤凤迎源",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isHit) {\n    const lianjiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    \n    await game.xjzl.api.effects.addEffect(args.target, lianjiData);\n    await game.xjzl.api.effects.addEffect(args.attacker, lianjiData);\n}"
+                            "script": "if (args.isHit) {\n    const lianjiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    \n    await game.xjzl.api.effects.addEffect(args.target, lianjiData);\n    await game.xjzl.api.effects.addEffect(actor, lianjiData);\n}",
+                            "active": true
                         }
                     ]
                 }

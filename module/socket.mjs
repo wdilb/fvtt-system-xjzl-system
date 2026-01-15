@@ -27,9 +27,9 @@ async function _socketApplyHealing(targetUuid, data) {
     return await target.applyHealing(data);
 }
 
-async function _socketAddEffect(targetUuid, effectData) {
+async function _socketAddEffect(targetUuid, effectData, count) { 
     const target = await fromUuid(targetUuid);
-    return await game.xjzl.api.effects.addEffect(target, effectData);
+    return await game.xjzl.api.effects.addEffect(target, effectData, count);
 }
 
 async function _socketRemoveEffect(targetUuid, targetId, amount) {

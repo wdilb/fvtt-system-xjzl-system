@@ -7,13 +7,14 @@ export class ActiveEffectManager {
      * 核心方法：向 Actor 添加或叠加特效
      * @param {Actor} actor - 目标角色
      * @param {Object} effectDataOrId - 特效源数据 (普通 Object或者系统状态 ID)
+     * @param {Number} [count=1] - 添加的层数，默认为 1
      * @returns {Promise<ActiveEffect|undefined>} 返回更新或创建的特效文档
      */
-    static async addEffect(actor, effectDataOrId) {
+    static async addEffect(actor, effectDataOrId, count = 1) {
         if (!actor || !effectDataOrId) return;
 
         // [权限拦截]
-        if (!actor.isOwner) return await xjzlSocket.executeAsGM("addEffect", actor.uuid, effectDataOrId);
+        if (!actor.isOwner) return await xjzlSocket.executeAsGM("addEffect", actor.uuid, effectDataOrId, count);
 
         let effectData;
         // =====================================================
@@ -77,6 +78,30 @@ export class ActiveEffectManager {
         // 3. 分支 A: 不存在 -> 直接创建
         // =====================================================
         if (!existingEffect) {
+            // 多层初始化的预处理
+            // 获取该特效定义的最大层数
+            const definedMax = foundry.utils.getProperty(effectData, "flags.xjzl-system.maxStacks") || 0;
+            // 如果有上限且超标，强行钳制
+            if (definedMax > 0 && count > definedMax) {
+                count = definedMax;
+            }
+            // 如果需要一次性创建多层 (count > 1) 且该特效可堆叠
+            const isStackable = foundry.utils.getProperty(effectData, "flags.xjzl-system.stackable");
+
+            if (isStackable && count > 1) {
+                // 1. 显式记录 BaseChanges (这是1层的原始值)
+                // 必须在修改 changes 之前保存，否则 _preCreate 会把乘算后的值当成基准值！
+                foundry.utils.setProperty(effectData, "flags.xjzl-system.baseChanges", foundry.utils.deepClone(effectData.changes));
+
+                // 2. 设置初始层数
+                foundry.utils.setProperty(effectData, "flags.xjzl-system.stacks", count);
+
+                // 3. 计算多层数值 (复用类方法，不手写公式)
+                // 在内存中创建一个临时特效实例 (不保存)
+                const tempEffect = new XJZLActiveEffect(effectData, { parent: actor });
+                // 调用写好的正确逻辑
+                effectData.changes = tempEffect.calculateChangesForStacks(count);
+            }
             // 创建时，系统会自动处理 duration.startTime 等初始化工作
             const createdDocs = await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
             return createdDocs[0];
@@ -115,7 +140,7 @@ export class ActiveEffectManager {
             // =======================================================
             const isChanshou = existingEffect.getFlag("xjzl-system", "slug") === "chanshou";
 
-            if (isChanshou && (currentStacks + 1) >= 5) {
+            if (isChanshou && (currentStacks + count) >= 5) {
                 // 1. 删除 颤手 (静默)
                 await existingEffect.delete({ scrollingStatusText: false });
 
@@ -168,15 +193,20 @@ export class ActiveEffectManager {
                 this._showScrollingText(actor, `~ ${existingEffect.name}`, "neutral");
             } else {
                 // 未达上限：增加层数
-                const newStacks = currentStacks + 1;
+                const newStacks = currentStacks + count;
 
-                // 调用 Document 类的方法，基于 BaseChanges 快照重新计算数值
-                updateData.changes = existingEffect.calculateChangesForStacks(newStacks);
-
-                // 记录新层数
-                updateData["flags.xjzl-system.stacks"] = newStacks;
-                // 因为这是 Update 操作，核心默认不飘字，我们补上
-                this._showScrollingText(actor, `+ ${existingEffect.name} (${newStacks})`, "create");
+                // 溢出检查
+                if (maxStacks > 0 && newStacks > maxStacks) {
+                    newStacks = maxStacks;
+                }
+                if (newStacks !== currentStacks) {
+                    // 调用 Document 类的方法，基于 BaseChanges 快照重新计算数值
+                    updateData.changes = existingEffect.calculateChangesForStacks(newStacks);
+                    // 记录新层数
+                    updateData["flags.xjzl-system.stacks"] = newStacks;
+                    // 因为这是 Update 操作，核心默认不飘字，我们补上
+                    this._showScrollingText(actor, `+ ${existingEffect.name} (${newStacks})`, "create");
+                }
             }
         } else {
             // --- 覆盖模式 (不可叠层) ---

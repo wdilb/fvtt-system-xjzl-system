@@ -57,6 +57,7 @@ const MULTI_FILE_CONFIG = {
         "yueqi",          // 乐器
         "sanshou",        // 散手
         "putong",         // 普通传承
+        "other",          // 其他，一些魔门武学、模组里的武学等等
         // 以后每增加一个 JSON，只需在这里添加文件名即可
     ],
     // 如果其他门派也变多了，也可以支持：
