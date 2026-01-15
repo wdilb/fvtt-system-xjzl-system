@@ -467,8 +467,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
                 let rawThresholds = [];
                 let labels = [];
-
-                if (wuxue.system.category === "qinggong" || wuxue.system.category === "zhenfa") {
+                if (move.progression.mode === "custom" && move.progression.customThresholds.length > 0) {
+                    // 使用自定义门槛
+                    rawThresholds = move.progression.customThresholds;
+                    // 自定义模式没有固定的“领悟/小成”叫法，生成通用标签
+                    labels = rawThresholds.map((_, i) => `阶段 ${i + 1}`);
+                } 
+                else if (wuxue.system.category === "qinggong" || wuxue.system.category === "zhenfa") {
                     if (tier === 1) rawThresholds = [1000];
                     else if (tier === 2) rawThresholds = [3000];
                     else rawThresholds = [6000];
