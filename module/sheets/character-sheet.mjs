@@ -472,7 +472,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     rawThresholds = move.progression.customThresholds;
                     // 自定义模式没有固定的“领悟/小成”叫法，生成通用标签
                     labels = rawThresholds.map((_, i) => `阶段 ${i + 1}`);
-                } 
+                }
                 else if (wuxue.system.category === "qinggong" || wuxue.system.category === "zhenfa") {
                     if (tier === 1) rawThresholds = [1000];
                     else if (tier === 2) rawThresholds = [3000];
@@ -1245,26 +1245,141 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /* -------------------------------------------- */
-    /*  Drag & Drop (堆叠逻辑)                      */
+    /*  Drag & Drop 核心逻辑 (修复版)               */
     /* -------------------------------------------- */
 
     /**
      * @override
-     * 统一处理物品拖拽逻辑
-     * 1. 互斥替换：背景/性格 (先删旧，再建新)
-     * 2. 堆叠逻辑：消耗品等 (只改数量，不建新)
-     * 3. 默认逻辑：创建新物品
+     * 拖拽事件的总入口
+     * 职责：
+     * 1. 解析拖拽数据。
+     * 2. 区分是“外来物品”(新建/堆叠) 还是 “内部物品”(排序/移动)。
+     * 3. 对于外来物品，绝对禁止在此处使用 await 数据库操作，必须直接交给父类。
+     */
+    async _onDrop(event) {
+        event.preventDefault();
+
+        // 1. 数据解析 (Standard Foundry Parsing)
+        let data;
+        try {
+            data = JSON.parse(event.dataTransfer.getData("text/plain"));
+        } catch (err) {
+            return super._onDrop(event, data);
+        }
+
+        // 如果不是物品，直接甩锅给父类处理 (比如可能是 Actor 或 Folder)
+        if (data.type !== "Item") return super._onDrop(event, data);
+
+        // =====================================================
+        // 同步判定来源 (Synchronous Check)
+        // =====================================================
+        // 直接对比字符串。如果 UUID 以当前 Actor 的 UUID 开头，说明是自己身上的东西。
+        const actorUuid = this.actor.uuid;
+        // 判定：data.uuid 存在，且格式为 "ActorID.Item.ItemID"
+        const isInternal = data.uuid && data.uuid.startsWith(actorUuid + ".Item.");
+
+        // =====================================================
+        // 情况 A：外来物品 (External Item)
+        // =====================================================
+        // 逻辑：如果是外面的东西，直接调用父类 super._onDrop。
+        // 父类会自动处理异步数据加载，并回调下方的 _onDropItem 方法。
+        if (!isInternal) {
+            return super._onDrop(event, data);
+        }
+
+        // =====================================================
+        // 情况 B：内部物品 (Internal Item)
+        // =====================================================
+
+        // 1. 检查排序开关
+        // 如果没有开启排序模式，直接返回 false 禁止操作。
+        // 这实现了“防止把物品拖到物品栏导致自我复制”的功能。
+        if (!this._isSorting) {
+            return false;
+        }
+
+        // 2. 获取源物品对象 (同步获取)
+        // 因为是内部物品，它一定在 this.actor.items 缓存里，不需要 await。
+        const itemId = data.uuid.split(".").pop(); // 从 UUID 字符串尾部提取 ID
+        const sourceItem = this.actor.items.get(itemId);
+
+        // 防御性检查：如果找不到物品，或者还没加载好，终止
+        if (!sourceItem) return false;
+
+        // -----------------------------------------------------
+        // 自定义排序逻辑 (Sorting Logic)
+        // -----------------------------------------------------
+
+        // A. 锁定目标位置 (拖到了哪一行？)
+        // 注意：HTML 里的 .wuxue-group 需要有 data-item-id 属性
+        const targetRow = event.target.closest(".wuxue-group");
+        if (!targetRow) return false; // 没拖对位置(比如拖到了空白处)
+
+        // B. 目标检查
+        const targetId = targetRow.dataset.itemId;
+        // 如果没有目标ID，或者目标就是自己，不做任何事
+        if (!targetId || targetId === sourceItem.id) return false;
+
+        // C. 获取同类兄弟列表 (用于计算新的排序值)
+        // 过滤掉自己，并按当前的 sort 值从小到大排序
+        const siblings = this.actor.itemTypes[sourceItem.type]
+            .filter(i => i.id !== sourceItem.id)
+            .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+
+        // D. 找到目标在兄弟列表中的索引
+        const targetIndex = siblings.findIndex(i => i.id === targetId);
+        if (targetIndex === -1) return; // 目标不在列表里（比如跨类型拖拽了，把内功拖到了武学里）
+
+        // E. 计算是在目标上方还是下方
+        const box = targetRow.getBoundingClientRect();
+        const midPoint = box.top + box.height / 2;
+        const isBefore = event.clientY < midPoint;
+
+        let sortBefore, sortAfter;
+
+        if (isBefore) {
+            // 放在目标上面：取目标的前一个和目标之间
+            const prevItem = siblings[targetIndex - 1];
+            // 如果没有前一个，就设为极小值
+            sortBefore = prevItem ? prevItem.sort : (siblings[0].sort - 100000);
+            sortAfter = siblings[targetIndex].sort;
+        } else {
+            // 放在目标下面：取目标和目标的后一个之间
+            const nextItem = siblings[targetIndex + 1];
+            sortBefore = siblings[targetIndex].sort;
+            // 如果没有后一个，就设为极大值
+            sortAfter = nextItem ? nextItem.sort : (siblings[siblings.length - 1].sort + 100000);
+        }
+
+        // F. 执行更新 (取平均值)
+        const newSort = (sortBefore + sortAfter) / 2;
+
+        return this.actor.updateEmbeddedDocuments("Item", [{
+            _id: sourceItem.id,
+            sort: newSort
+        }]);
+    }
+
+    /**
+     * @override
+     * 物品处理逻辑
+     * 职责：
+     * 1. 仅当 _onDrop 判定为“外来物品”并调用 super 时，此方法才会被触发。
+     * 2. 处理“互斥替换”(背景/性格)。
+     * 3. 处理“堆叠数量”(消耗品等)。
+     * 4. 执行最终的创建逻辑。
      */
     async _onDropItem(event, data) {
         // 1. 基础检查
         if (!this.actor.isOwner) return false;
 
-        // 解析拖拽数据 (V13/V12 通用写法)
+        // 2. 加载完整数据
+        // 这一步是异步的，但因为是在 _onDropItem 里，这里的等待是安全的，不会阻塞外层事件。
         const itemData = await Item.implementation.fromDropData(data);
         if (!itemData) return false;
 
         // =====================================================
-        // A. 互斥替换逻辑 (背景 & 性格)
+        // 逻辑 A. 互斥替换逻辑 (背景 & 性格)
         // =====================================================
         const singletonTypes = ["background", "personality"];
         if (singletonTypes.includes(itemData.type)) {
@@ -1279,7 +1394,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 const idsToDelete = existingItems.map(i => i.id);
                 await this.actor.deleteEmbeddedDocuments("Item", idsToDelete);
 
-                // 提示 (可选)
+                // 可选：提示用户
                 // ui.notifications.info(`已替换新的${game.i18n.localize("TYPES.Item." + itemData.type)}`);
             }
             // 逻辑继续向下，交给 super._onDropItem 去创建新的
@@ -1287,27 +1402,30 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // =====================================================
-        // B. 堆叠逻辑 (消耗品/材料)
+        // 逻辑 B. 堆叠逻辑 (消耗品/材料)
         // =====================================================
-        const stackableTypes = ["consumable", "misc", "manual"]; // 根据需要调整类型
+        const stackableTypes = ["consumable", "misc", "manual"];
         if (stackableTypes.includes(itemData.type)) {
             // 查找是否已存在同名同类物品
             const existingItem = this.actor.items.find(i => i.type === itemData.type && i.name === itemData.name);
 
             if (existingItem) {
-                // 计算新数量
+                // 计算新数量 (默认加1，如果拖拽数据里有quantity则加quantity)
                 const addQty = itemData.system.quantity || 1;
                 const newQty = (existingItem.system.quantity || 0) + addQty;
 
-                // 更新现有物品，并阻断后续创建
+                // 更新现有物品
                 await existingItem.update({ "system.quantity": newQty });
-                return false; // 阻断默认创建
+
+                // 【关键】返回 false 阻断默认创建，否则会多出一个新物品
+                return false;
             }
         }
 
         // =====================================================
-        // C. 默认逻辑 (创建新物品)
+        // 逻辑 C. 默认逻辑 (创建新物品)
         // =====================================================
+        // 如果上面都没拦截，就执行 Foundry 默认的创建流程
         return super._onDropItem(event, data);
     }
 
@@ -1982,95 +2100,6 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         });
     }
 
-    /**
-     * @override
-     * 处理拖拽放置逻辑
-     * 1. 外来物品（新建）：总是交给 super 处理
-     * 2. 内部物品（排序）：只有在 _isSorting 为 true 时才执行
-     */
-    async _onDrop(event) {
-        event.preventDefault();
-
-        // 1. 数据解析
-        let data;
-        try {
-            data = JSON.parse(event.dataTransfer.getData("text/plain"));
-        } catch (err) {
-            return super._onDrop(event, data);
-        }
-
-        if (data.type !== "Item") return super._onDrop(event, data);
-
-        // 2. 身份识别 (获取 sourceItem 对象)
-        // [修复点] 这里必须定义 sourceItem 变量，供后续排序逻辑使用
-        let sourceItem = null;
-        if (data.uuid) {
-            sourceItem = await fromUuid(data.uuid);
-        }
-
-        // 判断是否是“内部物品” (即物品属于当前 Actor)
-        const isInternal = sourceItem && (sourceItem.parent === this.actor);
-
-        // 3. 核心分流
-
-        // 【情况 A：外来物品】-> 交给父类创建
-        if (!isInternal) {
-            return super._onDrop(event, data);
-        }
-
-        // 【情况 B：内部物品】-> 检查排序开关
-        // 如果没有开启排序模式，直接禁止操作！防止自我复制
-        if (!this._isSorting) {
-            return false;
-        }
-
-        // -----------------------------------------------------
-        // 4. 自定义排序逻辑 (Sorting Logic)
-        // -----------------------------------------------------
-
-        // A. 锁定目标位置
-        const targetRow = event.target.closest(".wuxue-group");
-        if (!targetRow) return false; // 没拖对位置
-
-        // B. 目标检查
-        const targetId = targetRow.dataset.itemId;
-        // 如果没有 sourceItem (理论上不可能走到这) 或者拖到了自己身上，退出
-        if (!sourceItem || !targetId || targetId === sourceItem.id) return false;
-
-        // C. 获取兄弟列表
-        // [修复点] 现在 sourceItem 是有定义的，可以安全访问 type 属性
-        const siblings = this.actor.itemTypes[sourceItem.type]
-            .filter(i => i.id !== sourceItem.id)
-            .sort((a, b) => (a.sort || 0) - (b.sort || 0));
-
-        // D. 计算位置
-        const targetIndex = siblings.findIndex(i => i.id === targetId);
-        if (targetIndex === -1) return; // 目标不在列表里（比如跨类型拖拽了）
-
-        const box = targetRow.getBoundingClientRect();
-        const midPoint = box.top + box.height / 2;
-        const isBefore = event.clientY < midPoint;
-
-        let sortBefore, sortAfter;
-
-        if (isBefore) {
-            const prevItem = siblings[targetIndex - 1];
-            sortBefore = prevItem ? prevItem.sort : (siblings[0].sort - 100000);
-            sortAfter = siblings[targetIndex].sort;
-        } else {
-            const nextItem = siblings[targetIndex + 1];
-            sortBefore = siblings[targetIndex].sort;
-            sortAfter = nextItem ? nextItem.sort : (siblings[siblings.length - 1].sort + 100000);
-        }
-
-        // E. 执行更新
-        const newSort = (sortBefore + sortAfter) / 2;
-
-        return this.actor.updateEmbeddedDocuments("Item", [{
-            _id: sourceItem.id,
-            sort: newSort
-        }]);
-    }
 
     /**
      * 切换排序模式

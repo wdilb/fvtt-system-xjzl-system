@@ -958,20 +958,77 @@ if (item) item.postToChat();
  * 用于解决从角色身上拖拽已装备物品到物品栏时，状态依然是"已装备"的问题
  */
 Hooks.on("preCreateItem", (item, data, options, userId) => {
-  // 1. 检查这个物品是否是“世界物品” (即没有嵌入在 Actor 中)
-  // isEmbedded 是 V10+ 的属性，或者检查 !item.parent
-  if (!item.parent) {
+  // 1. 只有“世界物品”（没有 Parent Actor）才需要清洗
+    // 如果 item.parent 存在，说明是往角色身上添加物品，这时候通常需要保留数据（比如复制/导入）
+    if (item.parent) return;
 
-    // 2. 检查它是否有装备状态
-    if (item.system.equipped === true) {
-      // 3. 强制覆写数据源，将其设为未装备
-      // updateSource 修改的是即将写入数据库的原始数据
-      item.updateSource({ "system.equipped": false });
+    // 准备一个更新对象，用于批量清洗
+    const updates = {};
 
-      // 如果有其他的状态需要重置（比如 buff激活、内功运行），也可以在这里加
-      // item.updateSource({ "system.active": false }); 
+    // 2. 通用清洗：装备状态
+    // 任何放在物品栏的东西都不应该是“已装备”的
+    if (item.system.equipped) {
+        updates["system.equipped"] = false;
     }
-  }
+
+    // 3. 类型 A：内功 (Neigong) 清洗
+    if (item.type === "neigong") {
+        // 如果有投入修为，重置为 0
+        if (item.system.xpInvested > 0) {
+            updates["system.xpInvested"] = 0;
+            updates["system.sourceBreakdown"] = { general: 0, specific: 0 };
+        }
+        // 如果正在运行，强制停止
+        if (item.system.active) {
+            updates["system.active"] = false;
+        }
+    }
+
+    // 4. 类型 B：武学 (Wuxue) 清洗
+    else if (item.type === "wuxue") {
+        // 武学比较特殊，因为数据藏在 system.moves 数组里
+        // 我们需要遍历每一个招式，把它们的修为清零
+        
+        // 获取原始 moves 数组的副本
+        const rawMoves = item.system.toObject().moves || [];
+        
+        // 标记是否有数据被修改
+        let hasChanges = false;
+
+        const cleanMoves = rawMoves.map(move => {
+            // 检查该招式是否有脏数据
+            if (move.xpInvested > 0) {
+                hasChanges = true;
+                // 返回清洗后的新对象 (保留其他字段，仅重置修为)
+                return foundry.utils.mergeObject(move, {
+                    xpInvested: 0,
+                    sourceBreakdown: { general: 0, specific: 0 }
+                });
+            }
+            return move;
+        });
+
+        // 只有当確實发生了清洗时，才写入 updates，节省性能
+        if (hasChanges) {
+            updates["system.moves"] = cleanMoves;
+        }
+    }
+
+    // 5. 类型 C：技艺书 (Art Book) 清洗 (如果有的话)
+    else if (item.type === "art_book") {
+         if (item.system.xpInvested > 0) {
+            updates["system.xpInvested"] = 0;
+            updates["system.sourceBreakdown"] = { general: 0, specific: 0 };
+             // 如果有章节进度，可能也需要重置，视具体结构而定
+        }
+    }
+
+    // 6. 执行更新
+    // updateSource 会直接修改即将写入数据库的内存对象，不会触发额外的 update 钩子，非常高效
+    if (!foundry.utils.isEmpty(updates)) {
+        item.updateSource(updates);
+        // console.log(`XJZL | 已清洗物品数据: ${item.name}`, updates);
+    }
 });
 
 /* -------------------------------------------- */
