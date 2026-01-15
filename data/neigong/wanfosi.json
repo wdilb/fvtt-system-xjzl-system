@@ -774,7 +774,7 @@
             "sect": "wanfosi",
             "description": "<p>“地狱不空，誓不成佛，众生度尽，方证菩提。”<br>万佛寺秘传绝学之一，大成之时，禅音邈邈，恶鬼退避，唯有得宏大誓愿，方可证得菩萨果位。</p>",
             "requirement": "悟性需求: 11",
-            "automationNote": "完全自动化。通过脚本在战斗开始/回合开始时叠加愿力层数，并自动判断层数触发金身。",
+            "automationNote": "完全自动化。战斗/回合开始叠加愿力。虚招伤害加成已脚本化。恶行归零需手动。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -789,7 +789,7 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "积攒愿力",
+                            "label": "战斗开始-积攒愿力",
                             "trigger": "combatStart",
                             "script": "const effect = thisItem.effects.getName('愿力');\nif (effect) {\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
                             "active": true
@@ -797,7 +797,7 @@
                         {
                             "label": "虚招伤害加成",
                             "trigger": "calc",
-                            "script": "const stacks = actor.effects.find(e => e.name === '愿力')?.getFlag('xjzl-system', 'stacks') || 0;\nif (stacks > 0) args.output.feint += (stacks * 10);",
+                            "script": "// 修正：仅增加伤害，且仅针对虚招\nif (args.move.type !== 'feint') return;\n\nconst stacks = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuanli')?.getFlag('xjzl-system', 'stacks') || 0;\nif (stacks > 0) {\n    const bonus = stacks * 10;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`愿力加成 +${bonus}`);\n}",
                             "active": true
                         }
                     ]
@@ -815,7 +815,7 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "积攒愿力",
+                            "label": "回合开始-积攒愿力",
                             "trigger": "turnStart",
                             "script": "const effect = thisItem.effects.getName('愿力');\nif (effect) {\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
                             "active": true
@@ -823,7 +823,7 @@
                         {
                             "label": "虚招伤害加成",
                             "trigger": "calc",
-                            "script": "const stacks = actor.effects.find(e => e.name === '愿力')?.getFlag('xjzl-system', 'stacks') || 0;\nif (stacks > 0) args.output.feint += (stacks * 10);",
+                            "script": "if (args.move.type !== 'feint') return;\n\nconst stacks = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuanli')?.getFlag('xjzl-system', 'stacks') || 0;\nif (stacks > 0) {\n    const bonus = stacks * 10;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`愿力加成 +${bonus}`);\n}",
                             "active": true
                         }
                     ]
@@ -841,21 +841,21 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "积攒愿力与金身",
+                            "label": "回合开始-愿力与金身",
                             "trigger": "turnStart",
-                            "script": "const yuanli = thisItem.effects.getName('愿力');\nif (yuanli) {\n    const effectData = yuanli.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    const effect = await game.xjzl.api.effects.addEffect(actor, effectData);\n    // 检查层数触发金身\n    if (effect && effect.getFlag('xjzl-system', 'stacks') >= 3) {\n        const jinshen = thisItem.effects.getName('地藏菩萨金身');\n        if (jinshen) {\n            const goldenBody = jinshen.toObject();\n            delete goldenBody._id;\n            goldenBody.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(actor, goldenBody);\n        }\n    }\n}",
+                            "script": "const yuanli = thisItem.effects.getName('愿力');\nif (yuanli) {\n    const effectData = yuanli.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    // 添加愿力\n    const effect = await game.xjzl.api.effects.addEffect(actor, effectData);\n    \n    // 检查层数触发金身 (从返回的 effect 对象读取，或者重新查找 actor 上的)\n    // 注意：addEffect 返回的是 document，可以直接读 data\n    // 安全起见，我们重新在 actor 上找一下，确保拿到最新的 stacks\n    const currentYuanli = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuanli');\n    const stacks = currentYuanli ? (currentYuanli.getFlag('xjzl-system', 'stacks') || 1) : 0;\n\n    if (stacks >= 3) {\n        const jinshen = thisItem.effects.getName('地藏菩萨金身');\n        if (jinshen) {\n            const goldenBody = jinshen.toObject();\n            delete goldenBody._id;\n            goldenBody.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(actor, goldenBody);\n            ui.notifications.info(`${actor.name} 愿力圆满，证得地藏金身！`);\n        }\n    }\n}",
                             "active": true
                         },
                         {
                             "label": "虚招伤害加成",
                             "trigger": "calc",
-                            "script": "const stacks = actor.effects.find(e => e.name === '愿力')?.getFlag('xjzl-system', 'stacks') || 0;\nif (stacks > 0) args.output.feint += (stacks * 10);",
+                            "script": "if (args.move.type !== 'feint') return;\n\nconst stacks = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuanli')?.getFlag('xjzl-system', 'stacks') || 0;\nif (stacks > 0) {\n    const bonus = stacks * 10;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`愿力加成 +${bonus}`);\n}",
                             "active": true
                         }
                     ]
                 }
             },
-            "masteryEffect": "",
+            "masteryEffect": "气血+80，内力+40，当前恶行值归零（仅一次）。",
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",
@@ -876,7 +876,7 @@
         "effects": [
             {
                 "name": "愿力",
-                "icon": "icons/svg/light.svg",
+                "icon": "systems/xjzl-system/assets/icons/neigong/万佛.png",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
