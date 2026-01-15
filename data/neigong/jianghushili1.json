@@ -4898,16 +4898,16 @@
         }
     },
     {
-        "name": "《冰玄劲》",
+        "name": "冰玄劲",
         "type": "neigong",
         "img": "systems/xjzl-system/assets/icons/neigong/江湖3.png",
         "system": {
             "tier": 2,
             "element": "yin",
             "sect": "jianghushili",
-            "description": "以内力引寒气入体，日夜打熬，不仅淬炼内力，亦可在攻击间打入敌人身躯，破坏经脉骨骼，寻常人中招非死即伤。",
+            "description": "<p>以内力引寒气入体，日夜打熬，不仅淬炼内力，亦可在攻击间打入敌人身躯，破坏经脉骨骼，寻常人中招非死即伤。</p>",
             "requirement": "悟性 4",
-            "automationNote": "完全自动化。通过 Flag 记录攻击次数循环施加状态。",
+            "automationNote": "完全自动化。hit时施加状态，hit_once时推进计数，确保AOE攻击时所有目标状态一致且计数只加1。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -4931,14 +4931,20 @@
                         "qigan": 24,
                         "shencai": 10
                     },
-                    "description": "小成运功特效：你第一次出招造成伤害时为敌人添加“下盘不稳”，第二次添加“错骨”，都持续一回合。然后循环。",
+                    "description": "<p>小成运功特效：你第一次出招造成伤害时为敌人添加“下盘不稳”，第二次添加“错骨”，都持续一回合。然后循环。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "冰玄·循环(小)",
+                            "label": "冰玄(小)·施加",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.finalDamage > 0) {\n    let step = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    step = (step % 2) + 1;\n    let effectName = step === 1 ? 'unstable' : 'cuogu';\n    await game.xjzl.api.effects.toggleStatus(args.target, effectName, true, { duration: { rounds: 1 } });\n    await actor.setFlag('xjzl-system', 'neigong_bingxuan_step', step);\n}"
+                            "script": "// 仅造成伤害时生效\nif (args.finalDamage > 0) {\n    // 读取当前步数 (不修改)\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 计算本轮效果: 0->1(unstable), 1->2(cuogu)\n    const step = (currentStep % 2) + 1;\n    const effectName = step === 1 ? 'unstable' : 'cuogu';\n    \n    await game.xjzl.api.effects.toggleStatus(args.target, effectName, true, { duration: { rounds: 1 } });\n}"
+                        },
+                        {
+                            "label": "冰玄(小)·推进",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "// 检查是否有任意一个目标受到了伤害\nconst causedDamage = args.targets.some(t => t.finalDamage > 0);\n\nif (causedDamage) {\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 推进步数\n    const nextStep = (currentStep % 2) + 1;\n    await actor.setFlag('xjzl-system', 'neigong_bingxuan_step', nextStep);\n    // ui.notifications.info(`冰玄劲层数流转: ${nextStep}`); // 可选提示\n}"
                         }
                     ]
                 },
@@ -4951,19 +4957,25 @@
                         "qigan": 36,
                         "shencai": 15
                     },
-                    "description": "圆满运功特效：已修改：你第一次出招造成伤害时为敌人添加“下盘不稳”，第二次添加“错骨”，第三次添加“缚身”，第四次添加“封招”，都持续两回合。然后循环。\n修满特效：修满[永久]：气血+40，内力+20。",
+                    "description": "<p>圆满运功特效：你第一次出招造成伤害时为敌人添加“下盘不稳”，第二次添加“错骨”，第三次添加“缚身”，第四次添加“封招”，都持续两回合。然后循环。</p><p>修满特效：修满[永久]：气血+40，内力+20。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "冰玄·循环(圆)",
+                            "label": "冰玄(圆)·施加",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.finalDamage > 0) {\n    let step = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    step = (step % 4) + 1;\n    const map = {1:'unstable', 2:'cuogu', 3:'fushen', 4:'fengzhao'};\n    await game.xjzl.api.effects.toggleStatus(args.target, map[step], true, { duration: { rounds: 2 } });\n    await actor.setFlag('xjzl-system', 'neigong_bingxuan_step', step);\n}"
+                            "script": "if (args.finalDamage > 0) {\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 0->1, 1->2, 2->3, 3->4\n    const step = (currentStep % 4) + 1;\n    const map = {1:'unstable', 2:'cuogu', 3:'fushen', 4:'fengzhao'};\n    \n    await game.xjzl.api.effects.toggleStatus(args.target, map[step], true, { duration: { rounds: 2 } });\n}"
+                        },
+                        {
+                            "label": "冰玄(圆)·推进",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const causedDamage = args.targets.some(t => t.finalDamage > 0);\n\nif (causedDamage) {\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    const nextStep = (currentStep % 4) + 1;\n    await actor.setFlag('xjzl-system', 'neigong_bingxuan_step', nextStep);\n}"
                         }
                     ]
                 }
             },
-            "masteryEffect": "修满[永久]：气血+40，内力+20。",
+            "masteryEffect": "<p>修满[永久]：气血+40，内力+20。</p>",
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",
