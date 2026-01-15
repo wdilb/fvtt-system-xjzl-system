@@ -397,7 +397,7 @@ await Macros.requestSave({
     *   `hpLost`, `mpLost`, `hutiLost` (Number): **实际**造成的损失。
     *   `isDying`, `isDead` (Bool): 目标状态。
     *   `damageResult` (Object): 完整的结算数据包 (包含上述所有字段)。
-*   **参数 (`args`) - 治疗/Buff特有 (`type="heal"/"default"`)**:
+*   **参数 (`args`) - 治疗/Buff特有 (`type="heal"/"buff"`)**:
     *   `baseAmount` (Number): 面板数值 (治疗量或强度)。
     *   `finalAmount` (Number):
         *   若 `type === 'heal'`: 实际应用到 HP 上的回复量。
@@ -421,7 +421,7 @@ await Macros.requestSave({
 
 对于 **气招 (Qi)**，你需要根据其具体效果选择 **“结算模式 (Action Type)”**：
 
-*   **默认/Buff (Default)**:
+*   **默认/Buff**:
     *   **用途**: 给自身或队友施加状态、无伤害的 Debuff。
     *   **逻辑**: 无需命中检定。卡片显示**“应用效果”**。数值(`baseAmount`)作为**强度**传递给脚本，**不会**自动扣血/回血。
     *   **目标**: 如果未选中目标，**默认对自己生效**。
