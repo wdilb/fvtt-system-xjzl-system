@@ -1459,7 +1459,7 @@ export class XJZLItem extends Item {
       const costReductions = actor.system.combat.costs; // { mp: {total: 5}, rage: ... }
 
       let finalCost = {
-        mp: Math.max(0, costs.mp - (costReductions?.mp?.total || 0)),
+        mp: Math.max(0, costs.mp - (costReductions?.neili?.total || 0)),
         rage: Math.max(0, costs.rage - (costReductions?.rage?.total || 0)),
         hp: costs.hp // 气血通常不享受减耗
       };
