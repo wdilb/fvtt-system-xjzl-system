@@ -730,28 +730,34 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 });
 
 /**
- * 监听战斗人员创建 (进入战斗)
+ * 监听战斗开始 (点击 Begin Combat 按钮)
  */
-Hooks.on("createCombatant", async (combatant, options, userId) => {
-  // 1. 仅限 GM 执行 (防止多客户端重复触发数据修改)
-  if (!game.user.isGM) return;
+Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
+  // 1. 仅限 GM 执行，且只有当回合(round)发生变化时才触发
+  if (!game.user.isGM || !updateData.hasOwnProperty("round")) return;
 
-  // 2. 获取 Actor
-  const actor = combatant.actor;
-  if (!actor) return;
+  // 2. 只有当 round 从 0 变为 1 时，才视为“战斗正式开始”
+  // updateData.round 是新回合数，combat.previous.round 是旧回合数
+  if (updateData.round === 1 && combat.previous.round === 0) {
+    
+    console.log("XJZL | 战斗正式开始！正在触发所有参战者的脚本...");
 
-  // 3. 执行脚本
-  // "combatStart" 时机通常不需要额外的 context，
-  // 但我们可以把 combatant 本身传进去，万一脚本想读取先攻值之类的
-  const context = {
-    combatant: combatant
-  };
+    // 3. 遍历战斗中的所有人员
+    for (let combatant of combat.combatants) {
+      const actor = combatant.actor;
+      if (!actor) continue;
 
-  try {
-    await actor.runScripts("combatStart", context);
-    // 其他进入战斗触发的逻辑也可以写在这
-  } catch (err) {
-    console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
+      const context = {
+        combatant: combatant,
+        combat: combat
+      };
+
+      try {
+        await actor.runScripts("combatStart", context);
+      } catch (err) {
+        console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
+      }
+    }
   }
 });
 // 应该没有必要浪费性能去实现这种功能
