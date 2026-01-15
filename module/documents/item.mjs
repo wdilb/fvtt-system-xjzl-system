@@ -1370,10 +1370,10 @@ export class XJZLItem extends Item {
       let initialEffectiveMode = "attack";
       if (move.type === "stance") initialEffectiveMode = "buff";
       else if (move.type === "qi") {
-        const at = move.actionType || "default";
+        const at = move.actionType || "buff";
         if (at === "heal") initialEffectiveMode = "heal";
         else if (at === "attack") initialEffectiveMode = "attack";
-        else initialEffectiveMode = "buff"; //default视为buff
+        else initialEffectiveMode = "buff"; //兜底
       }
 
       // 即使目前是单体，也保留完整的 targets 数组传递给后续流程，为 AOE 铺路
@@ -1408,7 +1408,7 @@ export class XJZLItem extends Item {
         effectiveMode = "buff";
       }
       else if (move.type === "qi") {
-        const at = move.actionType || "default";
+        const at = move.actionType || "buff";
         if (at === "heal") effectiveMode = "heal";
         else if (at === "attack") effectiveMode = "attack";
         else effectiveMode = "buff";

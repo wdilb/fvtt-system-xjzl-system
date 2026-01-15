@@ -58,10 +58,10 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         label: "XJZL.Wuxue.Moves.Element"
       }),
       // 功能类型 (仅气招使用)
-      // default=自动判断, heal=治疗流程, attack=攻击流程(即使是气招)
+      // buff=buff类型, heal=治疗流程, attack=攻击流程(即使是气招)
       actionType: new fields.StringField({
-        initial: "default",
-        choices: ["default", "heal", "attack"],
+        initial: "buff",//虽然会导致其他非气招都默认buff，但实际上这个字段只对气招有意义
+        choices: ["buff", "heal", "attack"],
         label: "XJZL.Wuxue.Moves.ActionType"
       }),
       // 新增绝招标记，把绝招从招式类别中分离出来，因为存在即是绝招也是气招的东西，哎

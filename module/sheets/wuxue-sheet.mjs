@@ -78,7 +78,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             moveTypes: localizeConfig(XJZL.moveTypes),
             elements: localizeConfig(XJZL.elements),
             actionTypes: {
-                default: "默认",
+                buff: "BUFF",
                 heal: "治疗",
                 attack: "攻击"
             },
