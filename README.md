@@ -391,13 +391,13 @@ await Macros.requestSave({
     *   `isManual` (Bool): 是否手动应用。
     *   `isHit`, `isCrit`, `isBroken` (Bool)。
     *   `isAttack`, `isHeal`, `isBuff` (Bool): 快捷类型标记。
-*   **参数 (`args`) - 攻击特有 (`type="attack"`)**:
+*   **参数 (`args`) - 攻击特有 (非气招，或气招但是`type="attack"`)**:
     *   `baseDamage` (Number): 面板伤害。
     *   `finalDamage` (Number): 结算伤害。
     *   `hpLost`, `mpLost`, `hutiLost` (Number): **实际**造成的损失。
     *   `isDying`, `isDead` (Bool): 目标状态。
     *   `damageResult` (Object): 完整的结算数据包 (包含上述所有字段)。
-*   **参数 (`args`) - 治疗/Buff特有 (`type="heal"/"buff"`)**:
+*   **参数 (`args`) - 治疗/Buff特有 (`type="heal"/"default"`)**:
     *   `baseAmount` (Number): 面板数值 (治疗量或强度)。
     *   `finalAmount` (Number):
         *   若 `type === 'heal'`: 实际应用到 HP 上的回复量。
