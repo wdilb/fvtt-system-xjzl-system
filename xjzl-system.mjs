@@ -664,7 +664,7 @@ Hooks.on("updateCombat", async (combat, updateData, context) => {
   // 1. 仅限 GM 处理 (防止重复触发)
   // game.users.activeGM 永远指向当前在线 ID 最小的那个 GM
   // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
-  if (!game.users.activeGM?.isSelf) return; 
+  if (!game.users.activeGM?.isSelf) return;
 
   // 2. 检查是否是回合变更 (turn 或 round 变化)
   if (!("turn" in updateData) && !("round" in updateData)) return;
@@ -738,33 +738,61 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
   // 1. 仅限 GM 执行，且只有当回合(round)发生变化时才触发
   // game.users.activeGM 永远指向当前在线 ID 最小的那个 GM
   // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
-  if (!game.users.activeGM?.isSelf) return; 
+  if (!game.users.activeGM?.isSelf) return;
   if (!updateData.hasOwnProperty("round")) return;
-
+  console.log(combat.previous.round);
   // 2. 只有当 round 从 0 变为 1 时，才视为“战斗正式开始”
   // updateData.round 是新回合数，combat.previous.round 是旧回合数
   if (updateData.round === 1 && combat.previous.round === 0) {
-    
     console.log("XJZL | 战斗正式开始！正在触发所有参战者的脚本...");
 
     // 3. 遍历战斗中的所有人员
-    for (let combatant of combat.combatants) {
-      const actor = combatant.actor;
-      if (!actor) continue;
-
-      const context = {
-        combatant: combatant,
-        combat: combat
-      };
-
-      try {
-        await actor.runScripts("combatStart", context);
-      } catch (err) {
-        console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
-      }
-    }
+    await triggerCombatStartScripts(combat.combatants);
   }
 });
+
+/**
+ * 监听新成员加入 (处理中途拖入 Token)
+ * 作用对象：新加入的那一个 Combatant，用来补充上面的钩子无法触发在中途加入战斗的token的战斗开始触发脚本的问题
+ */
+Hooks.on("createCombatant", async (combatant, options, userId) => {
+  if (!game.users.activeGM?.isSelf) return; // 仅主 GM 执行
+
+  const combat = combatant.combat;
+
+  // 只有当战斗“已经开始”后加入的人，才立即执行脚本
+  // 如果战斗还在 Round 0，则不执行，等着上面那个 updateCombat 一起处理
+  if (combat.round > 0) {
+    console.log(`XJZL | 检测到中途加入战斗: ${combatant.name}`);
+    await triggerCombatStartScripts([combatant]);
+  }
+});
+
+/**
+ * 执行战斗开始脚本，把公共部分抽象出来了
+ */
+async function triggerCombatStartScripts(combatants) {
+  const promises = combatants.map(async (combatant) => {
+    const actor = combatant.actor;
+    if (!actor) return;
+
+    const context = {
+      combatant: combatant,
+      combat: combatant.combat
+    };
+
+    try {
+      // 并发执行，互不阻塞
+      await actor.runScripts("combatStart", context);
+      console.log(`XJZL | 进战脚本执行完毕: ${actor.name}`);
+    } catch (err) {
+      console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
+    }
+  });
+
+  // 等待所有脚本触发完成
+  await Promise.all(promises);
+}
 // 应该没有必要浪费性能去实现这种功能
 // 监听世界时间变化 (Seconds 变化)来清理过期AE
 // 比如 GM 手动调整时间，或使用了 Calendar 模组
@@ -964,76 +992,76 @@ if (item) item.postToChat();
  */
 Hooks.on("preCreateItem", (item, data, options, userId) => {
   // 1. 只有“世界物品”（没有 Parent Actor）才需要清洗
-    // 如果 item.parent 存在，说明是往角色身上添加物品，这时候通常需要保留数据（比如复制/导入）
-    if (item.parent) return;
+  // 如果 item.parent 存在，说明是往角色身上添加物品，这时候通常需要保留数据（比如复制/导入）
+  if (item.parent) return;
 
-    // 准备一个更新对象，用于批量清洗
-    const updates = {};
+  // 准备一个更新对象，用于批量清洗
+  const updates = {};
 
-    // 2. 通用清洗：装备状态
-    // 任何放在物品栏的东西都不应该是“已装备”的
-    if (item.system.equipped) {
-        updates["system.equipped"] = false;
+  // 2. 通用清洗：装备状态
+  // 任何放在物品栏的东西都不应该是“已装备”的
+  if (item.system.equipped) {
+    updates["system.equipped"] = false;
+  }
+
+  // 3. 类型 A：内功 (Neigong) 清洗
+  if (item.type === "neigong") {
+    // 如果有投入修为，重置为 0
+    if (item.system.xpInvested > 0) {
+      updates["system.xpInvested"] = 0;
+      updates["system.sourceBreakdown"] = { general: 0, specific: 0 };
     }
-
-    // 3. 类型 A：内功 (Neigong) 清洗
-    if (item.type === "neigong") {
-        // 如果有投入修为，重置为 0
-        if (item.system.xpInvested > 0) {
-            updates["system.xpInvested"] = 0;
-            updates["system.sourceBreakdown"] = { general: 0, specific: 0 };
-        }
-        // 如果正在运行，强制停止
-        if (item.system.active) {
-            updates["system.active"] = false;
-        }
+    // 如果正在运行，强制停止
+    if (item.system.active) {
+      updates["system.active"] = false;
     }
+  }
 
-    // 4. 类型 B：武学 (Wuxue) 清洗
-    else if (item.type === "wuxue") {
-        // 武学比较特殊，因为数据藏在 system.moves 数组里
-        // 我们需要遍历每一个招式，把它们的修为清零
-        
-        // 获取原始 moves 数组的副本
-        const rawMoves = item.system.toObject().moves || [];
-        
-        // 标记是否有数据被修改
-        let hasChanges = false;
+  // 4. 类型 B：武学 (Wuxue) 清洗
+  else if (item.type === "wuxue") {
+    // 武学比较特殊，因为数据藏在 system.moves 数组里
+    // 我们需要遍历每一个招式，把它们的修为清零
 
-        const cleanMoves = rawMoves.map(move => {
-            // 检查该招式是否有脏数据
-            if (move.xpInvested > 0) {
-                hasChanges = true;
-                // 返回清洗后的新对象 (保留其他字段，仅重置修为)
-                return foundry.utils.mergeObject(move, {
-                    xpInvested: 0,
-                    sourceBreakdown: { general: 0, specific: 0 }
-                });
-            }
-            return move;
+    // 获取原始 moves 数组的副本
+    const rawMoves = item.system.toObject().moves || [];
+
+    // 标记是否有数据被修改
+    let hasChanges = false;
+
+    const cleanMoves = rawMoves.map(move => {
+      // 检查该招式是否有脏数据
+      if (move.xpInvested > 0) {
+        hasChanges = true;
+        // 返回清洗后的新对象 (保留其他字段，仅重置修为)
+        return foundry.utils.mergeObject(move, {
+          xpInvested: 0,
+          sourceBreakdown: { general: 0, specific: 0 }
         });
+      }
+      return move;
+    });
 
-        // 只有当確實发生了清洗时，才写入 updates，节省性能
-        if (hasChanges) {
-            updates["system.moves"] = cleanMoves;
-        }
+    // 只有当確實发生了清洗时，才写入 updates，节省性能
+    if (hasChanges) {
+      updates["system.moves"] = cleanMoves;
     }
+  }
 
-    // 5. 类型 C：技艺书 (Art Book) 清洗 (如果有的话)
-    else if (item.type === "art_book") {
-         if (item.system.xpInvested > 0) {
-            updates["system.xpInvested"] = 0;
-            updates["system.sourceBreakdown"] = { general: 0, specific: 0 };
-             // 如果有章节进度，可能也需要重置，视具体结构而定
-        }
+  // 5. 类型 C：技艺书 (Art Book) 清洗 (如果有的话)
+  else if (item.type === "art_book") {
+    if (item.system.xpInvested > 0) {
+      updates["system.xpInvested"] = 0;
+      updates["system.sourceBreakdown"] = { general: 0, specific: 0 };
+      // 如果有章节进度，可能也需要重置，视具体结构而定
     }
+  }
 
-    // 6. 执行更新
-    // updateSource 会直接修改即将写入数据库的内存对象，不会触发额外的 update 钩子，非常高效
-    if (!foundry.utils.isEmpty(updates)) {
-        item.updateSource(updates);
-        // console.log(`XJZL | 已清洗物品数据: ${item.name}`, updates);
-    }
+  // 6. 执行更新
+  // updateSource 会直接修改即将写入数据库的内存对象，不会触发额外的 update 钩子，非常高效
+  if (!foundry.utils.isEmpty(updates)) {
+    item.updateSource(updates);
+    // console.log(`XJZL | 已清洗物品数据: ${item.name}`, updates);
+  }
 });
 
 /* -------------------------------------------- */
