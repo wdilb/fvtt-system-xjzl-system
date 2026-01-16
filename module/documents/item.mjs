@@ -1214,7 +1214,8 @@ export class XJZLItem extends Item {
     const moveTypes = {
       real: "实招",
       feint: "虚招",
-      counter: "反击"
+      counter: "反击",
+      qi: "气招"
     };
 
     // 过滤掉不需要显示的伤害类型(如果需要)或者直接使用全局配置
