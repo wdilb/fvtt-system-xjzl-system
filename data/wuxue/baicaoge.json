@@ -284,12 +284,24 @@
                     "name": "好雨知时节",
                     "type": "qi",
                     "actionType": "heal",
+                    "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "unarmed",
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>雪中送炭，封住伤患之处，减轻伤势，回复目标气血。（无法造成暴击）</p><p>·每有一级[疗伤]，提高 1 点气血回复。</p><p><strong>升级：</strong>增加 10 点气血回复，内力消耗+2。</p>",
-                    "automationNote": "完全自动化：使用脚本计算内息和疗伤加成。",
+                    "description": "<p>主要动作，雪中送炭，封住伤患之处，减轻伤势，回复目标 0.4 内息点气血。（无法造成暴击）</p><p>·每有一级[疗伤]，提高 1 点气血回复。</p><p><strong>升级：</strong>增加 10 点气血回复，内力消耗+2。</p>",
+                    "automationNote": "疗伤加成自动（通过calc脚本）。无法暴击自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -297,16 +309,18 @@
                             6
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
                     "scripts": [
                         {
-                            "label": "治疗计算",
-                            "trigger": "hit",
+                            "label": "疗伤加成",
+                            "trigger": "calc",
                             "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\n// 升级加成: Lv1=0, Lv2=10\nconst growthBonus = (lvl - 1) * 10;\n\n// 公式: 0.4 * 内息 + 疗伤 + 升级加值\nconst totalHeal = Math.floor(0.4 * neixi) + liaoshang + growthBonus;\n\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
+                            "script": "const liaoshang = actor.system.skills.liaoshang.total || 0;\nargs.output.damage += liaoshang;\nif (liaoshang > 0) args.output.bonusDesc.push(`疗伤加成 +${liaoshang}`);"
+                        },
+                        {
+                            "label": "禁止暴击",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "args.flags.canCrit = false;"
                         }
                     ]
                 },
@@ -314,12 +328,24 @@
                     "name": "当春乃发生",
                     "type": "qi",
                     "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "unarmed",
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>左手状若拈花，右手指尖连点，给目标添加“春雨”状态，持续到战斗脱离。</p><p><strong>春雨：</strong>下次出招时，提升伤害。</p><p>·此招中的内息是施展本招式者的内息属性。</p><p><strong>升级：</strong>春雨的伤害增加 10 点。内力消耗+2。</p>",
-                    "automationNote": "完全自动化：快照施法者属性，赋予一次性增伤Buff。",
+                    "description": "<p>主要动作，左手状若拈花，右手指尖连点，给目标添加“春雨”状态，持续到战斗脱离。</p><p><strong>春雨：</strong>下次出招时，提升 0.4 内息点伤害。</p><p>·此招中的内息是施展本招式者的内息属性。</p><p><strong>升级：</strong>春雨的伤害增加 10 点。内力消耗+2。</p>",
+                    "automationNote": "完全自动化。通过计算得出的最终数值快照给目标。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -332,19 +358,25 @@
                             "label": "施加春雨",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\n\n// 升级加成\nconst growthBonus = (lvl - 1) * 10;\n// 伤害加成: 0.4 * 内息 + 升级\nconst damageBoost = Math.floor(0.4 * neixi) + growthBonus;\n\n// 动态创建特效\nconst effectData = {\n    name: \"春雨\",\n    icon: args.item.img,\n    description: `下次出招伤害 +${damageBoost}`,\n    flags: { \"xjzl-system\": { \"stackable\": true } },\n    changes: []\n};\n\n// 注入一次性增伤脚本\neffectData.flags[\"xjzl-system\"].scripts = [{\n    label: \"春雨生效\",\n    trigger: \"calc\",\n    active: true,\n    script: `\n        args.output.damage += ${damageBoost};\n        args.output.bonusDesc.push(\"春雨 +${damageBoost}\");\n        await thisEffect.delete();\n    `\n}];\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                            "script": "// 1. 获取已计算好的数值 (在 _applyHeal 中，这个值存在 finalAmount 里)\n// 包含了内息、成长和所有增伤\nconst snapshotVal = Math.floor(args.finalAmount);\n\n// 2. 获取 AE 模板\nconst effData = thisItem.effects.getName(\"春雨\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 3. 注入数值到 AE 的 calc 脚本中\n// [修复] 使用 replaceAll 确保数值计算和文本描述都被替换\nconst scripts = effData.flags[\"xjzl-system\"].scripts;\nscripts[0].script = scripts[0].script.replaceAll(\"%VAL%\", snapshotVal);\n\n// 4. 更新描述\neffData.description = `下次出招伤害 +${snapshotVal}`;\n\nawait game.xjzl.api.effects.addEffect(args.target, effData);\nui.notifications.info(`${args.target.name} 获得春雨 (强度: ${snapshotVal})`);"
                         }
                     ]
                 },
                 {
                     "name": "随风潜入夜",
                     "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
                     "weaponType": "unarmed",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>双手如绵绵细雨般展开，开启架招。获得“随风潜入夜”，持续到脱战或被击破架招。</p><p><strong>随风潜入夜：</strong>5 米范围内的队友每次进行残疾检定时，获得 1 点怒气。</p><p><strong>升级：</strong>格挡值+10，随风潜入夜的范围提高 5 米，内力消耗+2。</p>",
-                    "automationNote": "范围与怒气回复需手动处理。",
+                    "description": "<p>次要动作，双手如绵绵细雨般展开，开启架招。获得“随风潜入夜”，持续到脱战或被击破架招。</p><p><strong>随风潜入夜：</strong>5 米范围内的队友每次进行残疾检定时，获得 1 点怒气。</p><p><strong>升级：</strong>格挡值+10，随风潜入夜的范围提高 5 米，内力消耗+2。</p>",
+                    "automationNote": "开启自动获得格挡。范围队友回怒需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -352,23 +384,38 @@
                             6
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10
-                    },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "范围提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst range = 5 + (lvl - 1) * 5;\nui.notifications.info(`架招开启：${range}米内队友残疾检定回怒 (请手动处理)`);"
+                        }
+                    ]
                 },
                 {
                     "name": "润物细无声",
                     "type": "qi",
                     "isUltimate": true,
                     "actionType": "heal",
+                    "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "unarmed",
                     "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>体内内力迸发，如春雨般滋润万物。为周围队友回复气血。（无法造成暴击）</p><p>·每有一级[疗伤]，提高 1 点气血回复。</p><p><strong>升级：</strong>回复气血+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "完全自动化：需手动选中所有受益目标。",
+                    "description": "<p>蓄力动作，体内内力迸发，如春雨般滋润万物。为周围队友回复 0.4 内息点气血。（无法造成暴击）</p><p>·每有一级[疗伤]，提高 1 点气血回复。</p><p><strong>升级：</strong>回复气血+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "疗伤加成自动。群体治疗自动(需选中)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             8,
@@ -381,21 +428,47 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
                     "scripts": [
                         {
-                            "label": "群体治疗",
-                            "trigger": "hit",
+                            "label": "疗伤加成",
+                            "trigger": "calc",
                             "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst neixi = args.attacker.system.stats.neixi.total || 0;\nconst liaoshang = args.attacker.system.skills.liaoshang.total || 0;\n\n// 升级加成: Lv1=0, Lv2=20\nconst growthBonus = (lvl - 1) * 20;\n\nconst totalHeal = Math.floor(0.4 * neixi) + liaoshang + growthBonus;\n\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
+                            "script": "const liaoshang = actor.system.skills.liaoshang.total || 0;\nargs.output.damage += liaoshang;\nif (liaoshang > 0) args.output.bonusDesc.push(`疗伤加成 +${liaoshang}`);"
                         }
                     ]
                 }
-            ]
-        }
+            ],
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "春雨",
+                "icon": "icons/magic/water/water-hand.webp",
+                "description": "下次出招伤害增加。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "chunyu",
+                        "stackable": true,
+                        "scripts": [
+                            {
+                                "label": "春雨加值",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "args.output.damage += %VAL%;\nargs.output.bonusDesc.push(`春雨 +%VAL%`);"
+                            },
+                            {
+                                "label": "春雨消耗",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "await thisEffect.delete();"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "五脏针诀",
@@ -414,7 +487,7 @@
                     "actionType": "heal",
                     "range": "5",
                     "description": "主要动作，统摄气血，为气血生化之源，添加：<br>锋针：目标每回合末恢复 10 气血，持续三回合。<br>大针：目标立即恢复 30 点气血。",
-                    "automationNote": "出招前询问使用锋针或大针。自动扣除物品（需自觉），自动应用对应效果。",
+                    "automationNote": "出招前询问使用锋针或大针。扣除物品需手动，自动应用对应效果。",
                     "costs": {
                         "mp": [
                             2,
@@ -444,7 +517,7 @@
                     "actionType": "heal",
                     "range": "5",
                     "description": "主要动作，肺司呼吸主气，循环内力，添加：<br>锋针：目标每回合末恢复 5 内力，持续三回合。<br>大针：目标立即恢复 15 点内力。",
-                    "automationNote": "出招前询问针法。自觉扣除。",
+                    "automationNote": "出招前询问针法。扣除物品需手动。",
                     "costs": {
                         "mp": [
                             2,
@@ -474,7 +547,7 @@
                     "actionType": "buff",
                     "range": "5",
                     "description": "主要动作，封藏精气，为先天生命之根，添加：<br>锋针：目标每回合初获得5护体真气，持续三回合。<br>大针：目标获得 15 点护体真气。<br>·本招式添加的护体真气均持续到战斗脱离。",
-                    "automationNote": "出招前询问针法。自觉扣除。",
+                    "automationNote": "出招前询问针法。扣除物品需手动。",
                     "costs": {
                         "mp": [
                             2,

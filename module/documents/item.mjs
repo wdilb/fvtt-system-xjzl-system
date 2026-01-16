@@ -990,9 +990,9 @@ export class XJZLItem extends Item {
     const hasScalings = move.calculation.scalings && move.calculation.scalings.length > 0;
     if (move.type === "qi" && !hasScalings) {
       return {
-        damage: 0, // 按照你的要求，直接返回 0
+        damage: Math.floor(moveBaseDmg),
         feint: 0,
-        breakdown: "实际效果将由脚本执行，无数值预览", // 清晰的提示
+        breakdown: "造成固定值或者不造成伤害，不享受一切通用加成", // 清晰的提示
         feintBreakdown: "",
         neigongBonus: "",
         cost: move.currentCost || { mp: 0, rage: 0, hp: 0 },
