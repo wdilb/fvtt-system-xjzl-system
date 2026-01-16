@@ -7,7 +7,7 @@
             "category": "wuxue",
             "sect": "jianghushili",
             "tier": 2,
-            "description": "<p>失传已久，曾为一燕姓剑客所用，很快销声匿迹。剑招如鬼斧神工，快、狠、奇，且杀气极重，稍加修炼便入疯魔。传闻还有第十四和第十五剑。</p>",
+            "description": "<p>失传已久，曾为一燕姓剑客所用，很快销声匿迹。剑招如鬼斧神工，快、狠、奇，且杀气极重，稍加修炼便入疯魔。传闻还有第十四和第十五剑。</p><p><strong>需求：</strong>悟性5</p>",
             "requirements": "悟性5",
             "moves": [
                 {
@@ -21,7 +21,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>剑本无招，招由心生</p><p>剑影连颤，无命无情，瞬间刺出十数剑，对目标造成伤害。</p><p>·本场战斗中目标每受到过一次【封喉】造成的伤害，招式提升20点。</p><p>·若施展本招将敌人击杀（死亡检定失败），为在场任意一个敌人添加“封喉”，持续到当前行动的玩家的回合结束。</p>",
-                    "automationNote": "封喉的伤害加成需手动在招式弹窗中输入修正值。击杀后施加状态需手动选择目标。",
+                    "automationNote": "自动化：自动检测目标身上的[封喉计数]并增加伤害。击杀后施加状态需手动选择目标。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -45,6 +45,12 @@
                         ]
                     },
                     "scripts": [
+                        {
+                            "label": "封喉增伤检测",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const counter = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fenghou_counter\");\nconst stacks = counter ? (counter.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks > 0) {\n    const bonus = stacks * 20;\n    args.config.amount += bonus;\n    // 这里的提示只给GM和玩家看，确认触发了效果\n    ui.notifications.info(`绝命：检测到 ${stacks} 层封喉计数，伤害 +${bonus}`);\n}"
+                        },
                         {
                             "label": "击杀检测",
                             "trigger": "hit",
@@ -168,7 +174,7 @@
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
                     "description": "<p>剑指咽喉，凝练一线，对直线上的敌人造成伤害。</p><p>若范围内有敌人处于半空中，此招可消耗反应动作释放，立于原地射出剑气，对其造成伤害。</p>",
-                    "automationNote": "完全自动化（伤害计算）。反应动作释放需玩家自行判断时机。",
+                    "automationNote": "自动化：伤害计算自动。命中后自动给目标叠加[封喉计数]（用于绝命增伤）。反应动作释放需玩家自行判断时机。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -185,7 +191,15 @@
                             8,
                             12
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "叠加封喉计数",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const effName = \"封喉计数\";\n    const eff = thisItem.effects.getName(effName);\n    if (eff) {\n        const effData = eff.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        // 叠加一层\n        await game.xjzl.api.effects.addEffect(args.target, effData, 1);\n    }\n}"
+                        }
+                    ]
                 }
             ],
             "effects": [
@@ -198,6 +212,19 @@
                         "xjzl-system": {
                             "slug": "fenghou",
                             "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "封喉计数",
+                    "icon": "icons/svg/blood.svg",
+                    "description": "记录受到【封喉】招式伤害的次数，用于增加【绝命】的伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fenghou_counter",
+                            "stackable": true
                         }
                     },
                     "changes": []
