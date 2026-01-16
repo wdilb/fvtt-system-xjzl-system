@@ -773,15 +773,16 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           const stage = move.effectiveStage || 0;
           const wType = move.weaponType; // 武器类型
 
-          if (wType && wType !== 'none') { //确实存在不带武器类型的招式，哎
+          //把悟性加成从下面的武器里移动到外面，虽然规则书上写的不加，但lxx说规则书是错的
+          // 1. 统计悟性加成 (需达到 精通/Stage>=3)
+          if (stage >= 3) {
+            if (tier === 1) wuxingHumanCount++;
+            if (tier === 2) wuxingEarthCount++;
+            if (tier === 3) wuxingBonus += 1; // 天级精通 +1
+          }
+          if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
 
-            // 1. 统计悟性加成 (需达到 精通/Stage>=3)
-            if (stage >= 3) {
-              if (tier === 1) wuxingHumanCount++;
-              if (tier === 2) wuxingEarthCount++;
-              if (tier === 3) wuxingBonus += 1; // 天级精通 +1
-            }
-            if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
+          if (wType && wType !== 'none') { //确实存在不带武器类型的招式
 
             // 2. 统计武器积分 (Tier 1/2/3 分组计数)
             if (combat.weaponRanks[wType]) {
