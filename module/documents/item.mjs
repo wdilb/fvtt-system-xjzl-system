@@ -948,8 +948,8 @@ export class XJZLItem extends Item {
   /**
    * 计算招式的详细数值 (预览/结算通用)
    * @param {String} moveId - 招式 ID
-   * @param {Object} options - [NEW] 额外配置
-   * @param {Number} options.overrideMorale - [NEW] 强制指定使用的士气值(用于Roll时传递已消耗的值)
+   * @param {Object} options - 额外配置
+   * @param {Number} options.overrideMorale - 强制指定使用的士气值(用于Roll时传递已消耗的值)
    */
   calculateMoveDamage(moveId, options = {}) {
     // 1. 基础校验
@@ -971,6 +971,34 @@ export class XJZLItem extends Item {
     // --- A. 招式自带基础 (Base + Growth) ---
     const lvl = Math.max(1, move.computedLevel || 1);
     const moveBaseDmg = (move.calculation.base || 0) + (move.calculation.growth || 0) * (lvl - 1);
+
+    // 1. 架招：只看强度，不吃任何加成，不跑脚本
+    if (move.type === "stance") {
+      return {
+        damage: Math.floor(moveBaseDmg),
+        feint: 0, // 架招无虚招
+        breakdown: `架招强度: ${Math.floor(moveBaseDmg)} (基础+成长)`,
+        feintBreakdown: "",
+        neigongBonus: "",
+        cost: move.currentCost || { mp: 0, rage: 0, hp: 0 },
+        isWeaponMatch: true // 架招默认匹配
+      };
+    }
+
+    // 2. 无系数气招 (纯脚本)：直接归零，不跑计算流程
+    // 判定条件：是气招 且 没有配置属性加成 (Scalings)
+    const hasScalings = move.calculation.scalings && move.calculation.scalings.length > 0;
+    if (move.type === "qi" && !hasScalings) {
+      return {
+        damage: 0, // 按照你的要求，直接返回 0
+        feint: 0,
+        breakdown: "实际效果将由脚本执行，无数值预览", // 清晰的提示
+        feintBreakdown: "",
+        neigongBonus: "",
+        cost: move.currentCost || { mp: 0, rage: 0, hp: 0 },
+        isWeaponMatch: true
+      };
+    }
 
     // --- B. 武器基础伤害 (Weapon Item) & 装备判定 ---
     let weaponDmg = 0;
@@ -1067,7 +1095,6 @@ export class XJZLItem extends Item {
 
     // --- F. 初步汇总 (Pre-Script) ---
     let preScriptDmg = Math.floor(moveBaseDmg + weaponDmg + attrBonus + flatBonus + weaponDmgBonus);
-    let totalDmg = preScriptDmg;
     let scriptDmgBonus = 0;
     let scriptFeintBonus = 0;
 
