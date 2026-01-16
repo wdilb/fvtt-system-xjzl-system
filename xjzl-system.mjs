@@ -662,7 +662,9 @@ Hooks.on("renderItemDirectory", (app, html, data) => {
  */
 Hooks.on("updateCombat", async (combat, updateData, context) => {
   // 1. 仅限 GM 处理 (防止重复触发)
-  if (!game.user.isGM) return;
+  // game.users.activeGM 永远指向当前在线 ID 最小的那个 GM
+  // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
+  if (!game.users.activeGM?.isSelf) return; 
 
   // 2. 检查是否是回合变更 (turn 或 round 变化)
   if (!("turn" in updateData) && !("round" in updateData)) return;
@@ -734,7 +736,10 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
  */
 Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
   // 1. 仅限 GM 执行，且只有当回合(round)发生变化时才触发
-  if (!game.user.isGM || !updateData.hasOwnProperty("round")) return;
+  // game.users.activeGM 永远指向当前在线 ID 最小的那个 GM
+  // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
+  if (!game.users.activeGM?.isSelf) return; 
+  if (!updateData.hasOwnProperty("round")) return;
 
   // 2. 只有当 round 从 0 变为 1 时，才视为“战斗正式开始”
   // updateData.round 是新回合数，combat.previous.round 是旧回合数
