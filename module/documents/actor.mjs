@@ -1817,7 +1817,7 @@ export class XJZLActor extends Actor {
     };
 
     if (!options.skipDialog) {
-      const dialogResult = await this._promptBasicAttackConfig(weaponName);
+      const dialogResult = await this._promptBasicAttackConfig(weaponName, options);
       if (!dialogResult) return; // 用户取消
       config = { ...config, ...dialogResult };
     }
@@ -2200,11 +2200,12 @@ export class XJZLActor extends Actor {
 
   /**
    * [内部] 普攻配置弹窗
+   * options 参数
    */
-  async _promptBasicAttackConfig(weaponName) {
+  async _promptBasicAttackConfig(weaponName, options = {}) {
     // 1. 生成唯一 ID
     const formId = `roll-config-${foundry.utils.randomID()}`;
-
+    const isOpportunity = options.mode === "opportunity"; // 判断是否趁虚而入
     // 2. 准备基础数据
     // 必须提供 selectOptions 所需的列表，否则 Handlebars 会报错
     const moveTypes = {
@@ -2230,12 +2231,12 @@ export class XJZLActor extends Actor {
       isFeint: false,     // 实招默认不显示虚招
       needsDamage: true,  // 普攻需要伤害
       isHeal: false,
-      canCrit: true,      // 普攻可暴击
+      // 趁虚而入默认不勾选暴击(!true = false)，普攻默认勾选(true)
+      canCrit: !isOpportunity,  
 
-      // 额外标记（可选，用于在模板里显示武器名，需要修改hbs支持，或者如下方通过title显示）
+      // 额外标记
       weaponName: weaponName
     };
-
     // 4. 渲染模板
     const content = await renderTemplate("systems/xjzl-system/templates/apps/roll-config.hbs", context);
 
