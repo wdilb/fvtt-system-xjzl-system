@@ -196,40 +196,55 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const html = this.element;
         const searchInput = html.querySelector('input[name="filter"]');
 
-        searchInput.addEventListener("keyup", (e) => {
-            const query = e.target.value.toLowerCase();
+        // 定义搜索处理函数
+        const handleSearch = (e) => {
+            const query = e.target.value.toLowerCase().trim();
 
-            // 过滤状态按钮
-            const btns = html.querySelectorAll(".effect-btn");
-            btns.forEach(btn => {
-                const name = btn.dataset.tooltip.toLowerCase();
-                btn.style.display = name.includes(query) ? "flex" : "none";
+            // =====================================================
+            // 1. 处理【通用状态】区域
+            // =====================================================
+            // 策略：直接选中所有通用按钮，独立控制显隐
+            const statusBtns = html.querySelectorAll('.effect-btn[data-action="applyStatus"]');
+
+            statusBtns.forEach(btn => {
+                const text = (btn.textContent + (btn.dataset.tooltip || "")).toLowerCase();
+                const isMatch = text.includes(query);
+
+                // 设置为空字符串 "" 会移除内联样式，使其回退到 CSS 定义的 display (比如 flex 或 grid)
+                // 这是比 removeProperty 更简洁的写法，且能完美恢复布局
+                btn.style.display = isMatch ? "" : "none";
             });
 
-            // 过滤场景特效 (按组过滤)
+            // =====================================================
+            // 2. 处理【场景特效】区域
+            // =====================================================
+            // 策略：遍历每个“演员分组”，再遍历组内按钮。
+            // 如果组内没有一个按钮是可见的，就把整个组隐藏。
             const groups = html.querySelectorAll(".actor-group");
-            groups.forEach(group => {
-                let hasVisible = false;
-                const rows = group.querySelectorAll(".effect-row");
 
-                rows.forEach(row => {
-                    // 搜索 特效名 或 来源物品名
-                    const text = row.innerText.toLowerCase();
-                    if (text.includes(query)) {
-                        row.style.display = "flex";
-                        hasVisible = true;
-                    } else {
-                        row.style.display = "none";
-                    }
+            groups.forEach(group => {
+                // 获取当前组内所有的特效按钮
+                const sceneBtns = group.querySelectorAll('.effect-btn[data-action="applyItemEffect"]');
+                let visibleCount = 0;
+
+                sceneBtns.forEach(btn => {
+                    const text = (btn.textContent + (btn.dataset.tooltip || "")).toLowerCase();
+                    const isMatch = text.includes(query);
+
+                    btn.style.display = isMatch ? "" : "none";
+
+                    if (isMatch) visibleCount++;
                 });
 
-                // 如果该组内没有匹配项，隐藏整组标题
-                group.style.display = hasVisible ? "block" : "none";
+                // 如果组内有可见按钮，显示整组；否则隐藏整组
+                group.style.display = visibleCount > 0 ? "" : "none";
             });
-        });
+        };
 
+        // 绑定事件
+        searchInput.addEventListener("input", handleSearch);
         // =====================================================
-        // 2. 【新增】右键点击逻辑 (减层/移除)
+        // 3. 右键点击逻辑 (减层/移除)
         // =====================================================
 
         // 获取所有带有 data-action 的按钮

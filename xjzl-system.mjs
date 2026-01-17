@@ -792,7 +792,7 @@ async function triggerCombatStartScripts(combatants) {
 
   // 等待所有脚本触发完成
   await Promise.all(promises);
-}
+};
 // 应该没有必要浪费性能去实现这种功能
 // 监听世界时间变化 (Seconds 变化)来清理过期AE
 // 比如 GM 手动调整时间，或使用了 Calendar 模组

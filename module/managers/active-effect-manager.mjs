@@ -87,6 +87,8 @@ export class ActiveEffectManager {
             }
             // 如果需要一次性创建多层 (count > 1) 且该特效可堆叠
             const isStackable = foundry.utils.getProperty(effectData, "flags.xjzl-system.stackable");
+            // 准备显示的文本，默认为特效名字
+            let displayLabel = effectData.name;
 
             if (isStackable && count > 1) {
                 // 1. 显式记录 BaseChanges (这是1层的原始值)
@@ -96,14 +98,22 @@ export class ActiveEffectManager {
                 // 2. 设置初始层数
                 foundry.utils.setProperty(effectData, "flags.xjzl-system.stacks", count);
 
+                // 更新显示文本，带上层数 (例如: "中毒 (3)")
+                displayLabel = `${effectData.name} (${count})`;
+
                 // 3. 计算多层数值 (复用类方法，不手写公式)
                 // 在内存中创建一个临时特效实例 (不保存)
                 const tempEffect = new XJZLActiveEffect(effectData, { parent: actor });
                 // 调用写好的正确逻辑
                 effectData.changes = tempEffect.calculateChangesForStacks(count);
             }
+            // 显式禁止系统默认飘字 (scrollingStatusText: false)
             // 创建时，系统会自动处理 duration.startTime 等初始化工作
-            const createdDocs = await actor.createEmbeddedDocuments("ActiveEffect", [effectData]);
+            const createdDocs = await actor.createEmbeddedDocuments("ActiveEffect", [effectData], { scrollingStatusText: false });
+
+            // 手动调用我们的 Socket 飘字 (绿色 +)
+            // 确保无论是第 1 层还是第 N 层，视觉效果统一且所有人可见
+            this._showScrollingText(actor, `+ ${displayLabel}`, "create");
             return createdDocs[0];
         }
 
@@ -295,7 +305,12 @@ export class ActiveEffectManager {
 
         // 3. 分支 A: 不可叠 或 移除层数 >= 当前层数 -> 直接删除
         if (!isStackable || amount >= currentStacks) {
-            return effect.delete();
+            // 1. 先飘字 (红色 -)
+            // 必须在 delete 之前飘，否则 delete 后 effect 可能就取不到名字了(虽然通常内存里还在)
+            this._showScrollingText(actor, `- ${effect.name}`, "delete");
+
+            // 2. 删除文档，并禁止系统默认白字
+            return effect.delete({ scrollingStatusText: false });
         }
 
         // 4. 分支 B: 减少层数
@@ -385,9 +400,8 @@ export class ActiveEffectManager {
         } else {
             // 关闭：调用 removeEffect
             // 如果是 toggle 逻辑，通常意味着完全移除，而不是减一层
-            // 所以我们传一个很大的数，或者扩展 removeEffect 支持 forceDelete
-            // 这里简单处理：直接删除，或者只减一层？
-            // 标准 toggle 行为通常是“关掉”，所以建议直接 delete
+            // 这里简单处理：直接删除
+            this._showScrollingText(actor, `- ${existing.name}`, "delete");
             if (existing) return existing.delete();
         }
     }
@@ -468,5 +482,4 @@ export class ActiveEffectManager {
             await actor.deleteEmbeddedDocuments("ActiveEffect", expiredIds);
         }
     }
-
 }
