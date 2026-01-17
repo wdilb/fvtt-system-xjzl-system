@@ -3471,7 +3471,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，一手握枪尾，一手握中段，枪锋护身，暗含黑云压城之势，开启架招。格挡成功后，可使用反应动作对目标释放【裂甲】。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "开启架招自动。",
+                    "automationNote": "开启架招自动。格挡成功后请手动判断距离释放【裂甲】。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -3482,7 +3482,15 @@
                             4,
                             6
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡提示",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"格挡成功！可消耗反应动作施展 [裂甲]\");\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "裂甲",
@@ -3494,7 +3502,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当有敌人进入你周围三米范围内，在你三米范围内消耗移动速度移动或是施展轻功经过，你可以消耗反应动作施展此招，提枪横扫，碎甲断骨，对其造成伤害，并使目标倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "反应判定手动。倒地手动。",
+                    "automationNote": "完全自动化。命中后自动给予目标[倒地]状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3514,9 +3522,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "倒地提示",
+                            "label": "施加倒地",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被击倒在地！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3531,7 +3539,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，枪破万千，对目标造成伤害，击破架招时，可以不消耗动作，对目标释放一次【裂甲】。</p><p>·你可以额外消耗怒气，每额外 1 点使虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破释放手动。怒气加成手动。",
+                    "automationNote": "半自动化。出招前弹窗询问是否投入额外怒气。击破架招后请手动施展免费的【裂甲】。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3556,6 +3564,12 @@
                     },
                     "scripts": [
                         {
+                            "label": "怒气加成决策",
+                            "trigger": "attack",
+                            "script": "const currentRage = actor.system.resources.rage.value;\nif (currentRage > 0) {\n    const confirm = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"狼袭 - 怒气加成\" },\n        content: `<p>当前剩余怒气: ${currentRage}</p><div class=\"form-group\"><label>额外投入怒气 (每点虚招+1)</label><input type=\"number\" name=\"rage\" value=\"0\" min=\"0\" max=\"${currentRage}\" autofocus></div>`,\n        ok: {\n            label: \"确定\",\n            callback: (event, button) => button.form.elements.rage.valueAsNumber\n        }\n    });\n    \n    const extraRage = confirm || 0;\n    if (extraRage > 0) {\n        await actor.update({ \"system.resources.rage.value\": currentRage - extraRage });\n        args.flags.bonusFeint += extraRage;\n        ui.notifications.info(`消耗 ${extraRage} 点额外怒气，虚招值 +${extraRage}`);\n    }\n}",
+                            "active": true
+                        },
+                        {
                             "label": "击破提示",
                             "trigger": "hit",
                             "script": "if (args.isBroken) {\n    ui.notifications.info(\"击破架招！请免费施展 [裂甲]\");\n}",
@@ -3573,7 +3587,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，极速攒刺，枪影翻飞，热浪汹涌，你本回合内获得一个额外的反应动作，并获得“焚江煮海”，持续一回合。</p><p><strong>焚江煮海：</strong>你的次要动作可以当做反应动作使用。</p><p>·你以反应动作释放的招式伤害+10。</p><p><strong>升级：</strong>焚江煮海令反应招式伤害+10，消耗+2。</p>",
-                    "automationNote": "获得BUFF自动。额外动作手动。",
+                    "automationNote": "应用后获得BUFF。请玩家在施展反应招式时，手动在弹窗的'伤害修正'中输入加值（+10/20）。额外动作请手动管理。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -3589,7 +3603,7 @@
                         {
                             "label": "获得BUFF",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"焚江煮海\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nif (lvl >= 2) {\n    eff.changes[0].value = \"20\";\n}\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"焚江煮海\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 提示玩家伤害加值\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = lvl >= 2 ? 20 : 10;\nui.notifications.info(`焚江煮海生效：下一次反应招式伤害应 +${dmgBonus} (请手动修正)`);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ],
@@ -3606,7 +3620,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，进入“极烈”之境，持续 4 个回合（极烈属特殊状态，无法移除）。</p><p>在极烈结束的回合初，你冲锋到范围内目标面前，一枪刺出，破尽千军，摧毁其身上的随机一件非玉品防具，并造成伤害。</p><p>·你每有一种武器技能达到 8，此招暴击骰-1。</p><p><strong>极烈：</strong>你失去且无法使用主要、次要动作。</p><p><strong>升级：</strong>招式伤害+20，极烈持续回合减 1，怒气-1，内力消耗+4。</p>",
-                    "automationNote": "极烈状态自动。延迟伤害/防具摧毁/暴击修正手动。",
+                    "automationNote": "手动流程：1. 正常出招，获得BUFF，请忽略此次伤害。2. BUFF结束回合，再次点击出招(勾选免费)，应用伤害。防具摧毁手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -3631,9 +3645,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得极烈",
+                            "label": "极烈处理",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"极烈\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nlet rounds = 4;\nif (lvl >= 2) rounds = 3;\nif (lvl >= 3) rounds = 2;\n\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "// 检查是否已处于极烈状态（判断是第1阶段还是第2阶段）\nconst hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jilie\");\n\nif (!hasBuff) {\n    // 阶段1：施加状态\n    const lvl = Math.max(1, move.computedLevel || 1);\n    let rounds = 4;\n    if (lvl >= 2) rounds = 3;\n    if (lvl >= 3) rounds = 2;\n\n    const eff = thisItem.effects.getName(\"极烈\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    \n    ui.notifications.info(\"进入 [极烈] 状态。本次出招仅为启动，请忽略伤害卡片。\");\n} else {\n    // 阶段2：结算伤害，计算暴击修正\n    let skillCount = 0;\n    const ranks = actor.system.combat.weaponRanks;\n    for (const key in ranks) {\n        if (ranks[key].total >= 8) skillCount++;\n    }\n    // 暴击阈值修正 (正数 = 阈值降低 = 更容易暴击)\n    args.flags.critThresholdMod += skillCount;\n    \n    ui.notifications.info(`[破军] 结算：武器技能修正暴击骰 -${skillCount}`);\n}",
                             "active": true
                         }
                     ]
@@ -3642,8 +3656,8 @@
             "effects": [
                 {
                     "name": "焚江煮海",
-                    "icon": "icons/magic/fire/projectile-wave-red.webp",
-                    "description": "反应招式伤害增加。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "你的次要动作可以当做反应动作使用。",
                     "transfer": false,
                     "duration": {
                         "rounds": 1
@@ -3654,18 +3668,12 @@
                             "stackable": false
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "changes": []
                 },
                 {
                     "name": "极烈",
-                    "icon": "icons/magic/fire/beam-jet-stream-red.webp",
-                    "description": "失去主次动作。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "失去且无法使用主要、次要动作(请手动跳过动作阶段)。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
