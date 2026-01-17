@@ -1892,7 +1892,7 @@ export class XJZLItem extends Item {
             total = finalDie + hitMod + (ctx.grantHit || 0);
             // 获取目标闪避
             // 这里只是预览命中，不做逻辑判定
-            dodge = t.actor.system.combat.dodgeTotal || 10;
+            dodge = t.actor.system.combat.dodgeTotal ?? 10;
             // 规则：20必中，1必失
             if (finalDie === 20) isHit = true;
             else if (finalDie === 1) isHit = false;

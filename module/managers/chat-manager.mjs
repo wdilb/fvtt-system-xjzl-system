@@ -469,7 +469,7 @@ export class ChatCardManager {
                     // 公式: 最终骰子 + 全局修正 + 目标修正
                     const targetHitMod = states.grantHit || 0;
                     const total = finalDie + globalHitMod + targetHitMod;
-                    dodge = tActor.system.combat.dodgeTotal || 10;
+                    dodge = tActor.system.combat.dodgeTotal ?? 10;
                     displayTotal = total
 
                     // 判定命中 (含20必中/1必失)
@@ -563,7 +563,7 @@ export class ChatCardManager {
 
                 // C. 计算数值
                 total = finalDie + hitMod + manualBonus;
-                const dodge = targetActor.system.combat.dodgeTotal || 10;
+                const dodge = targetActor.system.combat.dodgeTotal ?? 10;
 
                 // D. 判定命中
                 // 规则：20必中，1必失

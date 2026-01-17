@@ -2084,7 +2084,7 @@ export class XJZLActor extends Actor {
         else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
 
         total = finalDie + hitMod + (ctx.grantHit || 0);
-        dodge = t.actor?.system.combat.dodgeTotal || 10;
+        dodge = t.actor?.system.combat.dodgeTotal ?? 10;
 
         if (finalDie === 20) isHit = true;
         else if (finalDie === 1) isHit = false;
