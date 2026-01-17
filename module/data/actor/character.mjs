@@ -107,7 +107,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         general: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.General" }), // 通用修为
         neigong: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Neigong" }), // 专属内功修为
         wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Wuxue" }),     // 专属武学修为
-        arts: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Arts" })        // 专属技艺修为
+        arts: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Arts" }),       // 专属技艺修为
+        generalTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.GeneralTotal" }), // 总通用修为
+        neigongTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.NeigongTotal" }), // 总内功修为
+        wuxueTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.WuxueTotal" }), // 总武学修为
+        artsTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.ArtsTotal" }), // 总技艺修为
+        all: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.All" }) // 总全部修为
       }),
 
       // === D. 核心资源 (Resources) ===
