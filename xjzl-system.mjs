@@ -740,7 +740,6 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
   // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
   if (!game.users.activeGM?.isSelf) return;
   if (!updateData.hasOwnProperty("round")) return;
-  console.log(combat.previous.round);
   // 2. 只有当 round 从 0 变为 1 时，才视为“战斗正式开始”
   // updateData.round 是新回合数，combat.previous.round 是旧回合数
   if (updateData.round === 1 && combat.previous.round === 0) {
