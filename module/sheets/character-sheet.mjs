@@ -77,6 +77,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 发送物品详情卡片到聊天
             postItem: XJZLCharacterSheet.prototype._onPostItem,
             postMove: XJZLCharacterSheet.prototype._onPostMove,
+            // 交易系统
+            buyItem: XJZLCharacterSheet.prototype._onTradeItem,
+            sellItem: XJZLCharacterSheet.prototype._onTradeItem,
 
             //手工修正
             addGroup: XJZLCharacterSheet.prototype._onAction,
@@ -2287,5 +2290,142 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             yes: () => this.actor.longRest(),
             defaultYes: false
         });
+    }
+
+    /**
+     * 处理物品的购买与出售
+     * @param {Event} event 
+     * @param {HTMLElement} target 
+     */
+    async _onTradeItem(event, target) {
+        event.preventDefault();
+        const action = target.dataset.action; // "buyItem" 或 "sellItem"
+        const isBuy = action === "buyItem";
+        
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return;
+
+        // 1. 获取基础数据
+        const price = item.system.price || 0;
+        const quantity = item.system.quantity || 1;
+        const currentSilver = Number(this.document.system.resources.silver) || 0;
+
+        // 2. 默认配置
+        const defaultModifier = isBuy ? 1.0 : 0.5;
+        const titleText = isBuy ? `支付: ${item.name}` : `出售: ${item.name}`;
+        const confirmIcon = isBuy ? "fas fa-shopping-cart" : "fas fa-hand-holding-dollar";
+        const confirmBtnLabel = isBuy ? "支付" : "出售并移除";
+
+        // 3. 构建 HTML 内容
+        const content = `
+            <div class="trade-dialog-content" style="font-family: var(--font-primary); padding: 5px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;">
+                    <label style="font-weight:bold;">单价</label>
+                    <span style="font-family:Consolas;">${price}</span>
+                </div>
+                
+                <div style="display:flex; justify-content:space-between; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px;">
+                    <label style="font-weight:bold;">数量</label>
+                    <span style="font-family:Consolas;">x ${quantity}</span>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="display:block; margin-bottom:5px;">价格倍率 / 折扣</label>
+                    <div class="form-fields">
+                        <input type="number" name="modifier" value="${defaultModifier}" step="0.1" 
+                               style="width:100%; text-align:right; background:rgba(0,0,0,0.3); border:1px solid #555; padding:4px; color:#fff;" autofocus/>
+                    </div>
+                    <p class="notes" style="font-size:0.8em; color:#aaa; margin-top:4px; text-align:right;">
+                        ${isBuy ? "1.0 = 原价购买" : "0.5 = 半价出售"}
+                    </p>
+                </div>
+
+                <div style="text-align: right; font-size: 1.3em; margin-top: 10px; padding-top:10px; border-top: 2px dashed #444;">
+                    <label style="margin-right: 10px; font-size:0.8em; color:#ccc;">总金额:</label>
+                    <span id="trade-total" style="color: ${isBuy ? '#e67e22' : '#2ecc71'}; font-weight:bold; font-family:Consolas;">
+                        ${Math.floor(price * quantity * defaultModifier)}
+                    </span>
+                </div>
+            </div>
+        `;
+
+        // 4. 使用DialogV2
+        const result = await foundry.applications.api.DialogV2.wait({
+            window: { 
+                title: titleText, 
+                icon: confirmIcon,
+                resizable: false 
+            },
+            content: content,
+            buttons: [{
+                action: "confirm",
+                label: confirmBtnLabel,
+                icon: confirmIcon,
+                default: true,
+                callback: (event, button) => {
+                    // button 是 DOM 元素，向上寻找容器
+                    const container = button.closest(".window-content");
+                    const input = container.querySelector("input[name='modifier']");
+                    return parseFloat(input.value) || 0;
+                }
+            }, {
+                action: "cancel",
+                label: "取消",
+                icon: "fas fa-times"
+            }],
+            // 渲染回调：处理动态总价计算
+            render: (event) => {
+                const html = event.target.element; 
+                
+                const input = html.querySelector("input[name='modifier']");
+                const totalSpan = html.querySelector("#trade-total");
+
+                if (!input || !totalSpan) return;
+
+                // 定义计算函数
+                const calc = () => {
+                    const mod = parseFloat(input.value) || 0;
+                    const total = Math.floor(price * quantity * mod);
+                    totalSpan.textContent = total;
+                };
+
+                // 绑定输入事件
+                input.addEventListener("input", calc);
+                
+                // 自动聚焦并选中
+                input.focus();
+                input.select(); 
+            }
+        });
+
+        // 5. 如果用户取消
+        if (result === null || result === undefined) return;
+
+        // 6. 执行交易逻辑
+        const modifier = result;
+        const totalCost = Math.floor(price * quantity * modifier);
+
+        // 防止负数 Bug
+        if (totalCost < 0) {
+            return ui.notifications.error("交易金额不能为负数！");
+        }
+
+        if (isBuy) {
+            // --- 购买逻辑 ---
+            if (currentSilver < totalCost) {
+                return ui.notifications.warn(`银两不足！需要 ${totalCost}，你只有 ${currentSilver}。`);
+            }
+            // 扣钱
+            await this.document.update({"system.resources.silver": currentSilver - totalCost});
+            ui.notifications.info(`已购买 ${item.name} (x${quantity})，花费 ${totalCost} 银两。`);
+        } else {
+            // --- 出售逻辑 ---
+            // 1. 加钱
+            await this.document.update({"system.resources.silver": currentSilver + totalCost});
+            // 2. 删物品
+            await item.delete();
+            
+            ui.notifications.info(`已出售 ${item.name} (x${quantity})，获得 ${totalCost} 银两。`);
+        }
     }
 }
