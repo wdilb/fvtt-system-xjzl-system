@@ -1003,10 +1003,8 @@ export class ChatCardManager {
         if (!isBroken) {
             // A. 判定成功：架招维持
             // B. 视觉反馈 (飘字: 绿色)
-            if (targetActor.token?.object) {
-                canvas.interface.createScrollingText(targetActor.token.object.center, "看破！", {
-                    fill: "#00ff00", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                });
+            if (targetActor.showFloatyText) {
+                targetActor.showFloatyText("看破！", { fill: "#00ff00" });
             }
         }
 
@@ -1224,10 +1222,8 @@ export class ChatCardManager {
                 }
 
                 // C. 视觉反馈 (飘字: 红色)
-                if (targetActor.token?.object) {
-                    canvas.interface.createScrollingText(targetActor.token.object.center, "被击破架招！", {
-                        fill: "#ff0000", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                    });
+                if (targetActor.showFloatyText) {
+                    targetActor.showFloatyText("被击破架招！", { fill: "#ff0000" });
                 }
             }
             // =====================================================
@@ -1286,7 +1282,7 @@ export class ChatCardManager {
                 ignoreStance: damageConfig.ignoreStance,  //无视架招
                 isSkill: isSkillDamage,
                 element: damageConfig.element,
-                move: move, 
+                move: move,
                 item: item
             });
 
