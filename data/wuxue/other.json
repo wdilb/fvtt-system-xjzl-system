@@ -231,5 +231,397 @@
                 }
             ]
         }
+    },
+    {
+        "name": "摄魂魔刀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>魔刀门功法，刀光乍现，吸魂取魄，壮大自身。</p><p><strong>需求：</strong>刀-双刀</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "刀-双刀",
+            "moves": [
+                {
+                    "name": "血债血偿",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双刀交叉，新仇旧恨，开启架招。格挡成功后，自身获得一层“魂”，持续到脱战。</p><p><strong>魂：</strong>造成伤害时，可消耗一层“魂”，吸取【招式伤害（未扣除防御格挡）*20%】的气血。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "开启自动获魂。格挡自动获魂。吸血效果需在其他攻击招式中手动确认。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启获魂",
+                            "trigger": "attack",
+                            "script": "const eff = thisItem.effects.getName(\"魂\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        },
+                        {
+                            "label": "格挡获魂",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"魂\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "魂飞魄荡",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>挥刀之际，摄人心神，对目标造成伤害。击破架招时，若消耗一层“魂”，此次吸血比例从 20%提高到 100%。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中后弹窗询问是否消耗魂吸血（基于未减免伤害）。自动判断击破架招提升吸血比例。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "摄魂吸血",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 判断是否满足强化条件\nconst isBoosted = args.isBroken;\nconst ratio = isBoosted ? 1.0 : 0.2;\n// 使用 pre-defense damage (args.damageResult.damage)\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 魂飞魄荡\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>击破状态: <b>${isBoosted ? \"是\" : \"否\"}</b></p><p>预计算吸血量: <b>${healAmount}</b> (基于伤害 ${rawDamage})</p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "天诛地戮",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>挥舞双刀，心乱神迷，对周围 3 米范围内所有敌人造成伤害。</p><p>·若命中两人以上，在回合末获得一层“魂”，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "命中2人以上自动挂载回合末获魂特效。吸血询问自动（基于未减免伤害）。请遵循规则每次出招仅吸血一次。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "摄魂吸血(通用)",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * 0.2);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 天诛地戮\" },\n    content: `<p>对目标 <b>${args.target.name}</b> 消耗一层 [魂] 进行吸血？</p><p>预计算吸血量: <b>${healAmount}</b> (20%)</p><p style=\"color:red; font-size:0.8em;\">注意：规则限制每次出招仅能吸血一次。</p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "聚魂检测",
+                            "trigger": "hit_once",
+                            "script": "if (args.hitCount >= 2) {\n    const eff = thisItem.effects.getName(\"聚魂 (回合末)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"命中多人，将在回合末获得 [魂]\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "血溅当场",
+                    "type": "counter",
+                    "element": "gang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制目标虚招，刀架脖颈，身首异处，造成伤害。若消耗一层“魂”，此次吸血比例从 20%提高到 100%。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中后弹窗询问吸血。消耗魂自动提升比例（基于未减免伤害）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "摄魂吸血",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 反击固定提升比例\nconst ratio = 1.0;\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 血溅当场\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>反击加成比例: <b>100%</b></p><p>预计算吸血量: <b>${healAmount}</b></p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "无间地狱",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>刀斩无间，摄魂夺魄，对目标造成伤害。若消耗一层“魂”，此次吸血比例从 20%提高到 100%。还会让目标陷入“封招”，持续一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+2。</p>",
+                    "automationNote": "封招自动。命中后弹窗询问吸血（基于未减免伤害）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加封招",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"fengzhao\", { duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被封招！`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "摄魂吸血",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 绝招固定提升比例\nconst ratio = 1.0;\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 无间地狱\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>绝招加成比例: <b>100%</b></p><p>预计算吸血量: <b>${healAmount}</b></p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "魂",
+                    "icon": "icons/magic/death/skull-energy-light-purple.svg",
+                    "description": "消耗以吸血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shehun_hun",
+                            "stackable": true
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "聚魂 (回合末)",
+                    "icon": "icons/magic/death/skull-energy-light-purple.svg",
+                    "description": "回合结束时获得一层魂。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "temp_hun_gain",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "trigger": "turnEnd",
+                                    "script": "const eff = thisItem.effects.getName(\"魂\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"回合结束，吸取生魂！\");\nawait thisEffect.delete();",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "赶尽杀绝",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>魔刀门钩锁绝技，但凡被盯上，通常下场极惨。</p><p><strong>需求：</strong>奇门-鞭钩</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "奇门-鞭钩",
+            "moves": [
+                {
+                    "name": "赶尽杀绝",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>射出飞爪钩缠，造成 0.4 力量点内功伤害，并将自己不消耗速度牵引至其身旁空格。</p><p>·若目标无架招，招式释放距离+5。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "伤害自动。牵引效果手动。距离加成需手动判断（请自行确认距离）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "效果提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    ui.notifications.info(\"请手动将自己移动至目标身旁。若目标无架招，本招式距离可视为 10米。\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "血魄凝精",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>魔刀门弟子收集他人鲜血，以特殊手段融入己身。过程极其痛苦，若融合的鲜血种类过多，相互冲突，就可能导致经脉逆行，爆体而亡。</p><p><strong>炼血</strong></p><p>消耗一分钟，将尸体心口精血逼出，进行[渡气]检定（难度 15），成功则汇聚出一滴殷红泛光的魔血。之后尸体浑身血液挥发逸散，变为干尸。</p><p><strong>魔血：</strong>配合魔刀门功法使用，杀伐之力倍增。</p><p>·一具成年尸体只能炼出一滴魔血。</p><p>·魔血只能存在十二个时辰。</p><p><strong>融血</strong></p><p>自身躺入刀棺，以内劲秘法牵引吸纳魔血。进行[忍耐]检定（难度 11），失败则进行死亡检定。</p><p>若成功，你每融血一次，气血+10，内力+10，但下一次融血的忍耐检定难度+1。</p><p><strong>升级：</strong>炼血的检定难度-2，融血的检定难度-2。</p>",
+            "moves": [
+                {
+                    "name": "血魄凝精",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "其他",
+                    "description": "<p>魔刀门弟子收集他人鲜血，以特殊手段融入己身。</p><p><strong>炼血：</strong>消耗一分钟，对尸体进行[渡气]检定（难度 15），成功获得魔血（RP道具）。尸体变为干尸。</p><p><strong>融血：</strong>消耗魔血进行[忍耐]检定（难度 11+N），成功则永久气血/内力+10，失败触发死检。</p><p><strong>升级：</strong>炼血的检定难度-2，融血的检定难度-2。</p>",
+                    "automationNote": "纯手动/RP向。请GM协助判定炼血结果。融血请手动进行属性调整和死亡检定。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "血遁",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>魔刀门邪异功法，由血魔老祖所创。以自身血液为引，激发潜能，将速度短暂提升至极致。</p><p><strong>属性：</strong>阳</p>",
+            "moves": [
+                {
+                    "name": "血遁",
+                    "type": "qi",
+                    "actionType": "attack",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "none",
+                    "range": "10米",
+                    "targetInfo": "范围",
+                    "actionCost": "次要动作",
+                    "description": "<p>神色狰狞，血影遁行，选择范围内一处未被占据的空格，不消耗速度突进至那，并对周围 1 米范围内敌人造成 0.4 力量点内功伤害。</p><p><strong>消耗：</strong>气血上限 30%的气血或魔血*1</p><p><strong>升级：</strong>招式伤害+10，释放距离+5。</p>",
+                    "automationNote": "出招时弹窗选择消耗魔血(手动)或气血(自动)。位移手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "血遁消耗决策",
+                            "trigger": "attack",
+                            "script": "const choice = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"血遁消耗\" },\n    content: \"请选择消耗方式：\",\n    yes: { label: \"消耗魔血 (手动扣除)\", icon: \"fas fa-tint\" },\n    no: { label: \"消耗气血 (30%上限)\", icon: \"fas fa-heart-broken\" }\n});\n\nif (choice) {\n    ui.notifications.info(\"玩家选择消耗魔血，请手动扣除物品。\");\n} else {\n    const maxHP = S.resources.hp.max;\n    const cost = Math.floor(maxHP * 0.3);\n    if (S.resources.hp.value <= cost) {\n        args.flags.abort = true;\n        args.flags.abortReason = \"气血不足以支付血遁消耗\";\n        return;\n    }\n    // 扣除气血 (真实伤害)\n    await actor.applyDamage({\n        amount: cost,\n        type: \"liushi\",\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`血遁消耗 ${cost} 点气血`);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
     }
 ]
