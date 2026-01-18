@@ -2565,9 +2565,7 @@ export class XJZLActor extends Actor {
       "system.history": [historyEntry, ...system.history]
     };
 
-
     await this.update(updateData);
-
     ui.notifications.info(`修为已更新: ${poolKey} ${amount > 0 ? '+' : ''}${amount}`);
   }
 
