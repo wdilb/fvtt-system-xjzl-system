@@ -2498,32 +2498,74 @@
   font-weight: bold;
 }
 
-/* Actions */
+/* Actions 容器 */
 .xjzl-window.actor.character .card-actions {
   display: none;
   position: absolute;
   right: 0;
   top: 0;
   bottom: 0;
-  background: linear-gradient(to left, #fff 90%, transparent);
+  
+  /* 缩减背景范围：只遮挡右侧 55%，左侧完全透明，绝不挡图 */
+  background: linear-gradient(to left, #fff 55%, transparent);
+  
   padding-right: 5px;
-  gap: 5px;
-  align-items: center;
+  
+  /* 布局改为垂直列：按钮分上下两行显示，节省宽度 */
+  flex-direction: column;
+  justify-content: center; /* 垂直居中 */
+  align-items: flex-end;   /* 靠右对齐 */
+  gap: 2px;                /* 上下行之间的间距 */
+  
+  /* 鼠标穿透：容器本身不挡鼠标，只有点到具体按钮才生效 */
+  pointer-events: none; 
+  z-index: 10;
 }
 
+/* 鼠标悬停时显示 */
 .xjzl-window.actor.character .item-grid-card:hover .card-actions {
   display: flex;
 }
 
+/* 行容器：让每行的按钮横向排列 */
+.xjzl-window.actor.character .card-actions .action-row {
+  display: flex;
+  align-items: center;
+  gap: 6px; /* 按钮之间的间距 */
+  
+  /* 恢复按钮的点击响应 (重要！) */
+  pointer-events: auto;
+}
+
+/* 按钮通用样式 */
 .xjzl-window.actor.character .card-actions a {
   color: #666;
   font-size: 12px;
-  padding: 4px;
+  padding: 2px; /* 稍微减小内边距，让布局更紧凑 */
   cursor: pointer;
+  transition: color 0.2s; /* 增加一点丝滑的变色效果 */
 }
 
+/* 默认按钮 hover 颜色 */
 .xjzl-window.actor.character .card-actions a:hover {
   color: var(--c-cinnabar);
+}
+
+/* --- 买卖按钮专属颜色 --- */
+.xjzl-window.actor.character .card-actions a.action-buy {
+  color: #e67e22; /* 橙色 */
+}
+.xjzl-window.actor.character .card-actions a.action-buy:hover {
+  color: #d35400;
+  text-shadow: 0 0 2px rgba(230, 126, 34, 0.3);
+}
+
+.xjzl-window.actor.character .card-actions a.action-sell {
+  color: #2ecc71; /* 绿色 */
+}
+.xjzl-window.actor.character .card-actions a.action-sell:hover {
+  color: #27ae60;
+  text-shadow: 0 0 2px rgba(46, 204, 113, 0.3);
 }
 
 /* Tooltip Customization */
@@ -4143,8 +4185,6 @@
 .xjzl-window.actor.character .cultivation-header {
   display: flex;
   justify-content: space-between;
-  grid-template-rows: auto auto;
-  row-gap: 6px;
   align-items: center;
   padding: 10px 0 15px 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.05);
@@ -4155,65 +4195,207 @@
 
 /* --- 修为池 (Pools) --- */
 .xjzl-window.actor.character .pools-container {
-  display: flex-end;
-  gap: 8px;
+  display: flex;
+  gap: 15px;
   align-items: center;
 }
 
-.xjzl-window.actor.character .xp-pool {
-  position: relative;               
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
+/* --- tooltip效果 --- */
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip {
+  position: relative;
+  overflow: hidden;
+  padding: 8px 10px;
+  min-width: 170px;
+  line-height: 1.35;
 
-  padding: 14px 10px 6px;           
-  border-radius: 8px;
-  min-width: 120px;
-  max-width: 100%;   
-  background: rgba(255, 255, 255, 0.122);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(15, 15, 15, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+}
+
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip .tooltip-title {
+  font-size: 1.1em;
+  font-weight: bold;
+  margin-bottom: 4px;
+  color: var(--c-highlight, #e0c068);
+}
+
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip .tooltip-line {
+  font-size: 0.95em;
+  color: #ddd;
+}
+
+/* --- tooltip波纹特效 --- */
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip::before,
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip::after {
+  content: "";
+  position: absolute;
+  left: -50%;
+  width: 200%;
+  height: 18px;
+
+  
+  background:
+    radial-gradient(circle at 10px 9px, rgba(255,255,255,0.20) 9px, transparent 10px)
+    0 0 / 20px 18px repeat-x;
+
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 1;
+}
+
+
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip::before {
+  top: 42px; 
+  background-color: var(--wave1);
+  animation: ttWave1 1.8s linear infinite;
+}
+
+
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip::after {
+  top: 58px;
+  opacity: 0.35;
+  background-color: var(--wave2);
+  animation: ttWave2 2.6s linear infinite reverse;
+}
+
+
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip::before,
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip::after {
+  background-blend-mode: screen;
+}
+
+@keyframes ttWave1 { to { transform: translateX(20px); } }
+@keyframes ttWave2 { to { transform: translateX(30px); } }
+
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip.general {
+  --wave1: rgba(203, 160, 82, 0.35);
+  --wave2: rgba(203, 160, 82, 0.20);
+}
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip.general .tooltip-title {
+  color: rgba(203, 160, 82, 0.95);
+}
+
+/* Neigong - cyan/blue */
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip.neigong {
+  --wave1: rgba(70, 180, 255, 0.35);
+  --wave2: rgba(70, 180, 255, 0.18);
+}
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip.neigong .tooltip-title {
+  color: rgba(70, 180, 255, 0.95);
+}
+
+/* Wuxue - purple */
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip.wuxue {
+  --wave1: rgba(170, 110, 255, 0.35);
+  --wave2: rgba(170, 110, 255, 0.18);
+}
+.xjzl-window.actor.character .tooltip .tooltip .xjzl-pool-tooltip.wuxue .tooltip-title {
+  color: rgba(170, 110, 255, 0.95);
+}
+
+/* Arts - green */
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip.arts {
+  --wave1: rgba(90, 220, 140, 0.30);
+  --wave2: rgba(90, 220, 140, 0.16);
+}
+.xjzl-window.actor.character .tooltip .xjzl-pool-tooltip.arts .tooltip-title {
+  color: rgba(90, 220, 140, 0.95);
+}
+
+
+.xjzl-window.actor.character .xp-pool {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #444, #1a1a1a);
+  border: 2px solid #555;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: transform 0.3s;
+  cursor: help;
+
+  overflow: hidden;
+  --progress: 0%;
+}
+
+
+.xjzl-window.actor.character .xp-liquid {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: calc(var(--progress) * 1%); 
+  transition: height 0.35s ease;
+  background: linear-gradient(to top, #2e7d32, #66bb6a);
+}
+
+.xjzl-window.actor.character.xp-wave {
+  position: absolute;
+  left: -50%;
+  top: -8px;             
+  width: 200%;
+  height: 16px;
+
+  
+  background:
+    radial-gradient(circle at 10px 10px, rgba(255,255,255,0.35) 10px, transparent 11px) 0 0 / 20px 16px repeat-x;
+
+  opacity: 0.55;
+  filter: blur(0.2px);
+}
+
+.xjzl-window.actor.character .wave1 {
+  animation: waveMove1 1.7s linear infinite;
+}
+
+.xjzl-window.actor.character .wave2 {
+  top: -10px;
+  opacity: 0.35;
+  animation: waveMove2 2.4s linear infinite reverse;
+}
+
+
+@keyframes waveMove1 {
+  from { transform: translateX(0); }
+  to   { transform: translateX(20px); }
+}
+
+@keyframes waveMove2 {
+  from { transform: translateX(0); }
+  to   { transform: translateX(28px); }
 }
 
 .xjzl-window.actor.character .xp-pool:hover {
-  transform: none;
-  box-shadow: none;
-  border-color: rgba(255, 255, 255, 0.24); 
-  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.1);
+  border-color: var(--c-highlight);
+  box-shadow: 0 0 15px rgba(203, 160, 82, 0.4);
 }
 
 .xjzl-window.actor.character .xp-pool .pool-label {
-  position: absolute;
-  top: 4px;
-  right: 6px;
-  color: rgb(255, 255, 255); 
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  opacity: 0.65;
-  white-space: nowrap;
-  pointer-events: none;
-
-  font-family:
-    "Ma Shan Zheng",
-    "KaiTi",
-    "STKaiti",
-    cursive;
+  font-size: 9px;
+  color: #aaa;
+  margin-bottom: 1px;
+  position: relative;
+  z-index: 1;
 }
 
 .xjzl-window.actor.character .xp-pool .pool-val {
   font-family: "Consolas", monospace;
-  font-size: 13px;
-  color: rgb(255, 255, 255);       
-  font-weight: 700;
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
+  font-size: 14px;
+  color: #fff;
+  font-weight: bold;
+  position: relative;
+  z-index: 1;
 }
 
 /* 专属池配色 */
 .xjzl-window.actor.character .xp-pool.general {
-  border-color: #0000001d;
+  border-color: rgba(203, 160, 82, 0.95);
 }
 
 .xjzl-window.actor.character .xp-pool.neigong {
@@ -4230,7 +4412,7 @@
 
 /* --- 控制栏 (Controls) --- */
 .xjzl-window.actor.character .cultivation-controls {
-  display: flex-start;
+  display: flex;
   gap: 8px;
   align-items: center;
 }

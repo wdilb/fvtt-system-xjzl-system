@@ -2616,6 +2616,24 @@ export class XJZLActor extends Actor {
 
 
     await this.update(updateData);
+
+    // 5. 更新百分比显示
+    const xpStorage = (system.stats.tipo.total - system.stats.tipo.neigongBonus) * 200 + 5000
+
+    const total = (system.cultivation.general || 0) + 
+                    (system.cultivation.neigong || 0) + 
+                    (system.cultivation.wuxue || 0) + 
+                    (system.cultivation.arts || 0);
+
+    const percent = Math.min(
+      100,
+      (total / xpStorage) * 100
+    );
+
+    this.sheet?.element
+      .find(`.xp-pool.${poolKey}`)
+      .css("--progress", percent);
+
     ui.notifications.info(`修为已更新: ${poolKey} ${amount > 0 ? '+' : ''}${amount}`);
   }
 
