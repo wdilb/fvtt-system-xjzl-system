@@ -469,7 +469,7 @@ export class ChatCardManager {
                     // 公式: 最终骰子 + 全局修正 + 目标修正
                     const targetHitMod = states.grantHit || 0;
                     const total = finalDie + globalHitMod + targetHitMod;
-                    dodge = tActor.system.combat.dodgeTotal || 10;
+                    dodge = tActor.system.combat.dodgeTotal ?? 10;
                     displayTotal = total
 
                     // 判定命中 (含20必中/1必失)
@@ -563,7 +563,7 @@ export class ChatCardManager {
 
                 // C. 计算数值
                 total = finalDie + hitMod + manualBonus;
-                const dodge = targetActor.system.combat.dodgeTotal || 10;
+                const dodge = targetActor.system.combat.dodgeTotal ?? 10;
 
                 // D. 判定命中
                 // 规则：20必中，1必失
@@ -1003,10 +1003,8 @@ export class ChatCardManager {
         if (!isBroken) {
             // A. 判定成功：架招维持
             // B. 视觉反馈 (飘字: 绿色)
-            if (targetActor.token?.object) {
-                canvas.interface.createScrollingText(targetActor.token.object.center, "看破！", {
-                    fill: "#00ff00", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                });
+            if (targetActor.showFloatyText) {
+                targetActor.showFloatyText("看破！", { fill: "#00ff00" });
             }
         }
 
@@ -1205,7 +1203,7 @@ export class ChatCardManager {
             if (isHit && isBroken && targetActor.system.martial.stanceActive) {
 
                 // A. 判定失败：移除架招状态
-                await targetActor.update({ "system.martial.stanceActive": false });
+                await ChatCardManager._safeUpdateDocument(targetActor, { "system.martial.stanceActive": false });
                 // B. 应用 "破防" 状态
                 // 从配置中获取标准数据
                 const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
@@ -1220,14 +1218,12 @@ export class ChatCardManager {
                         description: game.i18n.localize(statusConfig.description),
                         origin: attacker ? attacker.uuid : message.uuid  // 只有来源是动态的
                     };
-                    await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
+                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [breakEffectData]);
                 }
 
                 // C. 视觉反馈 (飘字: 红色)
-                if (targetActor.token?.object) {
-                    canvas.interface.createScrollingText(targetActor.token.object.center, "被击破架招！", {
-                        fill: "#ff0000", stroke: "#000000", strokeThickness: 4, jitter: 0.25
-                    });
+                if (targetActor.showFloatyText) {
+                    targetActor.showFloatyText("被击破架招！", { fill: "#ff0000" });
                 }
             }
             // =====================================================
@@ -1286,7 +1282,7 @@ export class ChatCardManager {
                 ignoreStance: damageConfig.ignoreStance,  //无视架招
                 isSkill: isSkillDamage,
                 element: damageConfig.element,
-                move: move, 
+                move: move,
                 item: item
             });
 
@@ -1490,7 +1486,11 @@ export class ChatCardManager {
 
         // 应用数值更新
         if (!foundry.utils.isEmpty(updates)) {
-            await actor.update(updates);
+            if (actor.isOwner) {
+                await actor.update(updates);
+            } else {
+                await xjzlSocket.executeAsGM("updateDocument", actor.uuid, updates);
+            }
         }
 
         // =====================================================
@@ -2201,6 +2201,10 @@ export class ChatCardManager {
             updates["system.resources.morale.value"] = res.morale.value + cost.morale;
         }
 
+        if (!actor.isOwner) {
+            return ui.notifications.warn("权限不足：请让该角色的控制者进行操作。");
+        }
+
         // 提交更新
         if (!foundry.utils.isEmpty(updates)) {
             await actor.update(updates);
@@ -2253,5 +2257,25 @@ export class ChatCardManager {
             // 委托 GM 更新
             return await xjzlSocket.executeAsGM("updateDocument", message.uuid, updates);
         }
+    }
+
+    /**
+     * 更新文档 (自动判断权限，无权则走Socket)
+     */
+    static async _safeUpdateDocument(doc, data) {
+        if (!doc) return;
+        // 如果我是拥有者（GM或该角色的玩家），直接更新
+        if (doc.isOwner) return doc.update(data);
+        // 否则，发给 GM 帮我更新
+        return await xjzlSocket.executeAsGM("updateDocument", doc.uuid, data);
+    }
+
+    /**
+     * 创建内嵌文档 (自动判断权限，无权则走Socket)
+     */
+    static async _safeCreateEmbedded(parent, type, data) {
+        if (!parent) return;
+        if (parent.isOwner) return parent.createEmbeddedDocuments(type, data);
+        return await xjzlSocket.executeAsGM("createEmbedded", parent.uuid, type, data);
     }
 }

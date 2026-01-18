@@ -148,7 +148,14 @@ export async function seedNeigong() {
             disabled: e.disabled ?? false,
             changes: e.changes || [],
             flags: e.flags || {},
-            description: e.description || ""
+            description: e.description || "",
+            // 补上 duration
+            duration: e.duration || {},
+            // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
+            statuses: e.statuses || [],
+            tint: e.tint || null,
+            // 补上 origin，虽然通常是空的，但保持结构完整
+            origin: e.origin || null
         })) : [];
 
         items.push({

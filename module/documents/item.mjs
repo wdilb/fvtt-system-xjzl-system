@@ -950,6 +950,7 @@ export class XJZLItem extends Item {
    * @param {String} moveId - 招式 ID
    * @param {Object} options - 额外配置
    * @param {Number} options.overrideMorale - 强制指定使用的士气值(用于Roll时传递已消耗的值)
+   * @param {Number} options.overrideType - 修改后的招式类型
    */
   calculateMoveDamage(moveId, options = {}) {
     // 1. 基础校验
@@ -967,13 +968,15 @@ export class XJZLItem extends Item {
     // =====================================================
     //  核心计算流程
     // =====================================================
+    // 获取有效类型 (优先使用传入的覆盖类型)
+    const effectiveType = options.overrideType || move.type;
 
     // --- A. 招式自带基础 (Base + Growth) ---
     const lvl = Math.max(1, move.computedLevel || 1);
     const moveBaseDmg = (move.calculation.base || 0) + (move.calculation.growth || 0) * (lvl - 1);
 
     // 1. 架招：只看强度，不吃任何加成，不跑脚本
-    if (move.type === "stance") {
+    if (effectiveType === "stance") {
       return {
         damage: Math.floor(moveBaseDmg),
         feint: 0, // 架招无虚招
@@ -988,7 +991,7 @@ export class XJZLItem extends Item {
     // 2. 无系数气招 (纯脚本)：直接归零，不跑计算流程
     // 判定条件：是气招 且 没有配置属性加成 (Scalings)
     const hasScalings = move.calculation.scalings && move.calculation.scalings.length > 0;
-    if (move.type === "qi" && !hasScalings) {
+    if (effectiveType === "qi" && !hasScalings) {
       return {
         damage: Math.floor(moveBaseDmg),
         feint: 0,
@@ -1082,7 +1085,7 @@ export class XJZLItem extends Item {
     let moraleBonus = 0;
     // 只有 武学(wuxue) 且 非普攻(basic) 非气招(qi) 非架招(stance) 才享受
     // 注意：趁虚而入虽然也是 basic 类型，但它是通过 rollBasicAttack 调用的，不走这里，所以这里不用管
-    const isExcluded = ["basic", "qi", "stance"].includes(move.type);
+    const isExcluded = ["basic", "qi", "stance"].includes(effectiveType);
 
     if (!isExcluded && actor.system.resources.morale) {
       if (options.overrideMorale !== undefined) {
@@ -1102,8 +1105,17 @@ export class XJZLItem extends Item {
     let feintVal = 0;
     let feintBreakdown = "";
 
-    if (move.type === 'feint') {
-      const base = move.baseFeint || 0; // DataModel 算好的基础值
+    if (effectiveType === 'feint') {
+      let base = move.baseFeint || 0; // DataModel 算好的基础值
+
+      // 如果变成了虚招，但原数据里没有基础值 (说明是半路改的)，现场补算
+      if (base === 0 && move.type !== 'feint') {
+        const tier = move.tier ?? this.system.tier ?? 1;
+        // 系数公式：人级2，地级3，天级4
+        const feintCoef = (tier === 3) ? 4 : (tier === 2 ? 3 : 2);
+        const lvl = Math.max(1, move.computedLevel || 1);
+        base = lvl * feintCoef;
+      }
 
       // 武器等级加成 (同上逻辑)
       let wRankVal = 0;
@@ -1220,7 +1232,6 @@ export class XJZLItem extends Item {
   /**
    * 步骤 0: 动态配置弹窗
    * 根据招式类型显示不同的输入框
-   * [Updated] 支持 effectiveMode 参数，控制显示逻辑
    */
   async _promptRollConfiguration(move, effectiveMode = "attack") {
     if (move.type === "stance") return {};
@@ -1246,7 +1257,6 @@ export class XJZLItem extends Item {
     };
 
     // 过滤掉不需要显示的伤害类型(如果需要)或者直接使用全局配置
-    // 假设 XJZL.damageTypes 全局存在
     const damageTypes = XJZL.damageTypes;
 
     const context = {
@@ -1569,7 +1579,10 @@ export class XJZLItem extends Item {
 
       // 此时 effectiveMode 必定是 attack 或 heal
       // 传入 overrideMorale，确保计算使用刚才消耗掉的值
-      const calcResult = this.calculateMoveDamage(moveId, { overrideMorale: moraleSpent });
+      const calcResult = this.calculateMoveDamage(moveId, {
+        overrideMorale: moraleSpent,
+        overrideType: move.type // 此时 move.type 已经被弹窗配置修改过了 
+      });
       if (!calcResult) {
         this._rolling = false; // 记得这里要手动解锁，因为还未进入 try/catch 的深层或者直接抛错
         return ui.notifications.error("数值计算失败。");
@@ -1862,7 +1875,7 @@ export class XJZLItem extends Item {
           const tokenUuid = t.document.uuid;
           const ctx = targetContexts.get(tokenUuid) || { attackState: 0, grantHit: 0, grantFeint: 0, forceHit: false };
           const state = ctx.attackState;
-          // [MODIFIED] 核心命中判断逻辑
+          // 核心命中判断逻辑
           let finalDie = "-";
           let outcomeLabel = "-";
           let total = "-";
@@ -1879,7 +1892,7 @@ export class XJZLItem extends Item {
             total = finalDie + hitMod + (ctx.grantHit || 0);
             // 获取目标闪避
             // 这里只是预览命中，不做逻辑判定
-            dodge = t.actor.system.combat.dodgeTotal || 10;
+            dodge = t.actor.system.combat.dodgeTotal ?? 10;
             // 规则：20必中，1必失
             if (finalDie === 20) isHit = true;
             else if (finalDie === 1) isHit = false;

@@ -768,6 +768,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         const moves = item.system.moves || [];
         // 获取书本默认 Tier
         const bookTier = item.system.tier ?? 1;
+        // 检查是否排除悟性加成 (轻功和阵法不加)
+        const isWuxingExcluded = ["qinggong", "zhenfa"].includes(item.system.category);
+
         // 遍历每一招
         for (const move of moves) {
           // 现在必须针对每一招单独获取 tier
@@ -779,13 +782,16 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           const wType = move.weaponType; // 武器类型
 
           //把悟性加成从下面的武器里移动到外面，虽然规则书上写的不加，但lxx说规则书是错的
-          // 1. 统计悟性加成 (需达到 精通/Stage>=3)
-          if (stage >= 3) {
-            if (tier === 1) wuxingHumanCount++;
-            if (tier === 2) wuxingEarthCount++;
-            if (tier === 3) wuxingBonus += 1; // 天级精通 +1
+          //但是轻功和阵法不加
+          if (!isWuxingExcluded) {
+            // 1. 统计悟性加成 (需达到 精通/Stage>=3)
+            if (stage >= 3) {
+              if (tier === 1) wuxingHumanCount++;
+              if (tier === 2) wuxingEarthCount++;
+              if (tier === 3) wuxingBonus += 1; // 天级精通 +1
+            }
+            if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
           }
-          if (stage >= 4 && tier === 3) wuxingBonus += 1; // 天级合一 +1
 
           if (wType && wType !== 'none') { //确实存在不带武器类型的招式
 

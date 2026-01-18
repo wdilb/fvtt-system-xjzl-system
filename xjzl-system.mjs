@@ -740,7 +740,6 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
   // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
   if (!game.users.activeGM?.isSelf) return;
   if (!updateData.hasOwnProperty("round")) return;
-  console.log(combat.previous.round);
   // 2. 只有当 round 从 0 变为 1 时，才视为“战斗正式开始”
   // updateData.round 是新回合数，combat.previous.round 是旧回合数
   if (updateData.round === 1 && combat.previous.round === 0) {
@@ -792,7 +791,7 @@ async function triggerCombatStartScripts(combatants) {
 
   // 等待所有脚本触发完成
   await Promise.all(promises);
-}
+};
 // 应该没有必要浪费性能去实现这种功能
 // 监听世界时间变化 (Seconds 变化)来清理过期AE
 // 比如 GM 手动调整时间，或使用了 Calendar 模组

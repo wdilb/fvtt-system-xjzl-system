@@ -197,6 +197,7 @@ await Macros.requestSave({
 | **`trigger`** | `String` | **当前触发时机**。例如 `"attack"`, `"hit"`, `"damaged"`。用于在同一脚本中处理多重逻辑。 |
 | **`Macros`** | `Class` | **系统工具箱**。提供 `requestSave` (发起检定), `checkStance` (架招判断) 等静态方法。 |
 | **`console`** | `Console` | 浏览器控制台，用于 `console.log(args)` 调试。 |
+| **`actor.showFloatyText(text, style)`** | `Function` | **飘字广播方法**。<br>全客户端可见的视觉反馈。<br>参数: `text` (String), `style` (Object, 可选)。<br>示例: `actor.showFloatyText("触发特效!", {fill: "#ff0000"})`。 |
 | **`game`, `ui`** | `Object` | Foundry VTT 核心全局对象。 |
 
 ---
@@ -576,6 +577,43 @@ await Macros.requestSave({
 
 ---
 
+## 🎨 6.5 视觉特效与飘字 (Socket API)
+
+系统内置了全客户端同步的飘字系统，取代了旧版的 `canvas.interface.createScrollingText`。
+在任何脚本中（只要能获取到 `actor` 实例），都可以直接调用此方法。
+
+### `actor.showFloatyText(text, style)`
+
+*   **text**: 显示的文本内容。
+*   **style** (可选): 样式配置对象。
+    *   `fontSize`: 字号 (默认 32)。
+    *   `fill`: 填充颜色 (默认白色 `#ffffff`)。
+    *   `stroke`: 描边颜色 (默认黑色 `#000000`)。
+    *   `strokeThickness`: 描边宽度 (默认 4)。
+    *   `jitter`: 抖动幅度 (默认 0.25)。
+    *   `anchor`: 锚点 (默认 0.5)。
+    *   `direction`: 飘动方向 (0:向上, 1:向下)。
+
+**示例代码**:
+
+```javascript
+// 简单的绿色提示
+actor.showFloatyText("回气成功", { fill: "#00ff00" });
+
+// 醒目的暴击提示
+if (args.isCrit) {
+    actor.showFloatyText("暴击!!", { 
+        fontSize: 48, 
+        fill: "#ff4500", // 橙红色
+        strokeThickness: 6 
+    });
+}
+```
+
+> ⚠️ **迁移警告**: 请勿再使用 `canvas.interface.createScrollingText(...)`。旧方法在 Socket 代理模式下（如玩家攻击NPC）仅 GM 可见，无法广播给所有客户端。
+
+---
+
 ## 💡 7. 脚本实战范例大全 (Verified v6.1)
 
 以下范例均提取自系统核心合集包，经过实机验证，可直接作为模板使用。
@@ -793,7 +831,7 @@ if (inRange) {
         });
         
         // 发送提示
-        ui.notifications.info("反伤甲触发！");
+        actor.showFloatyText("反伤甲触发！", { fill: "#FFA500" }); // 橙色
 
     } finally {
         // [关键] 无论成功失败，必须清除标记
@@ -849,11 +887,10 @@ if (debuff && args.attacker) {
     await game.xjzl.api.effects.addEffect(args.attacker, effectData);
     
     // 飘字提示
-    if (actor.token?.object) {
-        canvas.interface.createScrollingText(actor.token.object.center, "格挡反震！", { 
-            fill: "#FFA500", stroke: "#000000", strokeThickness: 4 
-        });
-    }
+    actor.showFloatyText("格挡反震！", { 
+        fill: "#FFA500", // 橙色
+        fontSize: 36
+    });
 }
 ```
 

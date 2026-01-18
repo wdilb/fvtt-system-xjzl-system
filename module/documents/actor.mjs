@@ -119,13 +119,7 @@ export class XJZLActor extends Actor {
         this.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
 
         // 视觉反馈
-        if (this.token?.object) {
-          canvas.interface.createScrollingText(
-            this.token.object.center,
-            "脱离濒死",
-            { fill: "#00FF00", stroke: "#000000", strokeThickness: 4, jitter: 0.25 }
-          );
-        }
+        this.showFloatyText("脱离濒死", { fill: "#00FF00" });
       }
     }
   }
@@ -1068,11 +1062,7 @@ export class XJZLActor extends Actor {
 
       // 1. 未命中直接返回
       if (!isHit) {
-        if (this.token?.object) {
-          canvas.interface.createScrollingText(this.token.object.center, "闪避", {
-            direction: 0, fontSize: 32, fill: "#ffffff", stroke: "#000000", strokeThickness: 4
-          });
-        }
+        this.showFloatyText("闪避", { fontSize: 32, fill: "#ffffff" });
         return { finalDamage: 0, isDead: false };
       }
 
@@ -1104,11 +1094,7 @@ export class XJZLActor extends Actor {
           await this.update({ "system.resources.tili.value": newVal });
 
           // 飘字
-          if (this.token?.object) {
-            canvas.interface.createScrollingText(this.token.object.center, `-${actualLost} 体力`, {
-              fill: "#ff0000", stroke: "#000000", strokeThickness: 4, fontSize: 32, jitter: 0.25
-            });
-          }
+          this.showFloatyText(`-${actualLost} 体力`, { fill: "#ff0000", fontSize: 32 });
 
           // 死亡检查
           if (newVal <= 0) {
@@ -1121,11 +1107,7 @@ export class XJZLActor extends Actor {
         }
       } else {
         // 未破防
-        if (this.token?.object) {
-          canvas.interface.createScrollingText(this.token.object.center, "未破防", {
-            fill: "#cccccc", stroke: "#000000", strokeThickness: 4
-          });
-        }
+        this.showFloatyText("未破防", { fill: "#cccccc" });
       }
 
       return {
@@ -1149,7 +1131,7 @@ export class XJZLActor extends Actor {
       item = null
     } = data;
 
-    // [关键] 构建可配置对象 (Mutable Config)
+    // 构建可配置对象 (Mutable Config)
     // 这里的属性允许被 PRE_DEFENSE 脚本修改
     const config = {
       // 穿透规则
@@ -1181,11 +1163,8 @@ export class XJZLActor extends Actor {
       await this.runScripts(SCRIPT_TRIGGERS.AVOIDED, avoidContext);
 
       // 飘字：闪避
-      if (this.token?.object) {
-        canvas.interface.createScrollingText(this.token.object.center, "闪避", {
-          direction: 0, fontSize: 32, fill: "#ffffff", stroke: "#000000", strokeThickness: 4
-        });
-      }
+      this.showFloatyText("闪避", { fontSize: 32, fill: "#ffffff" });
+
       return { finalDamage: 0, hpLost: 0, isDead: false };
     }
 
@@ -1300,11 +1279,7 @@ export class XJZLActor extends Actor {
 
     // 脚本可能强行中止 (如无敌)
     if (takeContext.output.abort) {
-      if (this.token?.object) {
-        canvas.interface.createScrollingText(this.token.object.center, "免疫", {
-          fill: "#ffff00", stroke: "#000000", strokeThickness: 4
-        });
-      }
+      this.showFloatyText("免疫", { fill: "#ffff00" });
       return { finalDamage: 0, hpLost: 0, isDead: false };
     }
 
@@ -1509,23 +1484,16 @@ export class XJZLActor extends Actor {
           flavor = `护体 -${stdHutiLost}`;
         }
 
-        canvas.interface.createScrollingText(this.token.object.center, flavor, {
-          direction: 0, fontSize: size, fill: color,
-          stroke: "#000000", strokeThickness: 4, jitter: 0.25
-        });
+        this.showFloatyText(flavor, { fontSize: size, fill: color });
       }
 
       const liuTotal = liuHutiLost + liuHpLost;
       if (liuTotal > 0) {
-        canvas.interface.createScrollingText(this.token.object.center, `流失 -${liuTotal}`, {
-          direction: 0, fontSize: 28, fill: "#8b0000", stroke: "#ffffff", strokeThickness: 2, jitter: 0.25, anchor: 1
-        });
+        this.showFloatyText(`流失 -${liuTotal}`, { fontSize: 28, fill: "#8b0000", anchor: 1 });
       }
 
       if (stdTotal === 0 && liuTotal === 0 && isHit) {
-        canvas.interface.createScrollingText(this.token.object.center, "无伤", {
-          fill: "#cccccc", stroke: "#000000", strokeThickness: 4
-        });
+        this.showFloatyText("无伤", { fill: "#cccccc" });
       }
     }
 
@@ -1677,13 +1645,11 @@ export class XJZLActor extends Actor {
     // 2. 如果 actualHeal == 0 且是因为被禁疗拦截了
     if (showScrolling) {
       if (actualHeal !== 0) {
-        if (this.token?.object) {
-          canvas.interface.createScrollingText(this.token.object.center, label, {
-            direction: actualHeal > 0 ? 0 : 1, // 正数向上飘(0)，负数向下飘(1)
-            fontSize: 32, fill: color,
-            stroke: "#000000", strokeThickness: 4, jitter: 0.25
-          });
-        }
+        this.showFloatyText(label, {
+          direction: actualHeal > 0 ? 0 : 1, // 0=Top, 1=Bottom
+          fontSize: 32,
+          fill: color
+        });
       } else {
         // 可选：如果是因为禁疗导致加血失败，飘一个提示
         let blockLabel = "";
@@ -1693,11 +1659,8 @@ export class XJZLActor extends Actor {
           if ((type === "mp" || type === "neili") && this.xjzlStatuses.noRecoverNeili) blockLabel = "气滞";
         }
 
-        if (blockLabel && this.token?.object) {
-          canvas.interface.createScrollingText(this.token.object.center, blockLabel, {
-            direction: 0, fontSize: 24, fill: "#cccccc", // 灰色
-            stroke: "#000000", strokeThickness: 2, jitter: 0.25
-          });
+        if (blockLabel) {
+          this.showFloatyText(blockLabel, { fontSize: 24, fill: "#cccccc" });
         }
       }
     }
@@ -1759,15 +1722,11 @@ export class XJZLActor extends Actor {
         const flavor = `${timing === "Attack" ? "出招" : (timing === "TurnStart" ? "回合开始" : "回合结束")}: ${messages.join(", ")}`;
 
         // 飘字
-        if (this.token?.object) {
-          canvas.interface.createScrollingText(this.token.object.center, messages.join(" "), {
-            direction: 1,
-            fontSize: 28,
-            fill: "#00FF00",
-            stroke: "#000000",
-            strokeThickness: 4
-          });
-        }
+        this.showFloatyText(messages.join(" "), {
+          direction: 1,
+          fontSize: 28,
+          fill: "#00FF00"
+        });
 
         // 发送个小的 ChatMessage 记录，防止玩家不知道为什么血变了
 
@@ -1817,7 +1776,7 @@ export class XJZLActor extends Actor {
     };
 
     if (!options.skipDialog) {
-      const dialogResult = await this._promptBasicAttackConfig(weaponName);
+      const dialogResult = await this._promptBasicAttackConfig(weaponName, options);
       if (!dialogResult) return; // 用户取消
       config = { ...config, ...dialogResult };
     }
@@ -2084,7 +2043,7 @@ export class XJZLActor extends Actor {
         else if (state === -1) { finalDie = Math.min(d1, d2); outcomeLabel = "劣"; }
 
         total = finalDie + hitMod + (ctx.grantHit || 0);
-        dodge = t.actor?.system.combat.dodgeTotal || 10;
+        dodge = t.actor?.system.combat.dodgeTotal ?? 10;
 
         if (finalDie === 20) isHit = true;
         else if (finalDie === 1) isHit = false;
@@ -2200,11 +2159,12 @@ export class XJZLActor extends Actor {
 
   /**
    * [内部] 普攻配置弹窗
+   * options 参数
    */
-  async _promptBasicAttackConfig(weaponName) {
+  async _promptBasicAttackConfig(weaponName, options = {}) {
     // 1. 生成唯一 ID
     const formId = `roll-config-${foundry.utils.randomID()}`;
-
+    const isOpportunity = options.mode === "opportunity"; // 判断是否趁虚而入
     // 2. 准备基础数据
     // 必须提供 selectOptions 所需的列表，否则 Handlebars 会报错
     const moveTypes = {
@@ -2230,12 +2190,12 @@ export class XJZLActor extends Actor {
       isFeint: false,     // 实招默认不显示虚招
       needsDamage: true,  // 普攻需要伤害
       isHeal: false,
-      canCrit: true,      // 普攻可暴击
+      // 趁虚而入默认不勾选暴击(!true = false)，普攻默认勾选(true)
+      canCrit: !isOpportunity,
 
-      // 额外标记（可选，用于在模板里显示武器名，需要修改hbs支持，或者如下方通过title显示）
+      // 额外标记
       weaponName: weaponName
     };
-
     // 4. 渲染模板
     const content = await renderTemplate("systems/xjzl-system/templates/apps/roll-config.hbs", context);
 
@@ -2507,20 +2467,11 @@ export class XJZLActor extends Actor {
     }
 
     // 5. 视觉反馈
-    if (this.token?.object) {
-      canvas.interface.createScrollingText(
-        this.token.object.center,
-        "解除架招",
-        {
-          direction: 1, // 向下飘
-          fontSize: 28,
-          fill: "#cccccc", // 灰色
-          stroke: "#000000",
-          strokeThickness: 4,
-          jitter: 0.25
-        }
-      );
-    }
+    this.showFloatyText("解除架招", {
+      direction: 1,
+      fontSize: 28,
+      fill: "#cccccc"
+    });
 
     // 可选：发送一条聊天提示
     /*
@@ -2714,7 +2665,7 @@ export class XJZLActor extends Actor {
       user: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: content,
-      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      style: CONST.CHAT_MESSAGE_STYLES.OTHER
     });
   }
 
@@ -2783,7 +2734,7 @@ export class XJZLActor extends Actor {
       user: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: content,
-      type: CONST.CHAT_MESSAGE_TYPES.OTHER
+      style: CONST.CHAT_MESSAGE_STYLES.OTHER
     });
   }
 
@@ -2804,6 +2755,43 @@ export class XJZLActor extends Actor {
           return await xjzlSocket.executeAsGM("deleteEmbedded", value.uuid, type, ids, context);
         };
       }
+    }
+  }
+
+  /**
+   * 广播飘字效果 (Socket版)
+   * 自动通过 Socket 通知所有客户端渲染。
+   * @param {string} content - 显示的文本
+   * @param {Object} [style] - 样式配置 (可覆盖默认值)
+   * @param {number} [style.fontSize=32] - 字号
+   * @param {string} [style.fill="#ffffff"] - 填充颜色
+   * @param {string} [style.stroke="#000000"] - 描边颜色
+   * @param {number} [style.strokeThickness=4] - 描边宽度
+   * @param {number} [style.jitter=0.25] - 抖动幅度
+   * @param {number} [style.anchor] - 锚点
+   * @param {number} [style.direction] - 飘动方向
+   */
+  async showFloatyText(content, style = {}) {
+    // 1. 定义系统默认样式
+    const defaults = {
+      anchor: CONST.TEXT_ANCHOR_POINTS.CENTER,
+      direction: CONST.TEXT_ANCHOR_POINTS.TOP,
+      jitter: 0.25,
+      stroke: "#000000",
+      strokeThickness: 4,
+      fontSize: 32,
+      fill: "#ffffff" // 默认白色
+    };
+
+    // 2. 合并样式：传入的 style 会覆盖 defaults
+    const finalStyle = { ...defaults, ...style };
+
+    // 3. 调用 Socket 广播
+    // 传入 this.uuid，Socket端会自动解析
+    if (xjzlSocket) {
+      await xjzlSocket.executeForEveryone("showScrollingText", this.uuid, content, finalStyle);
+    } else {
+      console.warn("XJZL | Socket 未初始化，无法飘字");
     }
   }
 }
