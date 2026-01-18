@@ -4308,9 +4308,9 @@
             "tier": 2,
             "element": "yang",
             "sect": "jianghushili",
-            "description": "“一道残阳铺水中，半江瑟瑟半江红”，此功需陷于垂死绝境时，方可大彻而悟。练成后，平时真气内敛，迸发而出时侵略如火，锐不可挡。",
+            "description": "<p>“一道残阳铺水中，半江瑟瑟半江红”，此功需陷于垂死绝境时，方可大彻而悟。练成后，平时真气内敛，迸发而出时侵略如火，锐不可挡。</p><p><strong>需求：</strong>悟性 5</p>",
             "requirement": "悟性 5",
-            "automationNote": "完全自动化。check 触发器触发判定并给敌人施加 Debuff。",
+            "automationNote": "完全自动化。进战获得真气Buff。出招时通过Origin回溯查找Debuff模板。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -4334,14 +4334,14 @@
                         "qigan": 16,
                         "shencai": 8
                     },
-                    "description": "小成运功特效：进战后，你获得“残炎真气”，持续到战斗脱离。出招时可用“残炎真气”入侵敌方经脉，对方需投掷[韧性]检定（难度14），成功无事，失败则被添加“残炎”，持续到战斗脱离。\n·残炎：闪避-5，虚招对抗-3。",
+                    "description": "<p>小成运功特效：进战后，你获得“残炎真气”，持续到战斗脱离。出招时可用“残炎真气”入侵敌方经脉，对方需投掷[韧性]检定（难度 14），成功无事，失败则被添加“残炎”，持续到战斗脱离。</p><p>·残炎：闪避-5，虚招对抗-3。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "残日·入侵(小)",
-                            "trigger": "check",
+                            "label": "获得残炎真气(小)",
+                            "trigger": "combatStart",
                             "active": true,
-                            "script": "if (game.combat) { await Macros.requestSave({ target: args.target, type: 'renxing', dc: 14, label: '抵抗残炎', attacker: actor, onFail: thisItem.effects.getName('残炎').toObject() }); }"
+                            "script": "const eff = thisItem.effects.getName('残炎真气').toObject();\neff.flags['xjzl-system'].canyanDC = 14;\n// [关键修复] 显式记录来源UUID，供后续脚本回溯\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -4354,19 +4354,19 @@
                         "qigan": 26,
                         "shencai": 10
                     },
-                    "description": "圆满运功特效：进战后，你获得“残炎真气”，持续到战斗脱离。出招时可用“残炎真气”入侵敌方经脉，对方需投掷[韧性]检定（难度17），成功无事，失败则被添加“残炎”，持续到战斗脱离。\n·残炎：闪避-5，虚招对抗-3。\n修满特效：修满[永久]：气血+30，内力+30，气感+5。",
+                    "description": "<p>圆满运功特效：进战后，你获得“残炎真气”，持续到战斗脱离。出招时可用“残炎真气”入侵敌方经脉，对方需投掷[韧性]检定（难度 17），成功无事，失败则被添加“残炎”，持续到战斗脱离。</p><p>·残炎：闪避-5，虚招对抗-3。</p><p>修满[永久]：气血+30，内力+30，气感+5。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "残日·入侵(圆)",
-                            "trigger": "check",
+                            "label": "获得残炎真气(圆)",
+                            "trigger": "combatStart",
                             "active": true,
-                            "script": "if (game.combat) { await Macros.requestSave({ target: args.target, type: 'renxing', dc: 17, label: '抵抗残炎', attacker: actor, onFail: thisItem.effects.getName('残炎').toObject() }); }"
+                            "script": "const eff = thisItem.effects.getName('残炎真气').toObject();\neff.flags['xjzl-system'].canyanDC = 17;\n// [关键修复] 显式记录来源UUID\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 }
             },
-            "masteryEffect": "修满[永久]：气血+30，内力+30，气感+5。",
+            "masteryEffect": "<p>修满[永久]：气血+30，内力+30，气感+5。</p>",
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",
@@ -4390,10 +4390,37 @@
         },
         "effects": [
             {
+                "name": "残炎真气",
+                "icon": "icons/magic/fire/projectile-fireball-smoke-orange.webp",
+                "description": "出招时入侵敌方经脉。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "canyan_zhenqi",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "残日·入侵",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "const targets = Array.from(game.user.targets);\nconst dc = thisEffect.getFlag('xjzl-system', 'canyanDC') || 14;\n\n// 既然 thisItem 不可信，我们通过 Origin 回溯找到原来的内功物品\n// thisEffect.origin 在 combatStart 脚本里已经被正确设置了\nconst originItem = await fromUuid(thisEffect.origin);\n\nif (!originItem) {\n    ui.notifications.error(\"残日功诀数据源丢失，无法获取Debuff模板。\");\n    return;\n}\n\nconst debuff = originItem.effects.getName('残炎').toObject();\n\nif (targets.length > 0) {\n    for (const t of targets) {\n        const targetActor = t.actor;\n        if (targetActor) {\n            Macros.requestSave({\n                target: targetActor,\n                type: 'renxing',\n                dc: dc,\n                label: '抵抗残炎',\n                attacker: actor,\n                onFail: debuff\n            });\n        }\n    }\n} else {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold; color:#d35400;\">\n                <i class=\"fas fa-exclamation-circle\"></i> 残炎真气 - 未选目标\n            </div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>出招时未选中目标，无法自动发起入侵。</p>\n                <hr>\n                <p>请<b>手动</b>要求目标投掷：</p>\n                <ul>\n                    <li><b>属性:</b> [韧性]</li>\n                    <li><b>难度:</b> ${dc}</li>\n                </ul>\n                <p>失败则手动添加 <b>[残炎]</b>。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
                 "name": "残炎",
                 "icon": "icons/svg/fire.svg",
                 "description": "闪避-5，虚招对抗-3。",
                 "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "canyan",
+                        "stackable": false
+                    }
+                },
                 "changes": [
                     {
                         "key": "system.combat.dodge",
