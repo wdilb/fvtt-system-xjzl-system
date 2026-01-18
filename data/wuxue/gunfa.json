@@ -4469,7 +4469,7 @@
                         {
                             "label": "格挡-霸王",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取招式等级以计算额外层数 (基础1 + (Lv-1))\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst addStacks = 1 + (lvl - 1);\n\nconst eff = thisItem.effects.getName(\"霸王\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 循环添加多次以触发叠层逻辑\nfor(let i=0; i<addStacks; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nui.notifications.info(`格挡成功！霸王意气叠加 ${addStacks} 层。`);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取AE模板\nconst eff = thisItem.effects.getName(\"霸王\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 默认每次格挡加1层\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`格挡成功！霸王意气叠加。`);",
                             "active": true
                         }
                     ]
@@ -4477,7 +4477,7 @@
                 {
                     "name": "霸王卸甲",
                     "type": "qi",
-                    "actionType": "heal",
+                    "actionType": "buff",
                     "element": "gang",
                     "damageType": "none",
                     "weaponType": "staff",
@@ -4485,7 +4485,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，气散八方，以退为进，回复 10 气血，解除架招，进入“卸甲”状态，持续到战斗脱离。</p><p><strong>卸甲：</strong>你失去所有内外功防御。每因此失去 1 点内外功防御，下一次出招招式伤害+1。</p><p><strong>升级：</strong>额外回复气血 10 点，每点防御再增加 1 点伤害，内力消耗+4。</p>",
-                    "automationNote": "回复气血自动。解除架招自动。应用卸甲自动(快照当前防御力并转化)。",
+                    "automationNote": "完全自动化。自动回血、关架招、计算防御快照、扣除防御、赋予伤害加成。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -4508,7 +4508,7 @@
                         {
                             "label": "卸甲逻辑",
                             "trigger": "hit",
-                            "script": "// 1. 回复气血 (基础10 + (Lv-1)*10)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst healAmt = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ amount: healAmt, type: \"hp\", showScrolling: true });\n\n// 2. 解除架招\nawait actor.stopStance();\n\n// 3. 快照当前防御\nconst wai = actor.system.combat.def_waigongTotal || 0;\nconst nei = actor.system.combat.def_neigongTotal || 0;\nconst totalDef = wai + nei;\n\n// 4. 计算转化率 (基础1 + (Lv-1)*1 = Lv)\nconst ratio = lvl;\nconst dmgBonus = totalDef * ratio;\n\n// 5. 构建AE\nconst eff = thisItem.effects.getName(\"卸甲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态写入伤害加成\neff.changes.push({\n    key: \"system.combat.damages.skill.mod\",\n    mode: 2,\n    value: String(dmgBonus)\n});\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`霸王卸甲：牺牲 ${totalDef} 点防御，获得 ${dmgBonus} 点招式伤害加成！`);",
+                            "script": "// 0. 防复触发\nif (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xiejia\")) {\n    return ui.notifications.warn(\"你已处于卸甲状态！\");\n}\n\n// 1. 回复气血\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst healAmt = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ amount: healAmt, type: \"hp\", showScrolling: true });\n\n// 2. 解除架招 (确保架招提供的防御被移除)\nawait actor.stopStance();\n\n// 3. 快照当前防御 (使用 Total 属性)\nconst wai = actor.system.combat.defWaigongTotal || 0;\nconst nei = actor.system.combat.defNeigongTotal || 0;\nconst totalDef = wai + nei;\n\n// 4. 计算转化加成\nconst ratio = lvl;\nconst dmgBonus = totalDef * ratio;\n\n// 5. 应用状态 A: 卸甲 (防御归零)\n// 逻辑: 施加一个负的修正值，抵消当前所有防御\nconst effA = thisItem.effects.getName(\"卸甲\").toObject();\ndelete effA._id;\neffA.origin = thisItem.uuid;\n\n// 动态写入负值\neffA.changes[0].value = String(-wai);\neffA.changes[1].value = String(-nei);\n\nawait game.xjzl.api.effects.addEffect(actor, effA);\n\n// 6. 应用状态 B: 卸甲之力 (伤害加成)\nif (dmgBonus > 0) {\n    const effB = thisItem.effects.getName(\"卸甲之力\").toObject();\n    delete effB._id;\n    effB.origin = thisItem.uuid;\n    effB.changes[0].value = String(dmgBonus);\n    await game.xjzl.api.effects.addEffect(actor, effB);\n}\n\nui.notifications.info(`霸王卸甲：牺牲 ${totalDef} 防御，下一次伤害 +${dmgBonus}！`);",
                             "active": true
                         }
                     ]
@@ -4546,7 +4546,7 @@
                         {
                             "label": "类型转换",
                             "trigger": "preDamage",
-                            "script": "// 检查目标架招状态\nif (args.target && !args.target.system.martial.stanceActive) {\n    args.config.type = \"neigong\";\n    ui.notifications.info(\"目标无架招，破釜沉舟转为内功伤害！\");\n}",
+                            "script": "if (args.target && !args.target.system.martial.stanceActive) {\n    args.config.type = \"neigong\";\n    ui.notifications.info(\"目标无架招，破釜沉舟转为内功伤害！\");\n}",
                             "active": true
                         }
                     ]
@@ -4561,7 +4561,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，大枪横扫，对周围敌人造成 0.7 力量点外功伤害。</p><p>·自身存在“霸王”时，范围内每有一个敌人，招式伤害增加 15 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "霸王加成需玩家手动计算并在配置弹窗中增加。",
+                    "automationNote": "霸王加成自动(基于选中目标数)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4582,9 +4582,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "霸王提示",
+                            "label": "霸王群攻加伤",
                             "trigger": "attack",
-                            "script": "const hasBawang = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bawang\");\nif (hasBawang) {\n    ui.notifications.info(\"鸿门杀机：检测到 [霸王]，请手动增加伤害 (每有一个敌人+15)。\");\n}",
+                            "script": "const hasBawang = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bawang\");\nconst targetCount = game.user.targets.size;\n\nif (hasBawang && targetCount > 0) {\n    const bonus = 15 * targetCount;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 霸王群攻 (${targetCount}人): ${bonus}`;\n    ui.notifications.info(`鸿门杀机：霸王气概触发，伤害 +${bonus}`);\n}",
                             "active": true
                         }
                     ]
@@ -4599,7 +4599,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，长枪突刺，枪鸣如歌，造成 0.6 力量点外功伤害，击破架招时，使目标“封招”一回合。</p><p>·当自身存在三层以上“霸王”时，可将封招效果改为“眩晕”一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击破效果自动判断层数施加。",
+                    "automationNote": "击破效果自动判断霸王层数。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4622,7 +4622,7 @@
                         {
                             "label": "击破效果",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const bawang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bawang\");\n    const stacks = bawang ? (bawang.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    \n    let statusId = \"fengzhao\";\n    let label = \"封招\";\n    \n    if (stacks >= 3) {\n        statusId = \"xuanyun\";\n        label = \"眩晕\";\n    }\n    \n    const eff = CONFIG.statusEffects.find(e => e.id === statusId);\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被 ${label} (霸王 ${stacks} 层)`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const bawang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bawang\");\n    const stacks = bawang ? (bawang.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    \n    let statusId = \"fengzhao\";\n    let label = \"封招\";\n    \n    if (stacks >= 3) {\n        statusId = \"stun\"; // 使用系统定义的 stun\n        label = \"眩晕\";\n    }\n    \n    const eff = CONFIG.statusEffects.find(e => e.id === statusId);\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被 ${label} (霸王 ${stacks} 层)`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -4639,7 +4639,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，败势已难回，更需挽狂澜，回复生命值至上限，移除自身任意数量的状态，然后陷入“走火入魔”，持续五回合。</p><p><strong>升级：</strong>持续回合数-1，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "回满血自动。走火入魔自动。移除状态请在Token HUD或状态栏手动处理。",
+                    "automationNote": "回满血自动。走火入魔自动。移除状态需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -4662,7 +4662,7 @@
                         {
                             "label": "乌江再起",
                             "trigger": "hit",
-                            "script": "// 1. 回满血\nconst missingHp = actor.system.resources.hp.max - actor.system.resources.hp.value;\nif (missingHp > 0) {\n    await actor.applyHealing({ amount: missingHp, type: \"hp\", showScrolling: true });\n}\n\n// 2. 走火入魔 (持续: 5 - (Lv-1))\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = Math.max(1, 5 - (lvl - 1));\n\nconst rageEff = CONFIG.statusEffects.find(e => e.id === \"rage\");\nif (rageEff) {\n    const data = foundry.utils.deepClone(rageEff);\n    data.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, data);\n}\n\nui.notifications.info(\"乌江再起！气血已回满。请手动移除不需要的状态。\");",
+                            "script": "// 1. 回满血\nconst missingHp = actor.system.resources.hp.max - actor.system.resources.hp.value;\nif (missingHp > 0) {\n    await actor.applyHealing({ amount: missingHp, type: \"hp\", showScrolling: true });\n}\n\n// 2. 走火入魔\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = Math.max(1, 5 - (lvl - 1));\n\nconst rageEff = CONFIG.statusEffects.find(e => e.id === \"rage\");\nif (rageEff) {\n    const data = foundry.utils.deepClone(rageEff);\n    data.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, data);\n}\n\nui.notifications.info(\"乌江再起！气血已回满。请手动在 Token HUD 中移除不需要的状态。\");",
                             "active": true
                         }
                     ]
@@ -4701,7 +4701,7 @@
                 {
                     "name": "卸甲",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "description": "防御归零，转化伤害。",
+                    "description": "内外防归零。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -4712,18 +4712,40 @@
                     "changes": [
                         {
                             "key": "system.combat.def_waigong",
-                            "mode": 5,
+                            "mode": 2,
                             "value": "0"
                         },
                         {
                             "key": "system.combat.def_neigong",
-                            "mode": 5,
+                            "mode": 2,
                             "value": "0"
-                        },
+                        }
+                    ]
+                },
+                {
+                    "name": "卸甲之力",
+                    "icon": "icons/svg/explosion.svg",
+                    "description": "卸甲带来的爆发性伤害加成 (攻击一次后消失)。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xiejia_power",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "一击即逝",
+                                    "trigger": "hit_once",
+                                    "active": true,
+                                    "script": "if (args.move.type !== 'qi' && args.move.type !== 'stance') {\n    await thisEffect.delete();\n    ui.notifications.info(\"卸甲之力已耗尽。\");\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
                         {
-                            "key": "flags.xjzl-system.brokenDefense",
-                            "mode": 5,
-                            "value": "true"
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "0"
                         }
                     ]
                 }
