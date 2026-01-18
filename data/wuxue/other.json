@@ -1410,5 +1410,181 @@
                 }
             ]
         }
+    },
+    {
+        "name": "白鸿飞仙剑",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>白鸿剑派掌门，闯荡江湖，与诸多剑法高手切磋之后，总结出的一套剑法，剑如飞鸟临地，势不可挡，飘然如仙，只不过绝招尚未创出，终究少了一分凌厉。</p><p><strong>需求：</strong>剑-单剑 属性：太极</p>",
+            "requirements": "剑-单剑",
+            "moves": [
+                {
+                    "name": "千羽破云",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "主要动作",
+                    "description": "<p>衣袂翻飞间隐现鸿影，剑光如散落白羽笼罩两丈。对所有敌人造成 0.5 内息点内功伤害。击中无招架敌人时，给敌人添加“禁虚”状态，持续一回合。</p><p><strong>禁虚：</strong>无法施展虚招</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "对无架招目标施加禁虚自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "无架招禁虚",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    // 获取系统通用状态：禁虚 (jinxu)\n    const status = CONFIG.statusEffects.find(e => e.id === \"jinxu\");\n    if (status) {\n        // 克隆并修改持续时间为1回合\n        const data = foundry.utils.deepClone(status);\n        data.duration = { rounds: 1 };\n        // 调用 API 应用\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 未开启招架，被禁虚！`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "白鸿掠水",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>剑尖贴地三寸疾扫，待敌俯身格挡时陡然上挑，化作鸿雁振翅击喉之势，对目标造成 0.4 内息点内功伤害。击破敌方招架时，可以消耗反应动作，施展【千羽破云】。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破提示自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\" style=\"border-bottom:1px solid #ccc;font-weight:bold;\">白鸿掠水 - 击破触发</div><div style=\"padding:5px;font-size:0.9em;\">击破敌方招架！<br>可消耗反应动作，施展【千羽破云】。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "云崖折翼",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>剑身横转似断翅斜坠，以剑脊弧形卸力，开启架招，格挡成功时，寒光四散，击退目标 1 米并使目标陷入“禁足”，持续两回合。</p><p><strong>升级:</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "施加禁足自动。击退手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反击",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\n\n// 施加系统通用状态：禁足 (root)\nconst status = CONFIG.statusEffects.find(e => e.id === \"root\");\nif (status) {\n    const data = foundry.utils.deepClone(status);\n    data.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(args.attacker, data);\n    \n    actor.showFloatyText(\"寒光四散\", {fill: \"#00BFFF\"});\n    ui.notifications.info(`${args.attacker.name} 被击退1米并禁足！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "寒潭惊鸿",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>屈膝贴地，剑气凝霜，使你获得“惊鸿”状态，持续一回合。</p><p><strong>惊鸿：</strong>你的白鸿剑法可以攻击范围内所有敌人。</p><p><strong>升级:</strong>消耗+3 持续回合数+1。</p>",
+                    "automationNote": "获得状态自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            3,
+                            6,
+                            9,
+                            12
+                        ],
+                        "rage": [
+                            2,
+                            2,
+                            2,
+                            2
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得惊鸿",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"惊鸿\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\neff.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "惊鸿",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "白鸿剑法可以攻击范围内所有敌人。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jinghong",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
     }
 ]
