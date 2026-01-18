@@ -1778,7 +1778,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，凝掌合拍，对目标造成伤害。掌风携带毒劲，给无架招的敌人造成额外 10 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "额外毒伤自动。",
+                    "automationNote": "额外毒伤自动(含蚀心判定)。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -1800,7 +1800,7 @@
                         {
                             "label": "额外毒伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyDamage({ amount: 10, type: \"poison\", attacker: actor, isHit: true, ignoreDefense: true });\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    let dmg = 10;\n    // 检查蚀心易伤\n    const shixin = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shixin\");\n    if (shixin) dmg += 5;\n\n    // 提示卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; color:green;\">毒尊合掌 - 毒劲触发</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                造成 <b>${dmg}</b> 点毒素伤害 ${shixin ? \"(蚀心+5)\" : \"\"}\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n\n    await args.target.applyDamage({ amount: dmg, type: \"poison\", attacker: actor, isHit: true, ignoreDefense: true });\n}",
                             "active": true
                         }
                     ]
@@ -1831,7 +1831,7 @@
                         {
                             "label": "格挡挂毒",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args) || !args.attacker) return;\n\n// 获取毒药AE\nconst poison = thisItem.effects.getName(\"毒\").toObject();\ndelete poison._id;\npoison.origin = thisItem.uuid;\n\nawait game.xjzl.api.effects.addEffect(args.attacker, poison);",
+                            "script": "if (!Macros.checkStance(actor, args) || !args.attacker) return;\n\n// 获取毒药AE\nconst poison = thisItem.effects.getName(\"毒\").toObject();\ndelete poison._id;\npoison.origin = thisItem.uuid;\n\nawait game.xjzl.api.effects.addEffect(args.attacker, poison);\nactor.showFloatyText(\"中毒!\", {fill: \"#00ff00\"});",
                             "active": true
                         }
                     ]
@@ -1846,7 +1846,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，移步击发，掌掌破肤，对敌人造成伤害，击破架招时为其添加“蚀心”，持续两回合。</p><p><strong>蚀心：</strong>速度减半，每次受到毒素伤害时额外受到 5 点伤害，同时倒地。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "击破添加蚀心自动。蚀心效果：倒地、减速自动；毒素易伤需配合其他毒素脚本（目前未实现通用易伤，仅文字提示）。",
+                    "automationNote": "击破添加蚀心、倒地自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -1868,7 +1868,7 @@
                         {
                             "label": "蚀心",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"蚀心\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    // 持续2回合\n    eff.duration = { rounds: 2 };\n    \n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    \n    // 倒地\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n}",
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"蚀心\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 2 };\n    \n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    \n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n\n    ui.notifications.info(`${args.target.name} 蚀心入骨，颓然倒地！`);\n}",
                             "active": true
                         }
                     ]
@@ -1933,7 +1933,7 @@
                                     "label": "回合末毒伤",
                                     "trigger": "turnEnd",
                                     "active": true,
-                                    "script": "// 5 * 层数\nconst stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst dmg = 5 * stacks;\n\n// 检查蚀心易伤\nconst shixin = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shixin\");\nconst finalDmg = shixin ? (dmg + 5) : dmg;\n\nawait actor.applyDamage({ amount: finalDmg, type: 'poison', isHit: true, ignoreDefense: true });\nui.notifications.info(`${actor.name} 毒发！受到 ${finalDmg} 点毒素伤害。`);"
+                                    "script": "const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nlet dmg = 5 * stacks;\n\n// 检查蚀心易伤\nconst shixin = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shixin\");\nif (shixin) dmg += 5;\n\n// 同样发送卡片提示，防止默默扣血玩家不知道\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; font-size:0.9em; color:green;\">\n            <i class=\"fas fa-skull-crossbones\"></i> 毒发攻心！造成 <b>${dmg}</b> 毒伤\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\nawait actor.applyDamage({ amount: dmg, type: 'poison', isHit: true, ignoreDefense: true });"
                                 }
                             ]
                         }
