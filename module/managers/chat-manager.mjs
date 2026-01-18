@@ -1203,7 +1203,7 @@ export class ChatCardManager {
             if (isHit && isBroken && targetActor.system.martial.stanceActive) {
 
                 // A. 判定失败：移除架招状态
-                await targetActor.update({ "system.martial.stanceActive": false });
+                await ChatCardManager._safeUpdateDocument(targetActor, { "system.martial.stanceActive": false });
                 // B. 应用 "破防" 状态
                 // 从配置中获取标准数据
                 const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
@@ -1218,7 +1218,7 @@ export class ChatCardManager {
                         description: game.i18n.localize(statusConfig.description),
                         origin: attacker ? attacker.uuid : message.uuid  // 只有来源是动态的
                     };
-                    await targetActor.createEmbeddedDocuments("ActiveEffect", [breakEffectData]);
+                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [breakEffectData]);
                 }
 
                 // C. 视觉反馈 (飘字: 红色)
@@ -2257,5 +2257,25 @@ export class ChatCardManager {
             // 委托 GM 更新
             return await xjzlSocket.executeAsGM("updateDocument", message.uuid, updates);
         }
+    }
+
+    /**
+     * 更新文档 (自动判断权限，无权则走Socket)
+     */
+    static async _safeUpdateDocument(doc, data) {
+        if (!doc) return;
+        // 如果我是拥有者（GM或该角色的玩家），直接更新
+        if (doc.isOwner) return doc.update(data);
+        // 否则，发给 GM 帮我更新
+        return await xjzlSocket.executeAsGM("updateDocument", doc.uuid, data);
+    }
+
+    /**
+     * 创建内嵌文档 (自动判断权限，无权则走Socket)
+     */
+    static async _safeCreateEmbedded(parent, type, data) {
+        if (!parent) return;
+        if (parent.isOwner) return parent.createEmbeddedDocuments(type, data);
+        return await xjzlSocket.executeAsGM("createEmbedded", parent.uuid, type, data);
     }
 }
