@@ -623,5 +623,792 @@
                 }
             ]
         }
+    },
+    {
+        "name": "青云刀棍诀",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>威力不凡，大开大阖，善于正面搏杀。</p><p><strong>需求：</strong>刀-横刀/棍-长棍（升级提升刀等级）</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "刀-横刀",
+            "moves": [
+                {
+                    "name": "飞花难现",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>以刀掩面，气定神闲，开启架招，格挡成功后，获得一层“眼力”，至多三层，持续到脱战。</p><p><strong>眼力：</strong>每层使你的命中+5。</p><p><strong>升级：</strong>格挡值+10，消耗+2。</p>",
+                    "automationNote": "格挡获眼力自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡-眼力",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"眼力\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "满目苍痍",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>持刀回转，连扫数刀，对直线上的敌人造成伤害。若击中招架中的敌人，自己获得一层“青云意”，持续到战斗脱离。</p><p>·若你的武器为长棍，则直线变为扇形范围敌人。</p><p><strong>升级：</strong>招式伤害+10，消耗+4。</p>",
+                    "automationNote": "击中架招目标获青云意自动。范围形状、判定手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获青云意",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"青云意\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"击中架招目标，获得 [青云意]\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "平步青云",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "反应动作",
+                    "description": "<p>迅速飞身跃起，俯视战场。使自己跃至空中 3 米高处，并且在自己下个回合开始时落地。</p><p><strong>升级：</strong>飞身高度+1 米，消耗+4。</p>",
+                    "automationNote": "纯手动。请GM处理高度与落地。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "日月交汇",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>战意凛然，消耗一层青云意，使自己获得一层“蓄劲”，至多三层，持续到战斗脱离。</p><p><strong>蓄劲：</strong>每层使你招式暴击骰-1。</p><p><strong>升级：</strong>额外获得一层蓄劲，消耗+2。</p>",
+                    "automationNote": "消耗青云意自动。获得蓄劲自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "消耗青云意",
+                            "trigger": "attack",
+                            "script": "const qingyun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qingyunyi\");\nif (!qingyun) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"必须消耗 [青云意] 才能施展\";\n    return;\n}\nawait game.xjzl.api.effects.removeEffect(actor, \"qingyunyi\", 1);",
+                            "active": true
+                        },
+                        {
+                            "label": "获得蓄劲",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 1 + (lvl - 1); // 升级额外获得\nconst eff = thisItem.effects.getName(\"蓄劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff, gain);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "云卷三合",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>将刀以巧劲甩出，环绕周身飞掠一周，后顺势接刀，对周围斩出三道刀气，随机攻击范围内至多 3 个敌人（投掷 3 次 X 面骰子，X 是招式范围内的敌人数量，按投结果决定三次斩击的目标），造成伤害。</p><p>·你可以消耗任意层数的青云意，每消耗一层，可以让一道刀气斩向指定敌人。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，消耗+8。</p>",
+                    "automationNote": "随机目标手动。消耗青云意指定目标手动。只提供单次伤害计算，请多次应用。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "操作提示",
+                            "trigger": "hit",
+                            "script": "ui.notifications.info(\"请根据敌人数量手动投掷随机目标，或手动消耗 [青云意] 指定目标。\");",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "眼力",
+                    "icon": "icons/svg/eye.svg",
+                    "description": "命中增加。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yanli",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "mode": 2,
+                            "value": "5"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "青云意",
+                    "icon": "icons/magic/air/wind-stream-blue-gray.webp",
+                    "description": "特殊资源。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "qingyunyi",
+                            "stackable": true
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "蓄劲",
+                    "icon": "icons/magic/symbols/star-yellow.webp",
+                    "description": "暴击阈值降低。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xujin",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "-1"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "-1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "灭生四式",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>自塞外雪山当中发现的刀法残篇，据说源于北海遗族，此刀法自杀戮当中诞生，吞噬生命，可惜千年遗落，此刀法只余留残篇。</p><p>·此武学只能领悟，无法继续投入修为。</p><p><strong>需求：</strong>杀孽 50</p><p><strong>类型：</strong>刀-双刀 <strong>属性：</strong>阴</p>",
+            "requirements": "杀孽50；刀-双刀",
+            "moves": [
+                {
+                    "name": "永夜无光",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双刀染血，流失 80 点气血，开启招架。成功格挡时，自身进入“灭生”状态，持续一回合。开启招架时，你免疫“定身”“禁足”一回合。</p><p><strong>灭生：</strong>你暴击时，造成的伤害变为气血流失。</p><p><strong>升级：</strong>格挡值+10，流失的气血-20。</p>",
+                    "automationNote": "气血流失自动。格挡获灭生自动。开启获免疫自动(仅提示)。灭生变流失自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "流失气血&免疫",
+                            "trigger": "attack",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst hpCost = 80 - (lvl - 1) * 20;\nawait actor.applyHealing({amount: -hpCost, type: \"hp\", showScrolling: true});\n\nconst immuneEff = thisItem.effects.getName(\"永夜免疫\").toObject();\ndelete immuneEff._id;\nimmuneEff.origin = thisItem.uuid;\nimmuneEff.duration = {rounds: 1};\nawait game.xjzl.api.effects.addEffect(actor, immuneEff);",
+                            "active": true
+                        },
+                        {
+                            "label": "格挡-灭生",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"灭生\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = {rounds: 1};\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "生灭如絮",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "主要动作",
+                    "description": "<p>刀气如从天而降，扫向周围，对范围内所有敌人造成伤害。</p><p>击破架招时，将目标击飞 1 米，使目标陷入“禁足”一回合。</p><p>·若你处于“灭生”状态，此招式距离+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "灭生加距离提示。击破施加禁足自动。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "距离检测",
+                            "trigger": "calc",
+                            "script": "const hasMiesheng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"miesheng\");\nif (hasMiesheng) {\n    args.output.bonusDesc.push(\"灭生状态：距离 +1 米\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击破-禁足",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！(需手动击飞1米)`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "问枯冢",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招的时候，你可以用反应动作释放此招，压制对方虚招，对目标造成伤害，刀光入地，斩出一道 1m*3 米，深度 2m 的坑冢，敌人会直接落入坑中。</p><p>·若你处于“灭生”状态，使目标随机一条腿“骨折”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "落坑手动。灭生骨折提示。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "骨折提示",
+                            "trigger": "hit",
+                            "script": "const hasMiesheng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"miesheng\");\nif (hasMiesheng) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\"><b>问枯冢 - 灭生特效</b></div><div style=\"padding:5px;\">目标 <b>${args.target.name}</b> 随机一条腿骨折，请手动投掷伤残表或应用效果。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "红尘一入灭",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "8米",
+                    "targetInfo": "路径",
+                    "actionCost": "全回合动作",
+                    "description": "<p>双刀悲鸣，向前连踏最多七步，正面碰到敌人/障碍物后停止前行。刀光所过，红尘消散，对途径路上周围 1m 的敌人造成伤害，并且击倒所有敌人，被这一击打入濒死的敌人，无法进行濒死一击。</p><p>·若你处于“灭生”状态，被打入濒死的角色残疾与死亡检定具有劣势。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+16。</p>",
+                    "automationNote": "路径伤害与击倒手动。濒死限制手动。灭生劣势手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            16,
+                            32,
+                            48,
+                            64
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": []
+                }
+            ],
+            "effects": [
+                {
+                    "name": "灭生",
+                    "icon": "icons/magic/death/skull-energy-light-purple.webp",
+                    "description": "暴击造成气血流失。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "miesheng",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "暴击转流失",
+                                    "trigger": "preDamage",
+                                    "script": "if (args.outcome.isCrit) {\n    args.config.type = 'liushi';\n    ui.notifications.info(\"灭生生效：暴击转化为气血流失\");\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "永夜免疫",
+                    "icon": "icons/svg/shield.svg",
+                    "description": "免疫定身、禁足 (手动)。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yongye_immune",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ],
+            "progression": {
+                "mode": "custom",
+                "customThresholds": [
+                    0
+                ],
+                "mappedStage": 0
+            }
+        }
+    },
+    {
+        "name": "桃花扇",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>本为文人雅客所创，扇叶舞动间，桃花飞舞，煞是好看，后被采花贼习得，配合迷香，声誉虽损，却也名扬江湖。</p><p><strong>需求：</strong>匕首-扇 <strong>属性：</strong>阴</p>",
+            "requirements": "匕首-扇",
+            "moves": [
+                {
+                    "name": "别枝印潭",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>折扇轻弹，散出阵阵花香，开启招架，格挡成功时，也会触发武器涂抹毒药的效果。（视为消耗一次攻击涂抹毒素效果）</p><p><strong>升级：</strong>每升一级增加格挡值 5 点，消耗+1。</p>",
+                    "automationNote": "格挡提示触发毒药手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "毒药提示",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"格挡成功：请手动触发武器涂抹的毒药效果。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "桃之夭夭",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>桃花扇起，卷起疾风，扇身直刺，对目标造成伤害，击破招架时，可以将武器涂抹毒药的效果一次性全部触发。</p><p><strong>升级：</strong>伤害+5，消耗+1。</p>",
+                    "automationNote": "击破提示触发毒药手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "毒药提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"击破架招：请手动触发武器毒药全部效果。\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "春风拂面",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>扇卷清风，扫向目标，对目标造成伤害，击中未招架目标时，使目标陷入“下盘不稳”一回合。</p><p>出招前，你可以选择将一份扩散型毒药展开，随着攻击洒出，视为在目标位置释放此毒药，若如此，此招变为蓄力动作施展。</p><p><strong>升级：</strong>伤害+5，消耗+1。</p>",
+                    "automationNote": "施加下盘不稳自动。毒药释放手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "下盘不稳",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "倒转迷香",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>闪身回旋，扇扫周身，扬起风尘，对周围所有敌人造成伤害，若攻击范围内有扩散型毒药存在，则使毒药范围布满你的攻击范围。</p><p><strong>升级：</strong>造成伤害+10，消耗+5，怒气消耗-1。</p>",
+                    "automationNote": "毒药扩散范围手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "素女莲",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>天伶教资质出众的教众，均会修行此法，丝带内衬银丝，缠于腰间，既可对敌，又修塑身形，挥舞之时，内力灌注，行如刀劈斧砍，观似白莲绽放，威力极大。</p><p><strong>需求：</strong>奇门-鞭钩 <strong>属性：</strong>柔</p>",
+            "requirements": "奇门-鞭钩",
+            "moves": [
+                {
+                    "name": "飞仙流",
+                    "type": "stance",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "special",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>飘带飞舞，盘绕周身，开启架招。格挡成功后可以借力飘动，闪身后退 1 米。</p><p><strong>升级：</strong>格挡值+10，后退距离+1 米，消耗+2。</p>",
+                    "automationNote": "后退手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "后退提示",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dist = 1 + (lvl - 1);\n    ui.notifications.info(`格挡成功：可闪身后退 ${dist} 米。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "奉天莲",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>丝带如云狂舞，横扫周围，对周围所有敌人造成伤害。</p><p>如果有敌人处在空中，则可以消耗反应施展。</p><p><strong>升级：</strong>招式伤害+10。内力消耗+4。</p>",
+                    "automationNote": "反应动作判定手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "绽天莲",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>将丝带束为一剑，飞刺而出，触敌之时，层叠飞散，对目标造成伤害，而后迅速收回，并将对手向自己方向击飞 3 米。</p><p>·当剑熟练到达 3 时，此招可额外获得剑技能提供的伤害加值。</p><p>·当剑熟练到达 6 时，此招可攻击招式路线（一条直线）上的所有敌人。</p><p>·当剑熟练达到 9 时，此招范围可变成周围全部敌 人。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "剑技能伤害加成自动。范围变化需手动选择目标。击飞手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "剑技能加成",
+                            "trigger": "calc",
+                            "script": "const swordRank = actor.system.combat.weaponRanks.sword.total || 0;\nif (swordRank >= 3) {\n    let rankDmg = 0;\n    if (swordRank <= 4) rankDmg = swordRank * 1;\n    else if (swordRank <= 8) rankDmg = swordRank * 2;\n    else rankDmg = swordRank * 3;\n    \n    args.output.damage += rankDmg;\n    args.output.bonusDesc.push(`剑技能加成 +${rankDmg}`);\n}\n\nif (swordRank >= 6) {\n    args.output.bonusDesc.push(\"剑术>=6：范围变为直线\");\n}\nif (swordRank >= 9) {\n    args.output.bonusDesc.push(\"剑术>=9：范围变为周围全部\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "烈女歌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>以特殊的运功技巧，通过刺激穴道，大幅增加毒药的效果。</p><p><strong>效果：</strong>当有角色吸入扩散性毒药时，你可以消耗反应动作，对其进行一次点穴检定，检定成功不会使对方陷入“点穴”状态，而是使对方针对此次毒药的韧性检定难度+5。</p><p><strong>升级：</strong>此次点穴检定+5，韧性难度+5</p>",
+            "requirements": "特殊",
+            "moves": [
+                {
+                    "name": "烈女歌",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "视毒药",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当有角色吸入扩散性毒药时，你可以消耗反应动作，对其进行一次点穴检定，检定成功不会使对方陷入“点穴”状态，而是使对方针对此次毒药的韧性检定难度+5。</p><p><strong>升级：</strong>此次点穴检定+5，韧性难度+5</p>",
+                    "automationNote": "需手动施展。发送卡片提示对方增加难度。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "效果提示",
+                            "trigger": "attack",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\nconst totalDiff = 5 + bonus;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">烈女歌</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>消耗反应动作。</p>\n            <p>对吸入毒药者进行 <b>点穴检定</b> (气感)。</p>\n            <p>若成功，目标针对此次毒药的韧性检定难度 <b>+${totalDiff}</b>。</p>\n            <hr>\n            <p style=\"color:#888; font-size:0.8em;\">请 GM 手动主持检定。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
     }
 ]
