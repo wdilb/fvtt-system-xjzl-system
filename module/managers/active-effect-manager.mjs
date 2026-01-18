@@ -422,7 +422,10 @@ export class ActiveEffectManager {
             // 如果是 toggle 逻辑，通常意味着完全移除，而不是减一层
             // 这里简单处理：直接删除
             this._showScrollingText(actor, `- ${existing.name}`, "delete");
-            if (existing) return existing.delete();
+            if (existing) {
+                if (actor.isOwner) return existing.delete();
+                return await xjzlSocket.executeAsGM("deleteEmbedded", actor.uuid, "ActiveEffect", [existing.id]);
+            }
         }
     }
 
