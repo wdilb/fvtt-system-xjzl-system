@@ -39,9 +39,29 @@ export class ActiveEffectManager {
         }
         // 情况 B: 传入的是对象 (Object)
         else if (typeof effectDataOrId === "object") {
-            // 如果外部已经克隆过了，这里再克隆一次开销很小；
-            // 但如果外部忘了克隆（比如直接传了 CONFIG 对象），这一行能救命。
-            effectData = foundry.utils.deepClone(effectDataOrId);
+            // 1. 检查对象里是否有 'id' 且该 'id' 存在于系统配置中
+            // 这是一个 "Patch" 操作：以系统配置为底板，传入的对象为修改项
+            if (effectDataOrId.id) {
+                const baseStatus = CONFIG.statusEffects.find(e => e.id === effectDataOrId.id);
+
+                if (baseStatus) {
+                    // 合并对象：Base + Override
+                    // 使用 foundry.utils.mergeObject 深度合并
+                    effectData = foundry.utils.mergeObject(
+                        foundry.utils.deepClone(baseStatus), // 底板
+                        effectDataOrId,                      // 补丁 (例如 { duration: { rounds: 2 } })
+                        { inplace: false }
+                    );
+                } else {
+                    // ID 存在但不是系统状态，视为普通自定义数据
+                    effectData = foundry.utils.deepClone(effectDataOrId);
+                }
+            } else {
+                // 没有 ID，视为完全自定义数据
+                // 如果外部已经克隆过了，这里再克隆一次开销很小；
+                // 但如果外部忘了克隆（比如直接传了 CONFIG 对象），这一行能救命。
+                effectData = foundry.utils.deepClone(effectDataOrId);
+            }
         }
         else {
             return; // 无效输入
