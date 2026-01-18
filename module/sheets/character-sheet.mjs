@@ -2279,17 +2279,25 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     async _onLongRest(event) {
         event.preventDefault();
 
-        // 弹出确认框，防止手滑
-        Dialog.confirm({
-            title: "确认休整",
+        // 使用 foundry.applications.api.DialogV2
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: {
+                title: "确认休整",
+                icon: "fas fa-bed" 
+            },
             content: `
-            <p>休整将花费 <strong>四个时辰（8小时）</strong>。</p>
-            <p>这将回复满气血与内力，重置小憩次数。</p>
-            <p>确定要进行吗？</p>
-        `,
-            yes: () => this.actor.longRest(),
-            defaultYes: false
+                <p>休整将花费 <strong>四个时辰（8小时）</strong>。</p>
+                <p>这将回复满气血与内力，重置小憩次数。</p>
+                <p>确定要进行吗？</p>
+            `,
+            rejectClose: false, // 允许关闭
+            modal: true         // 模态窗口，强制玩家聚焦
         });
+
+        // 只有确认为 true 时才执行
+        if (confirmed) {
+            await this.actor.longRest();
+        }
     }
 
     /**
@@ -2301,7 +2309,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         event.preventDefault();
         const action = target.dataset.action; // "buyItem" 或 "sellItem"
         const isBuy = action === "buyItem";
-        
+
         const item = this.document.items.get(target.dataset.itemId);
         if (!item) return;
 
@@ -2351,10 +2359,10 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
         // 4. 使用DialogV2
         const result = await foundry.applications.api.DialogV2.wait({
-            window: { 
-                title: titleText, 
+            window: {
+                title: titleText,
                 icon: confirmIcon,
-                resizable: false 
+                resizable: false
             },
             content: content,
             buttons: [{
@@ -2375,8 +2383,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             }],
             // 渲染回调：处理动态总价计算
             render: (event) => {
-                const html = event.target.element; 
-                
+                const html = event.target.element;
+
                 const input = html.querySelector("input[name='modifier']");
                 const totalSpan = html.querySelector("#trade-total");
 
@@ -2391,10 +2399,10 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
                 // 绑定输入事件
                 input.addEventListener("input", calc);
-                
+
                 // 自动聚焦并选中
                 input.focus();
-                input.select(); 
+                input.select();
             }
         });
 
@@ -2416,15 +2424,15 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 return ui.notifications.warn(`银两不足！需要 ${totalCost}，你只有 ${currentSilver}。`);
             }
             // 扣钱
-            await this.document.update({"system.resources.silver": currentSilver - totalCost});
+            await this.document.update({ "system.resources.silver": currentSilver - totalCost });
             ui.notifications.info(`已购买 ${item.name} (x${quantity})，花费 ${totalCost} 银两。`);
         } else {
             // --- 出售逻辑 ---
             // 1. 加钱
-            await this.document.update({"system.resources.silver": currentSilver + totalCost});
+            await this.document.update({ "system.resources.silver": currentSilver + totalCost });
             // 2. 删物品
             await item.delete();
-            
+
             ui.notifications.info(`已出售 ${item.name} (x${quantity})，获得 ${totalCost} 银两。`);
         }
     }
