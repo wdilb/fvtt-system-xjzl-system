@@ -2581,9 +2581,13 @@ export class XJZLActor extends Actor {
       (total / xpStorage) * 100
     );
 
-    this.sheet?.element
-      .find(`.xp-pool.${poolKey}`)
-      .css("--progress", percent);
+    const root = this.element; // v13 sheets
+    root.querySelectorAll(".xp-pool").forEach(poolEl => {
+      poolEl.addEventListener("mouseenter", () => {
+        const tt = game.tooltip?.tooltip;
+        if (tt) tt.style.setProperty("--progress", percent);
+      });
+    });
 
     ui.notifications.info(`修为已更新: ${poolKey} ${amount > 0 ? '+' : ''}${amount}`);
   }
