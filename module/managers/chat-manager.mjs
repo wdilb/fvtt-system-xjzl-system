@@ -1486,7 +1486,11 @@ export class ChatCardManager {
 
         // 应用数值更新
         if (!foundry.utils.isEmpty(updates)) {
-            await actor.update(updates);
+            if (actor.isOwner) {
+                await actor.update(updates);
+            } else {
+                await xjzlSocket.executeAsGM("updateDocument", actor.uuid, updates);
+            }
         }
 
         // =====================================================
@@ -2195,6 +2199,10 @@ export class ChatCardManager {
         }
         if (cost.morale) {
             updates["system.resources.morale.value"] = res.morale.value + cost.morale;
+        }
+
+        if (!actor.isOwner) {
+            return ui.notifications.warn("权限不足：请让该角色的控制者进行操作。");
         }
 
         // 提交更新
