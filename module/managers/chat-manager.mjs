@@ -1087,6 +1087,8 @@ export class ChatCardManager {
     static async _applyDamage(attacker, item, flags, targets, message) {
         // 1. 命中复核
         const hitResults = await this._resolveHitRoll(attacker, item, flags, targets, message);
+        // 提前初始化暴击标记，在循环中一并计算，避免二次遍历
+        let hasCrit = false;
         // 如果点取消，hitResults 为 null，中断流程
         if (!hitResults) return;
         // 2. 虚招“漏网之鱼”检查
@@ -1359,6 +1361,8 @@ export class ChatCardManager {
                 damageResult: damageResult
             };
             summary.push(resultEntry);
+            // 只要 AOE 中有一个目标被暴击，就触发攻击者的暴击特效
+            if (isCrit) hasCrit = true;
 
             // E. 执行攻击者脚本 (Trigger: HIT)
             // 现在我们可以把“实际伤害”传给攻击者了 (比如：吸血逻辑，当然我们侠界的吸血是高贵的吸收没有减免的伤害)
@@ -1377,6 +1381,49 @@ export class ChatCardManager {
 
             // 无论命中与否都执行，脚本内自己判断 if (args.isHit)
             await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
+        }
+
+        // =====================================================
+        // 发送暴击信息，并且注入一个隐形锚点 (暴击)
+        // =====================================================
+
+        // 如果触发了暴击，发送一张简短的战报卡片
+        if (hasCrit) {
+            // 1. 构造具有武侠风范的提示语
+            const flavorTexts = [
+                "雷霆万钧，势不可挡！",
+                "劲气透体，摧枯拉朽！",
+                "正中要害，招招致命！",
+                "气贯长虹，石破天惊！"
+            ];
+            // 随机取一句骚话
+            const randomFlavor = flavorTexts[Math.floor(Math.random() * flavorTexts.length)];
+
+            // 2. 构造轻量级卡片
+            const critContent = `
+    <div class="xjzl-chat-card" style="padding: 0;">
+        <div style="border-left: 4px solid #ff4500; background: rgba(255, 69, 0, 0.05); padding: 8px 10px; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display:flex; align-items:center; gap:8px;">
+                <img src="${attacker.img}" style="width:32px; height:32px; border:none; border-radius:4px; object-fit:cover;"/>
+                <div>
+                    <div style="font-weight:bold; color:#d35400; font-size:1.1em;">在此次攻击中造成了暴击！</div>
+                    <div style="font-size:0.8em; color:#666; font-style:italic;">${randomFlavor}</div>
+                </div>
+            </div>
+            <i class="fas fa-bahai" style="font-size:1.5em; color:rgba(255, 69, 0, 0.3);"></i>
+        </div>
+        
+        <div style="display:none;">【暴击标签】</div>
+    </div>`;
+
+            // 3. 发送消息
+            ChatMessage.create({
+                user: game.user.id,
+                speaker: ChatMessage.getSpeaker({ actor: attacker }),
+                content: critContent,
+                type: CONST.CHAT_MESSAGE_TYPES.OTHER
+                // sound: "sounds/combat/hit_crit.ogg" // 可以考虑播放声音
+            });
         }
 
         // =====================================================
