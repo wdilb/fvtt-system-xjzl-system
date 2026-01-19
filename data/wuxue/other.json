@@ -1284,7 +1284,7 @@
                         {
                             "label": "后退提示",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dist = 1 + (lvl - 1);\n    ui.notifications.info(`格挡成功：可闪身后退 ${dist} 米。`);\n}",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const dist = 1 + (lvl - 1);\n    ui.notifications.info(`格挡成功：可闪身后退 ${dist} 米。`);\n}",
                             "active": true
                         }
                     ]
@@ -1447,8 +1447,7 @@
                         "mp": [
                             4,
                             8,
-                            12,
-                            16
+                            12
                         ]
                     },
                     "scripts": [
@@ -1485,8 +1484,7 @@
                         "mp": [
                             2,
                             4,
-                            6,
-                            8
+                            6
                         ]
                     },
                     "scripts": [
@@ -1517,8 +1515,7 @@
                         "mp": [
                             2,
                             4,
-                            6,
-                            8
+                            6
                         ]
                     },
                     "scripts": [
@@ -1550,11 +1547,9 @@
                         "mp": [
                             3,
                             6,
-                            9,
-                            12
+                            9
                         ],
                         "rage": [
-                            2,
                             2,
                             2,
                             2
@@ -1583,6 +1578,977 @@
                         }
                     },
                     "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "神火剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>神火教剑招，烈火飞舞，透露燃烧自我的疯狂之意。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "天火冲涌",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，剑指蓄力，抬剑轰斩，对自身周围敌人造成 0.4 内息点内功伤害。</p><p>·若自身处于“引燃”，招式释放距离+1</p><p><strong>升级：</strong>招式伤害+10，释放距离再+1，内力消耗+4。</p>",
+                    "automationNote": "伤害计算自动。检测引燃并提示距离增加。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "引燃提示",
+                            "trigger": "attack",
+                            "script": "const yinran = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yinran');\nif (yinran) {\n    ui.notifications.info(`${actor.name} 处于 [引燃] 状态，天火冲涌 释放距离+1。`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "心火乍燃",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，挥舞长剑，烈火乍起，开启架招。格挡成功后，自身陷入“引燃”，持续到战斗脱离，同时获得一层“凡火”，最多三层，持续到脱战。</p><p><strong>凡火：</strong>你对他人造成火焰伤害时，每有一层凡火，额外造成 5 火焰伤害。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡自动施加引燃和凡火。凡火增伤自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡触发",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 1. 自身获得引燃\nconst yinranData = thisItem.effects.getName('引燃').toObject();\ndelete yinranData._id;\nyinranData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, yinranData);\n\n// 2. 获得凡火 (Max 3)\nconst fanhuoData = thisItem.effects.getName('凡火').toObject();\ndelete fanhuoData._id;\nfanhuoData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, fanhuoData);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "地火飘翻",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，剑身刺地，翻转火花，对目标造成 0.4 内息点内功伤害，命中无架招目标时，使其陷入“引燃”，持续到战斗脱离。</p><p>·自身每有一层“凡火”，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "凡火加虚招值自动。命中无架招施加引燃自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "凡火加成",
+                            "trigger": "calc",
+                            "script": "const fanhuo = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'fanhuo');\nif (fanhuo) {\n    const stacks = fanhuo.getFlag('xjzl-system', 'stacks') || 1;\n    args.output.feint += stacks;\n    args.output.bonusDesc.push(`凡火加成: +${stacks} 虚招值`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "施加引燃",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = thisItem.effects.getName('引燃').toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被引燃！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "火中长生",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，心火燃起，四肢百骸，火中长存。消耗气血最大值 10%的气血，获得一层“凡火”，最多三层，持续到脱战。</p><p>·若你已经有三层“凡火”，施展此招时会将三层“凡火”移除，获得“疯火”，持续到战斗脱离。</p><p><strong>疯火：</strong>你对他人造成火焰伤害时，额外造成 10 点火焰伤害，同时回复 10 点气血。</p><p><strong>升级：</strong>额外获得一层凡火，疯火造成的火焰伤害和回复的气血+10。</p>",
+                    "automationNote": "扣血自动。凡火/疯火转化及效果自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "火中长生",
+                            "trigger": "hit",
+                            "script": "// 1. 扣除 10% 最大气血\nconst hpCost = Math.floor(actor.system.resources.hp.max * 0.1);\nawait actor.applyHealing({amount: -hpCost, type: 'hp', showScrolling: true});\n\n// 2. 检查凡火\nconst fanhuo = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'fanhuo');\nconst currentStacks = fanhuo ? (fanhuo.getFlag('xjzl-system', 'stacks') || 1) : 0;\n\n// 升级后每次获得层数 (Lv1=1, Lv2+=1)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gainStacks = 1 + (lvl - 1);\n\nif (currentStacks >= 3) {\n    // 转化疯火\n    if (fanhuo) await fanhuo.delete();\n    \n    const fenghuoData = thisItem.effects.getName('疯火').toObject();\n    delete fenghuoData._id;\n    fenghuoData.origin = thisItem.uuid;\n    \n    // 升级加成写入 Flag (疯火特效里读取)\n    const bonus = (lvl - 1) * 10;\n    fenghuoData.flags['xjzl-system'].fenghuoBonus = bonus;\n    // 动态修改疯火的伤害加成 (基础10 + 成长)\n    const totalFireDmg = 10 + bonus;\n    fenghuoData.changes[0].value = String(totalFireDmg);\n\n    await game.xjzl.api.effects.addEffect(actor, fenghuoData);\n    ui.notifications.info(`${actor.name} 凡火已极，化为疯火！`);\n} else {\n    // 获得凡火\n    const fanhuoData = thisItem.effects.getName('凡火').toObject();\n    delete fanhuoData._id;\n    fanhuoData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, fanhuoData, gainStacks);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "神火百杀",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，烈焰指天，火剑飞舞，对目标造成 0.7 内息点内功伤害。若目标处于“引燃”状态，则立刻焚毁对方身上一件金品及以下的防具。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "检测引燃自动。焚毁防具提示GM手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "焚甲提示",
+                            "trigger": "hit",
+                            "script": "const isYinran = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yinran');\nif (isYinran) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"background:#e74c3c; color:white; font-weight:bold;\">神火百杀 - 焚甲特效</div>\n            <div style=\"padding:5px;\">\n                <p>目标 <b>${args.target.name}</b> 处于 [引燃] 状态。</p>\n                <p>请GM手动焚毁其一件 <b>金品及以下</b> 的防具。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "引燃",
+                    "icon": "icons/magic/fire/flame-burning-skeleton-orange.webp",
+                    "description": "被神火点燃。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yinran",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "凡火",
+                    "icon": "icons/magic/fire/flame-burning-campfire-orange.webp",
+                    "description": "造成火焰伤害时，每层额外造成 5 点。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fanhuo",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.fire.mod",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "疯火",
+                    "icon": "icons/magic/fire/elemental-fire-flying-orange.webp",
+                    "description": "造成火焰伤害时增加伤害并回血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fenghuo",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "疯火回血",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "if (args.type === 'attack' && args.config?.element === 'fire') {\n    // 读取升级加成 (基础10 + Bonus)\n    const bonus = Number(thisEffect.getFlag('xjzl-system', 'fenghuoBonus')) || 0;\n    const heal = 10 + bonus;\n    await actor.applyHealing({amount: heal, type: 'hp', showScrolling: true});\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.fire.mod",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "哭五更",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>白事传统基本功，需情真意切，肝肠寸断，让人不自觉之中就被牵动心念。</p><p><strong>需求：</strong>奇门-无需武器</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "奇门-无需武器",
+            "moves": [
+                {
+                    "name": "追往昔",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "special",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，垂目而立，开启架招。格挡成功后，为目标添加一层“恸哭”，最高三层，持续到战斗脱离。</p><p><strong>恸哭：</strong>每层使你速度-1，回合末流失 5 点内力。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "格挡施加恸哭自动。恸哭效果（减速、流失内力）自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡施加恸哭",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effData = thisItem.effects.getName('恸哭').toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "寄哀思",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>反应动作，当你看破对方虚招时，可消耗反应动作，压制对方，面容凄苦，向对方长叹一口浊气，造成 0.5 内息点内功伤害。</p><p>若对方存在“恸哭”，使其“耳鸣”一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "检测恸哭施加耳鸣自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "恸哭耳鸣",
+                            "trigger": "hit",
+                            "script": "const hasTongku = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'tongku');\nif (args.isHit && hasTongku) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'deaf', true);\n    ui.notifications.info(`${args.target.name} 因恸哭而耳鸣！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "泣平生",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，捶胸顿足，嚎啕大哭，所听之人无不感同身受，对范围内目标造成 0.3 内息点内功伤害，击破架招时，为其添加一层“恸哭”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+5，消耗+2。</p>",
+                    "automationNote": "击破施加恸哭自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破施加恸哭",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const effData = thisItem.effects.getName('恸哭').toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n    ui.notifications.info(`${args.target.name} 被击破架招，陷入恸哭！`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "心悲切",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，无语凝噎，面如死灰，所看之人无不动容。对目标造成 0.4 内息点内功伤害，击中无架招目标时，目标进行[定力]检定（难度 10），若失败，双眼被泪水模糊，陷入“目盲”一回合。</p><p><strong>升级：</strong>招式伤害+5，检定难度+1，内力消耗+1。</p>",
+                    "automationNote": "无架招判定自动。发起定力检定请求自动。失败施加目盲自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "定力检定",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 10 + (lvl - 1);\n    \n    // 构造目盲效果数据\n    const blindData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'blind'));\n    blindData.duration = { rounds: 1 };\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"抵抗悲切\",\n        onFail: blindData\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "痛断肠",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，对目标造成 0.6 内息点内功伤害，目标每有一层“恸哭”，你获得一层基础战斗状态（人级叠加层数类，由你自己选择）。</p><p><strong>升级：</strong>招式伤害+10，消耗+2，怒气-1。</p>",
+                    "automationNote": "提示手动添加Buff。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "Buff提示",
+                            "trigger": "hit",
+                            "script": "const tongku = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'tongku');\nconst stacks = tongku ? (tongku.getFlag('xjzl-system', 'stacks') || 1) : 0;\n\nif (stacks > 0) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"background:#8e44ad; color:white;\">痛断肠 - 效果触发</div>\n            <div style=\"padding:5px;\">\n                <p>目标拥有 <b>${stacks}</b> 层 [恸哭]。</p>\n                <p>请手动为自己添加 <b>${stacks}</b> 层任意 [人级叠加类状态]。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "恸哭",
+                    "icon": "icons/svg/rain.svg",
+                    "description": "速度降低，内力流失。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tongku",
+                            "stackable": true,
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "内力流失",
+                                    "trigger": "turnEnd",
+                                    "active": true,
+                                    "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nawait actor.applyHealing({amount: -(stacks * 5), type: 'mp', showScrolling: true});"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "-1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "闹阴婚",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p><strong>需求：</strong>乐器-喇叭</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "乐器-喇叭",
+            "moves": [
+                {
+                    "name": "起轿迎新",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，对目标造成 0.4 力量点内功伤害，击破架招时，为其添加“禁足”，持续三回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破施加禁足自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破禁足",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === 'root');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "婚婚噩噩",
+                    "type": "stance",
+                    "element": "rou",
+                    "damageType": "waigong",
+                    "weaponType": "instrument",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，开启架招，格挡成功后，为目标添加“错乱”，持续一回合。</p><p><strong>错乱：</strong>你的每个回合末，朝 D4 随机方向不消耗速度走出一步，然后倒地。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2</p>",
+                    "automationNote": "格挡施加错乱自动。错乱随机移动和倒地自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡施加错乱",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const eff = CONFIG.statusEffects.find(e => e.id === 'cuoluan');\n    if(eff) {\n        // 注入错乱的具体脚本\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        \n        // 确保 flags 结构存在\n        if (!data.flags['xjzl-system']) data.flags['xjzl-system'] = {};\n        \n        // 添加 TurnEnd 脚本\n        data.flags['xjzl-system'].scripts = [{\n            label: \"错乱随机移动\",\n            trigger: \"turnEnd\",\n            active: true,\n            script: \"ChatMessage.create({content: `${actor.name} 处于错乱，请朝 D4 方向移动一步。`, speaker: ChatMessage.getSpeaker({actor: actor})}); await game.xjzl.api.effects.toggleStatus(actor, 'prone', true);\"\n        }];\n\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "郎情妾意",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，对目标造成 0.5 力量点内功伤害，命中无架招目标时，为其添加“错乱”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中无架招施加错乱自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加错乱",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === 'cuoluan');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        // 同样注入脚本\n        if (!data.flags['xjzl-system']) data.flags['xjzl-system'] = {};\n        data.flags['xjzl-system'].scripts = [{\n            label: \"错乱随机移动\",\n            trigger: \"turnEnd\",\n            active: true,\n            script: \"ChatMessage.create({content: `${actor.name} 处于错乱，请朝 D4 方向移动一步。`, speaker: ChatMessage.getSpeaker({actor: actor})}); await game.xjzl.api.effects.toggleStatus(actor, 'prone', true);\"\n        }];\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "痴男怨女",
+                    "type": "counter",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>反应动作，当你看破虚招时，可消耗反应动作，压制对方，造成 0.6 力量点内功伤害。</p><p>若对方拥有“错乱”，招式伤害类型变为精神伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "检测错乱并修改伤害类型自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "精神伤害转换",
+                            "trigger": "preDamage",
+                            "script": "const hasCuoluan = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'cuoluan');\nif (hasCuoluan) {\n    args.config.type = 'mental';\n    ui.notifications.info(\"目标错乱，伤害转化为 [精神]！\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "天人永隔",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，对目标造成 0.8 力量点内功伤害，并将目标朝任意方向击退至 5 米。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+4。</p>",
+                    "automationNote": "击退效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击退提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    ui.notifications.info(`${args.target.name} 被击退至 5 米！(请手动移动)`);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "神女舞",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>瑶池宫的武学，缠绵悱恻，额蹙心痛，以柔克刚、最是难当。</p><p><strong>需求：</strong>奇门-鞭钩</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "奇门-鞭钩",
+            "moves": [
+                {
+                    "name": "夜挑灯",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-神女摇曳，舞姿婀娜-</p><p>主要动作，仙女私语，灯火摇曳。丝带飘舞，蒙眼拉扯，造成 0.4 内息点内功伤害，击破敌人招架时，对其添加“迟滞”一回合。</p><p><strong>迟滞：</strong>·你失去反应动作。<br>·你进行属性检定时-5 且具有劣势。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破施加迟滞自动。迟滞效果（禁反+检定劣势）自动，检定数值惩罚手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破施加迟滞",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === 'chizhi');\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        // 迟滞效果在 Config 中定义为空，补充效果\n        // 1. 失去反应动作 -> 禁反\n        // 2. 检定劣势\n        data.changes = [\n            { key: \"flags.xjzl-system.blockCounter\", mode: 5, value: \"true\" },\n            { key: \"flags.xjzl-system.globalCheckLevel\", mode: 2, value: \"-1\" }\n        ];\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入 [迟滞]！`);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "流逝水",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "直线",
+                    "actionCost": "主要动作",
+                    "description": "<p>-仙女飞天，丝带如剑-</p><p>主要动作，韶华流逝水，新叶看旧花。丝带横挥舞宛若利剑，对范围内一条直线的所有敌人造成 0.5 内息点内功伤害。</p><p>若目标处于“迟滞”，你可以消耗反应动作释放此招，挥舞拉扯，对其造成伤害并将对方拉扯至你身前。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "拉扯效果手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "拉扯提示",
+                            "trigger": "hit",
+                            "script": "const isChizhi = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'chizhi');\nif (args.isHit && isChizhi) {\n    ui.notifications.info(`目标 [迟滞]，可消耗反应动作将其拉扯至身前。(手动)`);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "诉离殇",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "special",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>-双手捧心，如泣如诉-</p><p>次要动作，诉离殇，惆怅垂涕，求之至曙，开启招架。</p><p>成功格挡后，与目标进行一次神采对抗，若你胜出，则目标心生怜惜，对你造成伤害减少 10 点。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2，伤害减少+5。</p>",
+                    "automationNote": "格挡后请手动发起神采对抗，若胜出手动减伤。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "神采对抗提示",
+                            "trigger": "preTake",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 升级加成计算 (Lv1=10, Lv2=15...)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst reduction = 10 + (lvl - 1) * 5;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"background:#3498db; color:white;\">诉离殇 - 对抗请求</div>\n        <div style=\"padding:5px;\">\n            <p>请与攻击者进行 <b>神采对抗</b>。</p>\n            <p>若胜出，本次伤害减少 <b>${reduction}</b> 点 (需手动)。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "梦中人",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>-神女如梦，如梦如幻-</p><p>当你看破对方虚招时，可消耗反应动作施展此招，压制虚招，如梦似幻，不分虚实，对其造成 0.7 内息点内功伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "无特殊效果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": []
+                },
+                {
+                    "name": "夜归而去",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "special",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-乘夜而去，永不再见-</p><p>主要动作，神独享而未结兮，魂茕茕以无端。造成 0.7 内息点内功伤害，并为目标添加“窒息”，持续三回合。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+4，怒气消耗-1。</p>",
+                    "automationNote": "施加窒息自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加窒息",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const effData = thisItem.effects.getName('窒息').toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n    ui.notifications.info(`${args.target.name} 感到 [窒息]！`);\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "窒息",
+                    "icon": "icons/magic/air/fog-gas-smoke-swirling-white.webp",
+                    "description": "无法呼吸。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zhixi",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "娥皇女英",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>瑶池宫的独门武学，据说只有双胞胎姐妹才可以学习。</p><p><strong>需求：</strong>双胞胎姐妹，并学习《神女赋》</p>",
+            "requirements": "双胞胎姐妹；学习《神女赋》",
+            "moves": [
+                {
+                    "name": "娥皇女英",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "10米",
+                    "targetInfo": "友方",
+                    "actionCost": "反应动作",
+                    "description": "<p>回合末（结算其他效果前），你可以消耗反应动作，将身上的一个状态转移到你的血脉同胞身上。</p>",
+                    "automationNote": "纯手动。请自行操作状态转移。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            6
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "服毒法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>鬼灵门特殊的服毒法门，使用特殊毒囊包裹，将毒药藏于口中。</p><p><strong>需求：</strong>毒药 特制毒囊（20L）</p>",
+            "requirements": "毒药；特制毒囊（20L）",
+            "moves": [
+                {
+                    "name": "服毒法",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>你在濒死状态下，可以直接选择咬破毒囊，触发毒囊内毒药的服毒效果，此毒药若是使你进行死亡检定，则死亡检定必定为 1。</p>",
+                    "automationNote": "手动。请在濒死时使用物品栏中的毒药。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0
+                        ]
+                    },
+                    "scripts": []
                 }
             ]
         }
