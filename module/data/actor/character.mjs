@@ -501,7 +501,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     this._calculateStatsTotals();      // 重新计算 Total
     this._prepareSkills();             // 重新计算技能
     this._prepareCombatAndResources(); // 重新计算资源与战斗
-    this._prepareCultivationTotals; //计算用于显示的修为数据
+    this._prepareCultivationTotals(); //计算用于显示的修为数据
   }
 
   /**
@@ -1531,7 +1531,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     }
 
     // --- C. 汇总全系统总修为 (Grand Total) ---
-    cult.all = cult.generalTotal + cult.neigongTotal + cult.wuxueTotal + cult.artsTotal;
+    cult.all = cult.general + cult.neigong + cult.wuxue + cult.arts;
 
     // --- D. 计算丹田容量 (依赖最终体魄) ---
     const tipoVal = this.stats.tipo.total || 0;
