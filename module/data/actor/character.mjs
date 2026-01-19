@@ -108,11 +108,6 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         neigong: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Neigong" }), // 专属内功修为剩余
         wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Wuxue" }),     // 专属武学修为剩余
         arts: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Arts" }),       // 专属技艺修为剩余
-        generalTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.GeneralTotal" }), // 总通用修为
-        neigongTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.NeigongTotal" }), // 总内功修为
-        wuxueTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.WuxueTotal" }), // 总武学修为
-        artsTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.ArtsTotal" }), // 总技艺修为
-        all: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.All" }) // 总修为
       }),
 
       // === D. 核心资源 (Resources) ===
@@ -506,6 +501,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     this._calculateStatsTotals();      // 重新计算 Total
     this._prepareSkills();             // 重新计算技能
     this._prepareCombatAndResources(); // 重新计算资源与战斗
+    this._prepareCultivationTotals; //计算用于显示的修为数据
   }
 
   /**
@@ -1468,5 +1464,82 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     }
 
     return bonus;
+  }
+
+  /**
+   * 计算总修为与丹田占用 
+   * 总修为 = 丹田存量 + 已投入到物品中的修为
+   */
+  _prepareCultivationTotals() {
+    const cult = this.cultivation;
+    const actor = this.parent;
+    if (!actor) return;
+
+    // --- A. 初始化总值 (基数 = 当前丹田里的存量) ---
+    // 这些属性仅挂载在内存中，不存数据库
+    cult.generalTotal = cult.general || 0;
+    cult.neigongTotal = cult.neigong || 0;
+    cult.wuxueTotal = cult.wuxue || 0;
+    cult.artsTotal = cult.arts || 0;
+
+    // --- B. 遍历所有物品，累加“已投入”的修为 ---
+    // 1. 内功 (Neigong)
+    const neigongs = actor.itemTypes.neigong || [];
+    for (const item of neigongs) {
+      const invested = item.system.xpInvested || 0;
+      if (invested <= 0) continue;
+
+      // 读取专属投入 (默认为0)
+      const bd = item.system.sourceBreakdown || {};
+      const spec = bd.specific || 0;
+      // 计算通用投入 (总投入 - 专属)，并防止负数
+      const gen = Math.max(0, invested - spec);
+
+      cult.neigongTotal += spec; // 累加到内功专属总额
+      cult.generalTotal += gen;  // 累加到通用总额
+    }
+
+    // 2. 武学 (Wuxue) - 遍历招式
+    const wuxues = actor.itemTypes.wuxue || [];
+    for (const item of wuxues) {
+      const moves = item.system.moves || [];
+      for (const move of moves) {
+        const invested = move.xpInvested || 0;
+        if (invested <= 0) continue;
+
+        const bd = move.sourceBreakdown || {};
+        const spec = bd.specific || 0;
+        const gen = Math.max(0, invested - spec);
+
+        cult.wuxueTotal += spec;
+        cult.generalTotal += gen;
+      }
+    }
+
+    // 3. 技艺书 (Art Books)
+    const books = actor.itemTypes.art_book || [];
+    for (const item of books) {
+      const invested = item.system.xpInvested || 0;
+      if (invested <= 0) continue;
+
+      const bd = item.system.sourceBreakdown || {};
+      const spec = bd.specific || 0;
+      const gen = Math.max(0, invested - spec);
+
+      cult.artsTotal += spec;
+      cult.generalTotal += gen;
+    }
+
+    // --- C. 汇总全系统总修为 (Grand Total) ---
+    cult.all = cult.generalTotal + cult.neigongTotal + cult.wuxueTotal + cult.artsTotal;
+
+    // --- D. 计算丹田容量 (依赖最终体魄) ---
+    const tipoVal = this.stats.tipo.total || 0;
+    cult.storageMax = (tipoVal * 200) + 5000;
+
+    // --- E. 计算百分比 ---
+    cult.storagePercent = cult.storageMax > 0
+      ? Math.max(0, Math.min(100, (cult.all / cult.storageMax) * 100))
+      : 0;
   }
 }

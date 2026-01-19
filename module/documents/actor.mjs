@@ -2532,10 +2532,6 @@ export class XJZLActor extends Actor {
     }
 
 
-    // ex. 计算总额。
-    const newBalanceAll = system.cultivation.all + amount;
-    const newBalanceTotal = system.cultivation[`${poolKey}Total`] + amount;
-
     // 3. 构建历史日志 (History Object)
     const historyEntry = {
       id: foundry.utils.randomID(),
@@ -2560,8 +2556,6 @@ export class XJZLActor extends Actor {
     // 4. 执行更新
     const updateData = {
       [`system.cultivation.${poolKey}`]: newBalance,
-      [`system.cultivation.all`]: newBalanceAll,
-      [`system.cultivation.${poolKey}Total`]: newBalanceTotal,
       "system.history": [historyEntry, ...system.history]
     };
 

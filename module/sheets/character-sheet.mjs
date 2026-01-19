@@ -1118,42 +1118,20 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // =====================================================
         // 计算并显示丹田占用情况
         // =====================================================
-        const root = this.element;
-        if (!root) return;
+        // 直接从 system.cultivation 读取我们在 DataModel 算好的百分比
+        const percent = this.actor.system.cultivation.storagePercent || 0;
 
-        const system = this.actor.system;
+        html.querySelectorAll(".xp-pool").forEach(poolEl => {
+            // 防止重复绑定
+            if (poolEl.dataset.ttBound) return;
+            poolEl.dataset.ttBound = "true";
 
-        const xpStorage =
-            ((system.stats?.tipo?.total ?? 0) -
-            (system.stats?.tipo?.neigongBonus ?? 0) - (system.stats?.tipo?.assigned ?? 0)) * 200 + 5000;
-
-        const total =
-            (system.cultivation?.general ?? 0) +
-            (system.cultivation?.neigong ?? 0) +
-            (system.cultivation?.wuxue ?? 0) +
-            (system.cultivation?.arts ?? 0);
-
-        const percent =
-            xpStorage > 0
-                ? Math.max(0, Math.min(100, (total / xpStorage) * 100))
-                : 0;
-
-        root.querySelectorAll(".xp-pool").forEach(poolEl => {
-            if (poolEl.dataset.ttBound === "1") return;
-            poolEl.dataset.ttBound = "1";
-
+            // 只在鼠标进入时设置一次变量，而不是 move 时疯狂设置
             poolEl.addEventListener("mouseenter", () => {
                 const tt = document.getElementById("tooltip");
                 if (!tt) return;
-
-                // CSS expects 0..100
+                // CSS 变量传递百分比
                 tt.style.setProperty("--progress", String(percent));
-            });
-            
-            // 避免延迟导致更新失败
-            poolEl.addEventListener("mousemove", () => {
-                const tt = document.getElementById("tooltip");
-                if (tt) tt.style.setProperty("--progress", String(percent));
             });
         });
     }
@@ -2325,7 +2303,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const confirmed = await foundry.applications.api.DialogV2.confirm({
             window: {
                 title: "确认休整",
-                icon: "fas fa-bed" 
+                icon: "fas fa-bed"
             },
             content: `
                 <p>休整将花费 <strong>四个时辰（8小时）</strong>。</p>
