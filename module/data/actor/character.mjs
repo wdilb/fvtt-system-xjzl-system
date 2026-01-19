@@ -104,10 +104,15 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       // 仅存储“存量”数据 (当前余额)。
       // 这里的数值 = 总获得量 - 已投入到内功/武学中的量
       cultivation: new fields.SchemaField({
-        general: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.General" }), // 通用修为
-        neigong: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Neigong" }), // 专属内功修为
-        wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Wuxue" }),     // 专属武学修为
-        arts: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Arts" })        // 专属技艺修为
+        general: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.General" }), // 通用修为剩余
+        neigong: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Neigong" }), // 专属内功修为剩余
+        wuxue: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Wuxue" }),     // 专属武学修为剩余
+        arts: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.Arts" }),       // 专属技艺修为剩余
+        generalTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.GeneralTotal" }), // 总通用修为
+        neigongTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.NeigongTotal" }), // 总内功修为
+        wuxueTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.WuxueTotal" }), // 总武学修为
+        artsTotal: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.ArtsTotal" }), // 总技艺修为
+        all: new fields.NumberField({ min: 0, initial: 0, label: "XJZL.Cultivation.All" }) // 总修为
       }),
 
       // === D. 核心资源 (Resources) ===
