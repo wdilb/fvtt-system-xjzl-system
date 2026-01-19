@@ -2103,5 +2103,59 @@
                 }
             ]
         }
-    }
+    },
+    [
+        {
+            "name": "轻功-阴阳路",
+            "type": "wuxue",
+            "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+            "system": {
+                "category": "qinggong",
+                "sect": "jianghushili",
+                "tier": 2,
+                "description": "<p>踏步如风，幽冥如墨，一路生死莲。</p>",
+                "requirements": "悟性5",
+                "moves": [
+                    {
+                        "name": "阴阳路",
+                        "type": "qi",
+                        "actionType": "buff",
+                        "range": "视野",
+                        "targetInfo": "单体/自身",
+                        "actionCost": "次要动作",
+                        "requirements": "悟性5",
+                        "description": "<p>效果：你的速度+1。</p><p>次要动作，观人群站位，分地形地貌，进行一次[道法]检定（难度10），若成功，可选择视野任意一个敌人为其添加“下盘不稳”，持续三回合；<br>再为自己添加一层“乘风”，至多三层，持续到战斗脱离。</p>",
+                        "automationNote": "被动速度自动。主动效果点击应用后自动进行道法检定，成功后自动施加状态（需选中目标以施加下盘不稳）。",
+                        "costs": {
+                            "mp": [
+                                0
+                            ]
+                        },
+                        "scripts": [
+                            {
+                                "label": "阴阳路-道法检定",
+                                "trigger": "hit",
+                                "script": "const roll = await actor.rollAttributeTest('daofa', { async: true });\nif (roll && roll.total >= 10) {\n    ui.notifications.info('阴阳路：道法检定成功！');\n    \n    // 1. 对敌人施加下盘不稳\n    if (args.target) {\n        const unstable = CONFIG.statusEffects.find(e => e.id === 'unstable');\n        if (unstable) {\n            const data = foundry.utils.deepClone(unstable);\n            data.duration = { rounds: 3 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`已对 ${args.target.name} 施加 [下盘不稳]`);\n        }\n    } else {\n        ui.notifications.warn('未选中目标，无法施加 [下盘不稳]。');\n    }\n\n    // 2. 给自己施加乘风\n    const chengfeng = CONFIG.statusEffects.find(e => e.id === 'chengfeng');\n    if (chengfeng) {\n        const data = foundry.utils.deepClone(chengfeng);\n        // 覆盖最大层数为 3\n        foundry.utils.setProperty(data, 'flags.xjzl-system.maxStacks', 3);\n        await game.xjzl.api.effects.addEffect(actor, data);\n        ui.notifications.info('已获得 [乘风]');\n    }\n} else {\n    ui.notifications.warn('阴阳路：道法检定失败。');\n}",
+                                "active": true
+                            }
+                        ]
+                    }
+                ],
+                "effects": [
+                    {
+                        "name": "阴阳路",
+                        "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                        "transfer": true,
+                        "changes": [
+                            {
+                                "key": "system.combat.speed",
+                                "mode": 2,
+                                "value": "1"
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
 ]
