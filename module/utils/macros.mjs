@@ -30,6 +30,16 @@ export class XJZLMacros {
         const attackerName = attacker ? attacker.name : "未知来源";
         const targetName = target.name;
 
+        // 数据清洗与防错
+        let safeOnFail = onFail;
+        
+        // 检查 onFail 是否为函数
+        if (typeof onFail === 'function') {
+            console.warn(`XJZL Dev Warning | Macros.requestSave: onFail 参数不能是函数，因为它无法存入数据库。已自动忽略该参数。如果你想显示提示，请使用 'failureWarning' 参数。`);
+            // 强制置空，防止脏数据进入 flags
+            safeOnFail = null; 
+        }
+
         // 2. 渲染模板
         const content = await renderTemplate("systems/xjzl-system/templates/chat/request-save.hbs", {
             attackerName,
@@ -47,7 +57,7 @@ export class XJZLMacros {
             targetUuid: target.uuid,
             attribute: type,
             dc: dc,
-            onFail: onFail, // 直接存入 Effect 数据对象
+            onFail: safeOnFail, // 直接存入 Effect 数据对象
             damageOnFail: damageOnFail, //失败扣减的数值
             level: level //优势劣势等级
         };
