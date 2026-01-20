@@ -2379,7 +2379,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，挥鞭抖击，压制虚招，对目标造成 0.6 力量点外功伤害。同时和目标进行一个[角力]对抗，若你胜出，则施鞭缠绕，为其添加“下盘不稳”一回合。</p><p><strong>升级：</strong>伤害+10，下盘不稳回合数+1，消耗+2。</p>",
-                    "automationNote": "角力对抗需手动。胜利后手动添加下盘不稳。",
+                    "automationNote": "角力对抗自动。下盘不稳效果自动(System ID)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2399,9 +2399,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "提示对抗",
+                            "label": "角力对抗",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">恶蛟缠身 - 对抗提示</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请与目标进行 <b>[角力]</b> 对抗。</p>\n            <p>若胜利，请手动施加 <b>[下盘不稳]</b> (持续 ${rounds} 回合)。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"恶蛟缠身 - 角力对抗\",\n    outcome: {\n        win: {\n            text: \"缠绕成功！\",\n            targetEffect: \"unstable\"\n        },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -3113,7 +3113,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，鞭子顺着对方的武器缠住目标的身体，对其造成 0.8 力量点外功伤害，若目标无架招，则给予其“缴械”状态，持续一回合，同时与目标进行一个[角力]对抗，若你胜出，则施鞭缠绕，为目标添加“禁足”状态，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "无架招缴械自动。对抗提示与禁足手动。",
+                    "automationNote": "缴械自动(System ID)。角力对抗自动。禁足自动(System ID)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3136,7 +3136,7 @@
                         {
                             "label": "缴械与对抗",
                             "trigger": "hit",
-                            "script": "// 1. 无架招缴械\nif (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"jiaoxie\", true);\n}\n\n// 2. 提示对抗\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">蛛手擒龙 - 对抗提示</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请与目标进行 <b>[角力]</b> 对抗。</p>\n            <p>若胜利，请手动施加 <b>[禁足]</b> (持续1回合)。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "script": "// 1. 无架招缴械\nif (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"jiaoxie\", true);\n}\n\n// 2. 角力对抗\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"蛛手擒龙 - 角力对抗\",\n    outcome: {\n        win: {\n            text: \"缠绕成功！\",\n            targetEffect: \"root\"\n        },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
                             "active": true
                         }
                     ]

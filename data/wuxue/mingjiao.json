@@ -368,7 +368,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "弯刀缠割目标四肢，对其造成伤害。击破架招时，与其进行一次[角力]对抗，若你胜利，目标陷入“禁足”，持续两回合。",
-                    "automationNote": "对抗需手动。破招时仅发送提示。",
+                    "automationNote": "角力对抗自动。禁足效果自动(System ID)。",
                     "costs": {
                         "mp": [
                             1,
@@ -398,9 +398,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "角力提示",
+                            "label": "角力对抗",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const bonus = (lvl - 1);\n    ui.notifications.info(`破招触发角力对抗！攻击者加值: +${bonus}。胜利请手动施加禁足（2回合）。`);\n}",
+                            "script": "if (args.isBroken) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"jiaoli\",\n        defType: \"jiaoli\",\n        label: \"土崩瓦解 - 角力对抗\",\n        outcome: {\n            win: {\n                text: \"目标双腿被缚！\",\n                targetEffect: \"root\"\n            },\n            lose: { text: \"目标挣脱了束缚。\" }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -2525,8 +2525,15 @@
                         "growth": 0,
                         "scalings": []
                     },
-                    "automationNote": "完全手动。请手动掷骰对抗。",
-                    "scripts": []
+                    "automationNote": "武学对抗自动。改变目标手动。",
+                    "scripts": [
+                        {
+                            "label": "武学对抗",
+                            "trigger": "hit",
+                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"牵引挪移 - 武学对抗\",\n    outcome: {\n        win: { text: \"乾坤挪移：请手动指定新目标。\" },\n        lose: { text: \"牵引失败。\" }\n    }\n});",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "第三层",

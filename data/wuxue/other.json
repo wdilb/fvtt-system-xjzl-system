@@ -2367,7 +2367,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>-双手捧心，如泣如诉-</p><p>次要动作，诉离殇，惆怅垂涕，求之至曙，开启招架。</p><p>成功格挡后，与目标进行一次神采对抗，若你胜出，则目标心生怜惜，对你造成伤害减少 10 点。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2，伤害减少+5。</p>",
-                    "automationNote": "格挡后请手动发起神采对抗，若胜出手动减伤。",
+                    "automationNote": "神采对抗自动。减伤需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2381,9 +2381,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "神采对抗提示",
-                            "trigger": "preTake",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 升级加成计算 (Lv1=10, Lv2=15...)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst reduction = 10 + (lvl - 1) * 5;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"background:#3498db; color:white;\">诉离殇 - 对抗请求</div>\n        <div style=\"padding:5px;\">\n            <p>请与攻击者进行 <b>神采对抗</b>。</p>\n            <p>若胜出，本次伤害减少 <b>${reduction}</b> 点 (需手动)。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "label": "神采对抗",
+                            "trigger": "damaged",
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    // 计算减伤数值仅做显示\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const reduction = 10 + (lvl - 1) * 5;\n\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.attacker,\n        type: \"shencai\",\n        defType: \"shencai\",\n        label: \"诉离殇 - 神采对抗\",\n        outcome: {\n            win: { text: `目标心生怜惜！请手动返还 HP ${reduction} 点。` },\n            lose: { text: \"目标铁石心肠。\" }\n        }\n    });\n}",
                             "active": true
                         }
                     ]

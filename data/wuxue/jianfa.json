@@ -3682,7 +3682,7 @@
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
                     "description": "<p>清啸响彻，震耳欲聋，周围敌人与自己进行一个气感对抗，若敌人对抗失败，则陷入“耳鸣”状态，持续一回合。</p><p><strong>升级：</strong>招式距离+2，对抗检定+1，内力消耗+2。</p>",
-                    "automationNote": "请求对抗自动。耳鸣手动。",
+                    "automationNote": "对抗请求自动。耳鸣效果自动(System ID)。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -3698,7 +3698,7 @@
                         {
                             "label": "狮子吼",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = actor.system.stats.qigan.total + (lvl - 1);\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"qigan\",\n    dc: dc,\n    label: \"狮子吼对抗\",\n    onFail: \"deaf\"\n});",
+                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"qigan\",\n    defType: \"qigan\",\n    label: \"觉远狮子 - 气感对抗\",\n    outcome: {\n        win: {\n            text: \"目标被震慑！\",\n            targetEffect: \"deaf\"\n        },\n        lose: {\n            text: \"目标未受影响。\"\n        }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -3741,7 +3741,7 @@
                         {
                             "label": "慧寂对抗",
                             "trigger": "hit",
-                            "script": "const hasQizhi = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qizhi\");\nif (hasQizhi) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"wuxing\",\n        dc: actor.system.stats.wuxing.total,\n        label: \"慧寂对抗\",\n        onFail: \"zibi\"\n    });\n}",
+                            "script": "const hasQizhi = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qizhi\");\nif (hasQizhi) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"wuxing\",\n        defType: \"wuxing\",\n        label: \"慧寂金刚 - 悟性对抗\",\n        outcome: {\n            win: {\n                text: \"目标自闭！\",\n                targetEffect: \"zibi\"\n            },\n            lose: {\n                text: \"目标抵抗成功。\"\n            }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -4001,7 +4001,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>看破虚招后消耗反应施展，压制目标虚招，剑光闪闪，连绵不绝，对目标造成伤害。与目标进行一次[武学内功]对抗，对抗成功，击飞目标武器 3 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "武学对抗手动。",
+                    "automationNote": "武学对抗自动。击飞武器提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4023,7 +4023,14 @@
                             6
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "武学对抗",
+                            "trigger": "hit",
+                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"春潮带雨晚来急 - 武学对抗\",\n    outcome: {\n        win: { text: \"对抗胜利：击飞目标武器 3 米！\" },\n        lose: { text: \"对抗失败。\" }\n    }\n});",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "一行白鹭上青天",
@@ -7084,7 +7091,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>风清云谈，杀机四起，对目标造成伤害。</p><p>若有目标陷入地级或天级状态，可消耗反应动作释放此招，对其造成伤害。然后与目标进行一个悟性对抗，若对方失败，则目标获得的状态移除。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害自动。悟性对抗与状态移除手动。",
+                    "automationNote": "伤害自动。悟性对抗自动，状态移除手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7109,9 +7116,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "对抗提示",
+                            "label": "悟性对抗",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"若是用于移除状态，请手动进行 [悟性对抗]。\");",
+                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxing\",\n    defType: \"wuxing\",\n    label: \"尘剑悠然 - 悟性对抗\",\n    outcome: {\n        win: { text: \"对抗胜利：请手动移除目标状态！\" },\n        lose: { text: \"对抗失败。\" }\n    }\n});",
                             "active": true
                         }
                     ]

@@ -1431,7 +1431,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>咆哮大喝，与范围内所有敌人进行一次[定力]对抗，若敌人失败，则为其添加状态“畏惧”，持续一回合。</p><p><strong>畏惧：</strong>你无法对给你添加此状态的目标进行普通攻击。你被他攻击时，内外功防御归零。</p><p><strong>升级：</strong>持续回合数+1，[定力]对抗结果+2，内力消耗+4。</p>",
-                    "automationNote": "发起对抗自动。畏惧效果自动(防御者脚本)。",
+                    "automationNote": "对抗请求自动。畏惧状态自动（需物品内有对应AE）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1452,7 +1452,7 @@
                         {
                             "label": "发起对抗",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\n// 这里的 DC 是攻击者的定力检定结果，简单起见用 Roll 模拟或者取固定值，脚本无法方便得知对抗结果，让GM裁定。\n// 采用 requestSave 模式\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 10 + Math.floor(actor.system.skills.dingli.total) + bonus, \n    label: \"抵抗畏惧 (DC=10+定力+加成)\",\n    onFail: thisItem.effects.getName(\"畏惧\").toObject()\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 尝试获取物品内的特效，如果没有则只显示文本\nconst fearEffect = thisItem.effects.getName(\"畏惧\");\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"dingli\",\n    defType: \"dingli\",\n    label: \"万夫莫敌 - 定力对抗\",\n    outcome: {\n        win: {\n            text: \"目标心生畏惧！\",\n            targetEffect: fearEffect ? fearEffect.toObject() : null\n        },\n        lose: {\n            text: \"目标意志坚定，不受影响。\"\n        }\n    }\n});",
                             "active": true
                         }
                     ]
