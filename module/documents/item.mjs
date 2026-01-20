@@ -1998,10 +1998,18 @@ export class XJZLItem extends Item {
         autoApplied: isAutoApplied
       };
 
-      const content = await renderTemplate(
+      let content = await renderTemplate(
         "systems/xjzl-system/templates/chat/move-card.hbs",
         templateData
       );
+
+      // =====================================================
+      // 注入隐形锚点 (绝招)
+      // =====================================================
+      if (move.isUltimate) {
+        // 追加隐形标签，确保不影响视觉，但能被模组读取
+        content += `<div style="display:none;">【绝招标签】</div>`;
+      }
 
       // 发送消息
       const chatData = {

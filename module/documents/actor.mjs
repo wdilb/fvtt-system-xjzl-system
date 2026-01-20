@@ -1596,7 +1596,7 @@ export class XJZLActor extends Actor {
       if (amount > 0 && this.xjzlStatuses.noRecoverNeili) {
         actualHeal = 0;
       } else {
-        // [修改]: 兼容正负数逻辑
+        // 兼容正负数逻辑
         if (amount > 0) {
           newVal = Math.min(max, current + amount);
         } else {
