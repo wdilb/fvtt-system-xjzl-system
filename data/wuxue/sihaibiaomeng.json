@@ -1120,7 +1120,7 @@
             "category": "wuxue",
             "sect": "sihaibiaomeng",
             "tier": 2,
-            "description": "广州王家家传刀法，王德茂传于镖师，以壮大镖局实力，风吹刀间，劈开浪花。",
+            "description": "<p>广州王家家传刀法，王德茂传于镖师，以壮大镖局实力，风吹刀间，劈开浪花。</p><p><strong>需求：</strong>刀-双刀，镇远镖局</p><p><strong>属性：</strong>柔</p>",
             "requirements": "刀-双刀；镇远镖局",
             "moves": [
                 {
@@ -1130,7 +1130,8 @@
                     "weaponType": "blade",
                     "range": "自身",
                     "actionCost": "次要动作",
-                    "description": "双刀一扬一抑，开启架招。每次格挡成功时获得一层“浪潮”，战斗脱离后消失。",
+                    "description": "<p>双刀一扬一抑，开启架招。每次格挡成功时获得一层“浪潮”，战斗脱离后消失。</p><p><strong>升级：</strong>格挡值+10，额外获得一层“浪潮”，内力消耗+2。</p>",
+                    "automationNote": "开启自动。格挡获层自动(随等级成长)。",
                     "costs": {
                         "mp": [
                             2,
@@ -1146,10 +1147,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得浪潮",
+                            "label": "格挡获浪",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"浪潮\").toObject();\n    let stacks = 1;\n    if (lvl >= 2) stacks++; \n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                            "script": "// 1. 核心判断\nif (!Macros.checkStance(actor, args)) return;\n\n// 2. 获取等级 (成长逻辑)\n// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nlet gain = 1;\nif (lvl >= 2) gain += 1; // 升级额外获得一层\n\n// 3. 应用特效\nconst effectData = thisItem.effects.getName(\"浪潮\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, effectData, gain);"
                         }
                     ]
                 },
@@ -1159,9 +1160,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "blade",
-                    "range": "1",
+                    "range": "1米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "挥刀双斩，对目标造成 0.5 力量点外功伤害。命中无架招目标时，为其添加“下盘不稳”，持续两回合。<br>·若你具有“浪潮”，可以消耗一层“浪潮”，使该招式伤害+5。",
+                    "description": "<p>挥刀双斩，对目标造成伤害。命中无架招目标时，为其添加“下盘不稳”，持续两回合。</p><p>·若你具有“浪潮”，可以消耗一层“浪潮”，使该招式伤害+5。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "预览显示伤害加成。出招弹窗询问消耗。命中施加状态自动。",
                     "costs": {
                         "mp": [
                             2,
@@ -1183,16 +1186,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗浪潮增伤",
-                            "trigger": "attack",
+                            "label": "浪潮加伤预览",
+                            "trigger": "calc",
                             "active": true,
-                            "script": "if (await game.xjzl.api.effects.removeEffect(actor, \"wuxue_langchao_stack\", 1)) {\n    args.flags.bonusDamage = (args.flags.bonusDamage || 0) + 5;\n    ui.notifications.info(\"消耗浪潮，伤害+5\");\n}"
+                            "script": "const hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_langchao_stack\");\nif (hasBuff) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"浪潮加伤 +5 (需消耗)\");\n}"
                         },
                         {
-                            "label": "下盘不稳",
+                            "label": "询问消耗浪潮",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_langchao_stack\");\n// 必须与 calc 保持一致的加成数值\nconst bonus = 5;\n\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"劈流斩浪\" },\n        content: `<p>预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗 1 层 [浪潮] 以生效此加成？</p>`,\n        yes: { label: \"消耗 (保留加成)\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗 (移除加成)\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_langchao_stack\", 1);\n        ui.notifications.info(\"已消耗 1 层 [浪潮]\");\n    } else {\n        // 玩家拒绝：手动回滚伤害\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗：移除加成 (-${bonus})`;\n    }\n}"
+                        },
+                        {
+                            "label": "施加下盘不稳",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 使用通用状态 ID\n    const statusData = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.duration = { rounds: 2 }; // 明确持续2回合\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳 (2回合)`);\n    }\n}"
                         }
                     ]
                 },
@@ -1202,9 +1211,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "blade",
-                    "range": "3",
+                    "range": "3米",
+                    "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，双刀绞杀，对其造成 0.6 力量点外功伤害。<br>若你具有“浪潮”，可以消耗一层“浪潮”，击飞目标 1 米。",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，双刀绞杀，对其造成伤害。</p><p>若你具有“浪潮”，可以消耗一层“浪潮”，击飞目标 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中后弹窗询问是否消耗浪潮击飞。",
                     "costs": {
                         "mp": [
                             2,
@@ -1226,13 +1237,12 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗浪潮击飞",
+                            "label": "询问消耗击飞",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (await game.xjzl.api.effects.removeEffect(actor, \"wuxue_langchao_stack\", 1)) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米`);\n}"
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_langchao_stack\");\n\nif (args.isHit && buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"浪子回头\" },\n        content: `<p>是否消耗 1 层 [浪潮] 以击飞目标 1 米？</p>`,\n        yes: { label: \"消耗击飞\", icon: \"fas fa-wind\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_langchao_stack\", 1);\n        ui.notifications.info(`${args.target.name} 被击飞 1 米`);\n        // 击飞位移仍需手动\n    }\n}"
                         }
-                    ],
-                    "automationNote": "击飞位移需手动处理。"
+                    ]
                 },
                 {
                     "name": "一刀两断",
@@ -1241,9 +1251,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "blade",
-                    "range": "2",
+                    "range": "2米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "心念决绝，劈江斩浪，对目标造成 0.8 力量点外功伤害。<br>若你具有“浪潮”，可以消耗所有“浪潮”，每消耗一层，招式伤害提升 5 点伤害。",
+                    "description": "<p>心念决绝，劈江斩浪，对目标造成伤害。</p><p>若你具有“浪潮”，可以消耗所有“浪潮”，每消耗一层，招式伤害提升 5 点伤害。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+4。</p>",
+                    "automationNote": "预览显示全额加成。出招弹窗询问是否消耗全部层数。",
                     "costs": {
                         "mp": [
                             4,
@@ -1269,10 +1281,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "爆发增伤",
+                            "label": "爆发预览",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_langchao_stack\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`浪潮爆发(${stacks}层) +${bonus} (需全耗)`);\n}"
+                        },
+                        {
+                            "label": "询问爆发",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_langchao_stack\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 5;\n    args.flags.bonusDamage = (args.flags.bonusDamage || 0) + bonus;\n    await effect.delete();\n    ui.notifications.info(`消耗 ${stacks} 层浪潮，伤害+${bonus}`);\n}"
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_langchao_stack\");\n\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 5;\n\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"一刀两断\" },\n        content: `<p>当前 [浪潮] ${stacks} 层，预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗<b>所有层数</b>以生效此加成？</p>`,\n        yes: { label: \"消耗全部 (保留加成)\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗 (移除加成)\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        // 消耗全部 (直接删除)\n        await buff.delete();\n        ui.notifications.info(`已消耗 ${stacks} 层 [浪潮]`);\n    } else {\n        // 拒绝消耗，手动回滚伤害\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗：移除加成 (-${bonus})`;\n    }\n}"
                         }
                     ]
                 }
