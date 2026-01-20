@@ -50,6 +50,7 @@ import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.
 import { setupSocket } from "./module/socket.mjs";
 import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
 import { AOECreator } from "./module/applications/aoe-creator.mjs";
+import { XJZLMacros } from "./module/utils/macros.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -404,6 +405,8 @@ Hooks.once("ready", async function () {
   game.xjzl.applications = {
     XJZLCompendiumBrowser
   };
+
+  game.xjzl.Macros = XJZLMacros;
 
   // 3. 挂载 GM 专用 API (生成器)
   // 此时 game.user 已经不是 null 了，可以安全检查权限
