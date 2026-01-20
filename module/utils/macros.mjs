@@ -57,6 +57,7 @@ export class XJZLMacros {
         const flags = {
             type: "save-request", // 标记类型
             targetUuid: target.uuid,
+            attackerUuid: attacker?.uuid, //备用
             attribute: type,
             dc: dc,
             onFail: safeOnFail, // 直接存入 Effect 数据对象

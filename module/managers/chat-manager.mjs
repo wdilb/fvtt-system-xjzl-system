@@ -2033,14 +2033,12 @@ export class ChatCardManager {
      * @param {String} role "attacker" | "defender"
      */
     static async _onContestRoll(role, flags, message) {
-        // 1. 获取当前状态
-        const state = flags.state || {};
-        const config = flags.config || {};
+        // 1. 获取当前内存中的状态（仅用于初步检查，防止重复点击）
+        const currentState = message.flags["xjzl-system"]?.state || {};
+        const updateKey = role === "attacker" ? "attRoll" : "defRoll";
 
-        // 如果该方已经投过了，直接阻止 (防止连点)
-        if ((role === "attacker" && state.attRoll) || (role === "defender" && state.defRoll)) {
-            return;
-        }
+        // 如果本地状态显示已经投过了，阻止点击
+        if (currentState[updateKey]) return;
 
         // 2. 获取 Actor
         const uuid = role === "attacker" ? flags.attackerUuid : flags.defenderUuid;
@@ -2048,61 +2046,72 @@ export class ChatCardManager {
         const actor = doc?.actor || doc;
 
         if (!actor) return ui.notifications.warn("角色已不存在。");
-
-        // 权限检查
         if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
 
         // 3. 执行属性检定
+        const config = flags.config || {};
         const attrKey = role === "attacker" ? config.attAttr : config.defAttr;
         const roll = await actor.rollAttributeTest(attrKey, {
-            chatMessage: false //阻止rollAttributeTest自己发送卡片，这样卡片太多了
+            chatMessage: false
         });
 
-        if (!roll) return; // 玩家取消
+        if (!roll) return;
 
-        // 4. 构造结果数据
-        // 简单存一下总值和骰面，用于显示
         const rollData = {
             total: roll.total,
             formula: roll.formula
         };
 
-        // 5. 更新 Flags (只更新自己这一边的状态)
-        const updateKey = role === "attacker" ? "attRoll" : "defRoll";
-        // 深度合并更新，避免覆盖
-        const newState = {
-            ...state,
-            [updateKey]: rollData
-        };
+        // =====================================================
+        // 4. 原子化更新 (Atomic Update) - 修复并发的关键
+        // =====================================================
+        // 我们只更新 "flags.xjzl-system.state.attRoll" 这一条路径
+        // 这样即使对方同时在更新 "defRoll"，Foundry 也能合并这两个操作，而不是互相覆盖
+        const updatePath = `flags.xjzl-system.state.${updateKey}`;
 
-        // 6. 检查是否对抗完成 (双方都已有数据)
-        let finalState = newState;
-        if (newState.attRoll && newState.defRoll) {
-            finalState.isCompleted = true;
-            //发起者大于等于防守方就算获胜
-            if (newState.attRoll.total >= newState.defRoll.total) {
-                finalState.winner = "attacker";
-            } else {
-                finalState.winner = "defender";
-            }
-            // 触发自动化结算
-            // 只有当状态从未完成变成完成的那一瞬间触发
-            // 由于 _onContestRoll 是按序执行的，这里直接调用即可
-            const autoLogs = await ChatCardManager._executeContestAutomation(finalState.winner, flags, message);
-
-            // 将执行日志存入 state，方便在卡片上显示
-            finalState.executedLog = autoLogs;
-        }
-
-        // 7. 更新消息 Flags
-        // 注意：这里我们先更新 Flags，然后利用 Flags 重绘内容
         await ChatCardManager._safeUpdateMessage(message, {
-            "flags.xjzl-system.state": finalState
+            [updatePath]: rollData
         });
 
-        // 8. 原地重绘卡片内容 (Re-render)
-        // 我们利用最新的 flags 重新渲染 hbs，替换掉旧的 HTML
-        const updatedFlags = message.flags["xjzl-system"]; // 获取更新后的
+        // =====================================================
+        // 5. 重新获取最新状态 (Re-fetch State)
+        // =====================================================
+        // 等待数据库更新完毕后，重新从 game.messages 获取该消息的最新实例
+        // 这样能确保我们看到的是 双方都更新后（如果有的话）的状态
+        const freshMessage = game.messages.get(message.id);
+        const freshFlags = freshMessage.flags["xjzl-system"];
+        const freshState = freshFlags.state;
+
+        // 6. 检查是否对抗完成 (双端检查)
+        // 只有当两个都存在，且之前标记未完成时，才执行结算
+        // 使用一个锁 (isCompleted) 防止某一方网速慢重复触发
+        if (freshState.attRoll && freshState.defRoll && !freshState.isCompleted) {
+
+            // 确定赢家
+            let winner = null;
+            if (freshState.attRoll.total >= freshState.defRoll.total) {
+                winner = "attacker";
+            } else {
+                winner = "defender";
+            }
+
+            // 触发自动化结算
+            // 这里传入的是 freshMessage，确保自动化里用的也是最新数据
+            const autoLogs = await ChatCardManager._executeContestAutomation(winner, freshFlags, freshMessage);
+
+            // 更新完成状态和日志
+            // 同样使用路径更新，防止覆盖 rollData
+            await ChatCardManager._safeUpdateMessage(freshMessage, {
+                "flags.xjzl-system.state.isCompleted": true,
+                "flags.xjzl-system.state.winner": winner,
+                "flags.xjzl-system.state.executedLog": autoLogs
+            });
+        }
+
+        // 7. 原地重绘卡片内容
+        // 再次获取最新的（包含结算结果的）message进行渲染
+        const finalMessage = game.messages.get(message.id);
+        const finalFlags = finalMessage.flags["xjzl-system"];
 
         const content = await renderTemplate("systems/xjzl-system/templates/chat/request-contest.hbs", {
             ...config,
@@ -2110,10 +2119,10 @@ export class ChatCardManager {
             defenderName: (await fromUuid(flags.defenderUuid))?.name || "对抗者",
             attackerImg: (await fromUuid(flags.attackerUuid))?.img,
             defenderImg: (await fromUuid(flags.defenderUuid))?.img,
-            flags: updatedFlags // 传入最新的状态
+            flags: finalFlags // 使用最终状态
         });
 
-        await ChatCardManager._safeUpdateMessage(message, { content: content });
+        await ChatCardManager._safeUpdateMessage(finalMessage, { content: content });
     }
 
     /**
