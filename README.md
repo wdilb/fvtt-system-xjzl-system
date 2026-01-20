@@ -484,7 +484,45 @@ await Macros.requestSave({
 });
 ```
 
-### 4.2 `Macros.checkStance(actor, args)`
+### 4.2 `Macros.requestContest(options)`
+**功能**: 发起对抗请求（如内力比拼、拼刀）。
+**机制**: 创建一个**异步记分牌**卡片。发起者和对抗者可以在不同时间分别点击投掷，系统会自动记录双方点数并在界面上显示胜负结果和对应的描述文本。**系统只负责裁定胜负，不自动执行后果**。
+
+| 参数 | 类型 | 说明 |
+| :--- | :--- | :--- |
+| `attacker` | Actor | 发起者角色 (必须)。 |
+| `defender` | Actor | 对抗者角色 (必须)。 |
+| `type` | String | 发起者的属性 Key (如 `"neili"`, `"jingshen"`)。 |
+| `defType` | String | **(可选)** 对抗者的属性 Key。不填则默认与发起者相同。 |
+| `label` | String | **(可选)** 卡片标题 (如 "吸星大法", "兵刃相交")。 |
+| `winText` | String | **(可选)** 发起者获胜时显示的描述文本。 |
+| `loseText` | String | **(可选)** 发起者失败时显示的描述文本。 |
+
+**示例**:
+```javascript
+// 发起内力比拼
+await Macros.requestContest({
+    attacker: actor,
+    defender: args.target,
+    type: "neili",
+    label: "内力比拼",
+    winText: "对方内力激荡，陷入【内伤】状态。",
+    loseText: "由于内力不支，你受到反噬伤害。"
+});
+
+// 发起精神对抗 (以强凌弱)
+await Macros.requestContest({
+    attacker: actor,
+    defender: args.target,
+    type: "shencai", // 发起者用神采(精神)
+    defType: "dingli", // 目标用定力抵抗
+    label: "摄魂大法",
+    winText: "目标眼神涣散，被你控制。",
+    loseText: "目标意志坚定，未受影响。"
+});
+```
+
+### 4.3 `Macros.checkStance(actor, args)`
 **功能**: 在 `damaged` 或 `preTake` 脚本中，辅助判断是否满足触发架招特效的硬性条件。
 **检查逻辑**: 1. 架招已开启; 2. 命中; 3. 伤害类型有效(内外功); 4. 未被无视架招。
 
