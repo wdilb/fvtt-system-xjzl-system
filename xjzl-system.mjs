@@ -324,6 +324,17 @@ Hooks.once("init", async function () {
     requiresReload: true
   });
 
+  // 是否在聊天栏显示状态变更
+  game.settings.register("xjzl-system", "showEffectChatCards", {
+    name: "在聊天栏显示状态变更",
+    hint: "开启后，当角色获得、叠加或移除状态特效时，会在聊天栏发送一张提示卡片。",
+    scope: "world",      // 这是一个世界级设置，全部人同步
+    config: true,        // 显示在设置菜单中
+    type: Boolean,
+    default: false,      // 默认不开启
+    requiresReload: false
+  });
+
   // --- 野兽伤害规则设置 ---
 
   // 1. 计算模式

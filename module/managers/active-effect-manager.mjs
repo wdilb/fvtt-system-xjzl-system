@@ -354,6 +354,19 @@ export class ActiveEffectManager {
     static _showScrollingText(actor, text, type = "neutral") {
         if (!actor) return;
 
+        // =====================================================
+        // 聊天卡片发送
+        // =====================================================
+        // 1. 检查设置是否开启
+        const showCard = game.settings.get("xjzl-system", "showEffectChatCards");
+
+        // 2. 发送卡片
+        // 只让“当前执行逻辑的人”（也就是调用这个方法的人）来创建卡片，防止重复。
+        if (showCard) {
+            this._sendChatCard(actor, text, type);
+        }
+        // =====================================================
+
         const colors = {
             create: 0x00FF00, // 绿
             delete: 0xFF0000, // 红
@@ -380,6 +393,55 @@ export class ActiveEffectManager {
                 jitter: 0.25
             });
         }
+    }
+
+    /**
+     * 辅助方法：构建并发送状态变更卡片
+     */
+    static async _sendChatCard(actor, text, type) {
+        // 1. 清洗文本
+        // 浮动文字通常带有 "+ ", "- ", "! " 等前缀，在聊天卡片里我们希望去掉它们，或者用图标代替
+        const cleanText = text.replace(/^[\+\-\!\~]\s*/, "");
+
+        // 2. 确定样式和措辞
+        let actionLabel = "状态变更";
+        let iconClass = "fas fa-info-circle";
+        let colorStyle = "color: #4b4b4b;"; // 默认灰色
+
+        if (type === "create") {
+            actionLabel = "获得状态";
+            iconClass = "fas fa-plus-circle";
+            colorStyle = "color: #2e7d32;"; // 绿色
+        } else if (type === "delete") {
+            actionLabel = "移除状态";
+            iconClass = "fas fa-minus-circle";
+            colorStyle = "color: #c62828;"; // 红色
+        } else if (text.includes("!")) {
+            // 覆盖/刷新
+            actionLabel = "状态刷新";
+            iconClass = "fas fa-sync-alt";
+            colorStyle = "color: #1565c0;"; // 蓝色
+        }
+
+        // 3. 构建 HTML 内容
+        // 使用简单的内联样式，无需修改 CSS 文件
+        const content = `
+        <div class="xjzl-chat-card" style="font-size: 13px;">
+            <div class="card-header flexrow" style="align-items: center; border-bottom: 1px solid #AAA; padding-bottom: 5px; margin-bottom: 5px;">
+                <img src="${actor.img}" style="flex: 0 0 32px; height: 32px; width: 32px; margin-right: 8px; border: none;"/>
+                <h3 style="margin: 0; line-height: 1.2;">${actor.name}</h3>
+            </div>
+            <div class="card-content" style="${colorStyle} font-weight: bold;">
+                <i class="${iconClass}"></i> ${actionLabel}: ${cleanText}
+            </div>
+        </div>
+        `;
+
+        // 4. 创建消息
+        await ChatMessage.create({
+            content: content,
+            speaker: ChatMessage.getSpeaker({ actor: actor }),
+        });
     }
 
     /**
