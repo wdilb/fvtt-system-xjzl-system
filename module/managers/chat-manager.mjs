@@ -72,6 +72,12 @@ export class ChatCardManager {
             return;
         }
 
+        // 0. 特殊处理3：对抗投掷处理 (前置拦截)
+        if (action === "rollContest") {
+            await ChatCardManager._onContestRoll(button.dataset.role, flags, message);
+            return;
+        }
+
         // 1. 获取攻击者 (Speaker)
         // 对于防御请求卡，Speaker 可能是防御者自己，也可能是 GM
         const speaker = message.speaker;
@@ -2006,6 +2012,88 @@ export class ChatCardManager {
         } else {
             console.error("XJZL | 无法在卡片中找到 .card-buttons 容器");
         }
+    }
+
+    /**
+     * 处理对抗中的单方投掷
+     * @param {String} role "attacker" | "defender"
+     */
+    static async _onContestRoll(role, flags, message) {
+        // 1. 获取当前状态
+        const state = flags.state || {};
+        const config = flags.config || {};
+
+        // 如果该方已经投过了，直接阻止 (防止连点)
+        if ((role === "attacker" && state.attRoll) || (role === "defender" && state.defRoll)) {
+            return;
+        }
+
+        // 2. 获取 Actor
+        const uuid = role === "attacker" ? flags.attackerUuid : flags.defenderUuid;
+        const doc = await fromUuid(uuid);
+        const actor = doc?.actor || doc;
+
+        if (!actor) return ui.notifications.warn("角色已不存在。");
+
+        // 权限检查
+        if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
+
+        // 3. 执行属性检定
+        const attrKey = role === "attacker" ? config.attAttr : config.defAttr;
+        const roll = await actor.rollAttributeTest(attrKey, { 
+            chatMessage: false //阻止rollAttributeTest自己发送卡片，这样卡片太多了
+        });
+
+        if (!roll) return; // 玩家取消
+
+        // 4. 构造结果数据
+        // 简单存一下总值和骰面，用于显示
+        const rollData = {
+            total: roll.total,
+            formula: roll.formula
+        };
+
+        // 5. 更新 Flags (只更新自己这一边的状态)
+        const updateKey = role === "attacker" ? "attRoll" : "defRoll";
+        // 深度合并更新，避免覆盖
+        const newState = {
+            ...state,
+            [updateKey]: rollData
+        };
+
+        // 6. 检查是否对抗完成 (双方都已有数据)
+        let finalState = newState;
+        if (newState.attRoll && newState.defRoll) {
+            finalState.isCompleted = true;
+            // 简单比大小：发起者 >= 对抗者 算赢? 或者 > ? 
+            // 这里假设 平局算防守方赢 (即发起者必须严格大于)
+            if (newState.attRoll.total >= newState.defRoll.total) {
+                finalState.winner = "attacker";
+            } else {
+                finalState.winner = "defender";
+            }
+        }
+
+        // 7. 更新消息 Flags
+        // 注意：这里我们先更新 Flags，然后利用 Flags 重绘内容
+        await ChatCardManager._safeUpdateMessage(message, {
+            "flags.xjzl-system.state": finalState
+        });
+
+        // 8. 原地重绘卡片内容 (Re-render)
+        // 我们利用最新的 flags 重新渲染 hbs，替换掉旧的 HTML
+        const updatedFlags = message.flags["xjzl-system"]; // 获取更新后的
+
+        const content = await renderTemplate("systems/xjzl-system/templates/chat/request-contest.hbs", {
+            ...config,
+            attackerName: (await fromUuid(flags.attackerUuid))?.name || "发起者",
+            defenderName: (await fromUuid(flags.defenderUuid))?.name || "对抗者",
+            attackerImg: (await fromUuid(flags.attackerUuid))?.img,
+            defenderImg: (await fromUuid(flags.defenderUuid))?.img,
+            flags: updatedFlags // 传入最新的状态
+        });
+
+        await ChatCardManager._safeUpdateMessage(message, { content: content });
     }
 
     /**

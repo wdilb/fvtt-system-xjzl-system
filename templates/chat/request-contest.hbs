@@ -1,0 +1,105 @@
+{{!-- 动态计算头部颜色：如果有胜者，且胜者是发起方(绿色)或防守方(红色)，否则默认灰色 --}}
+{{#if flags.state.isCompleted}}
+{{#if (eq flags.state.winner "attacker")}}
+{{#var "headerColor"}}#27ae60{{/var}}
+{{else}}
+{{#var "headerColor"}}#c0392b{{/var}}
+{{/if}}
+{{else}}
+{{#var "headerColor"}}#78909c{{/var}}
+{{/if}}
+
+<div class="xjzl-chat-card request-card">
+    {{!-- 头部：复用结构，但左右放两个头像 --}}
+    <header class="card-header"
+        style="border-left: 4px solid {{headerColor}}; display: flex; align-items: center; justify-content: space-between;">
+
+        {{!-- 左侧：发起者信息 --}}
+        <div style="display: flex; align-items: center; gap: 5px;">
+            <img src="{{attackerImg}}" title="{{attackerName}}"
+                style="width: 36px; height: 36px; border-radius: 4px;" />
+            <div>
+                <h3 style="color: {{headerColor}}; margin: 0; line-height: 1;">{{label}}</h3>
+                <div style="font-size: 0.8em; color: #555;">{{attackerName}}</div>
+            </div>
+        </div>
+
+        {{!-- 右侧：VS 或 结果 --}}
+        <div style="font-weight: bold; font-size: 1.2em; color: #999; margin-right: 5px;">
+            {{#if flags.state.isCompleted}}
+            {{#if (eq flags.state.winner "attacker")}}
+            <span style="color: #27ae60;">胜</span>
+            {{else}}
+            <span style="color: #c0392b;">败</span>
+            {{/if}}
+            {{else}}
+            VS
+            {{/if}}
+        </div>
+    </header>
+
+    <div class="card-content-wrapper">
+        {{!-- 结果描述文本：只在结束后显示 --}}
+        {{#if flags.state.isCompleted}}
+        <div class="card-description"
+            style="margin-bottom: 5px; padding: 5px; background: rgba(0,0,0,0.03); border-radius: 4px;">
+            {{#if (eq flags.state.winner "attacker")}}
+            <i class="fas fa-check-circle" style="color: #27ae60;"></i> {{winText}}
+            {{else}}
+            <i class="fas fa-times-circle" style="color: #c0392b;"></i> {{loseText}}
+            {{/if}}
+        </div>
+        {{else}}
+        {{!-- 进行中提示 --}}
+        <div class="card-description" style="text-align: center; color: #666; font-style: italic;">
+            双方正在进行对抗...
+        </div>
+        {{/if}}
+
+        {{!-- 核心区域：复用 card-stats，但使用 flex 让两个 stat-block 并排 --}}
+        <div class="card-stats" style="display: flex; justify-content: space-around; gap: 5px;">
+
+            {{!-- 左侧 Block：发起者 --}}
+            <div class="stat-block" style="flex: 1; text-align: center;">
+                <div class="stat-label">{{attLabel}}</div>
+
+                {{#if flags.state.attRoll}}
+                {{!-- 已投掷 --}}
+                <div class="stat-value" style="color: #27ae60;">{{flags.state.attRoll.total}}</div>
+                <div style="font-size: 0.7em; color: #888;">{{flags.state.attRoll.formula}}</div>
+                {{else}}
+                {{!-- 未投掷按钮 --}}
+                <div style="padding: 5px 0;">
+                    <button data-action="rollContest" data-role="attacker" class="btn-heal"
+                        style="width: 100%; font-size: 0.8em;">
+                        <i class="fas fa-dice"></i> 投掷
+                    </button>
+                </div>
+                {{/if}}
+            </div>
+
+            {{!-- 分割线 --}}
+            <div style="width: 1px; background: #eee;"></div>
+
+            {{!-- 右侧 Block：对抗者 --}}
+            <div class="stat-block" style="flex: 1; text-align: center;">
+                <div class="stat-label">{{defLabel}}</div>
+
+                {{#if flags.state.defRoll}}
+                {{!-- 已投掷 --}}
+                <div class="stat-value" style="color: #c0392b;">{{flags.state.defRoll.total}}</div>
+                <div style="font-size: 0.7em; color: #888;">{{flags.state.defRoll.formula}}</div>
+                {{else}}
+                {{!-- 未投掷按钮 --}}
+                <div style="padding: 5px 0;">
+                    <button data-action="rollContest" data-role="defender" class="btn-heal"
+                        style="width: 100%; font-size: 0.8em;">
+                        <i class="fas fa-shield-alt"></i> 抵抗
+                    </button>
+                </div>
+                {{/if}}
+            </div>
+
+        </div>
+    </div>
+</div>

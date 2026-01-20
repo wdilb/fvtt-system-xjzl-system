@@ -1233,6 +1233,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/chat/heal-card.hbs", //伤害卡片
     "systems/xjzl-system/templates/chat/defend-result.hbs", //看破结果
     "systems/xjzl-system/templates/chat/request-save.hbs", //属性判定
+    "systems/xjzl-system/templates/chat/request-contest.hbs", //属性对抗
     "systems/xjzl-system/templates/chat/loot-card.hbs", //随机抽取卡片
     //应用窗口
     "systems/xjzl-system/templates/apps/damage-tool.hbs", //伤害工具

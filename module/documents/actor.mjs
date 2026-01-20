@@ -887,6 +887,15 @@ export class XJZLActor extends Actor {
     const roll = new Roll(formula, rollData);
     await roll.evaluate();
 
+    // === 静默模式拦截 ===
+    // 如果 options.chatMessage 为 false，则直接返回 roll 对象，不发消息
+    // 这样 ChatManager 拿到 roll 后可以更新到对抗卡片里
+    if (options.chatMessage === false) {
+      // 既然不发卡片，最好在这里播放一下 3D 骰子，否则玩家不知道投了
+      if (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);
+      return roll;
+    }
+
     // 5. 准备消息
     const flavorText = options.flavor || `${this.name} 进行 ${label} 检定${rollTypeLabel}`;
 
