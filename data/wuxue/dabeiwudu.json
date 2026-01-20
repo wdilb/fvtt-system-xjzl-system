@@ -280,7 +280,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，掌风奔涌，造成伤害，同时进行一次[角力]对抗，胜利则夺取对方兵器。</p><p>你每有一层“悲悯”，检定结果+1。对方每有一层“悲悯”，检定结果-1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害自动。角力对抗手动，会提示修正值。",
+                    "automationNote": "自动发起角力对抗。层数修正会显示在标题中。夺武效果手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -300,9 +300,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "夺武对抗提示",
+                            "label": "夺武对抗",
                             "trigger": "hit",
-                            "script": "const selfStacks = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nconst targetStacks = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">衔悲茹恨 - 夺武对抗</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请进行 <b>[角力]</b> 对抗。</p>\n            <p>我方修正: <b>+${selfStacks}</b> (悲悯层数)</p>\n            <p>敌方修正: <b>-${targetStacks}</b> (悲悯层数)</p>\n            <p><i>胜利后请手动处理夺取兵器。</i></p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "script": "const selfStacks = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nconst targetStacks = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n\nif (args.isHit) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'jiaoli',\n        label: `衔悲茹恨 (我方+${selfStacks} / 敌方-${targetStacks})`,\n        outcome: {\n            win: { text: '对抗胜利：请手动夺取对方兵器。' },\n            lose: { text: '对抗失败：夺取未遂。' }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -696,7 +696,7 @@
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
                     "description": "<p>天雷惊蛰，万毒乍醒，不消耗速度直线奔向一处空格，对路径上敌人造成伤害。每个路径上的敌人都需要与你进行一次[轻功]对抗，你每胜利一次获得一层“狂蛇”，至多五层，持续到战斗脱离。</p><p><strong>狂蛇：</strong>叠加至五层后，瞬时武器金光流转，你可以选择《狂蛇剑法》或《狂蛇锥》中的一招(绝招以外)不消耗动作释放，然后移除所有狂蛇。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "移动、对抗、添加狂蛇手动。",
+                    "automationNote": "自动发起轻功对抗。胜利自动给自己叠加“狂蛇”。移动手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -716,9 +716,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "提示信息",
+                            "label": "轻功对抗",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"请与目标进行 [轻功] 对抗。胜利后请手动添加 [狂蛇]。\");",
+                            "script": "if (args.isHit) {\n    // 获取物品自带的狂蛇AE模板\n    const effectName = \"狂蛇\";\n    const effectRef = thisItem.effects.getName(effectName)?.toObject();\n    if (effectRef) {\n        delete effectRef._id;\n        effectRef.origin = thisItem.uuid;\n    }\n\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'qinggong',\n        label: '毒蛇探首 - 轻功对抗',\n        outcome: {\n            win: {\n                text: '对抗胜利：获得一层 [狂蛇]。',\n                selfEffect: effectRef || null\n            },\n            lose: { text: '对抗失败：未能获得狂蛇。' }\n        }\n    });\n}",
                             "active": true
                         }
                     ]

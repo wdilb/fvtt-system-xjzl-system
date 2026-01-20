@@ -327,7 +327,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>弹出数子，与范围内每一个敌人进行一次[棋术]对抗，若敌人失败，则他被添加“黑白”三回合。</p><p><strong>黑白：</strong>他所有招式的属性对你来说视为太极。</p><p><strong>升级：</strong>该招式棋术对抗结果+2，内力消耗+2。</p>",
-                    "automationNote": "请求对抗自动。黑白效果手动。",
+                    "automationNote": "自动请求对抗。胜利自动应用物品内的“黑白”特效。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -343,7 +343,7 @@
                         {
                             "label": "请求棋术对抗",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: 'qishu',\n    label: `手谈一局 (我方棋术应+${bonus})`,\n    winText: '对抗胜利：请手动给目标添加 [黑白] (3回合)。',\n    loseText: '对抗失败：目标识破了棋局。'\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\n\n// 读取物品自身携带的 AE 模板\nconst effectName = \"黑白\";\nconst effectRef = thisItem.effects.getName(effectName)?.toObject();\n\nif (effectRef) {\n    delete effectRef._id;\n    effectRef.origin = thisItem.uuid;\n    effectRef.duration = { rounds: 3 }; // 确保时长正确\n}\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: 'qishu',\n    label: `手谈一局 (我方棋术应+${bonus})`,\n    outcome: {\n        win: {\n            text: '对抗胜利：应用 [黑白] (3回合)。',\n            targetEffect: effectRef || null\n        },\n        lose: { text: '对抗失败：目标识破了棋局。' }\n    }\n});",
                             "active": true
                         }
                     ]

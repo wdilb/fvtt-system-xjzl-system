@@ -2467,7 +2467,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>将短叉刺入自己大腿，流失 50 点气血，剧痛之下，气力倍增，向前扑去，一头撞向目标胸膛。对目标造成伤害。并与目标进行一次[韧性]对抗，失败的角色，陷入“错骨”三回合。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "自伤自动。韧性对抗手动。",
+                    "automationNote": "自伤自动。韧性对抗自动。胜利自动应用“错骨”(3回合)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2498,9 +2498,9 @@
                             "active": true
                         },
                         {
-                            "label": "对抗提示",
+                            "label": "韧性对抗",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"请与目标进行 [韧性] 对抗。若目标失败，手动添加 [错骨] (3回合)。\");",
+                            "script": "if (args.isHit) {\n    // 准备3回合的错骨状态\n    const status = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n    let effData = null;\n    if (status) {\n        effData = foundry.utils.deepClone(status);\n        effData.duration = { rounds: 3 };\n    }\n\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'renxing',\n        label: '莽夫一怒 - 韧性对抗',\n        outcome: {\n            win: {\n                text: '对抗胜利：目标 [错骨] (3回合)。',\n                targetEffect: effData || 'cuogu'\n            },\n            lose: { text: '对抗失败：目标抵抗了错骨。' }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -2635,7 +2635,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双刺如雨点般刺出，似美人垂泪，对目标造成伤害。同时与目标进行一个神采对抗，若你胜出，则目标心生怜惜，下回合无法选中你为攻击目标。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "神采对抗手动。",
+                    "automationNote": "神采对抗自动发起。效果需手动执行（无法选中）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2662,7 +2662,7 @@
                         {
                             "label": "对抗提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    ui.notifications.info(\"请手动与目标进行 [神采] 对抗。\");\n}",
+                            "script": "if (args.isHit) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'shencai',\n        label: '梨花带雨 - 神采对抗',\n        outcome: {\n            win: { text: '对抗胜利：目标心生怜惜，下回合无法选中你为攻击目标（请手动处理）。' },\n            lose: { text: '对抗失败：魅惑无效。' }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
