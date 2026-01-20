@@ -1913,20 +1913,30 @@ export class ChatCardManager {
 
                 // 使用管理器逐个添加，自动处理本地化、叠层和刷新
                 for (const e of effectsData) {
-                    // 准备数据
-                    const effectData = {
-                        ...e,
-                        origin: message.uuid, // 标记来源为这条消息
-                        disabled: false
-                    };
+                    let effectData;
+                    // 支持直接传入字符串 ID (如 "dianxue")
+                    if (typeof e === "string") {
+                        // 构造成 ActiveEffectManager 能识别的 "Patch Object"
+                        // Manager 内部会发现有 id 字段，自动去 CONFIG.statusEffects 找模板并合并
+                        effectData = {
+                            id: e,
+                            origin: message.uuid,
+                            disabled: false
+                        };
+                    } else {
+                        // 是对象，直接展开
+                        effectData = {
+                            ...e,
+                            origin: message.uuid,
+                            disabled: false
+                        };
+                    }
 
                     // 调用核心管理器
-                    // Manager 内部会自动执行: if (name) name = localize(name)
-                    // 也会自动处理 Stack 逻辑
                     const createdEffect = await ActiveEffectManager.addEffect(actor, effectData);
 
                     if (createdEffect) {
-                        appliedNames.push(createdEffect.name); // 使用最终生成的特效名字
+                        appliedNames.push(createdEffect.name);
                     }
                 }
 
