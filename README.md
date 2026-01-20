@@ -136,26 +136,17 @@
 *触发时机：`hit` (命中后)*
 
 ```javascript
-// 1. 发起体魄检定 (DC 15)
+// 发起体魄判定，失败扣除 10 点气血
 await Macros.requestSave({
     target: args.target,
-    attacker: actor,
-    type: "tipo", 
-    dc: 15,
+    type: "tipo",
+    dc: 18,
     label: "抵抗剧毒",
-    
-    // 2. 失败回调：应用中毒状态
-    onFail: async () => {
-        const poisonEffect = {
-            name: "剧毒攻心",
-            icon: "icons/svg/skull.svg",
-            duration: { rounds: 3 },
-            changes: [
-                { key: "system.combat.speed", mode: 2, value: -2 }
-            ]
-        };
-        await args.target.createEmbeddedDocuments("ActiveEffect", [poisonEffect]);
-        ui.notifications.warn(args.target.name + " 中毒了！");
+    attacker: actor,
+    // 使用 damageOnFail 对象
+    damageOnFail: {
+        value: 10, 
+        type: "hp" // 支持 hp, mp, rage 等
     }
 });
 ```
@@ -473,7 +464,8 @@ await Macros.requestSave({
 | `dc` | Number | 难度等级。 |
 | `label` | String | 弹窗标题 (可选)。 |
 | `level` | Number | 预设优劣势 (正数优, 负数劣)。 |
-| `onFail` | Object | **关键**: 失败时自动应用的 Active Effect 数据对象。 |
+| `onFail` | Object/Array | **(可选)** 失败时自动应用的 Active Effect 数据对象（支持数组）。 |
+| `damageOnFail` | Object | **(可选)** 失败时扣除资源。结构: `{ value: 10, type: "hp" }`。 |
 | `attacker`| Actor | 发起者 (用于显示名字)。 |
 
 **示例**:
@@ -781,8 +773,18 @@ if (args.isHit && !args.target.system.martial.stanceActive) {
         type: "neixi", // 判定属性
         dc: dc,
         label: "抵抗点穴",
-        onFail: "dianxue" // 失败时应用的状态 ID (来自 CONFIG.statusEffects)
-        // 也可以直接传一个 Active Effect 数据对象
+        
+        // [正确写法 A] 直接使用系统状态 ID (字符串)
+        onFail: "dianxue" 
+        
+        // [正确写法 B] 传入完整的 Active Effect 数据对象
+        /*
+        onFail: {
+            name: "自定点穴",
+            icon: "icons/svg/paralysis.svg",
+            changes: [{ key: "flags.xjzl-system.stun", mode: 5, value: "true" }]
+        }
+        */
     });
 }
 ```
