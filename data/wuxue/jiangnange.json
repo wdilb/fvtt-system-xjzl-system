@@ -420,7 +420,7 @@
                         {
                             "label": "酒艺检定",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"jiuyi\",\n        dc: 13,\n        label: \"抵抗醉意\",\n        onFail: async () => {\n            if (args.target.system.resources?.alcohol) {\n                const cur = args.target.system.resources.alcohol.value;\n                const max = args.target.system.resources.alcohol.max;\n                await args.target.update({ 'system.resources.alcohol.value': cur + 20 });\n                ui.notifications.warn(`${args.target.name} 醉意猛增！`);\n                \n                if (args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zuidao') || (cur + 20) > max) {\n                     const stun = CONFIG.statusEffects.find(e => e.id === 'stun');\n                     if (stun) {\n                         const vomit = foundry.utils.deepClone(stun);\n                         vomit.name = \"呕吐\";\n                         vomit.img = \"icons/svg/acid.svg\"; \n                         vomit.duration = { rounds: 1 };\n                         await game.xjzl.api.effects.addEffect(args.target, vomit);\n                         if (args.target.system.resources?.satiety) {\n                             const food = args.target.system.resources.satiety.value;\n                             await args.target.update({'system.resources.satiety.value': Math.max(0, food - 50)});\n                         }\n                         ui.notifications.warn(`${args.target.name} 呕吐不止！`);\n                     }\n                }\n            }\n        }\n    });\n}"
+                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"jiuyi\",\n        dc: 13,\n        label: \"抵抗醉意\",\n        failureText: \"抵抗失败！醉意+20。若因此醉倒或溢出，请手动应用[呕吐]状态并扣除饱食度。\"\n    });\n}"
                         }
                     ]
                 }
@@ -1387,7 +1387,7 @@
                         {
                             "label": "定力检定",
                             "trigger": "hit",
-                            "script": "const diff = 15 + (args.move.computedLevel - 1);\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: diff,\n    label: \"抵抗粉墙黛瓦\",\n    onFail: async () => {\n        const hasRoot = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'root');\n        let effectId = hasRoot ? 'blind' : 'root';\n        const effect = CONFIG.statusEffects.find(e => e.id === effectId);\n        if (effect) {\n            const data = foundry.utils.deepClone(effect);\n            data.duration = { rounds: 1 + (args.move.computedLevel - 1) };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n    }\n});"
+                            "script": "const diff = 15 + (args.move.computedLevel - 1);\nconst hasRoot = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'root');\nconst effectId = hasRoot ? 'blind' : 'root';\nconst effectData = {\n    id: effectId,\n    duration: { rounds: 1 + (args.move.computedLevel - 1) }\n};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: diff,\n    label: \"抵抗粉墙黛瓦\",\n    onFail: effectData\n});"
                         }
                     ]
                 },
@@ -1448,7 +1448,7 @@
                         {
                             "label": "剧痛判定",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    if (args.isBroken) {\n        const effect = CONFIG.statusEffects.find(e => e.id === 'pain');\n        const data = foundry.utils.deepClone(effect);\n        data.duration = { rounds: 5 + (args.move.computedLevel - 1) * 5 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    } else {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"dingli\",\n            dc: 15,\n            label: \"抵抗剧痛\",\n            onFail: async () => {\n                const effect = CONFIG.statusEffects.find(e => e.id === 'pain');\n                const data = foundry.utils.deepClone(effect);\n                data.duration = { rounds: 5 + (args.move.computedLevel - 1) * 5 };\n                await game.xjzl.api.effects.addEffect(args.target, data);\n            }\n        });\n    }\n}"
+                            "script": "if (args.isHit) {\n    const rounds = 5 + (args.move.computedLevel - 1) * 5;\n    const painEffect = { id: 'pain', duration: { rounds: rounds } };\n    \n    if (args.isBroken) {\n        await game.xjzl.api.effects.addEffect(args.target, painEffect);\n        ui.notifications.info(\"击破架招！直接施加剧痛。\");\n    } else {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"dingli\",\n            dc: 15,\n            label: \"抵抗剧痛\",\n            onFail: painEffect\n        });\n    }\n}"
                         }
                     ]
                 },

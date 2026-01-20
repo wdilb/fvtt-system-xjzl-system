@@ -823,7 +823,7 @@
                         {
                             "label": "破甲致死检定",
                             "trigger": "hit",
-                            "script": "if (args.target.effects.some(e => e.name === \"破甲\" || e.flags[\"xjzl-system\"]?.slug === \"pojia\")) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 15,\n        label: \"回马枪·韧性检定\",\n        onFail: async () => {\n             ChatMessage.create({ content: `<div style='color:red;font-weight:bold'>检定失败！</div>${args.target.name} 需进行 <b>死亡检定</b>。` });\n        }\n    });\n}",
+                            "script": "if (args.target.effects.some(e => e.name === \"破甲\" || e.flags[\"xjzl-system\"]?.slug === \"pojia\")) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 15,\n        label: \"回马枪·韧性检定\",\n        failureText: `<span style='color:red;font-weight:bold'>检定失败！</span> ${args.target.name} 需立即进行 <b>死亡检定</b>。`\n    });\n}",
                             "active": true
                         }
                     ],
@@ -1586,7 +1586,7 @@
                     "requirements": "火器-轰天雷",
                     "range": "10",
                     "description": "<p>主要动作，引燃后掷向敌人，炸开时声如霹雷，目标及其周围 3 米内所有敌人和其他友方进行一次[轻功]检定（难度 15），失败受到 50 点外功伤害并击飞 1 米。<br><strong>升级：</strong>外功伤害+10，释放距离+5，内力消耗+2。</p>",
-                    "automationNote": "消耗品扣除需手动。点击应用伤害仅发送检定请求，需在聊天卡片点击失败回调以造成伤害。",
+                    "automationNote": "消耗品扣除需手动。点击应用伤害仅发送检定请求，失败自动扣除对应HP。",
                     "costs": {
                         "mp": [
                             2,
@@ -1607,7 +1607,7 @@
                         {
                             "label": "轰天雷-豁免请求",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmg = 50 + (lvl - 1) * 10;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: 15,\n    label: '躲避轰天雷',\n    onFail: async () => {\n        await args.target.applyDamage({\n            amount: dmg,\n            type: 'waigong',\n            attacker: actor,\n            isHit: true,\n            ignoreBlock: true\n        });\n        ui.notifications.info(`${args.target.name} 被炸飞 1 米！`);\n    }\n});"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmg = 50 + (lvl - 1) * 10;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: 15,\n    label: '躲避轰天雷',\n    damageOnFail: { value: dmg, type: 'hp' },\n    failureText: `${args.target.name} 被炸飞 1 米！受到 ${dmg} 点伤害。`\n});"
                         }
                     ]
                 }
@@ -1652,10 +1652,10 @@
                             "script": "args.flags.forceHit = true;"
                         },
                         {
-                        "label": "神火飞鸦-豁免请求",
-                        "trigger": "hit",
-                        "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 15 + (lvl - 1);\nconst dmg = 30 + (lvl - 1) * 10;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避神火飞鸦',\n    damageOnFail: {\n        value: dmg,\n        type: 'fire'\n    }});"
-                    }
+                            "label": "神火飞鸦-豁免请求",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 15 + (lvl - 1);\nconst dmg = 30 + (lvl - 1) * 10;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避神火飞鸦',\n    damageOnFail: {\n        value: dmg,\n        type: 'fire'\n    }});"
+                        }
                     ]
                 }
             ]

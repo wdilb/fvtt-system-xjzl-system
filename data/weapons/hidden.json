@@ -17,7 +17,7 @@
                     "label": "锁喉判定",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (!args.isHit) return;\n\n// 1. 发起角力检定\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"jiaoli\",\n    dc: 15,\n    label: \"抵抗锁喉镖\",\n    onFail: async () => {\n        // 2. 失败应用状态 (禁言+禁内力)\n        // 使用系统通用的 silence (封穴/禁言) 和 qizhi (气滞/禁内力)\n        await game.xjzl.api.effects.addEffect(args.target, \"silence\");\n        await game.xjzl.api.effects.addEffect(args.target, \"qizhi\");\n        ui.notifications.warn(`${args.target.name} 被锁喉镖锁住！无法发声且无法使用内力！`);\n    }\n});"
+                    "script": "if (!args.isHit) return;\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"jiaoli\",\n    dc: 15,\n    label: \"抵抗锁喉镖\",\n    onFail: [\"silence\", \"qizhi\"],\n    failureText: `${args.target.name} 被锁喉镖锁住！无法发声且无法使用内力！`\n});"
                 }
             ]
         }
@@ -1338,7 +1338,7 @@
                     "label": "断梦",
                     "trigger": "hit",
                     "active": true,
-                    "script": "// 检测是否击破架招\nif (args.isBroken) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 16,\n        label: \"浮生断梦\",\n        onFail: async () => {\n            await game.xjzl.api.effects.addEffect(args.target, \"unconscious\"); // 昏迷\n            ui.notifications.info(`${args.target.name} 陷入昏迷！`);\n        }\n    });\n}"
+                    "script": "if (args.isBroken) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 16,\n        label: \"浮生断梦\",\n        onFail: \"unconscious\",\n        failureText: `${args.target.name} 陷入昏迷！`\n    });\n}"
                 }
             ]
         }
@@ -1452,7 +1452,7 @@
                     "label": "无涯",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isBroken) {\n    let dc = 17;\n    if (args.target.system.resources.shanie > 10) dc += 5;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"无涯心魔\",\n        onFail: async () => {\n            await game.xjzl.api.effects.addEffect(args.target, {\n                id: \"rage\",\n                duration: { rounds: 2 }\n            });\n        }\n    });\n}"
+                    "script": "if (args.isBroken) {\n    let dc = 17;\n    if (args.target.system.resources?.shanie > 10) dc += 5;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"无涯心魔\",\n        onFail: { id: \"rage\", duration: { rounds: 2 } }\n    });\n}"
                 }
             ]
         }
@@ -1608,7 +1608,7 @@
                     "label": "玉蜂针-蜂毒判定",
                     "trigger": "hit",
                     "active": true,
-                    "script": "// 获取物品内的特效模板\nconst poisonEffect = thisItem.effects.getName(\"蜂毒\");\nif (!poisonEffect) return ui.notifications.warn(\"未找到蜂毒特效模板\");\n\n// 发起韧性检定 DC 13\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"renxing\",\n    dc: 13,\n    label: \"抵抗蜂毒\",\n    onFail: async () => {\n        // 判定失败，应用蜂毒\n        // 需要将模板转为对象，并设置为非传输(transfer=false)\n        const effectData = poisonEffect.toObject();\n        delete effectData._id;\n        effectData.disabled = false;\n        effectData.transfer = false;\n        effectData.origin = thisItem.uuid;\n        \n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n});"
+                    "script": "const poisonEffect = thisItem.effects.getName(\"蜂毒\");\nif (!poisonEffect) return ui.notifications.warn(\"未找到蜂毒特效模板\");\n\nconst effectData = poisonEffect.toObject();\ndelete effectData._id;\neffectData.disabled = false;\neffectData.transfer = false;\neffectData.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"renxing\",\n    dc: 13,\n    label: \"抵抗蜂毒\",\n    onFail: effectData,\n    failureText: `${args.target.name} 中了玉蜂针毒！`\n});"
                 }
             ]
         },
