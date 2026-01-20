@@ -1675,7 +1675,7 @@
                     "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "命中后自动发起豁免，失败自动扣除气血。‘生死令’状态及其后续效果需手动。",
+                    "automationNote": "命中后自动发起豁免，失败自动扣除气血并应用‘生死令’状态。",
                     "costs": {
                         "mp": [
                             10,
@@ -1702,7 +1702,7 @@
                         {
                             "label": "生死令效果",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 13 + (lvl - 1) * 3;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: args.attacker,\n    type: \"qinggong\",\n    dc: dc,\n    label: \"躲避生死令\",\n    onFail: async () => {\n        // 1. 气血流失\n        await args.target.applyDamage({\n            amount: 20,\n            type: \"liushi\",\n            isHit: true,\n            attacker: args.attacker\n        });\n        \n        ui.notifications.info(\"生死令：目标豁免失败，气血流失20点。请手动添加‘生死令’状态。\");\n    }\n});"
+                            "script": "if (!args.isHit) return;\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 13 + (lvl - 1) * 3;\n\n// 1. 获取物品上自带的“生死令”特效数据\nconst sourceEffect = thisItem.effects.getName(\"生死令\");\nlet effectData = null;\nif (sourceEffect) {\n    effectData = sourceEffect.toObject();\n    delete effectData._id; // 清理ID以便创建新实例\n    effectData.origin = thisItem.uuid;\n}\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"qinggong\",\n    dc: dc,\n    label: \"躲避生死令\",\n    // 失败后果1: 扣除 20 点气血 (流失)\n    damageOnFail: { value: 20, type: \"hp\" },\n    // 失败后果2: 自动应用提取出的特效\n    onFail: effectData,\n    failureText: \"生死令入体，气血骤降！\"\n});"
                         }
                     ]
                 }
