@@ -90,8 +90,17 @@ export class XJZLMacros {
         const defenderType = defType || type; // 默认同属性对抗
 
         // 1. 准备显示标签
-        const attLabel = game.i18n.localize(CONFIG.XJZL.attributes[type] || type);
-        const defLabel = game.i18n.localize(CONFIG.XJZL.attributes[defenderType] || defenderType);
+        // 定义一个查找函数，依次尝试从 属性、技能、技艺 中寻找本地化 Key
+        const getLabel = (key) => {
+            return CONFIG.XJZL.attributes[key] ||
+                CONFIG.XJZL.skills[key] ||
+                CONFIG.XJZL.arts[key] ||
+                key;
+        };
+
+        // 获取翻译后的文本
+        const attLabel = game.i18n.localize(getLabel(type));
+        const defLabel = game.i18n.localize(getLabel(defenderType));
 
         // 2. 构造初始 Flags
         // 我们只存 ID 和 配置，不存 roll 对象(因为还没投)

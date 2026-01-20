@@ -1427,7 +1427,7 @@ export class ChatCardManager {
                 user: game.user.id,
                 speaker: ChatMessage.getSpeaker({ actor: attacker }),
                 content: critContent,
-                type: CONST.CHAT_MESSAGE_TYPES.OTHER
+                style: CONST.CHAT_MESSAGE_STYLES.OTHER
                 // sound: "sounds/combat/hit_crit.ogg" // 可以考虑播放声音
             });
         }
@@ -2040,7 +2040,7 @@ export class ChatCardManager {
 
         // 3. 执行属性检定
         const attrKey = role === "attacker" ? config.attAttr : config.defAttr;
-        const roll = await actor.rollAttributeTest(attrKey, { 
+        const roll = await actor.rollAttributeTest(attrKey, {
             chatMessage: false //阻止rollAttributeTest自己发送卡片，这样卡片太多了
         });
 
