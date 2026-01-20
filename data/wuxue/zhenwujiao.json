@@ -2784,7 +2784,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>剑舞九天，对目标造成伤害。击破架招后与对方进行一个悟性对抗，若你胜利，对方陷入“自闭”状态，持续一回合。</p><p>·你每消耗一层“道”，可以让对方“自闭”的持续回合数+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击破后提示手动对抗。消耗道、施加状态均为手动。",
+                    "automationNote": "击破后自动请求对抗。获胜自动施加[自闭]。消耗道延长持续时间需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2809,9 +2809,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "提示对抗",
+                            "label": "击破对抗",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">道镇九州 - 击破触发</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>请与目标进行 <b>悟性对抗</b>。</p>\n                <p>若胜利，请手动施加 [自闭] (持续1回合)。</p>\n                <p><i>可选：手动消耗 [道] 层数，每层使持续时间 +1。</i></p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "if (args.isBroken) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"wuxing\",\n        label: \"道镇九州 - 悟性压制\",\n        outcome: {\n            win: {\n                text: \"道韵压制！\",\n                targetEffect: \"zibi\"\n            },\n            lose: {\n                text: \"对方看破了你的道韵。\"\n            }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -3038,7 +3038,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，上肢发力，推其躯干，与目标进行一个[渡气]对抗，获胜者立于原地，失败者被击飞 1 米或可消耗 1 怒气重新发起[渡气]对抗，直到有人失败且不再发起对抗被击飞。<br>·每对抗一次，最终的失败者被击飞米数+1。<br>·你的对抗检定结果+1。<br>升级：击飞距离+1，对抗检定结果+1，消耗+1。</p>",
-                    "automationNote": "对抗检定、击飞位移、怒气重骰均为手动。",
+                    "automationNote": "对抗请求自动。击飞/怒气重骰均为手动。",
                     "costs": {
                         "mp": [
                             1,
@@ -3063,10 +3063,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "发送对抗提示卡",
+                            "label": "渡气对抗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const bonus = 1 + (move.level - 1);\nconst content = `<div class=\"xjzl-chat-card\"><header class=\"card-header\"><h3>对抗请求：太极推手</h3></header><div class=\"card-content\"><p><b>攻击者 (${actor.name})</b> 发起 [渡气] (内息) 对抗。</p><p>攻击者加值：<b>+${bonus}</b></p><hr><p><b>规则：</b>获胜者立于原地，失败者被击飞 1米 (每级+1)。<br>失败方可消耗 1 怒气重新发起对抗。</p></div></div>`;\nChatMessage.create({ user: game.user.id, content: content, speaker: ChatMessage.getSpeaker({actor: actor}) });"
+                            "script": "const bonus = 1 + (move.level - 1);\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"duqi\",\n    label: \"太极推手 - 渡气\",\n    winText: \"攻方加值: +\" + bonus,\n    outcome: {\n        win: { text: \"推手成功！目标被击飞 1米 (每级+1)。\" },\n        lose: { text: \"推手失败。目标可消耗怒气反推。\" }\n    }\n});"
                         }
                     ]
                 }

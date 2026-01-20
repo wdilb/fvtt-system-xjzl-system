@@ -3093,7 +3093,7 @@
                     "actionCost": "主要动作",
                     "range": "10米",
                     "description": "<p>传经布道，你与范围内单个目标进行一次论禅的[佛法]对抗，论禅失败者获得一层“乏力”，至多叠加三层，持续到战斗脱离。</p><p>乏力：招式伤害降低10点。</p>",
-                    "automationNote": "完全自动化。发起佛法对抗，失败自动应用乏力（已配置叠层上限）。",
+                    "automationNote": "完全自动化。发起佛法对抗，获胜自动应用乏力。",
                     "costs": {
                         "mp": [
                             2,
@@ -3109,7 +3109,8 @@
                         {
                             "label": "论禅",
                             "trigger": "hit",
-                            "script": "const bonus = args.move.computedLevel - 1;\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"fofa\",\n    dc: 15,\n    label: \"论禅对抗 (攻方加值 \" + bonus + \")\",\n    onFail: {\n        name: \"乏力\",\n        icon: \"icons/svg/downgrade.svg\",\n        flags: { \"xjzl-system\": { \"slug\": \"fali_debuff\", \"stackable\": true, \"maxStacks\": 3 } },\n        changes: [{ \"key\": \"system.combat.damages.skill.mod\", \"mode\": 2, \"value\": -10 }]\n    }\n});"
+                            "script": "const bonus = args.move.computedLevel - 1;\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"fofa\",\n    label: \"贫僧说法 - 论禅\",\n    winText: \"攻方加值: +\" + bonus,\n    outcome: {\n        win: {\n            text: \"佛法精深，对方哑口无言！\",\n            targetEffect: \"fali\"\n        },\n        lose: {\n            text: \"对方驳倒了你的佛理。\"\n        }\n    }\n});",
+                            "active": true
                         }
                     ],
                     "weaponType": "blade"
@@ -4348,8 +4349,15 @@
                         "base": 0,
                         "growth": 0
                     },
-                    "automationNote": "提供友方BUFF AE以供手动添加。倒地、敌方对抗手动。",
-                    "scripts": [],
+                    "automationNote": "佛法对抗自动请求。解除架招手动。友方BUFF AE以供手动添加。",
+                    "scripts": [
+                        {
+                            "label": "无言对抗",
+                            "trigger": "hit",
+                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"fofa\",\n    label: \"心印心法 - 无言对抗\",\n    outcome: {\n        win: { text: \"对方恼羞成怒，乱了方寸！请手动[解除]对方架招。\" },\n        lose: { text: \"对方心如止水。\" }\n    }\n});",
+                            "active": true
+                        }
+                    ],
                     "weaponType": "unarmed"
                 },
                 {

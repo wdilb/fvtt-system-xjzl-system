@@ -1807,7 +1807,7 @@
                     "actionType": "buff",
                     "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "<p>当你的力量大于等于 100 点时，每次出招可以与目标进行一次[角力]对抗，若你获胜，为其添加一层“颤手”，持续到战斗脱离。<br>颤手：满五层后，手持武器脱手落地（需花费主要动作拾起），并陷入“缴械”一回合，然后移除所有颤手。<br>缴械：你无法施展徒手以外的武学。</p>",
-                    "automationNote": "力量条件自动判断。对抗需手动进行（使用弹窗辅助请求）。颤手为系统通用状态，满层自动转化为缴械。",
+                    "automationNote": "力量条件自动判断。角力对抗自动请求，获胜自动施加颤手（叠层逻辑由系统AE接管）。满层转化需手动。",
                     "costs": {
                         "mp": [
                             0,
@@ -1832,7 +1832,7 @@
                         {
                             "label": "发起角力",
                             "trigger": "hit",
-                            "script": "if (actor.system.stats.liliang.total < 100) return ui.notifications.warn(\"力量不足100，无法触发。\");\n// 获取系统颤手数据\nconst chanshou = CONFIG.statusEffects.find(e => e.id === 'chanshou');\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"jiaoli\",\n    dc: 0, \n    label: \"角力对抗 (请双方投掷)\",\n    onFail: chanshou\n});",
+                            "script": "if (actor.system.stats.liliang.total < 100) return ui.notifications.warn(\"力量不足100，无法触发。\");\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    label: \"势不可当 - 角力对抗\",\n    outcome: {\n        win: {\n            text: \"力沉千钧！目标手臂剧烈颤抖。\",\n            targetEffect: \"chanshou\"\n        },\n        lose: {\n            text: \"目标顶住了你的压力。\"\n        }\n    }\n});",
                             "active": true
                         }
                     ]

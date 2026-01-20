@@ -466,7 +466,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>自身陷入重伤时（气血不足 50%）方能施展，次要动作，血液流转，鲜血蒸发，短棍引动形成周身血雾，开启架招。你每损失 100 点气血，获得额外 1 点格挡值。格挡成功后，你可以用自身气感与目标的身法进行一次对抗：</p><p>若你对抗成功，鲜血缠绕目标，粘于皮肤之上，使其状如血人，形态可怖，陷入“行刑”状态，持续到战斗脱离。</p><p>若你对抗失败，你的气血逸散，转送阎罗，解除架招，获得 1 点怒气，如果你愿意，你可以消耗反应动作施展一次【阿鼻降难】。</p><p><strong>升级：</strong>格挡值+10，每损失 100 气血获得的额外格挡值+1，内力消耗+4。</p>",
-                    "automationNote": "开启条件手动。血量转化格挡自动。对抗判定手动。",
+                    "automationNote": "开启条件手动。血量转化格挡自动。对抗请求自动。获胜行刑手动。失败回怒自动，解除架招手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -489,13 +489,13 @@
                         {
                             "label": "动态格挡",
                             "trigger": "passive",
-                            "script": "// 仅当架招激活时生效 (passive 已内置此判断)\nconst hp = actor.system.resources.hp.value;\nconst max = actor.system.resources.hp.max;\nconst lost = Math.max(0, max - hp);\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst ratio = 1 + (lvl - 1);\nconst bonus = Math.floor(lost / 100) * ratio;\n\n// 修改系统格挡值\nactor.system.combat.blockTotal += bonus;",
+                            "script": "const hp = actor.system.resources.hp.value;\nconst max = actor.system.resources.hp.max;\nconst lost = Math.max(0, max - hp);\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst ratio = 1 + (lvl - 1);\nconst bonus = Math.floor(lost / 100) * ratio;\nactor.system.combat.blockTotal += bonus;",
                             "active": true
                         },
                         {
-                            "label": "对抗提示",
+                            "label": "血雾对抗",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px\"><b>五宫血池</b> 格挡成功！<br>请进行 <b>气感 vs 身法</b> 对抗。<br>胜：施加 [行刑] (手动)<br>负：解除架招并回1怒 (手动)</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.attacker,\n    type: \"qigan\",\n    defType: \"shenfa\",\n    label: \"五宫血池 - 血雾缠绕\",\n    outcome: {\n        win: {\n            text: \"鲜血缠绕，状如恶鬼！请手动施加 [行刑]。\"\n        },\n        lose: {\n            text: \"气血逸散，请手动解除架招。\",\n            selfRecovery: { \"value\": 1, \"type\": \"rage\" }\n        }\n    }\n});",
                             "active": true
                         }
                     ]
