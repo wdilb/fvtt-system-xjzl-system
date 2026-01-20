@@ -17,8 +17,10 @@ export class XJZLMacros {
      * @param {Object} [options.damageOnFail] 失败时扣除资源 { value: 10, type: "hp" }
      * @param {Actor} [options.attacker] 发起者 Actor (可选，用于显示名字，脚本里通常是 `actor` 或 `attacker`)
      * @param {Number} options.level 预设优劣势 (正数=优, 负数=劣)
+     * @param {String} [options.successText] 成功时的提示文本
+     * @param {String} [options.failureText] 失败时的提示文本
      */
-    static async requestSave({ target, type, dc, label, onFail, damageOnFail, attacker, level = 0 }) {
+    static async requestSave({ target, type, dc, label, onFail, damageOnFail, attacker, level = 0, successText, failureText }) {
         if (!target) return ui.notifications.error("requestSave: 缺少目标 (target)");
         if (!type) return ui.notifications.error("requestSave: 缺少属性类型 (type)");
 
@@ -59,7 +61,9 @@ export class XJZLMacros {
             dc: dc,
             onFail: safeOnFail, // 直接存入 Effect 数据对象
             damageOnFail: damageOnFail, //失败扣减的数值
-            level: level //优势劣势等级
+            level: level, //优势劣势等级
+            successText: successText || null,
+            failureText: failureText || null
         };
 
         // 4. 发送消息
@@ -82,8 +86,9 @@ export class XJZLMacros {
      * @param {String} [options.label]   对抗标题 (如 "内力比拼", "吸星大法")
      * @param {String} [options.winText] 发起者获胜时的描述文本
      * @param {String} [options.loseText] 发起者失败时的描述文本
+     * @param {Object} [options.outcome] 自动化配置
      */
-    static async requestContest({ attacker, defender, type, defType, label, winText, loseText }) {
+    static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome }) {
         if (!attacker || !defender) return ui.notifications.error("对抗请求缺少参与双方。");
         if (!type) return ui.notifications.error("对抗请求缺少属性类型。");
 
@@ -102,6 +107,21 @@ export class XJZLMacros {
         const attLabel = game.i18n.localize(getLabel(type));
         const defLabel = game.i18n.localize(getLabel(defenderType));
 
+        // 将纯文本参数 winText/loseText 合并到新的 outcome 对象中
+        const finalOutcome = outcome || {};
+
+        // 确保 win/lose 节点存在
+        if (!finalOutcome.win) finalOutcome.win = {};
+        if (!finalOutcome.lose) finalOutcome.lose = {};
+
+        // 如果传了简单的 winText，优先使用；如果没传，看 outcome 里有没有
+        if (winText) finalOutcome.win.text = winText;
+        if (loseText) finalOutcome.lose.text = loseText;
+
+        // 默认文本保底
+        if (!finalOutcome.win.text) finalOutcome.win.text = "发起方胜出。";
+        if (!finalOutcome.lose.text) finalOutcome.lose.text = "发起方失败。";
+
         // 2. 构造初始 Flags
         // 我们只存 ID 和 配置，不存 roll 对象(因为还没投)
         const flags = {
@@ -114,15 +134,15 @@ export class XJZLMacros {
                 attLabel: attLabel,
                 defLabel: defLabel,
                 label: label || "属性对抗",
-                winText: winText || "发起方胜出。",
-                loseText: loseText || "发起方失败。"
+                outcome: finalOutcome // 存入清洗后的自动化配置
             },
             // 状态记录
             state: {
                 attRoll: null,
                 defRoll: null,
                 isCompleted: false,
-                winner: null   // "attacker" | "defender"
+                winner: null,
+                executedLog: [] // 用于记录自动化执行结果，显示在卡片上
             }
         };
 

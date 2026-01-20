@@ -1899,6 +1899,13 @@ export class ChatCardManager {
                 <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.SuccessHint")}</div>
             `;
             // 如果有成功回调（比如发个聊天消息），以后可以扩展
+            // === 成功文本 ===
+            if (flags.successText) {
+                resultHtml += `
+                <div style="margin-top:5px; padding:5px; background:rgba(39, 174, 96, 0.1); border-radius:4px; font-size:0.9em; color:#1e8449;">
+                    <i class="fas fa-info-circle"></i> ${flags.successText}
+                </div>`;
+            }
         } else {
             color = "#c0392b"; // Red
             resultHtml = `
@@ -1907,6 +1914,13 @@ export class ChatCardManager {
                 </div>
                 <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.FailureHint")}</div>
             `;
+            // === 失败文本 ===
+            if (flags.failureText) {
+                resultHtml += `
+                <div style="margin-top:5px; padding:5px; background:rgba(192, 57, 43, 0.1); border-radius:4px; font-size:0.9em; color:#922b21;">
+                    <i class="fas fa-exclamation-circle"></i> ${flags.failureText}
+                </div>`;
+            }
 
             // 应用惩罚 (Effects)
             // 脚本里传递过来的 onFail 对象，应该是一个标准的 ActiveEffect Data 对象 (或数组)
@@ -2065,13 +2079,19 @@ export class ChatCardManager {
         let finalState = newState;
         if (newState.attRoll && newState.defRoll) {
             finalState.isCompleted = true;
-            // 简单比大小：发起者 >= 对抗者 算赢? 或者 > ? 
-            // 这里假设 平局算防守方赢 (即发起者必须严格大于)
+            //发起者大于等于防守方就算获胜
             if (newState.attRoll.total >= newState.defRoll.total) {
                 finalState.winner = "attacker";
             } else {
                 finalState.winner = "defender";
             }
+            // 触发自动化结算
+            // 只有当状态从未完成变成完成的那一瞬间触发
+            // 由于 _onContestRoll 是按序执行的，这里直接调用即可
+            const autoLogs = await ChatCardManager._executeContestAutomation(finalState.winner, flags, message);
+
+            // 将执行日志存入 state，方便在卡片上显示
+            finalState.executedLog = autoLogs;
         }
 
         // 7. 更新消息 Flags
@@ -2094,6 +2114,126 @@ export class ChatCardManager {
         });
 
         await ChatCardManager._safeUpdateMessage(message, { content: content });
+    }
+
+    /**
+     * 执行对抗的自动化后果
+     * @param {String} winner "attacker" | "defender"
+     * @param {Object} flags 原始 flags
+     * @returns {Array<String>} 执行结果日志数组
+     */
+    static async _executeContestAutomation(winner, flags, message) {
+        const outcomeConfig = flags.config.outcome || {};
+        const logs = [];
+
+        // 1. 确定使用的是 win 配置还是 lose 配置
+        // outcome 配置是基于“发起者视角”的
+        // 如果 attacker 赢，用 outcome.win
+        // 如果 defender 赢，用 outcome.lose
+        const config = (winner === "attacker") ? outcomeConfig.win : outcomeConfig.lose;
+        if (!config) return logs; // 没有配置
+
+        // 2. 获取 Actor 实例
+        const attacker = (await fromUuid(flags.attackerUuid))?.actor || await fromUuid(flags.attackerUuid);
+        const defender = (await fromUuid(flags.defenderUuid))?.actor || await fromUuid(flags.defenderUuid);
+
+        if (!attacker || !defender) return ["错误：无法找到参与者，自动化中止。"];
+
+        // === A. 处理 AE (Case 1 & 2) ===
+
+        // 给发起者加状态 (Self Effect)
+        if (config.selfEffect) {
+            const result = await ChatCardManager._applyEffectHelper(attacker, config.selfEffect, message);
+            if (result) logs.push(`发起者获得: [${result}]`);
+        }
+
+        // 给对抗者加状态 (Target Effect)
+        if (config.targetEffect) {
+            const result = await ChatCardManager._applyEffectHelper(defender, config.targetEffect, message);
+            if (result) logs.push(`对抗者获得: [${result}]`);
+        }
+
+        // === B. 处理资源 (Case 3 & 4) ===
+
+        // 发起者获得资源 (Self Recovery)
+        if (config.selfRecovery) {
+            const res = await ChatCardManager._applyResourceHelper(attacker, config.selfRecovery, 1); // 1 = 加
+            if (res) logs.push(`发起者恢复: ${res}`);
+        }
+
+        // 对抗者扣除资源 (Target Damage)
+        if (config.targetDamage) {
+            const res = await ChatCardManager._applyResourceHelper(defender, config.targetDamage, -1); // -1 = 减
+            if (res) logs.push(`对抗者受到: ${res}`);
+        }
+
+        // 发起者受到反噬 (Self Damage - 如果配置了的话)
+        if (config.selfDamage) {
+            const res = await ChatCardManager._applyResourceHelper(attacker, config.selfDamage, -1);
+            if (res) logs.push(`发起者反噬: ${res}`);
+        }
+
+        return logs;
+    }
+
+    // --- 辅助：安全应用 AE ---
+    static async _applyEffectHelper(actor, effectRef, message) {
+        let effectData = {};
+
+        // 情况 A: 传入的是字符串 ID (如 "prone", "dianxue")
+        if (typeof effectRef === "string") {
+            // 1. 从系统配置中查找完整数据
+            const statusConfig = CONFIG.statusEffects.find(e => e.id === effectRef);
+
+            if (statusConfig) {
+                // 2. 找到预设：进行合并
+                effectData = {
+                    ...statusConfig, // 展开预设 (包含 icon, changes, etc.)
+                    name: game.i18n.localize(statusConfig.name), // 确保本地化
+                    // 如果系统有描述字段，也带上
+                    description: statusConfig.description ? game.i18n.localize(statusConfig.description) : ""
+                };
+            } else {
+                // 3. 没找到预设：做一个保底对象
+                console.warn(`XJZL | 未在 CONFIG.statusEffects 中找到 ID 为 "${effectRef}" 的状态。`);
+                effectData = {
+                    id: effectRef,
+                    name: effectRef, // 只能用 ID 当名字了
+                    icon: "icons/svg/mystery-man.svg"
+                };
+            }
+        }
+        // 情况 B: 传入的是对象 (自定义 Effect 数据)
+        else {
+            effectData = foundry.utils.deepClone(effectRef);
+        }
+
+        // 4. 注入来源 (必须步骤)
+        effectData.origin = message.uuid;
+
+        // 5. 调用你的管理器
+        const created = await ActiveEffectManager.addEffect(actor, effectData);
+        return created ? created.name : null;
+    }
+
+    // --- 辅助：安全应用资源 ---
+    static async _applyResourceHelper(actor, resourceConfig, multiplier) {
+        // resourceConfig: { value: 10, type: "hp" }
+        const val = Number(resourceConfig.value);
+        if (!val) return null;
+
+        const finalAmount = val * multiplier; // 正数回血，负数扣血
+
+        await actor.applyHealing({
+            amount: finalAmount,
+            type: resourceConfig.type || "hp",
+            showScrolling: true
+        });
+
+        // 构造简短的日志文本
+        const typeLabels = { hp: "气血", mp: "内力", rage: "怒气", tili: "体力" };
+        const label = typeLabels[resourceConfig.type] || resourceConfig.type;
+        return `${Math.abs(val)} ${label}`;
     }
 
     /**
