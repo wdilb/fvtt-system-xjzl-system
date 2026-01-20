@@ -455,72 +455,97 @@ await Macros.requestSave({
 在脚本中通过 `Macros` 对象调用。
 
 ### 4.1 `Macros.requestSave(options)`
-**功能**: 向目标发起属性判定请求（如点穴、中毒豁免），并在聊天栏发送卡片，失败自动应用效果。
+**功能**: 向目标发起属性判定请求（如点穴、中毒豁免），支持**失败后自动扣除资源**和**自动应用状态**。
 
 | 参数 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `target` | Actor | 目标角色 (必须)。 |
-| `type` | String | 属性 Key (如 `"liliang"`, `"neixi"`, `"qiaoshou"`)。 |
+| `target` | Actor/Token | 目标角色 (必须)。 |
+| `type` | String | 属性 Key (如 `"tizhi"`, `"neixi"`, `"shenfa"`)。 |
 | `dc` | Number | 难度等级。 |
 | `label` | String | 弹窗标题 (可选)。 |
-| `level` | Number | 预设优劣势 (正数优, 负数劣)。 |
-| `onFail` | Object/Array | **(可选)** 失败时自动应用的 Active Effect 数据对象（支持数组）。 |
+| `level` | Number | 预设优劣势 (正数=优, 负数=劣)。 |
+| `onFail` | String/Object/Array | **(可选)** 失败时自动应用的状态。支持系统状态ID字符串 (如 `"dianxue"`) 或完整的 Active Effect 数据对象。 |
 | `damageOnFail` | Object | **(可选)** 失败时扣除资源。结构: `{ value: 10, type: "hp" }`。 |
-| `attacker`| Actor | 发起者 (用于显示名字)。 |
+| `attacker`| Actor | 发起者 (可选，用于在卡片上显示名字)。 |
+| `successText` | String | **(可选)** 成功时的自定义提示文本。 |
+| `failureText` | String | **(可选)** 失败时的自定义提示文本。 |
 
 **示例**:
 ```javascript
-// 发起内息判定，失败晕眩
+// 发起体质判定，失败则扣血并应用“中毒”状态
 await Macros.requestSave({
     target: args.target,
-    type: "neixi",
-    dc: 15,
-    label: "抵抗点穴",
     attacker: actor,
-    onFail: {
-        name: "晕眩",
-        changes: [{ key: "flags.xjzl-system.stun", mode: 5, value: "true" }]
-    }
+    type: "tizhi",
+    dc: 15,
+    label: "剧毒陷阱",
+    level: -1, // 劣势
+    // 失败后果
+    damageOnFail: { value: 20, type: "hp" },
+    onFail: "poison", // 直接使用系统预设 ID
+    failureText: "毒气攻心！"
 });
 ```
 
+---
+
 ### 4.2 `Macros.requestContest(options)`
-**功能**: 发起对抗请求（如内力比拼、拼刀）。
-**机制**: 创建一个**异步记分牌**卡片。发起者和对抗者可以在不同时间分别点击投掷，系统会自动记录双方点数并在界面上显示胜负结果和对应的描述文本。**系统只负责裁定胜负，不自动执行后果**。
+**功能**: 发起对抗请求（如内力比拼、兵刃招架）。
+**机制**: 创建一个**异步记分牌**卡片，支持**并发防冲突**。双方投掷后系统自动裁定胜负，并可根据配置**自动执行胜负后果**（回血、扣血、上状态）。
 
 | 参数 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `attacker` | Actor | 发起者角色 (必须)。 |
 | `defender` | Actor | 对抗者角色 (必须)。 |
-| `type` | String | 发起者的属性 Key (如 `"neili"`, `"jingshen"`)。 |
+| `type` | String | 发起者的属性 Key (如 `"neili"`)。 |
 | `defType` | String | **(可选)** 对抗者的属性 Key。不填则默认与发起者相同。 |
-| `label` | String | **(可选)** 卡片标题 (如 "吸星大法", "兵刃相交")。 |
-| `winText` | String | **(可选)** 发起者获胜时显示的描述文本。 |
-| `loseText` | String | **(可选)** 发起者失败时显示的描述文本。 |
+| `label` | String | **(可选)** 卡片标题 (如 "吸星大法")。 |
+| `winText` | String | **(可选)** 发起者获胜时的描述文本。 |
+| `loseText` | String | **(可选)** 发起者失败时的描述文本。 |
+| `outcome` | Object | **(可选)** 自动化结算配置对象。详见下表。 |
+
+#### `outcome` 配置结构
+`outcome` 对象包含 `win` (发起者胜) 和 `lose` (发起者负) 两个子对象，结构通用：
+
+| Key | 说明 | 示例 |
+| :--- | :--- | :--- |
+| `text` | 覆盖 winText/loseText 的文本 | `"对方内力耗尽！"` |
+| `selfRecovery` | 发起者恢复资源 | `{ value: 30, type: "mp" }` |
+| `selfDamage` | 发起者受到伤害 | `{ value: 10, type: "hp" }` |
+| `selfEffect` | 发起者获得状态 | `"prone"` (倒地) |
+| `targetDamage` | 对抗者受到伤害 | `{ value: 50, type: "mp" }` |
+| `targetEffect` | 对抗者获得状态 | `"weak"` (虚弱) |
 
 **示例**:
 ```javascript
-// 发起内力比拼
+// 发起【吸星大法】对抗 (带有完整的自动化结算)
 await Macros.requestContest({
     attacker: actor,
     defender: args.target,
-    type: "neili",
-    label: "内力比拼",
-    winText: "对方内力激荡，陷入【内伤】状态。",
-    loseText: "由于内力不支，你受到反噬伤害。"
-});
-
-// 发起精神对抗 (以强凌弱)
-await Macros.requestContest({
-    attacker: actor,
-    defender: args.target,
-    type: "shencai", // 发起者用神采(精神)
-    defType: "dingli", // 目标用定力抵抗
-    label: "摄魂大法",
-    winText: "目标眼神涣散，被你控制。",
-    loseText: "目标意志坚定，未受影响。"
+    type: "neili",     // 攻方: 内力
+    defType: "dingli", // 守方: 定力
+    label: "吸星大法",
+    
+    // 自动化配置
+    outcome: {
+        // 发起者赢: 吸干对方内力
+        win: {
+            text: "你的丹田如黑洞般吞噬了对方的内力！",
+            selfRecovery: { value: 50, type: "mp" }, // 自回蓝
+            targetDamage: { value: 50, type: "mp" }, // 敌扣蓝
+            targetEffect: "weak" // 敌虚弱
+        },
+        // 发起者输: 遭到反噬
+        lose: {
+            text: "对方内力浑厚，你吸取不成反遭真气反噬！",
+            selfDamage: { value: 20, type: "hp" }, // 自扣血
+            selfEffect: "prone" // 自倒地
+        }
+    }
 });
 ```
+
+---
 
 ### 4.3 `Macros.checkStance(actor, args)`
 **功能**: 在 `damaged` 或 `preTake` 脚本中，辅助判断是否满足触发架招特效的硬性条件。
@@ -802,7 +827,7 @@ if (buff) {
 ```javascript
 // 仅当命中且目标未开启架招时生效
 if (args.isHit && !args.target.system.martial.stanceActive) {
-    // 计算动态难度 (DC)
+    // 动态计算难度: 基础20 + 招式等级修正
     const dc = 20 + (Math.max(1, move.computedLevel || 1) - 1) * 2;
 
     await Macros.requestSave({
@@ -812,22 +837,55 @@ if (args.isHit && !args.target.system.martial.stanceActive) {
         dc: dc,
         label: "抵抗点穴",
         
-        // [正确写法 A] 直接使用系统状态 ID (字符串)
-        onFail: "dianxue" 
+        // 失败效果配置
+        onFail: [
+            "dianxue", // 1. 应用系统预设的点穴状态
+            // 2. 额外叠加一个自定义特效 (可选)
+            {
+                name: "经脉受损",
+                icon: "icons/svg/blood.svg",
+                changes: [{ key: "system.attributes.speed", mode: 2, value: 0.5 }]
+            }
+        ],
         
-        // [正确写法 B] 传入完整的 Active Effect 数据对象
-        /*
-        onFail: {
-            name: "自定点穴",
-            icon: "icons/svg/paralysis.svg",
-            changes: [{ key: "flags.xjzl-system.stun", mode: 5, value: "true" }]
-        }
-        */
+        // 失败同时扣除 10 点内力
+        damageOnFail: { value: 10, type: "mp" },
+        
+        successText: "目标运转内息，冲开了被封的穴道！",
+        failureText: "目标穴道被封，动弹不得且内力流失！"
     });
 }
 ```
 
-### G. 智能反伤与防死循环
+### G. 强行控制与精神对抗 (新案例)
+> **场景**: 使用【移魂大法】尝试控制目标，进行精神 vs 定力对抗。
+> **时机**: `hit` (或 `pre_damage` 如果想做成无伤害招式)
+
+```javascript
+// 确保目标存在
+if (!args.target) return;
+
+await Macros.requestContest({
+    attacker: actor,
+    defender: args.target,
+    type: "shencai", // 攻方使用神采(精神)
+    defType: "dingli", // 守方使用定力抵抗
+    label: "移魂大法",
+    
+    outcome: {
+        win: {
+            text: "目标眼神涣散，完全听命于你！",
+            targetEffect: "charmed" // 应用魅惑状态
+        },
+        lose: {
+            text: "目标意志坚定，你的精神力未能侵入。",
+            selfDamage: { value: 5, type: "mp" } // 精神损耗
+        }
+    }
+});
+```
+
+### H. 智能反伤与防死循环
 > **场景**: 受到近战攻击时反弹伤害。必须防止“反伤触发反伤”的无限循环。
 > **时机**: `damaged` (防御者视角)
 
@@ -880,7 +938,7 @@ if (inRange) {
 }
 ```
 
-### H. 架招机制：激活与触发
+### I. 架招机制：激活与触发
 > **场景**: 架招包含两部分逻辑：
 > 1. **激活时**：开启架招瞬间，获得一个持续性 Buff（如“剑意”）。
 > 2. **生效时**：开启架招期间，每次成功格挡攻击，给对方施加 Debuff 或自己获得增益。
