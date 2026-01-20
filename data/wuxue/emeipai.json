@@ -1810,7 +1810,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>-吾闻子善剑，愿一见之-<br>青光闪烁，幻成剑网，对目标造成0.6内息点内功伤害，与其进行【D20+[剑]等级】的对抗，获胜后获得“神虹”，持续到战斗脱离。</p><p><strong>神虹</strong>：你投掷命中检定、属性检定、技能检定、技能对抗、虚招对抗、死亡检定的 D20 出现 20 时，立即回复 50 点气血，50 点内力。</p><p>·你的虚招对抗结果+1。</p>",
-                    "automationNote": "对抗需手动。获胜后需手动添加神虹Buff。",
+                    "automationNote": "对抗自动请求（使用剑术等级）。防刷屏（已有神虹不触发）。获胜后自动应用物品上的[神虹]AE，若物品无AE则提示手动。",
                     "costs": {
                         "mp": [
                             4,
@@ -1833,10 +1833,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "神虹提示",
+                            "label": "试剑对抗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if(args.isHit) { ui.notifications.info(\"请进行对抗，获胜后手动添加 [神虹] 状态\"); }"
+                            "script": "if (!args.isHit) return;\n\n// 1. 防刷屏：已有神虹状态则不触发\nif (actor.effects.some(e => e.name === \"神虹\")) return;\n\n// 2. 尝试读取物品自带的AE (符合规则)\nconst sourceAe = thisItem.effects.getName(\"神虹\");\nlet effectData = null;\nif (sourceAe) {\n    effectData = sourceAe.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n}\n\n// 3. 发起剑术等级对抗\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"sword\",\n    label: \"袁公试剑 - 剑术对抗\",\n    outcome: {\n        win: {\n            text: \"剑气冲霄！获胜获得 [神虹]。\",\n            selfEffect: effectData // 有数据则自动应用，无数据则忽略\n        },\n        lose: {\n            text: \"剑意被阻。\"\n        }\n    }\n});"
                         }
                     ]
                 },
