@@ -14,10 +14,11 @@ export class XJZLMacros {
      * @param {Number} options.dc        难度等级
      * @param {String} [options.label]   自定义标题 (可选)
      * @param {Object|Array} [options.onFail] 失败时应用的 Effect 数据 (必须包含 name, changes 等)
+     * @param {Object} [options.damageOnFail] 失败时扣除资源 { value: 10, type: "hp" }
      * @param {Actor} [options.attacker] 发起者 Actor (可选，用于显示名字，脚本里通常是 `actor` 或 `attacker`)
      * @param {Number} options.level 预设优劣势 (正数=优, 负数=劣)
      */
-    static async requestSave({ target, type, dc, label, onFail, attacker, level = 0 }) {
+    static async requestSave({ target, type, dc, label, onFail, damageOnFail, attacker, level = 0 }) {
         if (!target) return ui.notifications.error("requestSave: 缺少目标 (target)");
         if (!type) return ui.notifications.error("requestSave: 缺少属性类型 (type)");
 
@@ -47,6 +48,7 @@ export class XJZLMacros {
             attribute: type,
             dc: dc,
             onFail: onFail, // 直接存入 Effect 数据对象
+            damageOnFail: damageOnFail, //失败扣减的数值
             level: level //优势劣势等级
         };
 

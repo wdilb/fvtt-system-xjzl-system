@@ -1891,6 +1891,35 @@ export class ChatCardManager {
                     </div>`;
                 }
             }
+            // 应用惩罚 (扣资源)
+            if (flags.damageOnFail) {
+                // 1. 解析参数 (确保是固定数值)
+                const dmgConfig = flags.damageOnFail;
+                const rawVal = Number(dmgConfig.value);
+                const amount = isNaN(rawVal) ? 0 : rawVal; // 保底为0
+                const resType = dmgConfig.type || "hp";    // 默认为气血
+
+                if (amount > 0) {
+                    // 2. 调用 applyHealing
+                    await actor.applyHealing({
+                        amount: -amount, // 取负
+                        type: resType,
+                        showScrolling: true // 让大家看到扣血了
+                    });
+
+                    // 3. 更新卡片文本
+                    // 简单的字典映射，如果 config.mjs 里有完整的本地化 key 更好
+                    const typeLabels = {
+                        hp: "气血", mp: "内力", neili: "内力",
+                        rage: "怒气", huti: "护体", tili: "体力"
+                    };
+                    const label = typeLabels[resType] || resType;
+
+                    resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                        <i class="fas fa-heart-broken"></i> 受到伤害: <b>${amount}</b> 点${label}流失
+                    </div>`;
+                }
+            }
         }
 
         // 5. 更新卡片 (禁用按钮，显示结果)
