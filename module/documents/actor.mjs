@@ -809,6 +809,18 @@ export class XJZLActor extends Actor {
       labelKey = CONFIG.XJZL.arts[key];
       type = "art";
     }
+    else if (CONFIG.XJZL.weaponTypes[key] && sys.combat?.weaponRanks?.[key]) {
+      // --- D. 武器等级 (Weapon Ranks) ---
+      // 只有在 Config 里有定义，且 Actor 数据里确实有这个 Rank 时才执行
+      const rank = sys.combat.weaponRanks[key];
+      val = rank.total || 0; // 直接取 Total
+
+      // 武器等级检定是硬过的，不吃任何内置加成
+      extraBonus = 0;
+
+      labelKey = CONFIG.XJZL.weaponTypes[key];
+      type = "weaponRank";
+    }
     else {
       ui.notifications.warn(`未知的属性/技能键名: ${key}`);
       return null;

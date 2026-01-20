@@ -26,7 +26,11 @@ export class XJZLMacros {
 
         // 1. 准备显示数据
         // 兼容 stats 和 skills 的 Label 查找
-        const labelKey = CONFIG.XJZL.attributes[type] || CONFIG.XJZL.skills[type] || type;
+        const labelKey = CONFIG.XJZL.attributes[type] ||
+            CONFIG.XJZL.skills[type] ||
+            CONFIG.XJZL.arts[type] ||
+            CONFIG.XJZL.weaponTypes[type] ||
+            type;
         const attrLabel = game.i18n.localize(labelKey);
 
         const attackerName = attacker ? attacker.name : "未知来源";
@@ -101,6 +105,7 @@ export class XJZLMacros {
             return CONFIG.XJZL.attributes[key] ||
                 CONFIG.XJZL.skills[key] ||
                 CONFIG.XJZL.arts[key] ||
+                CONFIG.XJZL.weaponTypes[key] ||
                 key;
         };
 
