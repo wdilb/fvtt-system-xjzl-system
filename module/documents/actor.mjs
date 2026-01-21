@@ -475,8 +475,8 @@ export class XJZLActor extends Actor {
         if (wuxueItem) {
           // 在该武学中找到对应的招式
           const stanceMove = wuxueItem.system.moves.find(m => m.id === martial.stance);
-
-          if (stanceMove && stanceMove.scripts) {
+          // 新增校验：只有当招式等级 > 0 时才收集脚本，免得一些被动在没有领悟的情况下就生效
+          if (stanceMove && stanceMove.scripts && (stanceMove.computedLevel || 0) > 0) {
             stanceMove.scripts.forEach(s => {
               // 同样检查触发器和开关
               if (s.trigger === trigger && s.active) {
@@ -507,6 +507,8 @@ export class XJZLActor extends Actor {
       for (const item of passiveItems) {
         // 遍历这些物品下的所有招式
         for (const move of item.system.moves) {
+          // 直接跳过未入门的招式，避免被动在未入门的时候就生效
+          if ((move.computedLevel || 0) <= 0) continue;
           const moveScripts = move.scripts;
           if (!moveScripts || moveScripts.length === 0) continue;
           for (const s of move.scripts) {
