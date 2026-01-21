@@ -1797,7 +1797,7 @@
             "category": "wuxue",
             "sect": "emeipai",
             "tier": 3,
-            "description": "<p>越女剑法传承千年，失传前乃是纵横无敌之剑法绝技，如今能悟透参照者寥寥，仅峨眉掌门可习得。</p><p>·此套路可以短竹棍释放，升级只提升[剑]等级。</p>",
+            "description": "<p>“越有处女，出于南林，窃好剑道，一人当百，号曰‘越女’，当世莫胜越女之剑。”</p><p>越女剑法传承千年，失传前乃是纵横无敌之剑法绝技，如今能悟透参照者寥寥，仅峨眉掌门可习得。</p><p><strong>需求：</strong>剑-单剑/棍-短棍 <strong>属性：</strong>太极</p><p>·此套路可以短竹棍释放，升级只提升[剑]等级。</p>",
             "requirements": "剑-单剑/棍-短棍",
             "moves": [
                 {
@@ -1809,8 +1809,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>-吾闻子善剑，愿一见之-<br>青光闪烁，幻成剑网，对目标造成0.6内息点内功伤害，与其进行【D20+[剑]等级】的对抗，获胜后获得“神虹”，持续到战斗脱离。</p><p><strong>神虹</strong>：你投掷命中检定、属性检定、技能检定、技能对抗、虚招对抗、死亡检定的 D20 出现 20 时，立即回复 50 点气血，50 点内力。</p><p>·你的虚招对抗结果+1。</p>",
-                    "automationNote": "对抗需手动。获胜后需手动添加神虹Buff。",
+                    "description": "<p>青光闪烁，幻成剑网，对目标造成伤害，与其进行【D20+[剑]等级】的对抗，获胜后获得“神虹”，持续到战斗脱离。</p><p><strong>神虹：</strong>你投掷命中检定、属性检定、技能检定、技能对抗、虚招对抗、死亡检定的 D20 出现 20 时，立即回复 50 点气血，50 点内力。</p><p>·你的虚招对抗结果+1。</p><p><strong>升级：</strong>招式伤害+10，神虹的虚招对抗结果再+1，内力消耗+4。</p>",
+                    "automationNote": "对抗自动请求（使用剑术等级）。防刷屏（已有神虹不触发）。获胜后根据当前招式等级动态计算[神虹]加成并自动应用。",
                     "costs": {
                         "mp": [
                             4,
@@ -1833,10 +1833,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "神虹提示",
+                            "label": "试剑对抗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if(args.isHit) { ui.notifications.info(\"请进行对抗，获胜后手动添加 [神虹] 状态\"); }"
+                            "script": "if (!args.isHit) return;\n\n// 1. 防刷屏\nif (actor.effects.some(e => e.name === \"神虹\")) return;\n\n// 2. 读取并动态修改神虹数值\nconst sourceAe = thisItem.effects.getName(\"神虹\");\nlet effectData = null;\n\nif (sourceAe) {\n    effectData = sourceAe.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n\n    // 计算动态加成: 基础1 + (等级-1) = 等级\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = lvl;\n    \n    // 修改虚招对抗加值 (假设模板里这两个Change分别是索引0和1)\n    // 我们遍历查找 key 确保准确\n    effectData.changes.forEach(c => {\n        if (c.key === \"system.combat.xuzhao\" || c.key === \"system.combat.kanpo\") {\n            c.value = String(bonus);\n        }\n    });\n    \n    // 更新描述以便查看\n    effectData.description += ` (当前虚招加成: +${bonus})`;\n}\n\n// 3. 发起对抗\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"sword\",\n    label: \"袁公试剑 - 剑术对抗\",\n    outcome: {\n        win: {\n            text: \"剑气冲霄！获胜获得 [神虹]。\",\n            selfEffect: effectData\n        },\n        lose: {\n            text: \"剑意被阻。\"\n        }\n    }\n});"
                         }
                     ]
                 },
@@ -1849,8 +1849,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>-杳之若日，偏如腾兔-<br>瞬身出剑，奔袭至目标身旁空格，对其造成0.6内息点内功伤害。击破目标架招时，你可以消耗反应动作，同时对目标周围 3 米范围内的另一个敌人施展一次【追形逐影】，且此次虚招对抗检定的 D20 必定为 20。</p>",
-                    "automationNote": "追击需玩家手动操作。",
+                    "description": "<p>（可使用反应动作释放）瞬身出剑，奔袭至目标身旁空格，对其造成伤害。击破目标架招时，你可以消耗反应动作，同时对目标周围 3 米范围内的另一个敌人施展一次【追形逐影】，且此次虚招对抗检定的 D20 必定为 20。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "追击需玩家手动操作，如需必中请在弹窗勾选[单体必中]或手动调整骰值。",
                     "costs": {
                         "mp": [
                             4,
@@ -1881,8 +1881,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>-见之似好妇，夺之似惧虎-<br>微蹙眉头，剑护心口，开启架招。格挡成功时，为其添加两层“颤手”，持续到战斗脱离。</p><p><strong>颤手</strong>：满五层后，手持武器脱手落地，并陷入“缴械”一回合，然后移除所有颤手。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>微蹙眉头，剑护心口，开启架招。格挡成功时，为其添加两层“颤手”，持续到战斗脱离。</p><p><strong>颤手：</strong>满五层后，手持武器脱手落地（需花费主要动作拾起），并陷入“缴械”一回合，然后移除所有颤手。</p><p><strong>缴械：</strong>你无法施展徒手以外的武学。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。格挡后自动施加颤手，颤手满层自动缴械掉落武器。",
                     "costs": {
                         "mp": [
                             4,
@@ -1902,7 +1902,7 @@
                             "label": "格挡施加颤手",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chanshou\"));\n    effectData.duration = { rounds: 99 };\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // 从系统配置查找颤手 (通用状态)\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chanshou\"));\n    if (effectData) {\n        effectData.duration = { rounds: 99 };\n        // 添加两次 (两层)\n        await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n        await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n        actor.showFloatyText(\"颤手 x2\", { fill: \"#FFA500\" });\n    }\n}"
                         }
                     ]
                 },
@@ -1915,8 +1915,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>-布形候气，与神俱往-<br>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，绿影闪动，剑气激射而出，对目标造成0.8内息点内功伤害，同时与其进行【D20+[剑]等级】的对抗，获胜后获得“神虹”，持续到战斗脱离，你的这次对抗检定结果+3。</p>",
-                    "automationNote": "对抗需手动。",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，绿影闪动，剑气激射而出，对目标造成伤害，同时与其进行【D20+[剑]等级】的对抗，获胜后获得“神虹”，持续到战斗脱离，你的这次对抗检定结果+3。</p><p>·若你已经处于“神虹”，则在你的下个回合，额外获得一个反应动作。</p><p><strong>升级：</strong>招式伤害+10，再获得一个反应动作，内力消耗+4。</p>",
+                    "automationNote": "对抗需手动。若已有神虹，会发送聊天卡片提醒获得额外反应动作。",
                     "costs": {
                         "mp": [
                             4,
@@ -1936,7 +1936,15 @@
                                 "ratio": 0.8
                             }
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "神虹检测与提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const hasShenhong = actor.effects.some(e => e.name === \"神虹\");\n// 计算招式等级带来的额外反应次数 (升级: 再获得一个)\nconst lvl = Math.max(1, move.computedLevel || 1);\nlet extraReactions = (lvl - 1);\n\nif (hasShenhong) extraReactions += 1;\n\nif (extraReactions > 0) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; color:#2c3e50;\">\n                <p><b>纵横逆顺触发：</b></p>\n                <p>下回合额外获得 <b>${extraReactions}</b> 个反应动作。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "折枝捷末（失传）",
@@ -1948,8 +1956,8 @@
                     "range": "2米",
                     "targetInfo": "周围敌人",
                     "actionCost": "次要动作",
-                    "description": "<p>-内实精神，外示安仪-<br>道微而易，意幽而深，弹剑清吟，为周围敌人添加一层“颤手”，持续到战斗脱离。</p><p>·若你处于“神虹”，则还会刺击敌人双眼，为他们添加“目盲”，持续一回合。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>道微而易，意幽而深，弹剑清吟，为周围敌人添加一层“颤手”，持续到战斗脱离。</p><p>·若你处于“神虹”，则还会刺击敌人双眼，为他们添加“目盲”，持续一回合。</p><p><strong>升级：</strong>释放距离+2，目盲持续回合+1，消耗+4。</p>",
+                    "automationNote": "完全自动化。目盲持续时间自动随等级提升。",
                     "costs": {
                         "mp": [
                             4,
@@ -1969,7 +1977,7 @@
                             "label": "施加Debuff",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const chanshou = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chanshou\"));\nchanshou.duration = { rounds: 99 };\nawait game.xjzl.api.effects.addEffect(args.target, chanshou);\n\nif (actor.effects.some(e => e.name === \"神虹\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const blind = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"blind\"));\n    blind.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, blind);\n}"
+                            "script": "// 1. 施加颤手\nconst chanshou = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chanshou\"));\nif (chanshou) {\n    chanshou.duration = { rounds: 99 };\n    await game.xjzl.api.effects.addEffect(args.target, chanshou);\n}\n\n// 2. 施加目盲 (若有神虹)\nif (actor.effects.some(e => e.name === \"神虹\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const blind = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"blind\"));\n    if (blind) {\n        blind.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, blind);\n        ui.notifications.info(`${args.target.name} 被刺瞎双眼 (目盲 ${rounds} 回合)`);\n    }\n}"
                         }
                     ]
                 },
@@ -1983,8 +1991,8 @@
                     "range": "5米",
                     "targetInfo": "路径敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>-以一当百，举世无双-<br>一声清啸，剑扫千军，神剑无影，直线奔袭至目标空格处，对路径周围 1 米范围内的敌人造成0.8内息点内功伤害，同时与他们每一个人分别进行【D20+[剑]等级】的对抗，获胜后，你选择他的任意一只手“骨折”。</p>",
-                    "automationNote": "对抗与骨折需手动。",
+                    "description": "<p>一声清啸，剑扫千军，神剑无影，直线奔袭至目标空格处，对路径周围 1 米范围内的敌人造成伤害，同时与他们每一个人分别进行【D20+[剑]等级】的对抗，获胜后，你选择他的任意一只手“骨折”。</p><p><strong>升级：</strong>招式伤害+20，招式距离+5，对路径周围敌人的攻击范围+1，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "对抗与骨折状态需手动处理。",
                     "costs": {
                         "mp": [
                             16,
@@ -2017,7 +2025,7 @@
             {
                 "name": "神虹",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
-                "description": "投掷 D20 出现 20 时，立即回复 50 点气血，50 点内力。虚招对抗结果+1",
+                "description": "投掷 D20 出现 20 时，立即回复 50 点气血，50 点内力。虚招/看破对抗结果增加。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -2028,12 +2036,12 @@
                     {
                         "key": "system.combat.xuzhao",
                         "mode": 2,
-                        "value": 1
+                        "value": "1"
                     },
                     {
                         "key": "system.combat.kanpo",
                         "mode": 2,
-                        "value": 1
+                        "value": "1"
                     }
                 ]
             }

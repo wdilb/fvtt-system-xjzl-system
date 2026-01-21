@@ -426,12 +426,12 @@ export class ActiveEffectManager {
         // 3. 构建 HTML 内容
         // 使用简单的内联样式，无需修改 CSS 文件
         const content = `
-        <div class="xjzl-chat-card" style="font-size: 13px;">
-            <div class="card-header flexrow" style="align-items: center; border-bottom: 1px solid #AAA; padding-bottom: 5px; margin-bottom: 5px;">
-                <img src="${actor.img}" style="flex: 0 0 32px; height: 32px; width: 32px; margin-right: 8px; border: none;"/>
-                <h3 style="margin: 0; line-height: 1.2;">${actor.name}</h3>
+        <div class="xjzl-chat-card" style="font-size: 13px; padding: 2px 6px;"> 
+            <div class="card-header flexrow" style="display: flex; align-items: center; border-bottom: 1px solid #AAA; padding-bottom: 5px; margin-bottom: 5px;">
+                <img src="${actor.img}" style="flex: 0 0 36px; height: 36px; width: 36px; margin-right: 10px; border: none; border-radius: 4px; object-fit: cover;"/>
+                <h3 style="margin: 0; line-height: 1.4; font-weight: bold;">${actor.name}</h3>
             </div>
-            <div class="card-content" style="${colorStyle} font-weight: bold;">
+            <div class="card-content" style="${colorStyle} font-weight: bold; padding-left: 2px;">
                 <i class="${iconClass}"></i> ${actionLabel}: ${cleanText}
             </div>
         </div>

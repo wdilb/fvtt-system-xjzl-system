@@ -3149,7 +3149,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>剑尖轻点，剑芒如玉，对敌人造成伤害。击中无架招的敌人时，给予对方一层“气虚”，至多三层，持续到战斗脱离。</p><p><strong>气虚：</strong>每层使你回合末流失 5 点内力。</p><p>·当你在不是自己的回合移动超过 3 米时，你可以消耗反应动作释放此招。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无架招施加气虚自动。反应施展手动。",
+                    "automationNote": "命中无架招自动施加气虚（已限制至多3层）。反应释放需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3169,9 +3169,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加气虚",
+                            "label": "施加气虚(限3层)",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"qixu\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 获取系统预设气虚\n    const eff = CONFIG.statusEffects.find(e => e.id === \"qixu\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        // 动态修改该来源的堆叠上限为 3\n        foundry.utils.setProperty(data, \"flags.xjzl-system.maxStacks\", 3);\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3186,7 +3186,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>斜刺一剑，虚不受劲，对目标造成伤害。若击破架招，则给予对方“进退”状态，持续两回合。</p><p><strong>进退：</strong>每当你消耗移动速度移动 2 米，状态施加者便可不消耗速度地移动 1 米。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破施加进退自动。进退移动效果手动。",
+                    "automationNote": "击破自动施加进退。进退的具体移动效果需手动结算。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3223,7 +3223,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>运剑于顶旋转，开启架招，格挡成功时，借力踏步，可以不消耗速度地移动 1 米。</p><p>·当你在不是自己的回合移动超过 5 米时，你获得一层“玄门”，持续到战斗脱离。</p><p><strong>玄门：</strong>每层使你下一次【天罡指路】怒气消耗-1。</p><p><strong>升级:</strong>格挡值+10，内力消耗+2，移动距离+1。</p>",
-                    "automationNote": "格挡移动手动。获层手动。玄门减耗自动。",
+                    "automationNote": "开启架招自动。格挡移动手动。移动获[玄门]手动(可从特效栏拖拽)。玄门减耗在天罡指路中实现。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -3248,7 +3248,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>使剑刺向敌人的穴道，对目标造成伤害，若命中无架招目标，还可将其点穴（冲穴难度 10）。</p><p><strong>升级:</strong>招式伤害+10，冲穴难度+2，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "玄门减耗自动。无架招点穴自动。",
+                    "automationNote": "消耗玄门返还怒气自动。命中无架招直接施加[点穴]状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3275,16 +3275,31 @@
                         {
                             "label": "玄门减耗",
                             "trigger": "attack",
-                            "script": "const xuanmen = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xuanmen\");\nif (xuanmen) {\n    const stacks = xuanmen.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const refund = Math.min(stacks, args.move.currentCost.rage);\n    if (refund > 0) {\n        await actor.update({ \"system.resources.rage.value\": actor.system.resources.rage.value + refund });\n        ui.notifications.info(`玄门生效：返还 ${refund} 怒气`);\n    }\n    await xuanmen.delete(); \n}",
+                            "script": "const xuanmen = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xuanmen\");\nif (xuanmen) {\n    const stacks = xuanmen.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 计算可抵扣的怒气 (不超过当前招式消耗)\n    const cost = args.move.currentCost.rage || 0;\n    const refund = Math.min(stacks, cost);\n    \n    if (refund > 0) {\n        // 返还怒气\n        await actor.update({ \"system.resources.rage.value\": actor.system.resources.rage.value + refund });\n        // 消耗玄门 (假设每层抵扣1点，消耗对应层数)\n        await game.xjzl.api.effects.removeEffect(actor, \"xuanmen\", refund);\n        ui.notifications.info(`玄门生效：消耗 ${refund} 层，返还 ${refund} 怒气`);\n    }\n}",
                             "active": true
                         },
                         {
                             "label": "点穴",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 10 + (lvl - 1) * 2;\n    \n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"neixi\", \n        dc: dc,\n        label: \"冲穴判定\",\n        onFail: \"dianxue\"\n    });\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 计算难度仅用于显示\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 10 + (lvl - 1) * 2;\n    \n    // 获取通用点穴状态\n    const eff = CONFIG.statusEffects.find(e => e.id === \"dianxue\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        // 将冲穴难度写入描述，方便查看\n        data.description = (data.description || \"\") + `<br><strong>冲穴难度：${dc}</strong>`;\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被点穴 (冲穴难度 ${dc})`);\n    }\n}",
                             "active": true
                         }
                     ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "玄门",
+                    "icon": "icons/magic/symbols/runes-star-blue.webp",
+                    "description": "每层使你下一次【天罡指路】怒气消耗-1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xuanmen",
+                            "stackable": true
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }

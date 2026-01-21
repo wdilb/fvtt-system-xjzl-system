@@ -858,7 +858,7 @@
             "category": "wuxue",
             "sect": "zhenwujiao",
             "tier": 2,
-            "description": "<p>刚猛凌厉，一招制敌，目标全是敌人手腕的神门穴，敌人中剑后，手掌便再也使不出半点力道。</p><p>需求：剑-单剑 属性：刚</p>",
+            "description": "<p>刚猛凌厉，一招制敌，目标全是敌人手腕的神门穴，敌人中剑后，手掌便再也使不出半点力道。</p><p><strong>需求：</strong>剑-单剑 <strong>属性：</strong>刚</p>",
             "requirements": "剑-单剑",
             "moves": [
                 {
@@ -871,7 +871,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "actionType": "buff",
-                    "description": "<p>次要动作，收腰凝神，剑出定脉，自身进入“定穴”状态，持续一回合。<br>定穴：出招命中无架招敌人时，为其添加一层“神门受损”，至多三层，持续到脱战。<br>神门受损：每层使你的招式伤害降低 10 点；你再次被《神门剑诀》招式命中受伤时投掷 D20，结果小于等于 1 则兵器掉落。（需花费主要动作捡起）</p><p>升级:“定穴”持续的回合数+1，神门受损 D20 检定的结果判定数值+1。</p>",
+                    "description": "<p>次要动作，收腰凝神，剑出定脉，自身进入“定穴”状态，持续一回合。<br><strong>定穴：</strong>出招命中无架招敌人时，为其添加一层“神门受损”，至多三层，持续到脱战。<br><strong>神门受损：</strong>每层使你的招式伤害降低 10 点；你再次被《神门剑诀》招式命中受伤时投掷 D20，结果小于等于 1 则兵器掉落。（需花费主要动作捡起）</p><p><strong>升级：</strong>“定穴”持续的回合数+1，神门受损 D20 检定的结果判定数值+1。</p>",
                     "automationNote": "自动开启定穴状态。定穴状态下命中无架招敌人自动施加神门受损（掉落物器需手动）。",
                     "calculation": {
                         "base": 0,
@@ -892,9 +892,9 @@
                     "scripts": [
                         {
                             "label": "开启定穴",
-                            "trigger": "attack",
+                            "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst effect = thisItem.effects.getName(\"定穴\");\nconst effectData = effect.toObject();\ndelete effectData._id;\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.target, effectData);\nui.notifications.info(`开启定穴状态（持续 ${rounds} 回合）`);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n// 从物品中获取模板\nconst effect = thisItem.effects.getName(\"定穴\");\nif (effect) {\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    // 气招命中脚本中 args.target 默认为自身\n}"
                         }
                     ]
                 },
@@ -904,10 +904,10 @@
                     "damageType": "neigong",
                     "weaponType": "sword",
                     "element": "gang",
-                    "range": "2",
+                    "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，纵身向前，持剑斜刺神门穴，对敌人造成 0.4 力量点内功伤害。击破架招后，给对方添加一层“神门受损”状态，持续到战斗脱离。</p><p>升级:招式伤害+10，内力消耗+2。</p>",
+                    "description": "<p>主要动作，纵身向前，持剑斜刺神门穴，对敌人造成伤害。击破架招后，给对方添加一层“神门受损”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
                     "automationNote": "破防自动施加神门受损（掉落物器需手动）。",
                     "calculation": {
                         "base": 0,
@@ -931,7 +931,7 @@
                             "label": "神门受损",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.isBroken) {\n    const effect = thisItem.effects.getName(\"神门受损\");\n    await game.xjzl.api.effects.addEffect(args.target, effect);\n}"
+                            "script": "if (args.isHit && args.isBroken) {\n    const effect = thisItem.effects.getName(\"神门受损\");\n    if (effect) {\n        // 必须转为 Object\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
                         }
                     ]
                 },
@@ -944,7 +944,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>次要动作，提剑护身，开启架招。格挡成功后，可消耗反应动作，剑势如风，向 2 米内的攻击者手腕神门穴连续刺出两剑，每剑对其造成 30 点内功伤害。（投掷一次命中，造成 2 次伤害）</p><p>升级:格挡值+10，伤害增加 10 点，内力消耗+2。</p>",
+                    "description": "<p>次要动作，提剑护身，开启架招。格挡成功后，可消耗反应动作，剑势如风，向 2 米内的攻击者手腕神门穴连续刺出两剑，每剑对其造成 30 点内功伤害。（投掷一次命中，造成 2 次伤害）</p><p><strong>升级：</strong>格挡值+10，伤害增加 10 点，内力消耗+2。</p>",
                     "automationNote": "自动化仅含格挡值。反击请手动使用其他攻击方式模拟或GM判定。",
                     "calculation": {
                         "base": 0,
@@ -965,10 +965,10 @@
                     "damageType": "neigong",
                     "weaponType": "sword",
                     "element": "gang",
-                    "range": "3",
+                    "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，纵身向前，剑尖瞬点目标手腕神门穴，造成 0.7 力量点内功伤害。<br>若目标具有三层“神门受损”，你可以选择不造成伤害，而是为其添加“点穴”，持续三回合（冲穴难度 11）。</p><p>升级:招式伤害+20，冲穴难度+2，怒气消耗-1，内力消耗+4。</p>",
+                    "description": "<p>主要动作，纵身向前，剑尖瞬点目标手腕神门穴，造成伤害。<br>若目标具有三层“神门受损”，你可以选择不造成伤害，而是为其添加“点穴”，持续三回合（冲穴难度 11）。</p><p><strong>升级：</strong>招式伤害+20，冲穴难度+2，怒气消耗-1，内力消耗+4。</p>",
                     "automationNote": "伤害自动化。若目标满层受损，脚本会提示是否改为点穴，需手动执行点穴请求。",
                     "calculation": {
                         "base": 0,
@@ -997,63 +997,63 @@
                             "label": "点穴提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_shenmen_shousun\");\nif (effect && effect.getFlag(\"xjzl-system\", \"stacks\") >= 3) {\n    const dc = 11 + (Math.max(1, args.move.computedLevel||1)-1)*2;\n    ChatMessage.create({content: `<b>提示：</b>目标神门受损已满3层，可选择撤销本次伤害，改为点穴（难度 ${dc}）。`});\n}"
+                            "script": "const effect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_shenmen_shousun\");\nif (effect && effect.getFlag(\"xjzl-system\", \"stacks\") >= 3) {\n    const dc = 11 + (Math.max(1, move.computedLevel||1)-1)*2;\n    ChatMessage.create({content: `<div class=\"xjzl-chat-card\"><div class=\"card-content\" style=\"background:#e8f8f5; padding:5px; border:1px solid #1abc9c;\"><b>提示：</b>目标神门受损已满3层。<br>可选择手动撤销本次伤害，改为请求【点穴】（难度 ${dc}）。</div></div>`, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
                         }
                     ]
                 }
+            ],
+            "effects": [
+                {
+                    "name": "神门受损",
+                    "icon": "icons/svg/bones.svg",
+                    "description": "每层使你的招式伤害降低 10 点；你再次被《神门剑诀》招式命中受伤时投掷 D20，结果小于等于 1 则兵器掉落（需手动）。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_shenmen_shousun",
+                            "stackable": true,
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "掉落检定",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "if (args.attacker && args.item && args.item.name.includes(\"神门剑诀\")) {\n    const lvl = Math.max(1, args.move?.computedLevel || 1);\n    const threshold = 1 + (lvl - 1);\n    // 仅提示，不自动处理掉落\n    ChatMessage.create({content: `<div class=\"xjzl-chat-card\"><div style=\"color:#c0392b; font-weight:bold;\">神门受损触发</div><div>${actor.name} 被神门剑诀命中，请投掷 D20。若结果 <= ${threshold}，则兵器掉落。</div></div>`});\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "-10"
+                        }
+                    ]
+                },
+                {
+                    "name": "定穴",
+                    "icon": "icons/svg/target.svg",
+                    "description": "出招命中无架招敌人时，为其添加一层“神门受损”。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_dingxue",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "定穴应用",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "// 仅对攻击生效，且命中，且目标无架招\nif (args.type === \"attack\" && args.isHit && !args.target.system.martial.stanceActive) {\n    // 1. 获取来源物品 (神门剑诀)\n    const sourceItem = await fromUuid(thisEffect.origin);\n    if (!sourceItem) return;\n    \n    // 2. 从物品中提取子特效模板\n    const subEffect = sourceItem.effects.getName(\"神门受损\");\n    \n    if (subEffect) {\n        const data = subEffect.toObject();\n        delete data._id;\n        data.origin = sourceItem.uuid;\n        \n        // 3. 应用效果\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        // 飘字提示\n        args.target.showFloatyText(\"神门受损\", {fill: \"#e74c3c\"});\n    }\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
             ]
-        },
-        "effects": [
-            {
-                "name": "神门受损",
-                "icon": "icons/svg/bones.svg",
-                "description": "每层使你的招式伤害降低 10 点；你再次被《神门剑诀》招式命中受伤时投掷 D20，结果小于等于 1 则兵器掉落（需手动）。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_shenmen_shousun",
-                        "stackable": true,
-                        "maxStacks": 3,
-                        "scripts": [
-                            {
-                                "label": "掉落检定",
-                                "trigger": "damaged",
-                                "active": true,
-                                "script": "if (args.attacker && args.item && args.item.name.includes(\"神门剑诀\")) {\n    const lvl = Math.max(1, args.move?.computedLevel || 1);\n    const threshold = 1 + (lvl - 1);\n    ChatMessage.create({content: `<b>神门受损触发：</b> ${actor.name} 被神门剑诀命中，请投掷 D20，若结果 <= ${threshold} 则兵器掉落。`});\n}"
-                            }
-                        ]
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "-10"
-                    }
-                ]
-            },
-            {
-                "name": "定穴",
-                "icon": "icons/svg/target.svg",
-                "description": "出招命中无架招敌人时，为其添加一层“神门受损”。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_dingxue",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "定穴应用",
-                                "trigger": "hit",
-                                "active": true,
-                                "script": "if (args.type === \"attack\" && args.isHit && !args.target.system.martial.stanceActive) {\n    const effect = thisItem.effects.getName(\"神门受损\");\n    await game.xjzl.api.effects.addEffect(args.target, effect);\n    ui.notifications.info(`${args.target.name} 神门受损！`);\n}"
-                            }
-                        ]
-                    }
-                },
-                "changes": []
-            }
-        ]
+        }
     },
     {
         "name": "两仪双剑",
