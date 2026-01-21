@@ -51,6 +51,7 @@ import { setupSocket } from "./module/socket.mjs";
 import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
 import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
+import { XJZLTurnMarkerManager  } from "./module/combat-turn-marker.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -69,9 +70,12 @@ Hooks.once("init", async function () {
 
   // 替换系统的暂停类
   CONFIG.ui.pause = XJZLPause;
+
+  // 替换系统的当前战斗指示物
+  XJZLTurnMarkerManager.registerSettings();
+
   //替换系统的测量模板
   CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
-
   // 替换FVTT自带的一定距离计算方式
   const SquareGrid = foundry.grid.SquareGrid;
 
