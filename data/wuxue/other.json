@@ -306,7 +306,7 @@
                         {
                             "label": "摄魂吸血",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 判断是否满足强化条件\nconst isBoosted = args.isBroken;\nconst ratio = isBoosted ? 1.0 : 0.2;\n// 使用 pre-defense damage (args.damageResult.damage)\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 魂飞魄荡\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>击破状态: <b>${isBoosted ? \"是\" : \"否\"}</b></p><p>预计算吸血量: <b>${healAmount}</b> (基于伤害 ${rawDamage})</p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 判断是否满足强化条件\nconst isBoosted = args.isBroken;\nconst ratio = isBoosted ? 1.0 : 0.2;\n// 使用 baseDamage (未减免面板伤害)\nconst rawDamage = args.baseDamage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 魂飞魄荡\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>击破状态: <b>${isBoosted ? \"是\" : \"否\"}</b></p><p>预计算吸血量: <b>${healAmount}</b> (基于伤害 ${rawDamage})</p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
                             "active": true
                         }
                     ]
@@ -321,7 +321,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>挥舞双刀，心乱神迷，对周围 3 米范围内所有敌人造成伤害。</p><p>·若命中两人以上，在回合末获得一层“魂”，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "命中2人以上自动挂载回合末获魂特效。吸血询问自动（基于未减免伤害）。请遵循规则每次出招仅吸血一次。",
+                    "automationNote": "命中2人以上发送卡片提示手动获魂。吸血询问自动（基于未减免伤害）。请遵循规则每次出招仅吸血一次。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -343,13 +343,13 @@
                         {
                             "label": "摄魂吸血(通用)",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * 0.2);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 天诛地戮\" },\n    content: `<p>对目标 <b>${args.target.name}</b> 消耗一层 [魂] 进行吸血？</p><p>预计算吸血量: <b>${healAmount}</b> (20%)</p><p style=\"color:red; font-size:0.8em;\">注意：规则限制每次出招仅能吸血一次。</p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 只有当这是第一个命中的目标，或者玩家手动确认时才吸血。为了简化，每次命中都弹窗，依靠玩家自觉限制次数。\nconst rawDamage = args.baseDamage || 0;\nconst healAmount = Math.floor(rawDamage * 0.2);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 天诛地戮\" },\n    content: `<p>对目标 <b>${args.target.name}</b> 消耗一层 [魂] 进行吸血？</p><p>预计算吸血量: <b>${healAmount}</b> (20%)</p><p style=\"color:red; font-size:0.8em;\">注意：规则限制每次出招仅能吸血一次。</p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
-                            "label": "聚魂检测",
+                            "label": "聚魂提示",
                             "trigger": "hit_once",
-                            "script": "if (args.hitCount >= 2) {\n    const eff = thisItem.effects.getName(\"聚魂 (回合末)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"命中多人，将在回合末获得 [魂]\");\n}",
+                            "script": "if (args.hitCount >= 2) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">天诛地戮 - 聚魂</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>本次攻击命中 <b>${args.hitCount}</b> 人。</p>\n                <p style=\"color:green;\">满足条件！请在 <b>回合结束</b> 时手动为自己添加一层 [魂]。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -386,7 +386,7 @@
                         {
                             "label": "摄魂吸血",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 反击固定提升比例\nconst ratio = 1.0;\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 血溅当场\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>反击加成比例: <b>100%</b></p><p>预计算吸血量: <b>${healAmount}</b></p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 反击固定提升比例\nconst ratio = 1.0;\nconst rawDamage = args.baseDamage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 血溅当场\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>反击加成比例: <b>100%</b></p><p>预计算吸血量: <b>${healAmount}</b></p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
                             "active": true
                         }
                     ]
@@ -435,7 +435,7 @@
                         {
                             "label": "摄魂吸血",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 绝招固定提升比例\nconst ratio = 1.0;\nconst rawDamage = args.damageResult.damage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 无间地狱\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>绝招加成比例: <b>100%</b></p><p>预计算吸血量: <b>${healAmount}</b></p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
+                            "script": "if (!args.isHit) return;\nconst hun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shehun_hun\");\nif (!hun) return;\n\n// 绝招固定提升比例\nconst ratio = 1.0;\nconst rawDamage = args.baseDamage || 0;\nconst healAmount = Math.floor(rawDamage * ratio);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"摄魂魔刀 - 无间地狱\" },\n    content: `<p>消耗一层 [魂] 进行吸血？</p><p>绝招加成比例: <b>100%</b></p><p>预计算吸血量: <b>${healAmount}</b></p>`,\n    yes: { label: \"吸血\", icon: \"fas fa-skull\" },\n    no: { label: \"不吸\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"shehun_hun\", 1);\n    await actor.applyHealing({ amount: healAmount, type: \"hp\", showScrolling: true });\n}",
                             "active": true
                         }
                     ]
@@ -444,33 +444,13 @@
             "effects": [
                 {
                     "name": "魂",
-                    "icon": "icons/magic/death/skull-energy-light-purple.svg",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "消耗以吸血。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "shehun_hun",
                             "stackable": true
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "聚魂 (回合末)",
-                    "icon": "icons/magic/death/skull-energy-light-purple.svg",
-                    "description": "回合结束时获得一层魂。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "temp_hun_gain",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "trigger": "turnEnd",
-                                    "script": "const eff = thisItem.effects.getName(\"魂\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"回合结束，吸取生魂！\");\nawait thisEffect.delete();",
-                                    "active": true
-                                }
-                            ]
                         }
                     },
                     "changes": []
