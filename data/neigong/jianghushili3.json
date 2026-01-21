@@ -1781,9 +1781,9 @@
             "tier": 3,
             "element": "taiji",
             "sect": "jianghushili",
-            "description": "宫永世家至高心法，修炼之后，浑身内力呈现九彩光泽，静而不动，动而不发，犹如九天之凤，不鸣则已，一鸣惊人。",
+            "description": "<p>宫永世家至高心法，修炼之后，浑身内力呈现九彩光泽，静而不动，动而不发，犹如九天之凤，不鸣则已，一鸣惊人。</p>",
             "requirement": "悟性 11",
-            "automationNote": "请玩家自行开启“惊人”特效。",
+            "automationNote": "“惊人”增伤已修复：计算时自动加值，出招结算后自动移除。状态获取仍需玩家手动。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1794,7 +1794,7 @@
                         "qigan": 8,
                         "shencai": 10
                     },
-                    "description": "领悟特效：若你上回合没有造成过伤害，获得“惊人”，持续到战斗脱离。\n惊人：下一次出招，招式伤害提升20点。",
+                    "description": "<p><strong>领悟特效：</strong>若你上回合没有造成过伤害，获得“惊人”，持续到战斗脱离。</p><p><strong>惊人：</strong>下一次出招，招式伤害提升20点。</p>",
                     "xpCostRatio": 1,
                     "scripts": []
                 },
@@ -1807,7 +1807,7 @@
                         "qigan": 16,
                         "shencai": 20
                     },
-                    "description": "小成特效：若你上回合没有造成过伤害，获得“惊人”，持续到战斗脱离。\n惊人：下一次出招，招式伤害提升30点。",
+                    "description": "<p><strong>小成特效：</strong>若你上回合没有造成过伤害，获得“惊人”，持续到战斗脱离。</p><p><strong>惊人：</strong>下一次出招，招式伤害提升30点。</p>",
                     "xpCostRatio": 1,
                     "scripts": []
                 },
@@ -1820,7 +1820,7 @@
                         "qigan": 23,
                         "shencai": 30
                     },
-                    "description": "圆满特效：若你上回合没有造成过伤害，获得“惊人”，持续到战斗脱离。\n惊人：下一次出招，招式伤害提升40点。\n修满特效：修满[永久]：气血+80，内力+40。",
+                    "description": "<p><strong>圆满特效：</strong>若你上回合没有造成过伤害，获得“惊人”，持续到战斗脱离。</p><p><strong>惊人：</strong>下一次出招，招式伤害提升40点。</p><p><strong>修满特效：</strong>修满[永久]：气血+80，内力+40。</p>",
                     "xpCostRatio": 1,
                     "scripts": []
                 }
@@ -1848,6 +1848,8 @@
                 "name": "惊人",
                 "icon": "icons/svg/lightning.svg",
                 "description": "下一次出招伤害提升",
+                "transfer": false,
+                "disabled": false,
                 "changes": [],
                 "flags": {
                     "xjzl-system": {
@@ -1855,9 +1857,15 @@
                         "stackable": false,
                         "scripts": [
                             {
-                                "label": "惊人增伤",
+                                "label": "惊人增伤(计算)",
                                 "trigger": "calc",
-                                "script": "const origin = await fromUuid(effect.origin); let bonus = 20; if (origin && origin.system.stage) { if(origin.system.stage >= 2) bonus = 30; if(origin.system.stage >= 3) bonus = 40; } args.output.damage += bonus; args.output.bonusDesc.push('惊人 +' + bonus); await effect.delete();",
+                                "script": "// 1. 同步查找内功物品 (不使用 await)\nconst neigong = actor.items.find(i => i.name.includes(\"天凤心诀\") && i.type === \"neigong\");\nlet bonus = 20;\n\n// 2. 根据内功等级判断加成\nif (neigong && neigong.system.stage) {\n    if (neigong.system.stage >= 2) bonus = 30;\n    if (neigong.system.stage >= 3) bonus = 40;\n}\n\n// 3. 应用数值到输出对象\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`惊人 +${bonus}`);",
+                                "active": true
+                            },
+                            {
+                                "label": "惊人消耗(结算)",
+                                "trigger": "hit",
+                                "script": "// 只有在攻击动作结算后才移除\nif (args.type === \"attack\" || args.isAttack) {\n    await thisEffect.delete();\n}",
                                 "active": true
                             }
                         ]
