@@ -1130,10 +1130,128 @@
             "sect": "jianghushili",
             "tier": 2,
             "description": "<p>蛊族修炼蛊心诀时须以蛊虫相辅，否则难以修炼圆满，豢养不同蛊虫，可使内力附带不同特质。</p><p>·一人只可以选一类蛊虫辅修，否则中蛊而死。</p><p>·在蛊心诀小成时，开始做蛊豢养（详见做蛊），内功圆满那一刻，双手化去该蛊躯体，碾为粉末，吸入体内，你的圆满运功特效“蛊心”获得强化。</p><p><strong>疳蛊-蛊心：</strong>使目标额外流失 5 点内力。</p><p><strong>紫灵蛊-蛊心：</strong>招式命中后回复 5 点气血。</p><p><strong>癫蛊-蛊心：</strong>使目标陷入“错乱”，持续一回合。</p><p><strong>错乱：</strong>自己的每个回合末，朝 D4 随机方向不消耗速度走出一步，然后倒地。</p><p><strong>万蛇蛊-蛊心：</strong>使目标额外受到 5 点毒素伤害。</p><p><strong>金蝎蛊-蛊心：</strong>使目标陷入“脱力”，虚招对抗具有劣势，持续一回合。</p><p><strong>升级：</strong>流失内力、回复气血、毒素伤害+5，错乱、脱力的持续回合+1。</p>",
-            "automationNote": "被动说明，完全手动。",
+            "automationNote": "提供5种蛊虫的开关式Buff。请根据自己选择的蛊虫开启对应的特效。特效会在攻击命中时自动触发对应效果。",
             "requirements": "无",
-            "moves": [],
-            "scripts": []
+            "moves": [
+                {
+                    "name": "蛊心强化",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>作为被动能力，请在特效栏中开启对应的蛊虫效果。</p><p><strong>升级：</strong>数值效果随等级提升。</p>",
+                    "automationNote": "此招式仅用于记录等级和投入修为。实际效果请在特效栏开启。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "疳蛊-蛊心",
+                    "icon": "icons/creatures/invertebrates/beetle-horn-blue.webp",
+                    "description": "使目标额外流失内力。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "gangu",
+                            "scripts": [
+                                {
+                                    "label": "流失内力",
+                                    "trigger": "hit",
+                                    "script": "const lvl = Math.max(1, (item.system.moves[0]?.computedLevel || 1));\nconst drain = 5 + (lvl - 1) * 5;\nif (args.isHit && args.target) {\n    await args.target.applyHealing({amount: -drain, type: \"mp\"});\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "紫灵蛊-蛊心",
+                    "icon": "icons/creatures/invertebrates/wasp-purple.webp",
+                    "description": "招式命中后回复气血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "zilinggu",
+                            "scripts": [
+                                {
+                                    "label": "回复气血",
+                                    "trigger": "hit",
+                                    "script": "const lvl = Math.max(1, (item.system.moves[0]?.computedLevel || 1));\nconst heal = 5 + (lvl - 1) * 5;\nif (args.isHit) {\n    await actor.applyHealing({amount: heal, type: \"hp\"});\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "癫蛊-蛊心",
+                    "icon": "icons/creatures/invertebrates/spider-face-purple.webp",
+                    "description": "使目标陷入“错乱”。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "diangu",
+                            "scripts": [
+                                {
+                                    "label": "施加错乱",
+                                    "trigger": "hit",
+                                    "script": "if (args.isHit && args.target) {\n    const lvl = Math.max(1, (item.system.moves[0]?.computedLevel || 1));\n    const rounds = 1 + (lvl - 1);\n    const eff = CONFIG.statusEffects.find(e => e.id === \"cuoluan\") || { id: \"cuoluan\", name: \"错乱\", icon: \"icons/svg/hazard.svg\" };\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "万蛇蛊-蛊心",
+                    "icon": "icons/creatures/reptiles/snake-cobra-hood-green.webp",
+                    "description": "使目标额外受到毒素伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wanshegu",
+                            "scripts": [
+                                {
+                                    "label": "毒素伤害",
+                                    "trigger": "hit",
+                                    "script": "const lvl = Math.max(1, (item.system.moves[0]?.computedLevel || 1));\nconst dmg = 5 + (lvl - 1) * 5;\nif (args.isHit && args.target) {\n    await args.target.applyDamage({amount: dmg, type: \"poison\", ignoreBlock: true, ignoreDefense: true, attacker: actor});\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "金蝎蛊-蛊心",
+                    "icon": "icons/creatures/invertebrates/scorpion-tan.webp",
+                    "description": "使目标陷入“脱力”。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jinxiegu",
+                            "scripts": [
+                                {
+                                    "label": "施加脱力",
+                                    "trigger": "hit",
+                                    "script": "if (args.isHit && args.target) {\n    const lvl = Math.max(1, (item.system.moves[0]?.computedLevel || 1));\n    const rounds = 1 + (lvl - 1);\n    const eff = CONFIG.statusEffects.find(e => e.id === \"tuoli\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
         }
     },
     {
@@ -1145,10 +1263,39 @@
             "sect": "jianghushili",
             "tier": 2,
             "description": "<p>制蛊方法复杂，步骤众多，对毒虫品种、炼制地点、所耗材料、环境温度、季节时间等都各有要求，一旦出错便会前功尽弃甚至反噬自身。</p><p><strong>效果：</strong>你学会分辨大部分的蛊虫，并得知其习性，知晓做法和其解法。</p><p><strong>制蛊:</strong>每次做蛊时，需花费至少一整天，并消耗对应修为银两，然后进行一次【D20+[毒术]等级】的制蛊检定（难度见蛊虫描述），成功则获得蛊虫，存放在密闭小瓶中，失败则白费修为银两。</p><p><strong>解蛊：</strong>需花费银两购买大量药草奇物配置解药，还要配合特殊的治疗方法。</p>",
-            "automationNote": "技艺检定手动。",
+            "automationNote": "点击招式可直接发起制蛊检定。修为与银两消耗请手动扣除。",
             "requirements": "无",
-            "moves": [],
-            "scripts": []
+            "moves": [
+                {
+                    "name": "制蛊",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "工坊",
+                    "targetInfo": "无",
+                    "actionCost": "一整天",
+                    "description": "<p>进行一次【D20+[毒术]等级】的制蛊检定。请手动确认DC。</p>",
+                    "automationNote": "自动读取毒术等级进行检定。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "制蛊检定",
+                            "trigger": "hit",
+                            "script": "await actor.rollAttributeTest(\"dushu\", { flavor: \"进行制蛊检定\" });",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
         }
     },
     {
@@ -1195,10 +1342,32 @@
             "sect": "jianghushili",
             "tier": 1,
             "description": "<p>小憩时，把蛊虫喂在一把武器或者是一枚暗器上，持续十二个时辰，期间用该武器攻击命中时，目标视作被你放蛊，进行[韧性]检定（难度=制作难度），失败中蛊。</p><p>·一把武器同时只能进行一次淬蛊。</p><p><strong>升级：</strong>淬蛊的时间增加十二时辰。</p>",
-            "automationNote": "纯手动描述。",
-            "requirements": "无",
-            "moves": [],
-            "scripts": []
+            "automationNote": "完全手动。请手动消耗蛊虫物品。淬蛊持续时间和中毒判定请由GM裁定。",
+            "requirements": "蛊虫*1",
+            "moves": [
+                {
+                    "name": "淬蛊",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "武器",
+                    "targetInfo": "自身",
+                    "actionCost": "小憩",
+                    "description": "<p>消耗一只蛊虫，使武器附带蛊毒。</p><p><strong>升级：</strong>持续时间随等级增加。</p>",
+                    "automationNote": "无自动化脚本。仅用于记录等级和投入修为。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": []
+                }
+            ]
         }
     },
     {
@@ -1245,10 +1414,46 @@
             "sect": "jianghushili",
             "tier": 1,
             "description": "<p>苗疆五毒教奇功，以蛊喂食毒药，然后将蛊化入体内，气血中蕴养剧毒，此后血中含毒，常人难近。</p><p><strong>需求：</strong>《驭蛇术》修炼圆满。</p><p><strong>效果：</strong>你选择一种毒药，购买十份，然后每隔三天定时炼化一份。持续一个月后（炼化十份），你的血液充斥此毒，具有毒素效果，你获得“毒血-XX（毒药名）”，该状态无法被其他武功效果移除。</p><p><strong>毒血-XX：</strong>你免疫名为 XX 的毒药。</p><p>·当你为他人添加你的“毒血”效果时，他视作受到 XX 毒药的涂抹或扩散影响，并进行相应检定。</p><p>·只能服用的毒药无法炼化。</p><p><strong>升级：</strong>需要炼化的份数-1。</p>",
-            "automationNote": "手动记录毒血状态。",
+            "automationNote": "提供一个[毒血]模板状态。请玩家自行重命名并手动添加到自己身上。招式仅用于记录修为。",
             "requirements": "《驭蛇术》修炼圆满",
-            "moves": [],
-            "scripts": []
+            "moves": [
+                {
+                    "name": "炼毒血",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>被动能力。记录修炼进度。</p>",
+                    "automationNote": "无主动效果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "毒血-XX",
+                    "icon": "icons/svg/blood.svg",
+                    "description": "免疫该毒药。可将毒血涂抹于武器。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "duxue",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
         }
     }
 ]
