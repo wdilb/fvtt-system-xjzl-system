@@ -2089,6 +2089,25 @@ export class XJZLItem extends Item {
         game.dice3d.showForRoll(attackRoll, game.user, true);
       }
 
+      // =====================================================
+      // Automated Animations 对接
+      // =====================================================
+      // 只有当模组激活时才运行
+      if (game.modules.get("autoanimations")?.active) {
+        // 简单的类型映射：气招/治疗归为 "法术"，其他归为 "武器"
+        // 这样可以让 AA 的自动识别菜单里默认在正确的分类 (Melee/Spell) 下查找
+        const isSpell = move.type === "qi" || effectiveMode === "heal";
+
+        AutomatedAnimations.playAnimation(actor, {
+          name: move.name,            // 传招式名
+          type: isSpell ? "spell" : "weapon",
+          img: move.img || this.img,  // 传图标
+          hasAttack: effectiveMode === "attack",
+          hasDamage: true,
+          item: this                  // 传入原始 Item
+        }, { targets: targets });
+      }
+
       // 插入 Hook：允许后续逻辑（如自动播放特效、自动化模组监听）
       Hooks.callAll("xjzl.rollMove", this, move, message, calcResult);
 
