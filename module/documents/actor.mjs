@@ -1081,7 +1081,7 @@ export class XJZLActor extends Actor {
     // 0. 野兽/怪物特化逻辑 (Creature Logic)
     // =====================================================
     if (this.type === "creature") {
-      const { amount, isHit } = data;
+      let { amount, isHit, isCrit, applyCritDamage } = data;
 
       // 1. 未命中直接返回
       if (!isHit) {
@@ -1098,6 +1098,9 @@ export class XJZLActor extends Actor {
       let isDead = false;
 
       // 3. 伤害计算
+      if (isCrit && applyCritDamage !== false) {
+        amount = Math.floor(amount * 2); // 暴击翻倍
+      }
       if (amount > protection) {
         if (mode === "strict") {
           tiliLost = 1; // A. 规则书模式：固定扣 1
@@ -1117,7 +1120,18 @@ export class XJZLActor extends Actor {
           await this.update({ "system.resources.tili.value": newVal });
 
           // 飘字
-          this.showFloatyText(`-${actualLost} 体力`, { fill: "#ff0000", fontSize: 32 });
+          let flavor = `-${actualLost} 体力`;
+          let color = "#ff0000";
+          let size = 32;
+
+          // 暴击时的视觉反馈
+          if (isCrit) {
+            flavor = `暴击! ${flavor}`;
+            size = 48;
+            color = "#ff4500";
+          }
+
+          this.showFloatyText(flavor, { fill: color, fontSize: size });
 
           // 死亡检查
           if (newVal <= 0) {
