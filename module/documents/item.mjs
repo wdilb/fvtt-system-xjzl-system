@@ -2090,22 +2090,38 @@ export class XJZLItem extends Item {
       }
 
       // =====================================================
-      // Automated Animations 对接
+      // 9. Automated Animations 模组对接
       // =====================================================
-      // 只有当模组激活时才运行
       if (game.modules.get("autoanimations")?.active) {
-        // 简单的类型映射：气招/治疗归为 "法术"，其他归为 "武器"
-        // 这样可以让 AA 的自动识别菜单里默认在正确的分类 (Melee/Spell) 下查找
-        const isSpell = move.type === "qi" || effectiveMode === "heal";
+        // 若直接传入 Actor 可能导致无法计算距离而报错
+        // 这里显式获取场景中的 Token 对象 (Canvas Token)
+        const tokens = actor.isToken ? [actor.token.object] : actor.getActiveTokens();
+        const sourceToken = tokens.length > 0 ? tokens[0] : null;
 
-        AutomatedAnimations.playAnimation(actor, {
-          name: move.name,            // 传招式名
-          type: isSpell ? "spell" : "weapon",
-          img: move.img || this.img,  // 传图标
-          hasAttack: effectiveMode === "attack",
-          hasDamage: true,
-          item: this                  // 传入原始 Item
-        }, { targets: targets });
+        if (sourceToken) {
+          // 1. 数据准备
+          const safeName = move.name.trim(); // 去除首尾空格，确保匹配精准
+          // 将 气招/治疗 归类为 Spell，实招 归类为 Weapon
+          // 这决定了 A-A 自动去哪个菜单 (Melee/Spell) 查找匹配项
+          const isSpell = move.type === "qi" || effectiveMode === "heal";
+
+          // 2. 构建伪造 Item 对象
+          const pseudoItem = {
+            name: safeName,             // 设置里的匹配名称
+            type: isSpell ? "spell" : "weapon",
+            img: move.img || this.img,  // 优先使用招式图标
+            hasAttack: effectiveMode === "attack",
+            hasDamage: true,
+            system: {
+              // 显式指定动作类型，帮助 A-A 识别近战/远程 (mwak=近战武器, msak=近战法术)
+              actionType: isSpell ? "msak" : "mwak"
+            }
+          };
+
+          // 3. 播放动画
+          // 传入 sourceToken 确保距离计算正常，传入 targets 确保能播放对敌特效
+          AutomatedAnimations.playAnimation(sourceToken, pseudoItem, { targets: targets });
+        }
       }
 
       // 插入 Hook：允许后续逻辑（如自动播放特效、自动化模组监听）
