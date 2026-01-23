@@ -723,7 +723,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         context.pinnedMoves.push({
                             name: move.name, type: move.type, isUltimate: move.isUltimate, computedLevel: move.computedLevel,
                             range: move.range, derived: move.derived, tooltip: move.tooltip, currentCost: move.currentCost,
-                            parentName: item.name, itemId: item.id, moveId: moveId, isPinned: true
+                            parentName: item.name, itemId: item.id, moveId: moveId, isPinned: true, actionCost: move.actionCost
                         });
                     }
                 }
