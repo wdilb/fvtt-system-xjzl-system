@@ -1679,18 +1679,25 @@
                     "actionType": "buff",
                     "damageType": "none",
                     "weaponType": "none",
-                    "range": "被动",
+                    "range": "自身",
                     "targetInfo": "自身",
-                    "actionCost": "无",
+                    "actionCost": "反应动作",
                     "description": "<p>需求：悟性达到 12，修为 3000。</p><p>你可以无视困难地形，且可以双脚垂直悬停、倒挂于墙壁之上行走。</p><p>当你受伤时可以减免 50 点内外功伤害，然后获得“卸劲”，持续一回合。</p><p><strong>卸劲：</strong>招式伤害降低 50 点。</p>",
-                    "automationNote": "减伤效果与卸劲状态由全局特效[神行无双-被动监听]自动处理，触发时发送卡片提示。地形效果手动。",
+                    "automationNote": "地形效果手动。减伤效果改为主动气招：点击使用给自己施加[如履平地姿态]，该姿态开启期间，每次受到内外功伤害都会自动触发减伤并获得[卸劲]。若多次触发，[卸劲]持续时间累加。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
                             3000
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "开启姿态",
+                            "trigger": "hit",
+                            "script": "const effTemplate = thisItem.effects.getName(\"如履平地姿态\");\nif (effTemplate) {\n    const effData = effTemplate.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(\"如履平地姿态已开启，受击将自动卸劲。\");\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "百变不变 (第三层)",
@@ -1716,22 +1723,36 @@
                 {
                     "name": "神行无双-被动监听",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "description": "监听受击与出招事件，触发[如履平地]和[百变不变]的效果。",
+                    "description": "监听出招事件，触发[百变不变]的效果。",
                     "transfer": true,
                     "flags": {
                         "xjzl-system": {
                             "slug": "shenxing_listener",
                             "scripts": [
                                 {
-                                    "label": "如履平地 (受伤减免)",
-                                    "trigger": "preTake",
-                                    "script": "let sourceItem = null;\n// 1. 尝试通过 Origin 获取\nif (thisEffect.origin) {\n    sourceItem = await fromUuid(thisEffect.origin);\n}\n// 2. 保底机制：通过名称反查\nif (!sourceItem) {\n    sourceItem = actor.items.find(i => i.name === \"神行无双\" && i.type === \"wuxue\");\n}\nif (!sourceItem) return;\n\n// 3. 查找招式数据\nconst moveData = sourceItem.system.moves.find(m => m.name.includes(\"如履平地\"));\nif (!moveData) return;\n\nconst level = moveData.computedLevel || 0;\nif (level < 1) return;\n\n// 4. 执行减伤逻辑\nif (args.type === 'waigong' || args.type === 'neigong') {\n    const originalDamage = args.output.damage;\n    const reducedDamage = Math.max(0, originalDamage - 50);\n    \n    if (reducedDamage !== originalDamage) {\n        args.output.damage = reducedDamage;\n        \n        // 发送聊天卡片 (增加 padding 样式)\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\" style=\"padding: 5px 10px;\">\n                <header class=\"card-header flexrow\" style=\"border-bottom:1px solid #ccc; margin-bottom:5px;\">\n                    <h3 style=\"font-weight:bold; margin:0;\">神行无双 - 如履平地</h3>\n                </header>\n                <div class=\"card-content\">\n                    <p>身法如风，卸去劲力。</p>\n                    <p style=\"color:green; font-weight:bold;\">伤害减免: 50</p>\n                    <p>获得状态: <b>[卸劲]</b></p>\n                </div>\n            </div>`,\n            speaker: ChatMessage.getSpeaker({ actor: actor })\n        });\n\n        if (typeof actor.showFloatyText === 'function') {\n            actor.showFloatyText(\"神行护体 -50\", {fill: \"#00FFFF\"});\n        }\n        \n        const effTemplate = sourceItem.effects.getName(\"卸劲\");\n        if (effTemplate) {\n            const effData = effTemplate.toObject();\n            delete effData._id;\n            effData.origin = sourceItem.uuid;\n            effData.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(actor, effData);\n        }\n    }\n}",
-                                    "active": true
-                                },
-                                {
                                     "label": "百变不变 (出招叠层)",
                                     "trigger": "attack",
-                                    "script": "let sourceItem = null;\n// 1. 尝试通过 Origin 获取\nif (thisEffect.origin) {\n    sourceItem = await fromUuid(thisEffect.origin);\n}\n// 2. 保底机制：通过名称反查\nif (!sourceItem) {\n    sourceItem = actor.items.find(i => i.name === \"神行无双\" && i.type === \"wuxue\");\n}\nif (!sourceItem) return;\n\nconst moveData = sourceItem.system.moves.find(m => m.name.includes(\"百变不变\"));\nif (!moveData || (moveData.computedLevel || 0) < 1) return;\n\nconst effTemplate = sourceItem.effects.getName(\"百变\");\nif (effTemplate) {\n    const effData = effTemplate.toObject();\n    delete effData._id;\n    effData.origin = sourceItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                                    "script": "let sourceItem = null;\nif (thisEffect.origin) {\n    sourceItem = await fromUuid(thisEffect.origin);\n}\nif (!sourceItem) {\n    sourceItem = actor.items.find(i => i.name === \"神行无双\" && i.type === \"wuxue\");\n}\nif (!sourceItem) return;\n\nconst moveData = sourceItem.system.moves.find(m => m.name.includes(\"百变不变\"));\nif (!moveData || (moveData.computedLevel || 0) < 1) return;\n\nconst effTemplate = sourceItem.effects.getName(\"百变\");\nif (effTemplate) {\n    const effData = effTemplate.toObject();\n    delete effData._id;\n    effData.origin = sourceItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "如履平地姿态",
+                    "icon": "icons/svg/shield.svg",
+                    "description": "每次受击减免50点伤害并获得卸劲(时长累加)。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "rulpingdi_stance",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "触发减伤与时长叠加",
+                                    "trigger": "preTake",
+                                    "script": "if (args.type === 'waigong' || args.type === 'neigong') {\n    const originalDamage = args.output.damage;\n    const reducedDamage = Math.max(0, originalDamage - 50);\n    \n    if (reducedDamage !== originalDamage) {\n        args.output.damage = reducedDamage;\n        \n        // 视觉反馈\n        if (typeof actor.showFloatyText === 'function') {\n            actor.showFloatyText(\"神行护体 -50\", {fill: \"#00FFFF\"});\n        }\n\n        // 获取源物品以查找卸劲模板\n        let sourceItem = null;\n        if (thisEffect.origin) sourceItem = await fromUuid(thisEffect.origin);\n        if (!sourceItem) sourceItem = actor.items.find(i => i.name === \"神行无双\" && i.type === \"wuxue\");\n        \n        if (sourceItem) {\n            // 发送卡片\n            ChatMessage.create({\n                content: `<div class=\"xjzl-chat-card\" style=\"padding: 5px 10px;\">\n                    <header class=\"card-header flexrow\" style=\"border-bottom:1px solid #ccc; margin-bottom:5px;\">\n                        <h3 style=\"font-weight:bold; margin:0;\">如履平地 - 触发</h3>\n                    </header>\n                    <div class=\"card-content\">\n                        <p>卸去劲力，身形飘忽。</p>\n                        <p style=\"color:green; font-weight:bold;\">伤害减免: 50</p>\n                        <p>副作用: 获得/刷新 <b>[卸劲]</b></p>\n                    </div>\n                </div>`,\n                speaker: ChatMessage.getSpeaker({ actor: actor })\n            });\n\n            // 应用卸劲 (含时长叠加逻辑)\n            const effTemplate = sourceItem.effects.getName(\"卸劲\");\n            if (effTemplate) {\n                const effData = effTemplate.toObject();\n                delete effData._id;\n                effData.origin = sourceItem.uuid;\n                \n                // 逻辑：检查是否已有卸劲，如果有，时长 +1\n                const existing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xiejin\");\n                let rounds = 1;\n                if (existing) {\n                    // 读取现有回合数 (如果没定义则视为1)\n                    const currentRounds = existing.duration?.rounds || 1;\n                    rounds = currentRounds + 1;\n                }\n                \n                effData.duration = { rounds: rounds };\n                await game.xjzl.api.effects.addEffect(actor, effData);\n            }\n        }\n    }\n}",
                                     "active": true
                                 }
                             ]
