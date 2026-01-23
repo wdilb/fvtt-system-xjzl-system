@@ -1338,7 +1338,7 @@
                     "element": "gang",
                     "weaponType": "blade",
                     "description": "<p>主要动作，奋勇不惧，拼死杀敌，对目标造成 0.5 力量点外功伤害。<br>若有人处于半空中，可以消耗反应动作释放此招，猛跃而起，在半空中冲锋追砍，造成伤害。</p>",
-                    "actionCost": "主要动作/反应",
+                    "actionCost": "主要动作",
                     "range": "1米",
                     "costs": {
                         "mp": [
@@ -1498,7 +1498,8 @@
                     "calculation": {
                         "base": 0,
                         "growth": 0
-                    }
+                    },
+                    "actionCost": "蓄力动作"
                 }
             ]
         }
@@ -1536,7 +1537,8 @@
                             "trigger": "hit",
                             "script": "if (args.isDying) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const gain = 10 + (lvl - 1) * 5;\n    await actor.update({'system.resources.morale.value': S.resources.morale.value + gain});\n    ui.notifications.info(`${actor.name} 士气如虹：击倒敌人获得 ${gain} 点士气`);\n}"
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 }
             ]
         }
@@ -1562,7 +1564,8 @@
                     "calculation": {
                         "base": 0,
                         "growth": 0
-                    }
+                    },
+                    "actionCost": "无"
                 }
             ]
         }
@@ -1609,7 +1612,8 @@
                             "trigger": "hit",
                             "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmg = 50 + (lvl - 1) * 10;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: 15,\n    label: '躲避轰天雷',\n    damageOnFail: { value: dmg, type: 'hp' },\n    failureText: `${args.target.name} 被炸飞 1 米！受到 ${dmg} 点伤害。`\n});"
                         }
-                    ]
+                    ],
+                    "actionCost": "主要动作"
                 }
             ]
         }
@@ -1656,7 +1660,8 @@
                             "trigger": "hit",
                             "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 15 + (lvl - 1);\nconst dmg = 30 + (lvl - 1) * 10;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避神火飞鸦',\n    damageOnFail: {\n        value: dmg,\n        type: 'fire'\n    }});"
                         }
-                    ]
+                    ],
+                    "actionCost": "全回合动作"
                 }
             ]
         }
@@ -1704,7 +1709,8 @@
                             "trigger": "preDamage",
                             "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 17 + (lvl - 1) * 2;\n\n// 后台直接投掷检定\nconst roll = await args.target.rollAttributeTest('qinggong', { \n    skipDialog: true, \n    flavor: '躲避猛火油柜' \n});\nconst saveTotal = roll.total;\n\nif (saveTotal >= dc) {\n    args.config.amount = Math.floor(args.config.amount / 2);\n    ui.notifications.info(`${args.target.name} 成功躲避，伤害减半！`);\n} else {\n    // 失败：挂引燃\n    const effectData = thisItem.effects.getName('引燃');\n    if (effectData) {\n        await game.xjzl.api.effects.addEffect(args.target, effectData.toObject());\n        ui.notifications.warn(`${args.target.name} 被引燃了！`);\n    }\n}\n\nargs.config.ignoreBlock = true; // 火焰无视格挡"
                         }
-                    ]
+                    ],
+                    "actionCost": "全回合动作"
                 }
             ],
             "effects": [
@@ -1773,7 +1779,8 @@
                             "trigger": "preDamage",
                             "script": "// 从传递过来的对象中读取参数\n// 注意：hit/preDamage 阶段，之前的 flags.damageResult 被展开到了 args 中，或者作为 damageResult 存在\n// 根据你的 ChatManager 实现，它通常在 args.damageResult 里，或者直接在 args 里\n// 安全起见，我们在 attack 脚本里把 count 放进了 damageResult，这里应该能通过 args.damageResult 读到\n// 如果 args.damageResult 不存在，我们得检查下 ChatManager._applyDamage 的逻辑\n// 查看代码：summary.push(resultEntry); resultEntry 包含 ...damageResult\n// hitContext = { ...resultEntry }\n// 所以 args.rocketCount 应该直接可用 (如果它在 damageResult 里)\n\n// 重新确认逻辑：Attack 脚本修改的是 calcResult对象。\n// Item.roll 将 calcResult 存入了 flags['xjzl-system'].calc\n// ChatManager._applyDamage 读取 flags.calc\n// 构造 damageResult 时，并没有把 flags.calc 里的自定义字段全拷进去，只拷了 damage/feint/breakdown 等标准字段\n// ！！！修正：为了确保传递，我们还是得利用 preDamage 的 args.config.amount 反推，或者像之前一样把 count 存到 flags.bonusDamage 里 (不推荐了)\n\n// 【稳健写法】\n// 1. 获取当前伤害 (这是总伤害)\nconst totalDamage = args.config.amount;\n\n// 2. 重新计算单发伤害 (5 + lvl - 1)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst singleDmg = 5 + (lvl - 1);\n\n// 3. 反推数量\nconst count = Math.floor(totalDamage / singleDmg);\n\n// 4. 获取目标轻功\nconst qinggong = args.target.system.skills?.qinggong?.total || 0;\n\n// 5. 减免逻辑\nconst effective = Math.max(0, count - qinggong);\nconst realDamage = effective * singleDmg;\n\n// 6. 修改伤害\nargs.config.amount = realDamage;\n\n// 7. 必中属性\nargs.config.ignoreBlock = true;\nargs.config.ignoreDefense = true;\n\nif (qinggong > 0) {\n    ui.notifications.info(`${args.target.name} 轻功抵消了 ${Math.min(count, qinggong)} 支火箭`);\n}"
                         }
-                    ]
+                    ],
+                    "actionCost": "全回合动作"
                 }
             ]
         }
@@ -1802,7 +1809,8 @@
                             "trigger": "passive",
                             "script": "const hp = S.resources.hp.value;\nconst maxHp = S.resources.hp.max;\nif (maxHp > 0 && (hp / maxHp) < 0.1) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const baseBonus = 5 + (lvl - 1) * 5;\n    \n    const shanie = S.resources.shanie || 0;\n    const maxShanieBonus = 5 + (lvl - 1) * 5;\n    const shanieBonus = Math.min(shanie, maxShanieBonus);\n    \n    const totalBonus = baseBonus + shanieBonus;\n    \n    S.combat.damages.global.mod += totalBonus;\n    S.combat.hit_waigong += totalBonus;\n    S.combat.hit_neigong += totalBonus;\n}"
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 }
             ]
         }
@@ -1831,7 +1839,8 @@
                             "trigger": "passive",
                             "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.mashu.mod += (2 + (lvl - 1));"
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 }
             ]
         }
@@ -1878,7 +1887,8 @@
                             "trigger": "hit",
                             "script": "const options = [\n    { label: '一鼓作气 (+10士气/回合)', slug: 'haoling_1' },\n    { label: '全军冲锋 (速度+5)', slug: 'haoling_2' },\n    { label: '迎敌备战 (防御+10)', slug: 'haoling_3' },\n    { label: '诱敌深入 (闪避+10)', slug: 'haoling_4' },\n    { label: '包抄夹击 (命中附带下盘不稳)', slug: 'haoling_5' },\n    { label: '破军诛将 (伤害+10)', slug: 'haoling_6' },\n    { label: '合军聚众 (回血)', slug: 'haoling_7' },\n    { label: '鸣金收兵 (移动)', slug: 'haoling_8' }\n];\n\nconst content = options.map((o, i) => `<div class=\"form-group\"><input type=\"radio\" name=\"choice\" value=\"${i}\" ${i===0?'checked':''}> <label>${o.label}</label></div>`).join('');\n\nconst idx = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '选择号令' },\n    content: content,\n    ok: { label: '下令', callback: (e, b) => new FormData(b.form).get('choice') }\n});\n\nif (idx !== null) {\n    const choice = options[parseInt(idx)];\n    const effectData = thisItem.effects.find(e => e.flags?.['xjzl-system']?.slug === choice.slug);\n    if (effectData) {\n        await game.xjzl.api.effects.addEffect(args.target, effectData.toObject());\n        ui.notifications.info(`已对 ${args.target.name} 下达: ${choice.label}`);\n    }\n}"
                         }
-                    ]
+                    ],
+                    "actionCost": "蓄力动作"
                 }
             ]
         },

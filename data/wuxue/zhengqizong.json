@@ -3288,7 +3288,8 @@
                             "script": "const limit = 1 + (Math.max(1, args.move.computedLevel || 1) - 1); \n// 默认给予上限值\nS.arts.shuxie.checkMod += limit;",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 }
             ]
         }
@@ -3336,7 +3337,8 @@
                             "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\n// Lv1 -> floor=1, Lv2 -> floor=3, Lv3 -> floor=5\nconst floor = 1 + (lvl - 1) * 2;\n\nif (S.combat && S.combat.weaponRanks) {\n    for (const [key, rankData] of Object.entries(S.combat.weaponRanks)) {\n        const current = rankData.value || 0;\n        if (current < floor) {\n            rankData.mod = (rankData.mod || 0) + (floor - current);\n        }\n    }\n}",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 }
             ]
         }
@@ -3461,7 +3463,8 @@
                             "script": "// 获得护体 (heal类型招式自动根据 output.damage 提供数值，但需脚本指定为 huti 类型应用)\n// 注意：Hit脚本中 args.finalAmount 即为计算后的数值\nif (args.finalAmount > 0) {\n    await args.target.applyHealing({ amount: args.finalAmount, type: \"huti\" });\n}\n\n// 添加提示Buff\nconst effect = thisItem.effects.getName(\"立志明心 (免疫)\");\nif (effect) {\n    await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 }
             ]
         },
@@ -3518,7 +3521,8 @@
                             0,
                             0
                         ]
-                    }
+                    },
+                    "actionCost": "无"
                 }
             ]
         }
@@ -3559,7 +3563,8 @@
                             0,
                             0
                         ]
-                    }
+                    },
+                    "actionCost": "主要动作"
                 }
             ]
         }
@@ -3593,7 +3598,8 @@
                         "hp": [
                             0
                         ]
-                    }
+                    },
+                    "actionCost": "无"
                 },
                 {
                     "name": "贼法",
@@ -3620,7 +3626,8 @@
                             "script": "if (args.target) {\n    const res = args.target.system.resources;\n    if ((res.shalu?.value > 0) || (res.shanie > 0)) {\n        args.config.amount += 10;\n    }\n}",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 },
                 {
                     "name": "囚法",
@@ -3647,7 +3654,8 @@
                             "script": "if (args.isHit && args.target) {\n    // 检查计数器\n    if (actor.getFlag(\"xjzl-system\", \"wuxue_qiufa_used\")) return;\n\n    const soc = args.target.system.social || {};\n    // 恶标签: 恶行>=100 且 侠义<=50\n    const isEvil = (soc.exing >= 100) && (soc.xiayi <= 50);\n    if (isEvil) {\n        // 调用系统通用AE: 禁足(root)\n        const result = await game.xjzl.api.effects.addEffect(args.target, \"root\");\n        // 设置Flag\n        if (result) {\n             await actor.setFlag(\"xjzl-system\", \"wuxue_qiufa_used\", true);\n             // 如果返回的是Effect对象，手动更新时长为1回合\n             await result.update({ duration: { rounds: 1 } });\n             ui.notifications.info(`${actor.name} 触发囚法，禁足目标！`);\n        }\n    }\n}",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 },
                 {
                     "name": "捕法",
@@ -3674,7 +3682,8 @@
                             "script": "S.combat.speed += 3;",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 },
                 {
                     "name": "杂法",
@@ -3701,7 +3710,8 @@
                             "script": "if (args.target) {\n    const evil = args.target.system.social?.exing || 0;\n    const bonus = Math.floor(evil / 100) * 5;\n    if (bonus > 0) {\n        args.config.amount += bonus;\n    }\n}",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 },
                 {
                     "name": "具法",
@@ -3721,7 +3731,8 @@
                         "hp": [
                             0
                         ]
-                    }
+                    },
+                    "actionCost": "无"
                 }
             ]
         }
@@ -3755,7 +3766,8 @@
                         "hp": [
                             0
                         ]
-                    }
+                    },
+                    "actionCost": "反应动作"
                 },
                 {
                     "name": "鸡三足",
@@ -3775,7 +3787,8 @@
                         "hp": [
                             0
                         ]
-                    }
+                    },
+                    "actionCost": "无"
                 },
                 {
                     "name": "白狗黑",
@@ -3802,7 +3815,8 @@
                             "script": "// S.martial.stanceItemId 是当前开启的架招所属物品ID\n// args.item.id 是当前攻击使用的招式所属物品ID\nconst stanceItem = S.martial.stanceItemId;\nconst currentItem = args.item.id;\n\n// 如果开启了架招，且架招来源 != 当前攻击来源\nif (stanceItem && stanceItem !== currentItem) {\n    // 暴击骰-2 (变难) => 阈值修正 -2\n    // 逻辑：XJZL中 critThresholdMod 是 ADD 修正。\n    // 暴击更难 => d20需要更大 => 阈值提高 => Mod应为负数 (base - mod > base)\n    // Wait, let's check config: \n    // flags.critThresholdMod: Global crit threshold modifier. Positive means easier crit (e.g. +2 means threshold drops by 2).\n    // \"暴击骰-2\" usually means roll result -2, effectively making it harder.\n    // Equivalent to threshold +2.\n    // So critThresholdMod should be -2.\n    args.flags.critThresholdMod -= 2;\n}",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionCost": "无"
                 },
                 {
                     "name": "目不见",
@@ -3822,7 +3836,8 @@
                         "hp": [
                             0
                         ]
-                    }
+                    },
+                    "actionCost": "无"
                 }
             ]
         }

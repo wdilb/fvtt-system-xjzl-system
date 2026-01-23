@@ -32,7 +32,8 @@
                             "script": "if (!args.target) return;\n\n// 1. 移除状态\nconst effectsToRemove = args.target.effects.filter(e => \n    e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"root\"\n).map(e => e.id);\n\nif (effectsToRemove.length > 0) {\n    await args.target.deleteEmbeddedDocuments(\"ActiveEffect\", effectsToRemove);\n    ui.notifications.info(`${args.target.name} 的下盘不稳/禁足状态已移除。`);\n}\n\n// 2. 添加乘风\n// 计算层数: 基础1 + 升级\nconst lvl = args.move.computedLevel;\nconst stacksToAdd = 1 + (lvl - 1);\n\nconst chengfengData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\nchengfengData.name = \"乘风\";\n\n// 循环添加多次以叠加层数\nfor (let i = 0; i < stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
                         }
                     ],
-                    "weaponType": "unarmed"
+                    "weaponType": "unarmed",
+                    "actionCost": "全回合动作"
                 },
                 {
                     "name": "提按端挤",
@@ -64,7 +65,8 @@
                             "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst totalHeal = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ amount: totalHeal, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
                         }
                     ],
-                    "weaponType": "unarmed"
+                    "weaponType": "unarmed",
+                    "actionCost": "全回合动作"
                 },
                 {
                     "name": "手摸心会",
@@ -88,7 +90,8 @@
                             "script": "const lvl = args.move.computedLevel;\nconst bonus = 5 + (lvl - 1) * 5;\n\nconst effectData = {\n    name: \"坚骨\",\n    icon: args.item.img,\n    description: `下一次投掷残疾检定时，结果+${bonus}。`,\n    changes: [] // 纯提示\n};\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ],
-                    "weaponType": "unarmed"
+                    "weaponType": "unarmed",
+                    "actionCost": "全回合动作"
                 },
                 {
                     "name": "拔伸牵引",
@@ -118,7 +121,8 @@
                             "script": "if (args.isHit) {\n    const lvl = args.move.computedLevel;\n    const durationRounds = 5 + (lvl - 1) * 5;\n\n    const painData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pain\"));\n    painData.duration = { rounds: durationRounds };\n\n    await game.xjzl.api.effects.addEffect(args.target, painData);\n}"
                         }
                     ],
-                    "weaponType": "unarmed"
+                    "weaponType": "unarmed",
+                    "actionCost": "主要动作"
                 }
             ]
         }
@@ -509,7 +513,8 @@
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 养血 (持续3+lvl-1回合)\n    const duration = 3 + (lvl - 1);\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    yangxueData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, yangxueData);\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const heal = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
                     ],
-                    "weaponType": "hidden"
+                    "weaponType": "hidden",
+                    "actionCost": "主要动作"
                 },
                 {
                     "name": "理肺气针",
@@ -539,7 +544,8 @@
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 聚气 (5MP, 持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const juqiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"juqi\"));\n    juqiData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, juqiData);\n} else {\n    // 大针: 瞬间回蓝 (15 + (lvl-1)*5)\n    const heal = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: heal, type: \"mp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
                     ],
-                    "weaponType": "hidden"
+                    "weaponType": "hidden",
+                    "actionCost": "主要动作"
                 },
                 {
                     "name": "生肾水针",
@@ -569,7 +575,8 @@
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 每回合加护体\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"生肾水针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 5 点护体真气。\",\n        flags: { \"xjzl-system\": { \"stackable\": true, scripts: [{\n            trigger: \"turnStart\",\n            active: true,\n            script: \"await actor.applyHealing({ amount: 5, type: 'huti', showScrolling: true });\"\n        }] } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间加护体 (15 + (lvl-1)*5)\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
                     ],
-                    "weaponType": "hidden"
+                    "weaponType": "hidden",
+                    "actionCost": "主要动作"
                 },
                 {
                     "name": "养肝精针",
@@ -599,7 +606,8 @@
                             "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 回怒 (持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"养肝精针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 1 怒气。\",\n        changes: [{ key: \"flags.xjzl-system.regenRageTurnStart\", mode: 2, value: 1 }]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间回怒 (数值固定1)\n    await args.target.applyHealing({ amount: 1, type: \"rage\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
                         }
                     ],
-                    "weaponType": "hidden"
+                    "weaponType": "hidden",
+                    "actionCost": "主要动作"
                 },
                 {
                     "name": "护心火针",
@@ -622,7 +630,8 @@
                         ]
                     },
                     "scripts": [],
-                    "weaponType": "hidden"
+                    "weaponType": "hidden",
+                    "actionCost": "反应动作"
                 }
             ]
         }
@@ -695,7 +704,8 @@
                             "active": true,
                             "script": "// 基础效果：流失内力\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst mpDrain = 10 + (lvl - 1) * 10;\nawait args.target.applyHealing({ amount: -mpDrain, type: 'mp', showScrolling: true });\n\n// 子午加成：叠加气虚\nconst hasZiwu = actor.effects.some(e => e.name === '子午');\nif (hasZiwu) {\n    const stacks = 1 + (lvl - 1);\n    const qixuData = CONFIG.statusEffects.find(e => e.id === 'qixu');\n    if (qixuData) {\n        for(let i=0; i<stacks; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, qixuData);\n        }\n    }\n}"
                         }
-                    ]
+                    ],
+                    "actionCost": "反应动作"
                 },
                 {
                     "name": "流经注气",
@@ -745,7 +755,8 @@
                             "active": true,
                             "script": "// 获取目标\nconst targets = Array.from(game.user.targets).map(t => t.actor);\nif (targets.length === 0) return ui.notifications.warn('未选择目标');\n\n// 1. 医术检定\nconst roll = await actor.rollAttributeTest('yishu', { dc: 15 });\nif (roll.total >= 15) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const totalHeal = roll.total + (lvl - 1) * 5;\n    \n    for (const t of targets) {\n        // 应用治疗\n        await t.applyHealing({ amount: totalHeal, type: 'hp', showScrolling: true });\n        await t.applyHealing({ amount: totalHeal, type: 'mp', showScrolling: true });\n        \n        // 2. 添加 X势\n        const weapon = t.itemTypes.weapon.find(w => w.system.equipped);\n        if (weapon) {\n            const wType = weapon.system.type;\n            const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType]);\n            const effectData = {\n                name: `${wLabel}势`,\n                icon: 'icons/svg/upgrade.svg',\n                description: `使用${wLabel}时命中+10`,\n                changes: [\n                    { key: `system.combat.hit_waigong`, mode: 2, value: 10 }\n                ],\n                flags: { 'xjzl-system': { stackable: true } }\n            };\n            await game.xjzl.api.effects.addEffect(t, effectData);\n        }\n    }\n    ui.notifications.info(`医术检定成功！回复 ${totalHeal} 点。`);\n} else {\n    ui.notifications.warn('医术检定失败。');\n}\nargs.flags.autoApplied = true;"
                         }
-                    ]
+                    ],
+                    "actionCost": "主要动作"
                 },
                 {
                     "name": "截时定穴",
@@ -783,7 +794,8 @@
                             "active": true,
                             "script": "// 获取目标\nconst targets = Array.from(game.user.targets).map(t => t.actor);\nif (targets.length === 0) return ui.notifications.warn('未选择目标');\n\n// 计算数值 (基础由系统算好，这里手动算加成)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst levelBonus = (lvl - 1) * 20;\nconst baseHeal = (args.flags.damageResult?.damage || 0) + levelBonus;\n\n// 检测状态\nconst hasZiwu = actor.effects.some(e => e.name === '子午');\nconst hasYang = actor.effects.some(e => e.name === '阳盛');\nconst hasYin = actor.effects.some(e => e.name === '阴盛');\n\nfor (const t of targets) {\n    let amount = baseHeal;\n    let type = 'hp';\n    \n    // 提示子午加成\n    if (hasZiwu) ui.notifications.info(`【子午】请检查目标经脉数，手动增加治疗 (每条+10)。当前基础值: ${amount}`);\n    \n    // 阴阳逻辑\n    if (hasYang) {\n        type = 'mp';\n        ui.notifications.info('【阳盛】转为回复内力');\n    } else if (hasYin) {\n        // 阴盛流失：这里用 applyHealing 负数来实现流失\n        amount = -amount;\n        ui.notifications.info('【阴盛】转为流失气血');\n    }\n    \n    await t.applyHealing({ amount: amount, type: type, showScrolling: true });\n}\n\nargs.flags.autoApplied = true;"
                         }
-                    ]
+                    ],
+                    "actionCost": "主要动作"
                 }
             ],
             "effects": [
@@ -868,7 +880,8 @@
                     "tier": 1,
                     "description": "<p>百草谷环境怡人，是调养身体绝佳之地，即便无病在此居住，亦可增强体质、预防疾病。重病伤残之人，可前来花费一定时间金钱疗养，恢复健康。<br>·你可以将病人带往百草阁治疗残疾，你治疗目标期间，不可离开百草阁，治疗完成后，百草阁收取诊金的 10%会作为奖励给予你。<br>升级：疗程时间缩短 25%，诊金价格提升 20%。</p>",
                     "automationNote": "完全手动，RP向技能。",
-                    "weaponType": "none"
+                    "weaponType": "none",
+                    "actionCost": "无"
                 }
             ]
         }
@@ -891,7 +904,8 @@
                     "requirements": "《博脉心法》修炼圆满",
                     "description": "<p>你明了自身十二正经、奇经八脉的所有经络走向和要穴位置，并知晓正经奇经相交的八个穴位（称为交经八穴）。<br>·在你打通十二正经后，可以进行休整并花费 1000 修为，直接开启该经脉上的交经八穴，并获得与对应奇经八脉循环相通的属性加成。<br>·交经八穴并非武道穴位，不可服食奇珍。<br>·若你已同时打通交经八穴连通的正经和奇经，则无需休整和修为，直接开启该穴位。<br>后溪穴：自由属性+5<br>列缺穴：自由属性+5<br>公孙穴：气血上限+20<br>足临泣穴：格挡值+10<br>外关穴：施展阳、刚属性武学，招式伤害+5<br>内关穴：施展阴、柔属性武学，招式伤害+5<br>申脉穴：速度+2<br>照海穴：先攻+2<br>升级：开启交经八穴所需修为减少 500。</p>",
                     "automationNote": "请玩家使用手动修正器去修正属性。",
-                    "weaponType": "none"
+                    "weaponType": "none",
+                    "actionCost": "无"
                 }
             ]
         }
@@ -913,7 +927,8 @@
                     "tier": 2,
                     "description": "<p>百草阁弟子以自身为本，以针渡人，你可以灌注内力辅助他人打通十二正经。<br>通经<br>花费休整，为目标配置药浴，等其洗沐过后，施针帮助目标打通一条经脉（无需对方修炼内功）。<br>·药浴所需的药材非常昂贵，需大量银两采买。<br>·你只能帮助对方打通自己已经打通的经脉，且双方都需要耗费修为，尤其是施针之人。<br>消耗银两和修为如下：<br>通脉<br>花费休整和 1000 修为，将目标一条经脉中服食的奇珍挑散，目标失去该奇珍效果。<br>升级：通经中药浴的花费减少 20%。</p>",
                     "automationNote": "完全手动处理资源消耗和经脉开启。",
-                    "weaponType": "none"
+                    "weaponType": "none",
+                    "actionCost": "无"
                 }
             ]
         }
@@ -944,7 +959,8 @@
                             100,
                             100
                         ]
-                    }
+                    },
+                    "actionCost": "无"
                 }
             ]
         }
