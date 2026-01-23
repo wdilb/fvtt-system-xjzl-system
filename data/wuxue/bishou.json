@@ -2961,7 +2961,7 @@
                         {
                             "label": "格挡施加邪灭",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = thisItem.effects.getName(\"邪灭\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const val = -1 + (lvl - 1) * -1;\n    eff.changes[0].value = String(val);\n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n}",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = thisItem.effects.getName(\"邪灭\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    // 获取等级计算效果(暴击骰-1 = 对方更难暴击 = 门槛+1)\n    // 1级: +1, 2级: +2 ...\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const val = 1 + (lvl - 1);\n    // 同时修改外功和内功\n    eff.changes[0].value = String(val);\n    eff.changes[1].value = String(val);\n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n}",
                             "active": true
                         }
                     ]
@@ -3067,7 +3067,7 @@
                 {
                     "name": "邪灭",
                     "icon": "icons/magic/death/skull-energy-light-purple.webp",
-                    "description": "受到他人攻击时，对方暴击骰-1。",
+                    "description": "受到他人攻击时，对方暴击骰-1（更难暴击）。",
                     "transfer": false,
                     "duration": {
                         "rounds": 3
@@ -3080,9 +3080,14 @@
                     },
                     "changes": [
                         {
-                            "key": "flags.xjzl-system.critThresholdMod",
+                            "key": "system.combat.crit_waigong",
                             "mode": 2,
-                            "value": "-1"
+                            "value": "1"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "1"
                         }
                     ]
                 },
