@@ -58,6 +58,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
             investArtXP: XJZLCharacterSheet.prototype._onInvestArtXP,
             refundArtXP: XJZLCharacterSheet.prototype._onRefundArtXP,
+            investJingmaiXP: XJZLCharacterSheet.prototype._onInvestJingmaiXP,
+            refundJingmaiXP: XJZLCharacterSheet.prototype._onRefundJingmaiXP,
+
             togglePin: XJZLCharacterSheet.prototype._onTogglePin, //标记常用武学
             manageXP: XJZLCharacterSheet.prototype._onManageXP,  //管理修为
             viewHistory: XJZLCharacterSheet.prototype._onViewHistory, //查看修为日志
@@ -67,6 +70,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // --- 其他 ---
             //删除状态
             deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect,
+
+            //切换经脉显示
+            toggleJingmaiAttemptMode: XJZLCharacterSheet.prototype._onToggleJingmaiAttemptMode,
 
             //使用招式
             rollMove: XJZLCharacterSheet.prototype._onRollMove,
@@ -808,6 +814,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
             return { key, label: shortLabel, isActive: isOpen, tooltip, x: coord.x, y: coord.y, equippedItem, type: meta.type, tierLabel: `XJZL.Jingmai.T${meta.t}` };
         });
+
+        context.jingmaiAttemptMode = this._jingmaiAttemptMode;
 
         const extraOrder = ["du", "ren", "chong", "dai", "yangwei", "yinwei", "yangqiao", "yinqiao"];
         context.jingmaiExtraList = extraOrder.map(key => {
@@ -1864,6 +1872,33 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             await item.refundArt(result);
         }
     }
+    
+    /**
+     * 经脉突破尝试
+     */
+    async _onInvestJingmaiXP(event, target) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const key = target?.dataset?.jingmaiKey;
+        if(!key) return;
+
+        await this.document.investJingmai(key);
+    }
+
+    /**
+     * 经脉回退（只用于意外点错的情况）
+     */
+    async _onRefundJingmaiXP(event, target) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const key = target?.dataset?.jingmaiKey;
+        if(!key) return;
+
+        await this.document.refundJingmai(key);
+    }
+
 
     // --- 其他 ---
 
@@ -2455,5 +2490,17 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
             ui.notifications.info(`已出售 ${item.name} (x${quantity})，获得 ${totalCost} 银两。`);
         }
+    }
+
+    /** 
+     * 经脉栏显示切换
+     */
+    _jingmaiAttemptMode = false;
+
+    async _onToggleJingmaiAttemptMode(event) {
+        console.log("toggle clicked");
+        event.preventDefault();
+        this._jingmaiAttemptMode = !this._jingmaiAttemptMode;
+        this.render(false);
     }
 }
