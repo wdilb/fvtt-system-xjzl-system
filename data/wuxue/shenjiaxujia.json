@@ -394,20 +394,62 @@
         }
     },
     {
-        "name": "世家散手",
+        "name": "流水辨银",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
         "system": {
             "category": "sanshou",
             "sect": "jianghushili",
-            "tier": 3,
-            "description": "<p>江湖世家流传的散手招式。</p>",
+            "tier": 1,
+            "description": "<p>沈家从一穷二白跻身至大明首富，此技功不可没。以和气生财，辨别真假，招吉祥、除凶邪。</p><p><strong>效果：</strong>你的[交易]等级+1，且每个月底，你获得 D20 两白银。</p><p>·若你为[侠]，获得的白银上升为 D100 两。</p><p><strong>升级：</strong>[交易]等级再+1。</p>",
             "requirements": "",
+            "moves": [
+                {
+                    "name": "流水辨银",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "range": "自身",
+                    "targetInfo": "无",
+                    "actionCost": "无",
+                    "description": "<p>被动生效：你的[交易]等级提升。</p><p>每个月底，请手动投掷 D20 (侠为 D100) 获取白银。</p><p><strong>升级：</strong>[交易]等级再+1。</p>",
+                    "automationNote": "被动提升交易等级（随等级成长）。月度收益请手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "交易等级加成",
+                            "trigger": "passive",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\n// 基础1 + (等级-1)*1 = 等级\n// 或者理解为每级+1\nactor.system.skills.jiaoyi.mod += lvl;",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "金钱镖",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>暗器手法，商贾防身所用，以大制金币磨光边缘而成，易于制造，使用隐蔽。</p><p><strong>需求：</strong>暗器-金钱镖</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "暗器-金钱镖",
             "moves": [
                 {
                     "name": "金钱镖",
                     "type": "real",
-                    "tier": 2,
                     "element": "taiji",
                     "damageType": "liushi",
                     "weaponType": "hidden",
@@ -415,7 +457,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>金光灿灿，朝目标投掷若干枚金钱镖，每投掷一枚使其流失 10 点气血（外功命中可暴击），至多掷出五枚。</p><p>·若目标嗜好兵器、华服、首饰、金银财宝、古玩字画中的任意一种，此招必定命中。</p><p><strong>升级：</strong>可额外掷出 5 枚。</p>",
-                    "automationNote": "投掷数量弹窗询问，自动计算总流失量。嗜好必中自动检测（尝试读取目标shihao字段）。",
+                    "automationNote": "投掷数量弹窗询问并计算总伤害。请玩家自觉扣除银两(50两/枚)。目标嗜好自动检测必中。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -428,77 +470,43 @@
                         ]
                     },
                     "scripts": [
+                        {
+                            "label": "数量选择与伤害计算",
+                            "trigger": "calc",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxDarts = 5 + (lvl - 1) * 5;\n\n// 弹窗询问\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"金钱镖\" },\n    content: `<div style=\"text-align:center;\"><p>最大投掷数: ${maxDarts}</p><label>投掷数量 (请自觉扣除 50两/枚)</label><input type=\"number\" name=\"count\" value=\"1\" min=\"1\" max=\"${maxDarts}\" autofocus></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value }\n});\n\nconst num = Math.min(maxDarts, Math.max(1, parseInt(count) || 1));\n\n// 设置固定流失伤害\nargs.output.damage = num * 10;\nargs.output.bonusDesc.push(`投掷 ${num} 枚 (应耗银 ${num*50})`);",
+                            "active": true
+                        },
                         {
                             "label": "嗜好必中检测",
                             "trigger": "check",
-                            "script": "const targetShihao = args.target.system.social?.shihao || [];\nconst moneyHobbies = [\"weapon\", \"clothes\", \"jewelry\", \"money\", \"antique\"];\n// 检查是否有交集\nconst hasHobby = targetShihao.some(h => moneyHobbies.includes(h));\nif (hasHobby) {\n    args.flags.forceHit = true;\n    // ui.notifications.info(\"目标嗜财，金钱镖必中！\"); // check阶段频繁触发，不建议弹窗\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "投掷数量与伤害",
-                            "trigger": "calc",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxDarts = 5 + (lvl - 1) * 5;\n\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"金钱镖\" },\n    content: `<div style=\"text-align:center;\"><p>最大投掷数: ${maxDarts}</p><label>投掷数量</label><input type=\"number\" name=\"count\" value=\"1\" min=\"1\" max=\"${maxDarts}\" autofocus></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value }\n});\n\nconst num = Math.min(maxDarts, parseInt(count) || 1);\nargs.output.damage = num * 10;\nargs.output.bonusDesc.push(`投掷 ${num} 枚金钱镖`);",
+                            "script": "const targetShihao = args.target.system.social?.shihao || [];\nconst moneyHobbies = [\"weapon\", \"clothes\", \"jewelry\", \"money\", \"antique\"];\n// 检查是否有交集\nconst hasHobby = targetShihao.some(h => moneyHobbies.includes(h));\nif (hasHobby) {\n    args.flags.forceHit = true;\n}",
                             "active": true
                         }
                     ]
-                },
+                }
+            ]
+        }
+    },
+    {
+        "name": "物华天宝",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>沈家极尽奢靡，收藏无数珍奇宝贵之物，寻常吃饭，皆以夜光杯、象牙筷、珐琅碗为器，久而久之，富养人，贵养气，面对凡俗，无欲则刚。</p><p><strong>需求：</strong>《聚宝功》修炼圆满</p><p><strong>穷奢极欲：</strong>在你眼中，任何无价之宝都可将其定价为万两黄金（100000 两白银），然后买之。·你每拥有一件金品及以上品质的物品，你的神采+1（至多+10）。</p><p><strong>荣华富贵：</strong>你购物花费每满 10000 两白银，你的朝廷声望+1。你出售物品、产业收益而获得每 10000 两白银，你的武林声望+1。·以上两种方式至多使你的朝廷、武林声望+10。</p><p><strong>重义轻财：</strong>你视金钱如粪土，你可以赠予他人一千两白银，然后获得“豪绅”，持续一个月。</p><p><strong>豪绅：</strong>他人对你出招时伤害-10，暴击骰+1。·你赠予他人的金钱不可拿回，否则你遗忘《物华天宝》。</p><p><strong>升级：</strong>穷奢极欲的神采上限+5，荣华富贵的声望上限+5，重义轻财他人对你的伤害额外-5。</p>",
+            "requirements": "《聚宝功》修炼圆满",
+            "moves": [
                 {
-                    "name": "撒手锏",
-                    "type": "real",
-                    "tier": 2,
-                    "element": "gang",
-                    "damageType": "waigong",
-                    "weaponType": "staff",
-                    "range": "10米",
-                    "targetInfo": "单体",
-                    "actionCost": "主要动作",
-                    "description": "<p>大喊“着”，掷出双锏，打着旋儿朝目标飞射而去，对其造成伤害。</p><p>·出招的同时还可以不消耗动作进行一次投射的[抛掷]检定，将结果加到招式伤害上。</p><p>·若目标没有反应动作，招式必定暴击。</p><p>·施展此招后，你的[棍-双棍]武器视作脱手，掉落在目标所处空格处，需要用主要动作捡起。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "抛掷检定伤害需手动修正。脱手自动卸下武器。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.5
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "抛掷加伤提示",
-                            "trigger": "calc",
-                            "script": "const bonus = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"撒手锏 - 抛掷检定\" },\n    content: `<p>请进行[抛掷]检定，并输入结果。</p><input type=\"number\" name=\"roll\" value=\"0\">`,\n    ok: { callback: (event, button) => parseInt(button.form.elements.roll.value) || 0 }\n});\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`抛掷加伤 +${bonus}`);\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "武器脱手",
-                            "trigger": "hit",
-                            "script": "// 查找已装备的棍类武器 (假设双棍属于 staff 类型)\nconst weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === \"staff\");\nif (weapon) {\n    await weapon.update({\"system.equipped\": false});\n    ui.notifications.warn(`${weapon.name} 已脱手！`);\n}",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "物华天宝",
+                    "name": "重义轻财",
                     "type": "qi",
-                    "tier": 3,
                     "actionType": "buff",
-                    "element": "none",
-                    "damageType": "none",
-                    "weaponType": "none",
-                    "range": "无",
-                    "targetInfo": "无",
+                    "range": "自身",
+                    "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>需求：《聚宝功》修炼圆满</p><p><strong>穷奢极欲：</strong>在你眼中，任何无价之宝都可将其定价为万两黄金（100000 两白银），然后买之。·你每拥有一件金品及以上品质的物品，你的神采+1（至多+10）。</p><p><strong>荣华富贵：</strong>你购物花费每满 10000 两白银，你的朝廷声望+1。你出售物品、产业收益而获得每 10000 两白银，你的武林声望+1。·以上两种方式至多使你的朝廷、武林声望+10。</p><p><strong>重义轻财：</strong>你视金钱如粪土，你可以赠予他人一千两白银，然后获得“豪绅”，持续一个月。</p><p><strong>豪绅：</strong>他人对你出招时伤害-10，暴击骰+1。·你赠予他人的金钱不可拿回，否则你遗忘《物华天宝》。</p><p><strong>升级：</strong>穷奢极欲的神采上限+5，荣华富贵的声望上限+5，重义轻财他人对你的伤害额外-5。</p>",
-                    "automationNote": "完全手动/RP。涉及经营与声望。",
+                    "description": "<p>你视金钱如粪土，你可以赠予他人一千两白银，然后获得“豪绅”，持续一个月。</p><p><strong>豪绅：</strong>他人对你出招时伤害-10，暴击骰+1。</p><p><strong>升级：</strong>重义轻财他人对你的伤害额外-5。</p>",
+                    "automationNote": "纯手动。请自行扣除银两，并手动给角色添加[豪绅]状态（在特效栏中）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -510,36 +518,44 @@
                             0,
                             0
                         ]
-                    }
-                }
-            ],
-            "scripts": [
-                {
-                    "label": "流水辨银",
-                    "trigger": "passive",
-                    "script": "if (args.move.tier === 1) { // 仅针对流水辨银(人级)\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 交易等级+1 (基础1 + 升级)\n    actor.system.skills.jiaoyi.mod += lvl;\n}",
-                    "active": true
+                    },
+                    "scripts": [
+                        {
+                            "label": "提示",
+                            "trigger": "hit",
+                            "script": "ui.notifications.info(\"请手动扣除1000两白银，并手动将 [豪绅] 状态拖拽给角色。\");",
+                            "active": true
+                        }
+                    ]
                 }
             ],
             "effects": [
                 {
-                    "name": "流水辨银",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "description": "交易等级提升。",
-                    "transfer": true,
+                    "name": "豪绅",
+                    "icon": "icons/commodities/currency/coins-assorted-mix-copper-silver-gold.webp",
+                    "description": "视金钱如粪土，他人伤害降低，更难暴击。",
+                    "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "liushuibianyin",
-                            "stackable": false
+                            "slug": "haoshen",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "伤害减免",
+                                    "trigger": "preTake",
+                                    "script": "// 尝试动态查找角色身上的物华天宝招式等级\n// 如果找不到，默认为1级\nlet lvl = 1;\nconst item = actor.items.find(i => i.name === \"物华天宝\" && i.type === \"wuxue\");\nif (item) {\n    const move = item.system.moves.find(m => m.name === \"重义轻财\");\n    if (move) lvl = Math.max(1, move.computedLevel || 1);\n}\n\nconst reduct = 10 + (lvl - 1) * 5;\nargs.output.damage -= reduct;\nif (args.output.damage < 0) args.output.damage = 0;\n\n// 提示减伤\n// actor.showFloatyText(`豪绅减伤 -${reduct}`, {fill: \"#FFD700\"});",
+                                    "active": true
+                                },
+                                {
+                                    "label": "暴击抵抗",
+                                    "trigger": "check",
+                                    "script": "// 暴击骰+1 (意味着阈值更难达成，需要减去修正值)\nargs.flags.critThresholdMod -= 1;",
+                                    "active": true
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.skills.jiaoyi.mod",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
+                    "changes": []
                 }
             ]
         }
