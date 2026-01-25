@@ -1,15 +1,14 @@
 {{!-- templates/actor/character/tab-jingmai.hbs --}}
-<section class="tab scroll-area {{#if jingmaiAttemptMode}}attempt-mode{{/if}} {{#if (eq tabs.primary 'jingmai')}}active{{/if}}" data-tab="jingmai"
-    data-group="primary">
+<section
+    class="tab scroll-area {{#if jingmaiAttemptMode}}attempt-mode{{/if}} {{#if (eq tabs.primary 'jingmai')}}active{{/if}}"
+    data-tab="jingmai" data-group="primary">
 
     <div class="xjzl-bg-deco">脉</div>
 
     <div class="jingmai-stage">
-        {{!-- 增加的切换显示按钮 --}}
-        <button type="button"
-            class="jingmai-view-toggle"
-            data-action="toggleJingmaiAttemptMode"
-            data-tooltip="{{#if jingmaiAttemptMode}}{{localize "XJZL.Jingmai.Normal"}}{{else}}{{localize "XJZL.Jingmai.Attempts"}}{{/if}}">
+        {{!-- 1. 切换显示模式按钮 --}}
+        <button type="button" class="jingmai-view-toggle" data-action="toggleJingmaiAttemptMode"
+            data-tooltip="{{localize 'XJZL.Jingmai.ToggleTooltip'}}">
             <i class="fas fa-right-left"></i>
         </button>
 
@@ -18,18 +17,14 @@
 
         <img src="systems/xjzl-system/assets/icons/character/dazuo.svg" class="body-bg">
 
-        {{!-- 十二正经 --}}
+        {{!-- 2. 十二正经节点循环 --}}
         {{#each jingmaiStandardList as |node|}}
-        {{!-- 增加了 {{node.type}} 类名 --}}
         <div class="meridian-node {{node.type}} {{#if node.isActive}}active{{/if}} {{#if node.equippedItem}}equipped{{/if}}"
-            style="left: {{node.x}}%; top: {{node.y}}%;" {{#unless @root.jingmaiAttemptMode}} data-tooltip="{{node.tooltip}}" {{/unless}}>
+            style="left: {{node.x}}%; top: {{node.y}}%;" data-tooltip="{{node.tooltip}}">
 
             <div class="node-click-area">
-                {{!-- 突破模式 --}}
-                {{#if ../jingmaiAttemptMode}}
-                   <div class="node-dot"></div>
-                {{!-- 正常模式 --}}
-                {{else}}
+                {{!-- [视图 A] 正常模式：复选框 或 装备图标 --}}
+                <div class="view-normal">
                     {{#if node.equippedItem}}
                     <div class="qizhen-icon-wrapper" data-action="toggleEquip" data-item-id="{{node.equippedItem.id}}">
                         <img src="{{node.equippedItem.img}}">
@@ -38,67 +33,70 @@
                     <input type="checkbox" name="system.jingmai.standard.{{node.key}}" {{checked node.isActive}}>
                     <div class="node-dot"></div>
                     {{/if}}
-                {{/if}}
+                </div>
+
+                {{!-- [视图 B] 突破模式：只显示装饰点 (防止误触复选框) --}}
+                <div class="view-attempt">
+                    <div class="node-dot"></div>
+                </div>
             </div>
 
             <div class="node-info-stack">
-                {{!-- 突破模式UI --}}
-                {{#if ../jingmaiAttemptMode}}
-                    <div class="attempt-row">
-                        <span class="attempt-count">{{lookup ../system.jingmai.attempts node.key}}</span>
-
-                        <div class="attempt-btn-stack">
-                            <button type="button"
-                                class="attempt-btn plus"
-                                data-action="investJingmaiXP"
-                                data-jingmai-key="{{node.key}}">+</button>
-
-                            <button type="button"
-                                class="attempt-btn minus"
-                                data-action="refundJingmaiXP"
-                                data-jingmai-key="{{node.key}}">−</button>
-                        </div>
-                    </div>
+                {{#if node.equippedItem}}
+                <span class="info-line qizhen">{{node.equippedItem.name}}</span>
                 {{/if}}
 
+                {{!-- [视图 B] 突破模式：显示计数器和加减按钮 --}}
+                <div class="view-attempt attempt-row">
+                    <span class="attempt-count">{{lookup ../system.jingmai.attempts node.key}}</span>
+                    <div class="attempt-btn-stack">
+                        <button type="button" class="attempt-btn plus" data-action="investJingmaiXP"
+                            data-jingmai-key="{{node.key}}">+</button>
+                        <button type="button" class="attempt-btn minus" data-action="refundJingmaiXP"
+                            data-jingmai-key="{{node.key}}">−</button>
+                    </div>
+                </div>
+
+                {{!-- 公共标签 (所有模式都显示) --}}
+                <span class="info-line tier">{{localize node.tierLabel}}</span>
                 <span class="info-line name">{{localize node.label}}</span>
             </div>
 
         </div>
         {{/each}}
-        
-        {{#unless jingmaiAttemptMode}}
-            {{!-- 生死玄关 (正中心) --}}
-            <div class="xuanguan-core {{#if system.jingmai.xuanguan.broken}}broken{{/if}}"
-                data-tooltip="{{localize 'XJZL.Jingmai.XuanguanEffect'}}">
-                {{!-- 新增：定位锚点包裹层 --}}
-                <div class="xuanguan-anchor">
-                    <input type="checkbox" name="system.jingmai.xuanguan.broken" {{checked system.jingmai.xuanguan.broken}}>
-                    <div class="core-visual"><i class="fas fa-infinity"></i></div>
-                    <div class="core-rings"></div>
-                </div>
-                <span class="node-label main-label">{{localize "XJZL.Jingmai.Xuanguan"}}</span>
+
+        {{!-- 3. 生死玄关 (仅在正常模式显示，突破模式隐藏以防干扰) --}}
+        <div class="xuanguan-core view-normal {{#if system.jingmai.xuanguan.broken}}broken{{/if}}"
+            data-tooltip="{{localize 'XJZL.Jingmai.XuanguanEffect'}}">
+            <div class="xuanguan-anchor">
+                <input type="checkbox" name="system.jingmai.xuanguan.broken" {{checked system.jingmai.xuanguan.broken}}>
+                <div class="core-visual"><i class="fas fa-infinity"></i></div>
+                <div class="core-rings"></div>
             </div>
-        {{/unless}}
+            <span class="node-label main-label">{{localize "XJZL.Jingmai.Xuanguan"}}</span>
+        </div>
     </div>
 
-    {{#if @root.jingmaiAttemptMode}}
-        <div class="jingmai-attempt-guide"> 输入每个经脉尝试突破次数 </div>
-    {{else}}
-        {{!-- 奇经八脉 --}}
-        <div class="extra-meridians-bar">
-            <div class="bar-title">{{localize "XJZL.Jingmai.Extra"}}</div>
-            <div class="extra-grid">
-                {{#each jingmaiExtraList as |extra|}}
-                <div class="extra-node {{#if extra.isActive}}active{{/if}}" data-tooltip="{{extra.tooltip}}">
-                    <div class="icon-circle">
-                        {{#if extra.isActive}}<i class="fas fa-check"></i>{{else}}<i class="fas fa-lock"></i>{{/if}}
-                    </div>
-                    <span class="name">{{localize extra.label}}</span>
+    {{!-- 4. 底部面板切换 --}}
+
+    {{!-- [视图 B] 突破模式：操作指引 --}}
+    <div class="jingmai-attempt-guide view-attempt">
+        <i class="fas fa-plus"></i> {{localize "XJZL.Jingmai.GuideInvest"}} / <i class="fas fa-minus"></i> {{localize "XJZL.Jingmai.GuideRefund"}}
+    </div>
+
+    {{!-- [视图 A] 正常模式：奇经八脉 --}}
+    <div class="extra-meridians-bar view-normal">
+        <div class="bar-title">{{localize "XJZL.Jingmai.Extra"}}</div>
+        <div class="extra-grid">
+            {{#each jingmaiExtraList as |extra|}}
+            <div class="extra-node {{#if extra.isActive}}active{{/if}}" data-tooltip="{{extra.tooltip}}">
+                <div class="icon-circle">
+                    {{#if extra.isActive}}<i class="fas fa-check"></i>{{else}}<i class="fas fa-lock"></i>{{/if}}
                 </div>
-                {{/each}}
+                <span class="name">{{localize extra.label}}</span>
             </div>
+            {{/each}}
         </div>
-    {{/if}}
+    </div>
 
 </section>

@@ -54,6 +54,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       artsSchema[artKey] = makeArtSchema();
     }
 
+    // 动态构建经脉尝试次数 Schema，复用 Config 定义
+    const attemptsSchema = {};
+    for (const key of Object.keys(CONFIG.XJZL.acupoints)) {
+      attemptsSchema[key] = new fields.NumberField({ initial: 0, min: 0, integer: true });
+    }
+
     // [重构注]: 战斗属性 (combat) 和修正 (makeModField) 大部分已从 Schema 移除
     // 它们将在 prepareBaseData 中重建为内存对象，不占用数据库
 
@@ -193,24 +199,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       // === 经脉系统 (jingmai) ===
       jingmai: new fields.SchemaField({
         // 0. 十二正经突破记录
-        attempts: new fields.SchemaField({
-          // 第一关
-          hand_shaoyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),  // (少冲尝试次数记录）
-          foot_shaoyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),  //（涌泉）
-          hand_shaoyang: new fields.NumberField({ initial: 0, min: 0, integer: true}), // (关冲）
-          foot_shaoyang: new fields.NumberField({ initial: 0, min: 0, integer: true}), //（足窍）
-          // 第二关
-          hand_jueyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（中冲）
-          foot_jueyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（大敦）
-          hand_yangming: new fields.NumberField({ initial: 0, min: 0, integer: true}), //（商阳）
-          foot_yangming: new fields.NumberField({ initial: 0, min: 0, integer: true}),//（厉兑）
-          // 第三关
-          hand_taiyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（少商）
-          foot_taiyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（隐白）
-          hand_taiyang: new fields.NumberField({ initial: 0, min: 0, integer: true}),  //（少泽）
-          foot_taiyang: new fields.NumberField({ initial: 0, min: 0, integer: true})   //（足通）
-        }
-        ),
+        attempts: new fields.SchemaField(attemptsSchema),
 
         // 1. 十二正经 (Standard 12)
         standard: new fields.SchemaField({
@@ -230,7 +219,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           hand_taiyang: new fields.BooleanField(),  // 手太阳小肠经（少泽）
           foot_taiyang: new fields.BooleanField()   // 足太阳膀胱经（足通）
         }),
-        
+
         // 2. 奇经八脉 (Extra 8)
         extra: new fields.SchemaField({
           du: new fields.BooleanField(),      // 督脉
@@ -1549,7 +1538,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       cult.artsTotal += spec;
       cult.generalTotal += gen;
     }
-    
+
     // 4. 经脉（Jingmai）
     const attempts = this.jingmai?.attempts || {};
     let jingmaiAttempts = 0;
