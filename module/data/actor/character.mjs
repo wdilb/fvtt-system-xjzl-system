@@ -192,6 +192,26 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
       // === 经脉系统 (jingmai) ===
       jingmai: new fields.SchemaField({
+        // 0. 十二正经突破记录
+        attempts: new fields.SchemaField({
+          // 第一关
+          hand_shaoyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),  // (少冲尝试次数记录）
+          foot_shaoyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),  //（涌泉）
+          hand_shaoyang: new fields.NumberField({ initial: 0, min: 0, integer: true}), // (关冲）
+          foot_shaoyang: new fields.NumberField({ initial: 0, min: 0, integer: true}), //（足窍）
+          // 第二关
+          hand_jueyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（中冲）
+          foot_jueyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（大敦）
+          hand_yangming: new fields.NumberField({ initial: 0, min: 0, integer: true}), //（商阳）
+          foot_yangming: new fields.NumberField({ initial: 0, min: 0, integer: true}),//（厉兑）
+          // 第三关
+          hand_taiyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（少商）
+          foot_taiyin: new fields.NumberField({ initial: 0, min: 0, integer: true}),   //（隐白）
+          hand_taiyang: new fields.NumberField({ initial: 0, min: 0, integer: true}),  //（少泽）
+          foot_taiyang: new fields.NumberField({ initial: 0, min: 0, integer: true})   //（足通）
+        }
+        ),
+
         // 1. 十二正经 (Standard 12)
         standard: new fields.SchemaField({
           // 第一关
@@ -210,7 +230,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
           hand_taiyang: new fields.BooleanField(),  // 手太阳小肠经（少泽）
           foot_taiyang: new fields.BooleanField()   // 足太阳膀胱经（足通）
         }),
-
+        
         // 2. 奇经八脉 (Extra 8)
         extra: new fields.SchemaField({
           du: new fields.BooleanField(),      // 督脉
@@ -1529,6 +1549,19 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       cult.artsTotal += spec;
       cult.generalTotal += gen;
     }
+    
+    // 4. 经脉（Jingmai）
+    const attempts = this.jingmai?.attempts || {};
+    let jingmaiAttempts = 0;
+
+    for (const v of Object.values(attempts)) {
+      const n = Number(v) || 0;
+      if (n > 0) jingmaiAttempts += n;
+    }
+
+    const jingmaiSpent = jingmaiAttempts * 500;
+
+    cult.generalTotal += jingmaiSpent;
 
     // --- C. 汇总全系统总修为 (Grand Total) ---
     cult.all = cult.general + cult.neigong + cult.wuxue + cult.arts;

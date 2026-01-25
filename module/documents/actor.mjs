@@ -5,6 +5,25 @@ import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
 
+// 尝试突破经脉花费固定为500
+const JINGMAI_ATTEMPT_COST = 500;
+
+// 可以突破的经脉列表
+const STANDARD_JINGMAI_KEYS = [
+  "hand_taiyin",
+  "hand_yangming",
+  "hand_shaoyin",
+  "hand_taiyang",
+  "hand_jueyin",
+  "hand_shaoyang",
+  "foot_taiyin",
+  "foot_yangming",
+  "foot_shaoyin",
+  "foot_taiyang",
+  "foot_jueyin",
+  "foot_shaoyang",
+];
+
 // 将构造器缓存在模块作用域，避免每次 runScripts 重复创建
 const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -2749,6 +2768,93 @@ export class XJZLActor extends Actor {
       style: CONST.CHAT_MESSAGE_STYLES.OTHER
     });
   }
+
+  /**
+   * 执行经脉操作 (Invest/Refund Jingmai)
+   */
+
+  /**
+   * 增加突破经脉次数
+   * @param {string} key - 经脉名
+   */
+  async investJingmai(key) {
+
+    // 检查经脉是否是十二正经
+    if (!STANDARD_JINGMAI_KEYS.includes(key)) {
+      ui?.notifications?.warn?.(`${key}不存在或无法突破，请选择十二正经之一`);
+      return { applied: 0, cost: 0};
+    }
+
+    const jingmaiPath = `system.jingmai.standard.${key}`;
+    const attemptsPath = `system.jingmai.attempts.${key}`;
+
+    const isOpened = !!foundry.utils.getProperty(this, jingmaiPath);
+    const currentAttempts = Number(foundry.utils.getProperty(this, attemptsPath)) || 0;
+    const actorGeneral = Number(this.system?.cultivation?.general) || 0;
+    
+    // 检查通用修为是否足够或者经脉是否已打通
+    if (isOpened) {
+      ui?.notifications?.warn?.("此经脉已打通，不可再突破。");
+      return {applied: 0, cost: 0};
+    }
+
+    if (actorGeneral < JINGMAI_ATTEMPT_COST) {
+      ui?.notifications?.warn?.("通用修为不足。");
+      return { applied: 0, cost: 0};
+    }
+
+    // 执行更新
+    await this.update({
+      [attemptsPath]: currentAttempts + 1,
+      "system.cultivation.general": actorGeneral - JINGMAI_ATTEMPT_COST,
+    });
+
+    console.log(`使用500修为尝试突破经脉: ${key}。`);
+
+    return { applied: 1, cost: JINGMAI_ATTEMPT_COST};
+  }
+
+  /**
+   * 减少突破经脉次数
+   * @param {string} key - 经脉名
+   */
+  async refundJingmai(key) {
+    // 检查经脉是否是十二正经
+    if (!STANDARD_JINGMAI_KEYS.includes(key)) {
+      ui?.notifications?.warn?.(`${key}不存在或无法突破，请选择十二正经之一。`);
+      return { applied: 0, refund: 0};
+    }
+
+    const jingmaiPath = `system.jingmai.standard.${key}`;
+    const attemptsPath = `system.jingmai.attempts.${key}`;
+
+    const isOpened = !!foundry.utils.getProperty(this, jingmaiPath);
+    const currentAttempts = Number(foundry.utils.getProperty(this, attemptsPath)) || 0;
+    const actorGeneral = Number(this.system?.cultivation?.general) || 0;
+    
+    // 扣除时还需检查是否为0
+    if (currentAttempts <= 0) {
+      ui?.notifications?.warn?.(`此经脉没有尝试过突破，无法退还。`);
+      return { applied: 0, refund: 0}
+    }
+
+    // 检查经脉是否已打通
+    if (isOpened) {
+      ui?.notifications?.warn?.("此经脉已打通，请取消后再修改。");
+      return {applied: 0, cost: 0};
+    }
+
+    // 执行更新
+    await this.update({
+      [attemptsPath]: currentAttempts - 1,
+      "system.cultivation.general": actorGeneral + JINGMAI_ATTEMPT_COST,
+    });
+
+    console.log(`返还突破 ${key}使用的500修为。`);
+
+    return { applied: 1, refund: JINGMAI_ATTEMPT_COST};
+  }
+
 
   // ======= 添加代理工厂方法 =======
   _proxifySandbox(sandbox) {
