@@ -914,23 +914,24 @@
                         {
                             "label": "致盲",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"blind\");",
+                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
                             "active": true
                         }
                     ]
                 },
                 {
                     "name": "混沌一击",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "gang",
-                    "damageType": "neigong",
+                    "damageType": "none",
                     "weaponType": "hidden",
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "全回合动作",
                     "description": "<p>抠挖揉搓，全部甩出！对目标同时施展【干涸大地】、【水养四方】、【血如泉涌】。</p><p>然后自身陷入以下状态：1 禁足、2 错骨、3 定身、4 封招、5 自闭、6 眩晕，持续到自己下个回合结束。</p><p>·投掷一个 D6，根据数字减少一个不良状态。</p><p><strong>升级：</strong>额外投掷一个 D6，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "自身随机负面自动。3招需手动分别施展。",
+                    "automationNote": "已改为气招以便点击应用。点击后自动施加所有6种负面状态。发送卡片提示玩家：手动施展3个子招式、手动投掷D6并移除对应的状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -949,15 +950,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "施法提示",
-                            "trigger": "attack",
-                            "script": "ui.notifications.info(\"请依次手动施展：干涸大地、水养四方、血如泉涌\");",
-                            "active": true
-                        },
-                        {
-                            "label": "自身副作用",
+                            "label": "混沌一击流程",
                             "trigger": "hit",
-                            "script": "const debuffs = [\n    {id: 1, slug: \"root\", name: \"禁足\"},\n    {id: 2, slug: \"cuogu\", name: \"错骨\"},\n    {id: 3, slug: \"stun\", name: \"定身\"},\n    {id: 4, slug: \"fengzhao\", name: \"封招\"},\n    {id: 5, slug: \"zibi\", name: \"自闭\"},\n    {id: 6, slug: \"xuanyun\", name: \"眩晕\"}\n];\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst saves = 1 + (lvl - 1);\nconst rolls = [];\nfor(let i=0; i<saves; i++) {\n    const r = await new Roll(\"1d6\").evaluate();\n    rolls.push(r.total);\n}\nlet msg = `豁免骰点: [${rolls.join(\", \")}]<br>`;\nfor (const db of debuffs) {\n    if (!rolls.includes(db.id)) {\n        const eff = CONFIG.statusEffects.find(e => e.id === db.slug);\n        if(eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(actor, data);\n            msg += `获得状态: ${db.name}<br>`;\n        }\n    } else {\n        msg += `豁免状态: ${db.name}<br>`;\n    }\n}\nChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});",
+                            "script": "const debuffs = [\n    {id: 1, slug: \"root\", name: \"禁足\"},\n    {id: 2, slug: \"cuogu\", name: \"错骨\"},\n    {id: 3, slug: \"stun\", name: \"定身\"},\n    {id: 4, slug: \"fengzhao\", name: \"封招\"},\n    {id: 5, slug: \"zibi\", name: \"自闭\"},\n    {id: 6, slug: \"xuanyun\", name: \"眩晕\"}\n];\n\n// 1. 自动应用所有负面状态\nfor (const db of debuffs) {\n    const eff = CONFIG.statusEffects.find(e => e.id === db.slug);\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n}\n\n// 2. 计算投掷数量\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst diceCount = 1 + (lvl - 1);\n\n// 3. 发送引导卡片\nconst content = `\n<div class=\"xjzl-chat-card\">\n    <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold; color:#8b0000; margin-bottom:5px; padding-bottom:2px;\">\n        <i class=\"fas fa-skull\"></i> 混沌一击 - 结算指引\n    </div>\n    <div style=\"padding:5px; font-size:0.9em;\">\n        <p style=\"margin-bottom:5px;\"><strong>第一步：</strong>请依次手动施展以下招式（不消耗额外动作）：</p>\n        <ul style=\"margin-bottom:10px;\">\n            <li>【干涸大地】</li>\n            <li>【水养四方】</li>\n            <li>【血如泉涌】</li>\n        </ul>\n        <hr style=\"border: 0; border-top: 1px dashed #ccc; margin: 5px 0;\">\n        <p style=\"margin-bottom:5px;\"><strong>第二步：</strong>你已获得全部 6 种负面状态。</p>\n        <p style=\"margin-bottom:5px;\">请手动投掷 <b>${diceCount}d6</b>。</p>\n        <p style=\"margin-bottom:5px;\">根据点数，<b>手动移除</b>对应的状态：</p>\n        <ul style=\"font-size:0.85em; color:#555; column-count: 2; margin: 0;\">\n            <li>1: 禁足</li> <li>2: 错骨</li>\n            <li>3: 定身</li> <li>4: 封招</li>\n            <li>5: 自闭</li> <li>6: 眩晕</li>\n        </ul>\n    </div>\n</div>`;\n\nChatMessage.create({\n    content: content,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]

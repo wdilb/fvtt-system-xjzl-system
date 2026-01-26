@@ -51,7 +51,7 @@ import { setupSocket } from "./module/socket.mjs";
 import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
 import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
-import { XJZLTurnMarkerManager  } from "./module/combat-turn-marker.mjs";
+import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -74,87 +74,116 @@ Hooks.once("init", async function () {
   // 替换系统的当前战斗指示物
   XJZLTurnMarkerManager.registerSettings();
 
-  //替换系统的测量模板
-  CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
-  // 替换FVTT自带的一定距离计算方式
-  const SquareGrid = foundry.grid.SquareGrid;
+  // 是否启用侠界自定义距离
+  game.settings.register("xjzl-system", "customDistanceRule", {
+    name: "启用侠界自定义距离规则 (1-2-2-2)",
+    hint: "开启后，移动和测量将遵循：直行1，第一步斜行1，后续斜行2的规则，并针对V13地形消耗进行了修正。\n如果关闭，将使用FVTT核心设置（如欧几里得或5-10-5）进行计算。建议开启以获得最佳体验。",
+    scope: "world",      // 世界级设置，保持同步
+    config: true,        // 显示在菜单里
+    default: true,       // 默认开启
+    type: Boolean,
+    requiresReload: true // 重要！修改底层原型必须刷新页面才能生效/还原
+  });
+  // 获取用户设置
+  const useCustomRule = game.settings.get("xjzl-system", "customDistanceRule");
+  if (useCustomRule) {
 
-  if (!SquareGrid) {
-    console.error("XJZL | 无法找到 SquareGrid 类，移动距离计算修改失败。");
-    return;
-  }
+    //替换系统的测量模板
+    CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
+    // 替换FVTT自带的一定距离计算方式
+    const SquareGrid = foundry.grid.SquareGrid;
 
-  // 2. 保存原始方法 (说不定后面要用到)
-  const originalMeasurePath = SquareGrid.prototype.measurePath;
-
-  // 3. 修改原型 (Prototype)，这会影响所有基于方形网格的场景
-  SquareGrid.prototype.measurePath = function (waypoints, options = {}) {
-
-    // 调用原始方法获取 segments 结构
-    const result = originalMeasurePath.call(this, waypoints, options);
-
-    if (!result || !result.segments || result.segments.length === 0) return result;
-
-    const d = canvas.dimensions;
-    let globalDiagonalCount = 0; // 全局斜向计数 (跨越多个线段累加)
-    let runningTotal = 0;
-
-    for (let i = 0; i < result.segments.length; i++) {
-      const s = result.segments[i];
-      const p0 = waypoints[i];
-      const p1 = waypoints[i + 1];
-
-      if (!p0 || !p1) continue;
-
-      // 计算像素差
-      const dxPixels = p1.x - p0.x;
-      const dyPixels = p1.y - p0.y;
-
-      // 转换为格子数
-      const nx = Math.round(Math.abs(dxPixels) / d.size);
-      const ny = Math.round(Math.abs(dyPixels) / d.size);
-
-      // 计算直行和斜行步数
-      const diagonalSteps = Math.min(nx, ny);
-      const straightSteps = Math.abs(ny - nx);
-
-      // === 核心计费逻辑 (1-2-2-2...) ===
-      let segGridCost = straightSteps;
-
-      for (let j = 0; j < diagonalSteps; j++) {
-        // 第一步斜行算1，之后所有斜行都算2 (1-2-2-2 规则)
-        if (globalDiagonalCount === 0) {
-          segGridCost += 1;
-        } else {
-          segGridCost += 2;
-        }
-        globalDiagonalCount++;
-      }
-
-      // 计算距离数值
-      const segDistance = segGridCost * d.distance;
-
-      // 回写数据
-      s.distance = segDistance;
-      if (typeof s.cost !== "undefined") {
-        s.cost = segGridCost;
-      }
-
-      // 更新显示的标签
-      // V13 这里的 label 属性直接控制 Ruler 上的显示
-      s.label = String(Math.round(segDistance * 100) / 100); // 加个取整防止浮点数精度问题
-
-      runningTotal += segDistance;
+    if (!SquareGrid) {
+      console.error("XJZL | 无法找到 SquareGrid 类，移动距离计算修改失败。");
+      return;
     }
 
-    // 更新总结果
-    result.distance = runningTotal;
-    if (typeof result.totalDistance !== "undefined") result.totalDistance = runningTotal;
+    // 2. 保存原始方法 (说不定后面要用到)
+    const originalMeasurePath = SquareGrid.prototype.measurePath;
 
-    return result;
-  };
+    // 3. 修改原型 (Prototype)，这会影响所有基于方形网格的场景
+    SquareGrid.prototype.measurePath = function (waypoints, options = {}) {
 
-  console.log("XJZL | 已成功应用自定义距离移动计算 (SquareGrid Prototype)。");
+      // 调用原始方法获取 segments 结构
+      const result = originalMeasurePath.call(this, waypoints, options);
+
+      if (!result || !result.segments || result.segments.length === 0) return result;
+
+      const d = canvas.dimensions;
+      let globalDiagonalCount = 0; // 全局斜向计数 (跨越多个线段累加)
+      let runningTotal = 0;
+
+      for (let i = 0; i < result.segments.length; i++) {
+        const s = result.segments[i];
+        const p0 = waypoints[i];
+        const p1 = waypoints[i + 1];
+
+        if (!p0 || !p1) continue;
+
+        // 计算像素差
+        const dxPixels = p1.x - p0.x;
+        const dyPixels = p1.y - p0.y;
+
+        // 转换为格子数
+        const nx = Math.round(Math.abs(dxPixels) / d.size);
+        const ny = Math.round(Math.abs(dyPixels) / d.size);
+
+        // 计算直行和斜行步数
+        const diagonalSteps = Math.min(nx, ny);
+        const straightSteps = Math.abs(ny - nx);
+
+        // === 核心计费逻辑 (1-2-2-2...) ===
+        let segGridCost = straightSteps;
+
+        for (let j = 0; j < diagonalSteps; j++) {
+          // 第一步斜行算1，之后所有斜行都算2 (1-2-2-2 规则)
+          if (globalDiagonalCount === 0) {
+            segGridCost += 1;
+          } else {
+            segGridCost += 2;
+          }
+          globalDiagonalCount++;
+        }
+
+        // 提取地形倍率 (Terrain Factor)
+        // 仅在对角线规则设为 "等距 (1-1-1)"下才不会出错
+        // 那么原始方法认为的“标准几何步数”就是切比雪夫距离：Max(nx, ny)
+        const standardGeometricSteps = Math.max(nx, ny);
+
+        let terrainMultiplier = 1;
+
+        // 如果原始距离与标准几何距离不符，说明有地形消耗（例如困难地形 x2）
+        // 我们通过除法把这个倍率提取出来
+        if (standardGeometricSteps > 0 && typeof s.cost === "number") {
+          terrainMultiplier = s.cost / standardGeometricSteps;
+        }
+
+        // 计算距离数值
+        const finalSegCost = segGridCost * terrainMultiplier;
+        const finalSegDistance = finalSegCost * d.distance;
+
+        // 回写数据
+        s.distance = finalSegDistance;
+        if (typeof s.cost !== "undefined") {
+          s.cost = finalSegCost;
+        }
+
+        // 更新显示的标签
+        // V13 这里的 label 属性直接控制 Ruler 上的显示
+        s.label = String(Math.round(finalSegDistance * 100) / 100); // 加个取整防止浮点数精度问题
+
+        runningTotal += finalSegDistance;
+      }
+
+      // 更新总结果
+      result.distance = runningTotal;
+      if (typeof result.totalDistance !== "undefined") result.totalDistance = runningTotal;
+
+      return result;
+    };
+
+    console.log("XJZL | 已成功应用自定义距离移动计算 (SquareGrid Prototype)。");
+  }
 
   // 注销默认表单
   foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", "ActiveEffectConfig");

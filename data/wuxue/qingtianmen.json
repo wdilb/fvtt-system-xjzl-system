@@ -1217,7 +1217,7 @@
                         {
                             "label": "反击获得燧火",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算效果(暴击骰减免)\nconst stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst critReduct = -1 + (lvl - 1) * (-1);\n\nconst suihuo = thisItem.effects.getName(\"燧火\");\nif (suihuo) {\n    const effectData = suihuo.toObject();\n    // 动态修改暴击骰减免\n    effectData.changes[0].value = critReduct;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【燧火】\");\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算效果(暴击骰-X)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst critReduct = -1 + (lvl - 1) * (-1);\n\nconst suihuo = thisItem.effects.getName(\"燧火\");\nif (suihuo) {\n    const effectData = suihuo.toObject();\n    // 动态修改暴击骰减免 (同时改外功和内功)\n    effectData.changes[0].value = String(critReduct);\n    effectData.changes[1].value = String(critReduct);\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【燧火】\");\n}",
                             "active": true
                         }
                     ]
@@ -1382,7 +1382,7 @@
                                     "label": "燧火暴击施加烙伤",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "\n                    // 必须暴击才触发\n                    if (!args.isCrit) return;\n                    \n                    // 获取烙伤模板\n                    // 因为脚本在AE上运行，thisItem是AE。需要找到所属的物品(Wuxue)。\n                    // AE.origin 指向的是 Item.uuid。我们可以通过 fromUuidSync 获取。\n                    // 但 args.item 已经是当前攻击使用的物品了，直接用 args.item 即可。\n                    \n                    const laoshang = args.item.effects.getName(\"烙伤\");\n                    if (laoshang) {\n                        await game.xjzl.api.effects.addEffect(args.target, laoshang);\n                        ui.notifications.info(\"燧火暴击：目标被施加【烙伤】\");\n                    }\n                "
+                                    "script": "\n                    // 必须暴击才触发\n                    if (!args.isCrit) return;\n                    \n                    // 获取烙伤模板\n                    const laoshang = args.item.effects.getName(\"烙伤\");\n                    if (laoshang) {\n                        await game.xjzl.api.effects.addEffect(args.target, laoshang);\n                        ui.notifications.info(\"燧火暴击：目标被施加【烙伤】\");\n                    }\n                "
                                 }
                             ]
                         }
@@ -1390,6 +1390,11 @@
                     "changes": [
                         {
                             "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "-1"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
                             "mode": 2,
                             "value": "-1"
                         }
@@ -1436,9 +1441,14 @@
                             "value": "10"
                         },
                         {
-                            "key": "flags.xjzl-system.critThresholdMod",
+                            "key": "system.combat.crit_waigong",
                             "mode": 2,
-                            "value": "20"
+                            "value": "-20"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "-20"
                         }
                     ]
                 }

@@ -413,9 +413,9 @@
             "tier": 3,
             "element": "yin",
             "sect": "tangmen",
-            "description": "<p>唐门内功集大成者，以五毒化金木水火土修成特殊奇毒，内炼于身，外修于形。大成后力道大增，身法迅捷如雷，且举手投足间奇毒肆虐，控如使臂，极为可怕。</p>",
+            "description": "<p>唐门内功集大成者，以五毒化金木水火土修成特殊奇毒，内炼于身，外修于形。大成后力道大增，身法迅捷如雷，且举手投足间奇毒肆虐，控如使臂，极为可怕。</p><p><strong>属性：</strong>阴柔 <strong>悟性：</strong>11</p>",
             "requirement": "悟性需求: 11",
-            "automationNote": "完全自动化。自动计数出招，自动施加五毒，自动检测引爆。",
+            "automationNote": "完全自动化。Stage1/2通过Flag传递触发状态；Stage3无条件触发。自动处理引爆/施加互斥逻辑。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -426,19 +426,19 @@
                         "qigan": 11,
                         "shencai": 13
                     },
-                    "description": "<p>领悟运功特效：每第三次出招，为敌人添加“五毒”，持续两回合。<br>五毒：你在每回合末受到20点毒素伤害。</p>",
+                    "description": "<p>领悟运功特效：每第三次出招，为敌人添加“五毒”，持续两回合。<br>五毒：你在每回合末受到 20 点毒素伤害。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "五毒计数与施加",
+                            "label": "计数器 (3次)",
                             "trigger": "attack",
-                            "script": "let count = actor.getFlag('xjzl-system', 'neigong_wudu_count') || 0;\ncount++;\nif (count % 3 === 0) {\n    args.flags.applyWudu = true; // 传递给 HIT 脚本\n}\nawait actor.setFlag('xjzl-system', 'neigong_wudu_count', count);",
+                            "script": "// 1. 读取计数\nlet count = (actor.getFlag('xjzl-system', 'neigong_wudu_count') || 0) + 1;\nlet isActive = false;\n\n// 2. 判定触发\nif (count >= 3) {\n    isActive = true;\n    actor.showFloatyText(\"五毒运转: 3/3\", {fill: \"#00FF00\"});\n    count = 0;\n} else {\n    actor.showFloatyText(`五毒运转: ${count}/3`);\n}\n\n// 3. 存储状态供HIT使用\nawait actor.setFlag('xjzl-system', 'neigong_wudu_count', count);\nawait actor.setFlag('xjzl-system', 'neigong_wudu_active', isActive);",
                             "active": true
                         },
                         {
                             "label": "施加五毒",
                             "trigger": "hit",
-                            "script": "if (args.attacker.flags.applyWudu) {\n    // 检查是否存在\n    const existing = args.target.effects.find(e => e.name === '五毒');\n    if (!existing) {\n        const effect = thisItem.effects.getName('五毒');\n        if (effect) {\n            const effectData = effect.toObject();\n            delete effectData._id;\n            effectData.duration = { rounds: 2 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info('五毒真经：施加五毒');\n        }\n    }\n}",
+                            "script": "// 读取 ATTACK 阶段存入的 Flag\nconst isActive = actor.getFlag('xjzl-system', 'neigong_wudu_active');\n\nif (isActive) {\n    const effTemplate = thisItem.effects.getName(\"五毒\").toObject();\n    delete effTemplate._id;\n    effTemplate.origin = thisItem.uuid;\n    effTemplate.duration = { rounds: 2 };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effTemplate);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"padding: 5px 10px;\"><div style=\"color:purple;\"><b>${args.attacker.name}</b> 运转五毒真经，掌蕴剧毒！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: args.attacker})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -452,19 +452,19 @@
                         "qigan": 21,
                         "shencai": 23
                     },
-                    "description": "<p>小成运功特效：每第二次出招，为敌人添加“五毒”，持续三回合。<br>·若对方已经存在“五毒”，则毒发造成40点毒素伤害，移除目标“五毒”。</p>",
+                    "description": "<p>小成运功特效：每第二次出招，为敌人添加“五毒”，持续三回合。<br>·若对方已经存在“五毒”，则毒发造成 40 点毒素伤害，移除目标“五毒”。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "五毒计数",
+                            "label": "计数器 (2次)",
                             "trigger": "attack",
-                            "script": "let count = actor.getFlag('xjzl-system', 'neigong_wudu_count') || 0;\ncount++;\nif (count % 2 === 0) {\n    args.flags.applyWudu = true;\n}\nawait actor.setFlag('xjzl-system', 'neigong_wudu_count', count);",
+                            "script": "let count = (actor.getFlag('xjzl-system', 'neigong_wudu_count') || 0) + 1;\nlet isActive = false;\n\nif (count >= 2) {\n    isActive = true;\n    actor.showFloatyText(\"五毒运转: 2/2\", {fill: \"#00FF00\"});\n    count = 0;\n} else {\n    actor.showFloatyText(`五毒运转: ${count}/2`);\n}\n\nawait actor.setFlag('xjzl-system', 'neigong_wudu_count', count);\nawait actor.setFlag('xjzl-system', 'neigong_wudu_active', isActive);",
                             "active": true
                         },
                         {
-                            "label": "施加/引爆五毒",
+                            "label": "施加或引爆",
                             "trigger": "hit",
-                            "script": "if (args.attacker.flags.applyWudu) {\n    const existing = args.target.effects.find(e => e.name === '五毒');\n    if (existing) {\n        await args.target.applyDamage({ amount: 40, type: 'poison', isHit: true, attacker: args.attacker });\n        await existing.delete();\n        ui.notifications.info('五毒真经：毒发！');\n    } else {\n        const effect = thisItem.effects.getName('五毒');\n        if (effect) {\n            const effectData = effect.toObject();\n            delete effectData._id;\n            effectData.duration = { rounds: 3 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info('五毒真经：施加五毒');\n        }\n    }\n}",
+                            "script": "const isActive = actor.getFlag('xjzl-system', 'neigong_wudu_active');\n\n// 只有当计数器满足条件，试图施加时，才进行后续判定\nif (isActive) {\n    const existing = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'wudu');\n    \n    if (existing) {\n        // A. 试图施加但已有 -> 引爆\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\" style=\"padding: 5px 10px;\"><div style=\"color:purple;font-weight:bold;font-size:1.1em;\"><i class=\"fas fa-skull-crossbones\"></i> 毒素引爆！造成40毒素伤害！</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: args.attacker})\n        });\n        \n        await args.target.applyDamage({\n            amount: 40,\n            type: 'poison',\n            attacker: args.attacker,\n            isHit: true\n        });\n        \n        await existing.delete();\n        actor.showFloatyText(\"五毒引爆!\", {fill: \"#800080\", fontSize: 40});\n    } else {\n        // B. 试图施加且没有 -> 施加 (3回合)\n        const effTemplate = thisItem.effects.getName(\"五毒\").toObject();\n        delete effTemplate._id;\n        effTemplate.origin = thisItem.uuid;\n        effTemplate.duration = { rounds: 3 };\n        \n        await game.xjzl.api.effects.addEffect(args.target, effTemplate);\n        \n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\" style=\"padding: 5px 10px;\"><div style=\"color:purple;\">毒气入体，<b>${args.target.name}</b> 中毒了！</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: args.attacker})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -478,25 +478,19 @@
                         "qigan": 31,
                         "shencai": 33
                     },
-                    "description": "<p>圆满运功特效：每次出招，为敌人添加“五毒”，持续三回合。<br>·若对方已经存在“五毒”，则毒发造成50点毒素伤害，移除目标“五毒”。</p><p>修满特效：气血+80，内力+40，内息+10。</p>",
+                    "description": "<p>圆满运功特效：每次出招，为敌人添加“五毒”，持续三回合。<br>·若对方已经存在“五毒”，则毒发造成 50 点毒素伤害，移除目标“五毒”。</p><p>修满[永久]：气血+80，内力+40，内息+10。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "每次出招施毒",
-                            "trigger": "attack",
-                            "script": "args.flags.applyWudu = true;",
-                            "active": true
-                        },
-                        {
-                            "label": "施加/引爆五毒",
+                            "label": "施加或引爆",
                             "trigger": "hit",
-                            "script": "if (args.attacker.flags.applyWudu) {\n    const existing = args.target.effects.find(e => e.name === '五毒');\n    if (existing) {\n        await args.target.applyDamage({ amount: 50, type: 'poison', isHit: true, attacker: args.attacker });\n        await existing.delete();\n        ui.notifications.info('五毒真经：毒发！');\n    } else {\n        const effect = thisItem.effects.getName('五毒');\n        if (effect) {\n            const effectData = effect.toObject();\n            delete effectData._id;\n            effectData.duration = { rounds: 3 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info('五毒真经：施加五毒');\n        }\n    }\n}",
+                            "script": "// Stage 3: 无条件触发，无需检查 Flag\nconst existing = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'wudu');\n\nif (existing) {\n    // A. 引爆逻辑 (50点)\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"padding: 5px 10px;\"><div style=\"color:purple;font-weight:bold;font-size:1.2em;\"><i class=\"fas fa-biohazard\"></i> 毒素引爆！造成50毒素伤害！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: args.attacker})\n    });\n    \n    await args.target.applyDamage({\n        amount: 50,\n        type: 'poison',\n        attacker: args.attacker,\n        isHit: true\n    });\n    await existing.delete();\n    actor.showFloatyText(\"五毒引爆!\", {fill: \"#800080\", fontSize: 48});\n} else {\n    // B. 施加逻辑 (3回合)\n    const effTemplate = thisItem.effects.getName(\"五毒\").toObject();\n    delete effTemplate._id;\n    effTemplate.origin = thisItem.uuid;\n    effTemplate.duration = { rounds: 3 };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effTemplate);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"padding: 5px 10px;\"><div style=\"color:purple;\">毒气入体，<b>${args.target.name}</b> 中毒了！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: args.attacker})\n    });\n}",
                             "active": true
                         }
                     ]
                 }
             },
-            "masteryEffect": "",
+            "masteryEffect": "<p>修满[永久]：气血+80，内力+40，内息+10。</p>",
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",
@@ -522,12 +516,15 @@
             {
                 "name": "五毒",
                 "icon": "icons/svg/biohazard.svg",
+                "description": "你在每回合末受到 20 点毒素伤害。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "wudu",
+                        "stackable": false,
                         "scripts": [
                             {
+                                "label": "毒发",
                                 "trigger": "turnEnd",
                                 "script": "await actor.applyDamage({amount: 20, type: 'poison', isHit: true});",
                                 "active": true

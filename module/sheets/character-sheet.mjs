@@ -58,6 +58,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             refundMoveXP: XJZLCharacterSheet.prototype._onRefundMoveXP,
             investArtXP: XJZLCharacterSheet.prototype._onInvestArtXP,
             refundArtXP: XJZLCharacterSheet.prototype._onRefundArtXP,
+            investJingmaiXP: XJZLCharacterSheet.prototype._onInvestJingmaiXP,
+            refundJingmaiXP: XJZLCharacterSheet.prototype._onRefundJingmaiXP,
+
             togglePin: XJZLCharacterSheet.prototype._onTogglePin, //标记常用武学
             manageXP: XJZLCharacterSheet.prototype._onManageXP,  //管理修为
             viewHistory: XJZLCharacterSheet.prototype._onViewHistory, //查看修为日志
@@ -67,6 +70,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // --- 其他 ---
             //删除状态
             deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect,
+
+            //切换经脉显示
+            toggleJingmaiAttemptMode: XJZLCharacterSheet.prototype._onToggleJingmaiAttemptMode,
 
             //使用招式
             rollMove: XJZLCharacterSheet.prototype._onRollMove,
@@ -723,7 +729,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         context.pinnedMoves.push({
                             name: move.name, type: move.type, isUltimate: move.isUltimate, computedLevel: move.computedLevel,
                             range: move.range, derived: move.derived, tooltip: move.tooltip, currentCost: move.currentCost,
-                            parentName: item.name, itemId: item.id, moveId: moveId, isPinned: true
+                            parentName: item.name, itemId: item.id, moveId: moveId, isPinned: true, actionCost: move.actionCost
                         });
                     }
                 }
@@ -817,6 +823,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 tooltip: `<div style='text-align:left; max-width:250px;'><div style='margin-bottom:4px;'><b>条件:</b> ${game.i18n.localize(`XJZL.Jingmai.Conditions.${capKey}`)}</div><div style='color:#ccc;'><b>效果:</b> ${game.i18n.localize(`XJZL.Jingmai.Effects.${capKey}`)}</div></div>`
             };
         });
+
+        // 将当前的视图模式状态传给 HBS
+        context.jingmaiAttemptMode = this._jingmaiAttemptMode || false;
 
         // =====================================================
         // ✦ 8. 物品清单(Inventory)
@@ -1865,6 +1874,33 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
     }
 
+    /**
+     * 经脉突破尝试
+     */
+    async _onInvestJingmaiXP(event, target) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const key = target?.dataset?.jingmaiKey;
+        if (!key) return;
+
+        await this.document.investJingmai(key);
+    }
+
+    /**
+     * 经脉回退（只用于意外点错的情况）
+     */
+    async _onRefundJingmaiXP(event, target) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const key = target?.dataset?.jingmaiKey;
+        if (!key) return;
+
+        await this.document.refundJingmai(key);
+    }
+
+
     // --- 其他 ---
 
     async _onToggleSubTab(event, target) {
@@ -2454,6 +2490,38 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             await item.delete();
 
             ui.notifications.info(`已出售 ${item.name} (x${quantity})，获得 ${totalCost} 银两。`);
+        }
+    }
+
+    /** 
+     * 经脉栏显示切换
+     */
+    async _onToggleJingmaiAttemptMode(event) {
+        event.preventDefault();
+
+        // 1. 先切换内存中的状态变量
+        this._jingmaiAttemptMode = !this._jingmaiAttemptMode;
+
+        // 2. 找到经脉 Tab 的 DOM 元素
+        const tab = this.element.querySelector('section.tab[data-tab="jingmai"]');
+        if (!tab) return;
+
+        // 3. 根据【状态】强制设置 CSS 类
+        // 设置css而不是重绘性能更好
+        tab.classList.toggle("attempt-mode", this._jingmaiAttemptMode);
+
+        // 4. 切换按钮图标
+        const btnIcon = event.currentTarget.querySelector("i");
+        if (btnIcon) {
+            if (this._jingmaiAttemptMode) {
+                // 进入突破模式 -> 显示返回图标
+                btnIcon.classList.remove("fa-right-left");
+                btnIcon.classList.add("fa-rotate-left");
+            } else {
+                // 回到正常模式 -> 显示切换图标
+                btnIcon.classList.remove("fa-rotate-left");
+                btnIcon.classList.add("fa-right-left");
+            }
         }
     }
 }

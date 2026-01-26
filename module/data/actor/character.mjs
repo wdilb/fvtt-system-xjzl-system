@@ -54,6 +54,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       artsSchema[artKey] = makeArtSchema();
     }
 
+    // 动态构建经脉尝试次数 Schema，复用 Config 定义
+    const attemptsSchema = {};
+    for (const key of Object.keys(CONFIG.XJZL.acupoints)) {
+      attemptsSchema[key] = new fields.NumberField({ initial: 0, min: 0, integer: true });
+    }
+
     // [重构注]: 战斗属性 (combat) 和修正 (makeModField) 大部分已从 Schema 移除
     // 它们将在 prepareBaseData 中重建为内存对象，不占用数据库
 
@@ -192,6 +198,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
       // === 经脉系统 (jingmai) ===
       jingmai: new fields.SchemaField({
+        // 0. 十二正经突破记录
+        attempts: new fields.SchemaField(attemptsSchema),
+
         // 1. 十二正经 (Standard 12)
         standard: new fields.SchemaField({
           // 第一关
@@ -1529,6 +1538,19 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       cult.artsTotal += spec;
       cult.generalTotal += gen;
     }
+
+    // 4. 经脉（Jingmai）
+    const attempts = this.jingmai?.attempts || {};
+    let jingmaiAttempts = 0;
+
+    for (const v of Object.values(attempts)) {
+      const n = Number(v) || 0;
+      if (n > 0) jingmaiAttempts += n;
+    }
+
+    const jingmaiSpent = jingmaiAttempts * 500;
+
+    cult.generalTotal += jingmaiSpent;
 
     // --- C. 汇总全系统总修为 (Grand Total) ---
     cult.all = cult.general + cult.neigong + cult.wuxue + cult.arts;
