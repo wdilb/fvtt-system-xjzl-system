@@ -1934,9 +1934,9 @@
             "tier": 1,
             "element": "yin",
             "sect": "jianghushili",
-            "description": "静卧涯岛，观山岚所悟，是江湖奇人所创，沉静心灵，怒静结合，委实神奇。\n圆满运功特效：你无法获得怒气，施展人级招式需要消耗怒气时，改为消耗所需怒气值*5的内力。\n修满特效：修满[永久]：气血+10，内力+15。",
+            "description": "静卧涯岛，观山岚所悟，是江湖奇人所创，沉静心灵，怒静结合，委实神奇。<br><strong>圆满运功特效：</strong>你无法获得怒气，施展人级招式需要消耗怒气时，改为消耗所需怒气值*5的内力。<br><strong>修满特效：</strong>修满[永久]：气血+10，内力+15。",
             "requirement": "悟性2",
-            "automationNote": "完全自动化",
+            "automationNote": "完全自动化。通过内存修改实现了怒气消耗的动态替换，并发送聊天卡片记录消耗。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1977,15 +1977,15 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "观澜诀-不怒",
+                            "label": "观澜诀-不怒与消耗置换",
                             "trigger": "passive",
-                            "script": "actor.setFlag('xjzl-system', 'noRecoverRage', true);",
+                            "script": "// 1. 内存修改状态，不写数据库\nactor.xjzlStatuses.noRecoverRage = true;\n\n// 2. 遍历招式，欺骗系统检测\n// 利用 itemTypes 缓存进行快速遍历\nfor (const item of actor.itemTypes.wuxue) {\n    for (const move of item.system.moves) {\n        // 判定人级 (兼容招式独立tier和书本tier)\n        const tier = move.computedTier || move.tier || item.system.tier || 1;\n        \n        // 仅处理: 是人级 且 当前有怒气消耗 的招式\n        if (tier === 1 && move.currentCost?.rage > 0) {\n            // 备份原始消耗到内存，供 Attack 脚本使用\n            move.originalRageCost = move.currentCost.rage;\n            // 篡改当前消耗为0，绕过系统 System.roll() 的资源检查\n            move.currentCost.rage = 0;\n        }\n    }\n}",
                             "active": true
                         },
                         {
-                            "label": "观澜诀-怒气转化",
+                            "label": "观澜诀-执行转化扣除",
                             "trigger": "attack",
-                            "script": "if (args.move.tier === 1 && args.move.currentCost.rage > 0) { const mpCost = args.move.currentCost.rage * 5; if (S.resources.mp.value < mpCost) { ui.notifications.warn('内力不足以转化怒气消耗！'); args.flags.abort = true; } else { await actor.update({'system.resources.mp.value': S.resources.mp.value - mpCost}); ui.notifications.info(`【观澜诀】消耗 ${mpCost} 内力代替怒气`); } }",
+                            "script": "// 1. 确认是人级\nconst tier = args.move.computedTier || args.move.tier || 1;\nif (tier !== 1) return;\n\n// 2. 获取应扣怒气\nlet rageCost = args.move.originalRageCost;\nif (rageCost === undefined) {\n    const lvl = Math.max(0, (args.move.computedLevel || 1) - 1);\n    rageCost = args.move.costs?.rage?.[lvl] || 0;\n}\n\n// 3. 执行转化逻辑\nif (rageCost > 0) {\n    const mpCost = rageCost * 5;\n    \n    // 检查内力余额\n    if (S.resources.mp.value < mpCost) {\n        ui.notifications.warn(`【观澜诀】内力不足以转化怒气！(需要 ${mpCost} 点)`);\n        args.flags.abort = true;\n    } else {\n        // 手动扣除内力\n        const newMp = Math.max(0, S.resources.mp.value - mpCost);\n        await actor.update({'system.resources.mp.value': newMp});\n        \n        // 视觉反馈\n        if(actor.showFloatyText) actor.showFloatyText(`-${mpCost} 内力`, {fill: \"#0000FF\"});\n        \n        // 发送聊天卡片 (替换原有的 ui.notifications)\n        ChatMessage.create({\n            user: game.user.id,\n            speaker: ChatMessage.getSpeaker({ actor: actor }),\n            content: `<div class=\"xjzl-chat-card\" style=\"font-size:0.9em;\">\n                <div style=\"border-bottom:1px solid #ccc; margin-bottom:5px; font-weight:bold; color:#2c3e50;\">\n                    观澜诀 - 运功化气\n                </div>\n                <div>\n                    消耗 <span style=\"color:#0000FF; font-weight:bold;\">${mpCost} 内力</span> 代替了 <span style=\"color:#8B0000; font-weight:bold;\">${rageCost} 怒气</span>\n                </div>\n            </div>`\n        });\n    }\n}",
                             "active": true
                         }
                     ]
