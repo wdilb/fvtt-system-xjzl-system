@@ -709,12 +709,38 @@
         "name": "虚寂剑法（地）",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+        "effects": [
+            {
+                "name": "虚寂",
+                "icon": "icons/svg/sound.svg",
+                "description": "免疫“耳鸣”请手动；施展《虚寂剑法》暴击骰-2。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xuji",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-2"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
+            }
+        ],
         "system": {
             "category": "wuxue",
             "sect": "huashanpai",
             "tier": 2,
-            "description": "<p>气宗绝技，无形无声，寂静玄妙。</p>",
-            "requirements": "剑-单剑，气宗",
+            "description": "<p>气宗绝技，无形无声，寂静玄妙。</p><p><strong>需求：</strong>剑-单剑，气宗</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑-单剑；气宗",
             "moves": [
                 {
                     "name": "视而不见",
@@ -722,11 +748,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，陡射无形剑气，直取要害，造成 0.5 内息点内功伤害，招式无视目标内功防御。</p><p>若有敌人处于半空中，可消耗反应动作释放此招，立于原地飞射剑气，对其造成伤害。</p><p>·施展该招式时，自身不受目盲状态影响。</p>",
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害完全自动化。无视防御已实现。目盲免疫需手动。",
+                    "description": "<p>主要动作，陡射无形剑气，直取要害，造成 0.5 内息点内功伤害，招式无视目标内功防御。</p><p>若有敌人处于半空中，可消耗反应动作释放此招，立于原地飞射剑气，对其造成伤害。</p><p>·施展该招式时，自身不受目盲状态影响。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "无视内防自动。若自身目盲，脚本会自动抵消劣势以模拟“不受影响”。对空反应需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -746,14 +772,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "无视内防",
+                            "label": "无视防御",
                             "trigger": "preDamage",
-                            "script": "args.config.ignoreDefense = true;"
+                            "script": "args.config.ignoreDefense = true;",
+                            "active": true
                         },
                         {
                             "label": "无视目盲",
                             "trigger": "attack",
-                            "script": "ui.notifications.info(\"此招式不受目盲影响，请忽略相关的劣势惩罚。\");"
+                            "script": "if (actor.xjzlStatuses.blind) {\n    args.flags.level += 1; // 抵消目盲的劣势(-1)\n    ui.notifications.info(\"心眼通明，无视目盲劣势！\");\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -761,12 +789,13 @@
                     "name": "听而不闻",
                     "type": "stance",
                     "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "sword",
-                    "description": "<p>次要动作，淡笑自若，处变不惊，开启架招，同时进入“虚寂”，持续一回合或被击破架招。</p><p>虚寂：你免疫“耳鸣”；你施展《虚寂剑法》暴击骰-2。</p>",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "automationNote": "格挡加成自动化。虚寂效果自动化。",
+                    "description": "<p>次要动作，淡笑自若，处变不惊，开启架招，同时进入“虚寂”，持续一回合或被击破架招。</p><p><strong>虚寂：</strong>你免疫“耳鸣”；你施展《虚寂剑法》暴击骰-2。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+                    "automationNote": "开启自动获得[虚寂]。虚寂降低暴击门槛自动，免疫耳鸣请手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -778,36 +807,12 @@
                             6
                         ]
                     },
-                    "effects": [
-                        {
-                            "name": "虚寂",
-                            "icon": "icons/svg/sound.svg",
-                            "description": "免疫耳鸣，虚寂剑法暴击门槛降低2。",
-                            "transfer": false,
-                            "changes": [
-                                {
-                                    "key": "system.combat.crit_waigong",
-                                    "mode": 2,
-                                    "value": "-2"
-                                },
-                                {
-                                    "key": "system.combat.crit_neigong",
-                                    "mode": 2,
-                                    "value": "-2"
-                                }
-                            ],
-                            "flags": {
-                                "xjzl-system": {
-                                    "stackable": false
-                                }
-                            }
-                        }
-                    ],
                     "scripts": [
                         {
-                            "label": "添加虚寂",
+                            "label": "开启获得虚寂",
                             "trigger": "attack",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"虚寂\").toObject();\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"虚寂\").toObject();\neff.duration = { rounds: rounds };\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
                         }
                     ]
                 },
@@ -817,11 +822,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，身形飘然，挥洒无声剑气，对目标造成 0.4 内息点内功伤害。</p><p>击中无架招目标时，使其颅内声音大作，陷入“耳鸣”一回合。</p>",
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。耳鸣效果自动化。",
+                    "description": "<p>主要动作，身形飘然，挥洒无声剑气，对目标造成 0.4 内息点内功伤害。</p><p>击中无架招目标时，使其颅内声音大作，陷入“耳鸣”一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "命中无架招目标自动施加[耳鸣]。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -841,9 +846,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "耳鸣效果",
+                            "label": "施加耳鸣",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, args.move.computedLevel||1);\n    const rounds = 1 + (lvl - 1);\n    const effect = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"deaf\"));\n    effect.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effect);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -854,11 +860,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，剑招肆意挥洒而出，气象万千，对目标造成 0.7 内息点内功伤害。</p><p>·若对方没有反应动作，招式伤害+20。</p><p>·你每精通一式剑招，招式伤害+5。</p>",
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。精通加成与无反应加成需手动。",
+                    "description": "<p>主要动作，剑招肆意挥洒而出，气象万千，对目标造成 0.7 内息点内功伤害。</p><p>·若对方没有反应动作，招式伤害+20。</p><p>·你每精通一式剑招，招式伤害+5。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "自动统计精通剑招数并计算加成。无反应加成需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -883,9 +889,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "提示手动加成",
+                            "label": "精通剑招加成",
                             "trigger": "calc",
-                            "script": "args.output.bonusDesc.push(\"未检测精通数，请根据精通剑招数手动增加伤害 (每式+5)\");\nargs.output.bonusDesc.push(\"若目标无反应动作，请手动+20伤害\");"
+                            "script": "// 统计精通剑招数 (Stage >= 3 视为精通)\nlet count = 0;\nfor (const item of actor.itemTypes.wuxue) {\n    for (const m of item.system.moves) {\n        if (m.weaponType === \"sword\" && (m.computedLevel || 0) >= 3) {\n            count++;\n        }\n    }\n}\nconst bonus = count * 5;\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`精通剑招(${count}式) +${bonus}`);\n}\nargs.output.bonusDesc.push(\"若目标无反应动作，请手动+20伤害\");",
+                            "active": true
                         }
                     ]
                 }
@@ -1787,20 +1794,26 @@
             "category": "sanshou",
             "sect": "huashanpai",
             "tier": 1,
-            "description": "<p>华山弟子奕剑气布阵之法。</p>",
-            "requirements": "需求：剑、剑匣 属性：柔",
+            "description": "<p>华山弟子奕剑气布阵之法。</p><p><strong>需求：</strong>剑、剑匣</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "剑、剑匣",
             "moves": [
                 {
                     "name": "拭剑听风",
                     "type": "qi",
-                    "element": "rou",
                     "actionType": "buff",
+                    "element": "rou",
                     "damageType": "none",
                     "weaponType": "sword",
                     "range": "5米",
+                    "targetInfo": "范围",
                     "actionCost": "次要动作",
-                    "description": "<p>拍剑出匣，剑舞纷飞，选择范围内一空格在其周围 3 米范围建立‘听风’，持续三回合。</p><p>听风：处于其中的友方单位招式伤害+5。</p>",
-                    "automationNote": "手动处理光环位置与特效添加。",
+                    "description": "<p>拍剑出匣，剑舞纷飞，选择范围内一空格在其周围 3 米范围建立‘听风’，持续三回合。</p><p><strong>听风：</strong>处于其中的友方单位招式伤害+5。</p><p><strong>升级：</strong>气阵的伤害再+5 点，内力消耗+4。</p>",
+                    "automationNote": "光环/阵法类。请根据当前招式等级，手动将物品特效栏中对应的Buff应用给进入范围的友方。",
+                    "calculation": {
+                        "base": 5,
+                        "growth": 5,
+                        "scalings": []
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -1818,31 +1831,85 @@
                             0
                         ]
                     },
-                    "calculation": {
-                        "base": 5,
-                        "growth": 5,
-                        "scalings": []
-                    }
+                    "scripts": [
+                        {
+                            "label": "阵法提示",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 5 + (lvl - 1) * 5;\nui.notifications.info(`已建立 [拭剑听风] (伤害+${bonus})。请打开特效栏手动应用。`);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "听风 (领悟)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                    "description": "效果：招式伤害+5。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tingfeng",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 3
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "听风 (掌握)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                    "description": "效果：招式伤害+10。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tingfeng",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 4
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
+                },
+                {
+                    "name": "听风 (精通)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                    "description": "效果：招式伤害+15。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tingfeng",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 5
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "15"
+                        }
+                    ]
                 }
             ]
-        },
-        "effects": [
-            {
-                "name": "听风",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
-                "description": "处于其中的友方单位招式伤害增加。",
-                "duration": {
-                    "rounds": 3
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
-            }
-        ]
+        }
     },
     {
         "name": "光寒九州（地级散手）",
