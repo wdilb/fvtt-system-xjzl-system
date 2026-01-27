@@ -2159,6 +2159,7 @@ export class XJZLActor extends Actor {
           calc: calcResult,
           damageType: config.damageType,
           canCrit: config.canCrit,
+          manualCritMod: config.manualCritMod,
           attackBonus: config.bonusAttack,
           contextLevel: {
             selfLevel: selfLevel,
@@ -2333,6 +2334,7 @@ export class XJZLActor extends Actor {
             bonusDamage: parseInt(getVal("bonusDamage")) || 0,
             manualAttackLevel: parseInt(getVal("manualAttackLevel")) || 0,
             canCrit: getVal("canCrit") !== false,
+            manualCritMod: parseInt(getVal("manualCritMod")) || 0, //手动暴击阈值
 
             // 如果你希望普攻也能临时变更为虚招，可以在这里获取 overrideMoveType
             // 但目前的 rollBasicAttack 逻辑似乎只处理 basic，这里仅作兼容

@@ -1185,7 +1185,10 @@ export class ChatCardManager {
                 // 5. 修正2 (来自 CHECK 脚本，存储在 hitResults 中)
                 const targetScriptMod = res.critThresholdMod || 0;
 
-                const finalThreshold = Math.max(0, baseThreshold - moraleMod - globalScriptMod - targetScriptMod);
+                // 6. 修正3 (来自 玩家弹窗手动输入)
+                const manualMod = flags.manualCritMod || 0;
+
+                const finalThreshold = Math.max(0, baseThreshold - moraleMod - globalScriptMod - targetScriptMod - manualMod);
 
                 // 4. 判定 (命中 且 骰子 >= 动态阈值)
                 if (isHit && die >= finalThreshold) {

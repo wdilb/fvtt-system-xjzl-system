@@ -1360,6 +1360,7 @@ export class XJZLItem extends Item {
             bonusFeint: parseInt(getVal("bonusFeint")) || 0,
             bonusDamage: parseInt(getVal("bonusDamage")) || 0,
             canCrit: getVal("canCrit") !== false,
+            manualCritMod: parseInt(getVal("manualCritMod")) || 0,
             manualAttackLevel: parseInt(getVal("manualAttackLevel")) || 0,
             manualFeintLevel: parseInt(getVal("manualFeintLevel")) || 0,
             isFree: getVal("isFree") === true,
@@ -2035,6 +2036,7 @@ export class XJZLItem extends Item {
             calc: calcResult,          // 完整计算详情 (含 breakdown 文本)
             damageType: damageType,    // 伤害类型 (waigong/neigong/...)
             canCrit: config.canCrit,   //是否可以暴击（反应不能暴击）
+            manualCritMod: config.manualCritMod, //手动暴击阈值
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
             scriptBonusHit: scriptBonusHit, // 保存 ATTACK 脚本算出的全局命中修正
             critThresholdMod: attackContext.flags.critThresholdMod || 0,
