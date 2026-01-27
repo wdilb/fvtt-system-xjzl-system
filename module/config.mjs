@@ -37,7 +37,7 @@ XJZL.elements = {
 
 // 5. 角色属性 (对应 system.stats.xxx)
 XJZL.attributes = {
-liliang: "XJZL.Stats.Liliang",
+  liliang: "XJZL.Stats.Liliang",
   shenfa: "XJZL.Stats.Shenfa",
   tipo: "XJZL.Stats.Tipo",
   neixi: "XJZL.Stats.Neixi",
@@ -284,6 +284,14 @@ XJZL.artIdentities = {
     { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
     { level: 10, titleKey: "10.Title", descKey: "10.Desc" } // 招式伤害暂不自动
   ],
+  // === 演奏 ===
+  yanzou: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" }, // 抱谱童子
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc", bonuses: { "combat.weaponRanks.instrument.r2Bonus": 1 } }, // 乐坊师傅
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc" }, // 正音乐令 (修为减少需手动)
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" }, // 宫廷司乐 (乐器通用需手动)
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc" } // 妙音乐仙 (天籁之音需手动)
+  ],
   // === 棋术 ===
   qishu: [
     { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
@@ -377,55 +385,55 @@ XJZL.creatureTypes = {
 
 // 19. 性别定义
 XJZL.genders = {
-    "male": "XJZL.Info.Genders.Male",
-    "female": "XJZL.Info.Genders.Female"
+  "male": "XJZL.Info.Genders.Male",
+  "female": "XJZL.Info.Genders.Female"
 };
 
 // 20. 门派定义
 XJZL.sects = {
-    "none": "XJZL.Sect.None",
-    "zhengqizong": "XJZL.Sect.ZhengQiZong",
-    "zhenwujiao": "XJZL.Sect.ZhenWuJiao",
-    "wanfosi": "XJZL.Sect.WanFoSi",
-    "xiaoyaopai": "XJZL.Sect.XiaoYaoPai",
-    "qingtianmen": "XJZL.Sect.QingTianMen",
-    "emeipai": "XJZL.Sect.EMeiPai",
-    "huashanpai": "XJZL.Sect.HuaShanPai",
-    "tangmen": "XJZL.Sect.TangMen",
-    "mingjiao": "XJZL.Sect.MingJiao",
-    "gaibang": "XJZL.Sect.GaiBang",
-    "fenghuayuan": "XJZL.Sect.FengHuaYuan",
-    "liushanmen": "XJZL.Sect.LiuShanMen",
-    "jiangnange": "XJZL.Sect.JiangNanGe",
-    "shenfengbang": "XJZL.Sect.ShenFengBang",
-    "sihaibiaomeng": "XJZL.Sect.SiHaiBiaoMeng",
-    "jiangjunying": "XJZL.Sect.JiangJunYing",
-    "wanshoushanzhuang": "XJZL.Sect.WanShouShanZhuang",
-    "baicaoge": "XJZL.Sect.BaiCaoGe",
-    "jianghushili": "XJZL.Sect.JiangHuShiLi"
+  "none": "XJZL.Sect.None",
+  "zhengqizong": "XJZL.Sect.ZhengQiZong",
+  "zhenwujiao": "XJZL.Sect.ZhenWuJiao",
+  "wanfosi": "XJZL.Sect.WanFoSi",
+  "xiaoyaopai": "XJZL.Sect.XiaoYaoPai",
+  "qingtianmen": "XJZL.Sect.QingTianMen",
+  "emeipai": "XJZL.Sect.EMeiPai",
+  "huashanpai": "XJZL.Sect.HuaShanPai",
+  "tangmen": "XJZL.Sect.TangMen",
+  "mingjiao": "XJZL.Sect.MingJiao",
+  "gaibang": "XJZL.Sect.GaiBang",
+  "fenghuayuan": "XJZL.Sect.FengHuaYuan",
+  "liushanmen": "XJZL.Sect.LiuShanMen",
+  "jiangnange": "XJZL.Sect.JiangNanGe",
+  "shenfengbang": "XJZL.Sect.ShenFengBang",
+  "sihaibiaomeng": "XJZL.Sect.SiHaiBiaoMeng",
+  "jiangjunying": "XJZL.Sect.JiangJunYing",
+  "wanshoushanzhuang": "XJZL.Sect.WanShouShanZhuang",
+  "baicaoge": "XJZL.Sect.BaiCaoGe",
+  "jianghushili": "XJZL.Sect.JiangHuShiLi"
 };
 
 // 21. 态度
 XJZL.attitudes = {
-    "respect": "XJZL.Social.Attitude.Respect", // 敬重
-    "disdain": "XJZL.Social.Attitude.Disdain" // 无视
+  "respect": "XJZL.Social.Attitude.Respect", // 敬重
+  "disdain": "XJZL.Social.Attitude.Disdain" // 无视
 };
 
 // 22. 嗜好
 XJZL.hobbies = {
-    "weapon": "XJZL.Hobbies.Weapon", // 喜好兵器
-    "clothes": "XJZL.Hobbies.Clothes", // 喜好华服
-    "jewelry": "XJZL.Hobbies.Jewelry", // 喜好首饰
-    "wxManual": "XJZL.Hobbies.WxManual",   // 喜好秘籍
-    "sqManual": "XJZL.Hobbies.SqManual",   // 喜好秘籍
-    "ngManual": "XJZL.Hobbies.NgManual",   // 喜好秘籍
-    "jyManual": "XJZL.Hobbies.JyManual",   // 喜好秘籍
-    "qizhen": "XJZL.Hobbies.Qizhen",   // 喜好奇珍
-    "food": "XJZL.Hobbies.Food",       // 喜好美食
-    "pills": "XJZL.Hobbies.Pills",     // 喜好丹药
-    "money": "XJZL.Hobbies.Money",     // 喜好金银
-    "beauty": "XJZL.Hobbies.Beauty",   // 喜好美色
-    "antique": "XJZL.Hobbies.Antique"  // 喜好古玩
+  "weapon": "XJZL.Hobbies.Weapon", // 喜好兵器
+  "clothes": "XJZL.Hobbies.Clothes", // 喜好华服
+  "jewelry": "XJZL.Hobbies.Jewelry", // 喜好首饰
+  "wxManual": "XJZL.Hobbies.WxManual",   // 喜好秘籍
+  "sqManual": "XJZL.Hobbies.SqManual",   // 喜好秘籍
+  "ngManual": "XJZL.Hobbies.NgManual",   // 喜好秘籍
+  "jyManual": "XJZL.Hobbies.JyManual",   // 喜好秘籍
+  "qizhen": "XJZL.Hobbies.Qizhen",   // 喜好奇珍
+  "food": "XJZL.Hobbies.Food",       // 喜好美食
+  "pills": "XJZL.Hobbies.Pills",     // 喜好丹药
+  "money": "XJZL.Hobbies.Money",     // 喜好金银
+  "beauty": "XJZL.Hobbies.Beauty",   // 喜好美色
+  "antique": "XJZL.Hobbies.Antique"  // 喜好古玩
 };
 
 
@@ -1135,7 +1143,7 @@ XJZL.statusEffects = [
   {
     id: "pofang",
     name: "XJZL.Status.Pofang", // 破防
-    description: "XJZL.Status.PofangDesc", 
+    description: "XJZL.Status.PofangDesc",
     img: "icons/svg/downgrade.svg",
     flags: { "xjzl-system": { slug: "pofang", stackable: false } },
     duration: { rounds: 1 }, //破防就是持续1回合
@@ -1151,7 +1159,7 @@ XJZL.statusEffects = [
     flags: { "xjzl-system": { slug: "zuidao", stackable: false } },
     changes: [
       // 移动速度减半：复用你系统中的 unstable 逻辑（或直接修改速度倍率）
-      { key: "flags.xjzl-system.unstable", mode: 5, value: "true" }, 
+      { key: "flags.xjzl-system.unstable", mode: 5, value: "true" },
       { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
     ]
   },
@@ -1179,10 +1187,10 @@ XJZL.statusEffects = [
 
 //暂停用侠界笑话
 XJZL.pauseFlavorText = [
-    "全荒山寨的杀孽加起来没有过来的神风帮弟子一个人多，而神风弟子是十八正道",
-    "即使是天下第一，打狗也要三巴掌",
-    "侠界人早起第一件事就是开启架招",
-    "正气爷打架最常做的事是什么？ 答：把书收起来再掏出来",
-    "将军营在马上的战斗力非常强,但战斗时他的马往往都不在身边",
-    "姑苏行用吹箫让人禁足和剧痛，所以是“箫禁疼”"
+  "全荒山寨的杀孽加起来没有过来的神风帮弟子一个人多，而神风弟子是十八正道",
+  "即使是天下第一，打狗也要三巴掌",
+  "侠界人早起第一件事就是开启架招",
+  "正气爷打架最常做的事是什么？ 答：把书收起来再掏出来",
+  "将军营在马上的战斗力非常强,但战斗时他的马往往都不在身边",
+  "姑苏行用吹箫让人禁足和剧痛，所以是“箫禁疼”"
 ];
