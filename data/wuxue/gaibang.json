@@ -790,8 +790,8 @@
             "category": "wuxue",
             "sect": "gaibang",
             "tier": 3,
-            "description": "<p>天下第一掌法，取自《易经乾卦》爻辞，可惜在凤仙楼之战后失传。</p>",
-            "requirements": "徒手-拳掌；",
+            "description": "<p>天下第一掌法，取自《易经乾卦》爻辞，可惜在凤仙楼之战后失传，仅余降龙总纲，却无其他招式。</p><p><strong>需求：</strong>徒手-拳掌</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "徒手-拳掌",
             "moves": [
                 {
                     "name": "降龙总纲",
@@ -803,28 +803,26 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>施展《降龙神掌》招式时，额外消耗 4 点内力，招式暴击骰-1。然后获得一层“劲气”，至多三层。</p>",
-                    "automationNote": "完全自动化（通过AE增加消耗）。",
+                    "description": "<p>施展《降龙神掌》招式时，额外消耗 4 点内力，内劲四溢，风起龙现，招式暴击骰-1。</p><p>然后获得一层“劲气”，至多三层，持续到脱战。</p><p><strong>劲气：</strong>每层提高招式伤害 10 点。</p><p><strong>升级：</strong>暴击骰再-1，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。点击应用获得[降龙总纲]状态。该状态下使用本套路招式会自动扣除额外内力、修正暴击并获得劲气。不想触发请手动取消BUFF。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
                     },
                     "costs": {
                         "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ],
-                        "rage": [],
-                        "hp": []
+                            0,
+                            0,
+                            0,
+                            0
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "获得劲气",
+                            "label": "开启总纲",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const effectData = thisItem.effects.getName('劲气').toObject();\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, effectData);\n// 额外消耗效果\nconst costEffect = thisItem.effects.getName('降龙消耗').toObject();\ncostEffect.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, costEffect);"
+                            "script": "const effectData = thisItem.effects.getName('降龙总纲').toObject();\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nui.notifications.info(\"降龙总纲已运转，后续出招将自动触发特效。\");",
+                            "active": true
                         }
                     ]
                 },
@@ -837,8 +835,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>每次格挡成功时获得一条“神龙”围绕周身，至多一条。施展降龙神掌前，可消耗神龙复制本次出招。</p>",
-                    "automationNote": "格挡获得神龙。复制招式手动。",
+                    "description": "<p>掌围身沉，气劲龙盘，开启架招。每次格挡成功时获得一条“神龙”围绕周身，至多一条，持续到战斗脱离或被击破架招。</p><p><strong>神龙：</strong>每次施展《降龙神掌》前，可以消耗任意层数的神龙，每层神龙都会复制本次出招。</p><p>·神龙选择的目标与你相同，造成的伤害也相同，但无法暴击，且无法造成招式中的击飞、眩晕等其他特效。</p><p>·若施展虚招，每条神龙都会与目标进行虚招对抗，若神龙对抗失败遭到反击，不会影响到你。</p><p><strong>升级：</strong>格挡值+10，神龙上限+1，内力消耗+4。</p>",
+                    "automationNote": "格挡获龙自动。消耗神龙复制出招手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -849,16 +847,14 @@
                             8,
                             12,
                             16
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "获得神龙",
+                            "label": "格挡获龙",
                             "trigger": "damaged",
-                            "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName('神龙').toObject();\n    effectData.origin = thisItem.uuid;\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    foundry.utils.setProperty(effectData, 'flags.xjzl-system.maxStacks', lvl);\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName('神龙').toObject();\n    effectData.origin = thisItem.uuid;\n    \n    // 动态计算上限\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    foundry.utils.setProperty(effectData, 'flags.xjzl-system.maxStacks', lvl);\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -871,7 +867,7 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>双掌平推，对目标造成伤害。若目标半空且有劲气，可消耗反应动作释放，撕咬空中敌人。</p>",
+                    "description": "<p>双掌平推，威力惊人，对目标造成伤害。</p><p>若范围内有目标处于半空中，且自身存在“劲气”，招式可消耗反应动作释放，站于原地，平推真气，化为巨龙撕咬空中敌人，造成伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
                     "automationNote": "反应动作及空中判定手动。",
                     "calculation": {
                         "base": 0,
@@ -893,9 +889,7 @@
                             8,
                             12,
                             16
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     }
                 },
                 {
@@ -907,8 +901,8 @@
                     "range": "3米",
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>对周围敌人造成伤害，并将所有敌人击退至 3 米外。可消耗一层“劲气”，将击退改为击飞。</p>",
-                    "automationNote": "可手动消耗劲气改变击退效果。",
+                    "description": "<p>环掌拍飞，惊龙咆哮，对周围敌人造成伤害，并将所有敌人击退至自身 3 米范围外。</p><p>·可消耗一层“劲气”，将击退改为击飞。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "击退效果手动。若有劲气会提示可手动消耗。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -929,16 +923,14 @@
                             16,
                             24,
                             32
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "消耗劲气提示",
+                            "label": "劲气提示",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isHit) {\n    const jinqi = attacker.effects.find(e => e.name === '劲气');\n    if (jinqi) {\n        ui.notifications.info(\"可手动消耗[劲气]将击退改为击飞。\");\n    }\n}"
+                            "script": "if (args.isHit) {\n    const jinqi = attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinqi\");\n    if (jinqi) {\n        ui.notifications.info(\"可手动消耗 [劲气] 将击退改为击飞。\");\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -951,8 +943,8 @@
                     "range": "10米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>对目标及周围 2 米范围造成伤害，击破架招时，将其眩晕一回合。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>弓步探身，对目标及其周围 2 米范围内所有敌方造成伤害，击破架招时，将其眩晕一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "击破施加眩晕自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -973,16 +965,14 @@
                             16,
                             24,
                             32
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "破防眩晕",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'xuanyun', true);\n}"
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'xuanyun', true);\n    ui.notifications.info(`${args.target.name} 被跃龙在渊震晕！`);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -995,8 +985,8 @@
                     "range": "8米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>对目标及周围 2 米范围造成伤害，并将其击倒。可消耗一层“劲气”，施展本招时无法被选中。</p>",
-                    "automationNote": "命中施加倒地。无法被选中手动。",
+                    "description": "<p>跃起凌空（半空中），龙腾下击，对目标及其周围 2 米范围内所有敌方造成伤害，并将其击倒。</p><p>·可消耗一层“劲气”，施展本招时无法被选中。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "命中施加倒地自动。消耗劲气不可选中手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1017,16 +1007,14 @@
                             16,
                             24,
                             32
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "击倒",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'prone', true);\n}"
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'prone', true);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -1039,8 +1027,8 @@
                     "range": "5米",
                     "targetInfo": "周围",
                     "actionCost": "反应动作",
-                    "description": "<p>看破虚招后施展，对周围敌人造成伤害并击飞 1 米。当自身即将被控时，可消耗反应动作及一层“劲气”免疫。</p>",
-                    "automationNote": "击飞及免疫控制手动。",
+                    "description": "<p>当你看破对方虚招后，可以消耗反应动作施展，压制虚招。龙首昂扬，对周围范围内所有敌人造成伤害，并将其击飞 1 米。</p><p>·当自身即将被击退、击倒、击飞时，可消耗反应动作施展此招，并消耗一层“劲气”，使自身不受该效果影响。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "击飞手动。免疫控制手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1061,9 +1049,7 @@
                             16,
                             24,
                             32
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     }
                 },
                 {
@@ -1076,8 +1062,8 @@
                     "range": "3米",
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>对周围敌人造成伤害。若自身存在三层“劲气”，将敌人眩晕一回合。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>手掌相抵，然后双掌推出，龙吟九霄，对周围敌人造成伤害。</p><p>·若自身存在三层“劲气”，将敌人眩晕一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "三层劲气施加眩晕自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1104,81 +1090,74 @@
                             7,
                             6,
                             5
-                        ],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "劲气眩晕",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const jinqi = attacker.effects.find(e => e.name === '劲气');\nif (args.isHit && jinqi && jinqi.getFlag('xjzl-system', 'stacks') >= 3) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'xuanyun', true);\n    ui.notifications.info(`${args.target.name} 被亢龙有悔震晕！`);\n}"
+                            "script": "const jinqi = attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinqi\");\nif (args.isHit && jinqi && (jinqi.getFlag('xjzl-system', 'stacks') || 1) >= 3) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'xuanyun', true);\n    ui.notifications.info(`${args.target.name} 被亢龙有悔震晕！`);\n}",
+                            "active": true
                         }
                     ]
                 }
-            ]
-        },
-        "effects": [
-            {
-                "name": "劲气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
-                "description": "每层提高招式伤害 10 点。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "jinqi",
-                        "stackable": true,
-                        "maxStacks": 3
+            ],
+            "effects": [
+                {
+                    "name": "降龙总纲",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                    "description": "已激活：使用《降龙神掌》招式时，额外消耗内力，降低暴击阈值，并获得劲气。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xianglong_zonggang",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "总纲效果",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "// 仅对降龙神掌的非气招生效\nif (item && item.name === \"降龙神掌\" && move.type !== \"qi\") {\n    // 1. 获取总纲等级 (用于成长)\n    const gpMove = item.system.moves.find(m => m.name === \"降龙总纲\");\n    const lvl = Math.max(1, gpMove?.computedLevel || 1);\n\n    // 2. 暴击阈值修正 (每级-1，越低越容易爆)\n    // args.flags.critThresholdMod 正数表示阈值降低(更容易暴击)\n    args.flags.critThresholdMod += (1 * lvl);\n\n    // 3. 额外内力消耗 (每级+4)\n    const extraCost = 4 * lvl;\n    if (actor.system.resources.mp.value < extraCost) {\n         ui.notifications.warn(\"内力不足以支撑降龙总纲特效！\");\n    } else {\n         await actor.update({\"system.resources.mp.value\": actor.system.resources.mp.value - extraCost});\n         actor.showFloatyText(`总纲: -${extraCost} 内力`, {fill: \"#0000FF\"});\n    }\n\n    // 4. 获得劲气\n    const jinqiTpl = item.effects.getName(\"劲气\");\n    if (jinqiTpl) {\n        const effData = jinqiTpl.toObject();\n        effData.origin = item.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}"
+                                }
+                            ]
+                        }
                     }
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
-            },
-            {
-                "name": "降龙消耗",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
-                "description": "消耗+4，暴击骰-1。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "xianglong_cost",
-                        "stackable": false
-                    }
+                {
+                    "name": "劲气",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                    "description": "每层提高招式伤害 10 点。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jinqi",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.costs.neili.mod",
-                        "mode": 2,
-                        "value": "-4"
-                    },
-                    {
-                        "key": "system.combat.crit_neigong",
-                        "mode": 2,
-                        "value": "-1"
-                    },
-                    {
-                        "key": "system.combat.crit_waigong",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
-            },
-            {
-                "name": "神龙",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
-                "description": "围绕周身的神龙劲气，可用于复制出招。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "shenlong",
-                        "stackable": true,
-                        "maxStacks": 1
+                {
+                    "name": "神龙",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                    "description": "围绕周身的神龙劲气，可用于复制出招。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shenlong",
+                            "stackable": true,
+                            "maxStacks": 1
+                        }
                     }
                 }
-            }
-        ]
+            ]
+        }
     },
     {
         "name": "卑躬屈膝",
