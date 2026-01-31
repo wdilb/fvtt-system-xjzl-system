@@ -1527,15 +1527,47 @@ export class XJZLActor extends Actor {
         this.showFloatyText(flavor, { fontSize: size, fill: color });
       }
 
-      const liuTotal = liuHutiLost + liuHpLost;
+      // --- 流失伤害 (易伤/撕裂/中毒) 处理 ---
+      // 包含内力流失检查，防止仅流失内力时不提示
+      const liuTotal = liuHutiLost + liuHpLost + liuMpLost;
+
       if (liuTotal > 0) {
-        this.showFloatyText(`流失 -${liuTotal}`, { fontSize: 28, fill: "#8b0000", anchor: 1 });
+        // 1. 保持原有的飘字
+        this.showFloatyText(`流失 -${liuHutiLost + liuHpLost}`, { fontSize: 28, fill: "#8b0000", anchor: 1 });
+
+        // 2. 发送流失结算卡片
+        // 只有当有实际数值损失时才生成文本
+        let parts = [];
+        if (liuHutiLost > 0) parts.push(`护体 <span style="font-weight:bold;">-${liuHutiLost}</span>`);
+        if (liuHpLost > 0) parts.push(`气血 <span style="font-weight:bold;">-${liuHpLost}</span>`);
+        if (liuMpLost > 0) parts.push(`内力 <span style="font-weight:bold;">-${liuMpLost}</span>`);
+
+        const cardContent = `
+          <div class="xjzl-chat-card" style="padding: 4px 8px; border-left: 3px solid #8b0000; background: rgba(139, 0, 0, 0.05); font-size: 0.9em; color: #666;">
+              <div style="font-weight: bold; color: #8b0000; margin-bottom: 2px;">
+                  <i class="fas fa-tint"></i> 触发气血流失
+              </div>
+              <div style="display: flex; gap: 10px;">
+                  ${parts.join('<span style="color:#ccc;">|</span>')}
+              </div>
+          </div>
+        `;
+
+        // 发送给所有玩家看 (type: OTHER)
+        ChatMessage.create({
+          user: game.user.id,
+          speaker: ChatMessage.getSpeaker({ actor: this }),
+          content: cardContent,
+          style: CONST.CHAT_MESSAGE_STYLES.OTHER
+        });
       }
 
       if (stdTotal === 0 && liuTotal === 0 && isHit) {
         this.showFloatyText("无伤", { fill: "#cccccc" });
       }
+
     }
+
 
     // B. 被击回怒
     let rageGained = false;
