@@ -210,7 +210,7 @@
             "sect": "tangmen",
             "description": "<p>唐门核心内功心法。以贪狼、瘟疫、地空、灾煞、天哭、吊客为六煞，破其命格，杀敌于起势之前，为之六煞之法。</p>",
             "requirement": "悟性需求: 4",
-            "automationNote": "暴击毒伤和易伤完全自动化。",
+            "automationNote": "暴击毒伤和易伤完全自动化。易伤已限制最大3层。触发时发送全员卡片。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -240,7 +240,7 @@
                         {
                             "label": "暴击毒伤",
                             "trigger": "hit",
-                            "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 20, type: 'poison', isHit: true, attacker: args.attacker });\n    ui.notifications.info('六煞经：暴击附加20毒素伤害');\n}",
+                            "script": "if (args.isCrit) {\n    // 1. 造成伤害\n    await args.target.applyDamage({ amount: 20, type: 'poison', isHit: true, attacker: args.attacker });\n    \n    // 2. 发送全员卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <header class=\"card-header\" style=\"border-bottom:1px solid #5e4c41; margin-bottom:5px;\">\n                <h3 style=\"margin:0;\">《六煞经》- 煞气入体</h3>\n            </header>\n            <div style=\"margin-left: 5px; font-size: 0.9em; color: #4b4b4b;\">\n                <p><i class=\"fas fa-skull-crossbones\" style=\"color:#2e7d32;\"></i> 暴击触发！</p>\n                <p>额外造成 <span style=\"color:#2e7d32; font-weight:bold;\">20</span> 点毒素伤害。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({ actor: args.attacker })\n    });\n}",
                             "active": true
                         }
                     ]
@@ -260,7 +260,7 @@
                         {
                             "label": "暴击毒伤与易伤",
                             "trigger": "hit",
-                            "script": "if (args.isCrit) {\n    await args.target.applyDamage({ amount: 40, type: 'poison', isHit: true, attacker: args.attacker });\n    await game.xjzl.api.effects.addEffect(args.target, 'yishang');\n}",
+                            "script": "if (args.isCrit) {\n    // 1. 造成伤害\n    await args.target.applyDamage({ amount: 40, type: 'poison', isHit: true, attacker: args.attacker });\n    \n    // 2. 施加易伤\n    // 我们传入一个对象，AE管理器会自动将其与系统预设的 yishang 合并\n    const effectData = {\n        id: \"yishang\",\n        flags: {\n            \"xjzl-system\": { maxStacks: 3 } // 强制限制为 3 层\n        }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    \n    // 3. 发送全员卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <header class=\"card-header\" style=\"border-bottom:1px solid #5e4c41; margin-bottom:5px;\">\n                <h3 style=\"margin:0;\">《六煞经》- 六煞齐出</h3>\n            </header>\n            <div style=\"margin-left: 5px; font-size: 0.9em; color: #4b4b4b;\">\n                <p><i class=\"fas fa-skull-crossbones\" style=\"color:#2e7d32;\"></i> 暴击触发！</p>\n                <ul style=\"margin:0; padding-left:20px;\">\n                    <li>额外造成 <span style=\"color:#2e7d32; font-weight:bold;\">40</span> 点毒素伤害。</li>\n                    <li>撕裂伤口，施加 <b>[易伤]</b> (上限3层)。</li>\n                </ul>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({ actor: args.attacker })\n    });\n}",
                             "active": true
                         }
                     ]
