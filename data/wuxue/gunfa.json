@@ -3252,7 +3252,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，引矛震地，开启架招。格挡成功后，给目标添加一层“五雷”状态，持续到战斗脱离。</p><p><strong>五雷：</strong>每层使你的命中减少 2 点。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡施加BUFF自动。",
+                    "automationNote": "开启架招自动。格挡成功自动施加五雷。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -3282,8 +3282,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，矛尖刺出螺旋气劲，对目标造成伤害，若击中无架招的敌人，使目标陷入“禁足”状态。</p><p>·当有陷入“五雷”的敌人消耗移动速度，离开你周围三米时，你可以消耗反应动作对其施展此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "命中禁足自动。反应动作手动。",
+                    "description": "<p>主要动作，矛尖刺出螺旋气劲，对目标造成 0.5 内息点内功伤害，若击中无架招的敌人，使目标陷入“禁足”状态。</p><p>·当有陷入“五雷”的敌人消耗移动速度，离开你周围三米时，你可以消耗反应动作对其施展此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中禁足自动。反应动作追击需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3319,8 +3319,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，持矛闪至目标身边，直刺胸膛，对目标造成伤害，若目标身上有“五雷”状态，你可将此招视为虚招。目标每存在一层“五雷”状态，此次虚招值+1。（至多+3）</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "视作虚招手动。手动转虚招时五雷加值自动。",
+                    "description": "<p>主要动作，持矛闪至目标身边，直刺胸膛，对目标造成 0.5 内息点内功伤害，若目标身上有“五雷”状态，你可将此招视为虚招。目标每存在一层“五雷”状态，此次虚招值+1。（至多+3）</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "出招时手动将类型改为[虚招]。若改为虚招，脚本会自动检测目标身上的五雷层数并增加虚招值，同时发送卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3340,9 +3340,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "五雷增虚",
+                            "label": "五雷增虚 (计算)",
+                            "trigger": "check",
+                            "script": "if (args.move.type === 'feint') {\n    const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\n    if (wulei) {\n        const stacks = Math.min(3, wulei.getFlag(\"xjzl-system\", \"stacks\") || 1);\n        args.flags.grantFeint += stacks;\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "五雷增虚 (提示)",
                             "trigger": "attack",
-                            "script": "const targets = Array.from(game.user.targets);\nif (targets.length === 1) {\n    const t = targets[0].actor;\n    const wulei = t.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\n    if (wulei) {\n        const stacks = Math.min(3, wulei.getFlag(\"xjzl-system\", \"stacks\") || 1);\n        ui.notifications.info(`目标有 ${stacks} 层五雷。若转虚招，请手动+${stacks}虚招值。`);\n    }\n}",
+                            "script": "if (args.move.type === 'feint') {\n    const targets = Array.from(game.user.targets);\n    if (targets.length > 0) {\n        let msg = \"\";\n        for (const t of targets) {\n            const targetActor = t.actor || t;\n            const wulei = targetActor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\n            if (wulei) {\n                const stacks = Math.min(3, wulei.getFlag(\"xjzl-system\", \"stacks\") || 1);\n                msg += `<li style=\"display:flex; justify-content:space-between;\"><span>${t.name}</span><span style=\"color:blue;\">+${stacks} 虚招值</span></li>`;\n            }\n        }\n        if (msg) {\n            ChatMessage.create({\n                content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\" style=\"font-weight:bold; border-bottom:1px solid #ccc; padding: 5px 10px;\">奔雷突 - 五雷加成</div><ul style=\"padding: 5px 10px; list-style:none; margin:5px 0;\">${msg}</ul></div>`,\n                speaker: ChatMessage.getSpeaker({actor: actor})\n            });\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3356,8 +3362,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>看破虚招时消耗反应施展，压制目标虚招，雷矛直刺，造成伤害。目标身上每有一层“五雷”，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "五雷增伤自动。",
+                    "description": "<p>看破虚招时消耗反应施展，压制目标虚招，雷矛直刺，造成 0.5 内息点内功伤害。目标身上每有一层“五雷”，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "五雷增伤自动，并发送卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3379,23 +3385,23 @@
                         {
                             "label": "五雷增伤",
                             "trigger": "preDamage",
-                            "script": "const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\nif (wulei) {\n    const stacks = wulei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = 10 * stacks;\n    args.config.amount += bonus;\n    ui.notifications.info(`五雷增伤 +${bonus}`);\n}",
+                            "script": "const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\nif (wulei) {\n    const stacks = wulei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = 10 * stacks;\n    args.config.amount += bonus;\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding: 5px 10px;\"><b>${args.target.name}</b> 身上有 ${stacks} 层五雷。<br>雷光炸裂伤害 <span style=\"color:red; font-weight:bold;\">+${bonus}</span></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
                 },
                 {
                     "name": "五雷轰顶",
-                    "type": "real",
-                    "isUltimate": true,
+                    "type": "qi",
+                    "actionType": "buff",
                     "element": "yang",
                     "damageType": "none",
                     "weaponType": "staff",
                     "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，将矛奋力投向空中，消耗范围内所有目标身上的所有“五雷”，在自身周围 5 米范围产生‘雷云’，持续三回合。</p><p><strong>雷云：</strong>区域内同时视作‘雷暴’天气，雷云中的敌人开始回合时，受到此招消耗“五雷”总层数*10 点的气血流失。</p><p><strong>升级：</strong>雷云的流失系数+10，怒气-1，内力消耗+8。</p>",
-                    "automationNote": "消耗五雷自动。雷云及伤害手动。",
+                    "description": "<p>蓄力动作，将矛奋力投向空中，消耗范围内所有目标身上的所有“五雷”，在自身周围 5 米范围产生‘雷云’，持续三回合。</p><p><strong>雷云：</strong>区域内同时视作‘雷暴’天气，雷云中的敌人开始回合时，受到此招消耗“五雷”总层数*10 点的气血流失。</p><p><strong>升级：</strong>雷云的流失系数+10，怒气-1，内力消耗+8。</p><p>·雷云形成在原地，不会跟随你移动，你只能拥有一个雷云，如果你产生新的雷云，之前的消失。</p>",
+                    "automationNote": "改为气招以确保流畅释放。命中时自动消耗目标五雷，并发送卡片提示该目标贡献了多少层数。请GM根据所有目标的总贡献层数计算雷云伤害并手动应用流失。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -3416,7 +3422,7 @@
                         {
                             "label": "消耗五雷",
                             "trigger": "hit",
-                            "script": "const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\nif (wulei) {\n    const stacks = wulei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await wulei.delete();\n    ChatMessage.create({\n        content: `${args.target.name} 消耗 ${stacks} 层五雷 (雷云伤害+${stacks*10})`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\nif (wulei) {\n    const stacks = wulei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await wulei.delete();\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding: 5px 10px;\"><b>${args.target.name}</b> 身上的 [五雷] 被引爆！<br>贡献层数: <b>${stacks}</b> (伤害+${stacks*10})</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
