@@ -2688,16 +2688,16 @@
             "block": 10,
             "quantity": 1,
             "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><p><b>效果:</b> 装备后，出招命中目标时，自身恢复5点内力。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "清韵回气",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
+                }
+            ]
+        }
     },
     {
         "name": "真刚重剑",
@@ -2742,16 +2742,16 @@
             "block": 10,
             "quantity": 1,
             "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><p><b>效果:</b> 装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "霜月寒气",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.target) {\n    // 1. 获取系统标准状态数据\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.name = '下盘不稳 (霜月)';\n        effectData.duration = { rounds: 2 };\n        // 2. 应用特效\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "霜月寒气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    // 1. 获取系统标准状态数据\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.name = '下盘不稳 (霜月)';\n        effectData.duration = { rounds: 2 };\n        // 2. 应用特效\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
+                }
+            ]
+        }
     },
     {
         "name": "魅影重剑",
@@ -2838,6 +2838,12 @@
                     "trigger": "hit",
                     "active": true,
                     "script": "// 1. 基础命中与目标检查\nif (!args.isHit || !args.target) return;\n\n// 2. 排除架招和气招 (仅实招/虚招/反击/普攻生效)\nif ([\"stance\", \"qi\"].includes(args.move.type)) return;\n\n// 3. 执行流失伤害\n// type: \"liushi\" + ignoreDefense: true 确保无视防御直接扣血\nawait args.target.applyDamage({\n    amount: 20,\n    type: \"liushi\",\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true\n});\n\n// 4. 手动发送提示卡片 (弥补 applyDamage 不会为传参伤害发流失卡的机制)\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-content\" style=\"color:#8b0000; font-weight:bold; padding:4px; border-left: 3px solid #8b0000; background: rgba(139, 0, 0, 0.05); font-size: 0.9em;\">\n            <i class=\"fas fa-tint\"></i> 破釜沉舟：额外造成 20 点气血流失\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    style: CONST.CHAT_MESSAGE_STYLES.OTHER\n});"
+                },
+                {
+                    "label": "破釜流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'liushi', // 真实伤害模拟流失\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ui.notifications.info(\"破釜沉舟，额外流失！\");\n}"
                 }
             ]
         },
@@ -2860,14 +2866,6 @@
                     }
                 ]
             }
-        ],
-        "system.scripts": [
-            {
-                "label": "破釜流失",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.target) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'liushi', // 真实伤害模拟流失\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ui.notifications.info(\"破釜沉舟，额外流失！\");\n}"
-            }
         ]
     },
     {
@@ -2883,16 +2881,16 @@
             "block": 5,
             "quantity": 1,
             "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><p><b>效果:</b> 装备后，招式造成暴击时，额外造成10点气血流失。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "蟠龙撕裂",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"蟠龙暴击，鲜血飞溅！\");\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "蟠龙撕裂",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"蟠龙暴击，鲜血飞溅！\");\n}"
+                }
+            ]
+        }
     },
     {
         "name": "龙泉重剑",
@@ -2938,8 +2936,7 @@
             "quantity": 1,
             "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><p><b>效果:</b> 装备后，招式命中目标时,将其击退1米。</p>",
             "automationNote": "请手动"
-        },
-        "system.scripts": []
+        }
     },
     {
         "name": "铸血重剑",
@@ -2954,16 +2951,16 @@
             "block": 5,
             "quantity": 1,
             "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><p><b>效果:</b> 装备后，招式命中目标时，自身回复5气血。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "铸血",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "铸血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
+                }
+            ]
+        }
     },
     {
         "name": "翻腾重剑",
@@ -2979,8 +2976,7 @@
             "quantity": 1,
             "description": "<p>怒意狂表，气勋上涌。</p><p><b>效果:</b> 装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
             "automationNote": "请手动"
-        },
-        "system.scripts": []
+        }
     },
     {
         "name": "鱼肠重剑",
@@ -3395,16 +3391,16 @@
             "block": 10,
             "quantity": 1,
             "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><p><b>效果:</b> 装备后，出招命中目标时，自身恢复5点内力。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "清韵回气",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
+                }
+            ]
+        }
     },
     {
         "name": "真刚双剑",
@@ -3449,16 +3445,16 @@
             "block": 10,
             "quantity": 1,
             "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><p><b>效果:</b> 装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "霜月寒气",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.target) {\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.name = '下盘不稳 (霜月)';\n        effectData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "霜月寒气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.name = '下盘不稳 (霜月)';\n        effectData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
+                }
+            ]
+        }
     },
     {
         "name": "魅影双剑",
@@ -3545,6 +3541,12 @@
                     "trigger": "hit",
                     "active": true,
                     "script": "// 1. 基础命中与目标检查\nif (!args.isHit || !args.target) return;\n\n// 2. 排除架招和气招 (仅实招/虚招/反击/普攻生效)\nif ([\"stance\", \"qi\"].includes(args.move.type)) return;\n\n// 3. 执行流失伤害\n// type: \"liushi\" + ignoreDefense: true 确保无视防御直接扣血\nawait args.target.applyDamage({\n    amount: 20,\n    type: \"liushi\",\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true\n});\n\n// 4. 手动发送提示卡片 (弥补 applyDamage 不会为传参伤害发流失卡的机制)\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-content\" style=\"color:#8b0000; font-weight:bold; padding:4px; border-left: 3px solid #8b0000; background: rgba(139, 0, 0, 0.05); font-size: 0.9em;\">\n            <i class=\"fas fa-tint\"></i> 破釜沉舟：额外造成 20 点气血流失\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    style: CONST.CHAT_MESSAGE_STYLES.OTHER\n});"
+                },
+                {
+                    "label": "破釜流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ui.notifications.info(\"破釜沉舟，额外流失！\");\n}"
                 }
             ]
         },
@@ -3567,14 +3569,6 @@
                     }
                 ]
             }
-        ],
-        "system.scripts": [
-            {
-                "label": "破釜流失",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.target) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ui.notifications.info(\"破釜沉舟，额外流失！\");\n}"
-            }
         ]
     },
     {
@@ -3590,16 +3584,16 @@
             "block": 5,
             "quantity": 1,
             "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><p><b>效果:</b> 装备后，招式造成暴击时，额外造成10点气血流失。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "蟠龙撕裂",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"蟠龙暴击，鲜血飞溅！\");\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "蟠龙撕裂",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"蟠龙暴击，鲜血飞溅！\");\n}"
+                }
+            ]
+        }
     },
     {
         "name": "龙泉双剑",
@@ -3645,8 +3639,7 @@
             "quantity": 1,
             "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><p><b>效果:</b> 装备后，招式命中目标时,将其击退1米。</p>",
             "automationNote": "请手动"
-        },
-        "system.scripts": []
+        }
     },
     {
         "name": "铸血双剑",
@@ -3661,16 +3654,16 @@
             "block": 5,
             "quantity": 1,
             "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><p><b>效果:</b> 装备后，招式命中目标时，自身回复5气血。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "铸血",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "铸血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
+                }
+            ]
+        }
     },
     {
         "name": "翻腾双剑",
@@ -3686,8 +3679,7 @@
             "quantity": 1,
             "description": "<p>怒意狂表，气勋上涌。</p><p><b>效果:</b> 装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
             "automationNote": "请手动"
-        },
-        "system.scripts": []
+        }
     },
     {
         "name": "鱼肠双剑",
@@ -4102,16 +4094,16 @@
             "block": 10,
             "quantity": 1,
             "description": "<p>剑鸣铿锵清亮，剑韵激荡，无不侧目。</p><p><b>效果:</b> 装备后，出招命中目标时，自身恢复5点内力。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "清韵回气",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "清韵回气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
+                }
+            ]
+        }
     },
     {
         "name": "真刚剑",
@@ -4156,16 +4148,16 @@
             "block": 10,
             "quantity": 1,
             "description": "<p>以寒铁打造，阴寒无比，遇水结霜。</p><p><b>效果:</b> 装备后，出招命中敌人后，为其添加“下盘不稳”持续两回合。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "霜月寒气",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.target) {\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.name = '下盘不稳 (霜月)';\n        effectData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "霜月寒气",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    const statusData = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (statusData) {\n        const effectData = foundry.utils.deepClone(statusData);\n        effectData.name = '下盘不稳 (霜月)';\n        effectData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
+                }
+            ]
+        }
     },
     {
         "name": "魅影剑",
@@ -4252,6 +4244,12 @@
                     "trigger": "hit",
                     "active": true,
                     "script": "// 1. 基础命中与目标检查\nif (!args.isHit || !args.target) return;\n\n// 2. 排除架招和气招 (仅实招/虚招/反击/普攻生效)\nif ([\"stance\", \"qi\"].includes(args.move.type)) return;\n\n// 3. 执行流失伤害\n// type: \"liushi\" + ignoreDefense: true 确保无视防御直接扣血\nawait args.target.applyDamage({\n    amount: 20,\n    type: \"liushi\",\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true\n});\n\n// 4. 手动发送提示卡片 (弥补 applyDamage 不会为传参伤害发流失卡的机制)\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-content\" style=\"color:#8b0000; font-weight:bold; padding:4px; border-left: 3px solid #8b0000; background: rgba(139, 0, 0, 0.05); font-size: 0.9em;\">\n            <i class=\"fas fa-tint\"></i> 破釜沉舟：额外造成 20 点气血流失\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    style: CONST.CHAT_MESSAGE_STYLES.OTHER\n});"
+                },
+                {
+                    "label": "破釜流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.target) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ui.notifications.info(\"破釜沉舟，额外流失！\");\n}"
                 }
             ]
         },
@@ -4274,14 +4272,6 @@
                     }
                 ]
             }
-        ],
-        "system.scripts": [
-            {
-                "label": "破釜流失",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.target) {\n    await args.target.applyDamage({\n        amount: 20,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ui.notifications.info(\"破釜沉舟，额外流失！\");\n}"
-            }
         ]
     },
     {
@@ -4297,16 +4287,16 @@
             "block": 5,
             "quantity": 1,
             "description": "<p>蟠龙贲信于其藏，鲛鱼踊跃于其渊，引而不发，发而触杀。</p><p><b>效果:</b> 装备后，招式造成暴击时，额外造成10点气血流失。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "蟠龙撕裂",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"蟠龙暴击，鲜血飞溅！\");\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "蟠龙撕裂",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit && args.isCrit && args.target) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: 'liushi',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"蟠龙暴击，鲜血飞溅！\");\n}"
+                }
+            ]
+        }
     },
     {
         "name": "龙泉剑",
@@ -4352,8 +4342,7 @@
             "quantity": 1,
             "description": "<p>天崩地裂，闷雷霹炸，声势骇人。</p><p><b>效果:</b> 装备后，招式命中目标时,将其击退1米。</p>",
             "automationNote": "请手动"
-        },
-        "system.scripts": []
+        }
     },
     {
         "name": "铸血剑",
@@ -4368,16 +4357,16 @@
             "block": 5,
             "quantity": 1,
             "description": "<p>铸造时铁匠滴血淬火，以铸嗜血之兵。</p><p><b>效果:</b> 装备后，招式命中目标时，自身回复5气血。</p>",
-            "automationNote": "完全自动化 (Script: Hit)"
-        },
-        "system.scripts": [
-            {
-                "label": "铸血",
-                "trigger": "hit",
-                "active": true,
-                "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
-            }
-        ]
+            "automationNote": "完全自动化 (Script: Hit)",
+            "scripts": [
+                {
+                    "label": "铸血",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'hp', showScrolling: true });\n}"
+                }
+            ]
+        }
     },
     {
         "name": "翻腾剑",
@@ -4393,8 +4382,7 @@
             "quantity": 1,
             "description": "<p>怒意狂表，气勋上涌。</p><p><b>效果:</b> 装备后，连续出招三次攻击敌人都未暴击时，下次出招必定暴击。</p>",
             "automationNote": "请手动"
-        },
-        "system.scripts": []
+        }
     },
     {
         "name": "鱼肠剑",
