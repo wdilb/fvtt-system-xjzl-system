@@ -2829,10 +2829,11 @@
             "moves": [
                 {
                     "name": "裂心祭魂",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "yin",
-                    "damageType": "neigong",
+                    "damageType": "none",
                     "weaponType": "dagger",
                     "range": "3米",
                     "targetInfo": "范围",
@@ -2857,9 +2858,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得魔欲",
+                            "label": "魔欲与击飞提示",
                             "trigger": "hit",
-                            "script": "// 获取AE模板\nconst eff = thisItem.effects.getName(\"魔欲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态计算加伤数值\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 50 + (lvl - 1) * 50;\n\n// 写入 Flags 供 calc 脚本读取\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.moyuDmgBonus\", dmgBonus);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"进入 [魔欲] 状态！\");",
+                            "script": "// 1. 获取并应用AE\nconst eff = thisItem.effects.getName(\"魔欲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态计算加伤数值\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 50 + (lvl - 1) * 50;\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.moyuDmgBonus\", dmgBonus);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\n// 2. 发送提示卡片\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold; padding-left:10px;\">裂心祭魂 - 效果提示</div>\n        <div style=\"padding:5px 0 5px 10px; font-size:0.9em;\">\n            <p style=\"color:purple;\">已进入 <b>[魔欲]</b> 状态。</p>\n            <hr style=\"border-top:1px dashed #eee; margin:3px 0;\">\n            <p style=\"color:#d35400;\"><i class=\"fas fa-wind\"></i> <b>击飞效果：</b>请手动将范围(3米)内的敌人击飞 <b>3米</b>。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -2902,7 +2903,7 @@
                         {
                             "label": "状态加成虚招",
                             "trigger": "check",
-                            "script": "// 过滤出所有非被动传输的特效 (即 Buff/Debuff/状态)\n// !e.transfer 意味着它是被施加的，而不是装备自带的\nconst validEffects = args.target.effects.filter(e => e.transfer === false);\nconst bonus = Math.min(3, validEffects.length);\n\nif (bonus > 0) {\n    args.flags.grantFeint += bonus;\n}",
+                            "script": "// 过滤出所有非被动传输的特效\nconst validEffects = args.target.effects.filter(e => e.transfer === false);\nconst bonus = Math.min(3, validEffects.length);\n\nif (bonus > 0) {\n    args.flags.grantFeint += bonus;\n}",
                             "active": true
                         }
                     ]
@@ -2985,7 +2986,7 @@
             "effects": [
                 {
                     "name": "魔欲",
-                    "icon": "icons/magic/control/energy-stream-purple.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                     "description": "施展《销魂刺法》伤害提升；回合初获得魂欲。",
                     "transfer": false,
                     "flags": {
@@ -2997,13 +2998,13 @@
                                     "label": "回合初获魂欲",
                                     "trigger": "turnStart",
                                     "active": true,
-                                    "script": "const eff = thisItem.effects.getName(\"魂欲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 查找极乐引魂(Move 4)以计算回复量\nconst moveData = thisItem.system.moves[3];\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst healBase = 20 + (lvl - 1) * 10;\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.hunyuHeal\", healBase);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"魔欲生魂\", {fill: \"#800080\"});"
+                                    "script": "// 1. 反向查找源武学物品\nconst originItem = await fromUuid(thisEffect.origin);\nif (!originItem) return;\n\n// 2. 从武学中获取 '魂欲' 模板\nconst eff = originItem.effects.getName(\"魂欲\").toObject();\ndelete eff._id;\neff.origin = originItem.uuid;\n\n// 3. 计算回复量 (Move 3 是极乐引魂)\nconst moveData = originItem.system.moves[3];\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst healBase = 20 + (lvl - 1) * 10;\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.hunyuHeal\", healBase);\n\n// 4. 应用特效\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"魔欲生魂\", {fill: \"#800080\"});"
                                 },
                                 {
                                     "label": "招式加伤",
                                     "trigger": "calc",
                                     "active": true,
-                                    "script": "if (item && item.id === thisItem.id) {\n    const bonus = thisEffect.getFlag(\"xjzl-system\", \"moyuDmgBonus\") || 50;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`魔欲加成 +${bonus}`);\n}"
+                                    "script": "// 检查正在施展的招式(item)是否来源于此Buff的源头(origin)\nif (item && item.uuid === thisEffect.origin) {\n    const bonus = thisEffect.getFlag(\"xjzl-system\", \"moyuDmgBonus\") || 50;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`魔欲加成 +${bonus}`);\n}"
                                 }
                             ]
                         }
@@ -3012,7 +3013,7 @@
                 },
                 {
                     "name": "魂欲",
-                    "icon": "icons/magic/life/heart-shadow-red.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                     "description": "受击概率回复气血内力。",
                     "transfer": false,
                     "flags": {
@@ -3025,7 +3026,7 @@
                                     "label": "受击判定回复",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "// 仅限内外功伤害\nif (![\"waigong\", \"neigong\"].includes(args.type)) return;\n\nconst roll = await new Roll(\"1d20\").evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nif (roll.total >= 10) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const healBase = thisEffect.getFlag(\"xjzl-system\", \"hunyuHeal\") || 20;\n    const totalHeal = healBase * stacks;\n    \n    await actor.applyHealing({amount: totalHeal, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({amount: totalHeal, type: \"mp\", showScrolling: true});\n    ui.notifications.info(`${actor.name} 魂欲生效，回复 ${totalHeal} 点气血内力！`);\n}"
+                                    "script": "// 仅限内外功伤害\nif (![\"waigong\", \"neigong\"].includes(args.type)) return;\n\nconst roll = await new Roll(\"1d20\").evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nlet msgContent = \"\";\nif (roll.total >= 10) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const healBase = thisEffect.getFlag(\"xjzl-system\", \"hunyuHeal\") || 20;\n    const totalHeal = healBase * stacks;\n    \n    await actor.applyHealing({amount: totalHeal, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({amount: totalHeal, type: \"mp\", showScrolling: true});\n    \n    msgContent = `<p>判定成功: <b>${roll.total}</b> (>=10)</p><p style=\"color:green;\">回复 <b>${totalHeal}</b> 点气血内力</p>`;\n} else {\n    msgContent = `<p>判定失败: <b>${roll.total}</b> (<10)</p><p style=\"color:#666;\">未触发回复</p>`;\n}\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold; padding-left:10px;\">魂欲 - 受击判定</div>\n        <div style=\"padding:5px 0 5px 10px; font-size:0.9em;\">\n            ${msgContent}\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
                                 }
                             ]
                         }
