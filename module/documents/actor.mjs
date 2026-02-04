@@ -1524,7 +1524,18 @@ export class XJZLActor extends Actor {
           flavor = `护体 -${stdHutiLost}`;
         }
 
-        this.showFloatyText(flavor, { fontSize: size, fill: color });
+        this.showFloatyText(flavor, { fontSize: size, fill: color, anchor: 0 });
+      }
+
+      // --- 内力扣除  ---
+      // 濒死抵扣或以蓝代血时触发
+      if (stdMpLost > 0) {
+        // 蓝色字体表示内力损耗
+        let mpFlavor = `内力 -${stdMpLost}`;
+        if (config.isCrit && stdTotal === 0) { // 如果全是暴击造成的内力伤，也可以加暴击前缀
+          mpFlavor = `暴击! ${mpFlavor}`;
+        }
+        this.showFloatyText(mpFlavor, { fontSize: 32, fill: "#4444ff", anchor: 0.6 });
       }
 
       // --- 流失伤害 (易伤/撕裂/中毒) 处理 ---
@@ -1562,7 +1573,10 @@ export class XJZLActor extends Actor {
         });
       }
 
-      if (stdTotal === 0 && liuTotal === 0 && isHit) {
+      // 必须所有类型的损失都为0才算无伤
+      const totalLoss = stdTotal + stdMpLost + liuTotal;
+
+      if (totalLoss === 0 && isHit) {
         this.showFloatyText("无伤", { fill: "#cccccc" });
       }
 
