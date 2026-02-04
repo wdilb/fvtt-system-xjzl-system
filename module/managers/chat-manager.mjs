@@ -2432,7 +2432,7 @@ export class ChatCardManager {
 
         // 2. 展示骰子
         const total = roll.total;
-        const isSuccess = total > 10;
+        const isSuccess = total >= 10;
 
         // 3. 构建结果内容
         let flavor = isSuccess ? "回光返照！" : "回天乏术...";
