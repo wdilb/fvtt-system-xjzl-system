@@ -900,15 +900,15 @@
         }
     },
     {
-        "name": "狂风迅剑（地）",
+        "name": "狂风迅剑",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/华山.png",
         "system": {
             "category": "wuxue",
             "sect": "huashanpai",
             "tier": 2,
-            "description": "<p>剑宗绝技，风声凌厉，终成如狂风巨浪一般。</p>",
-            "requirements": "剑-单剑，剑宗",
+            "description": "<p>剑宗绝技，风声凌厉，终成如狂风巨浪一般。</p><p><strong>需求：</strong>剑-单剑，剑宗</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "剑-单剑；剑宗",
             "moves": [
                 {
                     "name": "风吹云散",
@@ -916,11 +916,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，气势凌厉，旋身踏步，突至目标周围未占据空格，对其则造成 0.5 力量点外功伤害。</p>",
+                    "description": "<p>主要动作，气势凌厉，旋身踏步，突至目标周围未占据空格，对其则造成 0.5 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+10。内力消耗+2。</p>",
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。位移手动。",
+                    "automationNote": "位移请手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -944,11 +944,11 @@
                     "type": "stance",
                     "element": "rou",
                     "weaponType": "sword",
-                    "description": "<p>次要动作，凭风巧借力，开启架招。成功格挡后，可以立即不消耗动作对攻击者施展【风吹云散】，之后你解除自身架招。</p>",
+                    "description": "<p>次要动作，凭风巧借力，开启架招。成功格挡后，可以立即不消耗动作对攻击者施展【风吹云散】，之后你解除自身架招。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "automationNote": "格挡加成自动化。反击提示已添加。",
+                    "automationNote": "格挡成功后发送卡片提示反击机会（需手动执行）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -964,7 +964,8 @@
                         {
                             "label": "反击提示",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.finalDamage <= 0) {\n    ChatMessage.create({content: `${actor.name} 格挡成功！可立即免费施展【风吹云散】，然后解除架招。`});\n    await actor.stopStance();\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.finalDamage <= 0) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding: 10px; color: #555;\">\n                <b>格挡成功！</b><br>\n                你可以立即免费施展【风吹云散】。<br>\n                <span style=\"font-size:0.9em; color:#888;\">若执行此反击，请手动解除架招。</span>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -974,11 +975,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，凭风钉敌于地，造成 0.4 力量点外功伤害，击中无架招目标时，将其击倒、禁足一回合。</p>",
+                    "description": "<p>主要动作，凭风钉敌于地，造成 0.4 力量点外功伤害，击中无架招目标时，将其击倒、禁足一回合。</p><p><strong>升级：</strong>招式伤害+10。内力消耗+2。</p>",
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。击倒禁足自动施加。",
+                    "automationNote": "命中无架招目标自动施加击倒和禁足。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1000,7 +1001,8 @@
                         {
                             "label": "击倒禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    root.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, root);\n    ui.notifications.info(`${args.target.name} 被击倒并禁足！`);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    \n    const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (root) {\n        const rootData = foundry.utils.deepClone(root);\n        rootData.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n    }\n    \n    ui.notifications.info(`${args.target.name} 被击倒并禁足！`);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -1010,11 +1012,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>反应动作，当你看破对方虚招时，可消耗反应动作压制对方虚招，弓步引剑，抖腕狂刺，对其造成 0.6 力量点外功伤害，并将其击倒、禁足一回合。</p>",
+                    "description": "<p>反应动作，当你看破对方虚招时，可消耗反应动作压制对方虚招，弓步引剑，抖腕狂刺，对其造成 0.6 力量点外功伤害，并将其击倒、禁足一回合。</p><p><strong>升级：</strong>伤害+10，禁足回合数+1，内力消耗+2。</p>",
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "automationNote": "伤害自动化。击倒禁足自动施加。",
+                    "automationNote": "命中自动施加击倒和禁足（持续时间随等级增加）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1036,7 +1038,8 @@
                         {
                             "label": "击倒禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel||1);\n    const rounds = 1 + (lvl - 1);\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    root.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, root);\n}"
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    \n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    \n    const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (root) {\n        const rootData = foundry.utils.deepClone(root);\n        rootData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n        ui.notifications.info(`${args.target.name} 被击倒并禁足 ${rounds} 回合！`);\n    }\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -1047,11 +1050,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>蓄力动作，乘风剑舞，一剑快似一剑，对目标造成 0.7 力量点外功伤害，再对该目标周围 2 米内的每一个目标不消耗动作的施展【风吹云散】。</p>",
+                    "description": "<p>蓄力动作，乘风剑舞，一剑快似一剑，对目标造成 0.7 力量点外功伤害，再对该目标周围 2 米内的每一个目标不消耗动作的施展【风吹云散】。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
                     "range": "4米",
                     "targetInfo": "单体+周围2米",
                     "actionCost": "蓄力动作",
-                    "automationNote": "主目标伤害自动化。AOE部分需手动。",
+                    "automationNote": "主目标伤害自动化。剩余部分请手动对周围目标使用【风吹云散】。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
