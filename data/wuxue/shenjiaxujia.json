@@ -924,20 +924,19 @@
         }
     },
     {
-        "name": "世家散手 (杂篇)",
+        "name": "明是非",
         "type": "wuxue",
-        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
         "system": {
             "category": "sanshou",
             "sect": "jianghushili",
-            "tier": 2,
-            "description": "<p>包含明是非、侠肝义胆等散手。</p>",
+            "tier": 1,
+            "description": "<p>所谓仗义每多屠狗辈，徐家起于微末，发于华枝，多警醒此理，不以王爵势力压人，亦不畏官贵，愿意倾听百姓之言，论心论迹，评判公义。</p><p><strong>效果：</strong>识人辨事，你可以与一个目标交谈一分钟，若目标不为[恶]或[邪道]，则你认可其人品，为目标添加“是”，持续到其增长恶行值。</p><p><strong>是：</strong>你行得直坐得正，被一名德高望重之人看重，但若你作恶，该状态会变成“否”，持续到你的恶行值归零。</p><p><strong>否：</strong>你的[说服]具有劣势。受到[侠]的攻击时，额外受到 10 点伤害。</p><p>·你至多只能为一个目标添加“是”，若再给其他人添加，第一个被你添加的目标将移除“是”。</p><p><strong>升级：</strong>你可以额外为一个目标添加“是”。</p>",
             "requirements": "",
             "moves": [
                 {
                     "name": "明是非",
                     "type": "qi",
-                    "tier": 1,
                     "actionType": "buff",
                     "element": "none",
                     "damageType": "none",
@@ -945,8 +944,8 @@
                     "range": "交谈",
                     "targetInfo": "单体",
                     "actionCost": "无",
-                    "description": "<p>识人辨事，你可以与一个目标交谈一分钟，若目标不为[恶]或[邪道]，则你认可其人品，为目标添加“是”，持续到其增长恶行值。</p><p><strong>是：</strong>你行得直坐得正，被一名德高望重之人看重，但若你作恶，该状态会变成“否”，持续到你的恶行值归零。</p><p><strong>否：</strong>你的[说服]具有劣势。受到[侠]的攻击时，额外受到 10 点伤害。</p><p>·你至多只能为一个目标添加“是”，若再给其他人添加，第一个被你添加的目标将移除“是”。</p><p>·当目标状态从“是”变为“否”时，会立刻被你知晓。</p><p><strong>升级：</strong>你可以额外为一个目标添加“是”。</p>",
-                    "automationNote": "纯RP技能，状态需手动管理。",
+                    "description": "<p>识人辨事，你可以与一个目标交谈一分钟，若目标不为[恶]或[邪道]，则你认可其人品，为目标添加“是”，持续到其增长恶行值。</p>",
+                    "automationNote": "使用自动添加[是]。[否]状态需手动，[否]状态包含自动化效果。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -957,12 +956,75 @@
                             0,
                             0
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "添加[是]",
+                            "trigger": "hit",
+                            "script": "const eff = thisItem.effects.getName(\"是\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nui.notifications.info(`${args.target.name} 获得了 [是] 评价。`);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "是",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "你行得直坐得正。若作恶，该状态会变成“否”。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "mingshifei_shi",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
                 },
+                {
+                    "name": "否",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "你的[说服]具有劣势。受到[侠]的攻击时，额外受到 10 点伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "mingshifei_fou",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "侠者增伤",
+                                    "trigger": "preTake",
+                                    "script": "// 检查攻击者是否为[侠]：侠义>=100 且 恶行<50\nconst attSocial = args.attacker?.system?.social;\nif (attSocial && attSocial.xiayi >= 100 && attSocial.exing < 50) {\n    args.output.damage += 10;\n    if (args.output.bonusDesc) args.output.bonusDesc.push(\"明是非[否]：遭侠者惩戒 (+10)\");\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.shuofuCheckLevel",
+                            "mode": 2,
+                            "value": "-1"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "侠肝义胆",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>何为侠，好管不平事，为人所不为，见义勇为、锄强扶弱，不求回报，只求问心无愧。</p><p><strong>轻财任侠：</strong>钱财乃身外之物，自身衣食温饱足矣，当助他人。你慷慨解囊，常行布施之事，赈灾民，救病残。效果：你每月可消耗 100 两并获得 10 侠义值。</p><p><strong>升级：</strong>轻财任侠每月获得的侠义值额外+10。</p>",
+            "requirements": "",
+            "moves": [
                 {
                     "name": "打抱不平",
                     "type": "qi",
-                    "tier": 2,
                     "actionType": "buff",
                     "element": "none",
                     "damageType": "none",
@@ -970,8 +1032,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>飒然出手，为自身添加“侠胆”，持续三回合，若你在中途加入一场正在发生的战斗，侠胆持续到战斗脱离。</p><p><strong>侠胆：</strong>格挡值+10，招式暴击骰-1。</p><p>·你每个回合末必须消耗 5 点侠义值维持“侠胆”，否则移除侠胆。</p><p>·一场战斗中，你只能打抱不平一次。</p><p><strong>升级：</strong>轻财任侠每月获得的侠义值额外+10；侠胆的格挡值+5，暴击骰再-1。</p>",
-                    "automationNote": "获得侠胆自动。回合末消耗手动。",
+                    "description": "<p>不消耗动作，飒然出手，为自身添加“侠胆”，持续三回合，若你在中途加入一场正在发生的战斗，侠胆持续到战斗脱离。</p><p><strong>侠胆：</strong>格挡值+10，招式暴击骰-1。</p><p>·你每个回合末必须消耗 5 点侠义值维持“侠胆”，否则移除侠胆。</p><p>·一场战斗中，你只能打抱不平一次。</p><p><strong>升级：</strong>侠胆的格挡值+5，暴击骰再-1。</p>",
+                    "automationNote": "应用侠胆自动。回合末自动扣除侠义值，不足自动移除状态。中途加入的持续时间需GM手动调整。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -987,7 +1049,7 @@
                         {
                             "label": "获得侠胆",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst block = 10 + (lvl - 1) * 5;\nconst crit = -1 + (lvl - 1) * -1;\n\nconst eff = thisItem.effects.getName(\"侠胆\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(block);\neff.changes[1].value = String(crit);\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst block = 10 + (lvl - 1) * 5;\nconst crit = -1 + (lvl - 1) * -1;\n\nconst eff = thisItem.effects.getName(\"侠胆\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 默认持续3回合\neff.duration = { rounds: 3 };\n// 写入动态数值\neff.changes[0].value = String(block);\neff.changes[1].value = String(crit);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -996,13 +1058,21 @@
             "effects": [
                 {
                     "name": "侠胆",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "提升格挡与暴击率。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "格挡提升，暴击门槛降低。回合末需消耗侠义值。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "xiadan",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "维持侠胆",
+                                    "trigger": "turnEnd",
+                                    "script": "const xiayi = actor.system.social.xiayi || 0;\nif (xiayi >= 5) {\n    await actor.update({\"system.social.xiayi\": xiayi - 5});\n    actor.showFloatyText(\"-5 侠义 (维持)\", {fill: \"#0000FF\", fontSize: 24});\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><b>侠胆</b>: 消耗 5 点侠义值维持状态 (剩余 ${xiayi - 5})。</div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    ui.notifications.warn(`${actor.name} 侠义值不足，侠胆消散！`);\n    await thisEffect.delete();\n}",
+                                    "active": true
+                                }
+                            ]
                         }
                     },
                     "changes": [
