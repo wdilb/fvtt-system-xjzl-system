@@ -172,18 +172,43 @@
 
         </div>
 
-        {{!-- 临时状态栏 (保持不变) --}}
+        {{!-- 临时状态栏 --}}
         <div class="active-effects-row">
             {{#if temporaryEffects.length}}
             {{#each temporaryEffects as |effect|}}
-            <div class="effect-chip {{#if effect.isSuppressed}}suppressed{{/if}}" data-tooltip="{{effect.description}}">
+            <div class="effect-chip interactive-effect {{#if effect.isSuppressed}}suppressed{{/if}}"
+                data-effect-id="{{effect.id}}" data-tooltip="
+                    <div style='text-align:left;'>
+                        <b>{{effect.name}}</b>
+                        {{#if effect.stacks}} <span style='color:#f1c40f'>(x{{effect.stacks}})</span>{{/if}}
+                        <hr style='margin:4px 0; border-color:#555;'>
+                        {{#if effect.description}}{{effect.description}}<br><br>{{/if}}
+                        
+                        {{#if effect.isStackable}}
+                            <span style='color:#2ecc71'><i class='fas fa-mouse-pointer'></i> 左键: 增加层数</span><br>
+                            <span style='color:#e74c3c'><i class='fas fa-mouse-pointer'></i> 右键: 减少层数</span>
+                        {{else}}
+                            <span style='color:#7f8c8d; font-style:italic;'>不可叠加</span>
+                        {{/if}}
+                    </div>
+                 ">
+
                 <img src="{{effect.img}}" class="effect-icon">
                 <span class="effect-label">{{effect.name}}</span>
+
+                {{!-- 如果有层数显示层数，没有显示轮次 --}}
+                {{#if (gt effect.stacks 1)}}
+                <span class="effect-rounds" style="color:#f1c40f;">x{{effect.stacks}}</span>
+                {{else}}
                 {{#if effect.duration.rounds}}
                 <span class="effect-rounds">({{effect.duration.rounds}})</span>
                 {{/if}}
-                <a class="effect-delete" data-action="deleteEffect" data-id="{{effect.id}}"><i
-                        class="fas fa-times"></i></a>
+                {{/if}}
+
+                {{!-- 删除按钮 --}}
+                <a class="effect-delete" data-action="deleteEffect" data-id="{{effect.id}}">
+                    <i class="fas fa-times"></i>
+                </a>
             </div>
             {{/each}}
             {{else}}
@@ -191,7 +216,7 @@
             {{/if}}
         </div>
 
-        {{!-- 武器等级条 (保持不变) --}}
+        {{!-- 武器等级条 --}}
         <div class="weapon-ranks-bar">
             {{#each combatStats.weaponRanks as |rank|}}
             <div class="rank-item" data-tooltip="{{rank.label}} {{localize 'XJZL.Combat.RankLevel'}}: {{rank.val}}">
@@ -255,7 +280,15 @@
                     <div class="passive-item {{#if effect.isSuppressed}}suppressed{{/if}}"
                         data-tooltip="{{#if effect.isSuppressed}}{{localize 'XJZL.UI.StatusDisabled'}}{{else}}{{effect.name}}: {{effect.description}}{{/if}}">
                         <img src="{{effect.img}}">
-                        <span>{{effect.name}}</span>
+
+                        {{!-- 增加层数显示逻辑 --}}
+                        <span>
+                            {{effect.name}}
+                            {{#if (gt effect.stacks 1)}}
+                            <span style="color:#f1c40f; font-size:0.9em;">x{{effect.stacks}}</span>
+                            {{/if}}
+                        </span>
+
                     </div>
                     {{/each}}
                 </div>

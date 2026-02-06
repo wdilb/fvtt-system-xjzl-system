@@ -9,6 +9,7 @@ import { ChatCardManager } from "../managers/chat-manager.mjs";
 import { XJZLAuditLog } from "../applications/audit-log.mjs";
 import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 import { XJZLManageXPDialog } from "../applications/manage-xp.mjs";
+import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -968,7 +969,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
             // 如果我们在 XJZLActiveEffect 里定义了 displayLabel (带层数)，就用它
             // 否则用 e.name
-            const displayName = e.displayLabel || e.name;
+            // const displayName = e.displayLabel || e.name;
+            const displayName = e.name;//在页面处理了叠层的显示，所以这里不需要用 displayLabel了
 
             const effectData = {
                 id: e.id,
@@ -977,7 +979,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 description: e.description,
                 sourceName: source,
                 // 为了给 HBS 里的删除按钮用，如果特效属于 Item (被动)，通常不允许在 Actor 卡直接删除
-                isItemEffect: (e.parent instanceof Item) && e.transfer
+                isItemEffect: (e.parent instanceof Item) && e.transfer,
+                isStackable: e.isStackable,
+                stacks: e.stacks
             };
 
             // 3. 核心分类逻辑 (Wuxia 风格)
@@ -1067,6 +1071,18 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 this._collapsedDetails.set(uid, el.open);
             });
         });
+
+        // =====================================================
+        // 特效交互：左键加层，右键减层
+        // =====================================================
+        const effectsContainer = html.querySelector(".active-effects-row");
+        if (effectsContainer) {
+            // 左键委托
+            effectsContainer.addEventListener("click", (event) => this._onEffectAction(event, 1));
+            // 右键委托
+            effectsContainer.addEventListener("contextmenu", (event) => this._onEffectAction(event, -1));
+        }
+
         // 1. 绑定即时搜索 (Live Search)
         const searchInput = html.querySelector(".inventory-search-input");
 
@@ -2522,6 +2538,72 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 btnIcon.classList.remove("fa-rotate-left");
                 btnIcon.classList.add("fa-right-left");
             }
+        }
+    }
+
+    /**
+     * 统一处理特效交互 (委托模式)
+     * @param {Event} event 
+     * @param {Number} change 1(左键/增加) 或 -1(右键/减少)
+     */
+    async _onEffectAction(event, change) {
+        // 1. 向上查找被点击的 Chip 元素
+        // 判断点击的是不是我们要处理的区域
+        const chip = event.target.closest(".interactive-effect");
+
+        // 如果点的不是 Chip (比如点到了容器的空白处)，直接忽略
+        if (!chip) return;
+
+        // 2. 排除删除按钮
+        // 如果点击的是 Chip 里的删除按钮，放行事件，我们不管
+        if (event.target.closest(".effect-delete") || event.target.closest("[data-action]")) {
+            return;
+        }
+
+        // 3. 阻止默认行为 (防止右键菜单，防止文本选中等等)
+        event.preventDefault();
+        event.stopPropagation();
+
+        // 4. 防抖锁 (Optional Performance Guard)
+        // 防止用户狂点导致数据库请求阻塞。如果正在处理上一次点击，则忽略本次。
+        if (this._effectProcessing) return;
+
+        const effectId = chip.dataset.effectId;
+        const effect = this.actor.effects.get(effectId);
+
+        if (!effect) return;
+
+        // 开启锁
+        this._effectProcessing = true;
+
+        try {
+            const isStackable = effect.isStackable;
+            const currentStacks = effect.stacks || 1;
+
+            // === 增加层数 ===
+            if (change > 0) {
+                if (!isStackable) {
+                    ui.notifications.warn(`"${effect.name}" 不可叠加层数。`);
+                } else {
+                    // 传入 toObject() 避免直接引用
+                    await ActiveEffectManager.addEffect(this.actor, effect.toObject(), 1);
+                }
+            }
+            // === 减少层数 ===
+            else {
+                if (!isStackable) return; // 不可叠层右键无反应即可，不用报错
+
+                if (currentStacks > 1) {
+                    await ActiveEffectManager.removeEffect(this.actor, effect.id, 1);
+                } else {
+                    ui.notifications.info(`"${effect.name}" 当前只有 1 层。如需移除请点击删除按钮。`);
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            // 无论成功还是失败，都要释放锁
+            this._effectProcessing = false;
         }
     }
 }
