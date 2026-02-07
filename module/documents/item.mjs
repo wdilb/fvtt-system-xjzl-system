@@ -100,16 +100,18 @@ export class XJZLItem extends Item {
 
     // 2. 应用特效 (互斥逻辑)
     const consumableType = config.type || "other";
+    if (config.autoReplace ?? true) {  //如果为空或者定义为true则触发互斥
+      // 移除互斥旧特效
+      const effectsToDelete = actor.effects
+        .filter(e => e.getFlag("xjzl-system", "consumableType") === consumableType)
+        .map(e => e.id);
 
-    // 移除互斥旧特效
-    const effectsToDelete = actor.effects
-      .filter(e => e.getFlag("xjzl-system", "consumableType") === consumableType)
-      .map(e => e.id);
-
-    if (effectsToDelete.length > 0) {
-      await actor.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
-      // ui.notifications.info(`旧的 [${consumableType}] 效果已被覆盖。`); // 可选提示
+      if (effectsToDelete.length > 0) {
+        await actor.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
+        ui.notifications.info(`旧的 [${consumableType}] 效果已被覆盖。`); // 可选提示
+      }
     }
+
 
     // 创建新特效
     const effectsToCreate = this.effects.map(e => {

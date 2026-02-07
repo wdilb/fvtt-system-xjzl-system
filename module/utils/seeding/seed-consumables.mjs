@@ -101,6 +101,7 @@ export async function seedConsumables() {
                 description: d.system.description,
                 usageScript: d.system.usageScript,
                 automationNote: d.system.automationNote,
+                autoReplace: d.system.autoReplace ?? true, //为空则默认为true
                 recovery: d.system.recovery || { hp: 0, mp: 0, rage: 0 } // 默认值
             },
             effects: effects

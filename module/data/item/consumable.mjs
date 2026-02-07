@@ -57,7 +57,15 @@ export class XJZLConsumableData extends foundry.abstract.TypeDataModel {
         required: false,
         initial: "",
         label: "XJZL.AutomationNote" // 使用全局 Key
-      })
+      }),
+
+      // 互斥开关 ===
+      // initial: true 确保了老数据和空数据默认都会触发互斥
+      autoReplace: new fields.BooleanField({
+        required: true,
+        initial: true,
+        label: "XJZL.Consumable.AutoReplaceLabel" 
+      }),
     };
   }
 }
