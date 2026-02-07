@@ -1438,11 +1438,35 @@
             "sect": "tangmen",
             "category": "sanshou",
             "tier": 2,
-            "description": "<p>唐门弟子暗器不离手，日夜锻炼掷、索、射、喷、埋等各类暗器，以求无声无息间索敌之命。</p><p>需求：《潜渊心法》圆满</p><p>你选择一种暗器-子武器，作为你的秘密暗器，选择之后无法再更改。</p><ul><li>你施展秘密暗器武学套路时，招式伤害+10。</li><li>你为秘密暗器抹毒时，[韧性]检定难度+1。</li></ul><p>升级：可额外选择一种暗器；抹毒韧性难度+1。</p>",
+            "description": "<p>唐门弟子暗器不离手，日夜锻炼掷、索、射、喷、埋等各类暗器，以求无声无息间索敌之命。</p><p><strong>需求：</strong>《潜渊心法》圆满</p><p>你选择一种暗器-子武器，作为你的秘密暗器，选择之后无法再更改。</p><ul><li>你施展秘密暗器武学套路时，招式伤害+10。</li><li>你为秘密暗器抹毒时，[韧性]检定难度+1。</li></ul><p><strong>升级：</strong>可额外选择一种暗器；抹毒韧性难度+1。</p>",
             "requirements": "《潜渊心法》圆满",
-            "moves": [],
+            "moves": [
+                {
+                    "name": "暗器秘录",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>被动生效：</p><p>·你施展秘密暗器武学套路时，招式伤害+10。</p><p>·你为秘密暗器抹毒时，[韧性]检定难度+1。</p>",
+                    "automationNote": "伤害加成已通过AE脚本实现。抹毒检定难度增加需GM手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": []
+                }
+            ],
             "scripts": [],
-            "automationNote": "伤害加成已自动化。抹毒检定难度增加需GM手动处理。"
+            "automationNote": "伤害加成自动化。抹毒检定难度增加需GM手动处理。"
         },
         "effects": [
             {
@@ -1450,20 +1474,22 @@
                 "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                 "transfer": true,
                 "disabled": false,
-                "description": "秘密暗器伤害+10。",
-                "changes": [
-                    {
-                        "key": "system.combat.damages.weaponTypes.hidden.mod",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ],
+                "description": "秘密暗器武学伤害+10。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "anqi-milu",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "秘密暗器加伤",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "// 1. 过滤逻辑：必须是 暗器(hidden) 且 非普攻(basic)\nif (args.move.type === \"basic\") return;\nif (args.move.weaponType !== \"hidden\") return;\n\n// 2. 查找源武学 (内存查找，零IO)\n// 假设书名未改动\nconst book = actor.items.find(i => i.name === \"暗器秘录\" && i.type === \"wuxue\");\nif (!book) return;\n\n// 3. 查找招式数据以确认等级\nconst passiveMove = book.system.moves.find(m => m.name === \"暗器秘录\");\n// 尚未入门 (计算等级 < 1) 则不生效\nif (!passiveMove || (passiveMove.computedLevel || 0) < 1) return;\n\n// 4. 应用数值\nargs.output.damage += 10;\nargs.output.bonusDesc.push(\"暗器秘录 +10\");"
+                            }
+                        ]
                     }
-                }
+                },
+                "changes": []
             }
         ]
     },
