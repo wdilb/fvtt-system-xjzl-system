@@ -972,6 +972,23 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // const displayName = e.displayLabel || e.name;
             const displayName = e.name;//在页面处理了叠层的显示，所以这里不需要用 displayLabel了
 
+            // 计算持续时间简写 (为了支持 轮/回合/秒 多种情况)
+            let durationLabel = null;
+            const d = e.duration;
+            
+            if (d) {
+                if (d.rounds) {
+                    durationLabel = String(d.rounds) + "回合"; // 例如: "3"
+                } else if (d.turns) {
+                    durationLabel = `${d.turns}轮`;    // 例如: "2T" (Turn)
+                } else if (d.seconds) {
+                    // 如果是秒，转换成人话 (比如 600s -> 10m)
+                    if (d.seconds >= 3600) durationLabel = `${Math.floor(d.seconds / 3600)}h`;
+                    else if (d.seconds >= 60) durationLabel = `${Math.floor(d.seconds / 60)}m`;
+                    else durationLabel = `${d.seconds}s`;
+                }
+            }
+
             const effectData = {
                 id: e.id,
                 name: displayName,
@@ -981,7 +998,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 // 为了给 HBS 里的删除按钮用，如果特效属于 Item (被动)，通常不允许在 Actor 卡直接删除
                 isItemEffect: (e.parent instanceof Item) && e.transfer,
                 isStackable: e.isStackable,
-                stacks: e.stacks
+                stacks: e.stacks,
+                // 传入计算好的时间标签
+                durationLabel: durationLabel,
+                // 还是要把原始 duration 对象传进去 (防止有其他地方用)
+                duration: e.duration 
             };
 
             // 3. 核心分类逻辑 (Wuxia 风格)
