@@ -146,6 +146,9 @@ export class ActiveEffectManager {
         // -----------------------------------------------------
         // 4.1 叠层与数值逻辑
         // -----------------------------------------------------
+        // 新增标记：是否执行了持续时间延长逻辑
+        // 用于阻止后续的 "4.2" 步骤重置开始时间
+        let isDurationExtended = false;
         if (isStackable) {
             // --- 叠层模式 ---
             const currentStacks = existingEffect.getFlag("xjzl-system", "stacks") || 1;
@@ -247,12 +250,41 @@ export class ActiveEffectManager {
                 // 覆盖时：手动字幕
                 this._showScrollingText(actor, `! ${existingEffect.name}`, "neutral");
             }
+
+            // 持续时间叠加 (Extension)
+            const oldDur = existingEffect.duration;
+            const newDur = effectData.duration;
+
+            // 只有当两者都存在且为非无限时才尝试叠加
+            if (oldDur && newDur) {
+                // 情况A: Rounds (回合) - 最常用
+                if (typeof oldDur.rounds === "number" && typeof newDur.rounds === "number") {
+                    // 核心：深拷贝旧的时间数据，保留 startTime, startRound, startTurn
+                    updateData.duration = foundry.utils.deepClone(oldDur);
+                    // 累加时长
+                    updateData.duration.rounds = oldDur.rounds + newDur.rounds;
+                    isDurationExtended = true;
+                }
+                // 情况B: Seconds (秒)
+                else if (typeof oldDur.seconds === "number" && typeof newDur.seconds === "number") {
+                    updateData.duration = foundry.utils.deepClone(oldDur);
+                    updateData.duration.seconds = oldDur.seconds + newDur.seconds;
+                    isDurationExtended = true;
+                }
+                // 情况C: Turns (轮)
+                else if (typeof oldDur.turns === "number" && typeof newDur.turns === "number") {
+                    updateData.duration = foundry.utils.deepClone(oldDur);
+                    updateData.duration.turns = oldDur.turns + newDur.turns;
+                    isDurationExtended = true;
+                }
+            }
         }
 
         // -----------------------------------------------------
-        // 4.2 持续时间逻辑 (Duration) - 核心修正
+        // 4.2 持续时间逻辑 (Duration)
         // -----------------------------------------------------
-        if (effectData.duration) {
+        // 只有当提供了新时间，且没有执行刚才的叠加持续时间逻辑时，才执行标准的“重置/比较”逻辑
+        if (effectData.duration && !isDurationExtended) {
             // 判定是否需要更新持续时间：
             // 1. 如果是可叠层的 (isStackable) -> 总是视为“刷新/重置”，需要更新
             // 2. 如果不可叠层 -> 调用比较函数，只有新时间更长(或相等)时才更新
