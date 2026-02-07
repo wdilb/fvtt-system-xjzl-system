@@ -3,61 +3,6 @@
         "name": "走镖歌",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-        "effects": [
-            {
-                "name": "以武会友",
-                "icon": "icons/svg/downgrade.svg",
-                "description": "对添加该状态者以外的角色造成的伤害降低 20 点。",
-                "duration": {
-                    "rounds": 1
-                },
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_yiwuhuiyou_debuff",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "伤害降低",
-                                "trigger": "preDamage",
-                                "active": true,
-                                "script": "const sourceUuid = thisEffect.getFlag('xjzl-system', 'sourceActorUuid');\nif (args.target && args.target.uuid !== sourceUuid) {\n    args.config.amount = Math.max(0, args.config.amount - 20);\n    ui.notifications.info(\"以武会友：伤害降低 20 点\");\n}"
-                            }
-                        ]
-                    }
-                }
-            },
-            {
-                "name": "和气生财",
-                "icon": "icons/svg/peace.svg",
-                "description": "招式伤害-10，暴击骰+2。",
-                "duration": {
-                    "rounds": 1
-                },
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_heqishengcai_debuff",
-                        "stackable": false
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.crit_waigong",
-                        "mode": 2,
-                        "value": "-2"
-                    },
-                    {
-                        "key": "system.combat.crit_neigong",
-                        "mode": 2,
-                        "value": "-2"
-                    }
-                ]
-            }
-        ],
         "system": {
             "category": "wuxue",
             "sect": "sihaibiaomeng",
@@ -71,27 +16,30 @@
                     "actionType": "buff",
                     "element": "yang",
                     "weaponType": "instrument",
-                    "range": "10",
+                    "range": "10米",
+                    "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "重重敲锣，高挂镖旗，行威武镖，为范围内所有敌方添加“以武会友”，持续一回合。<br>以武会友：对添加该状态者以外的角色造成的伤害降低 20 点。",
+                    "description": "<p>重重敲锣，高挂镖旗，行威武镖，为范围内所有敌方添加“以武会友”，持续一回合。<br><strong>以武会友：</strong>对添加该状态者以外的角色造成的伤害降低 20 点。</p><p><strong>升级：</strong>以武会友持续回合数+1，内力消耗+2。</p>",
+                    "automationNote": "自动化。需手动选择范围目标。时长随等级自动成长。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "以武会友",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effectData = thisItem.effects.getName(\"以武会友\").toObject();\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.sourceActorUuid\", actor.uuid);\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = lvl;\n\nconst effectData = thisItem.effects.getName(\"以武会友\").toObject();\neffectData.duration = { rounds: rounds };\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.sourceActorUuid\", actor.uuid);\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
-                    ],
-                    "automationNote": "完全自动化。需要玩家手动选择范围内所有敌方。"
+                    ]
                 },
                 {
                     "name": "合吾",
@@ -99,27 +47,30 @@
                     "actionType": "buff",
                     "element": "yang",
                     "weaponType": "instrument",
-                    "range": "10",
+                    "range": "10米",
+                    "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "轻缓敲锣，半降镖旗，行仁义镖，为范围内所有敌方添加“和气生财”，持续一回合。<br>和气生财：招式伤害-10，暴击骰+2。",
+                    "description": "<p>轻缓敲锣，半降镖旗，行仁义镖，为范围内所有敌方添加“和气生财”，持续一回合。<br><strong>和气生财：</strong>招式伤害-10，暴击骰+2。</p><p><strong>升级：</strong>和气生财的持续回合数+1，内力消耗+2。</p>",
+                    "automationNote": "自动化。需手动选择范围目标。时长随等级自动成长。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "和气生财",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effectData = thisItem.effects.getName(\"和气生财\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = lvl;\n\nconst effectData = thisItem.effects.getName(\"和气生财\").toObject();\neffectData.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
-                    ],
-                    "automationNote": "完全自动化。暴击骰+2实现为暴击属性-2（更难暴击）。"
+                    ]
                 },
                 {
                     "name": "偃旗息锣",
@@ -127,22 +78,21 @@
                     "element": "yang",
                     "weaponType": "instrument",
                     "range": "自身",
+                    "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "按锣不敲，收起镖旗，行哑镖。<br>格挡成功后，可消耗反应动作施展【我武唯扬】或【合吾】。",
+                    "description": "<p>按锣不敲，收起镖旗，行哑镖。<br>格挡成功后，可消耗反应动作施展【我武唯扬】或【合吾】。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "反击动作需玩家手动执行。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
-                        ],
-                        "rage": [],
-                        "hp": []
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 5
-                    },
-                    "automationNote": "反击动作需玩家手动执行。"
+                        ]
+                    }
                 },
                 {
                     "name": "一齐打响",
@@ -151,22 +101,11 @@
                     "element": "yang",
                     "weaponType": "instrument",
                     "damageType": "waigong",
-                    "range": "5",
+                    "range": "5米",
+                    "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "万不得已，猛敲铜锣，声震耳聋，对范围内敌人造成 0.5 力量点外功伤害。<br>同时给目标添加“耳鸣”，持续两回合。",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ],
-                        "rage": [
-                            7,
-                            6,
-                            5
-                        ],
-                        "hp": []
-                    },
+                    "description": "<p>万不得已，猛敲铜锣，声震耳聋，对范围内敌人造成伤害。<br>同时给目标添加“耳鸣”，持续两回合。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "伤害自动。命中后自动施加[耳鸣] (2回合)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -177,15 +116,83 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
                     "scripts": [
                         {
                             "label": "添加耳鸣",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"deaf\");"
+                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}"
                         }
-                    ],
-                    "automationNote": "完全自动化。耳鸣持续时间由系统状态默认处理，如需强制2回合需玩家手动调整或GM干预。"
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "以武会友",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "对添加该状态者以外的角色造成的伤害降低 20 点。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_yiwuhuiyou_debuff",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "伤害降低",
+                                    "trigger": "preDamage",
+                                    "active": true,
+                                    "script": "const sourceUuid = thisEffect.getFlag('xjzl-system', 'sourceActorUuid');\n// 攻击者(拥有Buff的人)攻击其他人时\nif (args.target && args.target.uuid !== sourceUuid) {\n    args.config.amount = Math.max(0, args.config.amount - 20);\n    actor.showFloatyText(\"以武会友 -20\", { fill: \"#cccccc\" });\n}"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "和气生财",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "招式伤害-10，暴击骰+2。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_heqishengcai_debuff",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "-10"
+                        },
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "2"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "2"
+                        }
+                    ]
                 }
             ]
         }
