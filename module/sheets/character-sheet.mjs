@@ -975,17 +975,49 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 计算持续时间简写 (为了支持 轮/回合/秒 多种情况)
             let durationLabel = null;
             const d = e.duration;
-            
+
             if (d) {
-                if (d.rounds) {
-                    durationLabel = String(d.rounds) + "回合"; // 例如: "3"
-                } else if (d.turns) {
-                    durationLabel = `${d.turns}轮`;    // 例如: "2T" (Turn)
-                } else if (d.seconds) {
-                    // 如果是秒，转换成人话 (比如 600s -> 10m)
-                    if (d.seconds >= 3600) durationLabel = `${Math.floor(d.seconds / 3600)}h`;
-                    else if (d.seconds >= 60) durationLabel = `${Math.floor(d.seconds / 60)}m`;
-                    else durationLabel = `${d.seconds}s`;
+                // --- 情况 1: 基于秒的实时时间 (Seconds) ---
+                if (d.seconds) {
+                    // 获取开始时间 (如果没记录开始时间，就假设是现在)
+                    const startTime = d.startTime || game.time.worldTime;
+                    // 计算结束时间
+                    const endTime = startTime + d.seconds;
+                    // 计算剩余秒数 (最大值取0，防止出现负数)
+                    const remainingSeconds = Math.max(0, endTime - game.time.worldTime);
+
+                    // 格式化显示
+                    if (remainingSeconds >= 3600) durationLabel = `${Math.floor(remainingSeconds / 3600)}h`;
+                    else if (remainingSeconds >= 60) durationLabel = `${Math.floor(remainingSeconds / 60)}m`;
+                    else durationLabel = `${remainingSeconds}s`;
+                }
+
+                // --- 情况 2: 基于战斗轮 (Rounds) ---
+                else if (d.rounds) {
+                    // 只有在【战斗中】且战斗已开始时，才能计算剩余轮次
+                    if (game.combat && game.combat.round) {
+                        const currentRound = game.combat.round;
+                        const startRound = d.startRound || currentRound;
+
+                        // 计算已经过去了多少轮
+                        const elapsed = currentRound - startRound;
+
+                        // 计算剩余轮次 = 总轮次 - 已过轮次
+                        const remaining = Math.max(0, d.rounds - elapsed);
+
+                        // 如果剩余0轮，说明即将在本轮结束
+                        if (remaining === 0) durationLabel = "即将结束";
+                        else durationLabel = `${remaining} 回合`;
+                    } else {
+                        // 如果不在战斗中，只能显示总时长 (静态)
+                        durationLabel = `${d.rounds} 回合`;
+                    }
+                }
+
+                // --- 情况 3: 基于回合 (Turns) ---
+                // Turns 通常比较短，或者用于 Initiative 排序，简单处理
+                else if (d.turns) {
+                    durationLabel = `${d.turns} 轮`;
                 }
             }
 
@@ -1002,7 +1034,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 // 传入计算好的时间标签
                 durationLabel: durationLabel,
                 // 还是要把原始 duration 对象传进去 (防止有其他地方用)
-                duration: e.duration 
+                duration: e.duration
             };
 
             // 3. 核心分类逻辑 (Wuxia 风格)
