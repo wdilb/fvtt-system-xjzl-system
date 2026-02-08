@@ -482,16 +482,25 @@
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 2,
-            "description": "旨在调理五脏，运化其中精气，调节平衡。<br>锋针-铜 60 两：无伤害，筩其身，锋其末，刃三隅，绵延持有。<br>大针-铜 60 两：无伤害，尖如梃，当为筵，其锋微圆，剧烈短暂。",
+            "description": "<p>旨在调理五脏，运化其中精气，调节平衡。</p><p><strong>需求：</strong>暗器-针 <strong>属性：</strong>太极</p><p><strong>锋针-铜 60 两：</strong>无伤害，筩其身，锋其末，刃三隅，绵延持有。</p><p><strong>大针-铜 60 两：</strong>无伤害，尖如梃，当为筵，其锋微圆，剧烈短暂。</p>",
             "requirements": "暗器-针",
             "moves": [
                 {
                     "name": "蕴脾血针",
                     "type": "qi",
                     "actionType": "heal",
-                    "range": "5",
-                    "description": "主要动作，统摄气血，为气血生化之源，添加：<br>锋针：目标每回合末恢复 10 气血，持续三回合。<br>大针：目标立即恢复 30 点气血。",
-                    "automationNote": "出招前询问使用锋针或大针。扣除物品需手动，自动应用对应效果。",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，统摄气血，为气血生化之源，添加：</p><p><strong>锋针：</strong>目标每回合末恢复 10 气血，持续三回合。</p><p><strong>大针：</strong>目标立即恢复 30 点气血。</p><p><strong>升级：</strong>锋针持续回合+1，大针回复气血+10，消耗+2</p>",
+                    "automationNote": "出招前弹窗选择针法。多目标时共享同一选择。锋针自动应用AE，大针自动回血。结束后自动清理标记。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -501,28 +510,41 @@
                     },
                     "scripts": [
                         {
-                            "label": "前置:记录选择",
+                            "label": "选择针法",
                             "trigger": "attack",
-                            "active": true,
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 蕴脾血针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续回血)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回血)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\n\n// 提示扣除物品\nconst itemName = dialog === 'feng' ? '锋针' : '大针';\nui.notifications.info(`请手动扣除背包中的 [${itemName}]。`);\n\n// 记录选择到 Item 上\nawait args.item.setFlag('xjzl-system', 'temp_needle_spleen', dialog);",
+                            "active": true
                         },
                         {
-                            "label": "蕴脾效果",
+                            "label": "应用效果",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 养血 (持续3+lvl-1回合)\n    const duration = 3 + (lvl - 1);\n    const yangxueData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yangxue\"));\n    yangxueData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, yangxueData);\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const heal = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_spleen');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    // 锋针: 持续回血 (基础3回合 + 升级)\n    const template = thisItem.effects.getName(\"蕴脾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const amount = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ amount: amount, type: \"hp\", showScrolling: true });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "清理标记",
+                            "trigger": "hit_once",
+                            "script": "await args.item.unsetFlag('xjzl-system', 'temp_needle_spleen');",
+                            "active": true
                         }
-                    ],
-                    "weaponType": "hidden",
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "理肺气针",
                     "type": "qi",
                     "actionType": "heal",
-                    "range": "5",
-                    "description": "主要动作，肺司呼吸主气，循环内力，添加：<br>锋针：目标每回合末恢复 5 内力，持续三回合。<br>大针：目标立即恢复 15 点内力。",
-                    "automationNote": "出招前询问针法。扣除物品需手动。",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，肺司呼吸主气，循环内力，添加：</p><p><strong>锋针：</strong>目标每回合末恢复 5 内力，持续三回合。</p><p><strong>大针：</strong>目标立即恢复 15 点内力。</p><p><strong>升级：</strong>锋针持续回合+1，大针回复内力+5，消耗+2</p>",
+                    "automationNote": "出招前弹窗选择针法。锋针自动应用AE，大针自动回内。结束后自动清理标记。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -532,28 +554,41 @@
                     },
                     "scripts": [
                         {
-                            "label": "前置:记录选择",
+                            "label": "选择针法",
                             "trigger": "attack",
-                            "active": true,
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 理肺气针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续回内)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回内)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_lung', dialog);",
+                            "active": true
                         },
                         {
-                            "label": "理肺效果",
+                            "label": "应用效果",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 聚气 (5MP, 持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const juqiData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"juqi\"));\n    juqiData.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, juqiData);\n} else {\n    // 大针: 瞬间回蓝 (15 + (lvl-1)*5)\n    const heal = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: heal, type: \"mp\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_lung');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"理肺-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"mp\", showScrolling: true });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "清理标记",
+                            "trigger": "hit_once",
+                            "script": "await args.item.unsetFlag('xjzl-system', 'temp_needle_lung');",
+                            "active": true
                         }
-                    ],
-                    "weaponType": "hidden",
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "生肾水针",
                     "type": "qi",
                     "actionType": "buff",
-                    "range": "5",
-                    "description": "主要动作，封藏精气，为先天生命之根，添加：<br>锋针：目标每回合初获得5护体真气，持续三回合。<br>大针：目标获得 15 点护体真气。<br>·本招式添加的护体真气均持续到战斗脱离。",
-                    "automationNote": "出招前询问针法。扣除物品需手动。",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，封藏精气，为先天生命之根，添加：</p><p><strong>锋针：</strong>目标每回合初获得5护体真气，持续三回合。</p><p><strong>大针：</strong>目标获得 15 点护体真气。</p><p>·本招式添加的护体真气均持续到战斗脱离。</p><p><strong>升级：</strong>锋针持续回合+1，大针护体真气+5，消耗+2</p>",
+                    "automationNote": "出招前弹窗选择针法。锋针自动应用AE(内含回合脚本)，大针自动加护体。结束后自动清理标记。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -563,28 +598,41 @@
                     },
                     "scripts": [
                         {
-                            "label": "前置:记录选择",
+                            "label": "选择针法",
                             "trigger": "attack",
-                            "active": true,
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 生肾水针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续护体)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间护体)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_kidney', dialog);",
+                            "active": true
                         },
                         {
-                            "label": "生肾效果",
+                            "label": "应用效果",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 每回合加护体\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"生肾水针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 5 点护体真气。\",\n        flags: { \"xjzl-system\": { \"stackable\": true, scripts: [{\n            trigger: \"turnStart\",\n            active: true,\n            script: \"await actor.applyHealing({ amount: 5, type: 'huti', showScrolling: true });\"\n        }] } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间加护体 (15 + (lvl-1)*5)\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_kidney');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"生肾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "清理标记",
+                            "trigger": "hit_once",
+                            "script": "await args.item.unsetFlag('xjzl-system', 'temp_needle_kidney');",
+                            "active": true
                         }
-                    ],
-                    "weaponType": "hidden",
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "养肝精针",
                     "type": "qi",
                     "actionType": "buff",
-                    "range": "5",
-                    "description": "主要动作，疏泄疏通、调节精神情志，添加：<br>锋针：每回合初获得 1 怒气，持续三回合。<br>大针：两个友方各获得 1 怒气。",
-                    "automationNote": "出招前询问针法。大针请手动选择两个目标。",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，疏泄疏通、调节精神情志，添加：</p><p><strong>锋针：</strong>每回合初获得 1 怒气，持续三回合。</p><p><strong>大针：</strong>两个友方各获得 1 怒气。</p><p><strong>升级：</strong>锋针持续回合+1，大针选择友方+1，消耗+2</p>",
+                    "automationNote": "出招前弹窗选择针法。大针请在场景中手动选择对应数量的目标(基础2+等级)。结束后自动清理标记。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -594,29 +642,42 @@
                     },
                     "scripts": [
                         {
-                            "label": "前置:记录选择",
+                            "label": "选择针法",
                             "trigger": "attack",
-                            "active": true,
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请自觉扣除 ${dialog === 'feng' ? '锋针' : '大针'}。`);\nawait args.item.setFlag('xjzl-system', 'tempNeedleType', dialog);"
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 养肝精针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续回怒)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回怒)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_liver', dialog);",
+                            "active": true
                         },
                         {
-                            "label": "养肝效果",
+                            "label": "应用效果",
                             "trigger": "hit",
-                            "active": true,
-                            "script": "const needleType = args.item.getFlag('xjzl-system', 'tempNeedleType');\nconst lvl = args.move.computedLevel;\n\nif (needleType === 'feng') {\n    // 锋针: 回怒 (持续3+lvl-1)\n    const duration = 3 + (lvl - 1);\n    const effectData = {\n        name: \"养肝精针(持续)\",\n        icon: args.item.img,\n        duration: { rounds: duration },\n        description: \"每回合初获得 1 怒气。\",\n        changes: [{ key: \"flags.xjzl-system.regenRageTurnStart\", mode: 2, value: 1 }]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n} else {\n    // 大针: 瞬间回怒 (数值固定1)\n    await args.target.applyHealing({ amount: 1, type: \"rage\", showScrolling: true });\n}\n\n// 清理临时 Flag\nawait args.item.unsetFlag('xjzl-system', 'tempNeedleType');"
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_liver');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"养肝-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    await args.target.applyHealing({ amount: 1, type: \"rage\", showScrolling: true });\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "清理标记",
+                            "trigger": "hit_once",
+                            "script": "await args.item.unsetFlag('xjzl-system', 'temp_needle_liver');",
+                            "active": true
                         }
-                    ],
-                    "weaponType": "hidden",
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "护心火针",
                     "type": "qi",
                     "isUltimate": true,
                     "actionType": "buff",
-                    "range": "5",
-                    "description": "心主通明神志，维系一切生命精神。当目标即将陷入濒死后，可消耗反应动作释放此招，针刺其心，护其心火不灭。<br>目标需要进行一次[韧性]检定，难度=【本次受到伤害/20】，成功则回复 1 点气血，并将先攻顺序调整到最末。",
-                    "automationNote": "纯手动：请在目标濒死时手动使用，手动检定，手动修改先攻。",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "hidden",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>心主通明神志，维系一切生命精神。当目标即将陷入濒死后，可消耗反应动作释放此招，针刺其心，护其心火不灭。</p><p>目标需要进行一次[韧性]检定，难度=【本次受到伤害/20】，成功则回复 1 点气血，并将先攻顺序调整到最末。</p><p><strong>升级：</strong>难度-3，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "纯手动。请在目标濒死时手动使用。检定和修改先攻需手动操作。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -629,9 +690,94 @@
                             5
                         ]
                     },
-                    "scripts": [],
-                    "weaponType": "hidden",
-                    "actionCost": "反应动作"
+                    "scripts": [
+                        {
+                            "label": "提示信息",
+                            "trigger": "hit",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst diffMod = (lvl - 1) * 3;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">护心火针 - 救治提示</div>\n        <div style=\"padding:5px; font-size:0.9em; color:#555;\">\n            <p>目标需进行 <b>[韧性]</b> 检定。</p>\n            <p>DC = (本次致死伤害 / 20) - ${diffMod}。</p>\n            <hr>\n            <p><b>若成功：</b>回复 1 点气血，并将先攻调整至最后。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "蕴脾-锋针",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                    "description": "每回合末恢复 10 气血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yunpi_feng",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnEnd",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
+                },
+                {
+                    "name": "理肺-锋针",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                    "description": "每回合末恢复 5 内力。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "lifei_feng",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenMpTurnEnd",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                },
+                {
+                    "name": "生肾-锋针",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                    "description": "每回合初获得 5 点护体真气。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shengshen_feng",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "每回合加护体",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "await actor.applyHealing({ amount: 5, type: 'huti', showScrolling: true });"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "养肝-锋针",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                    "description": "每回合初获得 1 怒气。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yanggan_feng",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenRageTurnStart",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
                 }
             ]
         }
