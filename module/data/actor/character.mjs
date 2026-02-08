@@ -1227,6 +1227,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     res.fire.total = 0 + (res.fire.mod || 0);
     res.mental.total = 0 + (res.mental.mod || 0);
     res.global.total = 0 + (res.global.mod || 0);
+    res.neigong.total = 0 + (res.neigong.mod || 0);
+    res.waigong.total = 0 + (res.waigong.mod || 0);
 
     // 3. 武器等级修正与伤害计算 (Weapon Ranks & Dmg)
     // ------------------------------------
