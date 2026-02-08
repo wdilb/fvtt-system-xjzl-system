@@ -37,6 +37,8 @@ export class XJZLActor extends Actor {
   */
   async _preUpdate(changed, options, user) {
     await super._preUpdate(changed, options, user);
+    // 如果是容器，跳过所有复杂的角色数据预处理
+    if (this.type === "container") return;
 
     // 只有当 system 数据发生变化时才检查
     if (!changed.system) return;
@@ -94,6 +96,12 @@ export class XJZLActor extends Actor {
    * 监控自身数据更新 (基础属性变动/升级)
    */
   _onUpdate(changed, options, userId) {
+    // 如果是容器，直接终止，不再执行后续的资源检查
+    if (this.type === "container") {
+      super._onUpdate(changed, options, userId);
+      return;
+    }
+
     super._onUpdate(changed, options, userId);
     if (userId !== game.user.id) return;
 
@@ -140,6 +148,30 @@ export class XJZLActor extends Actor {
 
     // 获取原型 Token 的初始数据
     const prototypeToken = {};
+
+    // A. 容器/战利品 特殊初始化
+    if (data.type === "container") {
+      // 1. 默认权限：所有玩家可见 (Observer)
+      // 这样玩家可以直接双击 Token 打开查看，或双击列表里的名字
+      this.updateSource({
+        "ownership.default": CONST.DOCUMENT_OWNERSHIP_LEVELS.OBSERVER
+      });
+
+      // 2. Token 设置：
+      // - 敌对状态：中立 (0)
+      // - 显示名字：总是显示 (或者悬停显示)
+      // - 链接：默认不链接 (actorLink=false)，这意味着拖出来的每一个宝箱都是独立的，互不影响。
+      //   如果你想要“公共仓库”(所有宝箱通向同一个空间)，则需要手动勾选“链接角色数据”。
+      prototypeToken.actorLink = false;
+      prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
+      prototypeToken.displayName = CONST.TOKEN_DISPLAY_MODES.HOVER;
+
+      // 应用 Token 设置
+      this.updateSource({ prototypeToken });
+
+      // 容器处理完毕，直接退出，不走下面角色的逻辑
+      return;
+    }
 
     // === 1. 根据角色类型设置默认关联状态 ===
     if (data.type === "character") {
@@ -220,6 +252,10 @@ export class XJZLActor extends Actor {
 
   prepareBaseData() {
     super.prepareBaseData();
+    // 容器类型的特殊处理：直接跳过后续复杂的初始化
+    if (this.type === "container") {
+      return;
+    }
     // =====================================================
     // 检测让装备无效的flags，如果不在这里加载可能会因为加载AE顺序的问题导致flags生效的时候其他装备的AE已经被计算过了的问题
     // =====================================================
@@ -239,6 +275,14 @@ export class XJZLActor extends Actor {
   }
 
   /**
+   * 专门处理容器的数据准备 (如果有需要的话)
+   */
+  _prepareContainerData() {
+    // 目前可能什么都不用做
+    // 但如果未来要做什么，可以写在这里
+  }
+
+  /**
    * 数据准备流程的生命周期：
    * 1. prepareData()
    *    -> prepareBaseData()  (DataModel)
@@ -246,6 +290,12 @@ export class XJZLActor extends Actor {
    *    -> prepareDerivedData() (DataModel + Document)
    */
   prepareDerivedData() {
+    // 容器类型的特殊处理：直接跳过
+    // 容器没有属性、没有派生数值、不需要计算内功加成
+    if (this.type === "container") {
+      this._prepareContainerData();
+      return;
+    }
     // ----------------------------------------------------
     // PHASE 1: 基础计算 (Pass 1)
     // ----------------------------------------------------
@@ -308,6 +358,8 @@ export class XJZLActor extends Actor {
    * 这决定了你在公式里可以用 @ 什么属性
    */
   getRollData() {
+    // --- 容器直接返回基础数据，不进行属性映射 ---
+    if (this.type === "container") return super.getRollData();
     const data = super.getRollData();
     const sys = this.system;
 
@@ -395,6 +447,8 @@ export class XJZLActor extends Actor {
    * @returns {Array} 脚本对象数组 [{ script, label, source }]
    */
   collectScripts(trigger, contextItem = null) {
+    // --- 容器没有脚本逻辑 ---
+    if (this.type === "container") return [];
     const scripts = [];
 
     // 1. 内功 (Neigong) - 从 active_neigong 指向的 Item 中读取
@@ -578,6 +632,7 @@ export class XJZLActor extends Actor {
    * @param {Object|Item} [contextItem] - 用于 collectScripts 的上下文对象
    */
   async runScripts(trigger, context = {}, contextItem = null) {
+    if (this.type === "container") return; //容器没有脚本
     // 1. 收集脚本
     const scriptsToRun = this.collectScripts(trigger, contextItem);
     if (!scriptsToRun.length) return;
@@ -775,6 +830,9 @@ export class XJZLActor extends Actor {
    * @returns {Promise<Roll>} 返回 Roll 实例
    */
   async rollAttributeTest(key, options = {}) {
+    // --- 容器没有属性 ---
+    if (this.type === "container") return null;
+
     const sys = this.system;
 
     let labelKey = "";
@@ -940,6 +998,7 @@ export class XJZLActor extends Actor {
    * 辅助方法：获取当前角色可用的穴位列表
    */
   getAvailableAcupoints() {
+    if (this.type === "container") return []; //容器直接返回
     const occupiedPoints = new Set();
     this.itemTypes.qizhen.forEach(i => {
       if (i.system.equipped && i.system.acupoint) {
@@ -972,6 +1031,7 @@ export class XJZLActor extends Actor {
    * @returns {Object} { valid: boolean, message: string, oldValue: number }
    */
   canUpdateStat(fieldName, newValue) {
+    if (this.type === "container") return { valid: false }; //容器直接返回
     // 1. 获取旧值
     const oldValue = foundry.utils.getProperty(this, fieldName) || 0;
 
@@ -1001,6 +1061,8 @@ export class XJZLActor extends Actor {
    * 覆盖范围：HP, MP, Tili (野兽), Rage (怒气)
    */
   _enforceResourceIntegrity() {
+    // --- 容器没有这些资源，直接跳过 ---
+    if (this.type === "container") return;
     // 1. 获取计算后的衍生数据 (包含最新的 max)
     const res = this.system.resources;
 
@@ -1078,6 +1140,12 @@ export class XJZLActor extends Actor {
         delete socketData.attacker; // 剔除复杂对象
       }
       return await xjzlSocket.executeAsGM("applyDamage", this.uuid, socketData);
+    }
+
+    // --- 容器受到攻击不处理，或者返回0伤害 ---
+    if (this.type === "container") {
+      this.showFloatyText("无效", { fill: "#cccccc" });
+      return { finalDamage: 0 };
     }
 
     // =====================================================
@@ -1623,6 +1691,9 @@ export class XJZLActor extends Actor {
   async applyHealing(data) {
     // [权限拦截]
     if (!this.isOwner) return await xjzlSocket.executeAsGM("applyHealing", this.uuid, data);
+    // --- 容器无法治疗 ---
+    if (this.type === "container") return { actualHeal: 0 };
+
     const { amount = 0, type = "hp", showScrolling = true } = data;
 
     // 允许负数，只拦截 0
@@ -1764,6 +1835,9 @@ export class XJZLActor extends Actor {
    * @param {String} timing 时机标识: "TurnStart", "TurnEnd", "Attack"
    */
   async processRegen(timing) {
+    // --- 容器没有自动回复 ---
+    if (this.type === "container") return;
+
     const updates = {};
     const messages = [];
     const resources = this.system.resources;
@@ -1837,6 +1911,7 @@ export class XJZLActor extends Actor {
    * @param {String} [options.mode="basic"] - "basic" | "opportunity"
    */
   async rollBasicAttack(options = {}) {
+    if (this.type === "container") return; //容器直接返回
     const mode = options.mode || "basic";
     const isOpportunity = mode === "opportunity";
     const label = isOpportunity ? "趁虚而入" : "普通攻击";
@@ -2517,6 +2592,7 @@ export class XJZLActor extends Actor {
    * 3. 视觉反馈
    */
   async stopStance() {
+    if (this.type === "container") return; //容器直接返回
     // 1. 检查当前是否有架招
     const martial = this.system.martial;
     if (!martial.stanceActive) return;
@@ -2602,6 +2678,7 @@ export class XJZLActor extends Actor {
    * @param {Object} details - 日志详情 { title, reason, gameDate }
    */
   async manualModifyXP(poolKey, amount, { title, reason, gameDate } = {}) {
+    if (this.type === "container") return; //容器直接返回
     const system = this.system;
 
     // 1. 验证目标池
@@ -2655,6 +2732,7 @@ export class XJZLActor extends Actor {
    * 执行小憩 (Short Rest)
    */
   async shortRest() {
+    if (this.type === "container") return; // 容器不能休息
     const res = this.system.resources;
 
     // 1. 检查次数
@@ -2736,6 +2814,7 @@ export class XJZLActor extends Actor {
    * 执行休整 (Long Rest)
    */
   async longRest() {
+    if (this.type === "container") return; //容器直接返回
     const res = this.system.resources;
 
     // 1. 准备更新数据
@@ -2811,6 +2890,8 @@ export class XJZLActor extends Actor {
    */
   async investJingmai(key) {
 
+    if (this.type === "container") return { applied: 0, cost: 0 }; //容器直接返回
+
     // 检查经脉是否是十二正经
     if (!CONFIG.XJZL.acupoints[key]) {
       ui?.notifications?.warn?.(`${key}不存在或无法突破，请选择十二正经之一`);
@@ -2852,6 +2933,7 @@ export class XJZLActor extends Actor {
    * @param {string} key - 经脉名
    */
   async refundJingmai(key) {
+    if (this.type === "container") return { applied: 0, refund: 0 }; //容器直接返回
     // 检查经脉是否是十二正经
     if (!CONFIG.XJZL.acupoints[key]) {
       ui?.notifications?.warn?.(`${key}不存在或无法突破，请选择十二正经之一`);

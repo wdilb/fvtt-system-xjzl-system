@@ -10,6 +10,7 @@ import { XJZLAuditLog } from "../applications/audit-log.mjs";
 import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 import { XJZLManageXPDialog } from "../applications/manage-xp.mjs";
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
+import { xjzlSocket } from "../socket.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -1173,8 +1174,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const dragSelectors = [
             ".move-card",         // 招式
             ".item-grid-card",    // 物品/消耗品
-            ".neigong-card",      // 内功 (可选，如果你想让他也能拖到物品栏备份)
-            ".art-book-card"      // 技艺书 (可选)
+            ".neigong-card",      // 内功
+            ".art-book-card"      // 技艺书
         ];
 
         // 2. 遍历并绑定
@@ -1368,6 +1369,16 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             return super._onDrop(event, data);
         }
 
+        // =====================================================
+        // 拦截容器数据
+        // =====================================================
+        // 检查是否有我们的自定义标记 "xjzlSource"
+        // 如果有，说明这是我们自己封装的数据，直接交给 _onDropItem 处理
+        // 从而跳过 super._onDrop (因为它会清洗掉 containerUuid 等关键字段)
+        if (data && data.xjzlSource === "container") {
+            return this._onDropItem(event, data);
+        }
+
         // 如果不是物品，直接甩锅给父类处理 (比如可能是 Actor 或 Folder)
         if (data.type !== "Item") return super._onDrop(event, data);
 
@@ -1473,6 +1484,64 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     async _onDropItem(event, data) {
         // 1. 基础检查
         if (!this.actor.isOwner) return false;
+
+        // =====================================================
+        // 特殊处理从【箱子/战利品】拿取
+        // =====================================================
+        // 检查 sourceItem 是否存在，且其 parent 是 container
+        if (data.xjzlSource === "container" && data.data) {
+            
+            // 1. 锁检查 (需要手动获取容器，因为不能依赖 uuid 解析)
+            let container = null;
+            try {
+                if (data.containerUuid) container = await fromUuid(data.containerUuid);
+            } catch(e) {}
+
+            // 如果连容器都找不到，或者是上锁的，直接拒绝
+            if (container) {
+                const isGM = game.user.isGM;
+                if (!isGM && container.system.locked) {
+                    ui.notifications.warn("箱子已上锁，无法拿取。");
+                    return false;
+                }
+            }
+
+            const itemData = data.data; // 直接使用纯数据
+
+            // 2. 堆叠逻辑
+            const stackableTypes = ["consumable", "misc", "manual"];
+            if (stackableTypes.includes(itemData.type)) {
+                const existingItem = this.actor.items.find(i => i.type === itemData.type && i.name === itemData.name);
+                if (existingItem) {
+                    const addQty = itemData.system.quantity || 1;
+                    const newQty = (existingItem.system.quantity || 0) + addQty;
+                    await existingItem.update({ "system.quantity": newQty });
+
+                    // 删除源物品
+                    if (data.uuid && data.containerUuid) {
+                         const itemId = data.uuid.split(".").pop();
+                         await xjzlSocket.executeAsGM("deleteEmbedded", data.containerUuid, "Item", [itemId]);
+                         ui.notifications.info(`已堆叠: ${itemData.name}`);
+                    }
+                    return false; // 结束，不往下走
+                }
+            }
+
+            // 3. 创建新物品
+            const createdItems = await this.actor.createEmbeddedDocuments("Item", [itemData]);
+
+            // 4. 删源
+            if (createdItems && createdItems.length > 0 && data.uuid && data.containerUuid) {
+                const itemId = data.uuid.split(".").pop();
+                try {
+                    await xjzlSocket.executeAsGM("deleteEmbedded", data.containerUuid, "Item", [itemId]);
+                    ui.notifications.info(`已拿取: ${itemData.name}`);
+                } catch (err) { console.error(err); }
+            }
+            
+            // 直接返回，不让代码往下执行到 super._onDropItem
+            return createdItems;
+        }
 
         // 2. 加载完整数据
         // 这一步是异步的，但因为是在 _onDropItem 里，这里的等待是安全的，不会阻塞外层事件。

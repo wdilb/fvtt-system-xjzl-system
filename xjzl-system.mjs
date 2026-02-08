@@ -12,6 +12,7 @@ import { XJZLActiveEffect } from "./module/documents/active-effect.mjs";
 // 导入 DataModels (数据结构)
 import { XJZLCharacterData } from "./module/data/actor/character.mjs";
 // import { XJZLNPCData } from "./module/data/actor/npc.mjs"; // npc就使用和character一样的数据好了
+import { XJZLContainerData } from "./module/data/actor/container.mjs";
 import { XJZLCreatureData } from "./module/data/actor/creature.mjs";
 import { XJZLNeigongData } from "./module/data/item/neigong.mjs";
 import { XJZLWuxueData } from "./module/data/item/wuxue.mjs"
@@ -28,6 +29,7 @@ import { XJZLBackgroundData } from "./module/data/item/background.mjs";
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
 import { XJZLCreatureSheet } from "./module/sheets/creature-sheet.mjs";
+import { XJZLContainerSheet } from "./module/sheets/container-sheet.mjs";
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
@@ -220,7 +222,8 @@ Hooks.once("init", async function () {
   CONFIG.Actor.dataModels = {
     character: XJZLCharacterData,
     npc: XJZLCharacterData,
-    creature: XJZLCreatureData
+    creature: XJZLCreatureData,
+    container: XJZLContainerData
   };
 
   CONFIG.Item.dataModels = {
@@ -256,6 +259,12 @@ Hooks.once("init", async function () {
     types: ["creature"],
     makeDefault: true,
     label: "XJZL.Sheet.Creature"
+  });
+
+  Actors.registerSheet("xjzl-system", XJZLContainerSheet, {
+    types: ["container"],
+    makeDefault: true,
+    label: "XJZL.Sheet.Container"
   });
 
   // ---注册 Item Sheet ---
@@ -701,6 +710,47 @@ Hooks.on("renderItemDirectory", (app, html, data) => {
 
   // 5. 插入到界面中 (headerActions 之后)
   headerActions.after(button);
+});
+
+/**
+ * 渲染角色目录时的钩子
+ * 作用：对玩家隐藏 "container" 类型的 Actor，避免侧边栏剧透
+ */
+Hooks.on("renderActorDirectory", (app, html, data) => {
+  // 1. GM 始终可见所有，直接跳过
+  if (game.user.isGM) return;
+
+  // 2. 筛选需要隐藏的 Actor ID
+  // 逻辑：类型是 container 且 当前用户不是 Owner (即 Observer 或 None)
+  const hiddenActorIds = game.actors
+    .filter(a => a.type === "container" && !a.isOwner)
+    .map(a => a.id);
+
+  // 3. 获取或创建样式标签
+  const styleId = "xjzl-hide-containers";
+  let styleElement = document.getElementById(styleId);
+
+  // 如果没有需要隐藏的（比如玩家买了仓库，有了 Owner 权限），且样式标签存在，则清空它
+  if (hiddenActorIds.length === 0) {
+    if (styleElement) styleElement.innerText = "";
+    return;
+  }
+
+  // 4. 构建 CSS 规则
+  const selector = hiddenActorIds.map(id => `.directory-item[data-entry-id="${id}"]`).join(", ");
+  const cssRule = `${selector} { display: none !important; }`;
+
+  // 5. 比对内容
+  // 只有当规则发生变化时（比如新发现了战利品），才操作 DOM
+  if (!styleElement) {
+    styleElement = document.createElement("style");
+    styleElement.id = styleId;
+    document.head.appendChild(styleElement);
+  }
+
+  if (styleElement.innerText !== cssRule) {
+    styleElement.innerText = cssRule;
+  }
 });
 
 /**
@@ -1230,6 +1280,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/manage-xp.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
+    "systems/xjzl-system/templates/actor/container/sheet.hbs",
 
     // 内功
     "systems/xjzl-system/templates/item/neigong/header.hbs",
