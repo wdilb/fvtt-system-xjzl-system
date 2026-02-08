@@ -188,10 +188,10 @@ export function getModifierChoices() {
   // 5. 抗性修正 (Resistances)
   const groupResist = "抗性修正";
   // 基础类型
-  add(groupResist, "combat.resistances.global.mod", "全局抗性 (Mod)"); // [补全]
-  add(groupResist, "combat.resistances.skill.mod", "招式抗性 (Mod)"); // [补全]
+  add(groupResist, "combat.resistances.global.mod", "全局抗性 (Mod)");
+  add(groupResist, "combat.resistances.skill.mod", "招式抗性 (Mod)");
   // 特殊类型
-  for (const k of ["poison", "bleed", "fire", "mental", "liushi"]) {
+  for (const k of ["poison", "bleed", "fire", "mental", "liushi", "neigong", "waigong"]) {
     add(groupResist, `combat.resistances.${k}.mod`, `${game.i18n.localize("XJZL.Combat.Res." + k.charAt(0).toUpperCase() + k.slice(1))} (Mod)`);
   }
 

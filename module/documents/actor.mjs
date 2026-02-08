@@ -1350,6 +1350,8 @@ export class XJZLActor extends Actor {
       case "fire": specificRes = resMap.fire.total; break;
       case "mental": specificRes = resMap.mental.total; break;
       case "liushi": specificRes = resMap.liushi.total; break;
+      case "neigong": specificRes = resMap.neigong.total; break;
+      case "waigong": specificRes = resMap.waigong.total; break;
       default: specificRes = 0; break;
     }
     const totalRes = globalRes + specificRes + skillRes;

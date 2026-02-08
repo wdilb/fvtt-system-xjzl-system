@@ -450,7 +450,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // C. 抗性 (Resistances)
     if (!this.combat.resistances) this.combat.resistances = {};
-    const resKeys = ["global", "bleed", "poison", "fire", "mental", "liushi", "skill"];
+    const resKeys = ["global", "bleed", "poison", "fire", "mental", "liushi", "skill", "neigong", "waigong"];
     for (const k of resKeys) {
       this.combat.resistances[k] = makeRuntimeMod();
     }
