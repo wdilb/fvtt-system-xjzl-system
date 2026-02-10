@@ -74,6 +74,10 @@ export class ActiveEffectManager {
             effectData.name = game.i18n.localize(effectData.name);
         }
 
+        if (effectData.description) {
+            effectData.description = game.i18n.localize(effectData.description);
+        }
+
         // 补全 statuses (用于系统逻辑判定)
         if (effectData.id && !effectData.statuses) {
             effectData.statuses = [effectData.id];
