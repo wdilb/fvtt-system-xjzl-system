@@ -4961,13 +4961,13 @@
                             "label": "冰玄(小)·施加",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 仅造成伤害时生效\nif (args.finalDamage > 0) {\n    // 读取当前步数 (不修改)\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 计算本轮效果: 0->1(unstable), 1->2(cuogu)\n    const step = (currentStep % 2) + 1;\n    const effectName = step === 1 ? 'unstable' : 'cuogu';\n    \n    await game.xjzl.api.effects.toggleStatus(args.target, effectName, true, { duration: { rounds: 1 } });\n}"
+                            "script": "if (args.finalDamage > 0) {\n    // 读取当前步数 (0/1)\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 计算本轮效果: 0->1(unstable), 1->2(cuogu)\n    const step = (currentStep % 2) + 1;\n    const effectId = step === 1 ? 'unstable' : 'cuogu';\n    \n    // 使用 addEffect 并手动构造对象，确保 duration 生效\n    // addEffect 会自动处理本地化翻译\n    const effectData = {\n        id: effectId,\n        duration: { rounds: 1 }\n    };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         },
                         {
                             "label": "冰玄(小)·推进",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "// 检查是否有任意一个目标受到了伤害\nconst causedDamage = args.targets.some(t => t.finalDamage > 0);\n\nif (causedDamage) {\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 推进步数\n    const nextStep = (currentStep % 2) + 1;\n    await actor.setFlag('xjzl-system', 'neigong_bingxuan_step', nextStep);\n    // ui.notifications.info(`冰玄劲层数流转: ${nextStep}`); // 可选提示\n}"
+                            "script": "const causedDamage = args.targets.some(t => t.finalDamage > 0);\n\nif (causedDamage) {\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 推进步数\n    const nextStep = (currentStep % 2) + 1;\n    await actor.setFlag('xjzl-system', 'neigong_bingxuan_step', nextStep);\n}"
                         }
                     ]
                 },
@@ -4987,7 +4987,7 @@
                             "label": "冰玄(圆)·施加",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.finalDamage > 0) {\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 0->1, 1->2, 2->3, 3->4\n    const step = (currentStep % 4) + 1;\n    const map = {1:'unstable', 2:'cuogu', 3:'fushen', 4:'fengzhao'};\n    \n    await game.xjzl.api.effects.toggleStatus(args.target, map[step], true, { duration: { rounds: 2 } });\n}"
+                            "script": "if (args.finalDamage > 0) {\n    const currentStep = actor.getFlag('xjzl-system', 'neigong_bingxuan_step') || 0;\n    // 0->1, 1->2, 2->3, 3->4\n    const step = (currentStep % 4) + 1;\n    const map = {1:'unstable', 2:'cuogu', 3:'fushen', 4:'fengzhao'};\n    \n    const effectData = {\n        id: map[step],\n        duration: { rounds: 2 }\n    };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         },
                         {
                             "label": "冰玄(圆)·推进",
