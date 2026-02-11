@@ -5681,8 +5681,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，欲念横生，将目标向自身方向拉扯 3 米，并对其造成 0.5 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "拉扯手动。",
+                    "description": "<p>主要动作，欲念横生，将目标向自身方向拉扯 3 米，并对其造成伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "拉扯效果手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -5711,7 +5711,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，瞬间出掌，对目标造成 0.4 力量点外功伤害，击破架招给其添加“迷踪”，持续三回合。</p><p><strong>迷踪：</strong>受到‘魔气’的毒素伤害翻倍。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "description": "<p>主要动作，瞬间出掌，对目标造成伤害，击破架招给其添加“迷踪”，持续三回合。</p><p><strong>迷踪：</strong>受到‘魔气’的毒素伤害翻倍。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
                     "automationNote": "击破施加迷踪自动。伤害翻倍逻辑手动（因魔气来源复杂）。",
                     "calculation": {
                         "base": 0,
@@ -5765,7 +5765,7 @@
                         {
                             "label": "格挡获魔影",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n// 检测魔临\nconst hasMolin = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"molin\");\n// 检测魔气 (假设用 flag 标记，或者此处弹窗询问)\n// 简化处理：弹窗确认是否在魔气中\nlet inMoqi = false;\nif (!hasMolin) {\n    inMoqi = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"邪魔纷飞\" },\n        content: \"<p>当前是否处于 [魔气] 范围？</p>\",\n        yes: { label: \"是\" },\n        no: { label: \"否\" }\n    });\n}\n\nif (hasMolin || inMoqi) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const eff = thisItem.effects.getName(\"魔影\").toObject();\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 1. 检测魔临\nconst hasMolin = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"molin\");\n\n// 2. 检测魔气 (简化处理：弹窗确认)\nlet inMoqi = false;\nif (!hasMolin) {\n    inMoqi = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"邪魔纷飞\" },\n        content: \"<p>当前是否处于 [魔气] 范围？</p>\",\n        yes: { label: \"是\" },\n        no: { label: \"否\" }\n    });\n}\n\nif (hasMolin || inMoqi) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    \n    const eff = thisItem.effects.getName(\"魔影\").toObject();\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ]
@@ -5826,9 +5826,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "魔临",
+                            "label": "获得魔临",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"魔临\").toObject();\neff.origin = thisItem.uuid;\n\n// 升级减伤计算\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduction = 20 + (lvl - 1) * 20;\neff.flags[\"xjzl-system\"].reduction = reduction;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"魔临\").toObject();\neff.origin = thisItem.uuid;\n\n// 写入升级后的减伤数值备用 (用于爆发时手动计算)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduction = 20 + (lvl - 1) * 20;\neff.flags[\"xjzl-system\"].reduction = reduction;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -5882,10 +5882,10 @@
                             "storedDmg": 0,
                             "scripts": [
                                 {
-                                    "label": "储伤",
+                                    "label": "储伤逻辑",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "if (args.type === 'waigong' || args.type === 'neigong') {\n    const stored = Number(thisEffect.getFlag('xjzl-system', 'storedDmg')) || 0;\n    const absorbed = Math.floor(args.calcDamage * 0.5);\n    const newDamage = args.calcDamage - absorbed;\n    const newTotal = stored + absorbed;\n    \n    await thisEffect.setFlag('xjzl-system', 'storedDmg', newTotal);\n    args.output.damage = newDamage;\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; background:#333; color:#fff;\"><b>魔临触发</b><br>减免伤害: ${absorbed}<br>当前储存: ${newTotal}</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                                    "script": "if (args.type === 'waigong' || args.type === 'neigong') {\n    // 1. 防御性读取：确保 incoming 是有效数字\n    const incoming = Number(args.calcDamage);\n    if (isNaN(incoming) || incoming <= 0) return;\n\n    // 2. 防御性读取：确保 stored 是有效数字 (如果是NaN则重置为0)\n    let stored = Number(thisEffect.getFlag('xjzl-system', 'storedDmg'));\n    if (isNaN(stored)) stored = 0;\n\n    // 3. 计算\n    const absorbed = Math.floor(incoming * 0.5);\n    const newDamage = incoming - absorbed;\n    const newTotal = stored + absorbed;\n\n    // 4. 执行写入\n    // 必须使用 await 确保 Flag 在下一次计算前更新\n    await thisEffect.setFlag('xjzl-system', 'storedDmg', newTotal);\n    \n    // 5. 修改即将受到的伤害\n    args.output.damage = newDamage;\n\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; background:#333; color:#fff;\"><b>魔临触发</b><br>减免伤害: ${absorbed}<br>当前储存: ${newTotal}</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                                 }
                             ]
                         }
