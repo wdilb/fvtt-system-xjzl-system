@@ -1994,7 +1994,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>尖啸旋出，弧形飞剐，对目标造成 0.6 身法点内功伤害。击破架招时，割开目标喉部动脉，鲜血狂涌，使其流失 100 点气血，然后再为其添加三层“血滴”，持续到脱战。</p><p>·若目标已经具有“血滴”，可以移除一层，使招式虚招值+2。</p><p><strong>升级：</strong>招式伤害+10，虚招值+1，内力消耗+4。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "完全自动化。在判定阶段(Check)检测目标血滴，弹窗询问是否吞噬以增强虚招（数值随等级成长）。击破架招后自动处理流失伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2015,15 +2015,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "吞噬血滴增强",
+                            "label": "询问吞噬血滴",
                             "trigger": "check",
-                            "script": "const bloodDrop = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xuedi\");\nif (bloodDrop && bloodDrop.getFlag(\"xjzl-system\", \"stacks\") > 0) {\n    args.flags.grantFeint += 2;\n}",
+                            "script": "// CHECK 阶段：args.target 存在且安全\nconst bloodDrop = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xuedi\");\nconst stacks = bloodDrop ? (bloodDrop.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n\nif (stacks > 0) {\n    // 计算动态加值: 基础2 + (等级-1)\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = 2 + (lvl - 1);\n\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"吞噬血滴\" },\n        content: `<p>目标 <b>${args.target.name}</b> 身上有 <b>${stacks}</b> 层血滴。</p><p>是否消耗 1 层以使本招式 <b>虚招值 +${bonus}</b>？</p>`,\n        yes: { label: `消耗 (+${bonus})`, icon: \"fas fa-tint\" },\n        no: { label: \"保留层数\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        // 1. 移除层数\n        await game.xjzl.api.effects.removeEffect(args.target, \"xuedi\", 1);\n        \n        // 2. 增加针对该目标的虚招加值 (grantFeint)\n        // 此数值直接加在最终判定的结果上\n        args.flags.grantFeint += bonus;\n        \n        ui.notifications.info(`已吞噬血滴，虚招值 +${bonus}！`);\n    }\n}",
                             "active": true
                         },
                         {
-                            "label": "执行吞噬与击破",
+                            "label": "击破效果",
                             "trigger": "hit",
-                            "script": "const bloodDrop = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xuedi\");\nif (bloodDrop && bloodDrop.getFlag(\"xjzl-system\", \"stacks\") > 0) {\n    await game.xjzl.api.effects.removeEffect(args.target, \"xuedi\", 1);\n    ui.notifications.info(`已吞噬 ${args.target.name} 1层血滴，虚招增强生效。`);\n}\n\nif (args.isBroken) {\n    await args.target.applyDamage({ amount: 100, type: \"liushi\", attacker: actor });\n    const eff = thisItem.effects.getName(\"血滴\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    for(let i=0; i<3; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n    ui.notifications.info(`${args.target.name} 动脉割裂！流失100血，叠加3层血滴。`);\n}",
+                            "script": "if (args.isBroken) {\n    // 1. 造成流失伤害\n    await args.target.applyDamage({ amount: 100, type: \"liushi\", attacker: actor });\n\n    // 2. 发送卡片\n    const cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; padding-left: 8px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left: 2px;\">\n                <div style=\"font-weight:bold; color:#8b0000; font-size:1.1em;\">\n                    <i class=\"fas fa-cut\"></i> 动脉割裂！\n                </div>\n                <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                    目标喉管被切开，鲜血狂涌。<br>\n                    流失 <span style=\"font-weight:bold; color:red;\">100</span> 点气血！\n                </div>\n            </div>\n        </div>`;\n    \n    ChatMessage.create({\n        content: cardContent,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n\n    // 3. 叠加3层血滴\n    const eff = thisItem.effects.getName(\"血滴\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    for(let i=0; i<3; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
                             "active": true
                         }
                     ]
