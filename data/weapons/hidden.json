@@ -913,35 +913,38 @@
             "price": 30000,
             "damage": 30,
             "block": 0,
-            "description": "极薄的暗钢圆环，布满锋利细小的尖刃，需用特制的鞣皮抓握，一旦飞出便会尖啸着在空中回旋。<br><strong>效果：</strong>特效：该暗器射出后，会飞回你手中。<br>·该暗器命中无架招目标时，为其添加一层“血滴”，持续到脱战。<br>血滴：受内外功伤害时每层使自己流失10气血。<br>·该暗器材质特殊而昂贵，是单独的一枚暗器，而不是20枚。",
-            "automationNote": "完全自动化：命中破防后自动叠加血滴状态（流血变种）。",
+            "description": "<p>极薄的暗钢圆环，布满锋利细小的尖刃，需用特制的鞣皮抓握，一旦飞出便会尖啸着在空中回旋。</p><p><strong>效果：</strong></p><p>·该暗器射出后，会飞回你手中。</p><p>·该暗器命中无架招目标时，为其添加一层“血滴”，持续到脱战。</p><p><strong>血滴：</strong>受内外功伤害时每层使自己流失 10 气血。</p><p>·该暗器材质特殊而昂贵，是单独的一枚暗器，而不是20枚。</p>",
+            "automationNote": "完全自动化：命中且目标未开启架招时，自动施加血滴状态。",
             "scripts": [
                 {
-                    "label": "血滴子",
+                    "label": "血滴子特性",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (!args.isHit) return;\nif (args.damageResult && args.damageResult.finalDamage > 0) {\n    const sourceEffect = thisItem.effects.getName(\"血滴\");\n    if (sourceEffect) {\n        await game.xjzl.api.effects.addEffect(args.target, sourceEffect.toObject());\n    }\n}"
+                    "script": "// 规则：命中 + 无架招\nif (!args.isHit) return;\nif (args.target.system.martial.stanceActive) return;\n\nconst sourceEffect = thisItem.effects.getName(\"血滴\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n    ui.notifications.info(`${args.target.name} 被血滴子套中！(无架招)`);\n}"
                 }
             ]
         },
         "effects": [
             {
                 "name": "血滴",
-                "icon": "icons/svg/blood.svg",
+                "icon": "icons/magic/blood/drop-splash-red.webp",
+                "description": "受击流失气血，满10层转为失血。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "xuedi",
-                        "stackable": true
+                        "stackable": true,
+                        "scripts": [
+                            {
+                                "label": "受击流失",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "if ([\"waigong\", \"neigong\"].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const loss = 10 * stacks;\n    await actor.applyDamage({ amount: loss, type: \"liushi\", attacker: args.attacker });\n\n    if (stacks >= 10) {\n        const bloodLoss = CONFIG.statusEffects.find(e => e.id === \"bloodloss\");\n        await game.xjzl.api.effects.addEffect(actor, bloodLoss);\n        ui.notifications.warn(`${actor.name} 血滴攻心，引发失血！`);\n    }\n}"
+                            }
+                        ]
                     }
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.wuxueBleedOnHit",
-                        "mode": 2,
-                        "value": 10
-                    }
-                ]
+                "changes": []
             }
         ]
     },
