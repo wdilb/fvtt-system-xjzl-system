@@ -7,7 +7,7 @@
             "category": "wuxue",
             "sect": "liushanmen",
             "tier": 1,
-            "description": "<p>六扇门捕快拿手功夫，拳路刚猛，寸劲崩烈，若是全力使出，可赤手空拳断人腿脚。</p>",
+            "description": "<p>六扇门捕快拿手功夫，拳路刚猛，寸劲崩烈，若是全力使出，可赤手空拳断人腿脚。</p><p><strong>需求：</strong>徒手</p>",
             "requirements": "徒手",
             "moves": [
                 {
@@ -17,13 +17,10 @@
                     "element": "yang",
                     "weaponType": "unarmed",
                     "range": "1米",
-                    "costs": {
-                        "mp": [
-                            1,
-                            2,
-                            3
-                        ]
-                    },
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>直拳重劈，造成伤害。</p><p>招式造成暴击时，将目标击退 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 伤害计算。暴击时自动发送击退卡片 (位移需手动调整 Token)。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -34,16 +31,21 @@
                             }
                         ]
                     },
-                    "description": "<p>主要动作，直拳重劈，造成 0.4 力量点外功伤害。<br>招式造成暴击时，将目标击退 1 米。<br>升级：招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "自动化: 伤害计算。手动: 暴击后的击退效果。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "暴击击退提示",
+                            "label": "暴击击退",
                             "trigger": "hit",
-                            "script": "if (args.isCrit) ui.notifications.info(`${args.target.name} 被击退 1 米。`);"
+                            "script": "if (args.isCrit) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(255, 69, 0, 0.1); border-left:3px solid #ff4500; color:#d35400;\">\n                <strong>击退效果</strong><br>\n                ${args.target.name} 被暴击击退 <b>1</b> 米。\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
                         }
-                    ],
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "无影拳",
@@ -52,13 +54,10 @@
                     "element": "yang",
                     "weaponType": "unarmed",
                     "range": "2米",
-                    "costs": {
-                        "mp": [
-                            1,
-                            2,
-                            3
-                        ]
-                    },
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>不见其影，快速挥拳，造成伤害。</p><p>击破架招时，将其击飞 1 米并倒地。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 伤害计算。击破架招自动施加[倒地]并发送击飞卡片。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -69,21 +68,6 @@
                             }
                         ]
                     },
-                    "description": "<p>主要动作，不见其影，快速挥拳，造成 0.3 力量点外功伤害，击破架招时，将其击飞 1 米并倒地。<br>升级：招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "自动化: 伤害计算。手动: 击破架招后的击飞和倒地。",
-                    "scripts": [
-                        {
-                            "label": "破架击飞倒地提示",
-                            "trigger": "hit",
-                            "script": "if (args.isBroken) { ui.notifications.info(`${args.target.name} 被击飞 1 米并倒地（请手动应用'倒地'状态）。`); }"
-                        }
-                    ],
-                    "actionCost": "主要动作"
-                },
-                {
-                    "name": "沉舟",
-                    "type": "stance",
-                    "range": "自身",
                     "costs": {
                         "mp": [
                             1,
@@ -91,21 +75,45 @@
                             3
                         ]
                     },
+                    "scripts": [
+                        {
+                            "label": "击破效果",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    // 1. 发送击飞卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(139, 0, 0, 0.1); border-left:3px solid #8b0000; color:#8b0000;\">\n                <strong>击破效果</strong><br>\n                ${args.target.name} 被击飞 <b>1</b> 米并击倒！\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    // 2. 自动应用倒地\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "沉舟",
+                    "type": "stance",
+                    "damageType": "waigong",
+                    "element": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双拳摆腰，开启架招，成功格挡后，获得“沉舟”，持续到战斗脱离。</p><p><strong>沉舟：</strong>下一次出招额外消耗 5 内力，招式伤害+5。</p><p><strong>升级：</strong>格挡值+5，沉舟的伤害再+5，内力消耗+1。</p>",
+                    "automationNote": "自动化: 开启架招; 格挡成功自动获Buff; Buff生效时自动扣除额外内力并加伤。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
                     },
-                    "description": "<p>次要动作，双拳摆腰，开启架招，成功格挡后，获得“沉舟”，持续到战斗脱离。<br>沉舟：下一次出招额外消耗 5 内力，招式伤害+5。<br>升级：格挡值+5，沉舟的伤害再+5，内力消耗+1。</p>",
-                    "automationNote": "自动化: 开启架招; 格挡成功后自动获得沉舟Buff。",
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "格挡触发沉舟",
+                            "label": "格挡获沉舟",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) { const effect = thisItem.effects.getName('沉舟'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, data); ui.notifications.info(`${actor.name} 格挡成功，获得沉舟。`); } }"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName('沉舟');\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, data);\n        actor.showFloatyText(\"获得沉舟\", {fill: \"#00FFFF\"});\n    }\n}",
+                            "active": true
                         }
-                    ],
-                    "weaponType": "unarmed",
-                    "actionCost": "次要动作"
+                    ]
                 },
                 {
                     "name": "开山拳",
@@ -115,6 +123,20 @@
                     "element": "yang",
                     "weaponType": "unarmed",
                     "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>凝聚劲力，一发崩山，对目标造成伤害，并将其击退 3 米。</p><p>若命中无架招目标，还会给其添加“重创”，持续到战斗脱离。</p><p><strong>重创：</strong>下一次受到伤害时，额外流失 20 点气血。</p><p><strong>升级：</strong>招式伤害+10，额外流失+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "自动化: 伤害计算; 对无架招目标自动施加[重创]。命中发送击退卡片。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -127,26 +149,14 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.6
-                            }
-                        ]
-                    },
-                    "description": "<p>蓄力动作，凝聚劲力，一发崩山，对目标造成 0.6 力量点外功伤害，并将其击退 3 米。<br>若命中无架招目标，还会给其添加“重创”，持续到战斗脱离。<br>重创：下一次受到伤害时，额外流失 20 点气血。<br>升级：招式伤害+10，额外流失+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "自动化: 伤害计算; 对无架招/破架目标自动施加“重创”。手动: 击退效果。",
                     "scripts": [
                         {
-                            "label": "无架招施加重创",
+                            "label": "击退与重创",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) { const effect = thisItem.effects.getName('重创'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(args.target, data); ui.notifications.info(`${args.target.name} 受到重创。`); } }"
+                            "script": "if (args.isHit) {\n    // 1. 击退卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(255, 165, 0, 0.1); border-left:3px solid #FFA500; color:#d35400;\">\n                <strong>击退效果</strong><br>\n                ${args.target.name} 被击退 <b>3</b> 米。\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    \n    // 2. 施加重创\n    if (!args.target.system.martial.stanceActive) {\n        const effect = thisItem.effects.getName('重创');\n        if (effect) {\n            const data = effect.toObject();\n            delete data._id;\n            data.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 受到重创。`);\n        }\n    }\n}",
+                            "active": true
                         }
-                    ],
-                    "actionCost": "蓄力动作"
+                    ]
                 }
             ],
             "effects": [
@@ -154,7 +164,6 @@
                     "name": "沉舟",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
                     "description": "下一次出招额外消耗 5 内力，招式伤害+5 (随等级成长)。",
-                    "changes": [],
                     "flags": {
                         "xjzl-system": {
                             "slug": "chenzhou",
@@ -163,12 +172,12 @@
                                 {
                                     "label": "沉舟消耗",
                                     "trigger": "attack",
-                                    "script": "args.move.currentCost.mp += 5;"
+                                    "script": "const currentMp = actor.system.resources.mp.value;\n// 因为系统在 attack 阶段已经扣除了基础消耗，这里我们需要手动扣除额外的\nif (currentMp >= 5) {\n    await actor.update({ \"system.resources.mp.value\": currentMp - 5 });\n    // 飘字提示扣除\n    actor.showFloatyText(\"-5 内力 (沉舟)\", {fill: \"#0000FF\", fontSize: 24});\n} else {\n    ui.notifications.warn(\"沉舟生效，但内力不足以支付额外消耗！\");\n}"
                                 },
                                 {
                                     "label": "沉舟增伤",
                                     "trigger": "calc",
-                                    "script": "const lvl = Math.max(1, thisItem.system.moves.find(m => m.name === '沉舟')?.computedLevel || 1); const bonus = 5 + (lvl - 1) * 5; args.output.damage += bonus; args.output.bonusDesc.push(`沉舟 +${bonus}`);"
+                                    "script": "const originItem = await fromUuid(thisEffect.origin);\n// 查找招式 '沉舟' 的等级\nconst lvl = Math.max(1, originItem?.system?.moves?.find(m => m.name === '沉舟')?.computedLevel || 1);\nconst bonus = 5 + (lvl - 1) * 5;\n\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`沉舟 +${bonus}`);"
                                 },
                                 {
                                     "label": "移除沉舟",
@@ -191,7 +200,7 @@
                                 {
                                     "label": "重创流失",
                                     "trigger": "preTake",
-                                    "script": "if (args.calcDamage > 0) { const originItem = await fromUuid(thisEffect.origin); const lvl = originItem?.system?.moves?.find(m => m.name === '开山拳')?.computedLevel || 1; const loss = 20 + (lvl - 1) * 10; ui.notifications.warn(`${actor.name} 重创发作，流失 ${loss} 气血！`); await actor.applyDamage({ amount: loss, type: 'liushi', isHit: true }); await thisEffect.delete(); }"
+                                    "script": "if (args.calcDamage > 0) {\n    const originItem = await fromUuid(thisEffect.origin);\n    const lvl = originItem?.system?.moves?.find(m => m.name === '开山拳')?.computedLevel || 1;\n    const loss = 20 + (lvl - 1) * 10;\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(139, 0, 0, 0.1); border-left:3px solid #8b0000; color:#8b0000;\">\n                <strong>重创发作</strong><br>\n                ${actor.name} 伤口崩裂，额外流失 <b>${loss}</b> 点气血！\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    \n    await actor.applyDamage({ amount: loss, type: 'liushi', isHit: true });\n    await thisEffect.delete();\n}"
                                 }
                             ]
                         }
