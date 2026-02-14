@@ -851,8 +851,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，如车轮般挥舞手臂，原本是小孩子过家家般的拳法动作，却返璞归真，威力巨大。对敌人造成伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "",
+                    "description": "<p>主要动作，如车轮般挥舞手臂，原本是小孩子过家家般的拳法动作，却返璞归真，威力巨大。\n对敌人造成 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -881,8 +881,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，双手击打对方耳廓，对敌人造成伤害，击中无架招的敌人时，获得一层“王八劲”。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "获劲自动。",
+                    "description": "<p>主要动作，双手击打对方耳廓，对敌人造成 0.3 力量点外功伤害，击中无架招的敌人时，获得一层“王八劲”。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "获劲自动。层数上限根据[龟龙片甲]等级自动计算。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -904,7 +904,7 @@
                         {
                             "label": "获得王八劲",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"王八劲\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"王八劲\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n\n    // --- 动态计算上限 (Critical Fix) ---\n    // 查找同Item下的架招，读取其等级\n    // 即使没学会(level 0)，Math.max保证最低为1级(3层)\n    const stanceMove = thisItem.system.moves.find(m => m.name === \"龟龙片甲\");\n    const stanceLvl = Math.max(1, stanceMove?.computedLevel || 1);\n    const max = 3 + (stanceLvl - 1);\n    \n    // 将计算好的上限写入数据，addEffect 会负责更新现有的 Buff\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.maxStacks\", max);\n\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ]
@@ -935,23 +935,23 @@
                         {
                             "label": "格挡获劲",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"王八劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态上限: 3 + (Lv-1)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst max = 3 + (lvl - 1);\neff.flags[\"xjzl-system\"].maxStacks = max;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"王八劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态上限: 3 + (Lv-1)\n// 这里可以直接用 move (因为当前就在架招里)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst max = 3 + (lvl - 1);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.maxStacks\", max);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
                 },
                 {
                     "name": "王八缩壳",
-                    "type": "qi",
+                    "type": "real",
                     "isUltimate": true,
                     "element": "gang",
                     "damageType": "none",
                     "weaponType": "unarmed",
-                    "range": "自身",
+                    "range": "1米",
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，双手抱头，消耗所有王八劲，每一层王八劲使你获得一层“王八壳”，持续到战斗脱离。</p><p><strong>王八壳：</strong>每层使你提升 2 点内外功防御、提升 2 点韧性、回合末回复 1 点生命值。</p><p><strong>升级：</strong>每层“王八壳”提供的内外功防御+1，韧性+1，生命值回复+1，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。消耗层数转化BUFF。",
+                    "automationNote": "完全自动化。消耗劲层数，根据本招式等级计算壳的强度并应用。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -972,7 +972,7 @@
                         {
                             "label": "转化王八壳",
                             "trigger": "hit",
-                            "script": "const jin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wangbajin\");\nif (!jin) return ui.notifications.warn(\"无王八劲可消耗！\");\n\nconst stacks = jin.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait jin.delete();\n\n// 获取壳模板\nconst ke = thisItem.effects.getName(\"王八壳\").toObject();\ndelete ke._id;\nke.origin = thisItem.uuid;\n\n// 动态数值: (2 + (Lv-1)) * stacks\n// 这里我们不乘stacks写入change，而是直接把stacks设为当前层数\n// 因为AE配置里是ADD模式，且stackable=true，系统会自动乘\n// 但这里稍微特殊：壳的数值随招式等级变化。\n// 方案：修改 baseChanges 的值，然后让系统叠层。\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst defBase = 2 + (lvl - 1);\nconst resBase = 2 + (lvl - 1);\nconst hpBase = 1 + (lvl - 1);\n\nke.changes[0].value = String(defBase);\nke.changes[1].value = String(defBase);\nke.changes[2].value = String(resBase);\nke.changes[3].value = String(hpBase);\n\n// 强制设置层数\nke.flags[\"xjzl-system\"].stacks = stacks;\n\n// 使用 addEffect (它会处理覆盖或叠加，这里我们直接覆盖或新增)\nawait game.xjzl.api.effects.addEffect(actor, ke);",
+                            "script": "const jin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wangbajin\");\nif (!jin) return ui.notifications.warn(\"无王八劲可消耗！\");\n\nconst stacks = jin.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait jin.delete();\n\n// 获取壳模板\nconst ke = thisItem.effects.getName(\"王八壳\").toObject();\ndelete ke._id;\nke.origin = thisItem.uuid;\n\n// 动态数值: (基础 + (绝招等级-1)) * 层数\n// 注意：因为 AE 配置了 stackable=true 且 mode=ADD，系统会自动乘层数\n// 所以这里我们只需要设定【单层】的数值即可\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst defBase = 2 + (lvl - 1);\nconst resBase = 2 + (lvl - 1);\nconst hpBase = 1 + (lvl - 1);\n\n// 修改 changes 数组中的数值\nke.changes[0].value = String(defBase);\nke.changes[1].value = String(defBase);\nke.changes[2].value = String(resBase);\nke.changes[3].value = String(hpBase);\n\n// 强制设置初始层数 (等于消耗的劲层数)\nfoundry.utils.setProperty(ke, \"flags.xjzl-system.stacks\", stacks);\n\n// 使用 addEffect (它会处理覆盖或叠加)\nawait game.xjzl.api.effects.addEffect(actor, ke);",
                             "active": true
                         }
                     ]
