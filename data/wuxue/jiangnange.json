@@ -139,15 +139,24 @@
             "category": "wuxue",
             "sect": "jiangnange",
             "tier": 1,
-            "description": "<p>琴阁特定武学，“清风低诉些些事，昨月始从今日圆”，倾诉哀怨悲愁，无可奈何，寂寥清冷之意。</p>",
-            "requirements": "乐器 属性：阴",
+            "description": "<p>琴阁特定武学，“清风低诉些些事，昨月始从今日圆”，倾诉哀怨悲愁，无可奈何，寂寥清冷之意。</p><p><strong>需求：</strong>乐器 属性：阴</p>",
+            "requirements": "乐器；属性：阴",
             "moves": [
                 {
                     "name": "清冷月",
                     "type": "stance",
                     "element": "yin",
+                    "damageType": "waigong",
                     "weaponType": "instrument",
                     "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，静默音清，开启架招。格挡成功后，自身获得“清音”，持续一回合。</p><p><strong>清音：</strong>你的[演奏]检定结果+1。</p><p><strong>升级：</strong>格挡值+5，清音的持续回合数+1，演奏检定结果再+1，内力消耗+1。</p>",
+                    "automationNote": "开启架招自动。格挡成功后自动获得[清音]状态，数值与持续时间随等级自动成长。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
                     "costs": {
                         "mp": [
                             1,
@@ -155,19 +164,14 @@
                             3
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 5
-                    },
-                    "description": "<p>次要动作，静默音清，开启架招。格挡成功后，自身获得“清音”，持续一回合。<br>清音：你的[演奏]检定结果+1。</p>",
                     "scripts": [
                         {
                             "label": "格挡触发清音",
                             "trigger": "damaged",
-                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    effect.duration.rounds = rounds;\n    effect.changes[0].value = bonus;\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}"
+                            "script": "// 获取当前架招等级\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\n// 检查是否满足架招触发条件\nif (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    // 获取特效模板\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    // 动态修改数值\n    effect.duration.rounds = rounds;\n    effect.changes[0].value = String(bonus);\n    // 应用特效\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}",
+                            "active": true
                         }
-                    ],
-                    "actionCost": "次要动作"
+                    ]
                 },
                 {
                     "name": "玉叶坠",
@@ -175,7 +179,21 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "instrument",
-                    "range": "5",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，思物心伤，一音三叹，对范围内所有敌人造成伤害。</p><p>·若目标的侠恶标签与你不同，招式暴击骰-2。</p><p>·若目标的性别与你不同，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "自动比对侠恶标签修正暴击阈值。自动比对性别修正伤害。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -183,29 +201,20 @@
                             6
                         ]
                     },
-                    "calculation": {
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.3
-                            }
-                        ],
-                        "growth": 5
-                    },
-                    "description": "<p>蓄力动作，思物心伤，一音三叹，对范围内所有敌造成 0.3 内息点内功伤害。<br>·若目标的侠恶标签与你不同，招式暴击骰-2。<br>·若目标的性别与你不同，招式伤害+10。</p>",
                     "scripts": [
                         {
-                            "label": "侠恶与性别判断",
+                            "label": "侠恶判定",
                             "trigger": "check",
-                            "script": "const myXiayi = actor.system.social.xiayi; const myExing = actor.system.social.exing;\nconst tXiayi = args.target.system.social.xiayi; const tExing = args.target.system.social.exing;\nconst myTag = (myXiayi >= 100 && myExing <= 50) ? 'good' : (myExing >= 100 && myXiayi <= 50 ? 'evil' : 'neutral');\nconst tTag = (tXiayi >= 100 && tExing <= 50) ? 'good' : (tExing >= 100 && tXiayi <= 50 ? 'evil' : 'neutral');\nif (myTag !== tTag) {\n    args.flags.critThresholdMod += 2;\n}"
+                            "script": "const myXiayi = actor.system.social.xiayi || 0; \nconst myExing = actor.system.social.exing || 0;\nconst tXiayi = args.target.system.social.xiayi || 0; \nconst tExing = args.target.system.social.exing || 0;\n\n// 定义标签计算函数 (Rule 8)\nconst getTag = (xiayi, exing) => {\n    if (xiayi >= 100 && exing <= 50) return 'good'; // 侠\n    if (exing >= 100 && xiayi <= 50) return 'evil'; // 恶\n    return 'neutral';\n};\n\nconst myTag = getTag(myXiayi, myExing);\nconst tTag = getTag(tXiayi, tExing);\n\n// 标签不同，暴击骰-2 (即更容易暴击，critThresholdMod +2)\nif (myTag !== tTag) {\n    args.flags.critThresholdMod += 2;\n}",
+                            "active": true
                         },
                         {
                             "label": "性别伤害修正",
                             "trigger": "preDamage",
-                            "script": "if (actor.system.info.gender !== args.target.system.info.gender) {\n    args.config.amount += 10;\n}"
+                            "script": "const myGender = actor.system.info.gender;\nconst tGender = args.target.system.info.gender;\n\n// 若双方都有性别且不一致\nif (myGender && tGender && myGender !== tGender) {\n    args.config.amount += 10;\n}",
+                            "active": true
                         }
-                    ],
-                    "actionCost": "蓄力动作"
+                    ]
                 },
                 {
                     "name": "泪无声",
@@ -213,7 +222,21 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "instrument",
-                    "range": "5",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，情已死，奏短促顿音，对敌方造成伤害。击破架招时，为其添加“不怒”，持续两回合。</p><p><strong>不怒：</strong>你无法获得怒气。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破架招后自动施加[不怒]状态。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             1,
@@ -221,24 +244,14 @@
                             3
                         ]
                     },
-                    "calculation": {
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.3
-                            }
-                        ],
-                        "growth": 5
-                    },
-                    "description": "<p>主要动作，情已死，奏短促顿音，对敌方造成 0.3 内息点内功伤害。击破架招时，为其添加“不怒”，持续两回合。<br>不怒：你无法获得怒气。</p>",
                     "scripts": [
                         {
                             "label": "击破添加不怒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.isBroken) {\n    const effect = game.xjzl.api.effects.getEffectData(\"bunu\");\n    if (effect) {\n        effect.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, effect);\n    } else {\n       // Fallback for system effect ID if getEffectData helper is not available, use addEffect directly\n       const sysEffect = CONFIG.statusEffects.find(e => e.id === 'bunu');\n       if(sysEffect) {\n           const data = foundry.utils.deepClone(sysEffect);\n           data.duration = { rounds: 2 };\n           await game.xjzl.api.effects.addEffect(args.target, data);\n       }\n    }\n}"
+                            "script": "if (args.isHit && args.isBroken) {\n    // 使用标准查找方法\n    const sysEffect = CONFIG.statusEffects.find(e => e.id === 'bunu');\n    if(sysEffect) {\n        const data = foundry.utils.deepClone(sysEffect);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入 [不怒] 状态`);\n    }\n}",
+                            "active": true
                         }
-                    ],
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "照尘凡",
@@ -247,7 +260,21 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "instrument",
-                    "range": "5",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，清怨抑郁待天明，音色委婉痛人心，对周围敌人造成伤害。</p><p>·若目标存在任意乐器武学、乐谱散手给予的状态，每有一个，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "目标身上的乐器状态加成需手动计算并修正伤害。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -260,37 +287,32 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.5
-                            }
-                        ],
-                        "growth": 10
-                    },
-                    "description": "<p>蓄力动作，清怨抑郁待天明，音色委婉痛人心，对周围敌人造成 0.5 内息点内功伤害。<br>·若目标存在任意乐器武学、乐谱散手给予的状态，每有一个，招式伤害+10。</p>",
-                    "automationNote": "目标身上的乐器状态加成需手动计算并修正伤害。",
                     "scripts": [],
-                    "actionCost": "蓄力动作"
+                    "effects": []
+                }
+            ],
+            "effects": [
+                {
+                    "name": "清音",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                    "description": "你的[演奏]检定结果+1。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "qingyin",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.arts.yanzou.checkMod",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ],
+                    "transfer": false
                 }
             ]
-        },
-        "effects": [
-            {
-                "name": "清音",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
-                "description": "你的[演奏]检定结果+1。",
-                "changes": [
-                    {
-                        "key": "system.arts.yanzou.checkMod",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ],
-                "transfer": false
-            }
-        ]
+        }
     },
     {
         "name": "醉梦笔录",
