@@ -4495,7 +4495,7 @@
             "price": 50,
             "quality": 1,
             "type": "medicine",
-            "autoReplace":false,
+            "autoReplace": false,
             "description": "<p>主治言多损气，神疲懒语。</p><hr><p><strong>效果：</strong>你的每回合末回复5点内力，持续十回合。</p>",
             "automationNote": "完全自动化"
         },
@@ -4575,5 +4575,66 @@
             "automationNote": "完全自动化"
         },
         "effects": []
+    },
+    {
+        "name": "回光散",
+        "type": "consumable",
+        "img": "systems/xjzl-system/assets/icons/consumable/药品3.png",
+        "system": {
+            "quantity": 1,
+            "price": 1000,
+            "quality": 2,
+            "type": "medicine",
+            "description": "<p>傩尸派独门奇药，赶活尸所用，以归乡执念激发将死之人的全部潜力。</p><hr><p><strong>效果：</strong>服用后，你获得 100 点护体真气且移动速度+5，持续五日。</p><p>·若你在药效持续期间陷入濒死，将直接死亡，同时进入“活尸”状态，持续到药效结束或受到伤害。</p><p><strong>活尸：</strong>你虽死亡，但依旧可以获得移动速度。</p><p>·你保留部分神智，但只能进行“回家”相关话题的问答。</p>",
+            "recovery": {
+                "huti": 100
+            },
+            "automationNote": "服用自动获得护体和移动速度BUFF。濒死触发时，脚本会自动抓取物品上的[活尸]特效并应用。"
+        },
+        "effects": [
+            {
+                "name": "回光散",
+                "icon": "systems/xjzl-system/assets/icons/consumable/药品3.png",
+                "transfer": false,
+                "duration": {
+                    "seconds": 432000
+                },
+                "description": "移动速度+5。濒死转化为活尸。",
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "med-buff-huiguang",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "濒死转化活尸",
+                                "trigger": "dying",
+                                "active": true,
+                                "script": "// 1. 阻止系统濒死处理\nargs.preventDying = true;\n\n// 2. 从物品上抓取[活尸]特效模板\nconst sourceEff = thisItem.effects.getName(\"活尸\");\n\nif (sourceEff) {\n    const effData = sourceEff.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 应用活尸状态\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}\n\n// 3. 发送剧情提示 (注意 padding-left: 8px)\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"background:#2c3e50; color:#ecf0f1; border:1px solid #000; padding-left: 8px;\"><h3 style=\"border-bottom:1px solid #7f8c8d; color:#e74c3c; margin:0 0 5px 0;\">回光返照</h3><p>药力激发了最后的执念。</p><p><b>${actor.name}</b> 咽下了最后一口气，但化为 <b>[活尸]</b> 继续前行。</p><p style=\"font-size:0.8em; color:#bdc3c7; font-style:italic;\">“...回家...”</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "活尸",
+                "icon": "icons/svg/skull.svg",
+                "transfer": false,
+                "description": "虽死犹行，执念归乡。受到伤害即消散(请手动移除)。只能回答回家相关问题。",
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huoshi",
+                        "stackable": false
+                    }
+                }
+            }
+        ]
     }
 ]
