@@ -2163,7 +2163,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>刺出梅花朵朵，生机盎然，杀机暗藏。造成伤害。击破架招时，为其添加“未知生”，持续一回合。</p><p><strong>未知生：</strong>目标每次回复气血时，回复量-10。</p><p><strong>升级：</strong>伤害+5，未知生持续回合数+1，消耗+1。</p>",
-                    "automationNote": "击破施加状态自动。扣除回复量需手动。",
+                    "automationNote": "击破施加状态自动。状态效果（减少回血）无法自动，需手动扣除。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -2185,7 +2185,7 @@
                         {
                             "label": "击破-未知生",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const effData = {\n        name: \"未知生\",\n        icon: \"icons/magic/life/cross-worn-green.webp\",\n        description: \"每次回复气血时，回复量-10。\",\n        duration: { rounds: rounds },\n        flags: { \"xjzl-system\": { slug: \"weizhisheng\", stackable: false } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n    ui.notifications.info(`${args.target.name} 陷入 [未知生]！`);\n}",
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"未知生\");\n    if (eff) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const rounds = 1 + (lvl - 1);\n        const data = eff.toObject();\n        delete data._id;\n        data.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        // 发送卡片提示而不是通知\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"color:darkgreen;\"><b>${args.target.name}</b> 陷入 [未知生]！<br><i style=\"font-size:0.8em\">回复气血时效果减少。</i></div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2222,7 +2222,7 @@
                         {
                             "label": "死生抉择",
                             "trigger": "preDamage",
-                            "script": "if (args.outcome.isHit && !args.target.system.martial.stanceActive && !args.isManual) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const healVal = 10 + (lvl - 1) * 10;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"死生同归\" },\n        content: `<p>命中无架招目标！</p><p>是否<b>伤害减半</b>并<b>回复 ${healVal} 点气血</b>？</p>`,\n        yes: { label: \"吸取生机\", icon: \"fas fa-heart\" },\n        no: { label: \"全力输出\", icon: \"fas fa-skull\" }\n    });\n    \n    if (confirm) {\n        // 伤害减半\n        args.config.amount = Math.floor(args.config.amount / 2);\n        // 执行回血\n        await actor.applyHealing({ amount: healVal, type: \"hp\", showScrolling: true });\n        ui.notifications.info(\"已发动死生同归：伤害减半，汲取生机。\");\n    }\n}",
+                            "script": "if (args.outcome.isHit && !args.target.system.martial.stanceActive && !args.isManual) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const healVal = 10 + (lvl - 1) * 10;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"死生同归\" },\n        content: `<p>命中无架招目标！</p><p>是否<b>伤害减半</b>并<b>回复 ${healVal} 点气血</b>？</p>`,\n        yes: { label: \"吸取生机\", icon: \"fas fa-heart\" },\n        no: { label: \"全力输出\", icon: \"fas fa-skull\" }\n    });\n    \n    if (confirm) {\n        // 伤害减半\n        args.config.amount = Math.floor(args.config.amount / 2);\n        // 执行回血\n        await actor.applyHealing({ amount: healVal, type: \"hp\", showScrolling: true });\n        // 卡片提示\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"color:blue;\">已发动 <b>死生同归</b>：伤害减半，汲取生机。</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2237,7 +2237,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>持剑相抵，扪心叩问，开启架招。格挡成功后，为目标添加“焉知死”，持续一回合。</p><p><strong>焉知死：</strong>目标每次受伤时，额外流失 10 点气血。</p><p><strong>升级:</strong>格挡值+5，持续回合数+1，内力消耗+1。</p>",
-                    "automationNote": "格挡施加状态自动。状态效果自动。",
+                    "automationNote": "格挡施加状态自动。状态效果自动（使用 bleedOnHit Flag）。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -2253,7 +2253,7 @@
                         {
                             "label": "格挡-焉知死",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nconst effData = {\n    name: \"焉知死\",\n    icon: \"icons/magic/death/skull-energy-light-purple.webp\",\n    description: \"每次受伤时，额外流失 10 点气血。\",\n    duration: { rounds: rounds },\n    flags: { \n        \"xjzl-system\": { \n            slug: \"yanzhisi\", \n            stackable: false,\n            scripts: [{\n                label: \"额外流失\",\n                trigger: \"damaged\",\n                script: \"if(args.finalDamage > 0) { await actor.applyHealing({amount: -10, type:'hp', showScrolling:true}); ui.notifications.info('焉知死：额外流失 10 点气血'); }\",\n                active: true\n            }]\n        } \n    }\n};\n\nif (args.attacker) {\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    ui.notifications.info(`${args.attacker.name} 沾染 [焉知死]！`);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招招式数据以读取等级\n// thisItem 指向后土剑法 Item\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nconst eff = thisItem.effects.getName(\"焉知死\");\nif (eff && args.attacker) {\n    const data = eff.toObject();\n    delete data._id;\n    data.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.attacker, data);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"color:darkred;\"><b>${args.attacker.name}</b> 沾染 [焉知死]！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -2297,8 +2297,42 @@
                         {
                             "label": "轮回判定",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasWei = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"weizhisheng\");\n    const hasYan = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yanzhisi\");\n    \n    if (hasWei && hasYan) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const dc = 11 + (lvl - 1) * 3;\n        \n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"qigan\",\n            dc: dc,\n            label: \"抵抗往生轮回\",\n            onFail: {\n                name: \"自闭\",\n                img: \"icons/svg/sleep.svg\",\n                changes: [],\n                flags: { \"xjzl-system\": { slug: \"zibi\" } },\n                duration: { rounds: 1 }\n            }\n        });\n    }\n}",
+                            "script": "if (args.isHit) {\n    const hasWei = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"weizhisheng\");\n    const hasYan = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yanzhisi\");\n    \n    if (hasWei && hasYan) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const dc = 11 + (lvl - 1) * 3;\n        \n        // 使用系统状态：自闭 (zibi)\n        // onFail 可以直接传 ID 字符串，Macros.requestSave 会自动处理\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"qigan\",\n            dc: dc,\n            label: \"抵抗往生轮回\",\n            onFail: \"zibi\" // 直接引用系统状态\n        });\n    }\n}",
                             "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "未知生",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "每次回复气血时，回复量-10。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "weizhisheng",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "焉知死",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "每次受伤时，额外流失 10 点气血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yanzhisi",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.bleedOnHit",
+                            "mode": 2,
+                            "value": "10"
                         }
                     ]
                 }
