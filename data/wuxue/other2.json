@@ -1248,5 +1248,1005 @@
                 }
             ]
         }
+    },
+    {
+        "name": "蛮骨手",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>彝族搏击手法，以硬撼硬、骨击骨为核心，无花哨技巧，以力为尊。</p><p><strong>需求：</strong>徒手 <strong>属性：</strong>刚</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "荒山裂骨",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>收拳凝劲，全力轰出，对目标造成 0.5 力量点外功伤害，并为其添加“骨裂”，持续两回合。</p><p><strong>骨裂：</strong>每次受到外功伤害时流失 20 点气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中自动施加骨裂。骨裂效果自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加骨裂",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"骨裂\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "彝水匆匆",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>身形虚晃，迂回侧击目标造成 0.4 力量点外功伤害。击中无架招目标时将其击飞三米并倒地，落地时还会受到 20 点外功伤害。</p><p><strong>升级：</strong>招式伤害+10，落地伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中无架招自动施加倒地和落地伤害。击飞位移手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞倒地",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 1. 施加倒地\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    \n    // 2. 计算落地伤害 (基础20 + 升级10)\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const fallDmg = 20 + (lvl - 1) * 10;\n    \n    // 3. 应用额外伤害\n    await args.target.applyDamage({ \n        amount: fallDmg, \n        type: \"waigong\", \n        attacker: actor \n    });\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><b>击飞提示：</b><br>目标已倒地并受到落地伤害。<br>请手动移动目标 <b>3米</b>。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "乌蒙磅礴",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>沉身扎马，以坚石之姿开启架招。格挡成功后反震目标，对其造成 10 点外功伤害。</p><p><strong>升级：</strong>格挡值+10，反震伤害+10，内力消耗+2。</p>",
+                    "automationNote": "格挡自动反震。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反震",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\n\n// 1. 查找招式等级\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\n// 2. 计算反震伤害 (基础10 + 升级10)\nconst reflectDmg = 10 + (lvl - 1) * 10;\n\n// 3. 应用伤害\nawait args.attacker.applyDamage({\n    amount: reflectDmg,\n    type: \"waigong\",\n    attacker: actor,\n    ignoreDefense: true,\n    isHit: true\n});\n\nactor.showFloatyText(\"反震!\", { fill: \"#FFA500\" });"
+                        }
+                    ]
+                },
+                {
+                    "name": "黔岭反戈",
+                    "type": "counter",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制目标虚招，肘部猛击目标头、胸、腹，对其造成三次 0.3 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化（伤害系数已合并计算）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.9
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    }
+                },
+                {
+                    "name": "彝疆镇岳",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>拳掌连环，如群山压顶，对目标造成 0.8 力量点外功伤害。若目标具有“骨裂”，可将其一只手或腿打断，陷入“骨折”。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "检测到骨裂自动发送骨折提示。具体部位残疾需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "骨折判定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const hasBoneCrack = args.target.effects.some(e => e.name === \"骨裂\");\nif (hasBoneCrack) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"color:#8b0000;\"><b><i class=\"fas fa-bone\"></i> 粉碎性打击！</b><br>目标具有[骨裂]，请GM判定其一手或一腿断裂（骨折）。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "骨裂",
+                    "icon": "icons/svg/bones.svg",
+                    "description": "受外功伤害时流失气血。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "gulie",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "受击流失",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "if (args.type === \"waigong\") {\n    await actor.applyDamage({ amount: 20, type: \"liushi\", attacker: args.attacker });\n    actor.showFloatyText(\"骨裂疼痛\", { fill: \"#FF0000\" });\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "赶尸棍法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>“阴司当差，万灵让道”，赶尸人夜间行路所用。</p><p><strong>需求：</strong>棍-长棍，炼煞脉 <strong>属性：</strong>阴</p>",
+            "requirements": "棍-长棍",
+            "moves": [
+                {
+                    "name": "挑灯看尸",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>棍头上抬，点攻下颚，对目标造成 0.3 内息点内功伤害。击破架招时，为其添加“缚身”，持续两回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破架招自动施加缚身。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破缚身",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n    const eff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fushen\");\n    if (eff) await eff.update({ \"duration.rounds\": 2 });\n    ui.notifications.info(`${args.target.name} 被缚身！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "阴煞贯棍",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>棍风直点要穴，对目标造成 0.4 内息点内功伤害。命中无架招目标时，将其击倒，并添加“下盘不稳”，持续一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "命中无架招自动施加倒地和下盘不稳。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击倒不稳",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    \n    // 下盘不稳持续1回合\n    const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    const data = foundry.utils.deepClone(unstable);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "束带揽魂",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>长杆横置膝窝，开启架招，格挡成功后，可以消耗反应动作对目标施展【阴煞贯棍】。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "格挡后发送卡片提示反击。施展反击需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "反击提示",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p><b>束带揽魂触发：</b></p><p>可消耗反应动作施展 <b>[阴煞贯棍]</b>。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "黄泉引渡",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "5米",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>以棍尖点地，借地脉阴气，范围内每有一个【尸傀】，你回复 10 点气血。</p><p><strong>升级：</strong>每个尸傀回复气血+10，内力消耗+1。</p>",
+                    "automationNote": "弹窗询问尸傀数量，自动计算并应用治疗。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ],
+                        "rage": [
+                            1,
+                            1,
+                            1
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "尸傀治疗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst healPerUnit = 10 + (lvl - 1) * 10;\n\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"黄泉引渡\" },\n    content: `<div class=\"form-group\"><label>周围尸傀数量</label><input type=\"number\" name=\"count\" min=\"0\" value=\"0\" autofocus></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value }\n});\n\nif (count > 0) {\n    const totalHeal = count * healPerUnit;\n    await actor.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`尸傀(${count}) 共回复 ${totalHeal} 气血`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "引路还阳",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "3米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>内力澎湃，全力刺棍，对一条直线上的所有敌人造成 0.6 内息点内功伤害。</p><p>·被此招命中的敌人周围 3 米内若有【尸傀】存在，每有一个尸傀流失20点气血；若其3米内超过三个【尸傀】，为其添加“缚身”“迟滞”一回合。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "伤害自动。命中后弹窗询问周围尸傀数量，自动应用流失和控制效果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "尸傀追击",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const count = await foundry.applications.api.DialogV2.prompt({\n        window: { title: `目标 ${args.target.name} 周围尸傀` },\n        content: `<div class=\"form-group\"><label>3米内尸傀数量</label><input type=\"number\" name=\"count\" min=\"0\" value=\"0\" autofocus></div>`,\n        ok: { callback: (event, button) => button.form.elements.count.value }\n    });\n\n    if (count > 0) {\n        // 1. 流失伤害\n        const loss = count * 20;\n        await args.target.applyDamage({ amount: loss, type: \"liushi\", attacker: actor });\n\n        // 2. 超过3个施加控制\n        if (count > 3) {\n            await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n            await game.xjzl.api.effects.addEffect(args.target, \"chizhi\");\n            \n            // 统一调整持续时间 (系统状态默认可能不同，这里强制设为1回合)\n            // 注意：addEffect 返回的是 Document，如果需要修改需要 update\n            // 为简化，我们提示状态已加。\n            ui.notifications.info(`${args.target.name} 被尸群围困 (缚身/迟滞)`);\n        }\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "巫仪剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>巫祝所用古傩舞剑式，剑走祭礼仪法，气合巫傩本源，剑势庄重，可压制阴祟。</p><p><strong>类型：</strong>剑-双剑，巫灵脉 <strong>属性：</strong>阳</p>",
+            "requirements": "剑-双剑",
+            "moves": [
+                {
+                    "name": "巫坛定仪",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双剑交叠，念仪轨之咒，开启架招。架招持续期间，攻击你的阴属性招式伤害和毒素伤害减少 10 点。</p><p><strong>升级：</strong>格挡值+10，招式伤害再减 5 点，消耗+2。</p>",
+                    "automationNote": "开启自动获得AE。AE自动减免阴/毒伤害（含成长）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启仪轨",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"巫坛\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态写入减伤值 (基础10 + 升级5)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduction = 10 + (lvl - 1) * 5;\neff.flags[\"xjzl-system\"].damageReduction = reduction;\neff.description += ` (当前减免: ${reduction})`;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                        }
+                    ]
+                },
+                {
+                    "name": "傩影祛邪",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>傩舞展臂，绕体旋剑，对周围敌人造成 0.4 力量点外功伤害。</p><p>·若范围内有任意角色受到阴属性招式伤害和毒素伤害时，此招可消耗反应动作释放。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害完全自动。反应触发条件需玩家自行判断。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    }
+                },
+                {
+                    "name": "祭剑镇祟",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>引气踏步，向前劈斩，对目标造成 0.4 力量点外功伤害。击破架招时，给目标添加“渡魂”，持续两回合。</p><p><strong>渡魂：</strong>当你在自己的回合出招后，立即结束回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破架招自动添加[渡魂] AE。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破渡魂",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"渡魂\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "祝咒引灵",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，引正阳剑气流转，移除自身和目标各一个状态，并给招式范围内所有友方添加 20 点护体真气。</p><p><strong>升级：</strong>招式伤害+10，护体真气+10，内力消耗+2。</p>",
+                    "automationNote": "伤害自动。移除状态需手动。命中后发送卡片提示给友方应用护体（含成长）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "添加护体提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst huti = 20 + (lvl - 1) * 10;\n\n// 提示移除状态与护体\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p><b>祝咒引灵：</b></p><p>请手动移除自身和目标各一个状态。</p><p>请手动选中范围内友方，应用 <b>${huti}</b> 点护体。</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "万魂安灵",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "直线",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>傩舞踏坛安客魂，剑气铺散，对一条直线上的敌人造成 0.8 力量点外功伤害，并为他们添加“渡魂”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "命中自动添加[渡魂] AE。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加渡魂",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"渡魂\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 99 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "巫坛",
+                    "icon": "icons/svg/shield.svg",
+                    "description": "减少受到的阴属性/毒素伤害。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 99
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wutan",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "伤害减免",
+                                    "trigger": "preTake",
+                                    "active": true,
+                                    "script": "if ([\"poison\"].includes(args.type) || args.element === \"yin\") {\n    // 读取 flag 里存的动态数值\n    const reduction = thisEffect.flags[\"xjzl-system\"].damageReduction || 10;\n    args.output.damage = Math.max(0, args.output.damage - reduction);\n    actor.showFloatyText(`减免 ${reduction}`, { fill: \"#00FF00\" });\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "渡魂",
+                    "icon": "icons/svg/daze.svg",
+                    "description": "当你在自己的回合出招后，立即结束回合。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "duhun",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "引魂铃",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>傩尸派赶尸绝技，铃声诡谲莫测，闻者心神动摇。</p><p><strong>需求：</strong>乐器-铃铛，巫灵脉 <strong>属性：</strong>太极</p>",
+            "requirements": "乐器-铃铛",
+            "moves": [
+                {
+                    "name": "离魂调",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "15米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>内力催动摇铃，声波震动，周围敌人进行[韧性]检定（难度 17），失败受到 0.4 内息点内功伤害并添加一层“气虚”，至多三层，持续到战斗脱离。</p><p><strong>气虚：</strong>每层使你回合末流失 5 点内力。</p><p><strong>升级：</strong>招式伤害+10，检定难度+2，内力消耗+4。</p>",
+                    "automationNote": "命中后自动发起韧性豁免。失败自动扣血并叠加气虚。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "韧性检定与气虚",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    // 计算 DC (基础17 + 升级2)\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 17 + (lvl - 1) * 2;\n    // 计算伤害\n    const dmg = args.finalDamage;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: dc,\n        label: \"离魂调 - 韧性抵抗\",\n        damageOnFail: { value: dmg, type: \"hp\" },\n        onFail: \"qixu\", // 系统状态气虚\n        failureText: \"心神失守，真气溃散！\"\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "阴路遥",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>指尖轻点铃身，荡开音波，开启架招。格挡成功时，可命令战场中的一只由你操控的【尸傀】不消耗速度移动到攻击者身旁的空格处。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡后发送卡片提示操作尸傀。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "操作提示",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p><b>阴路遥触发：</b></p><p>请手动操作 [尸傀] 移动到攻击者身旁。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "迷魂引",
+                    "type": "qi",
+                    "actionType": "attack",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "instrument",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>铃音缥缈虚幻，目标进行一次[定力]检定（难度 15），失败则心神飘远，如坠梦中，主动解除自身架招，并朝你的方向不消耗速度移动 3 米，直到移动到距离你最近的空格。</p><p><strong>升级：</strong>检定难度+2，移动距离+3，内力消耗+2。</p>",
+                    "automationNote": "自动发起定力豁免。失败后提示手动解除架招和移动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "定力检定与控制",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 15 + (lvl - 1) * 2;\nconst dist = 3 + (lvl - 1) * 3;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: dc,\n    label: \"迷魂引 - 定力抵抗\",\n    failureText: `眼神涣散，请解除架招，向施法者移动 ${dist} 米。`\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "幽冥开",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "instrument",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>铃音激荡响，转瞬而消音，对范围内所有敌人造成 0.7 内息点内功伤害。</p><p>·你可以额外消耗 20 内力并进行一次残疾检定，以全身经脉内力与铃音共振，则敌人还需进行[韧性]检定（难度 13），失败则陷入“昏迷”，持续一个时辰。</p><p><strong>升级：</strong>招式伤害+20，检定难度+3，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "伤害自动。攻击时弹窗询问是否爆发(20MP+残疾检定)。若确认，命中后自动发起群体韧性豁免，失败昏迷。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "爆发询问",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"幽冥开 - 爆发选择\" },\n    content: `<p>是否消耗 <b>20</b> 内力并进行残疾检定以震慑敌魂？</p>`,\n    yes: { label: \"爆发\", icon: \"fas fa-bomb\" },\n    no: { label: \"仅伤害\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    // 1. 扣除内力\n    await actor.update({ \"system.resources.mp.value\": Math.max(0, actor.system.resources.mp.value - 20) });\n    ui.notifications.info(\"已扣除 20 内力，共振爆发！\");\n    \n    // 2. 发起残疾检定 (此处仅发送卡片提示玩家投掷，或者调用系统检定)\n    await actor.rollAttributeTest(\"canji\", { skipDialog: true, bonus: 0 }); // 假设系统有 canji，没有则提示手动\n    // 实际系统可能用 rollDisabilityTable 或其他宏，这里发卡片提示更稳妥\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><p style=\"color:red\"><b>请手动进行残疾检定！</b></p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n\n    // 3. 标记 flag 供 hit 使用\n    args.flags.performBurst = true;\n}"
+                        },
+                        {
+                            "label": "爆发效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && args.flags.performBurst) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 13 + (lvl - 1) * 3;\n\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: dc,\n        label: \"幽冥开 - 韧性抵抗\",\n        onFail: \"unconscious\",\n        failureText: \"魂魄震荡，陷入昏迷！\"\n    });\n}"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "护尸法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>寻常尸体三日腐坏，赶尸人有处理尸体的特殊手段，可大幅减缓尸体腐烂速度。</p>",
+            "moves": [
+                {
+                    "name": "护尸法",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "接触",
+                    "targetInfo": "尸体",
+                    "actionCost": "一个时辰",
+                    "description": "<p>花费一个时辰将尸体内脏掏空，用朱砂混合特制草药（约花费 10 两白银）涂抹全身，达到防腐、防臭、防野兽的效果。经过此术养护之后，可保尸体 30 日不腐坏，此乃赶尸人的看家本领。</p><p><strong>升级：</strong>使养护的尸体额外保持 30 日不腐坏，但涂抹的草药价格提升 10 两。</p>",
+                    "automationNote": "纯规则描述，请手动扣除银两并记录时间。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "赶尸法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>“客死归乡，魂安魄宁”，不论是积阴德庇子孙，亦或是赚钱安身立命，行尸之路涉险荒途，还需避煞驱邪，常人难以渡之，价格十分高昂。</p>",
+            "moves": [
+                {
+                    "name": "赶尸法",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "见描述",
+                    "targetInfo": "见描述",
+                    "actionCost": "见描述",
+                    "description": "<p><strong>定契：</strong>他人请求护送亡者归葬时，需提前与其核验亡者身份、尸身状况，再约定目的地、运送路线和时间，对方必须提前付清酬金，否则免谈。</p><p><strong>行路：</strong>赶尸人在长竿表面涂抹特制的漆黑油料，穿过遗体腋下，前后端搭在赶尸人的肩头，可轻松驱使多具遗体，且不影响自身移动。但遗体不可受午间日晒，需提前开辟洞穴藏尸，躲避烈阳。</p><p><strong>酬劳：</strong>通常根据行路日数结算酬劳，一具遗体每运送一天花费一两银子。</p><p>·你至多同时驱赶三具遗体。</p><p><strong>赔偿：</strong>若尸身腐坏、丢失且无法寻回，无法归葬，你必须向委托人赔偿双倍的酬劳。</p><p><strong>升级：</strong>可额外驱使 1 具遗体。</p>",
+                    "automationNote": "纯规则描述，请手动记录遗体数量、契约状态和酬劳。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "食尸法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>傩尸派先辈逢战乱天灾、饥荒求生时所创。可果腹兼修肉身，见效不弱。但此法污秽，近于魔道，门内早已弃用。</p>",
+            "moves": [
+                {
+                    "name": "食尸法",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "见描述",
+                    "description": "<p><strong>食尸身：</strong>你将腐尸视作正常食物，可根据食用体积，恢复 10-50 点饱食度。</p><p><strong>解尸气：</strong>【食尸身】后立即盘坐，并花费一个时辰缓解体内尸气淤积，以此炼体。</p><p><strong>化尸修：</strong>若能持续坚持【解尸气】一个月，你的体质改变，获得“尸修”状态，尸修是特殊状态，不会被其他武功效果移除。</p><p><strong>尸修：</strong>你的体魄+5。只要每日坚持【解尸气】，每月都可获得 100 点修为。</p><p>·你的背部将不断出现糜烂红点，在食用寻常食物或佳肴时，需进行[韧性]检定（难度 15），失败则“呕吐”一回合且无法获得佳肴效果。</p><p><strong>升级：</strong>成为尸修后体魄额外+5。</p>",
+                    "automationNote": "纯手动。物品内包含[尸修]状态，达成条件后请手动将该状态拖拽至角色身上。随着升级带来的额外属性，请手动编辑状态数值。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "尸修",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "体魄增加。食用寻常食物需韧性检定。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shixiu",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.stats.tipo.mod",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "炼尸",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>以朱砂、糯米、雪莲、沉香、防腐草药、凝魂膏等，于阴地设傩坛祭炼，取自身精血，催发遗体煞气，炼就可控之尸，称为【尸傀】。</p>",
+            "moves": [
+                {
+                    "name": "炼尸",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "见描述",
+                    "targetInfo": "见描述",
+                    "actionCost": "见描述",
+                    "description": "<p><strong>炼制：</strong>炼尸需花费大量时间，短则数日，长则数月，尸傀生前内功境界越高，炼制的尸傀品阶越高，实力越强，付出的代价也越重。</p><p>·若生前是尸修，炼制尸傀时折损的寿命减半。</p><p><strong>属性：</strong>尸傀保留生前属性，但无法运行内功，且武学全部降低至“领悟”。</p><p>·尸傀炼成时一次性回复所有气血内力，炼成后百日不腐，但超过一百天后，每日将流失 1 点气血内力。尸傀气血内力归零时，崩解死亡。</p><p>·尸傀无法休整，无法修炼，无法获得修为。</p><p><strong>操控：</strong>你可以炼制多具尸傀，但同一时间至多只能操纵一具尸傀行动。尸傀距离你超过 10 米后，将不再受你控制，保持不动或反击攻击他的目标。</p><p>·当你进入战斗时，如果尸傀在你的操纵范围内，它与你一同进入战斗；尸傀拥有自己的回合，它的先攻顺序插入到你之后（若有多具尸傀，则由主持人决定尸傀的先攻）。</p><p><strong>升级：</strong>可同时操纵的尸傀数量+1，操纵距离+10 米。</p>",
+                    "automationNote": "纯规则描述，请GM手动处理尸傀的角色卡、数据和行动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "养尸",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>尸傀需以尸气常年蕴养，一旦断养，尸身便会快速腐朽溃散。因此不外出作战时，尸傀通常封存于藏尸洞静养，以维持尸身稳固。</p>",
+            "moves": [
+                {
+                    "name": "养尸",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "range": "见描述",
+                    "targetInfo": "见描述",
+                    "actionCost": "见描述",
+                    "description": "<p><strong>辟藏尸洞：</strong>选择死气汇聚或天堑煞、孤峰煞、龙衔虎等风水凶地，洞口以尸油布封堵，隔绝阳气，洞内立阴木柱，便可修成适宜养尸的阴窟。</p><p><strong>效果：</strong>尸傀于藏尸洞蕴养，每天恢复 1 气血内力。</p><p>·尸傀蕴养满 1 年，气息内力永久+1（至多+20）。</p><p>·墓地多为福地，煞气不足，不适合养尸，但尸气充盈，尸傀停留墓地时，不会流失气血内力。</p><p><strong>吞噬尸气：</strong>尸傀可啃食其他尸傀或尸修，以此恢复自身气血与内力。被吞噬的尸傀需受操控，尸修则需自愿或死亡。</p><p><strong>效果：</strong>被吞噬者直接消亡，其残存的气血和内力，被吞噬者尽数汲取，吞噬过程持续一盏茶的时间。</p><p><strong>升级：</strong>每天恢复的气血内力+1，每年蕴养增加的气血内力上限+10。</p>",
+                    "automationNote": "纯规则描述，请手动记录蕴养时间和调整尸傀气血/内力数值。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    }
+                }
+            ]
+        }
     }
 ]
