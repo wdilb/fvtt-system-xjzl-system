@@ -324,6 +324,14 @@ XJZL.artIdentities = {
     { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
     { level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: { "stats.shencai": 10 } } // 神采+10
   ],
+  // === 乞讨 ===
+  qitao: [
+    { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
+    { level: 3, titleKey: "3.Title", descKey: "3.Desc" },
+    { level: 5, titleKey: "5.Title", descKey: "5.Desc", bonuses: { "arts.biaoyan.checkMod": 2 } }, // 表演+2
+    { level: 7, titleKey: "7.Title", descKey: "7.Desc" },
+    { level: 10, titleKey: "10.Title", descKey: "10.Desc", bonuses: { "stats.shencai": 10 } } // 神采+10
+  ],
   // === 驭兽 ===
   yushou: [
     { level: 1, titleKey: "1.Title", descKey: "1.Desc" },
