@@ -235,7 +235,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，掀起阴风阵阵，对范围内敌人造成 0.5 内息点内功伤害。若击中无架招目标，则驱散其身上所有持续回合类状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "伤害自动。驱散效果请GM手动删除Buff。",
+                    "automationNote": "伤害自动。若命中无架招目标会弹窗提示GM驱散。已包含招式计数逻辑。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -256,9 +256,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "驱散提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px\"><b>轮转定魂</b> 命中无架招目标！<br>请GM手动驱散 ${args.target.name} 的持续状态。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #8e44ad;\"><b>轮转定魂</b> 命中无架招目标！<br>请GM手动驱散 <b>${args.target.name}</b> 的持续回合类状态。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -273,7 +279,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，棍棒飞舞，交织成虚网一般，开启架招。成功格挡时，使对方禁足一回合。</p><p>当阿鼻降难被击破时，你的下一次出招无视敌方闪避，并且释放距离提升 20 米。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "格挡禁足自动。被击破后自身BUFF自动。",
+                    "automationNote": "格挡禁足自动。被击破后自身获得增益BUFF(阿鼻降难-破)。已包含招式计数逻辑。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -288,21 +294,27 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "格挡禁足",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        ui.notifications.info(`${args.attacker.name} 被禁足！`);\n    }\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    // 使用系统预设的禁足\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n        actor.showFloatyText(\"禁足反击\", {fill: \"#0000FF\"});\n    }\n}",
                             "active": true
                         },
                         {
                             "label": "被破增益",
                             "trigger": "damaged",
-                            "script": "// 防御者视角：架招被击破\nif (args.isBroken) {\n    const buffData = thisItem.effects.getName(\"阿鼻降难-破\").toObject();\n    delete buffData._id;\n    buffData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, buffData);\n    ui.notifications.info(\"阿鼻降难被破，获得反击增益！\");\n}",
+                            "script": "if (args.isBroken) {\n    const buffData = thisItem.effects.getName(\"阿鼻降难-破\").toObject();\n    delete buffData._id;\n    buffData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, buffData);\n    ui.notifications.info(\"阿鼻降难被破，获得反击增益！\");\n}",
                             "active": true
                         }
                     ]
                 },
                 {
-                    "name": "大热恼",
+                    "name": "大热恼（失传）",
                     "type": "feint",
                     "element": "yin",
                     "damageType": "neigong",
@@ -311,7 +323,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，棍扫腰腹，内力撕裂内脏，如车崩碎寡，爬肠炙髓。对敌人造成 0.5 内息点内功伤害。</p><p>击破架招时，使目标历经痛苦加刑，投入第十殿，轮回转世，可消耗次要动作施展一次【轮转定魂】。</p><p>·若目标无视世俗，此招虚招对抗时具有优势。</p><p>·若范围内有敌人陷入“走火入魔”，可消耗反应动作对其施展此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "无视世俗优势自动。追击提示手动。",
+                    "automationNote": "对无视世俗目标自动优势。击破后提示追击。对走火入魔敌人使用需玩家自行判断。已包含招式计数。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -332,15 +344,27 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "世俗优势",
                             "trigger": "check",
                             "script": "const attitude = args.target.system.social?.attitude_shisu;\nif (attitude === \"disdain\" || attitude === \"ignore\") { \n    args.flags.feintLevel += 1;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击破追击提示",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px;\"><b>大热恼</b> 击破架招！<br>你可消耗 <b>次要动作</b> 施展一次 【轮转定魂】。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
                 },
                 {
-                    "name": "泰山锥肉",
+                    "name": "泰山锥肉（失传）",
                     "type": "qi",
                     "actionType": "buff",
                     "element": "yin",
@@ -350,7 +374,7 @@
                     "targetInfo": "地面",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，将内力灌注于棍，奋力插地，入土三分。在周围地面引起阵阵阴气，化为‘热恼地狱’，持续 1 回合。</p><p><strong>热恼地狱：</strong>在其中施展的【大热恼】，不会被“行刑”状态的敌人压制反击。</p><p>·在其中开启【阿鼻降难】成功格挡时，还可使敌方陷入“行刑”，持续一回合。</p><p><strong>升级：</strong>‘热恼地狱’持续回合+1，内力消耗+8。</p>",
-                    "automationNote": "仅提示生成地狱，具体交互需手动。",
+                    "automationNote": "仅提示生成地狱，具体区域判定需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -365,6 +389,12 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "生成提示",
                             "trigger": "hit",
                             "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nui.notifications.info(`已生成 [热恼地狱] (2米)，持续 ${rounds} 回合。请手动放置模板。`);",
@@ -373,7 +403,7 @@
                     ]
                 },
                 {
-                    "name": "卞城枉死",
+                    "name": "卞城枉死（失传）",
                     "type": "qi",
                     "actionType": "buff",
                     "element": "yin",
@@ -383,7 +413,7 @@
                     "targetInfo": "自身",
                     "actionCost": "反应动作",
                     "description": "<p>当你即将受到暴击伤害时，你可以消耗反应动作释放此招，引动阴死审判之气，抵挡此次攻击。你的每点恶行值为你提供 1 点减伤（至多 200 点）。</p><p>若你将此次伤害抵消至仅剩 1 点，历经大叫唤地狱，满日转解闹恼地狱，你可以立即不消耗动作施展一次【泰山锥肉】。</p><p><strong>升级：</strong>恶行值提供的减伤上限提高 100 点。</p>",
-                    "automationNote": "请在即将受到暴击前手动施展。会自动应用Buff，Buff会自动计算减伤。",
+                    "automationNote": "反应技。完全自动化：自动计算恶行值并修改最终伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -398,15 +428,21 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "应用护盾",
                             "trigger": "hit",
-                            "script": "const effData = thisItem.effects.getName(\"卞城枉死\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { turns: 1 }; // 仅生效一次攻击\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "script": "const effData = thisItem.effects.getName(\"卞城枉死\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n// 设置为持续1回合(实际上preTake里会判断只生效一次，但为了防止不触发一直挂着，设为1回合保险)\neffData.duration = { rounds: 1 }; \nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
                 },
                 {
-                    "name": "望乡还阳",
+                    "name": "望乡还阳（失传）",
                     "type": "real",
                     "isUltimate": true,
                     "element": "yin",
@@ -416,7 +452,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，只能对无架招目标（包括友军）使用，一棍轻点头颅，内力缓缓注入，为目标回复 1.0 内息点气血（内功命中，但无法暴击），目标每有 1 点侠义值，减少 1 点回复量，若减少到负数，则使目标流失等同于该负数绝对值的气血。</p><p>若目标处于“行刑”状态，目标每有一点侠义值额外减少 1 点回复量。</p><p><strong>升级：</strong>回复气血-20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "治疗/伤害判定完全自动化。",
+                    "automationNote": "治疗/反转伤害逻辑全自动。检测目标[行刑]状态。",
                     "calculation": {
                         "base": 0,
                         "growth": -20,
@@ -443,9 +479,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "侠义反转",
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
+                            "label": "架招检查",
+                            "trigger": "check",
+                            "script": "if (args.target.system.martial.stanceActive) {\n    ui.notifications.warn(\"目标开启了架招，望乡还阳无法生效！\");\n    args.flags.abort = true;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "侠义反转与治疗",
                             "trigger": "hit",
-                            "script": "if (args.target.system.martial.stanceActive) {\n    return ui.notifications.warn(\"目标开启了架招，无法生效！\");\n}\n\n// 1. 计算初始回复 (damageResult.damage 此时存储的是内息加成后的基础值)\nlet healAmount = args.damageResult.damage;\n\n// 2. 读取目标侠义\nconst xiayi = args.target.system.social?.xiayi || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ amount: finalValue, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`${args.target.name} 获得 ${finalValue} 治疗`);\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyHealing({ amount: -damage, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`${args.target.name} 因侠义过高流失 ${damage} 气血`);\n}",
+                            "script": "// 1. 计算初始回复 (damageResult.damage 此时存储的是内息加成后的基础值)\nlet healAmount = args.damageResult.damage;\n\n// 2. 读取目标侠义\nconst xiayi = args.target.system.social?.xiayi || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ amount: finalValue, type: \"hp\", showScrolling: true });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         },
                         {
@@ -457,7 +505,7 @@
                     ]
                 },
                 {
-                    "name": "五宫血池",
+                    "name": "五宫血池（失传）",
                     "type": "stance",
                     "element": "yin",
                     "damageType": "waigong",
@@ -466,7 +514,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>自身陷入重伤时（气血不足 50%）方能施展，次要动作，血液流转，鲜血蒸发，短棍引动形成周身血雾，开启架招。你每损失 100 点气血，获得额外 1 点格挡值。格挡成功后，你可以用自身气感与目标的身法进行一次对抗：</p><p>若你对抗成功，鲜血缠绕目标，粘于皮肤之上，使其状如血人，形态可怖，陷入“行刑”状态，持续到战斗脱离。</p><p>若你对抗失败，你的气血逸散，转送阎罗，解除架招，获得 1 点怒气，如果你愿意，你可以消耗反应动作施展一次【阿鼻降难】。</p><p><strong>升级：</strong>格挡值+10，每损失 100 气血获得的额外格挡值+1，内力消耗+4。</p>",
-                    "automationNote": "开启条件手动。血量转化格挡自动。对抗请求自动。获胜行刑手动。失败回怒自动，解除架招手动。",
+                    "automationNote": "开启条件自动检查。格挡值根据血量动态增加。格挡后自动请求对抗。对抗后续需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -481,27 +529,33 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "开启条件检查",
                             "trigger": "attack",
                             "script": "const hp = system.resources.hp.value;\nconst max = system.resources.hp.max;\nif (hp > max * 0.5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"气血未低于50%，无法施展！\";\n}",
                             "active": true
                         },
                         {
-                            "label": "动态格挡",
+                            "label": "动态格挡值",
                             "trigger": "passive",
-                            "script": "const hp = actor.system.resources.hp.value;\nconst max = actor.system.resources.hp.max;\nconst lost = Math.max(0, max - hp);\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst ratio = 1 + (lvl - 1);\nconst bonus = Math.floor(lost / 100) * ratio;\nactor.system.combat.blockTotal += bonus;",
+                            "script": "const hp = actor.system.resources.hp.value;\nconst max = actor.system.resources.hp.max;\nconst lost = Math.max(0, max - hp);\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst ratio = 1 + (lvl - 1);\nconst bonus = Math.floor(lost / 100) * ratio;\n\n// 修改基础格挡值\nS.combat.block += bonus;",
                             "active": true
                         },
                         {
                             "label": "血雾对抗",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.attacker,\n    type: \"qigan\",\n    defType: \"shenfa\",\n    label: \"五宫血池 - 血雾缠绕\",\n    outcome: {\n        win: {\n            text: \"鲜血缠绕，状如恶鬼！请手动施加 [行刑]。\"\n        },\n        lose: {\n            text: \"气血逸散，请手动解除架招。\",\n            selfRecovery: { \"value\": 1, \"type\": \"rage\" }\n        }\n    }\n});",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.attacker,\n    type: \"qigan\",\n    defType: \"shenfa\",\n    label: \"五宫血池 - 血雾缠绕\",\n    outcome: {\n        win: {\n            text: \"鲜血缠绕！请手动施加 [行刑]。\"\n        },\n        lose: {\n            text: \"对抗失败。请手动解除架招。\",\n            selfRecovery: { \"value\": 1, \"type\": \"rage\" }\n        }\n    }\n});",
                             "active": true
                         }
                     ]
                 },
                 {
-                    "name": "黑绳宋帝",
+                    "name": "黑绳宋帝（失传）",
                     "type": "real",
                     "element": "yin",
                     "damageType": "neigong",
@@ -510,7 +564,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，棍舞下盘，轰向双膝，对目标造成 0.7 内息点内功伤害，若目标无架招，且目标的【侠义值+恶行值】低于你的，则目标深陷黑绳地狱，受刮骨，挖眼，倒吊之刑，其本场战斗中的残疾检定，会依次出现 5，6，71，73，之后再进行正常判定。</p><p>若目标格挡成功，则他侠义值、恶行值中较小的那个，减少小（他的神采*0.5）。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "条件判定自动。残疾/数值削减请GM手动操作。",
+                    "automationNote": "黑绳地狱条件判定自动，满足时弹窗提示GM。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -531,9 +585,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "效果提示",
                             "trigger": "hit",
-                            "script": "const mySum = (actor.system.social.xiayi || 0) + (actor.system.social.exing || 0);\nconst targetSum = (args.target.system.social.xiayi || 0) + (args.target.system.social.exing || 0);\nconst noStance = !args.target.system.martial.stanceActive;\n\nif (noStance && targetSum < mySum) {\n    ui.notifications.info(\"满足黑绳地狱条件！请GM接管残疾判定。\");\n} else if (!args.isHit) {\n    if (args.finalDamage <= 0) {\n         ui.notifications.info(\"疑似格挡成功，请检查是否需要扣除侠义/恶行。\");\n    }\n}",
+                            "script": "const mySum = (actor.system.social.xiayi || 0) + (actor.system.social.exing || 0);\nconst targetSum = (args.target.system.social.xiayi || 0) + (args.target.system.social.exing || 0);\nconst noStance = !args.target.system.martial.stanceActive;\n\nif (noStance && targetSum < mySum) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #000;\"><b>黑绳宋帝</b> 条件满足！<br>目标堕入黑绳地狱。<br>请GM接管残疾判定 (5, 6, 71, 73...)。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else if (!args.isHit) {\n    if (args.finalDamage <= 0) {\n         ui.notifications.info(\"疑似格挡成功，请检查是否需要扣除侠义/恶行。\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -548,7 +608,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可以消耗反应动作施展此招，压制目标虚招，棍如刀削，铺天盖地，避无可避，造成 0.7 内息点内功伤害。</p><p>若对方处于“行刑”状态，则使其立刻进行一次残疾检定。</p><p><strong>升级：</strong>招式伤害+10，增加一次残疾检定，内力消耗+4。</p>",
-                    "automationNote": "检测行刑自动。残疾检定手动。",
+                    "automationNote": "自动检测[行刑]并提示残疾检定。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -569,15 +629,21 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "残疾提示",
                             "trigger": "hit",
-                            "script": "const isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nif (isXingxing) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const count = 1 + (lvl - 1);\n    ui.notifications.info(`目标处于行刑状态！请进行 ${count} 次残疾检定。`);\n}",
+                            "script": "const isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nif (isXingxing) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const count = 1 + (lvl - 1);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #8b0000;\"><b>楚江剥皮</b> 触发！<br>目标处于行刑状态。<br>请进行 <b>${count}</b> 次残疾检定。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
                 },
                 {
-                    "name": "秦广超生",
+                    "name": "秦广超生（失传）",
                     "type": "feint",
                     "element": "yin",
                     "damageType": "neigong",
@@ -586,7 +652,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，以棍虚画一圈，定阴阳善恶，对目标造成 0.6 内息点内功伤害，若击破架招，则根据目标标签产生效果。</p><p>[大侠]目标无法再次开启被击破的架招，持续到战斗结束。</p><p>[大恶]目标施展的外功伤害招式，无法造成暴击，持续到战斗结束。</p><p>[侠士][恶人]：陷入“行刑”状态，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "标签判定复杂，请GM手动应用效果。",
+                    "automationNote": "击破架招后提示GM根据标签应用效果。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -607,9 +673,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "记录招式使用",
+                            "trigger": "attack",
+                            "script": "const history = new Set(actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || []);\nhistory.add(move.name);\nawait actor.setFlag('xjzl-system', 'wuxue_yanwang_moves', Array.from(history));",
+                            "active": true
+                        },
+                        {
                             "label": "击破提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px\"><b>秦广超生</b> 击破架招！<br>请根据目标标签 [大侠/大恶/侠士/恶人] 应用对应效果。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #2c3e50;\"><b>秦广超生</b> 击破架招！<br>请检查目标标签：<br><ul><li>[大侠]: 禁架 (无法再开此架招)</li><li>[大恶]: 禁暴 (外功无法暴击)</li><li>[侠士/恶人]: 施加 [行刑]</li></ul></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -624,8 +696,8 @@
                     "range": "10米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，人间生死手中定，棍舞阴曹，对周围敌人造成 0.8 内息点内功伤害。</p><p>·你在本场战斗中每施展过一招不同的《阎王棍》招式，此招招式伤害+20（不包括此招，即最多计算十招）。</p><p><strong>升级：</strong>招式伤害+20，每施展过一招增加的招式伤害+10，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "已用招式计数需手动，请在出招前手动修正伤害。",
+                    "description": "<p>蓄力动作，人间生死手中定，棍舞阴曹，对周围敌人造成 0.8 内息点内功伤害。</p><p>·你在本场战斗中每施展过一招不同的《阎王棍》招式，此招招式伤害+20（不包括此招，即最多计算十招）。</p><p><strong>升级：</strong>招式伤害+20，每施展过一招增加的招式伤害+10，怒气消耗-1，内力消耗+16。</p><p style=\"color:#888; font-size:0.8em;\">* 提示：若需重置计数，请使用宏清理 flags.xjzl-system.wuxue_yanwang_moves。</p>",
+                    "automationNote": "自动根据历史使用招式数量计算额外伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -650,13 +722,33 @@
                             5
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "招式计数加伤",
+                            "trigger": "calc",
+                            "script": "// 读取历史记录 Set\nconst history = actor.getFlag('xjzl-system', 'wuxue_yanwang_moves') || [];\n// 过滤掉自己 (虽然逻辑上可能还没加进去，但保险起见)\nconst uniqueMoves = history.filter(n => n !== move.name);\nconst count = Math.min(uniqueMoves.length, 10);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\n// 升级：每施展过一招增加的招式伤害+10 (基础20)\nconst perMoveBonus = 20 + (lvl - 1) * 10;\nconst totalBonus = count * perMoveBonus;\n\nargs.output.damage += totalBonus;\nargs.output.bonusDesc.push(`十殿判定: 已用 ${count} 招，加成 +${totalBonus}`);",
+                            "active": true
+                        }
+                    ]
                 }
             ],
             "effects": [
                 {
+                    "name": "行刑",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "标记状态：用于阎王棍其他招式判定。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xingxing",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
                     "name": "阿鼻降难-破",
-                    "icon": "icons/svg/up.svg",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "下一次出招无视闪避，距离+20米。",
                     "transfer": false,
                     "flags": {
@@ -667,7 +759,7 @@
                                 {
                                     "label": "无视闪避",
                                     "trigger": "attack",
-                                    "script": "args.flags.forceHit = true;\nui.notifications.info(\"阿鼻降难效果：本次必中！\");",
+                                    "script": "args.flags.forceHit = true;\nui.notifications.info(\"阿鼻降难效果：本次必中，距离+20米！\");",
                                     "active": true
                                 },
                                 {
@@ -683,7 +775,7 @@
                 },
                 {
                     "name": "卞城枉死",
-                    "icon": "icons/svg/shield.svg",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "护盾：恶行值减伤。",
                     "transfer": false,
                     "flags": {
@@ -694,13 +786,45 @@
                                 {
                                     "label": "恶行护盾",
                                     "trigger": "preTake",
-                                    "script": "const exing = actor.system.social.exing || 0;\nconst lvl = 1; \nconst max = 200 + (lvl - 1) * 100;\nconst reduction = Math.min(exing, max);\n\nconst original = args.output.damage;\nconst reduced = Math.max(0, original - reduction);\n\nargs.output.damage = reduced;\nargs.output.bonusDesc.push(`卞城枉死减伤 -${original - reduced}`);\n\nif (reduced === 1) {\n    ui.notifications.info(\"伤害抵消至1点！触发 [泰山锥肉] 追击机会！\");\n}\n",
+                                    "script": "if (args.isCrit) {\n    const exing = actor.system.social.exing || 0;\n    const lvl = 1;\n    const max = 200 + (lvl - 1) * 100;\n    const reduction = Math.min(exing, max);\n\n    const original = args.output.damage;\n    const reduced = Math.max(0, original - reduction);\n\n    args.output.damage = reduced;\n    args.output.bonusDesc.push(`卞城枉死减伤 -${original - reduced}`);\n\n    if (reduced <= 1) {\n        ChatMessage.create({content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\"><b>卞城枉死</b> 完美抵消！<br>伤害仅剩 1 点。<br>触发 <b>【泰山锥肉】</b> 免费追击机会！</div></div>`, speaker: ChatMessage.getSpeaker({actor: actor})});\n    }\n}",
                                     "active": true
                                 }
                             ]
                         }
                     },
                     "changes": []
+                },
+                {
+                    "name": "禁架 (大侠)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "无法再次开启被击破的架招。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jin_jia",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "禁暴 (大恶)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "外功伤害招式无法造成暴击。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jin_bao",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 5,
+                            "value": "999"
+                        }
+                    ]
                 }
             ]
         }
