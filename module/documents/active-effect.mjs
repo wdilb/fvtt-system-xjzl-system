@@ -181,6 +181,25 @@ export class XJZLActiveEffect extends ActiveEffect {
     const flags = data.flags?.["xjzl-system"] || {};
     const updates = {};
 
+    // 强制本地化 Description
+    // 无论来源是 Core toggleStatusEffect 还是其他
+    if (data.description) {
+      // game.i18n.localize 的特性：如果有翻译就返回翻译，没有就返回原Key
+      // 所以这里直接赋值是安全的，不会把原本就是中文的文本搞坏
+      const localizedDesc = game.i18n.localize(data.description);
+      if (localizedDesc !== data.description) {
+        updates["description"] = localizedDesc;
+      }
+    }
+
+    // 强制本地化 Name (防止某些直接调用没翻译名字)
+    if (data.name) {
+      const localizedName = game.i18n.localize(data.name);
+      if (localizedName !== data.name) {
+        updates["name"] = localizedName;
+      }
+    }
+
     // 2. 确保 Slug 存在
     if (!flags.slug) {
       // 优先尝试将 name 转为 slug (如 "Green Snake Poison" -> "green-snake-poison")
@@ -285,7 +304,7 @@ export class XJZLActiveEffect extends ActiveEffect {
     // 自定义飘字（绿色/红色、支持叠层显示），因此必须在这里阻断
     // 核心的默认行为，防止出现双重飘字。
     // ---------------------------------------------------------------
-    
+
     return; // 显式返回，表明“此处逻辑终结”
   }
 }
