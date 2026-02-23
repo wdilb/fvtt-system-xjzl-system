@@ -1605,7 +1605,12 @@ export class XJZLActor extends Actor {
         if (config.isCrit && stdTotal === 0) { // 如果全是暴击造成的内力伤，也可以加暴击前缀
           mpFlavor = `暴击! ${mpFlavor}`;
         }
-        this.showFloatyText(mpFlavor, { fontSize: 32, fill: "#4444ff", anchor: 0.6 });
+        this.showFloatyText(mpFlavor, {
+          fontSize: 32,
+          fill: "#4444ff",
+          anchor: CONST.TEXT_ANCHOR_POINTS.CENTER,
+          jitter: 0.35 // 稍微增加抖动以错开位置
+        });
       }
 
       // --- 流失伤害 (易伤/撕裂/中毒) 处理 ---
