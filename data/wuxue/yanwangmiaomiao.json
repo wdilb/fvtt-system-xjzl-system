@@ -374,7 +374,7 @@
                     "targetInfo": "地面",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，将内力灌注于棍，奋力插地，入土三分。在周围地面引起阵阵阴气，化为‘热恼地狱’，持续 1 回合。</p><p><strong>热恼地狱：</strong>在其中施展的【大热恼】，不会被“行刑”状态的敌人压制反击。</p><p>·在其中开启【阿鼻降难】成功格挡时，还可使敌方陷入“行刑”，持续一回合。</p><p><strong>升级：</strong>‘热恼地狱’持续回合+1，内力消耗+8。</p>",
-                    "automationNote": "仅提示生成地狱，具体区域判定需手动。",
+                    "automationNote": "仅提示生成地狱，具体区域判定需手动。包含计数。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -397,7 +397,7 @@
                         {
                             "label": "生成提示",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nui.notifications.info(`已生成 [热恼地狱] (2米)，持续 ${rounds} 回合。请手动放置模板。`);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #7f8c8d;\"><b>泰山锥肉</b> 生效！<br>已生成 [热恼地狱] (2米)<br>持续 <b>${rounds}</b> 回合。<br><i>请手动放置模板。</i></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -413,7 +413,7 @@
                     "targetInfo": "自身",
                     "actionCost": "反应动作",
                     "description": "<p>当你即将受到暴击伤害时，你可以消耗反应动作释放此招，引动阴死审判之气，抵挡此次攻击。你的每点恶行值为你提供 1 点减伤（至多 200 点）。</p><p>若你将此次伤害抵消至仅剩 1 点，历经大叫唤地狱，满日转解闹恼地狱，你可以立即不消耗动作施展一次【泰山锥肉】。</p><p><strong>升级：</strong>恶行值提供的减伤上限提高 100 点。</p>",
-                    "automationNote": "反应技。完全自动化：自动计算恶行值并修改最终伤害。",
+                    "automationNote": "反应技。使用后自动获得护盾BUFF，BUFF会自动计算减伤并在受击时提示是否满足追击条件。包含计数。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -436,7 +436,7 @@
                         {
                             "label": "应用护盾",
                             "trigger": "hit",
-                            "script": "const effData = thisItem.effects.getName(\"卞城枉死\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n// 设置为持续1回合(实际上preTake里会判断只生效一次，但为了防止不触发一直挂着，设为1回合保险)\neffData.duration = { rounds: 1 }; \nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "script": "// 1. 计算护盾数值\nconst exing = actor.system.social?.exing || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst max = 200 + (lvl - 1) * 100;\nconst shieldValue = Math.min(exing, max);\n\n// 2. 发送卡片告知\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\"><b>卞城枉死</b> 护盾激活！<br>护盾强度: <b>${shieldValue}</b><br><i style=\"font-size:0.8em\">将在下次受击前生效。</i></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 3. 施加状态 (将数值带入Flag)\nconst effData = thisItem.effects.getName(\"卞城枉死\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { rounds: 1 };\nfoundry.utils.setProperty(effData, \"flags.xjzl-system.shieldValue\", shieldValue);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
@@ -452,7 +452,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，只能对无架招目标（包括友军）使用，一棍轻点头颅，内力缓缓注入，为目标回复 1.0 内息点气血（内功命中，但无法暴击），目标每有 1 点侠义值，减少 1 点回复量，若减少到负数，则使目标流失等同于该负数绝对值的气血。</p><p>若目标处于“行刑”状态，目标每有一点侠义值额外减少 1 点回复量。</p><p><strong>升级：</strong>回复气血-20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "治疗/反转伤害逻辑全自动。检测目标[行刑]状态。",
+                    "automationNote": "治疗/反转伤害逻辑全自动。检测目标[行刑]状态。包含计数。",
                     "calculation": {
                         "base": 0,
                         "growth": -20,
@@ -493,7 +493,7 @@
                         {
                             "label": "侠义反转与治疗",
                             "trigger": "hit",
-                            "script": "// 1. 计算初始回复 (damageResult.damage 此时存储的是内息加成后的基础值)\nlet healAmount = args.damageResult.damage;\n\n// 2. 读取目标侠义\nconst xiayi = args.target.system.social?.xiayi || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ amount: finalValue, type: \"hp\", showScrolling: true });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "// 1. 读取基础数值 (来自面板)\nlet healAmount = args.baseDamage || 0;\n\n// 2. 读取目标侠义 (NaN防卫)\nconst xiayi = Number(args.target.system.social?.xiayi) || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ amount: finalValue, type: \"hp\", showScrolling: true });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         },
                         {
@@ -786,7 +786,7 @@
                                 {
                                     "label": "恶行护盾",
                                     "trigger": "preTake",
-                                    "script": "if (args.isCrit) {\n    const exing = actor.system.social.exing || 0;\n    const lvl = 1;\n    const max = 200 + (lvl - 1) * 100;\n    const reduction = Math.min(exing, max);\n\n    const original = args.output.damage;\n    const reduced = Math.max(0, original - reduction);\n\n    args.output.damage = reduced;\n    args.output.bonusDesc.push(`卞城枉死减伤 -${original - reduced}`);\n\n    if (reduced <= 1) {\n        ChatMessage.create({content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\"><b>卞城枉死</b> 完美抵消！<br>伤害仅剩 1 点。<br>触发 <b>【泰山锥肉】</b> 免费追击机会！</div></div>`, speaker: ChatMessage.getSpeaker({actor: actor})});\n    }\n}",
+                                    "script": "// 1. 读取 Flag 中的护盾强度\nconst shieldValue = thisEffect.getFlag(\"xjzl-system\", \"shieldValue\") || 0;\n\n// 2. 计算减伤\nconst original = args.output.damage;\n// 确保至少扣1点血 (除非完全免疫，但此招描述为抵挡)\nlet reduced = Math.max(1, original - shieldValue);\nconst blocked = original - reduced;\n\n// 3. 应用结果\nargs.output.damage = reduced;\n// 已修复：移除 args.output.bonusDesc.push 避免报错\n\n// 4. 发送卡片通知\nlet msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\">\n    <b>卞城枉死</b> 触发！<br>\n    原始伤害: ${original}<br>\n    抵消伤害: ${blocked}<br>\n    <span style=\"font-size:1.2em; font-weight:bold;\">最终伤害: ${reduced}</span>\n`;\n\n// 追击判定：伤害<=1点\nif (reduced <= 1) {\n    msg += `<hr><b style=\"color:red;\">条件满足！</b><br>伤害已压制至1点以下。<br>获得【泰山锥肉】追击机会！`;\n}\n\nmsg += `<hr><i style=\"color:#666; font-size:0.8em;\">请手动删除此状态</i></div></div>`;\n\nChatMessage.create({\n    content: msg,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                                     "active": true
                                 }
                             ]
