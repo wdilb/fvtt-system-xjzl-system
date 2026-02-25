@@ -1081,7 +1081,7 @@ XJZL.statusEffects = [
     flags: { "xjzl-system": { slug: "prone", stackable: false } },
     changes: [
       { key: "flags.xjzl-system.grantAttackLevel", mode: 2, value: "1" },
-      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" }
+      { key: "flags.xjzl-system.defendFeintLevel", mode: 2, value: "1" }
     ]
   },
   {
