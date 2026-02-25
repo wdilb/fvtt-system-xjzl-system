@@ -588,9 +588,9 @@
             "tier": 2,
             "element": "taiji",
             "sect": "jianghushili",
-            "description": "吴越时人所传，琴者，乐之器也，书者，人之志也。此功记载琴律心法和书画的玄奥心法，要求精通书音，神韵相通，练至大成可琴心内成，以墨传意，淡然百态人生。\n小成运功特效：进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。\n书音值：你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。\n圆满运功特效：进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。\n战斗中，你每次进行[书写]或[演奏]检定时，将检定结果记为“书音值”，书音值数值可累加。\n书音值：你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。\n修满特效：修满[永久]：气血+40，内力+20。选择[书写][演奏]其中一个技艺等级+1。",
+            "description": "<p>吴越时人所传，琴者，乐之器也，书者，人之志也。此功记载琴律心法和书画的玄奥心法，要求精通书音，神韵相通，练至大成可琴心内成，以墨传意，淡然百态人生。</p><p><strong>小成运功特效：</strong>进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。<br><strong>书音值：</strong>你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。</p><p><strong>圆满运功特效：</strong>进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。<br>战斗中，你每次进行[书写]或[演奏]检定时，将检定结果记为“书音值”，书音值数值可累加。<br><strong>书音值：</strong>你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。</p><p><strong>修满特效：</strong>修满[永久]：气血+40，内力+20。选择[书写][演奏]其中一个技艺等级+1。</p>",
             "requirement": "悟性4",
-            "automationNote": "完全自动化：进战自动检定，濒死自动触发回复。",
+            "automationNote": "1. 进战时自动弹窗选择技艺检定并设定初始书音值。\n2. 濒死时自动消耗书音值回血回护体。\n3. 【注意】圆满后战斗中的'累加'无法自动监听。请玩家在战斗中进行书/音检定后，使用宏[🔧 设置角色标记]手动修改 'neigong_shuyin' 的数值。\n4. 修满属性中默认填写了[演奏]+1，如果你选择了[书写]，请手动修改内功数据的'修满加成'。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -614,19 +614,19 @@
                         "qigan": 20,
                         "shencai": 10
                     },
-                    "description": "小成运功特效：进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。\n书音值：你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。",
+                    "description": "<p><strong>小成运功特效：</strong>进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。<br><strong>书音值：</strong>你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "古今秘谱-书音值",
+                            "label": "古今秘谱-进战定韵",
                             "trigger": "combatStart",
-                            "script": "const roll = await actor.rollAttributeTest('shuxie'); actor.setFlag('xjzl-system', 'neigong_shuyin', roll.total); ui.notifications.info(`书音值已设定: ${roll.total}`);",
+                            "script": "const choice = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"古今秘谱 - 进战定韵\" },\n    content: \"<p>琴心墨意，请选择一种技艺进行检定，结果将转化为<b>书音值</b>。</p>\",\n    buttons: [\n        { label: \"书写\", action: \"shuxie\", icon: \"fas fa-pen-nib\" },\n        { label: \"演奏\", action: \"yanzou\", icon: \"fas fa-music\" }\n    ],\n    close: () => null\n});\n\nif (choice) {\n    const roll = await actor.rollAttributeTest(choice);\n    // 小成：覆盖\n    await actor.setFlag('xjzl-system', 'neigong_shuyin', roll.total);\n    ui.notifications.info(`【古今秘谱】书音值已设定为: ${roll.total}`);\n}",
                             "active": true
                         },
                         {
                             "label": "古今秘谱-濒死护体",
                             "trigger": "dying",
-                            "script": "const val = actor.getFlag('xjzl-system', 'neigong_shuyin') || 0; if (val > 0) { args.preventDying = true; await actor.applyHealing({amount: val, type: 'hp'}); await actor.applyHealing({amount: val, type: 'huti'}); actor.setFlag('xjzl-system', 'neigong_shuyin', 0); ui.notifications.info('【古今秘谱】触发护体！'); }",
+                            "script": "const val = actor.getFlag('xjzl-system', 'neigong_shuyin') || 0;\nif (val > 0) {\n    args.preventDying = true;\n    await actor.applyHealing({amount: val, type: 'hp', showScrolling: true});\n    await actor.applyHealing({amount: val, type: 'huti', showScrolling: true});\n    await actor.setFlag('xjzl-system', 'neigong_shuyin', 0);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\" style=\"border-bottom:1px solid #ccc;\"><b>古今秘谱 - 护体触发</b></div><div style=\"padding:5px;\">消耗 <b>${val}</b> 点书音值，抵御了死亡！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -640,19 +640,19 @@
                         "qigan": 30,
                         "shencai": 15
                     },
-                    "description": "圆满运功特效：进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。\n战斗中，你每次进行[书写]或[演奏]检定时，将检定结果记为“书音值”，书音值数值可累加。\n书音值：你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。",
+                    "description": "<p><strong>圆满运功特效：</strong>进战时，你可以进行一次[书写]或[演奏]检定并将检定结果记为“书音值”，持续到战斗脱离。<br>战斗中，你每次进行[书写]或[演奏]检定时，将检定结果记为“书音值”，书音值数值可累加。<br><strong>书音值：</strong>你陷入濒死后，立即回复书音值等额的气血和护体真气，护体真气持续到战斗脱离，然后书音值归零。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "古今秘谱-书音值(进战)",
+                            "label": "古今秘谱-进战定韵",
                             "trigger": "combatStart",
-                            "script": "const roll = await actor.rollAttributeTest('shuxie'); actor.setFlag('xjzl-system', 'neigong_shuyin', roll.total); ui.notifications.info(`书音值已设定: ${roll.total}`);",
+                            "script": "const choice = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"古今秘谱 - 进战定韵\" },\n    content: \"<p>琴心墨意，请选择一种技艺进行检定，结果将转化为<b>书音值</b>。</p>\",\n    buttons: [\n        { label: \"书写\", action: \"shuxie\", icon: \"fas fa-pen-nib\" },\n        { label: \"演奏\", action: \"yanzou\", icon: \"fas fa-music\" }\n    ],\n    close: () => null\n});\n\nif (choice) {\n    const roll = await actor.rollAttributeTest(choice);\n    // 圆满进战：覆盖初始值\n    await actor.setFlag('xjzl-system', 'neigong_shuyin', roll.total);\n    ui.notifications.info(`【古今秘谱】书音值初始化: ${roll.total}`);\n}",
                             "active": true
                         },
                         {
                             "label": "古今秘谱-濒死护体",
                             "trigger": "dying",
-                            "script": "const val = actor.getFlag('xjzl-system', 'neigong_shuyin') || 0; if (val > 0) { args.preventDying = true; await actor.applyHealing({amount: val, type: 'hp'}); await actor.applyHealing({amount: val, type: 'huti'}); actor.setFlag('xjzl-system', 'neigong_shuyin', 0); ui.notifications.info('【古今秘谱】触发护体！'); }",
+                            "script": "const val = actor.getFlag('xjzl-system', 'neigong_shuyin') || 0;\nif (val > 0) {\n    args.preventDying = true;\n    await actor.applyHealing({amount: val, type: 'hp', showScrolling: true});\n    await actor.applyHealing({amount: val, type: 'huti', showScrolling: true});\n    await actor.setFlag('xjzl-system', 'neigong_shuyin', 0);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\" style=\"border-bottom:1px solid #ccc;\"><b>古今秘谱 - 护体触发</b></div><div style=\"padding:5px;\">消耗 <b>${val}</b> 点书音值，抵御了死亡！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -666,6 +666,11 @@
                 {
                     "key": "resources.mp.bonus",
                     "value": 20
+                },
+                {
+                    "key": "arts.yanzou.value",
+                    "value": 1,
+                    "label": "默认演奏+1 (若选书写请修改Key为 arts.shuxie.value)"
                 }
             ],
             "xpInvested": 0,
