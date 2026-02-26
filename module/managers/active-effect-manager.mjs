@@ -90,6 +90,49 @@ export class ActiveEffectManager {
         const lookupSlug = XJZLActiveEffect.getSlug(effectData);
 
         // =====================================================
+        // 特殊规则：忍耐减免剧痛
+        // =====================================================
+        // 规则：每1级忍耐，减少1回合持续时间 (仅限有持续时间且单位是round)
+        if (lookupSlug === "pain" && effectData.duration?.rounds > 0) {
+            const rennai = actor.system.skills?.rennai?.total || 0;
+
+            if (rennai > 0) {
+                const original = effectData.duration.rounds;
+                const reduced = Math.max(0, original - rennai);
+                const reducedAmount = original - reduced;
+
+                // 修改持续时间
+                effectData.duration.rounds = reduced;
+
+                // 发送提示卡片
+                const msgContent = `
+                <div class="xjzl-chat-card" style="font-size: 13px; padding: 2px 6px;">
+                    <div style="border-left: 3px solid #795548; background: rgba(121, 85, 72, 0.1); padding: 4px 6px; border-radius: 2px; margin-left: 2px;">
+                        <div style="font-weight: bold; color: #5d4037;">
+                            <i class="fas fa-user-shield"></i> 忍耐生效
+                        </div>
+                        <div style="margin-top: 3px; color: #444; padding-left: 4px; font-size: 0.9em;">
+                            剧痛持续时间 -${reducedAmount} 回合<br>
+                            <span style="color: #666;">(剩余: ${reduced} 回合)</span>
+                        </div>
+                    </div>
+                </div>`;
+
+                ChatMessage.create({
+                    content: msgContent,
+                    speaker: ChatMessage.getSpeaker({ actor: actor })
+                });
+
+                // 如果减到 0，视为完全豁免，直接中止添加
+                if (reduced === 0) {
+                    // 可选：飘字提示豁免
+                    this._showScrollingText(actor, "忍耐豁免", "neutral");
+                    return;
+                }
+            }
+        }
+
+        // =====================================================
         // 2. 查找：是否已存在同名/同Slug特效
         // =====================================================
         const existingEffect = actor.effects.find(e => {
