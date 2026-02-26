@@ -1375,14 +1375,14 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制目标虚招，肘部猛击目标头、胸、腹，对其造成三次 0.3 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化（伤害系数已合并计算）。",
+                    "automationNote": "完全自动化。系统执行第1击，脚本自动追加第2、3击。每次攻击独立计算防御。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
                         "scalings": [
                             {
                                 "prop": "liliang",
-                                "ratio": 0.9
+                                "ratio": 0.3
                             }
                         ]
                     },
@@ -1392,7 +1392,15 @@
                             4,
                             6
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "连环三击",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 仅在命中时触发后续连击\nif (!args.isHit) return;\n\n// 获取本次计算出的单次伤害数值 (已包含 0.3系数 + 10成长)\n// args.damageResult.damage 是减伤前的面板伤害\nconst rawDamage = args.damageResult.damage;\n\n// 额外执行 2 次打击 (共3击)\nfor (let i = 0; i < 2; i++) {\n    await args.target.applyDamage({\n        amount: rawDamage,\n        type: args.type, // waigong\n        attacker: actor,\n        isHit: true,     // 反击/连击默认命中\n        isCrit: args.isCrit, // 继承第一次的暴击状态\n        ignoreDefense: args.damageResult.ignoreDefense,\n        ignoreBlock: args.damageResult.ignoreBlock,\n        ignoreStance: args.damageResult.ignoreStance,\n        element: args.move.element\n    });\n    \n    // 视觉提示\n    if (i === 1) {\n        actor.showFloatyText(\"三连击!\", { fill: \"#FFA500\", fontSize: 40 });\n    }\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "彝疆镇岳",
