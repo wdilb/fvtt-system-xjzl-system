@@ -1095,5 +1095,58 @@
                 }
             ]
         }
+    },
+    {
+        "name": "撒手锏",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>必刺之万众之中，人马辟易，扭转局势之招数。</p><p><strong>需求：</strong>棍-双棍</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "棍-双棍",
+            "moves": [
+                {
+                    "name": "撒手锏",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>大喊“着”，掷出双锏，打着旋儿朝目标飞射而去，对其造成 0.5 力量点外功伤害。</p><p>·出招的同时还可以不消耗动作进行一次投射的[抛掷]检定，将结果加到招式伤害上。</p><p>·若目标没有反应动作，招式必定暴击。</p><p>·施展此招后，你的[棍-双棍]武器视作脱手，掉落在目标所处空格处，需要用主要动作捡起。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "出招时弹窗询问是否进行抛掷检定（结果自动加伤）以及目标是否无反应动作（确认后必暴）。武器脱手需手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "抛掷与暴击判定",
+                            "trigger": "attack",
+                            "script": "// 1. 抛掷检定\nconst doPaozhi = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"撒手锏 - 抛掷\" },\n    content: \"<p>是否进行 <b>[抛掷]</b> 检定以增加伤害？</p>\",\n    yes: { label: \"投掷\", icon: \"fas fa-dice-d20\" },\n    no: { label: \"跳过\", icon: \"fas fa-forward\" }\n});\n\nif (doPaozhi) {\n    // 调用 Actor 的检定方法\n    const roll = await actor.rollAttributeTest(\"paozhi\", { chatMessage: true });\n    if (roll) {\n        const bonus = roll.total;\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 抛掷检定: ${bonus}`;\n    }\n}\n\n// 2. 反应动作判定 (暴击)\nconst noReaction = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"撒手锏 - 暴击判定\" },\n    content: \"<p>目标是否 <b>没有反应动作</b>？</p>\",\n    yes: { label: \"是 (必暴)\", icon: \"fas fa-skull\" },\n    no: { label: \"否 (正常)\", icon: \"fas fa-times\" }\n});\n\nif (noReaction) {\n    // 提高暴击阈值修正，使其极易暴击 (例如 +50)\n    args.flags.critThresholdMod += 50;\n    ui.notifications.info(\"目标无反应动作，招式必定暴击！\");\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ]
+        }
     }
 ]
