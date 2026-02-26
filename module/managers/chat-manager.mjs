@@ -741,7 +741,7 @@ export class ChatCardManager {
                 const attackTotal = finalDie + finalFeintVal;
 
                 // 获取头像
-                const imgPath = target.texture?.src || targetActor.img;
+                const imgPath = targetActor.img || target.texture?.src;
 
                 // D. 渲染并发送防御请求卡
                 const templateData = {
@@ -1302,7 +1302,7 @@ export class ChatCardManager {
                 hitCount++;
                 const templateData = {
                     name: displayName,
-                    img: target.texture?.src || targetActor.img, // 优先取 Token 图
+                    img: targetActor.img || target.texture?.src, // 优先取 actor 图
                     finalDamage: damageResult.finalDamage,
                     hutiLost: damageResult.hutiLost,
                     hpLost: damageResult.hpLost,
@@ -1685,7 +1685,7 @@ export class ChatCardManager {
                 // 发送伤害卡片 (复用 damage-card.hbs)
                 const templateData = {
                     name: target.name,
-                    img: target.texture?.src || targetActor.img,
+                    img: targetActor.img || target.texture?.src,
                     finalDamage: damageResult.finalDamage,
                     hutiLost: damageResult.hutiLost,
                     hpLost: damageResult.hpLost,
