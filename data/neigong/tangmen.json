@@ -9,7 +9,7 @@
             "sect": "tangmen",
             "description": "<p>唐门入门内功心法。以唐律谋杀、劫杀、故杀、斗杀、误杀、戏杀、失杀为七杀，训诫弟子不可滥杀，但若该杀者，不可放过。</p>",
             "requirement": "悟性需求: 1",
-            "automationNote": "完全自动化。每3次出招免蓝耗(通过返还)，击杀回蓝。",
+            "automationNote": "完全自动化。每3次出招(不含普攻)免蓝耗(通过返还)，击杀回蓝。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -50,15 +50,9 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "七杀计数与免耗",
+                            "label": "七杀计数与返还",
                             "trigger": "attack",
-                            "script": "let count = actor.getFlag('xjzl-system', 'neigong_qisha_count') || 0;\ncount++;\nif (count % 3 === 0) {\n    ui.notifications.info('七杀经：本次出招不消耗内力(消耗后返还)');\n    // 记录这次需要返还内力，待资源扣除后执行\n    args.flags.qisha_refund = true;\n}\nawait actor.setFlag('xjzl-system', 'neigong_qisha_count', count);",
-                            "active": true
-                        },
-                        {
-                            "label": "执行返还",
-                            "trigger": "hit_once",
-                            "script": "if (args.attacker.flags.qisha_refund) {\n    const cost = args.move.currentCost.mp || 0;\n    if (cost > 0) await args.attacker.applyHealing({amount: cost, type: 'mp'});\n}",
+                            "script": "// 1. 排除普攻 (关键修正)\nif (args.move.type === 'basic') return;\n\n// 2. 计数\nlet count = actor.getFlag('xjzl-system', 'neigong_qisha_count') || 0;\ncount++;\nawait actor.setFlag('xjzl-system', 'neigong_qisha_count', count);\n\n// 3. 每3次触发返还\nif (count % 3 === 0) {\n    // 计算实际消耗 (基础消耗 - 减耗)\n    const baseCost = args.move.currentCost?.mp || 0;\n    const reduction = actor.system.combat.costs?.neili?.total || 0;\n    const actualCost = Math.max(0, baseCost - reduction);\n    \n    if (actualCost > 0) {\n        // 执行返还\n        await actor.applyHealing({amount: actualCost, type: 'mp', showScrolling: true});\n        ui.notifications.info(`七杀经：第 ${count} 次出招，内力已返还。`);\n    }\n}",
                             "active": true
                         },
                         {
