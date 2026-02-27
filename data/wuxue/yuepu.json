@@ -2131,8 +2131,8 @@
                     "range": "15米",
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
-                    "description": "<p>全回合动作，简洁悠扬，气盖云天，为范围内所有友方添加“笑傲”，持续到战斗脱离。</p><p><strong>笑傲：</strong>你的招式命中+5，且释放距离+5；</p><p>·当你受到内外功伤害时，可以选择移除笑傲，使此次伤害减免 30 点。</p><p><strong>音阶排序：</strong>羽、徵、角、商、宫</p><p><strong>天籁之音：</strong>笑傲的效果提升如下：笑傲：你的招式必定命中，且释放距离+5；·当你受到内外功伤害时，可以选择移除笑傲，使此次伤害减免 200 点。</p>",
-                    "automationNote": "添加BUFF自动。BUFF减伤逻辑自动。",
+                    "description": "<p>全回合动作，简洁悠扬，气盖云天，为范围内所有友方添加“笑傲”，持续到战斗脱离。</p><p><strong>笑傲：</strong>你的招式命中+5，且释放距离+5；</p><p><strong>天籁之音：</strong>笑傲的效果提升如下：笑傲：你的招式必定命中，且释放距离+5；</p><p>·当你受到内外功伤害时，可以选择移除笑傲，使此次伤害减免 30 点（天籁为 200 点）。</p><p><strong>音阶排序：</strong>羽、徵、角、商、宫</p>",
+                    "automationNote": "施放后弹窗询问应用[普通]还是[天籁]版本（需自行进行演奏检定）。BUFF提供的命中/必中、减伤逻辑完全自动。",
                     "tier": 3,
                     "progression": {
                         "mode": "custom",
@@ -2158,10 +2158,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "添加笑傲",
+                            "label": "选择效果版本",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"笑傲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                            "script": "const basicEff = thisItem.effects.getName(\"笑傲\").toObject();\nconst heavenEff = thisItem.effects.getName(\"笑傲 (天籁)\").toObject();\ndelete basicEff._id; basicEff.origin = thisItem.uuid;\ndelete heavenEff._id; heavenEff.origin = thisItem.uuid;\n\nnew Dialog({\n  title: \"演奏效果判定\",\n  content: \"<p>请根据演奏检定结果选择效果：</p>\",\n  buttons: {\n    normal: {\n      label: \"普通 (命中+5, 抵挡30)\",\n      callback: async () => await game.xjzl.api.effects.addEffect(args.target, basicEff)\n    },\n    heaven: {\n      label: \"天籁 (必中, 抵挡200)\",\n      callback: async () => await game.xjzl.api.effects.addEffect(args.target, heavenEff)\n    }\n  },\n  default: \"normal\"\n}).render(true);"
                         }
                     ]
                 }
@@ -2170,7 +2170,7 @@
                 {
                     "name": "笑傲",
                     "icon": "icons/svg/sun.svg",
-                    "description": "命中+5, 距离+5。受到内外功伤害可消耗抵挡30伤害。",
+                    "description": "命中+5，释放距离+5。受到内外功伤害时，可消耗此状态抵挡30点伤害。",
                     "transfer": false,
                     "changes": [
                         {
@@ -2192,7 +2192,33 @@
                                     "label": "减伤移除",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "if (['waigong','neigong'].includes(args.type)) { const confirm = await foundry.applications.api.DialogV2.confirm({ window:{title:'笑傲江湖'}, content:'消耗[笑傲]抵挡30点伤害？', yes:{label:'抵挡'}, no:{label:'保留'} }); if(confirm){ args.output.damage -= 30; thisEffect.delete(); } }"
+                                    "script": "if (['waigong','neigong'].includes(args.type)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '笑傲江湖' },\n        content: '<p>消耗 [笑傲] 抵挡 <b>30</b> 点伤害？</p>',\n        yes: { label: '抵挡', icon: 'fas fa-shield-alt' },\n        no: { label: '保留', icon: 'fas fa-times' }\n    });\n    if (confirm) {\n        args.output.damage -= 30;\n        thisEffect.delete();\n    }\n}"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "笑傲 (天籁)",
+                    "icon": "icons/svg/sun.svg",
+                    "description": "招式必定命中，释放距离+5。受到内外功伤害时，可消耗此状态抵挡200点伤害。",
+                    "transfer": false,
+                    "changes": [],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "xiaoao_heaven",
+                            "scripts": [
+                                {
+                                    "label": "招式必中",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "args.flags.forceHit = true;"
+                                },
+                                {
+                                    "label": "强力减伤移除",
+                                    "trigger": "preTake",
+                                    "active": true,
+                                    "script": "if (['waigong','neigong'].includes(args.type)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '笑傲江湖 (天籁)' },\n        content: '<p>消耗 [笑傲] 抵挡 <b>200</b> 点伤害？</p>',\n        yes: { label: '抵挡', icon: 'fas fa-shield-alt' },\n        no: { label: '保留', icon: 'fas fa-times' }\n    });\n    if (confirm) {\n        args.output.damage -= 200;\n        thisEffect.delete();\n    }\n}"
                                 }
                             ]
                         }
