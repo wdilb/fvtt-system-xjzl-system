@@ -531,15 +531,15 @@
         }
     },
     {
-        "name": "善吾剑法（地）",
+        "name": "善吾剑法",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/华山.png",
         "system": {
             "category": "wuxue",
             "sect": "huashanpai",
             "tier": 2,
-            "description": "<p>气宗绝技，君子应当静以修身，俭以养德。</p>",
-            "requirements": "剑-单剑，气宗",
+            "description": "<p>气宗绝技，君子应当静以修身，俭以养德。</p><p><strong>需求：</strong>剑-单剑，气宗</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "剑-单剑；气宗",
             "moves": [
                 {
                     "name": "劝人以德",
@@ -547,11 +547,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，世间浮躁，剑招平平，造成 0.5 内息点内功伤害。</p><p>·若目标没有任何一项技艺的等级大于 2，则此招必定命中。</p>",
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。必中逻辑自动化。",
+                    "description": "<p>世间浮躁，剑招平平，造成 0.5 内息点内功伤害。</p><p>·若目标没有任何一项技艺的等级大于 2，则此招必定命中。</p><p><strong>升级：</strong>技艺判定阈值+2，内力消耗+2。</p>",
+                    "automationNote": "伤害自动化。必中逻辑自动化 (使用 forceHit)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -573,7 +573,8 @@
                         {
                             "label": "技艺检测必中",
                             "trigger": "check",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst threshold = 2 + (lvl - 1) * 2;\nlet hasHighArt = false;\nif (args.target.system.arts) {\n    for (const art of Object.values(args.target.system.arts)) {\n        if (art.total > threshold) {\n            hasHighArt = true;\n            break;\n        }\n    }\n}\nif (!hasHighArt) {\n    args.flags.grantHit += 100; // 强行必中\n    ui.notifications.info(`${args.target.name} 技艺粗浅，此招必中！`);\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst threshold = 2 + (lvl - 1) * 2;\nlet hasHighArt = false;\nif (args.target.system.arts) {\n    for (const art of Object.values(args.target.system.arts)) {\n        if (art.total > threshold) {\n            hasHighArt = true;\n            break;\n        }\n    }\n}\nif (!hasHighArt) {\n    args.flags.forceHit = true;\n    ui.notifications.info(`${args.target.name} 技艺粗浅，此招必中！`);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -581,12 +582,13 @@
                     "name": "养精蓄锐",
                     "type": "stance",
                     "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "sword",
-                    "description": "<p>次要动作，剑养正气，开启架招，获得 10 点护体真气，持续到战斗脱离，同时你进入“善吾”，持续一回合或被击破架招。</p><p>善吾：受到反应动作的招式伤害时，若你具有护体真气，则本次受到的伤害（计算减伤前）减半。</p>",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "automationNote": "护体获取自动化。善吾状态自动化。减伤需手动。",
+                    "description": "<p>剑养正气，开启架招，获得 10 点护体真气，持续到战斗脱离，同时你进入“善吾”，持续一回合或被击破架招。</p><p><strong>善吾：</strong>受到反应动作的招式伤害时，若你具有护体真气，则本次受到的伤害（计算减伤前）减半。</p><p><strong>升级：</strong>护体获取+10，善吾持续+1回合，内力消耗+2。</p>",
+                    "automationNote": "护体获取自动化。善吾状态自动化。减伤逻辑需手动 (目前系统暂无判定攻击来源是否为反应动作的钩子)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -598,24 +600,12 @@
                             6
                         ]
                     },
-                    "effects": [
-                        {
-                            "name": "善吾",
-                            "icon": "icons/svg/shield.svg",
-                            "description": "受到反应动作伤害且有护体时，伤害减半。",
-                            "transfer": false,
-                            "flags": {
-                                "xjzl-system": {
-                                    "stackable": false
-                                }
-                            }
-                        }
-                    ],
                     "scripts": [
                         {
                             "label": "获取护体与状态",
                             "trigger": "attack",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst hutiVal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({amount: hutiVal, type: \"huti\"});\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"善吾\").toObject();\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst hutiVal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({amount: hutiVal, type: \"huti\", showScrolling: true});\n\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"善吾\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
+                            "active": true
                         }
                     ]
                 },
@@ -625,11 +615,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，养气于胸，引剑直刺，造成 0.6 内息点内功伤害，同时给对方添加“迟滞”一回合。</p>",
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "automationNote": "伤害自动化。迟滞效果自动化。",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，养气于胸，引剑直刺，造成 0.6 内息点内功伤害，同时给对方添加“迟滞”一回合。</p><p><strong>升级：</strong>招式伤害+10，迟滞持续+1回合，内力消耗+2。</p>",
+                    "automationNote": "伤害自动化。迟滞效果自动化 (使用系统预设)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -651,7 +641,8 @@
                         {
                             "label": "施加迟滞",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel||1);\n    const rounds = 1 + (lvl - 1);\n    const effect = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\n    effect.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effect);\n}"
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel||1);\n    const rounds = 1 + (lvl - 1);\n    const effect = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\n    effect.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effect);\n    ui.notifications.info(`${args.target.name} 动作迟滞！`);\n}",
+                            "active": true
                         }
                     ]
                 },
@@ -662,11 +653,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "description": "<p>蓄力动作，心存敬意挥剑，锐气含而不发，对目标及其周围 1 米内的目标造成 0.6 内息点内功伤害，招式提升你【最高技艺等级*5】的伤害。</p><p>·若目标的最高技艺等级低于 2，必定受到暴击。</p>",
                     "range": "5米",
                     "targetInfo": "单体+周围1米",
                     "actionCost": "蓄力动作",
-                    "automationNote": "技艺增伤自动化。暴击判定自动化。",
+                    "description": "<p>心存敬意挥剑，锐气含而不发，对目标及其周围 1 米内的目标造成 0.6 内息点内功伤害，招式提升你【最高技艺等级*5】的伤害。</p><p>·若目标的最高技艺等级低于 2，必定受到暴击。</p><p><strong>升级：</strong>招式伤害+20，暴击判定技艺等级阈值+1，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "技艺增伤自动化。暴击判定自动化 (修改 critThresholdMod)。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -691,19 +682,36 @@
                     },
                     "scripts": [
                         {
-                            "label": "技艺加成与暴击",
+                            "label": "技艺加成预览",
                             "trigger": "calc",
-                            "script": "let maxArt = 0;\nif (actor.system.arts) {\n    for (const art of Object.values(actor.system.arts)) {\n        if (art.total > maxArt) maxArt = art.total;\n    }\n}\nconst bonus = maxArt * 5;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`技艺加成: +${bonus}`);"
+                            "script": "let maxArt = 0;\nif (actor.system.arts) {\n    for (const art of Object.values(actor.system.arts)) {\n        if (art.total > maxArt) maxArt = art.total;\n    }\n}\nconst bonus = maxArt * 5;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`技艺加成: +${bonus}`);",
+                            "active": true
                         },
                         {
                             "label": "暴击判定",
                             "trigger": "check",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst threshold = 2 + (lvl - 1);\nlet targetMaxArt = 0;\nif (args.target.system.arts) {\n    for (const art of Object.values(args.target.system.arts)) {\n        if (art.total > targetMaxArt) targetMaxArt = art.total;\n    }\n}\nif (targetMaxArt < threshold) {\n    args.flags.critThresholdMod += 20;\n    ui.notifications.info(`${args.target.name} 技艺不足，必受暴击！`);\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst threshold = 2 + (lvl - 1);\nlet targetMaxArt = 0;\nif (args.target.system.arts) {\n    for (const art of Object.values(args.target.system.arts)) {\n        if (art.total > targetMaxArt) targetMaxArt = art.total;\n    }\n}\nif (targetMaxArt < threshold) {\n    // 降低暴击阈值 20，确保哪怕投出 1 也能暴击 (假设基础阈值是20)\n    args.flags.critThresholdMod += 20;\n    ui.notifications.info(`${args.target.name} 技艺不足，必受暴击！`);\n}",
+                            "active": true
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "善吾",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                "description": "受到反应动作伤害且有护体时，伤害减半。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shanwu",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "虚寂剑法（地）",
