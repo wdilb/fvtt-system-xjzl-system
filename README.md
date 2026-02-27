@@ -369,7 +369,7 @@ await Macros.requestSave({
         *   `amount` (Number): 伤害数值。
         *   `type` (String): 伤害类型。
         *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
-        *   `ignoreBlock`, `ignoreDefense`, `ignoreStance`, `applyCritDamage` (Bool)。
+        *   `ignoreBlock`, `ignoreDefense`, `ignoreStance`, `ignoreMinDamage`(是否允许伤害归零。设为 true 可防止系统强制保底造成 1 点伤害), `applyCritDamage` (Bool)。
 
 #### 🩸 `hit` (单体结算/应用)
 *   **时机**: 对**每一个目标**应用伤害/治疗/Buff 后触发。
