@@ -604,7 +604,7 @@
                     "targetInfo": "周围敌人",
                     "actionCost": "蓄力动作",
                     "description": "<p>探出双掌，连拍四方，对周围敌人造成0.4内息点内功伤害，同时自身回复10点气血。</p><p>·当你处于“阴阳调和”状态时，招式可消耗反应动作释放，并将目标朝你的方向拉扯 1 米。</p>",
-                    "automationNote": "拉扯效果需手动。",
+                    "automationNote": "回血自动。拉扯效果会发送卡片提示手动处理。",
                     "costs": {
                         "mp": [
                             4,
@@ -626,10 +626,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "自身回血",
+                            "label": "自身回血与提示",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n\nif (actor.effects.some(e => e.name === \"阴阳调和\")) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><p><b>推窗望月·阴阳：</b></p><p>可消耗反应动作，将目标朝你拉扯 <b>1米</b>。</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 },
@@ -643,7 +643,7 @@
                     "targetInfo": "周围目标",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制虚招，半蹲转身，掌心外旋，对周围目标造成0.5内息点内功伤害。</p><p>·当你处于“阴阳调和”状态时，还可为其添加“禁实”或“禁虚”（由你选择），持续一回合。</p>",
-                    "automationNote": "阴阳调和时的状态添加需手动选择（或通过宏）。",
+                    "automationNote": "阴阳调和时的状态添加需手动选择。",
                     "costs": {
                         "mp": [
                             4,
@@ -668,7 +668,7 @@
                             "label": "阴阳特效提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && actor.effects.some(e => e.name === \"阴阳调和\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><h3>叶底藏花·阴阳</h3><p>请选择为 ${args.target.name} 添加的状态 (${rounds}回合):</p><p>需手动添加 [禁实] 或 [禁虚]</p></div>`\n    });\n}"
+                            "script": "if (args.isHit && actor.effects.some(e => e.name === \"阴阳调和\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><h3>叶底藏花·阴阳</h3><p>请选择为 ${args.target.name} 添加的状态 (${rounds}回合):</p><p>需手动添加 [禁实] 或 [禁虚]</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 },
@@ -682,7 +682,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>叠掌胸前，开启架招。格挡成功时，若对方运行阳刚内功，获得“太阳”“少阳”；若对方运行阴柔内功，获得“太阴”“少阴”；若对方运行太极内功，获得上述状态中任意两个；“少阳”“少阴”“太阳”“太阴”持续到脱战。</p>",
-                    "automationNote": "半自动化。需手动判断对方内功属性并添加对应状态。",
+                    "automationNote": "半自动化。自动尝试读取攻击者内功属性并添加对应四象状态，无法读取时提示手动。",
                     "costs": {
                         "mp": [
                             2,
@@ -701,7 +701,7 @@
                             "label": "格挡获取四象",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    if (args.attacker) {\n        const neigongId = args.attacker.system.martial.active_neigong;\n        let element = \"none\";\n        if (neigongId) {\n            const ng = args.attacker.items.get(neigongId);\n            if (ng) element = ng.system.element;\n        }\n        \n        let buffs = [];\n        if (element === \"yang\") buffs = [\"太阳\", \"少阳\"];\n        else if (element === \"yin\") buffs = [\"太阴\", \"少阴\"];\n        else if (element === \"taiji\") buffs = [\"太阳\", \"太阴\"]; \n        \n        for (const name of buffs) {\n            const source = thisItem.effects.getName(name);\n            if(source) await game.xjzl.api.effects.addEffect(actor, source.toObject());\n        }\n        if(buffs.length > 0) ui.notifications.info(`气象万千触发：获得 ${buffs.join(\",\")}`);\n        else ui.notifications.warn(\"气象万千：无法识别对方内功属性，请手动添加四象状态\");\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    if (args.attacker) {\n        const neigongId = args.attacker.system.martial?.active_neigong;\n        let element = \"none\";\n        if (neigongId) {\n            const ng = args.attacker.items.get(neigongId);\n            if (ng) element = ng.system.element;\n        }\n        \n        let buffs = [];\n        if (element === \"yang\") buffs = [\"太阳\", \"少阳\"];\n        else if (element === \"yin\") buffs = [\"太阴\", \"少阴\"];\n        else if (element === \"taiji\") buffs = [\"太阳\", \"太阴\"]; \n        \n        for (const name of buffs) {\n            const source = thisItem.effects.getName(name);\n            if(source) await game.xjzl.api.effects.addEffect(actor, source.toObject());\n        }\n        if(buffs.length > 0) ui.notifications.info(`气象万千触发：获得 ${buffs.join(\",\")}`);\n        else ui.notifications.warn(\"气象万千：无法识别对方内功属性，请手动添加四象状态\");\n    }\n}"
                         }
                     ]
                 },
@@ -716,7 +716,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>掌影连绵，阴阳变色，对目标造成0.7内息点内功伤害，并为其添加“封招”一回合。</p><p>·当你处于“阴阳调和”状态时，你出招前，会先给目标添加“禁足”，持续一回合。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "完全自动化。禁足在命中计算前应用（Check阶段），确保利用其闪避归零的效果。封招在命中后应用。",
                     "costs": {
                         "mp": [
                             4,
@@ -742,10 +742,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加状态",
+                            "label": "出招前禁足",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.name === \"阴阳调和\")) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    // 查找禁足 (root/jinzu)\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (root) {\n        root.duration = { rounds: 1 + (lvl - 1) };\n        root.origin = item.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, root);\n        ui.notifications.info(`${args.target.name} 被动静方圆先行禁足！`);\n    }\n}"
+                        },
+                        {
+                            "label": "命中封招",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const fengzhao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fengzhao\"));\n    fengzhao.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, fengzhao);\n    \n    if (actor.effects.some(e => e.name === \"阴阳调和\")) {\n        const lvl = Math.max(1, args.move.computedLevel || 1);\n        const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n        root.duration = { rounds: 1 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.target, root);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const fengzhao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fengzhao\"));\n    if (fengzhao) {\n        fengzhao.duration = { rounds: 1 };\n        fengzhao.origin = item.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, fengzhao);\n    }\n}"
                         }
                     ]
                 }
@@ -761,7 +767,8 @@
                     "xjzl-system": {
                         "slug": "taiyang"
                     }
-                }
+                },
+                "changes": []
             },
             {
                 "name": "少阳",
@@ -772,7 +779,8 @@
                     "xjzl-system": {
                         "slug": "shaoyang"
                     }
-                }
+                },
+                "changes": []
             },
             {
                 "name": "太阴",
@@ -783,7 +791,8 @@
                     "xjzl-system": {
                         "slug": "taiyin"
                     }
-                }
+                },
+                "changes": []
             },
             {
                 "name": "少阴",
@@ -794,7 +803,8 @@
                     "xjzl-system": {
                         "slug": "shaoyin"
                     }
-                }
+                },
+                "changes": []
             },
             {
                 "name": "阴阳调和",
@@ -805,7 +815,8 @@
                     "xjzl-system": {
                         "slug": "yinyang_harmony"
                     }
-                }
+                },
+                "changes": []
             }
         ]
     },
