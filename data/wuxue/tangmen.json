@@ -579,14 +579,14 @@
         }
     },
     {
-        "name": "隐空匕（地）",
+        "name": "隐空匕",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
         "system": {
             "category": "wuxue",
             "sect": "tangmen",
             "tier": 2,
-            "description": "<p>唐门匕首绝技，以巧劲使匕首于手心旋转，来回飞舞，难以防备。</p>",
+            "description": "<p>唐门匕首绝技，以巧劲使匕首于手心旋转，来回飞舞，难以防备。</p><p><strong>需求：</strong>匕首 <strong>属性：</strong>阴</p>",
             "requirements": "匕首",
             "moves": [
                 {
@@ -596,26 +596,16 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "dagger",
-                    "description": "<p>蓄力动作，隐匕虚空，将匕首朝空格处旋转掷出，对直线路径上的敌人造成 0.4 力量点外功伤害，若命中无架招目标，将其击飞 1 米。</p><p>·匕首飞行至空格处后，在你的回合末直线飞回你手中，并对返回直线路径上敌人造成 20 点气血流失，并使无架招目标击飞（返回距离无限制）。</p>",
-                    "actionCost": "蓄力动作",
                     "range": "5米",
                     "targetInfo": "直线/空地",
-                    "automationNote": "手动：击飞。手动：返回伤害。",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，隐匕虚空，将匕首朝空格处旋转掷出，对直线路径上的敌人造成 0.4 力量点外功伤害，若命中无架招目标，将其击飞 1 米。</p><p>·匕首飞行至空格处后，在你的回合末直线飞回你手中，并对返回直线路径上敌人造成 20 点气血流失，并使无架招目标击飞（返回距离无限制）。</p><p><strong>升级：</strong>招式伤害+10，气血流失+10，消耗+4。</p>",
+                    "automationNote": "手动：第一段击飞。手动：回合末返回时的直线伤害与击飞。",
                     "costs": {
                         "mp": [
                             4,
                             8,
                             12
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "calculation": {
@@ -627,8 +617,7 @@
                                 "ratio": 0.4
                             }
                         ]
-                    },
-                    "scripts": []
+                    }
                 },
                 {
                     "name": "旋舞刃",
@@ -637,26 +626,16 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "dagger",
-                    "description": "<p>主要动作，蹲身旋刃，造成 0.4 力量点外功伤害。击破对方架招时，给目标添加“五毒”，持续到战斗脱离。</p><p>五毒：你在每回合末受到 20 点毒素伤害。</p>",
-                    "actionCost": "主要动作",
                     "range": "1米",
                     "targetInfo": "单体",
-                    "automationNote": "完全自动化。",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，蹲身旋刃，造成 0.4 力量点外功伤害。击破对方架招时，给目标添加“五毒”，持续到战斗脱离。</p><p><strong>五毒：</strong>你在每回合末受到 20 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。击破架招后自动从物品中读取[五毒]特效并应用给目标。",
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "calculation": {
@@ -671,9 +650,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "应用五毒",
+                            "label": "击破施毒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.isBroken) {\n    const effectData = {\n        name: \"五毒\",\n        icon: \"icons/svg/acid.svg\",\n        changes: [{ key: \"flags.xjzl-system.regenHpTurnEnd\", mode: 2, value: \"-20\" }],\n        flags: { \"xjzl-system\": { slug: \"wudu\", stackable: false } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 中了五毒`);\n}"
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"五毒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 中了五毒`);\n}"
                         }
                     ]
                 },
@@ -684,26 +664,16 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "dagger",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制目标虚招，上步戳背，飞身翻摔，对目标造成 0.5 力量点外功伤害。</p>",
-                    "actionCost": "反应动作",
                     "range": "2米",
                     "targetInfo": "单体",
-                    "automationNote": "手动：反应动作。",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制目标虚招，上步戳背，飞身翻摔，对目标造成 0.5 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "手动：消耗反应动作。",
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "calculation": {
@@ -715,8 +685,7 @@
                                 "ratio": 0.5
                             }
                         ]
-                    },
-                    "scripts": []
+                    }
                 },
                 {
                     "name": "旷雷刃",
@@ -725,26 +694,16 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "dagger",
-                    "description": "<p>当有目标处于半空中时，消耗反应动作释放此招，瞬身闪击至目标周围空格的半空中，对其造成 0.5 力量点外功伤害。</p><p>·命中无架招目标时，使其禁足一回合。</p>",
-                    "actionCost": "反应动作",
                     "range": "10米",
                     "targetInfo": "单体",
-                    "automationNote": "手动：反应动作。手动：位移。",
+                    "actionCost": "反应动作",
+                    "description": "<p>当有目标处于半空中时，消耗反应动作释放此招，瞬身闪击至目标周围空格的半空中，对其造成 0.5 力量点外功伤害。</p><p>·命中无架招目标时，使其禁足一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "手动：反应动作。手动：位移。自动：检测架招并施加禁足。",
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "calculation": {
@@ -761,22 +720,23 @@
                         {
                             "label": "无架招禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    ui.notifications.info(`${args.target.name} 被禁足`);\n}"
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n    const eff = foundry.utils.deepClone(root);\n    eff.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被禁足`);\n}"
                         }
                     ]
                 },
                 {
                     "name": "翻魂刃",
                     "type": "real",
+                    "isUltimate": true,
                     "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "dagger",
-                    "isUltimate": true,
-                    "description": "<p>主要动作，转身飞踹，刃旋翔击，对目标造成 0.8 力量点外功伤害，同时击飞目标 3 米。</p>",
-                    "actionCost": "主要动作",
                     "range": "2米",
                     "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，转身飞踹，刃旋翔击，对目标造成 0.8 力量点外功伤害，同时击飞目标 3 米。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
                     "automationNote": "手动：击飞。",
                     "costs": {
                         "mp": [
@@ -788,11 +748,6 @@
                             7,
                             6,
                             5
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
                     },
                     "calculation": {
@@ -804,8 +759,30 @@
                                 "ratio": 0.8
                             }
                         ]
+                    }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "五毒",
+                    "icon": "icons/svg/acid.svg",
+                    "description": "每回合末受到 20 点毒素伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wudu",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "五毒伤害",
+                                    "trigger": "turnEnd",
+                                    "active": true,
+                                    "script": "await actor.applyDamage({ amount: 20, type: \"poison\" });"
+                                }
+                            ]
+                        }
                     },
-                    "scripts": []
+                    "changes": []
                 }
             ]
         }
