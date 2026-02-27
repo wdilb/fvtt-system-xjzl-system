@@ -1357,8 +1357,10 @@ export class XJZLActor extends Actor {
     const totalRes = globalRes + specificRes + skillRes;
     // D. 执行减法
     let reducedDamage = calculatedDamage - defenseVal - blockVal - totalRes;
-    reducedDamage = Math.max(1, reducedDamage); // 保底为1
-
+    // 检查是否允许伤害归零 (默认为 false，即保底 1)
+    // 某些情况下我们允许伤害归零
+    const minDamage = data.ignoreMinDamage ? 0 : 1; 
+    reducedDamage = Math.max(minDamage, reducedDamage);
     // =====================================================
     // 6. 受伤前置/护盾脚本 (Trigger: PRE_TAKE)
     // =====================================================
