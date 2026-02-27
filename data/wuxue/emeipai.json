@@ -997,7 +997,7 @@
             "category": "wuxue",
             "sect": "emeipai",
             "tier": 2,
-            "description": "<p>峨眉派绝技，招式繁复，动作多变，防不胜防，又有气功法门，可兼治疗伤势之效。</p>",
+            "description": "<p>峨眉派绝技，招式繁复，动作多变，防不胜防，又有气功法门，可兼治疗伤势之效。</p><p><strong>需求：</strong>匕首-双刺 <strong>属性：</strong>太极</p>",
             "requirements": "匕首-双刺",
             "moves": [
                 {
@@ -1010,8 +1010,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "次要动作",
-                    "description": "<p>运气而出，薄雾升腾，为目标回复【[疗伤]技能等级】点气血，同时使其获得“云霞”，持续三回合。</p><p><strong>云霞</strong>：下次施展招式时，招式伤害+10。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>运气而出，薄雾升腾，为目标回复【[疗伤]技能等级】点气血，同时使其获得“云霞”，持续三回合。</p><p><strong>云霞</strong>：下次施展招式时，招式伤害+10。</p><p><strong>升级：</strong>施展距离+1，气血回复+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。治疗量由脚本计算（技能等级+升级加成）。",
                     "costs": {
                         "mp": [
                             2,
@@ -1027,20 +1027,14 @@
                     },
                     "calculation": {
                         "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "skills.liaoshang",
-                                "ratio": 1
-                            }
-                        ]
+                        "growth": 0
                     },
                     "scripts": [
                         {
-                            "label": "云霞Buff",
+                            "label": "计算治疗与Buff",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const source = thisItem.effects.getName(\"云霞\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "// 1. 计算治疗量\nconst skillVal = actor.system.skills.liaoshang.total;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 10;\nconst totalHeal = skillVal + bonus;\n\n// 执行治疗\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });\n\n// 2. 应用云霞Buff\nconst source = thisItem.effects.getName(\"云霞\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -1053,8 +1047,8 @@
                     "range": "2米",
                     "targetInfo": "周围敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>刺起四方，铿锵雨落，对周围敌人造成0.4内息点内功伤害。</p><p>·招式可以在半空中释放，你凌空跃起，招式伤害+10。</p>",
-                    "automationNote": "半空判断需手动增加修正。",
+                    "description": "<p>刺起四方，铿锵雨落，对周围敌人造成 0.4 内息点内功伤害。</p><p>·招式可以在半空中释放，你凌空跃起，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "半空判断需玩家手动增加修正(在弹窗中输入)。",
                     "costs": {
                         "mp": [
                             4,
@@ -1084,8 +1078,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>分刺于侧，开启架招。每次成功格挡后，额外增加 1 点怒气，且获得一层“离苦”，至多 5 层，持续到战斗脱离。</p><p><strong>离苦</strong>：每有一层招式伤害+5，每次出招后消耗一层“离苦”。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>分刺于侧，开启架招。每次成功格挡后，额外增加 1 点怒气，且获得一层“离苦”，至多 5 层，持续到战斗脱离。</p><p><strong>离苦</strong>：每有一层招式伤害+5，每次出招后消耗一层“离苦”。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。格挡成功自动回怒并叠层。出招消耗逻辑位于[离苦]状态中。",
                     "costs": {
                         "mp": [
                             2,
@@ -1101,16 +1095,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡触发离苦",
+                            "label": "格挡触发",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value + 1});\n    const source = thisItem.effects.getName(\"离苦\");\n    if (source) {\n        await game.xjzl.api.effects.addEffect(actor, source.toObject());\n    }\n}"
-                        },
-                        {
-                            "label": "出招消耗离苦",
-                            "trigger": "hit_once",
-                            "active": true,
-                            "script": "if (args.move.type !== \"stance\") {\n    await game.xjzl.api.effects.removeEffect(actor, \"liku\", 1);\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    // 额外增加1点怒气 (系统默认受击/格挡可能会回怒，这里是额外的)\n    const currentRage = actor.system.resources.rage.value;\n    const maxRage = actor.system.resources.rage.max;\n    if (currentRage < maxRage) {\n        await actor.update({\"system.resources.rage.value\": currentRage + 1});\n        actor.showFloatyText(\"怒气 +1\", {fill: \"#0000FF\"});\n    }\n    \n    // 获得离苦\n    const source = thisItem.effects.getName(\"离苦\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
                         }
                     ]
                 },
@@ -1124,8 +1112,8 @@
                     "range": "2米",
                     "targetInfo": "周围敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>旋身挥刺连舞，发出阴阳二劲，对周围敌人造成0.5内息点内功伤害，为周围友方回复【[疗伤]技能等级*2】点气血；</p><p>·此招可移动释放，对移动路径上周围 2 米范围内的敌人造成伤害，为友方回复气血。（不会重复造成伤害或回复气血）</p>",
-                    "automationNote": "移动路径需手动。",
+                    "description": "<p>旋身挥刺连舞，发出阴阳二劲，对周围敌人造成 0.5 内息点内功伤害，为周围友方回复【[疗伤]技能等级*2】点气血；</p><p>·此招可移动释放，对移动路径上周围 2 米范围内的敌人造成伤害，为友方回复气血。（不会重复造成伤害或回复气血）</p><p><strong>升级：</strong>招式伤害+20，气血回复+10，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "完全自动化。自动识别敌友（基于Disposition）。友方免伤并治疗，敌方正常造成伤害。移动路径需手动处理。",
                     "costs": {
                         "mp": [
                             8,
@@ -1151,56 +1139,70 @@
                     },
                     "scripts": [
                         {
-                            "label": "范围治疗",
+                            "label": "友方免伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 获取敌我态度 (1: 友善, 0: 中立, -1: 敌对)\nconst getDisp = (a) => {\n    if (a.token) return a.token.disposition;\n    if (a.prototypeToken) return a.prototypeToken.disposition;\n    return 0;\n};\n\nconst actorDisp = getDisp(actor);\nconst targetDisp = getDisp(args.target);\n\n// 判定逻辑: 相同 disposition 视为友方 \nif (actorDisp === targetDisp) {\n    args.config.amount = 0; // 伤害置零\n    args.config.ignoreBlock = true; // 不跳格挡字样\n    args.config.ignoreDefense = true;\n}"
+                        },
+                        {
+                            "label": "友方治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.target.disposition === actor.disposition) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const bonus = 10 + (lvl - 1) * 10;\n    const heal = (actor.system.skills.liaoshang.total * 2) + bonus;\n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
+                            "script": "const getDisp = (a) => {\n    if (a.token) return a.token.disposition;\n    if (a.prototypeToken) return a.prototypeToken.disposition;\n    return 0;\n};\n\nconst actorDisp = getDisp(actor);\nconst targetDisp = getDisp(args.target);\n\nif (actorDisp === targetDisp) {\n    // 计算治疗量: (疗伤*2) + (等级-1)*10\n    const skillVal = actor.system.skills.liaoshang.total;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const bonus = (lvl - 1) * 10;\n    const heal = (skillVal * 2) + bonus;\n    \n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "云霞",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "下次施展招式时，招式伤害+10",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yunxia",
+                            "maxStacks": 1
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
+                },
+                {
+                    "name": "离苦",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "每有一层招式伤害+5，每次出招后消耗一层",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "liku",
+                            "stackable": true,
+                            "maxStacks": 5,
+                            "scripts": [
+                                {
+                                    "label": "出招消耗",
+                                    "trigger": "hit_once",
+                                    "active": true,
+                                    "script": "// 每次出招后(HIT_ONCE)消耗一层，排除架招本身\nif (args.move.type !== \"stance\") {\n    await game.xjzl.api.effects.removeEffect(actor, \"liku\", 1);\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "5"
                         }
                     ]
                 }
             ]
-        },
-        "effects": [
-            {
-                "name": "云霞",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
-                "description": "下次施展招式时，招式伤害+10",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "yunxia",
-                        "maxStacks": 1
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": 10
-                    }
-                ]
-            },
-            {
-                "name": "离苦",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
-                "description": "每有一层招式伤害+5，每次出招后消耗一层",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "liku",
-                        "stackable": true,
-                        "maxStacks": 5
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": 5
-                    }
-                ]
-            }
-        ]
+        }
     },
     {
         "name": "玉女剑法",
