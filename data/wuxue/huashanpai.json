@@ -1416,14 +1416,14 @@
         }
     },
     {
-        "name": "独孤剑诀（天级残招）",
+        "name": "独孤剑诀",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/华山.png",
         "system": {
             "category": "wuxue",
             "sect": "huashanpai",
             "tier": 3,
-            "description": "<p>独孤剑诀壁画刻划于华山落雁峰的石洞内，因年久风化，被发现时，字迹难辨。目前仅破译出三招。（失传：破索诀、破掌诀、破刀诀、破箭诀、破刺诀、破枪诀）</p>",
+            "description": "<p>独孤剑诀壁画刻划于华山落雁峰的石洞内，因年久风化，被发现时，字迹难辨。目前仅破译出三招。（失传：破索诀、破掌诀、破刀诀、破箭诀、破刺诀、破枪诀）</p><p><strong>需求：</strong>剑-单剑 <strong>属性：</strong>太极</p>",
             "requirements": "剑-单剑",
             "moves": [
                 {
@@ -1433,11 +1433,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，亟急破攻，空灵飘逸，对目标造成 0.6 力量+0.5 内息点外功伤害。</p><p>同时使目标陷入“破绽”状态，持续一回合。</p><p>破绽：你的所有对抗检定具有劣势；每次出招前流失 20 点气血，且该状态持续时间再增加一回合。</p>",
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。破绽状态自动化（AE）。",
+                    "description": "<p>亟急破攻，空灵飘逸，对目标造成 0.6 力量+0.5 内息点外功伤害。</p><p>同时使目标陷入“破绽”状态，持续一回合。</p><p><strong>破绽：</strong>你的所有对抗检定具有劣势；每次出招前流失 20 点气血，且该状态持续时间再增加一回合。</p><p><strong>升级：</strong>伤害+20，持续回合数+1，怒气消耗-1。</p>",
+                    "automationNote": "伤害自动。施加破绽自动。破绽出招流失气血及自我延长自动（脚本）。破绽的对抗劣势需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1462,10 +1462,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "添加破绽",
+                            "label": "施加破绽",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"破绽\").toObject();\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"破绽\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ]
                 },
@@ -1475,11 +1475,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>蓄力动作，啸剑聚芒，斩舞翻飞，对周围敌人造成 0.4 力量+0.3 内息点外功伤害，并击退无架招的敌人 1 米。</p><p>当范围内有敌人施展剑法攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p>",
                     "range": "3米",
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
-                    "automationNote": "伤害自动化。击退手动。武学对抗自动。",
+                    "description": "<p>（可用反应动作释放）啸剑聚芒，斩舞翻飞，对周围敌人造成 0.4 力量+0.3 内息点外功伤害，并击退无架招的敌人 1 米。</p><p>当范围内有敌人施展剑法攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p><p><strong>升级：</strong>招式伤害+10，破剑诀检定对抗+1。</p>",
+                    "automationNote": "主动释放伤害自动。反应对抗请求在出招(Attack)阶段触发，需选中目标。若未选中目标，发送提示卡片。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1504,10 +1504,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
-                            "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"破剑诀 - 武学对抗\",\n    outcome: {\n        win: { text: \"压制成功！请手动造成伤害。\" },\n        lose: { text: \"压制失败。\" }\n    }\n});",
-                            "active": true
+                            "label": "反应对抗请求",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 尝试获取当前选中的目标\nconst target = game.user.targets.first()?.actor;\n\n// 计算对抗加值 (等级-1)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\n\n// 检查是否有破箭强化\nlet winText = \"压制成功！请手动点击卡片上的【应用伤害】。\";\nconst poJian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojian\");\nif (poJian) winText += \"<br><b>破箭强化：</b>可选 击飞5米 / 击退5米 / 击倒并禁足。\";\n\nif (target) {\n    if (bonus > 0) ui.notifications.info(`破剑诀等级加值: +${bonus} (请在对抗弹窗中手动调整)`);\n    await Macros.requestContest({\n        attacker: actor,\n        defender: target,\n        type: \"wuxue\",\n        defType: \"wuxue\",\n        label: \"破剑诀 - 招式对抗\",\n        outcome: {\n            win: { text: winText },\n            lose: { text: \"对抗失败，压制无效。请勿应用伤害。\" }\n        }\n    });\n} else {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-exclamation-circle\"></i> 未选中目标，无法自动发起对抗。</p><hr><p>请手动进行 <b>武学内功</b> 对抗。</p><p>你的加值: <b>+${bonus}</b></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1517,11 +1517,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，血溅封喉，剑意大盛，对目标造成 0.4 力量+0.3 内息点外功伤害。</p><p>击破对方架招时，选择目标身上的三个状态移除，同时移除自身任意数量的状态。</p><p>命中无架招目标时，选择目标身上的一个状态将其移除。</p>",
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。状态移除提示。",
+                    "description": "<p>血溅封喉，剑意大盛，对目标造成 0.4 力量+0.3 内息点外功伤害。</p><p>击破对方架招时，选择目标身上的三个状态移除，同时移除自身任意数量的状态。</p><p>命中无架招目标时，选择目标身上的一个状态将其移除。</p><p><strong>升级：</strong>招式伤害+10，虚招检定对抗+1。</p>",
+                    "automationNote": "伤害自动。虚招值随等级自动成长。状态移除需手动操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1546,10 +1546,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "移除提示",
+                            "label": "虚招值修正",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "// 升级：虚招检定对抗+1 (即虚招值+1)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nargs.output.feint += bonus;\nargs.output.bonusDesc.push(`破气诀加成 +${bonus}（虚招值）`);"
+                        },
+                        {
+                            "label": "状态移除提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"【破气诀】击破架招：请手动移除目标 3 个状态，及自身任意状态。\");\n} else if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(\"【破气诀】命中：请手动移除目标 1 个状态。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:darkred; font-weight:bold;\">击破架招！</p><p>请手动：<br>1. 移除目标 <b>3个</b> 状态<br>2. 移除自身 <b>任意</b> 状态</p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n} else if (args.isHit && !args.target.system.martial.stanceActive) {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:darkblue; font-weight:bold;\">命中无架招目标</p><p>请手动移除目标 <b>1个</b> 状态。</p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1559,11 +1565,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，飞身流萤，剑点江山，纷飞剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人使用奇门-鞭钩攻击时，你可以在他投掷命中前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p>",
                     "range": "15米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。武学对抗自动。",
+                    "description": "<p>（可用反应动作释放）飞身流萤，剑点江山，纷飞剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人使用奇门-鞭钩攻击时，你可以在他投掷命中前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p><p><strong>升级：</strong>招式伤害+10，破索诀检定对抗+1。</p>",
+                    "automationNote": "反应对抗需选中目标。若未选中则发卡片提示手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1588,10 +1594,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
-                            "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"破索诀 - 武学对抗\",\n    outcome: {\n        win: { text: \"压制成功！请手动造成伤害。\" },\n        lose: { text: \"压制失败。\" }\n    }\n});",
-                            "active": true
+                            "label": "反应对抗请求",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nlet winText = \"压制成功！请手动点击卡片上的【应用伤害】。\";\nconst poJian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojian\");\nif (poJian) winText += \"<br><b>破箭强化：</b>可选 击飞5米 / 击退5米 / 击倒并禁足。\";\n\nif (target) {\n    if (bonus > 0) ui.notifications.info(`破索诀等级加值: +${bonus}`);\n    await Macros.requestContest({\n        attacker: actor,\n        defender: target,\n        type: \"wuxue\",\n        defType: \"wuxue\",\n        label: \"破索诀 - 招式对抗\",\n        outcome: {\n            win: { text: winText },\n            lose: { text: \"对抗失败，压制无效。请勿应用伤害。\" }\n        }\n    });\n} else {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-exclamation-circle\"></i> 未选中目标。</p><hr><p>请手动进行 <b>武学内功</b> 对抗。</p><p>你的加值: <b>+${bonus}</b></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1601,11 +1607,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>蓄力动作，悬锋倒刺，落掌崩摧，对周围敌人造成 0.4 力量+0.3 内息点外功伤害，并击倒无架招的敌人。</p><p>当范围内有敌人施展徒手武学攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p>",
                     "range": "3米",
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
-                    "automationNote": "伤害自动化。击倒手动。武学对抗自动。",
+                    "description": "<p>（可用反应动作释放）悬锋倒刺，落掌崩摧，对周围敌人造成 0.4 力量+0.3 内息点外功伤害，并击倒无架招的敌人。</p><p>当范围内有敌人施展徒手武学攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p><p><strong>升级：</strong>招式伤害+10，破掌诀检定对抗+1。</p>",
+                    "automationNote": "反应对抗需选中目标。若未选中则发卡片提示手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1630,10 +1636,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
-                            "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"破掌诀 - 武学对抗\",\n    outcome: {\n        win: { text: \"压制成功！请手动造成伤害。\" },\n        lose: { text: \"压制失败。\" }\n    }\n});",
-                            "active": true
+                            "label": "反应对抗请求",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nlet winText = \"压制成功！请手动点击卡片上的【应用伤害】。\";\nconst poJian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojian\");\nif (poJian) winText += \"<br><b>破箭强化：</b>可选 击飞5米 / 击退5米 / 击倒并禁足。\";\n\nif (target) {\n    if (bonus > 0) ui.notifications.info(`破掌诀等级加值: +${bonus}`);\n    await Macros.requestContest({\n        attacker: actor,\n        defender: target,\n        type: \"wuxue\",\n        defType: \"wuxue\",\n        label: \"破掌诀 - 招式对抗\",\n        outcome: {\n            win: { text: winText },\n            lose: { text: \"对抗失败，压制无效。请勿应用伤害。\" }\n        }\n    });\n} else {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-exclamation-circle\"></i> 未选中目标。</p><hr><p>请手动进行 <b>武学内功</b> 对抗。</p><p>你的加值: <b>+${bonus}</b></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1643,11 +1649,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，封刀入鞘，弱剑劲风，剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人施展刀法攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p>",
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。武学对抗自动。",
+                    "description": "<p>（可用反应动作释放）封刀入鞘，弱剑劲风，剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人施展刀法攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p><p><strong>升级：</strong>招式伤害+10，破刀诀检定对抗+1。</p>",
+                    "automationNote": "反应对抗需选中目标。若未选中则发卡片提示手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1672,10 +1678,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
-                            "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"破刀诀 - 武学对抗\",\n    outcome: {\n        win: { text: \"压制成功！请手动造成伤害。\" },\n        lose: { text: \"压制失败。\" }\n    }\n});",
-                            "active": true
+                            "label": "反应对抗请求",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nlet winText = \"压制成功！请手动点击卡片上的【应用伤害】。\";\nconst poJian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojian\");\nif (poJian) winText += \"<br><b>破箭强化：</b>可选 击飞5米 / 击退5米 / 击倒并禁足。\";\n\nif (target) {\n    if (bonus > 0) ui.notifications.info(`破刀诀等级加值: +${bonus}`);\n    await Macros.requestContest({\n        attacker: actor,\n        defender: target,\n        type: \"wuxue\",\n        defType: \"wuxue\",\n        label: \"破刀诀 - 招式对抗\",\n        outcome: {\n            win: { text: winText },\n            lose: { text: \"对抗失败，压制无效。请勿应用伤害。\" }\n        }\n    });\n} else {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-exclamation-circle\"></i> 未选中目标。</p><hr><p>请手动进行 <b>武学内功</b> 对抗。</p><p>你的加值: <b>+${bonus}</b></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1685,11 +1691,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，荡剑萍空，突兀变戈，剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人施展棍法攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p>",
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。武学对抗自动。",
+                    "description": "<p>（可用反应动作释放）荡剑萍空，突兀变戈，剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人施展棍法攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p><p><strong>升级：</strong>招式伤害+10，破枪诀检定对抗+1。</p>",
+                    "automationNote": "反应对抗需选中目标。若未选中则发卡片提示手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1714,10 +1720,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
-                            "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"破枪诀 - 武学对抗\",\n    outcome: {\n        win: { text: \"压制成功！请手动造成伤害。\" },\n        lose: { text: \"压制失败。\" }\n    }\n});",
-                            "active": true
+                            "label": "反应对抗请求",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nlet winText = \"压制成功！请手动点击卡片上的【应用伤害】。\";\nconst poJian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojian\");\nif (poJian) winText += \"<br><b>破箭强化：</b>可选 击飞5米 / 击退5米 / 击倒并禁足。\";\n\nif (target) {\n    if (bonus > 0) ui.notifications.info(`破枪诀等级加值: +${bonus}`);\n    await Macros.requestContest({\n        attacker: actor,\n        defender: target,\n        type: \"wuxue\",\n        defType: \"wuxue\",\n        label: \"破枪诀 - 招式对抗\",\n        outcome: {\n            win: { text: winText },\n            lose: { text: \"对抗失败，压制无效。请勿应用伤害。\" }\n        }\n    });\n} else {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-exclamation-circle\"></i> 未选中目标。</p><hr><p>请手动进行 <b>武学内功</b> 对抗。</p><p>你的加值: <b>+${bonus}</b></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1728,14 +1734,14 @@
                     "element": "taiji",
                     "damageType": "none",
                     "weaponType": "sword",
-                    "description": "<p>次要动作，不变应万变。为自身添加“破箭”状态，持续一回合。</p><p>破箭：你免疫暗器武学添加的状态，暗器武学对你造成的伤害减少 40 点。</p><p>·每当你在破箭状态下，消耗反应动作施展破剑、刀、掌、枪、索、鞭诀并成功压制对手出招时，可以选择一项效果强化这一招：</p><p>1.击飞对手 5 米。</p><p>2.击退对手 5 米。</p><p>3.击倒并禁足目标一回合。</p><p>修炼至合一后，“破箭”额外持续一个回合。</p>",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "automationNote": "破箭状态自动化（AE）。减伤需手动。强化效果手动。",
+                    "description": "<p>不变应万变。为自身添加“破箭”状态，持续一回合。</p><p><strong>破箭：</strong>你免疫暗器武学添加的状态，暗器武学对你造成的伤害减少 40 点。</p><p>·每当你在破箭状态下，消耗反应动作施展破剑、刀、掌、枪、索、鞭诀并成功压制对手出招时，可以选择一项效果强化这一招：</p><p>1.击飞对手 5 米。</p><p>2.击退对手 5 米。</p><p>3.击倒并禁足目标一回合。</p><p><strong>升级：</strong>暗器对你造成的伤害再减少 20 点。</p><p>修炼至合一后，“破箭”额外持续一个回合。</p>",
+                    "automationNote": "添加状态自动。状态持续时间自动（合一+1回合）。暗器减伤自动（数值随等级成长）。免疫暗器状态需手动。压制强化效果在各破X诀的对抗获胜信息中提示。",
                     "calculation": {
-                        "base": 40,
-                        "growth": 20
+                        "base": 0,
+                        "growth": 0
                     },
                     "costs": {
                         "mp": [
@@ -1749,8 +1755,8 @@
                         {
                             "label": "添加破箭",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst rounds = lvl >= 4 ? 2 : 1;\nconst effectData = thisItem.effects.getName(\"破箭\").toObject();\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = lvl >= 4 ? 2 : 1;\nconst effectData = thisItem.effects.getName(\"破箭\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\n// 写入动态减伤值: 40 + (lvl-1)*20\nconst reduction = 40 + (lvl - 1) * 20;\neffectData.changes[0].value = String(-reduction);\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
                         }
                     ]
                 },
@@ -1760,11 +1766,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "description": "<p>主要动作，浣剑浮香，沧波极逸，剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人使用奇门-鞭钩攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p>",
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。武学对抗自动。",
+                    "description": "<p>（可用反应动作释放）浣剑浮香，沧波极逸，剑气对目标造成 0.5 力量+0.3 内息点外功伤害。</p><p>当范围内有敌人使用匕首攻击时，你可以在他投掷命中之前，使用反应动作施展此招，与对方进行一个[武学内功]的对抗。如果你获胜，则压制对方招式，同时对其造成伤害；失败则无效。</p><p><strong>升级：</strong>招式伤害+10，破鞭诀检定对抗+1。</p>",
+                    "automationNote": "反应对抗需选中目标。若未选中则发卡片提示手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1789,51 +1795,56 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
-                            "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    defType: \"wuxue\",\n    label: \"破鞭诀 - 武学对抗\",\n    outcome: {\n        win: { text: \"压制成功！请手动造成伤害。\" },\n        lose: { text: \"压制失败。\" }\n    }\n});",
-                            "active": true
+                            "label": "反应对抗请求",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const target = game.user.targets.first()?.actor;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nlet winText = \"压制成功！请手动点击卡片上的【应用伤害】。\";\nconst poJian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojian\");\nif (poJian) winText += \"<br><b>破箭强化：</b>可选 击飞5米 / 击退5米 / 击倒并禁足。\";\n\nif (target) {\n    if (bonus > 0) ui.notifications.info(`破鞭诀等级加值: +${bonus}`);\n    await Macros.requestContest({\n        attacker: actor,\n        defender: target,\n        type: \"wuxue\",\n        defType: \"wuxue\",\n        label: \"破鞭诀 - 招式对抗\",\n        outcome: {\n            win: { text: winText },\n            lose: { text: \"对抗失败，压制无效。请勿应用伤害。\" }\n        }\n    });\n} else {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-exclamation-circle\"></i> 未选中目标。</p><hr><p>请手动进行 <b>武学内功</b> 对抗。</p><p>你的加值: <b>+${bonus}</b></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "破绽",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                    "description": "所有对抗检定劣势(需手动)；每次出招前流失20气血。出招时状态持续时间延长。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "pozhan",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "出招流失与延长",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "await actor.applyHealing({ amount: -20, type: \"hp\", showScrolling: true });\nthisEffect.update({ \"duration.rounds\": thisEffect.duration.rounds + 1 });\nui.notifications.info(`${actor.name} 破绽流失气血，且破绽持续时间延长。`);"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "破箭",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                    "description": "免疫暗器状态(需手动)，暗器伤害减少。成功压制后强化反击。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "pojian",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.weaponTypes.hidden.mod",
+                            "mode": 2,
+                            "value": "-40"
                         }
                     ]
                 }
             ]
-        },
-        "effects": [
-            {
-                "name": "破绽",
-                "icon": "icons/svg/downgrade.svg",
-                "description": "所有对抗检定劣势；每次出招前流失20气血。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "stackable": false
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpAttack",
-                        "mode": 2,
-                        "value": "-20"
-                    },
-                    {
-                        "key": "flags.xjzl-system.globalCheckLevel",
-                        "mode": 2,
-                        "value": "-1"
-                    }
-                ]
-            },
-            {
-                "name": "破箭",
-                "icon": "icons/svg/shield.svg",
-                "description": "免疫暗器状态，暗器伤害减少。成功压制后强化反击。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "stackable": false
-                    }
-                }
-            }
-        ]
+        }
     },
     {
         "name": "拭剑听风（人级散手）",
