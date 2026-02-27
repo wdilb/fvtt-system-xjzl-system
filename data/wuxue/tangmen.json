@@ -788,27 +788,48 @@
         }
     },
     {
-        "name": "离魂镖（地）",
+        "name": "离魂镖",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+        "effects": [
+            {
+                "name": "神魂颠倒",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                "description": "施展《离魂镖》套路时，招式额外造成内息+固定数值的毒素伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shenhundao",
+                        "scripts": [
+                            {
+                                "label": "离魂镖加伤",
+                                "trigger": "hit",
+                                "active": true,
+                                "script": "// 1. 筛选条件：必须是离魂镖套路，且必须命中\nif (!item || !item.name.includes(\"离魂镖\")) return;\nif (!args.isHit) return;\n\n// 2. 读取施法时存入的固定伤害加成 (由绝招等级决定)\nconst flatBonus = thisEffect.getFlag(\"xjzl-system\", \"flatBonus\") || 0;\n\n// 3. 计算伤害: 0.4 内息 + 固定加成\nconst neixi = actor.system.stats.neixi.total;\nconst dmg = Math.floor(neixi * 0.4) + flatBonus;\n\nif (dmg > 0) {\n    // 4. 应用毒素伤害 (无视防御)\n    await args.target.applyDamage({\n        amount: dmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    // 5. 发送卡片 (带边距样式)\n    const cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #800080; background: rgba(128, 0, 128, 0.1); margin-left: 2px;\">\n                <div style=\"font-weight:bold; color:#800080; font-size:1.1em;\">\n                    <i class=\"fas fa-skull-crossbones\"></i> 神魂颠倒\n                </div>\n                <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                    经脉逆行，毒气攻心！<br>\n                    附加毒伤: <span style=\"font-weight:bold; color:purple;\">${dmg}</span>\n                </div>\n            </div>\n        </div>`;\n    \n    ChatMessage.create({\n        content: cardContent,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ],
         "system": {
             "category": "wuxue",
             "sect": "tangmen",
             "tier": 2,
-            "description": "<p>唐门暗器绝技，以飞镖淬毒击敌，中者浑浑噩噩，脚步紊乱，死于不明不白。</p>",
+            "description": "<p>唐门暗器绝技，以飞镖淬毒击敌，中者浑浑噩噩，脚步紊乱，死于不明不白。</p><p><strong>需求：</strong>暗器-飞镖 <strong>属性：</strong>阴</p>",
             "requirements": "暗器-飞镖",
             "moves": [
                 {
                     "name": "星魂赶月",
                     "type": "real",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "description": "<p>主要动作，眼疾手快，飞速一镖，对目标造成 0.5 身法点外功伤害。</p><p>消耗：飞镖*1</p>",
-                    "actionCost": "主要动作",
                     "range": "15米",
                     "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>眼疾手快，飞速一镖，对目标造成 0.5 身法点外功伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
                     "automationNote": "完全自动化。",
                     "costs": {
                         "mp": [
@@ -816,16 +837,8 @@
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -836,78 +849,60 @@
                                 "ratio": 0.5
                             }
                         ]
-                    },
-                    "scripts": []
+                    }
                 },
                 {
                     "name": "离魂去魄",
                     "type": "stance",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "element": "yin",
+                    "damageType": "waigong",
                     "weaponType": "hidden",
-                    "description": "<p>次要动作，反手握镖，开启架招。当你每次成功格挡后，获得“游魂”，持续三回合或被击破架招。</p><p>游魂：速度+3，免疫下盘不稳。</p>",
-                    "actionCost": "次要动作",
                     "range": "自身",
                     "targetInfo": "自身",
-                    "automationNote": "完全自动化。",
+                    "actionCost": "次要动作",
+                    "description": "<p>反手握镖，开启架招。当你每次成功格挡后，获得“游魂”，持续三回合或被击破架招。</p><p><strong>游魂：</strong>速度+3，免疫下盘不稳。</p><p><strong>升级：</strong>格挡值+10，游魂速度+1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。格挡成功后自动获得Buff。Buff含速度加成。免疫下盘不稳需手动处理。",
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
-                        "growth": 10,
-                        "scalings": []
+                        "growth": 10
                     },
                     "scripts": [
                         {
                             "label": "获得游魂",
                             "trigger": "damaged",
-                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (Macros.checkStance(actor, args)) {\n    const lvl = lvl || 1;\n    const speedBonus = 3 + (lvl - 1);\n    const effectData = {\n        name: \"游魂\",\n        icon: \"icons/svg/spirit.svg\",\n        duration: { rounds: 3 },\n        changes: [{ key: \"system.combat.speed\", mode: 2, value: speedBonus }],\n        scripts: [{\n            label: \"免疫不稳\",\n            trigger: \"turnStart\",\n            script: \"await game.xjzl.api.effects.removeEffect(actor, 'unstable', 99);\"\n        }]\n    };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "active": true,
+                            "script": "// 1. 校验架招触发条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 2. 获取架招等级 (从 Item 数据中查找当前招式)\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\n\n// 3. 计算速度加成 (基础3 + 升级成长)\n// 升级描述: 游魂速度+1。 Level 1 -> +3, Level 2 -> +4\nconst speedBonus = 3 + (lvl - 1);\n\n// 4. 构建特效数据\nconst effectData = {\n    name: \"游魂\",\n    icon: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n    duration: { rounds: 3 },\n    flags: {\n        \"xjzl-system\": {\n            slug: \"youhun\",\n            stackable: false\n        }\n    },\n    changes: [\n        // 速度加成\n        { key: \"system.combat.speed\", mode: 2, value: speedBonus }\n    ]\n};\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
                         }
                     ]
                 },
                 {
                     "name": "亡魂丧魄",
                     "type": "feint",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "description": "<p>主要动作，巧劲一镖，对目标造成 0.4 身法点外功伤害，击破对方架招时，给目标添加“错乱”，持续一回合。</p><p>错乱：自己的每个回合末，朝 D4 随机方向不消耗速度走出一步，然后倒地。</p><p>消耗：飞镖*1</p>",
-                    "actionCost": "主要动作",
                     "range": "10米",
                     "targetInfo": "单体",
-                    "automationNote": "手动：错乱随机移动。",
+                    "actionCost": "主要动作",
+                    "description": "<p>巧劲一镖，对目标造成 0.4 身法点外功伤害，击破对方架招时，给目标添加“错乱”，持续一回合。</p><p><strong>错乱：</strong>自己的每个回合末，朝 D4 随机方向不消耗速度走出一步，然后倒地。</p><p><strong>升级：</strong>招式伤害+10，错乱持续回合数+1，内力消耗+2。</p>",
+                    "automationNote": "击破架招自动施加错乱状态。错乱的具体随机移动效果需手动执行。",
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -921,26 +916,26 @@
                     },
                     "scripts": [
                         {
-                            "label": "应用错乱",
+                            "label": "施加错乱",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.isBroken) {\n    const lvl = args.move.computedLevel || 1;\n    const rounds = 1 + (lvl - 1);\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuoluan\", duration: { rounds: rounds } });\n    ui.notifications.info(`${args.target.name} 陷入错乱`);\n}"
+                            "active": true,
+                            "script": "if (args.isHit && args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    \n    // 使用系统预设 ID \"cuoluan\"\n    const effectData = {\n        id: \"cuoluan\",\n        icon: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n        duration: { rounds: rounds }\n    };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 陷入错乱！`);\n}"
                         }
                     ]
                 },
                 {
                     "name": "神魂颠倒",
                     "type": "qi",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "isUltimate": true,
                     "element": "yin",
                     "damageType": "none",
                     "actionType": "buff",
                     "weaponType": "hidden",
-                    "isUltimate": true,
-                    "description": "<p>次要动作，阴劲勃发，侵染自身获得“神魂颠倒”，持续一回合。</p><p>神魂颠倒：施展《离魂镖》套路时，招式额外造成 0.4 内息点毒素伤害。</p>",
-                    "actionCost": "次要动作",
                     "range": "自身",
                     "targetInfo": "自身",
-                    "automationNote": "完全自动化。",
+                    "actionCost": "次要动作",
+                    "description": "<p>阴劲勃发，侵染自身获得“神魂颠倒”，持续一回合。</p><p><strong>神魂颠倒：</strong>施展《离魂镖》套路时，招式额外造成 0.4 内息点毒素伤害。</p><p><strong>升级：</strong>额外造成 20 毒素伤害，持续回合数+1，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。施展时根据当前等级计算额外伤害并存入Buff。攻击命中时触发Buff逻辑。",
                     "costs": {
                         "mp": [
                             4,
@@ -952,40 +947,18 @@
                             4,
                             3
                         ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
-                        "growth": 0,
-                        "scalings": []
+                        "growth": 0
                     },
-                    "effects": [
-                        {
-                            "name": "神魂颠倒",
-                            "icon": "icons/svg/daze.svg",
-                            "flags": {
-                                "xjzl-system": {
-                                    "slug": "shenhundao",
-                                    "scripts": [
-                                        {
-                                            "label": "离魂镖加伤",
-                                            "trigger": "hit",
-                                            "script": "if (item && item.name.includes('离魂镖') && args.isHit) { const lvl = thisItem.system.moves.find(m => m.name === '神魂颠倒')?.computedLevel || 1; const extraDmg = 20 * (lvl - 1); const dmg = Math.floor(actor.system.stats.neixi.total * 0.4) + extraDmg; await args.target.applyDamage({ amount: dmg, type: 'poison', attacker: actor, isHit: true }); ui.notifications.info('神魂颠倒附加毒素伤害'); }"
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    ],
                     "scripts": [
                         {
                             "label": "应用Buff",
                             "trigger": "attack",
-                            "script": "const lvl = args.move.computedLevel || 1;\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"神魂颠倒\").toObject();\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\nargs.flags.autoApplied = true;"
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n// 计算升级带来的额外固定伤害: (Level - 1) * 20\nconst extraFlatDmg = (lvl - 1) * 20;\n\n// 获取模板\nconst effectData = thisItem.effects.getName(\"神魂颠倒\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\n\n// 将计算好的固定伤害存入 Flag，供特效脚本读取\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.flatBonus\", extraFlatDmg);\n\n// 应用\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\n\n// 标记自动应用，隐藏卡片按钮\nargs.flags.autoApplied = true;"
                         }
                     ]
                 }
