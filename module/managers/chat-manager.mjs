@@ -1251,7 +1251,8 @@ export class ChatCardManager {
                 ignoreDefense: ignoreDefense,   // 无视防御
                 ignoreStance: ignoreStance,     // 无视架招
                 applyCritDamage: flags.canCrit,  // 是否应用暴击倍率
-                element: moveElement
+                element: moveElement,
+                ignoreMinDamage: false          // 默认为 false (保底1点伤害)
             };
 
             // 2. 只有命中了才跑这个脚本 (未命中不需要改伤害类型)
@@ -1291,6 +1292,7 @@ export class ChatCardManager {
                 ignoreBlock: damageConfig.ignoreBlock,    //无视格挡
                 ignoreDefense: damageConfig.ignoreDefense, //无视内外功防御
                 ignoreStance: damageConfig.ignoreStance,  //无视架招
+                ignoreMinDamage: damageConfig.ignoreMinDamage, //是否无视保底伤害
                 isSkill: isSkillDamage,
                 element: damageConfig.element,
                 move: move,
@@ -1637,7 +1639,8 @@ export class ChatCardManager {
                 ignoreBlock: config.ignoreBlock,
                 ignoreDefense: config.ignoreDefense,
                 ignoreStance: config.ignoreStance,
-                applyCritDamage: config.applyCritDamage
+                applyCritDamage: config.applyCritDamage,
+                ignoreMinDamage: false  // 默认为 false (保底1点伤害)
             };
 
             // 执行 PRE_DAMAGE 脚本
@@ -1674,6 +1677,7 @@ export class ChatCardManager {
                 ignoreBlock: damageConfig.ignoreBlock,
                 ignoreDefense: damageConfig.ignoreDefense,
                 ignoreStance: damageConfig.ignoreStance,
+                ignoreMinDamage: damageConfig.ignoreMinDamage, //是否无视保底伤害
                 isSkill: isSkillDamage,
                 element: damageConfig.element,
                 move: move,
