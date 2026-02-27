@@ -3,72 +3,40 @@
         "name": "洪水刺法",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-        "effects": [
-            {
-                "name": "毒",
-                "icon": "icons/svg/biohazard.svg",
-                "description": "每层每回合末受到 5 点毒素伤害。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_mingjiao_poison",
-                        "stackable": true,
-                        "maxStacks": 3
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnEnd",
-                        "mode": 2,
-                        "value": "-5"
-                    }
-                ]
-            }
-        ],
         "system": {
             "category": "wuxue",
             "sect": "mingjiao",
             "tier": 1,
-            "description": "洪水旗特定武学，刃光如水，浸染毒液，剧毒无比，波绵不绝。",
+            "description": "<p>洪水旗特定武学，刃光如水，浸染毒液，剧毒无比，波绵不绝。</p><p><strong>需求：</strong>匕首</p><p><strong>属性：</strong>阴</p>",
             "requirements": "匕首",
             "moves": [
                 {
                     "name": "滴水不漏",
                     "type": "stance",
                     "element": "yin",
-                    "damageType": "none",
+                    "damageType": "waigong",
                     "weaponType": "dagger",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "拇指蘸毒，抹过匕首，开启架招。成功格挡时，给目标添加一层“毒”，至多三层，持续到战斗脱离。<br>毒：每层每回合末受到 5 点毒素伤害。",
-                    "automationNote": "格挡成功自动给攻击者施加毒。",
+                    "description": "<p>次要动作，拇指蘸毒，抹过匕首，开启架招。成功格挡时，给目标添加一层“毒”，至多三层，持续到战斗脱离。</p><p><strong>毒：</strong>每层每回合末受到 5 点毒素伤害。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "开启架招自动。格挡成功后自动给攻击者施加[毒]。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
                         ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 5,
-                        "scalings": []
                     },
                     "scripts": [
                         {
-                            "label": "架招反击：施毒",
+                            "label": "格挡施毒",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effect = thisItem.effects.getName(\"毒\");\nif (effect) await game.xjzl.api.effects.addEffect(args.attacker, effect.toObject());",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"毒\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);",
                             "active": true
                         }
                     ]
@@ -82,25 +50,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "银光歃血，对敌人造成伤害，并为其添加一层“毒”，至多三层，持续到战斗脱离。<br>若目标无架招，你可以选择该目标 3 米范围内的另一个敌人，为其添加与该目标同样层数的“毒”。",
-                    "automationNote": "命中自动施毒。若目标无架招产生的传染效果需手动。",
-                    "costs": {
-                        "mp": [
-                            1,
-                            2,
-                            3
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
+                    "description": "<p>主要动作，银光歃血，对敌人造成 0.4 力量点外功伤害，并为其添加一层“毒”，至多三层，持续到战斗脱离。</p><p>若目标无架招，你可以选择该目标 3 米范围内的另一个敌人，为其添加与该目标同样层数的“毒”。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "命中自动施加[毒]。若目标无架招，发送卡片提示手动给另一人施毒。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -111,11 +62,18 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "命中施毒",
+                            "label": "命中施毒与传染提示",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst effect = thisItem.effects.getName(\"毒\");\nif (effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n\nif (!args.target.system.martial.stanceActive) {\n    ui.notifications.info(\"目标无架招！请手动给 3米内另一个敌人添加毒。\");\n}",
+                            "script": "if (!args.isHit) return;\n// 1. 施加毒\nconst eff = thisItem.effects.getName(\"毒\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);\n\n// 2. 传染判断\nif (!args.target.system.martial.stanceActive) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mingjiao_du\");\n    const stacks = poison ? (poison.getFlag(\"xjzl-system\", \"stacks\") || 1) : 1;\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 8px; border-left: 4px solid #2c3e50;\"><p style=\"color:#2c3e50; font-size:0.9em;\"><i class=\"fas fa-skull-crossbones\"></i> <b>毒液扩散：</b><br>目标未开启架招！<br>请手动选择3米内另一个敌人，为其添加 <b>${stacks}</b> 层 [毒]。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -129,25 +87,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "挥刃撒毒，对目标造成伤害。击破目标架招时，若目标具有三层“毒”，为其添加“破甲”，持续两回合。<br>破甲：你的外功防御归零。",
-                    "automationNote": "击破架招且目标满毒时自动应用破甲（2回合）。",
-                    "costs": {
-                        "mp": [
-                            1,
-                            2,
-                            3
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
+                    "description": "<p>主要动作，挥刃撒毒，对目标造成 0.3 力量点外功伤害。击破目标架招时，若目标具有三层“毒”，为其添加“破甲”，持续两回合。</p><p><strong>破甲：</strong>你的外功防御归零。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破架招且目标满3层毒时，自动施加[破甲]。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -158,11 +99,18 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
                     "scripts": [
                         {
                             "label": "毒攻破甲",
                             "trigger": "hit",
-                            "script": "if (!args.isBroken) return;\nconst poisonEffect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_mingjiao_poison\");\nconst stacks = poisonEffect ? (poisonEffect.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3) {\n    const pojia = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n    pojia.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(args.target, pojia);\n}",
+                            "script": "if (args.isBroken) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mingjiao_du\");\n    const stacks = poison ? (poison.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n    \n    if (stacks >= 3) {\n        const pojia = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n        if (pojia) {\n            pojia.duration = { rounds: 2 };\n            await game.xjzl.api.effects.addEffect(args.target, pojia);\n            ui.notifications.info(`${args.target.name} 毒深入骨，防御尽失！`);\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -177,25 +125,8 @@
                     "range": "3米",
                     "targetInfo": "周围敌人",
                     "actionCost": "蓄力动作",
-                    "description": "旋身切刺，对周围敌人造成伤害。范围内每有一层“毒”，招式额外对敌人造成 5 点毒素伤害。",
-                    "automationNote": "根据目标身上的毒素层数自动增加伤害。",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12
-                        ],
-                        "rage": [
-                            7,
-                            6,
-                            5
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
-                    },
+                    "description": "<p>蓄力动作，旋身切刺，对周围敌人造成 0.5 力量点外功伤害。范围内每有一层“毒”，招式额外对敌人造成 5 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "命中后检测目标毒素层数，自动造成额外的毒素伤害（可被抗性抵消，允许伤害为0）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -206,17 +137,53 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "毒素增伤",
-                            "trigger": "calc",
-                            "script": "const poisonEffect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_mingjiao_poison\");\nconst stacks = poisonEffect ? (poisonEffect.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (stacks > 0) {\n    const bonus = stacks * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`毒素引爆: +${bonus}`);\n}",
+                            "label": "毒素引爆",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mingjiao_du\");\n    const stacks = poison ? (poison.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n    \n    if (stacks > 0) {\n        const extraDmg = stacks * 5;\n        await args.target.applyDamage({\n            amount: extraDmg,\n            type: \"poison\",\n            attacker: actor,\n            ignoreDefense: true,\n            ignoreBlock: true,\n            ignoreMinDamage: true\n        });\n        \n        const content = `\n            <div class=\"xjzl-chat-card\">\n                <div class=\"card-content-wrapper\" style=\"padding-left: 8px; border-left: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\">\n                    <div style=\"font-weight:bold; color:#27ae60; font-size:1.1em; margin-bottom: 4px;\">\n                        <i class=\"fas fa-biohazard\"></i> 毒素引爆\n                    </div>\n                    <div style=\"font-size:0.9em; color:#555;\">\n                        引爆了目标身上的 <span style=\"font-weight:bold;\">${stacks}</span> 层毒素。<br>\n                        造成额外 <span style=\"font-weight:bold; color:#27ae60;\">${extraDmg}</span> 点毒素伤害。\n                    </div>\n                </div>\n            </div>`;\n        \n        ChatMessage.create({\n            content: content,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "毒",
+                "icon": "icons/svg/biohazard.svg",
+                "description": "每层每回合末受到 5 点毒素伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "mingjiao_du",
+                        "stackable": true,
+                        "maxStacks": 3,
+                        "scripts": [
+                            {
+                                "label": "回合末毒发",
+                                "trigger": "turnEnd",
+                                "active": true,
+                                "script": "const dmg = 5 * thisEffect.stacks;\n// 毒素伤害：无视防御和格挡，但受毒抗影响，允许伤害为0\nawait actor.applyDamage({\n    amount: dmg,\n    type: \"poison\",\n    attacker: null,\n    ignoreDefense: true,\n    ignoreBlock: true,\n    ignoreMinDamage: true\n});"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "厚土弯刀",
