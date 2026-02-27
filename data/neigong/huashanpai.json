@@ -187,7 +187,7 @@
             "sect": "huashanpai",
             "description": "<p>混元功在传统开合功的基础上几经提炼、深化而形成，为万法之基础，和混元掌相辅相成。修行大成后，可治病健身，延年益寿。</p>",
             "requirement": "<p>悟性需求：5</p>",
-            "automationNote": "部分自动化。混元状态下的受击回血已实现（通过预设AE实现回合末自动回复）。圆满特效中“被添加状态时投掷d20移除”无法自动触发，请玩家手动执行。",
+            "automationNote": "部分自动化。当您拥有怒气时，请手动开启特效栏中的[混元 (运功)]，开启后受击若满足条件会发送回血卡片。圆满特效中“被添加状态时投掷d20移除”无法自动触发，请玩家手动执行。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -213,14 +213,7 @@
                     },
                     "description": "<p>小成运功特效：你有怒气时，进入“混元”状态。<br>混元：当你处于下盘不稳、倒地、禁足、目盲、耳鸣时被攻击，在该回合末回复20点气血。</p>",
                     "xpCostRatio": 1,
-                    "scripts": [
-                        {
-                            "label": "混元功-混元回血(小成)",
-                            "trigger": "damaged",
-                            "script": "const rage = S.resources.rage.value;\nconst s = actor.xjzlStatuses;\nif (rage > 0 && (s.unstable || s.prone || s.root || s.blind || s.deaf)) {\n    const sourceEffect = thisItem.effects.getName(\"混元回血\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"混元功触发：回合末将回复20点气血\");\n    }\n}",
-                            "active": true
-                        }
-                    ]
+                    "scripts": []
                 },
                 "stage3": {
                     "stats": {
@@ -233,14 +226,7 @@
                     },
                     "description": "<p>圆满运功特效：你有怒气时，获得“混元”。<br>混元：当你处于下盘不稳、倒地、禁足、目盲、耳鸣时被攻击，在该回合末回复20点气血。<br>你每次被敌人添加状态时，投掷一个d20，如果大于10，移除该状态。<br>修满特效：修满[永久]：气血+30，内力+30，气感+5。</p>",
                     "xpCostRatio": 1,
-                    "scripts": [
-                        {
-                            "label": "混元功-混元回血(圆满)",
-                            "trigger": "damaged",
-                            "script": "const rage = S.resources.rage.value;\nconst s = actor.xjzlStatuses;\nif (rage > 0 && (s.unstable || s.prone || s.root || s.blind || s.deaf)) {\n    const sourceEffect = thisItem.effects.getName(\"混元回血\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"混元功触发：回合末将回复20点气血\");\n    }\n}",
-                            "active": true
-                        }
-                    ]
+                    "scripts": []
                 }
             },
             "masteryEffect": "<p>修满[永久]：气血+30，内力+30，气感+5。</p>",
@@ -270,21 +256,25 @@
         },
         "effects": [
             {
-                "name": "混元回血",
-                "icon": "icons/svg/heal.svg",
+                "name": "混元",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                "description": "处于下盘不稳/倒地/禁足/击飞/目盲/耳鸣状态被攻击时，触发回血卡片。",
                 "transfer": false,
-                "disabled": false,
-                "duration": {
-                    "rounds": 1
-                },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnEnd",
-                        "mode": 2,
-                        "value": "20"
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "hunyuan",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "负面状态受击检测",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "// 检测负面状态\nconst s = actor.statuses;\nconst f = actor.xjzlStatuses;\nif (f.unstable || s.has(\"unstable\") || s.has(\"prone\") || s.has(\"root\") || f.forceSpeedZero || s.has(\"blind\") || s.has(\"deaf\")) {\n    \n    // [修复] 获取源武学 Item (通过 origin 反查)\n    // thisEffect.origin 通常是 Item UUID (例如: Scene.x.Token.y.Item.z)\n    const sourceItem = await fromUuid(thisEffect.origin);\n    const itemId = sourceItem ? sourceItem.id : null;\n\n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; margin-bottom:5px;\">\n            <h3 style=\"margin:0;\">混元回血</h3>\n        </div>\n        <div class=\"card-content\" style=\"font-size:0.9em; color:#555;\">\n            <p><b>触发条件满足</b></p>\n            <p>处于负面状态受击。</p>\n            <p>请在<b>攻击者回合结束时</b>点击：</p>\n        </div>\n        <div class=\"card-buttons\">\n            <button data-action=\"applyHeal\">\n                <i class=\"fas fa-heart\"></i> 回复 20 气血\n            </button>\n        </div>\n    </div>`;\n\n    ChatMessage.create({\n        content: content,\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        flags: {\n            \"xjzl-system\": {\n                actionType: \"heal\",\n                damage: 20,\n                itemId: itemId // 使用反查到的正确 ID\n            }\n        }\n    });\n    actor.showFloatyText(\"混元触发\", { fill: \"#00FFFF\" });\n}"
+                            }
+                        ]
                     }
-                ],
-                "description": "混元功触发：回合结束时回复20点气血。"
+                },
+                "changes": []
             }
         ]
     },

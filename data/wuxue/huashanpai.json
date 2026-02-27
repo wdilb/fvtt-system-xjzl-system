@@ -1214,26 +1214,27 @@
         }
     },
     {
-        "name": "混元掌（地）",
+        "name": "混元掌",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/华山.png",
         "system": {
             "category": "wuxue",
             "sect": "huashanpai",
             "tier": 2,
-            "description": "<p>道家秘传掌法内功，此技由外入内，配合混元功无往不利、无坚不摧。</p>",
+            "description": "<p>道家秘传掌法内功，此技由外入内，配合混元功无往不利、无坚不摧。</p><p><strong>需求：</strong>徒手-拳掌</p><p><strong>属性：</strong>太极</p>",
             "requirements": "徒手-拳掌",
             "moves": [
                 {
                     "name": "抱元守一",
                     "type": "stance",
                     "element": "taiji",
+                    "damageType": "waigong",
                     "weaponType": "unarmed",
-                    "description": "<p>次要动作，双手环型成定式，开启架招，成功格挡后获得“混元”，持续一回合。</p><p>混元：当你处于下盘不稳、倒地、禁足、击飞、目盲、耳鸣状态被攻击时，在攻击者的回合末回复 20 点气血。</p>",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "automationNote": "格挡加成自动化。混元状态及回血自动化。",
+                    "description": "<p>次要动作，双手环型成定式，开启架招，成功格挡后获得“混元”，持续一回合。</p><p><strong>混元：</strong>当你处于下盘不稳、倒地、禁足、击飞、目盲、耳鸣状态被攻击时，在攻击者的回合末回复 20 点气血。</p><p><strong>升级：</strong>格挡值+10，混元持续回合数+1，消耗+2。</p>",
+                    "automationNote": "完全自动化。格挡成功后应用[混元]状态。触发回血条件时，会发送一张治疗卡片，请在攻击者回合结束时手动点击回复。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1245,24 +1246,12 @@
                             6
                         ]
                     },
-                    "effects": [
-                        {
-                            "name": "混元",
-                            "icon": "icons/svg/aura.svg",
-                            "description": "处于负面状态被攻击时，回合末回血20。",
-                            "transfer": false,
-                            "flags": {
-                                "xjzl-system": {
-                                    "stackable": false
-                                }
-                            }
-                        }
-                    ],
                     "scripts": [
                         {
-                            "label": "添加混元状态",
+                            "label": "格挡获混元",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) ) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const effectData = thisItem.effects.getName(\"混元\").toObject();\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 计算持续时间\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\n// 获取AE模板\nconst eff = thisItem.effects.getName(\"混元\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
                         }
                     ]
                 },
@@ -1272,11 +1261,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "description": "<p>主要动作，双手翻掌，左拙右巧，对至多 2 个目标造成 0.4 内息点内功伤害。若只攻击一个目标，则双掌齐出，招式伤害+10。</p>",
                     "range": "2米",
                     "targetInfo": "2个目标",
                     "actionCost": "主要动作",
-                    "automationNote": "伤害自动化。单目标加成手动。",
+                    "description": "<p>主要动作，双手翻掌，左拙右巧，对至多 2 个目标造成 0.4 内息点内功伤害。若只攻击一个目标，则双掌齐出，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "伤害自动化。若攻击单一目标，请在出招配置弹窗的【伤害修正】中手动输入 +10。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1294,13 +1283,7 @@
                             6
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "单目标提示",
-                            "trigger": "attack",
-                            "script": "if (game.user.targets.size === 1) {\n    ui.notifications.info(\"单目标攻击，请手动在伤害修正中 +10。\");\n}"
-                        }
-                    ]
+                    "scripts": []
                 },
                 {
                     "name": "混沌未形",
@@ -1309,14 +1292,14 @@
                     "element": "taiji",
                     "damageType": "none",
                     "weaponType": "unarmed",
-                    "description": "<p>全回合动作，嘴虚合，眼微闭，排除杂念，气引归田，若你此时处于“混元”状态，则你的混元状态额外添加“不可被招式选中”的效果。</p><p>在你下个回合初，若没有怒气，则回复 40 气血。</p>",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "全回合动作",
-                    "automationNote": "延迟回血需手动。混元强化需手动。",
+                    "description": "<p>全回合动作，嘴虚合，眼微闭，排除杂念，气引归田，若你此时处于“混元”状态，则你的混元状态额外添加“不可被招式选中”的效果。</p><p>在你下个回合初，若没有怒气，则回复 40 气血。</p><p><strong>升级：</strong>回复气血值提高 30 点，内力消耗+2。</p>",
+                    "automationNote": "应用时自动获得[运气中]状态，下回合初自动判定怒气并回血。混元强化(不可选中)需人工判定执行。",
                     "calculation": {
-                        "base": 40,
-                        "growth": 30
+                        "base": 0,
+                        "growth": 0
                     },
                     "costs": {
                         "mp": [
@@ -1329,7 +1312,15 @@
                             1,
                             1
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "混沌运气",
+                            "trigger": "hit",
+                            "script": "// 1. 混元强化提示\nconst hasHunyuan = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"hunyuan\");\nif (hasHunyuan) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><p><i class=\"fas fa-info-circle\"></i> <b>混沌未形：</b><br>当前处于[混元]状态，获得 <b>不可被招式选中</b> 效果。<br>(请GM手动处理)</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}\n\n// 2. 施加延时回血状态\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst calcHeal = 40 + (lvl - 1) * 30;\n\n// 获取AE模板\nconst eff = thisItem.effects.getName(\"运气中\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态修改脚本中的回血数值\nconst scriptObj = eff.flags[\"xjzl-system\"].scripts.find(s => s.trigger === \"turnStart\");\nif (scriptObj) {\n    scriptObj.script = `\n        if (actor.system.resources.rage.value === 0) {\n            await actor.applyHealing({ amount: ${calcHeal}, type: \"hp\", showScrolling: true });\n            ui.notifications.info(\"混沌未形：气息归田，回复气血。\");\n        } else {\n            ui.notifications.warn(\"混沌未形：心有怒气，回血失败。\");\n        }\n        await thisEffect.delete();\n    `;\n}\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "混元无极",
@@ -1338,11 +1329,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "description": "<p>蓄力动作，展臂画圆，气揽四方，归捧丹田，对自身周围目标造成 0.7 内息点内功伤害。</p><p>·你可以选择任意一个自身存在的状态，转移给所有命中的目标。</p>",
                     "range": "3米",
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
-                    "automationNote": "伤害自动化。状态转移手动。",
+                    "description": "<p>蓄力动作，展臂画圆，气揽四方，归捧丹田，对自身周围目标造成 0.7 内息点内功伤害。</p><p>·你可以选择任意一个自身存在的状态，转移给所有命中的目标。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "伤害自动化。状态转移请玩家手动在侧边栏操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1364,7 +1355,62 @@
                             6,
                             5
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "状态转移提示",
+                            "trigger": "hit",
+                            "script": "ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><p><b>混元无极：</b><br>请手动选择一个自身状态，转移给所有命中目标。</p></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "混元",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                    "description": "处于下盘不稳/倒地/禁足/击飞/目盲/耳鸣状态被攻击时，触发回血卡片。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "hunyuan",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "负面状态受击检测",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "// 检测负面状态\nconst s = actor.statuses;\nconst f = actor.xjzlStatuses;\nif (f.unstable || s.has(\"unstable\") || s.has(\"prone\") || s.has(\"root\") || f.forceSpeedZero || s.has(\"blind\") || s.has(\"deaf\")) {\n    \n    // [修复] 获取源武学 Item (通过 origin 反查)\n    // thisEffect.origin 通常是 Item UUID (例如: Scene.x.Token.y.Item.z)\n    const sourceItem = await fromUuid(thisEffect.origin);\n    const itemId = sourceItem ? sourceItem.id : null;\n\n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; margin-bottom:5px;\">\n            <h3 style=\"margin:0;\">混元回血</h3>\n        </div>\n        <div class=\"card-content\" style=\"font-size:0.9em; color:#555;\">\n            <p><b>触发条件满足</b></p>\n            <p>处于负面状态受击。</p>\n            <p>请在<b>攻击者回合结束时</b>点击：</p>\n        </div>\n        <div class=\"card-buttons\">\n            <button data-action=\"applyHeal\">\n                <i class=\"fas fa-heart\"></i> 回复 20 气血\n            </button>\n        </div>\n    </div>`;\n\n    ChatMessage.create({\n        content: content,\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        flags: {\n            \"xjzl-system\": {\n                actionType: \"heal\",\n                damage: 20,\n                itemId: itemId // 使用反查到的正确 ID\n            }\n        }\n    });\n    actor.showFloatyText(\"混元触发\", { fill: \"#00FFFF\" });\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "运气中",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/华山.png",
+                    "description": "下回合初检测怒气并回血。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "hundun_yunqi",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "回合初回血",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "// 占位脚本，实际逻辑会在施展招式时动态注入\nawait thisEffect.delete();"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }
