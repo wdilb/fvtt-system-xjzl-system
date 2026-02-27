@@ -1423,7 +1423,7 @@
             "category": "wuxue",
             "sect": "emeipai",
             "tier": 3,
-            "description": "<p>峨眉派镇派绝技，取自峨眉峰冬日绝景，冰霜万里，薄雾绕云，内劲极寒，化水为冰。</p>",
+            "description": "<p>峨眉派镇派绝技，取自峨眉峰冬日绝景，冰霜万里，薄雾绕云，内劲极寒，化水为冰。</p><p><strong>需求：</strong>徒手 <strong>属性：</strong>阴</p>",
             "requirements": "徒手",
             "moves": [
                 {
@@ -1436,8 +1436,12 @@
                     "range": "2米",
                     "targetInfo": "周围友方",
                     "actionCost": "次要动作",
-                    "description": "<p>玉手回转，拍出清冷内劲，立即移除自身及周围友方的移动限制，包括但不限于“下盘不稳”“禁足”等任意降低移动速度的武学内功状态，之后，自身速度+2，持续到回合末。</p>",
+                    "description": "<p>玉手回转，拍出清冷内劲，立即移除自身及周围友方的移动限制，包括但不限于“下盘不稳”“禁足”等任意降低移动速度的武学内功状态，之后，自身速度+2，持续到回合末。</p><p><strong>升级：</strong>释放距离+1，自身速度+1，内力消耗+4。</p>",
                     "automationNote": "半自动化。需脚本移除特定Effect。速度Buff自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -1448,16 +1452,12 @@
                         "rage": [],
                         "hp": []
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
                     "scripts": [
                         {
                             "label": "移除移速限制",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const toRemove = target.effects.filter(e => \n    e.statuses.has(\"unstable\") || e.statuses.has(\"root\") || \n    e.changes.some(c => c.key === \"system.combat.speed\" && Number(c.value) < 0)\n).map(e => e.id);\nif(toRemove.length > 0) await target.deleteEmbeddedDocuments(\"ActiveEffect\", toRemove);\n\nif (target === actor) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1;\n    const source = thisItem.effects.getName(\"白雪皑皑\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        const spd = 2 + (lvl - 1);\n        effectData.changes[0].value = spd;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
+                            "script": "const targetDoc = args.target;\n// 1. 移除限制状态\nconst toRemove = targetDoc.effects.filter(e => \n    e.statuses.has(\"unstable\") || e.statuses.has(\"root\") || \n    e.changes.some(c => c.key === \"system.combat.speed\" && Number(c.value) < 0)\n).map(e => e.id);\n\nif(toRemove.length > 0) await targetDoc.deleteEmbeddedDocuments(\"ActiveEffect\", toRemove);\n\n// 2. 自身增加速度 (仅对自己生效)\nif (targetDoc.uuid === actor.uuid) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1;\n    const source = thisItem.effects.getName(\"白雪皑皑\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        // 基础2 + (等级-1)\n        const spd = 2 + (lvl - 1);\n        effectData.changes[0].value = String(spd);\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
                         }
                     ]
                 },
@@ -1470,18 +1470,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>出掌飘逸，两畔生风，对目标造成0.7内息点内功伤害，同时为其添加“冻伤”一回合。</p><p><strong>冻伤</strong>：被阴、柔属性招式攻击时，额外受到 30 点伤害。</p>",
+                    "description": "<p>出掌飘逸，两畔生风，对目标造成 0.7 内息点内功伤害，同时为其添加“冻伤”一回合。</p><p><strong>冻伤</strong>：被阴、柔属性招式攻击时，额外受到 30 点伤害。</p><p><strong>升级：</strong>招式伤害+10，冻伤持续回合数+1，内力消耗+4。</p>",
                     "automationNote": "完全自动化。",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ],
-                        "rage": [],
-                        "hp": []
-                    },
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1492,12 +1482,22 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
                     "scripts": [
                         {
                             "label": "施加冻伤",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
                         }
                     ]
                 },
@@ -1510,8 +1510,12 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>掌心拖上，清身侧立，开启架招。同时获得“飞鸿踏雪”，持续一回合或被击破架招。</p><p><strong>飞鸿踏雪</strong>：你免疫所有你不想要的状态。</p>",
-                    "automationNote": "免疫状态需手动操作。",
+                    "description": "<p>掌心拖上，清身侧立，开启架招。同时获得“飞鸿踏雪”，持续一回合或被击破架招。</p><p><strong>飞鸿踏雪</strong>：你免疫所有你不想要的状态。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+                    "automationNote": "开启自动获BUFF。免疫状态需手动操作。若被破防，需手动移除此BUFF。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -1522,16 +1526,12 @@
                         "rage": [],
                         "hp": []
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10
-                    },
                     "scripts": [
                         {
-                            "label": "飞鸿踏雪Buff",
-                            "trigger": "damaged",
+                            "label": "获得状态",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args) && !actor.effects.some(e => e.name === \"飞鸿踏雪\")) {\n    const source = thisItem.effects.getName(\"飞鸿踏雪\");\n    if (source) await game.xjzl.api.effects.addEffect(actor, source.toObject());\n}"
+                            "script": "const source = thisItem.effects.getName(\"飞鸿踏雪\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    // 持续1回合\n    effectData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 },
@@ -1544,18 +1544,8 @@
                     "range": "3米",
                     "targetInfo": "周围敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>飘然若仙，回旋拍出冰气，对周围敌人造成0.6内息点内功伤害。此招每击破一个目标的架招，自身便回复最大气血 10%的气血。</p><p>·招式每选中一个具有“冻伤”的目标，本招式虚招值+1。</p>",
-                    "automationNote": "完全自动化。",
-                    "costs": {
-                        "mp": [
-                            8,
-                            16,
-                            24,
-                            32
-                        ],
-                        "rage": [],
-                        "hp": []
-                    },
+                    "description": "<p>飘然若仙，回旋拍出冰气，对周围敌人造成 0.6 内息点内功伤害。此招每击破一个目标的架招，自身便回复最大气血 10%的气血。</p><p>·招式每选中一个具有“冻伤”的目标，本招式虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，回复气血+5%，内力消耗+8。</p>",
+                    "automationNote": "完全自动化。检测目标冻伤增加虚招值。击破后自动回血。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1566,18 +1556,28 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
                     "scripts": [
                         {
                             "label": "冻伤加虚招",
                             "trigger": "check",
                             "active": true,
-                            "script": "if (args.target.effects.some(e => e.name === \"冻伤\")) {\n    args.flags.grantFeint += 1;\n}"
+                            "script": "if (args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"frostbite\")) {\n    args.flags.grantFeint += 1;\n}"
                         },
                         {
                             "label": "击破回血",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const pct = 0.10 + (lvl - 1) * 0.05;\n    const heal = Math.floor(actor.system.resources.hp.max * pct);\n    await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础10% + 升级5%\n    const pct = 0.10 + (lvl - 1) * 0.05;\n    const heal = Math.floor(actor.system.resources.hp.max * pct);\n    await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
                         }
                     ]
                 },
@@ -1590,18 +1590,8 @@
                     "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，冰掌连绵，落雪追敌，对目标造成0.7内息点内功伤害。</p><p>·若对方处于“冻伤”，招式伤害+30。</p>",
-                    "automationNote": "完全自动化。",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ],
-                        "rage": [],
-                        "hp": []
-                    },
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，冰掌连绵，落雪追敌，对目标造成 0.7 内息点内功伤害。</p><p>·若对方处于“冻伤”，招式伤害+30。</p><p><strong>升级：</strong>招式伤害+10，冻伤时的伤害再+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。冻伤增伤已脚本化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1612,12 +1602,22 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
                     "scripts": [
                         {
                             "label": "冻伤增伤",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "if (args.target.effects.some(e => e.name === \"冻伤\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    args.config.amount += (30 + (lvl - 1) * 10);\n}"
+                            "script": "if (args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"frostbite\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础30 + 升级10\n    args.config.amount += (30 + (lvl - 1) * 10);\n}"
                         }
                     ]
                 },
@@ -1630,18 +1630,8 @@
                     "range": "5米",
                     "targetInfo": "范围敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>迸发寒劲，地面凝霜，侵蚀周围，对范围内敌人造成0.6内息点内功伤害。</p><p>若有敌人处于半空中，可以消耗反应动作释放此招，凌空穿云（半空中）至目标处，掌劲肆意化为落雪，使自身周围所有敌方受到伤害。</p>",
-                    "automationNote": "半空需手动。",
-                    "costs": {
-                        "mp": [
-                            8,
-                            16,
-                            24,
-                            32
-                        ],
-                        "rage": [],
-                        "hp": []
-                    },
+                    "description": "<p>迸发寒劲，地面凝霜，侵蚀周围，对范围内敌人造成 0.6 内息点内功伤害。</p><p>若有敌人处于半空中，可以消耗反应动作释放此招，凌空穿云（半空中）至目标处，掌劲肆意化为落雪，使自身周围所有敌方受到伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "半空追击需手动操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1651,6 +1641,16 @@
                                 "ratio": 0.6
                             }
                         ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [],
+                        "hp": []
                     }
                 },
                 {
@@ -1663,8 +1663,12 @@
                     "range": "20米",
                     "targetInfo": "范围内所有单位",
                     "actionCost": "蓄力动作",
-                    "description": "<p>向周围释放冰雪真气，刹那间宛如冰天雪地，为范围内的敌方添加“下盘不稳”，持续一回合；</p><p>为范围内的友方添加“凝霜”：招式伤害提高 5 点，且可视为阴属性伤害，持续一回合。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>缓缓运功，向周围释放冰雪真气，刹那间宛如冰天雪地，为范围内的敌方添加“下盘不稳”，持续一回合；</p><p>为范围内的友方添加“凝霜”：招式伤害提高 5 点，且可视为阴属性伤害，持续一回合。</p><p><strong>升级：</strong>“下盘不稳”和“凝霜”额外持续一回合。凝霜提高的伤害+5，内力消耗+8。</p>",
+                    "automationNote": "半自动化。自动判断敌友并施加状态。\"视为阴属性伤害\"需手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             8,
@@ -1675,16 +1679,12 @@
                         "rage": [],
                         "hp": []
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0
-                    },
                     "scripts": [
                         {
-                            "label": "敌友判定",
+                            "label": "敌友判定与施法",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nif (args.target.disposition === actor.disposition) {\n    const bonus = 5 + (lvl - 1) * 5;\n    const source = thisItem.effects.getName(\"凝霜\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: rounds };\n        effectData.description = `招式伤害+${bonus}，视为阴属性`;\n        effectData.changes[0].value = bonus;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n} else {\n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\n// 获取敌我态度 (1: 友善, 0: 中立, -1: 敌对)\n// 兼容 Actor 和 TokenDocument 数据结构\nconst getDisp = (a) => {\n    if (a.token) return a.token.disposition; // TokenDocument (v11+)\n    if (a.prototypeToken) return a.prototypeToken.disposition; // Actor\n    return 0;\n};\n\nconst actorDisp = getDisp(actor);\nconst targetDisp = getDisp(args.target);\n\n// 判定逻辑: 相同 disposition 视为友方 \nconst isFriend = (actorDisp === targetDisp);\n\nif (isFriend) {\n    // 友方：凝霜\n    const bonus = 5 + (lvl - 1) * 5;\n    const source = thisItem.effects.getName(\"凝霜\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { rounds: rounds };\n        effectData.description = `招式伤害+${bonus}，手动视为阴属性`;\n        effectData.changes[0].value = String(bonus);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [凝霜]`);\n    }\n} else {\n    // 敌方：下盘不稳\n    const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (unstable) {\n        const effectData = foundry.utils.deepClone(unstable);\n        effectData.duration = { rounds: rounds };\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 下盘不稳`);\n    }\n}"
                         }
                     ]
                 },
@@ -1698,8 +1698,18 @@
                     "range": "8米",
                     "targetInfo": "周围敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>拍出寒气弥漫，冰雪翻涌，对周围敌人造成0.8内息点内功伤害。</p><p>·为敌人添加“冻伤”，持续到战斗脱离。</p><p>·如果目标身上已经存在“冻伤”，目标陷入“眩晕”，持续一回合。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>傲立雪中，拍出寒气弥漫，冰雪翻涌，对周围敌人造成 0.8 内息点内功伤害。</p><p>·为敌人添加“冻伤”，持续到战斗脱离。</p><p>·如果目标身上已经存在“冻伤”，目标陷入“眩晕”，持续一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "完全自动化。自动检测冻伤并施加眩晕。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             16,
@@ -1715,95 +1725,89 @@
                         ],
                         "hp": []
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.8
-                            }
-                        ]
-                    },
                     "scripts": [
                         {
-                            "label": "冻伤与眩晕",
+                            "label": "冻伤眩晕连招",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    if (args.target.effects.some(e => e.name === \"冻伤\")) {\n        const stun = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"stun\"));\n        stun.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, stun);\n        ui.notifications.info(`${args.target.name} 被冰封眩晕！`);\n    }\n    \n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.duration = { rounds: 99 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                            "script": "if (args.isHit) {\n    // 1. 检查是否已有冻伤 (触发眩晕)\n    if (args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"frostbite\")) {\n        // 使用 xuanyun ID\n        const xuanyun = CONFIG.statusEffects.find(e => e.id === \"xuanyun\");\n        if (xuanyun) {\n            const effectData = foundry.utils.deepClone(xuanyun);\n            effectData.duration = { rounds: 1 };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info(`${args.target.name} 伤上加霜，陷入眩晕！`);\n        }\n    }\n    \n    // 2. 无论如何都施加冻伤 (刷新或叠加)\n    const source = thisItem.effects.getName(\"冻伤\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { rounds: 99 };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "白雪皑皑",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "移动速度提升",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "baixueaiai",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "2"
+                        }
+                    ]
+                },
+                {
+                    "name": "冻伤",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "被阴、柔属性招式攻击时，额外受到 30 点伤害",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "frostbite",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "冻伤易伤",
+                                    "trigger": "preTake",
+                                    "active": true,
+                                    "script": "if (args.type === 'neigong' || args.move?.element === 'yin' || args.move?.element === 'rou') { args.output.damage += 30; }"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "飞鸿踏雪",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "免疫所有你不想要的状态 (需手动移除)",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "feihongtaxue",
+                            "stackable": false
+                        }
+                    }
+                },
+                {
+                    "name": "凝霜",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
+                    "description": "招式伤害提高，且可视为阴属性伤害",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "ningshuang",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.global.mod",
+                            "mode": 2,
+                            "value": "5"
                         }
                     ]
                 }
             ]
-        },
-        "effects": [
-            {
-                "name": "白雪皑皑",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
-                "description": "移动速度提升",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "baixueaiai"
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": 2
-                    }
-                ]
-            },
-            {
-                "name": "冻伤",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
-                "description": "被阴、柔属性招式攻击时，额外受到 30 点伤害",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "frostbite",
-                        "scripts": [
-                            {
-                                "label": "冻伤易伤",
-                                "trigger": "preTake",
-                                "active": true,
-                                "script": "if (args.type === 'neigong' || args.move?.element === 'yin' || args.move?.element === 'rou') { args.output.damage += 30; }"
-                            }
-                        ]
-                    }
-                }
-            },
-            {
-                "name": "飞鸿踏雪",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
-                "description": "免疫所有你不想要的状态 (需手动移除)",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "feihongtaxue"
-                    }
-                }
-            },
-            {
-                "name": "凝霜",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/峨眉.png",
-                "description": "招式伤害提高，且可视为阴属性伤害",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "ningshuang"
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.global.mod",
-                        "mode": 2,
-                        "value": 5
-                    }
-                ]
-            }
-        ]
+        }
     },
     {
         "name": "越女剑法",
