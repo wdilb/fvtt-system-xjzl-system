@@ -992,8 +992,9 @@ export class XJZLItem extends Item {
 
     // 2. 无系数气招 (纯脚本)：直接归零，不跑计算流程
     // 判定条件：是气招 且 没有配置属性加成 (Scalings)
+    // 先去掉气招的条件，无系数的应该都不吃加成
     const hasScalings = move.calculation.scalings && move.calculation.scalings.length > 0;
-    if (effectiveType === "qi" && !hasScalings) {
+    if (!hasScalings) {
       return {
         damage: Math.floor(moveBaseDmg),
         feint: 0,
