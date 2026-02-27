@@ -1429,16 +1429,15 @@
             "moves": [
                 {
                     "name": "唐花",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "type": "real",
                     "element": "yin",
                     "damageType": "poison",
                     "weaponType": "hidden",
-                    "description": "<p>主要动作，投向范围内空格，如花瓣般爆散开来，空格周围 3 米的所有敌人和其他友方进行[轻功]检定（难度 15），失败受到造成 40 点毒素伤害。</p><p>升级：毒素伤害+10，释放距离+5，内力消耗+2。</p>",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "圆形3米",
                     "actionCost": "主要动作",
-                    "automationNote": "完全自动化：需手动选中范围内所有目标。自动请求轻功检定，失败提示伤害数值，需手动应用毒素伤害。",
+                    "description": "<p>投向范围内空格，如花瓣般爆散开来，空格周围 3 米的所有敌人和其他友方进行[轻功]检定（难度 15），失败受到造成 40 点毒素伤害。</p><p><strong>升级：</strong>毒素伤害+10，释放距离+5，内力消耗+2。</p>",
+                    "automationNote": "半自动化。自动阻断默认伤害。自动发起轻功检定请求。失败后仅提示伤害数值，需GM手动应用伤害（以计算毒抗）。",
                     "calculation": {
                         "base": 40,
                         "growth": 10,
@@ -1449,21 +1448,19 @@
                             2,
                             4,
                             6
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "唐花机制",
-                            "trigger": "calc",
-                            "script": "args.output.damage = 0; // 面板显示0，伤害通过脚本应用",
+                            "label": "阻断默认伤害",
+                            "trigger": "preDamage",
+                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
                             "active": true
                         },
                         {
                             "label": "轻功检定",
                             "trigger": "hit",
-                            "script": "const lvl = args.move.computedLevel || 1;\nconst dmg = 40 + (lvl - 1) * 10;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: 15,\n    label: '躲避唐花',\n    // 不自动扣血，而是提示数值让GM手动处理特殊类型伤害\n    failureText: `闪避不及！请手动对目标应用 ${dmg} 点【毒素伤害】。`\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 15;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避唐花',\n    // 不使用 damageOnFail 以免无视抗性\n    failureText: `闪避不及！请手动造成 <b>${dmg}</b> 点毒素伤害。`\n});",
                             "active": true
                         }
                     ]
@@ -1484,16 +1481,15 @@
             "moves": [
                 {
                     "name": "暴雨梨花针",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "type": "real",
                     "element": "yin",
                     "damageType": "poison",
                     "weaponType": "hidden",
-                    "description": "<p>主要动作，开启后二十七枚银钉势急力猛，每根能够造成 4 点毒素伤害，共一次性造成 108 点毒素伤害，无需投掷命中，敌人无法闪避。</p><ul><li>目标每有一级[轻功]，便能抵消一根银钉的毒素伤害（即减少 4 点毒素伤害）。</li><li>偷袭敌人时，可造成双倍伤害。</li></ul><p>升级：每根银钉造成的毒素伤害+1，内力消耗+2。</p>",
-                    "range": "10",
+                    "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "完全自动化：全局必中。自动化：轻功减伤逻辑已实现。手动：偷袭双倍伤害需手动修正。",
+                    "description": "<p>开启后二十七枚银钉势急力猛，每根能够造成 4 点毒素伤害，共一次性造成 108 点毒素伤害，无需投掷命中，敌人无法闪避。</p><p>·目标每有一级[轻功]，便能抵消一根银钉的毒素伤害（即减少 4 点毒素伤害）。</p><p>·偷袭敌人时，可造成双倍伤害。</p><p><strong>升级：</strong>每根银钉造成的毒素伤害+1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。出招时弹窗询问是否偷袭（双倍伤害）。自动检测目标轻功等级并减伤。",
                     "calculation": {
                         "base": 108,
                         "growth": 27,
@@ -1504,21 +1500,19 @@
                             2,
                             4,
                             6
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "全局必中",
+                            "label": "偷袭判定",
                             "trigger": "attack",
-                            "script": "args.flags.forceHit = true;",
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"暴雨梨花针\" },\n    content: `<p>是否为<b>偷袭</b>？</p><p style=\"font-size:0.9em; color:#666;\">(偷袭造成双倍伤害)</p>`,\n    yes: { label: \"是 (双倍)\", icon: \"fas fa-user-secret\" },\n    no: { label: \"否\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    args.flags.damageResult.damage *= 2;\n    args.flags.damageResult.breakdown += \"\\n+ 偷袭加成 (x2)\";\n    ui.notifications.info(\"偷袭生效！伤害翻倍。\");\n}",
                             "active": true
                         },
                         {
                             "label": "轻功抵消",
                             "trigger": "preDamage",
-                            "script": "const qg = args.target.system.skills?.qinggong?.total || 0;\nconst lvl = args.move.computedLevel || 1;\nconst needleDmg = 4 + (lvl - 1) * 1;\nconst reduction = qg * needleDmg;\nif (reduction > 0) {\n    args.config.amount = Math.max(0, args.config.amount - reduction);\n    if (args.attacker.token?.object) {\n        args.attacker.showFloatyText(`轻功抵挡 -${reduction}`, { fill: '#cccccc', stroke: '#000000', strokeThickness: 4 });\n    }\n}",
+                            "script": "const qg = args.target.system.skills?.qinggong?.total || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst needleDmg = 4 + (lvl - 1) * 1;\n\n// 计算抵消量\nconst reduction = qg * needleDmg;\n\nif (reduction > 0) {\n    args.config.amount = Math.max(0, args.config.amount - reduction);\n    if (args.attacker.showFloatyText) {\n        args.attacker.showFloatyText(`轻功抵挡 -${reduction}`, { fill: '#cccccc' });\n    }\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"font-size:0.9em; color:#555;\">目标利用轻功(${qg}级) 抵消了 <b>${reduction}</b> 点伤害。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: args.attacker})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -1539,16 +1533,15 @@
             "moves": [
                 {
                     "name": "阎王帖",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "type": "real",
                     "element": "yin",
                     "damageType": "poison",
                     "weaponType": "hidden",
-                    "description": "<p>蓄力动作，毒化流雨，自身周围敌人进行[轻功]检定（难度 17），失败受到 40 点毒素伤害，并被添加“冤魂”，持续一回合。</p><p>冤魂：命中-10，移动速度-5。</p><p>升级：难度+2，毒素伤害+10，冤魂持续回合+1，内力消耗+4。</p>",
-                    "range": "10",
+                    "range": "10米",
                     "targetInfo": "自身周围",
                     "actionCost": "蓄力动作",
-                    "automationNote": "完全自动化：自动请求检定，失败自动扣血并应用冤魂Debuff。",
+                    "description": "<p>毒化流雨，自身周围敌人进行[轻功]检定（难度 17），失败受到 40 点毒素伤害，并被添加“冤魂”，持续一回合。</p><p><strong>冤魂：</strong>命中-10，移动速度-5。</p><p><strong>升级：</strong>难度+2，毒素伤害+10，冤魂持续回合+1，内力消耗+4。</p>",
+                    "automationNote": "半自动化。自动阻断默认伤害，发起豁免。失败自动应用[冤魂]，伤害数值仅提示，需手动应用。",
                     "calculation": {
                         "base": 40,
                         "growth": 10,
@@ -1559,21 +1552,19 @@
                             4,
                             8,
                             12
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "伤害置零",
-                            "trigger": "calc",
-                            "script": "args.output.damage = 0;",
+                            "label": "阻断默认伤害",
+                            "trigger": "preDamage",
+                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
                             "active": true
                         },
                         {
                             "label": "阎王索命",
                             "trigger": "hit",
-                            "script": "const lvl = args.move.computedLevel || 1;\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst durationRounds = 1 + (lvl - 1);\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: async () => {\n        await args.target.applyDamage({\n            amount: dmg,\n            type: 'poison',\n            attacker: actor,\n            isHit: true\n        });\n        // 获取并克隆特效数据\n        const sourceEffect = thisItem.effects.getName('冤魂');\n        if (sourceEffect) {\n            const effectData = sourceEffect.toObject();\n            delete effectData._id;\n            effectData.duration = { rounds: durationRounds };\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.warn(`${args.target.name} 被冤魂缠身！`);\n        }\n    }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\n// 获取特效模板\nconst sourceEffect = thisItem.effects.getName('冤魂').toObject();\ndelete sourceEffect._id;\nsourceEffect.duration = { rounds: rounds };\nsourceEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: sourceEffect,\n    failureText: `阎王索命，冤魂缠身！请手动造成 <b>${dmg}</b> 点毒素伤害。`\n});",
                             "active": true
                         }
                     ]
@@ -1583,7 +1574,7 @@
         "effects": [
             {
                 "name": "冤魂",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                "icon": "icons/magic/death/skull-energy-light-purple.webp",
                 "transfer": false,
                 "disabled": false,
                 "description": "命中-10，移动速度-5。",
@@ -1626,16 +1617,16 @@
             "moves": [
                 {
                     "name": "七步绝命针",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "element": "yin",
                     "damageType": "poison",
                     "weaponType": "hidden",
-                    "description": "<p>主要动作，不动声色，夺命无形，为敌人添加“七步绝命”两回合。无需投掷命中，敌人无法闪避。</p><p>七步绝命：持续期间，你累计消耗速度移动 7 米以上的距离后，每多移动 1 米便受到 10 点毒素伤害，毒素伤害在状态持续时间结束时一次性生效。</p><ul><li>目标无法知晓自身被添加了“七步绝命”，除非花费主要动作进行一个[医术]或[毒术]检定（难度 11）且成功，方能知晓相关效果。</li></ul><p>升级：七步绝命持续回合数+1，内力消耗+2。</p>",
-                    "range": "10",
+                    "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "完全自动化：全局必中。自动化：状态施加。手动：移动距离追踪与伤害结算需手动处理。",
+                    "description": "<p>不动声色，夺命无形，为敌人添加“七步绝命”两回合。无需投掷命中，敌人无法闪避。</p><p><strong>七步绝命：</strong>持续期间，你累计消耗速度移动 7 米以上的距离后，每多移动 1 米便受到 10 点毒素伤害，毒素伤害在状态持续时间结束时一次性生效。</p><p>·目标无法知晓自身被添加了“七步绝命”，除非花费主要动作进行一个[医术]或[毒术]检定（难度 11）且成功，方能知晓相关效果。</p><p><strong>升级：</strong>七步绝命持续回合数+1，内力消耗+2。</p>",
+                    "automationNote": "自动化：状态施加。手动：移动距离追踪与伤害结算需手动处理（GM通过AE图标提示）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0,
@@ -1646,21 +1637,13 @@
                             2,
                             4,
                             6
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "全局必中",
-                            "trigger": "attack",
-                            "script": "args.flags.forceHit = true;",
-                            "active": true
-                        },
-                        {
                             "label": "施加绝命",
                             "trigger": "hit",
-                            "script": "const lvl = args.move.computedLevel || 1;\nconst durationRounds = 2 + (lvl - 1);\n\nconst sourceEffect = thisItem.effects.getName('七步绝命');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.duration = { rounds: durationRounds };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`已对 ${args.target.name} 施加七步绝命。`);\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 2 + (lvl - 1);\n\nconst sourceEffect = thisItem.effects.getName('七步绝命');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.duration = { rounds: rounds };\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`已对 ${args.target.name} 施加七步绝命（隐蔽）。`);\n}",
                             "active": true
                         }
                     ]
@@ -1670,10 +1653,10 @@
         "effects": [
             {
                 "name": "七步绝命",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                "icon": "icons/magic/movement/trail-streak-impact-blue.webp",
                 "transfer": false,
                 "disabled": false,
-                "description": "累计移动超过7米后，每多1米受到10点毒素伤害（结束时结算）。需要医术/毒术(DC11)检定发现。",
+                "description": "累计移动>7米后，每多1米受10毒伤（结束时结算）。需医术/毒术(DC11)检定发现。",
                 "changes": [],
                 "flags": {
                     "xjzl-system": {
@@ -1697,16 +1680,15 @@
             "moves": [
                 {
                     "name": "满天花雨",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "type": "real",
                     "element": "yin",
                     "damageType": "poison",
                     "weaponType": "hidden",
-                    "description": "<p>蓄力动作，机匣射出五色奇毒，于空中如花伞般炸开，范围内一个空格周围 5 米的所有敌人和其他友方进行[轻功]检定（难度 20），失败则受到 150 点毒素伤害，并被添加“五毒”，持续到脱战。</p><p>五毒：你在每回合末受到 20 点毒素伤害。</p><p>升级：难度+3，暗器造成的毒素伤害+50，内力消耗+8。</p>",
-                    "range": "20",
+                    "range": "20米",
                     "targetInfo": "圆形5米",
                     "actionCost": "蓄力动作",
-                    "automationNote": "完全自动化：自动请求检定，失败自动扣血并施加五毒DOT。",
+                    "description": "<p>机匣射出五色奇毒，于空中如花伞般炸开，范围内一个空格周围 5 米的所有敌人和其他友方进行[轻功]检定（难度 20），失败则受到 150 点毒素伤害，并被添加“五毒”，持续到脱战。</p><p><strong>五毒：</strong>你在每回合末受到 20 点毒素伤害。</p><p><strong>升级：</strong>难度+3，暗器造成的毒素伤害+50，内力消耗+8。</p>",
+                    "automationNote": "完全自动化。自动阻断默认伤害，发起豁免。失败自动施加五毒DOT（每回合末自动扣血），即时伤害仅提示。",
                     "calculation": {
                         "base": 150,
                         "growth": 50,
@@ -1718,21 +1700,19 @@
                             16,
                             24,
                             32
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "伤害置零",
-                            "trigger": "calc",
-                            "script": "args.output.damage = 0;",
+                            "label": "阻断默认伤害",
+                            "trigger": "preDamage",
+                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
                             "active": true
                         },
                         {
                             "label": "花雨毒爆",
                             "trigger": "hit",
-                            "script": "const lvl = args.move.computedLevel || 1;\nconst dmg = 150 + (lvl - 1) * 50;\nconst dc = 20 + (lvl - 1) * 3;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避满天花雨',\n    damageOnFail: {\n        value: dmg,\n        type: 'poison'\n    },\n    onFail: async () => {\n        const sourceEffect = thisItem.effects.getName('五毒');\n        if (sourceEffect) {\n            const effectData = sourceEffect.toObject();\n            delete effectData._id;\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            ui.notifications.info(`${args.target.name} 身中五色奇毒！`);\n        }\n    }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 150 + (lvl - 1) * 50;\nconst dc = 20 + (lvl - 1) * 3;\n\n// 获取五毒AE模板\nconst wuduEffect = thisItem.effects.getName('五毒').toObject();\ndelete wuduEffect._id;\nwuduEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避满天花雨',\n    onFail: wuduEffect,\n    failureText: `身中剧毒，五内如焚！请手动应用 <b>${dmg}</b> 点毒素伤害。`\n});",
                             "active": true
                         }
                     ]
@@ -1742,26 +1722,28 @@
         "effects": [
             {
                 "name": "五毒",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                "icon": "icons/svg/biohazard.svg",
                 "transfer": false,
                 "disabled": false,
-                "description": "每回合末受到 20 点毒素伤害。",
+                "description": "你在每回合末受到 20 点毒素伤害。",
                 "duration": {
                     "seconds": 9999
                 },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenHpTurnEnd",
-                        "mode": 2,
-                        "value": "-20"
-                    }
-                ],
                 "flags": {
                     "xjzl-system": {
                         "slug": "wudu",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "毒发",
+                                "trigger": "turnEnd",
+                                "script": "await actor.applyDamage({amount: 20, type: 'poison', attacker: actor, isHit: true});",
+                                "active": true
+                            }
+                        ]
                     }
-                }
+                },
+                "changes": []
             }
         ]
     },
@@ -1778,16 +1760,15 @@
             "moves": [
                 {
                     "name": "观音泪",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "type": "real",
                     "element": "yin",
                     "damageType": "poison",
                     "weaponType": "hidden",
-                    "description": "<p>主要动作，观音有泪，泪众生苦，对敌人造成 50 点毒素伤害，并为其添加“观音泪”，持续一日，无需投掷命中，敌人无法闪避。</p><p>观音泪：你每消耗 1 点内力受到 5 点毒素伤害。</p><p>升级：暗器造成的毒素伤害+50，每消耗 1 内力受到的毒素伤害+5，内力消耗+4。</p>",
-                    "range": "20",
+                    "range": "20米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "automationNote": "完全自动化：全局必中。自动化：状态施加。手动：内力消耗触发伤害需手动结算。",
+                    "description": "<p>观音有泪，泪众生苦，对敌人造成 50 点毒素伤害，并为其添加“观音泪”，持续一日，无需投掷命中，敌人无法闪避。</p><p><strong>观音泪：</strong>你每消耗 1 点内力受到 5 点毒素伤害。</p><p><strong>升级：</strong>暗器造成的毒素伤害+50，每消耗 1 内力受到的毒素伤害+5，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。自动阻断默认应用，手动脚本应用伤害（无视防御，计算抗性）和AE。AE内力惩罚需手动结算。",
                     "calculation": {
                         "base": 50,
                         "growth": 50,
@@ -1799,21 +1780,19 @@
                             8,
                             12,
                             16
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "全局必中",
-                            "trigger": "attack",
-                            "script": "args.flags.forceHit = true;",
+                            "label": "阻断默认伤害",
+                            "trigger": "preDamage",
+                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
                             "active": true
                         },
                         {
-                            "label": "施加观音泪",
+                            "label": "应用伤害与AE",
                             "trigger": "hit",
-                            "script": "const lvl = args.move.computedLevel || 1;\nconst dotDmg = 5 + (lvl - 1) * 5;\n\nconst sourceEffect = thisItem.effects.getName('观音泪');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.description = `每消耗1点内力，受到${dotDmg}点毒素伤害。`;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被种下观音泪！`);\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst baseDmg = 50 + (lvl - 1) * 50;\nconst dotDmg = 5 + (lvl - 1) * 5;\n\n// 1. 应用伤害 (使用脚本触发，支持抗性)\nawait args.target.applyDamage({\n    amount: baseDmg,\n    type: 'poison',\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true // 毒素无视防御\n});\n\n// 2. 应用AE\nconst sourceEffect = thisItem.effects.getName('观音泪');\nif (sourceEffect) {\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.description = `每消耗1点内力，受到${dotDmg}点毒素伤害。`;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 泪如雨下！`);\n}",
                             "active": true
                         }
                     ]
@@ -1823,13 +1802,10 @@
         "effects": [
             {
                 "name": "观音泪",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                "icon": "icons/svg/ice-aura.svg",
                 "transfer": false,
                 "disabled": false,
                 "description": "消耗内力时受到毒素伤害。",
-                "duration": {
-                    "seconds": 86400
-                },
                 "changes": [],
                 "flags": {
                     "xjzl-system": {
