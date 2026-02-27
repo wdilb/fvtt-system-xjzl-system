@@ -966,44 +966,35 @@
         }
     },
     {
-        "name": "泣血飞刀（地）",
+        "name": "泣血飞刀",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
         "system": {
             "category": "wuxue",
             "sect": "tangmen",
             "tier": 2,
-            "description": "<p>唐门绝技，杜鹃啼血惊夜半，触人离恨断愁肠，中者立刻血流而尽。</p>",
+            "description": "<p>唐门绝技，杜鹃啼血惊夜半，触人离恨断愁肠，中者立刻血流而尽。</p><p><strong>需求：</strong>暗器-飞刀 <strong>属性：</strong>太极</p>",
             "requirements": "暗器-飞刀",
             "moves": [
                 {
                     "name": "悲痛无声",
                     "type": "real",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "description": "<p>蓄力动作，飞刀默然而出，静谧无声，对直线上所有敌人造成 0.4 身法点外功伤害。</p><p>若目标处于“耳鸣”，招式伤害提高 20 点。</p><p>消耗：飞刀*1</p>",
-                    "actionCost": "蓄力动作",
                     "range": "10米",
                     "targetInfo": "直线",
-                    "automationNote": "完全自动化。",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>飞刀默然而出，静谧无声，对直线上所有敌人造成 0.4 身法点外功伤害。</p><p>若目标处于“耳鸣”，招式伤害提高 20 点。</p><p><strong>消耗：</strong>飞刀*1</p><p><strong>升级：</strong>伤害+10，内力消耗+4。</p>",
+                    "automationNote": "耳鸣加伤自动检测。",
                     "costs": {
                         "mp": [
                             4,
                             8,
                             12
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -1019,97 +1010,63 @@
                         {
                             "label": "耳鸣加伤",
                             "trigger": "preDamage",
-                            "script": "if (args.target.statuses.has(\"deaf\") || args.target.effects.find(e => e.name === \"耳鸣\")) {\n    args.config.amount += 20;\n    ui.notifications.info(\"悲痛无声：耳鸣加伤\");\n}"
+                            "active": true,
+                            "script": "if (args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"deaf\" || e.name === \"耳鸣\")) {\n    args.config.amount += 20;\n    actor.showFloatyText(\"悲痛无声: 耳鸣加伤\", { fill: \"#00FF00\" });\n}"
                         }
                     ]
                 },
                 {
                     "name": "泪如血涌",
                     "type": "stance",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "hidden",
-                    "description": "<p>次要动作，刀尖饮血，开启架招。当你每次成功格挡后，获得“泣血”，持续一回合。</p><p>泣血：你的暗器招式命中目标后，额外给目标添加一层“流血”，持续到战斗脱离。</p>",
-                    "actionCost": "次要动作",
                     "range": "自身",
                     "targetInfo": "自身",
-                    "automationNote": "完全自动化。",
+                    "actionCost": "次要动作",
+                    "description": "<p>刀尖饮血，开启架招。当你每次成功格挡后，获得“泣血”，持续一回合。</p><p><strong>泣血：</strong>你的暗器招式命中目标后，额外给目标添加一层“流血”，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+10，泣血持续回合数+1，消耗+2。</p>",
+                    "automationNote": "完全自动化。格挡后获得泣血BUFF，有泣血BUFF时暗器命中自动施加流血。",
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
-                        "growth": 10,
-                        "scalings": []
+                        "growth": 10
                     },
-                    "effects": [
-                        {
-                            "name": "泣血",
-                            "icon": "icons/svg/blood.svg",
-                            "flags": {
-                                "xjzl-system": {
-                                    "slug": "qixue",
-                                    "scripts": [
-                                        {
-                                            "label": "暗器施加流血",
-                                            "trigger": "hit",
-                                            "script": "if (args.move.weaponType === 'hidden' && args.isHit) { await game.xjzl.api.effects.addEffect(args.target, 'bleed_stack'); ui.notifications.info('泣血触发：施加流血'); }"
-                                        }
-                                    ]
-                                }
-                            }
-                        }
-                    ],
                     "scripts": [
                         {
-                            "label": "获得泣血",
+                            "label": "格挡获泣血",
                             "trigger": "damaged",
-                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (Macros.checkStance(actor, args)) {\n    const lvl = lvl || 1;\n    const rounds = 1 + (lvl - 1);\n    const effectData = thisItem.effects.getName(\"泣血\").toObject();\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招数据以计算等级\nconst stanceId = actor.system.martial.stance;\nconst stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\nconst level = Math.max(1, stanceMove?.computedLevel || 1);\nconst rounds = 1 + (level - 1);\n\nconst effectData = thisItem.effects.getName(\"泣血\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
                         }
                     ]
                 },
                 {
                     "name": "哀鸣荡野",
                     "type": "counter",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制目标虚招，飞刀射出，尖锐激鸣，对目标造成 0.6 身法点外功伤害，同时为目标周围 3 米内所有敌人添加“耳鸣”，持续一回合。</p><p>消耗：飞刀*1</p>",
-                    "actionCost": "反应动作",
                     "range": "10米",
                     "targetInfo": "单体",
-                    "automationNote": "手动：反应动作。手动：AOE耳鸣。",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制目标虚招，飞刀射出，尖锐激鸣，对目标造成 0.6 身法点外功伤害，同时为目标周围 3 米内所有敌人添加“耳鸣”，持续一回合。</p><p><strong>消耗：</strong>飞刀*1</p><p><strong>升级：</strong>伤害+10，耳鸣持续回合数+1，消耗+2。</p>",
+                    "automationNote": "当前目标耳鸣自动。AOE耳鸣需手动。",
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -1125,23 +1082,23 @@
                         {
                             "label": "施加耳鸣",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = args.move.computedLevel || 1;\n    const rounds = 1 + (lvl - 1);\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"deaf\", duration: { rounds: rounds } });\n    ui.notifications.info(\"目标被施加耳鸣，请检查周围3米敌人手动添加\");\n}"
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const level = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (level - 1);\n    // 使用系统预设 ID \"deaf\"\n    const deaf = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n    const effectData = foundry.utils.deepClone(deaf);\n    effectData.duration = { rounds: rounds };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(\"目标被施加耳鸣。请检查周围3米敌人并手动添加。\");\n}"
                         }
                     ]
                 },
                 {
                     "name": "杜鹃啼血",
                     "type": "real",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "isUltimate": true,
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "isUltimate": true,
-                    "description": "<p>主要动作，绝命飞刀，触之断肠，对目标造成 0.7 身法点外功伤害。若目标处于“流血”，额外对其造成流血层数*10 的气血流失，并为其添加一层“失血”。</p><p>·若该飞刀抹毒，命中敌人时韧性检定难度+2。</p><p>消耗：飞刀*1</p>",
-                    "actionCost": "主要动作",
                     "range": "15米",
                     "targetInfo": "单体",
-                    "automationNote": "手动：抹毒检定。",
+                    "actionCost": "主要动作",
+                    "description": "<p>绝命飞刀，触之断肠，对目标造成 0.7 身法点外功伤害。若目标处于“流血”，额外对其造成流血层数*10 的气血流失，并为其添加一层“失血”。</p><p>·若该飞刀抹毒，命中敌人时韧性检定难度+2。</p><p><strong>消耗：</strong>飞刀*1</p><p><strong>升级：</strong>招式伤害+20，飞刀抹毒的韧性检定难度+1，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "流失伤害与失血自动。抹毒检定需手动。",
                     "costs": {
                         "mp": [
                             4,
@@ -1153,11 +1110,7 @@
                             6,
                             5
                         ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -1171,11 +1124,34 @@
                     },
                     "scripts": [
                         {
-                            "label": "流血结算",
+                            "label": "流血引爆",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const bleedEffect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\");\n    if (bleedEffect) {\n        const stacks = bleedEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const dmg = stacks * 10;\n        await args.target.applyDamage({ amount: dmg, type: \"liushi\", isHit: true });\n        await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n        ui.notifications.info(`杜鹃啼血结算流血：造成 ${dmg} 伤害并施加失血`);\n    }\n}"
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const bleed = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\");\n    if (bleed) {\n        const stacks = bleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const dmg = stacks * 10;\n        await args.target.applyDamage({ amount: dmg, type: \"liushi\", attacker: actor });\n        await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n        ui.notifications.info(`${args.target.name} 流血引爆！流失 ${dmg} 气血并获得失血。`);\n    }\n}"
                         }
                     ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "泣血",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "description": "暗器招式命中目标后，额外给目标添加一层“流血”。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "qixue",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "暗器施加流血",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "if (args.move.weaponType === 'hidden' && args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n    actor.showFloatyText(\"泣血: 施加流血\", { fill: \"#8b0000\" });\n}"
+                                }
+                            ]
+                        }
+                    }
                 }
             ]
         }
