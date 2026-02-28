@@ -263,6 +263,32 @@ export class ActiveEffectManager {
             }
             // =======================================================
 
+            // =======================================================
+            // 心火 (Xinhuo) 转化逻辑
+            // =======================================================
+            const isXinhuo = existingEffect.getFlag("xjzl-system", "slug") === "wuxue_mingjiao_xinhuo";
+
+            if (isXinhuo && (currentStacks + count) >= 3) {
+                // 1. 删除 所有心火 (静默)
+                await existingEffect.delete({ scrollingStatusText: false });
+
+                // 2. 添加 走火入魔 (持续1回合)
+                const rageData = foundry.utils.deepClone(
+                    CONFIG.statusEffects.find(e => e.id === "rage")
+                );
+
+                if (rageData) {
+                    rageData.duration = { rounds: 1 };
+                    await this.addEffect(actor, rageData);
+                }
+
+                // 3. 飘字提示
+                this._showScrollingText(actor, "心火焚身 -> 走火入魔!", "delete");
+
+                // 终止后续叠层逻辑
+                return;
+            }
+            // =======================================================
 
             // 判断是否达到上限
             // 注意：这里不再直接 return，而是由后续逻辑决定是否只刷新时间
