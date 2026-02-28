@@ -204,8 +204,8 @@
             "category": "wuxue",
             "sect": "gaibang",
             "tier": 1,
-            "description": "<p>丐帮弟子蓄气养身，修心健体的武学。</p>",
-            "requirements": "徒手-拳掌，净衣派；",
+            "description": "<p>丐帮弟子蓄气养身，修心健体的武学。</p><p><strong>需求：</strong>徒手-拳掌，净衣派</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "徒手-拳掌，净衣派",
             "moves": [
                 {
                     "name": "掌心生莲",
@@ -216,8 +216,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>双掌聚气于胸口，开启架招。成功格挡后，可化解对方之力转为一层“莲花真气”至多三层。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>次要动作，双掌聚气于胸口，开启架招。</p><p>成功格挡后，可化解对方之力转为一层“莲花真气”至多三层，持续到战斗脱离。</p><p><strong>莲花真气：</strong>每层使你内功命中+5。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。开启架招后，受击格挡成功将自动叠加莲花真气。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -236,7 +236,7 @@
                             "label": "生成真气",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName('莲花真气').toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName('莲花真气').toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 },
@@ -247,10 +247,10 @@
                     "damageType": "neigong",
                     "weaponType": "unarmed",
                     "range": "2米",
-                    "targetInfo": "周围",
+                    "targetInfo": "周围目标",
                     "actionCost": "蓄力动作",
-                    "description": "<p>对周围目标造成伤害，若目标无架招，将其拉扯至近身周围空格，每拉扯一个目标，获得一层“莲花真气”。</p>",
-                    "automationNote": "若目标无架招自动获得真气。拉扯手动。",
+                    "description": "<p>蓄力动作，张臂揽空，对周围目标造成 0.3 力量点内功伤害，若目标无架招，将其拉扯至近身周围空格，每拉扯一个目标，获得一层“莲花真气”。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "若目标未开启架招，自动获得真气。位移拉扯效果请手动在地图上拖拽 Token。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -275,7 +275,7 @@
                             "label": "拉扯获气",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName('莲花真气').toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(attacker, effectData);\n    ui.notifications.info(`拉扯成功，获得莲花真气！`);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName('莲花真气').toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(`${actor.name} 拉扯成功，获得 1 层莲花真气！`);\n}"
                         }
                     ]
                 },
@@ -288,8 +288,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>抬掌上击，造成伤害，你可以消耗一层莲花真气，将其击飞 1 米。若有人处于半空中，你可以消耗反应动作释放此招，将其抱摔至地面，造成伤害并倒地。</p>",
-                    "automationNote": "自动消耗真气。半空、抱摔、倒地手动。",
+                    "description": "<p>（可消耗反应动作对空释放）主要动作，抬掌上击，对目标造成 0.4 力量点内功伤害，你可以消耗一层莲花真气，将其击飞 1 米。</p><p>若有人处于半空中，你可以消耗反应动作释放此招，一呼冲天，跃至半空将目标抱摔至地面，造成伤害，并使其倒地。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "命中时发送可选动作提示卡片，请根据局势手动点击消耗真气或处理对空抱摔及倒地效果。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -311,10 +311,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗真气",
+                            "label": "可选效果提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const zhenqi = attacker.effects.find(e => e.name === '莲花真气');\n    if (zhenqi) {\n        await game.xjzl.api.effects.removeEffect(attacker, '莲花真气', 1);\n        ui.notifications.info(`${attacker.name} 消耗莲花真气（击飞请手动）`);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const zhenqi = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'lianhuazhenqi');\n    if (zhenqi) {\n        const msg = `\n        <div class=\"xjzl-chat-card\">\n            <div class=\"card-content-wrapper\" style=\"padding-left: 8px; border-left: 3px solid #ff9800; background: rgba(255, 152, 0, 0.05);\">\n                <p style=\"color:#d35400; font-size:0.9em; margin: 0;\">\n                    <i class=\"fas fa-info-circle\"></i> <b>真气爆发提示：</b><br>\n                    你当前拥有 <b>[莲花真气]</b>，可选择<b>手动</b>消耗 1 层并击飞目标 1 米。<br>\n                </p>\n            </div>\n        </div>`;\n        ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}"
                         }
                     ]
                 },
@@ -328,8 +328,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>招行如水，落掌似风，每有一层莲花真气，招式伤害提升 5 点。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>主要动作，招行如水，落掌似风，对目标造成 0.6 力量点内功伤害，每有一层莲花真气，招式伤害提升 5 点。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。于预览时自动根据当前真气层数累加伤害数值。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -358,7 +358,7 @@
                             "label": "真气增伤",
                             "trigger": "calc",
                             "active": true,
-                            "script": "const zhenqi = actor.effects.find(e => e.name === '莲花真气');\nif (zhenqi) {\n    const stacks = zhenqi.getFlag('xjzl-system', 'stacks') || 1;\n    const bonus = stacks * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`莲花真气 +${bonus}`);\n}"
+                            "script": "const zhenqi = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'lianhuazhenqi');\nif (zhenqi) {\n    const stacks = zhenqi.getFlag('xjzl-system', 'stacks') || 1;\n    const bonus = stacks * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`莲花真气 +${bonus}`);\n}"
                         }
                     ]
                 }
@@ -369,6 +369,7 @@
                 "name": "莲花真气",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
                 "description": "每层使你内功命中+5。",
+                "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "lianhuazhenqi",
