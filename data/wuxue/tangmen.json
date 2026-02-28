@@ -1437,7 +1437,7 @@
                     "targetInfo": "圆形3米",
                     "actionCost": "主要动作",
                     "description": "<p>投向范围内空格，如花瓣般爆散开来，空格周围 3 米的所有敌人和其他友方进行[轻功]检定（难度 15），失败受到造成 40 点毒素伤害。</p><p><strong>升级：</strong>毒素伤害+10，释放距离+5，内力消耗+2。</p>",
-                    "automationNote": "半自动化。自动阻断默认伤害。自动发起轻功检定请求。失败后仅提示伤害数值，需GM手动应用伤害（以计算毒抗）。",
+                    "automationNote": "完全自动化。自动阻断默认伤害。自动发起轻功检定请求。失败后自动应用毒素伤害（计算毒抗）。",
                     "calculation": {
                         "base": 40,
                         "growth": 10,
@@ -1460,7 +1460,7 @@
                         {
                             "label": "轻功检定",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 15;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避唐花',\n    // 不使用 damageOnFail 以免无视抗性\n    failureText: `闪避不及！请手动造成 <b>${dmg}</b> 点毒素伤害。`\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 15;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避唐花',\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
                             "active": true
                         }
                     ]
@@ -1541,7 +1541,7 @@
                     "targetInfo": "自身周围",
                     "actionCost": "蓄力动作",
                     "description": "<p>毒化流雨，自身周围敌人进行[轻功]检定（难度 17），失败受到 40 点毒素伤害，并被添加“冤魂”，持续一回合。</p><p><strong>冤魂：</strong>命中-10，移动速度-5。</p><p><strong>升级：</strong>难度+2，毒素伤害+10，冤魂持续回合+1，内力消耗+4。</p>",
-                    "automationNote": "半自动化。自动阻断默认伤害，发起豁免。失败自动应用[冤魂]，伤害数值仅提示，需手动应用。",
+                    "automationNote": "完全自动化。自动阻断默认伤害，发起豁免。失败自动应用[冤魂]及毒素伤害（计算毒抗）。",
                     "calculation": {
                         "base": 40,
                         "growth": 10,
@@ -1564,7 +1564,7 @@
                         {
                             "label": "阎王索命",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\n// 获取特效模板\nconst sourceEffect = thisItem.effects.getName('冤魂').toObject();\ndelete sourceEffect._id;\nsourceEffect.duration = { rounds: rounds };\nsourceEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: sourceEffect,\n    failureText: `阎王索命，冤魂缠身！请手动造成 <b>${dmg}</b> 点毒素伤害。`\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 10;\nconst dc = 17 + (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\n// 获取特效模板\nconst sourceEffect = thisItem.effects.getName('冤魂').toObject();\ndelete sourceEffect._id;\nsourceEffect.duration = { rounds: rounds };\nsourceEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避阎王帖',\n    onFail: sourceEffect,\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
                             "active": true
                         }
                     ]
@@ -1688,7 +1688,7 @@
                     "targetInfo": "圆形5米",
                     "actionCost": "蓄力动作",
                     "description": "<p>机匣射出五色奇毒，于空中如花伞般炸开，范围内一个空格周围 5 米的所有敌人和其他友方进行[轻功]检定（难度 20），失败则受到 150 点毒素伤害，并被添加“五毒”，持续到脱战。</p><p><strong>五毒：</strong>你在每回合末受到 20 点毒素伤害。</p><p><strong>升级：</strong>难度+3，暗器造成的毒素伤害+50，内力消耗+8。</p>",
-                    "automationNote": "完全自动化。自动阻断默认伤害，发起豁免。失败自动施加五毒DOT（每回合末自动扣血），即时伤害仅提示。",
+                    "automationNote": "完全自动化。自动阻断默认伤害，发起豁免。失败自动应用即时毒伤（计算抗性）并施加五毒DOT。",
                     "calculation": {
                         "base": 150,
                         "growth": 50,
@@ -1712,7 +1712,7 @@
                         {
                             "label": "花雨毒爆",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 150 + (lvl - 1) * 50;\nconst dc = 20 + (lvl - 1) * 3;\n\n// 获取五毒AE模板\nconst wuduEffect = thisItem.effects.getName('五毒').toObject();\ndelete wuduEffect._id;\nwuduEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避满天花雨',\n    onFail: wuduEffect,\n    failureText: `身中剧毒，五内如焚！请手动应用 <b>${dmg}</b> 点毒素伤害。`\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 150 + (lvl - 1) * 50;\nconst dc = 20 + (lvl - 1) * 3;\n\n// 获取五毒AE模板\nconst wuduEffect = thisItem.effects.getName('五毒').toObject();\ndelete wuduEffect._id;\nwuduEffect.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: 'qinggong',\n    dc: dc,\n    label: '躲避满天花雨',\n    onFail: wuduEffect,\n    damageOnFail: { value: dmg, type: 'poison' }\n});",
                             "active": true
                         }
                     ]
@@ -1726,9 +1726,6 @@
                 "transfer": false,
                 "disabled": false,
                 "description": "你在每回合末受到 20 点毒素伤害。",
-                "duration": {
-                    "seconds": 9999
-                },
                 "flags": {
                     "xjzl-system": {
                         "slug": "wudu",
