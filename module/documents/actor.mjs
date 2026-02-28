@@ -1359,7 +1359,8 @@ export class XJZLActor extends Actor {
     let reducedDamage = calculatedDamage - defenseVal - blockVal - totalRes;
     // 检查是否允许伤害归零 (默认为 false，即保底 1)
     // 某些情况下我们允许伤害归零
-    const minDamage = data.ignoreMinDamage ? 0 : 1; 
+    // 或者不是内外功伤害，保底也为0
+    const minDamage = (data.ignoreMinDamage || !["waigong", "neigong"].includes(type)) ? 0 : 1; 
     reducedDamage = Math.max(minDamage, reducedDamage);
     // =====================================================
     // 6. 受伤前置/护盾脚本 (Trigger: PRE_TAKE)
