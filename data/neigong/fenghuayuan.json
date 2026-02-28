@@ -9,7 +9,7 @@
             "sect": "fenghuayuan",
             "description": "<p>柳缺兰深秋观漫山红枫如斑斓彩蝶，不胜凄凉而得。此功飘逸清冷，含斜阳西照、岁月不老之意。练至大成，炼气而行，运无形之气化为有形。</p>",
             "requirement": "悟性: 4",
-            "automationNote": "需手动。请玩家根据触发条件（小成：进战首击 / 圆满：每次攻击），手动将内功附带的“残气”特效拖拽至目标身上。",
+            "automationNote": "被动特效【残气】：小成阶段需手动施加（进战首击）。圆满阶段完全自动化（只要命中并造成气血/护体/内力损耗即自动给目标叠层）。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -46,24 +46,34 @@
                         "qigan": 24,
                         "shencai": 22
                     },
-                    "description": "<p>造成伤害时，对命中目标添加一层“残气”，至多五层，持续到脱战。<br>·残气：每层使你命中-2，闪避-2。</p><p><strong>修满特效：</strong>气血+30，内力+30，身法5点。</p>",
+                    "description": "<p>造成伤害时，对命中目标添加一层“残气”，至多五层，持续到脱战。<br>·残气：每层使你命中-2，闪避-2。</p><p><strong>修满特效：</strong>气血+30，内力+30，身法+5点。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "圆满自动残气",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && (args.hpLost > 0 || args.hutiLost > 0 || args.mpLost > 0)) {\n    const eff = thisItem.effects.getName(\"残气\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                        }
+                    ]
                 }
             },
             "masteryEffect": "",
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",
-                    "value": 30
+                    "value": 30,
+                    "label": "气血"
                 },
                 {
                     "key": "resources.mp.bonus",
-                    "value": 30
+                    "value": 30,
+                    "label": "内力"
                 },
                 {
                     "key": "stats.shenfa.mod",
-                    "value": 5
+                    "value": 5,
+                    "label": "身法"
                 }
             ],
             "xpInvested": 0,
@@ -72,7 +82,9 @@
         "effects": [
             {
                 "name": "残气",
-                "icon": "icons/svg/degen.svg",
+                "icon": "systems/xjzl-system/assets/icons/neigong/枫华.png",
+                "transfer": false,
+                "description": "命中-2，闪避-2",
                 "changes": [
                     {
                         "key": "system.combat.hit_waigong",
@@ -92,12 +104,11 @@
                 ],
                 "flags": {
                     "xjzl-system": {
-                        "slug": "canqi",
                         "stackable": true,
-                        "maxStacks": 5
+                        "maxStacks": 5,
+                        "slug": "canqi"
                     }
-                },
-                "transfer": false
+                }
             }
         ]
     },
