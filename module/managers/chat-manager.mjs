@@ -1975,33 +1975,77 @@ export class ChatCardManager {
                     </div>`;
                 }
             }
-            // 应用惩罚 (扣资源)
+            // 应用惩罚 (扣资源或造成伤害)
             if (flags.damageOnFail) {
                 // 1. 解析参数 (确保是固定数值)
                 const dmgConfig = flags.damageOnFail;
                 const rawVal = Number(dmgConfig.value);
                 const amount = isNaN(rawVal) ? 0 : rawVal; // 保底为0
-                const resType = dmgConfig.type || "hp";    // 默认为气血
-
+                const typeKey = dmgConfig.type || "hp";    // 默认为气血
+                // 2. 调用 失败结果
                 if (amount > 0) {
-                    // 2. 调用 applyHealing
-                    await actor.applyHealing({
-                        amount: -amount, // 取负
-                        type: resType,
-                        showScrolling: true // 让大家看到扣血了
-                    });
+                    // 判断 typeKey 是否在系统定义的伤害类型中 (如 poison, fire, waigong)
+                    // 注意：CONFIG.XJZL.damageTypes 包含了 liushi, none 等
+                    const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
 
-                    // 3. 更新卡片文本
-                    // 简单的字典映射，如果 config.mjs 里有完整的本地化 key 更好
-                    const typeLabels = {
-                        hp: "气血", mp: "内力", neili: "内力",
-                        rage: "怒气", huti: "护体", tili: "体力"
-                    };
-                    const label = typeLabels[resType] || resType;
+                    if (isDamageType) {
+                        // === 分支 A: 造成伤害 (走 applyDamage) ===
+                        // 这样可以计算抗性、护体抵扣、触发受击特效等
 
-                    resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
-                        <i class="fas fa-heart-broken"></i> 受到伤害: <b>${amount}</b> 点${label}流失
-                    </div>`;
+                        // 尝试解析发起者 (用于日志)
+                        let attacker = null;
+                        if (flags.attackerUuid) {
+                            const attDoc = await fromUuid(flags.attackerUuid);
+                            attacker = attDoc?.actor || attDoc;
+                        }
+
+                        // 调用伤害逻辑
+                        // 判定失败的伤害通常：必中(true),但会受到 抗性 (Resistances) 的减免
+                        const damageResult = await actor.applyDamage({
+                            amount: amount,
+                            type: typeKey,
+                            attacker: attacker,
+                            isHit: true,
+                            ignoreMinDamage: true //可以减免到0
+                        });
+
+                        // 构造显示文本 (显示实际损失)
+                        const losses = [];
+                        if (damageResult.hutiLost > 0) losses.push(`${damageResult.hutiLost} 护体`);
+                        if (damageResult.hpLost > 0) losses.push(`${damageResult.hpLost} 气血`);
+                        if (damageResult.mpLost > 0) losses.push(`${damageResult.mpLost} 内力`);
+
+                        const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[typeKey]);
+                        const lossText = losses.length > 0 ? losses.join(", ") : "被抗性抵消";
+
+                        resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                            <i class="fas fa-bolt"></i> 判定失败: <b>${amount}</b> 点${typeLabel}伤害<br>
+                            <span style="color:#555;">(实际结算: -${lossText})</span>
+                        </div>`;
+
+                    }
+                    else {
+                        // === 分支 B: 直接资源流失 (走 applyHealing) ===
+                        // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)
+                        
+                        await actor.applyHealing({
+                            amount: -amount,
+                            type: typeKey,
+                            showScrolling: true
+                        });
+
+                        // 更新卡片文本
+                        // 简单的字典映射
+                        const typeLabels = {
+                            hp: "气血", mp: "内力", neili: "内力",
+                            rage: "怒气", huti: "护体", tili: "体力"
+                        };
+                        const label = typeLabels[typeKey] || typeKey;
+
+                        resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                            <i class="fas fa-heart-broken"></i> 判定失败: <b>${amount}</b> 点${label}流失
+                        </div>`;
+                    }
                 }
             }
         }
