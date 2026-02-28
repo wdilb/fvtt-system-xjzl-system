@@ -455,7 +455,7 @@ await Macros.requestSave({
 在脚本中通过 `Macros` 对象调用。
 
 ### 4.1 `Macros.requestSave(options)`
-**功能**: 向目标发起属性判定请求（如点穴、中毒豁免），支持**失败后自动扣除资源**和**自动应用状态**。
+**功能**: 向目标发起属性判定请求（如点穴、中毒豁免），支持**失败后自动扣除资源、造成伤害**和**自动应用状态**。
 
 | 参数 | 类型 | 说明 |
 | :--- | :--- | :--- |
@@ -465,14 +465,14 @@ await Macros.requestSave({
 | `label` | String | 弹窗标题 (可选)。 |
 | `level` | Number | 预设优劣势 (正数=优, 负数=劣)。 |
 | `onFail` | String/Object/Array | **(可选)** 失败时自动应用的状态。支持系统状态ID字符串 (如 `"dianxue"`) 或完整的 Active Effect 数据对象。 |
-| `damageOnFail` | Object | **(可选)** 失败时扣除资源。结构: `{ value: 10, type: "hp" }`。 |
-| `attacker`| Actor | 发起者 (可选，用于在卡片上显示名字)。 |
+| `damageOnFail` | Object | **(可选)** 失败时的惩罚。结构: `{ value: 10, type: "..." }`。<br>• 若 `type` 为资源 (如 `"hp"`, `"mp"`)：**直接流失**，无视护体。<br>• 若 `type` 为伤害 (如 `"poison"`, `"fire"`)：**造成伤害**，会计算抗性和护体抵扣。 |
+| `attacker`| Actor | 发起者 (可选，用于在卡片上显示名字及作为伤害来源)。 |
 | `successText` | String | **(可选)** 成功时的自定义提示文本。 |
 | `failureText` | String | **(可选)** 失败时的自定义提示文本。 |
 
 **示例**:
 ```javascript
-// 发起体质判定，失败则扣血并应用“中毒”状态
+// 发起体质判定，失败则受到毒素伤害并应用“中毒”状态
 await Macros.requestSave({
     target: args.target,
     attacker: actor,
@@ -481,7 +481,8 @@ await Macros.requestSave({
     label: "剧毒陷阱",
     level: -1, // 劣势
     // 失败后果
-    damageOnFail: { value: 20, type: "hp" },
+    // 类型为 "poison"，系统会自动计算目标的毒素抗性和护体真气
+    damageOnFail: { value: 20, type: "poison" }, 
     onFail: "poison", // 直接使用系统预设 ID
     failureText: "毒气攻心！"
 });
@@ -511,14 +512,14 @@ await Macros.requestSave({
 | :--- | :--- | :--- |
 | `text` | 覆盖 winText/loseText 的文本 | `"对方内力耗尽！"` |
 | `selfRecovery` | 发起者恢复资源 | `{ value: 30, type: "mp" }` |
-| `selfDamage` | 发起者受到伤害 | `{ value: 10, type: "hp" }` |
+| `selfDamage` | 发起者受到伤害/流失。<br>• 资源类型(`hp`)：直接流失。<br>• 伤害类型(`poison`)：计算抗性。 | `{ value: 10, type: "hp" }` (流失)<br>`{ value: 20, type: "neigong" }` (伤害) |
 | `selfEffect` | 发起者获得状态 | `"prone"` (倒地) |
-| `targetDamage` | 对抗者受到伤害 | `{ value: 50, type: "mp" }` |
+| `targetDamage` | 对抗者受到伤害/流失。<br>规则同上。 | `{ value: 50, type: "mp" }` |
 | `targetEffect` | 对抗者获得状态 | `"weak"` (虚弱) |
 
 **示例**:
 ```javascript
-// 发起【吸星大法】对抗 (带有完整的自动化结算)
+// 发起【吸星大法】对抗
 await Macros.requestContest({
     attacker: actor,
     defender: args.target,
@@ -532,13 +533,14 @@ await Macros.requestContest({
         win: {
             text: "你的丹田如黑洞般吞噬了对方的内力！",
             selfRecovery: { value: 50, type: "mp" }, // 自回蓝
-            targetDamage: { value: 50, type: "mp" }, // 敌扣蓝
+            targetDamage: { value: 50, type: "mp" }, // 敌流失蓝 (无视抗性)
             targetEffect: "weak" // 敌虚弱
         },
-        // 发起者输: 遭到反噬
+        // 发起者输: 遭到反噬 (内功伤害)
         lose: {
             text: "对方内力浑厚，你吸取不成反遭真气反噬！",
-            selfDamage: { value: 20, type: "hp" }, // 自扣血
+            // 造成内功伤害，如果自己有内功抗性或护体，可以抵扣
+            selfDamage: { value: 30, type: "neigong" }, 
             selfEffect: "prone" // 自倒地
         }
     }
