@@ -1702,11 +1702,230 @@
         "name": "焚心圣火令",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "mingjiao",
+            "tier": 3,
+            "description": "<p>明教绝技，取自摩尼教经典《下部赞》，记载于禁地之中，此功需诱发心魔之火，方能将精微妙诀尽数发挥，非大毅力者不可修。</p><p><strong>需求：</strong>匕首-尺 <strong>属性：</strong>太极</p>",
+            "requirements": "匕首-尺",
+            "moves": [
+                {
+                    "name": "如火如荼",
+                    "type": "stance",
+                    "element": "taiji",
+                    "damageType": "waigong",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>-处所庄严皆清净，诸恶不净彼元无-</p><p>次要动作，心火自燃，焚我残躯，开启架招。格挡成功时，给目标添加一层“心火”，至多三层，持续到战斗脱离。</p><p><strong>心火：</strong>每层使招式伤害降低 10 点，叠加满三层时，移除所有心火，陷入“走火入魔”一回合。</p><p>·当该架招被击破时，自身陷入“走火入魔”，持续到开启任意架招。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+                    "automationNote": "格挡成功自动施加心火。架招被击破时陷入走火入魔需手动。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反击心火",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect && args.attacker) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n        actor.showFloatyText(\"心火反噬\", { fill: \"#ff4500\" });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "火中取栗",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "5米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>-彼受欢乐无烦恼，若言有苦无是处-</p><p>蓄力动作，熊熊圣火，灼击周围敌人，造成 0.6 力量点内功伤害，并为无架招目标添加一层“心火”，至多三层，持续到战斗脱离。</p><p>·若有敌人处于半空中，可消耗反应动作释放此招，原地打出灼热气劲，对周围敌人造成伤害，并为无架招目标添加一层“心火”。</p><p>·若你处于“走火入魔”，有架招的目标也会被添加“心火”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "命中时根据目标架招状态或自身走火入魔状态自动施加心火。半空反应动作施放为叙事/手动处理。",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "判断施加心火",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst targetNoStance = !args.target.system.martial.stanceActive;\nconst hasRage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"rage\");\n\nif (targetNoStance || hasRage) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "燎若观火",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-光明普遍皆清净，常乐寂灭无动诅-</p><p>主要动作，生亦何欢，死亦何苦，炎击目标造成 0.6 力量点内功伤害，击破敌人架招时，将其击飞 3 米，并为其添加两层“心火”，至多三层，持续到战斗脱离。</p><p>·若处于“走火入魔”，该招式虚招值+2。</p><p><strong>升级：</strong>招式伤害+10，走火入魔时虚招值再+1，内力消耗+4。</p>",
+                    "automationNote": "入魔增加虚招值自动（随等级成长）。击破架招施加心火自动。击飞需手动。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "入魔虚招加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const hasRage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"rage\");\nif (hasRage) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = 2 + (lvl - 1);\n    args.output.feint += bonus;\n    args.output.bonusDesc.push(`走火入魔虚招+${bonus}`);\n}"
+                        },
+                        {
+                            "label": "破招双重心火",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`击破架招，给 ${args.target.name} 施加了2层心火，请手动处理击飞。`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "刀山火海",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>-常受快乐光明中，若言有病无是处-</p><p>当你看破对方虚招时，可消耗反应动作施展此招，压制对方虚招，唯光明故，令牌飞舞，对目标造成 0.8 力量点内功伤害，并为其添加两层“心火”，持续到战斗脱离。</p><p>·若你处于“走火入魔”，招式伤害翻倍。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "入魔双倍伤害自动。命中施加心火自动。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "入魔伤害翻倍",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const hasRage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"rage\");\nif (hasRage) {\n    args.output.damage *= 2;\n    args.output.bonusDesc.push(\"走火入魔伤害翻倍\");\n}"
+                        },
+                        {
+                            "label": "命中双重心火",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "星火燎原",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "10米",
+                    "targetInfo": "周围范围内所有敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>-如有得住彼国者，究竟普会无忧愁-</p><p>蓄力动作，星星之火，遂成燎原，舞令灼击周围范围内所有敌人，造成 1.0 力量点内功伤害。</p><p>目标身上若存在“心火”，则每层使本招式伤害提升 20 点。</p><p>若目标处于“走火入魔”，将其眩晕一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "目标心火增伤自动。引爆入魔眩晕自动。",
+                    "costs": {
+                        "mp": [
+                            16,
+                            32,
+                            48,
+                            64
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 1.0
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "心火增伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const xinhuoEffect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_mingjiao_xinhuo\");\nconst stacks = xinhuoEffect ? (xinhuoEffect.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks > 0) {\n    args.config.amount += 20 * stacks;\n    // 这里不使用 ui.notifications，避免群攻时刷屏\n    console.log(`XJZL | 星火燎原：目标 ${args.target.name} 有 ${stacks} 层心火，伤害增加 ${20 * stacks}`);\n}"
+                        },
+                        {
+                            "label": "入魔眩晕",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst hasRage = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"rage\");\n\nif (hasRage) {\n    const stun = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"stun\"));\n    if (stun) {\n        stun.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, stun);\n        actor.showFloatyText(\"入魔引爆！\", { fill: \"#ff4500\" });\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        },
         "effects": [
             {
                 "name": "心火",
-                "icon": "icons/svg/fire.svg",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/明教.png",
                 "description": "每层使招式伤害降低 10 点。",
+                "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "wuxue_mingjiao_xinhuo",
@@ -1722,280 +1941,7 @@
                     }
                 ]
             }
-        ],
-        "system": {
-            "category": "wuxue",
-            "sect": "mingjiao",
-            "tier": 3,
-            "description": "明教绝技，取自摩尼教经典《下部赞》，记载于禁地之中，此功需诱发心魔之火，方能将精微妙诀尽数发挥，非大毅力者不可修。",
-            "requirements": "匕首-尺",
-            "moves": [
-                {
-                    "name": "如火如荼",
-                    "type": "stance",
-                    "element": "taiji",
-                    "damageType": "none",
-                    "weaponType": "special",
-                    "range": "自身",
-                    "targetInfo": "自身",
-                    "actionCost": "次要动作",
-                    "description": "-处所庄严皆清净，诸恶不净彼元无- <br>心火自燃，焚我残躯，开启架招。格挡成功时，给目标添加一层“心火”，至多三层，持续到战斗脱离。<br>心火：每层使招式伤害降低 10 点，叠加满三层时，移除所有心火，陷入“走火入魔”一回合。<br>当该架招被击破时，自身陷入“走火入魔”，持续到开启任意架招。",
-                    "automationNote": "格挡反击心火，满层自动转化走火入魔。被破招自动走火入魔。",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": []
-                    },
-                    "scripts": [
-                        {
-                            "label": "心火与走火",
-                            "trigger": "damaged",
-                            "script": "// 1. 被破招 -> 自身走火入魔\nif (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(actor, \"rage\");\n    ui.notifications.warn(`${actor.name} 圣火令被破，走火入魔！`);\n    return;\n}\n\n// 2. 格挡成功 -> 攻击者加心火\nif (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        // 添加并获取最新层数\n        await game.xjzl.api.effects.addEffect(args.attacker, effect.toObject());\n        \n        const updatedEffect = args.attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_mingjiao_xinhuo\");\n        const stacks = updatedEffect ? updatedEffect.getFlag(\"xjzl-system\", \"stacks\") : 0;\n        \n        if (stacks >= 3) {\n            await updatedEffect.delete();\n            await game.xjzl.api.effects.addEffect(args.attacker, \"rage\");\n            ui.notifications.info(`${args.attacker.name} 心火焚身，走火入魔！`);\n        }\n    }\n}",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "火中取栗",
-                    "type": "real",
-                    "element": "taiji",
-                    "damageType": "neigong",
-                    "weaponType": "special",
-                    "range": "5米",
-                    "targetInfo": "周围敌人",
-                    "actionCost": "蓄力动作",
-                    "description": "-彼受欢乐无烦恼，若言有苦无是处- <br>熊熊圣火，灼击周围敌人，造成伤害，并为无架招目标添加一层“心火”，至多三层，持续到战斗脱离。<br>若有敌人处于半空中，可消耗反应动作释放此招，原地打出灼热气劲，对周围敌人造成伤害，并为无架招目标添加一层“心火”。<br>若你处于“走火入魔”，有架招的目标也会被添加“心火”。",
-                    "automationNote": "无架招（或自身走火入魔）时施加心火。",
-                    "costs": {
-                        "mp": [
-                            8,
-                            16,
-                            24,
-                            32
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.6
-                            }
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "添加心火",
-                            "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst targetNoStance = !args.target.system.martial.stanceActive;\nconst selfRage = actor.statuses.has(\"rage\") || actor.effects.some(e => e.name === \"走火入魔\");\n\nif (targetNoStance || selfRage) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "燎若观火",
-                    "type": "feint",
-                    "element": "taiji",
-                    "damageType": "neigong",
-                    "weaponType": "special",
-                    "range": "5米",
-                    "targetInfo": "单体",
-                    "actionCost": "主要动作",
-                    "description": "-光明普遍皆清净，常乐寂灭无动诅- <br>生亦何欢，死亦何苦，炎击目标造成伤害，击破敌人架招时，将其击飞 3 米，并为其添加两层“心火”，至多三层，持续到战斗脱离。<br>若处于“走火入魔”，该招式虚招值+2。",
-                    "automationNote": "走火入魔增加虚招值。破招施加心火。击飞手动。",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.6
-                            }
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "入魔虚招",
-                            "trigger": "calc",
-                            "script": "if (actor.statuses.has(\"rage\") || actor.effects.some(e => e.name === \"走火入魔\")) {\n    args.output.feint += 2;\n    args.output.bonusDesc.push(\"入魔虚招+2\");\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "破招心火",
-                            "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n        await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n    }\n}",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "刀山火海",
-                    "type": "counter",
-                    "element": "taiji",
-                    "damageType": "neigong",
-                    "weaponType": "special",
-                    "range": "10米",
-                    "targetInfo": "单体",
-                    "actionCost": "反应动作",
-                    "description": "-常受快乐光明中，若言有病无是处- <br>当你看破对方虚招时，可消耗反应动作施展此招，压制对方虚招，唯光明故，令牌飞舞，对目标造成伤害，并为其添加两层“心火”，持续到战斗脱离。<br>若你处于“走火入魔”，招式伤害翻倍。",
-                    "automationNote": "入魔双倍伤害。命中施加心火。",
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12,
-                            16
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.8
-                            }
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "入魔双倍",
-                            "trigger": "calc",
-                            "script": "if (actor.statuses.has(\"rage\") || actor.effects.some(e => e.name === \"走火入魔\")) {\n    args.output.damage *= 2;\n    args.output.bonusDesc.push(\"入魔伤害翻倍\");\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "添加心火",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n        await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n    }\n}",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "星火燎原",
-                    "type": "real",
-                    "isUltimate": true,
-                    "element": "taiji",
-                    "damageType": "neigong",
-                    "weaponType": "special",
-                    "range": "10米",
-                    "targetInfo": "周围范围内所有敌人",
-                    "actionCost": "蓄力动作",
-                    "description": "-如有得住彼国者，究竟普会无忧愁- <br>星星之火，遂成燎原，舞令灼击周围范围内所有敌人，造成伤害。<br>目标身上若存在“心火”，则每层使本招式伤害提升 20 点。<br>若目标处于“走火入魔”，将其眩晕一回合。",
-                    "automationNote": "根据心火层数增伤。若目标走火入魔则眩晕。",
-                    "costs": {
-                        "mp": [
-                            16,
-                            32,
-                            48,
-                            64
-                        ],
-                        "rage": [
-                            8,
-                            7,
-                            6,
-                            5
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 1.0
-                            }
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "心火增伤与入魔眩晕",
-                            "trigger": "preDamage",
-                            "script": "// 检查心火增伤\nconst xinhuoEffect = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_mingjiao_xinhuo\");\nconst stacks = xinhuoEffect ? (xinhuoEffect.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks > 0) {\n    args.config.amount += 20 * stacks;\n    ui.notifications.info(`${args.target.name} 心火助燃：伤害+${20*stacks}`);\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "入魔眩晕",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    if (args.target.statuses.has(\"rage\") || args.target.effects.some(e => e.name === \"走火入魔\")) {\n        await game.xjzl.api.effects.addEffect(args.target, \"stun\");\n        ui.notifications.info(`${args.target.name} 走火入魔被引爆：眩晕！`);\n    }\n}",
-                            "active": true
-                        }
-                    ]
-                }
-            ]
-        }
+        ]
     },
     {
         "name": "三印洗沐（人）",
