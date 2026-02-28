@@ -1490,12 +1490,12 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // =====================================================
         // 检查 sourceItem 是否存在，且其 parent 是 container
         if (data.xjzlSource === "container" && data.data) {
-            
+
             // 1. 锁检查 (需要手动获取容器，因为不能依赖 uuid 解析)
             let container = null;
             try {
                 if (data.containerUuid) container = await fromUuid(data.containerUuid);
-            } catch(e) {}
+            } catch (e) { }
 
             // 如果连容器都找不到，或者是上锁的，直接拒绝
             if (container) {
@@ -1519,9 +1519,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
                     // 删除源物品
                     if (data.uuid && data.containerUuid) {
-                         const itemId = data.uuid.split(".").pop();
-                         await xjzlSocket.executeAsGM("deleteEmbedded", data.containerUuid, "Item", [itemId]);
-                         ui.notifications.info(`已堆叠: ${itemData.name}`);
+                        const itemId = data.uuid.split(".").pop();
+                        await xjzlSocket.executeAsGM("deleteEmbedded", data.containerUuid, "Item", [itemId]);
+                        ui.notifications.info(`已堆叠: ${itemData.name}`);
                     }
                     return false; // 结束，不往下走
                 }
@@ -1538,7 +1538,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     ui.notifications.info(`已拿取: ${itemData.name}`);
                 } catch (err) { console.error(err); }
             }
-            
+
             // 直接返回，不让代码往下执行到 super._onDropItem
             return createdItems;
         }
@@ -2705,7 +2705,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // === 增加层数 ===
             if (change > 0) {
                 if (!isStackable) {
-                    ui.notifications.warn(`"${effect.name}" 不可叠加层数。`);
+                    // 如果是不可叠层的，弹出修改持续时间窗口
+                    await this._promptEffectDuration(effect);
                 } else {
                     // 传入 toObject() 避免直接引用
                     await ActiveEffectManager.addEffect(this.actor, effect.toObject(), 1);
@@ -2726,6 +2727,101 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         } finally {
             // 无论成功还是失败，都要释放锁
             this._effectProcessing = false;
+        }
+    }
+
+    /**
+     * [辅助] 修改特效持续时间弹窗
+     * @param {ActiveEffect} effect 
+     */
+    async _promptEffectDuration(effect) {
+        // 1. 获取默认显示值
+        // 优先尝试获取系统计算的“剩余回合数” (effect.duration.remaining)
+        // 如果不在战斗中或没有剩余时间数据，则回退到原始定义的总回合数 (effect.duration.rounds)
+        let defaultVal = effect.duration.rounds || 0;
+
+        // 检查是否有剩余时间属性 (Foundry V11+ 特性)
+        if (effect.duration && typeof effect.duration.remaining === "number") {
+            defaultVal = effect.duration.remaining;
+        }
+
+        // 2. 构建 HTML 内容
+        // 样式调整：
+        // - label: 添加 white-space: nowrap 防止换行; flex: 0 0 auto 让它只占据文字所需宽度
+        // - input: flex: 1 占据剩余空间
+        // - p: 增加提示语
+        const content = `
+            <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
+                <label style="flex: 0 0 auto; white-space: nowrap; font-weight:bold;">持续时间 (回合):</label>
+                <div style="flex: 1;">
+                    <input type="number" name="rounds" value="${defaultVal}" min="0" step="1" autofocus style="text-align:center; width: 100%;">
+                </div>
+            </div>
+            
+            <div style="background: rgba(0, 0, 0, 0.05); padding: 8px; border-radius: 4px; font-size: 0.85em; color: #555; line-height: 1.4;">
+                <p style="margin-bottom: 5px;">
+                    <i class="fas fa-exclamation-circle"></i> <b>机制说明：</b><br>
+                    点击更新将<b>重置</b>该状态的开始时间。<br>
+                    设定为 <b>X</b>，意味着<b>从当前时刻起</b>，该状态还将持续 X 回合。
+                </p>
+                <p style="margin: 0;">
+                    <i class="fas fa-clock"></i> <b>结束时机：</b><br>
+                    将在当前角色的第 X 个回合<b>开始时</b>自动移除。
+                </p>
+                <p style="margin-top: 5px; color: #888;">(设为 0 代表无限持续)</p>
+            </div>
+        `;
+
+        const result = await foundry.applications.api.DialogV2.wait({
+            window: {
+                title: `调整: ${effect.name}`,
+                icon: "fas fa-stopwatch",
+                width: 320 //稍微加宽一点，保证舒适度
+            },
+            content: content,
+            buttons: [{
+                action: "ok",
+                label: "更新时长",
+                icon: "fas fa-check",
+                default: true,
+                callback: (event, button, dialog) => {
+                    const input = button.form.elements.rounds;
+                    return parseInt(input.value) || 0;
+                }
+            }],
+            rejectClose: false
+        });
+
+        // 如果用户没点确认，直接返回
+        if (result === null) return;
+
+        // 准备更新数据
+        const updateData = {
+            duration: {
+                rounds: result,
+                // 重要：修改时间时，必须重置开始锚点，否则系统会按旧的开始时间计算，导致刚改完就过期
+                startTime: game.time.worldTime
+            }
+        };
+
+        // 如果在战斗中，关联战斗轮次
+        if (game.combat) {
+            updateData.duration.startRound = game.combat.round;
+            updateData.duration.startTurn = game.combat.turn;
+        } else {
+            // 不在战斗中，清除战斗锚点，防止逻辑混乱
+            updateData.duration.startRound = null;
+            updateData.duration.startTurn = null;
+        }
+
+        // 执行更新
+        await effect.update(updateData);
+
+        // 视觉反馈
+        if (result > 0) {
+            ui.notifications.info(`${effect.name} 剩余时间已重置为 ${result} 回合。`);
+        } else {
+            ui.notifications.info(`${effect.name} 已设为无限持续。`);
         }
     }
 }
