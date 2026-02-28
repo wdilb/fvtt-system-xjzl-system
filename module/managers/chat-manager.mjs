@@ -2027,7 +2027,7 @@ export class ChatCardManager {
                     else {
                         // === 分支 B: 直接资源流失 (走 applyHealing) ===
                         // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)
-                        
+
                         await actor.applyHealing({
                             amount: -amount,
                             type: typeKey,
@@ -2276,24 +2276,87 @@ export class ChatCardManager {
         return created ? created.name : null;
     }
 
-    // --- 辅助：安全应用资源 ---
+    /**
+     * 辅助：安全应用资源变动 (支持 恢复、流失、伤害)
+     * @param {Actor} actor 目标角色
+     * @param {Object} resourceConfig 配置 { value: 10, type: "hp"/"poison" }
+     * @param {Number} multiplier 系数 (1=获得/恢复, -1=失去/伤害)
+     * @returns {String} 简短的日志文本
+     */
     static async _applyResourceHelper(actor, resourceConfig, multiplier) {
-        // resourceConfig: { value: 10, type: "hp" }
+        // 1. 基础解析
         const val = Number(resourceConfig.value);
-        if (!val) return null;
+        if (!val || val === 0) return null;
 
-        const finalAmount = val * multiplier; // 正数回血，负数扣血
+        const typeKey = resourceConfig.type || "hp";
 
-        await actor.applyHealing({
-            amount: finalAmount,
-            type: resourceConfig.type || "hp",
-            showScrolling: true
-        });
+        // 获取本地化标签 (尝试从伤害类型或通用标签中找)
+        let typeLabel = typeKey;
+        if (CONFIG.XJZL.damageTypes && CONFIG.XJZL.damageTypes[typeKey]) {
+            typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[typeKey]);
+        } else {
+            // 简单的资源字典映射
+            const map = { hp: "气血", mp: "内力", neili: "内力", rage: "怒气", tili: "体力", huti: "护体" };
+            typeLabel = map[typeKey] || typeKey;
+        }
 
-        // 构造简短的日志文本
-        const typeLabels = { hp: "气血", mp: "内力", rage: "怒气", tili: "体力" };
-        const label = typeLabels[resourceConfig.type] || resourceConfig.type;
-        return `${Math.abs(val)} ${label}`;
+        // =====================================================
+        // 情况 A: 恢复/获得 (Multiplier > 0)
+        // =====================================================
+        if (multiplier > 0) {
+            // 恢复永远走 applyHealing
+            await actor.applyHealing({
+                amount: val, // 正数
+                type: typeKey,
+                showScrolling: true
+            });
+            return `恢复 ${val} ${typeLabel}`;
+        }
+
+        // =====================================================
+        // 情况 B: 失去/伤害 (Multiplier < 0)
+        // =====================================================
+
+        // 检查是否为伤害类型 (poison, fire, mental, waigong 等)
+        const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
+
+        if (isDamageType) {
+            // --- 分支 B1: 造成伤害 (走 applyDamage, 计算抗性/护体) ---
+
+            // 对抗失败造成的伤害，通常视为无法规避的直击
+            const damageResult = await actor.applyDamage({
+                amount: val, // applyDamage 接收正数作为面板伤害
+                type: typeKey,
+                isHit: true,        // 必中
+                ignoreBlock: true,  // 无视格挡
+                ignoreStance: true, // 无视架招
+                ignoreDefense: true // 无视防御 (护甲)，但保留抗性计算
+            });
+
+            // 构建详细反馈 (显示实际损失)
+            const losses = [];
+            if (damageResult.hpLost > 0) losses.push(`${damageResult.hpLost} 气血`);
+            if (damageResult.mpLost > 0) losses.push(`${damageResult.mpLost} 内力`);
+            if (damageResult.hutiLost > 0) losses.push(`${damageResult.hutiLost} 护体`);
+
+            // 如果数值全为0，说明被抗性完全抵消
+            if (losses.length === 0) {
+                return `承受 ${val} ${typeLabel}伤害 (被抵消)`;
+            }
+            return `承受 ${val} ${typeLabel}伤害 (实扣: ${losses.join(", ")})`;
+
+        } else {
+            // --- 分支 B2: 直接流失 (走 applyHealing, 强制扣除) ---
+            // 适用于 hp, mp, rage 等非伤害类型
+
+            await actor.applyHealing({
+                amount: -val, // 传入负数
+                type: typeKey,
+                showScrolling: true
+            });
+
+            return `流失 ${val} ${typeLabel}`;
+        }
     }
 
     /**
