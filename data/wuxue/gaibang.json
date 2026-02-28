@@ -7,8 +7,8 @@
             "category": "wuxue",
             "sect": "gaibang",
             "tier": 1,
-            "description": "<p>原是家中孝子对逝者的哀悼和尊敬时持用，此中则颠三倒四，出招时夸张呼喝，样貌骇人。</p>",
-            "requirements": "棍-短棍，污衣派；",
+            "description": "<p>原是家中孝子对逝者的哀悼和尊敬时持用，此中则颠三倒四，出招时夸张呼喝，样貌骇人。</p><p><strong>需求：</strong>棍-短棍，污衣派</p><p><strong>属性：</strong>阳</p>",
+            "requirements": "棍-短棍；污衣派",
             "moves": [
                 {
                     "name": "悼心疾首",
@@ -19,8 +19,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>挥棍大叫而击，对目标造成伤害。可消耗两层“痛哭”，击飞目标 1 米。</p>",
-                    "automationNote": "自动检测并消耗痛哭。击飞手动。",
+                    "description": "<p>挥棍大叫而击，对目标造成 0.4 力量点外功伤害。可消耗两层“痛哭”，击飞目标 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "痛哭效果出招时弹窗选择是否消耗，同意则发送击飞卡片提醒。位移请手动操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -36,16 +36,14 @@
                             1,
                             2,
                             3
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "消耗痛哭",
-                            "trigger": "hit",
+                            "label": "选择消耗痛哭",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "const tongku = attacker.effects.find(e => e.name === '痛哭');\nif (tongku && tongku.stacks >= 2) {\n    await game.xjzl.api.effects.removeEffect(attacker, '痛哭', 2);\n    ui.notifications.info(`${attacker.name} 消耗两层痛哭！`);\n}"
+                            "script": "const tongku = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tongku\");\nconst stacks = tongku ? (tongku.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (stacks >= 2) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"悼心疾首 - 痛哭爆发\" },\n        content: `<p>你当前拥有 ${stacks} 层 <b>[痛哭]</b>。</p><p>是否消耗 2 层，将目标击飞 1 米？</p>`,\n        yes: { label: \"消耗击飞\", icon: \"fas fa-check\" },\n        no: { label: \"保留痛哭\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"tongku\", 2);\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#8b0000; font-weight:bold;\"><i class=\"fas fa-wind\"></i> 触发击飞效果！<br><span style=\"font-size:0.9em; font-weight:normal; color:#555;\">请手动将目标击飞 1 米。</span></div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
                         }
                     ]
                 },
@@ -58,8 +56,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>流泪狠击，对目标造成伤害，击破架招时给目标添加“哭丧”，持续三回合。</p><p><strong>哭丧</strong>：施展消耗动作的轻功时，流失 5 点内力（升级后流失增加）。</p>",
-                    "automationNote": "破防施加哭丧。哭丧效果手动。",
+                    "description": "<p>流泪狠击，对目标造成 0.3 力量点外功伤害，击破架招时给目标添加“哭丧”，持续三回合。</p><p><strong>哭丧：</strong>施展消耗动作的轻功时，流失 5 点内力（升级后流失增加）。</p><p><strong>升级：</strong>招式伤害+5，流失内力+5，内力消耗+1。</p>",
+                    "automationNote": "破防后自动施加[哭丧]，持续三回合。流失效果随等级智能计算，但施展轻功扣蓝需要依赖提示手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -75,16 +73,14 @@
                             1,
                             2,
                             3
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "施加哭丧",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const effectData = thisItem.effects.getName('哭丧').toObject();\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const val = 5 + (lvl - 1) * 5;\n    effectData.description = `施展消耗动作的轻功时，流失 ${val} 点内力。`;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isBroken) {\n    const effectData = thisItem.effects.getName('哭丧').toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const val = 5 + (lvl - 1) * 5;\n    effectData.description = `施展消耗动作的轻功时，请手动流失 ${val} 点内力。`;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -97,8 +93,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>以棍抵地，满脸哀丧，开启架招。成功格挡后，给对方添加“下盘不稳”，持续一回合。并获得两层“痛哭”，最多叠加 5 层。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>以棍抵地，满脸哀丧，开启架招。成功格挡后，给对方添加“下盘不稳”，持续一回合。并获得两层“痛哭”，最多叠加 5 层。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。格挡后为对方施加系统[下盘不稳]1回合，并为自己叠加两层痛哭。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -108,16 +104,14 @@
                             1,
                             2,
                             3
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "格挡反馈",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    await game.xjzl.api.effects.toggleStatus(args.attacker, 'unstable', true);\n    const tongku = thisItem.effects.getName('痛哭').toObject();\n    tongku.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, tongku);\n    await game.xjzl.api.effects.addEffect(actor, tongku);\n    ui.notifications.info(\"哭哭啼啼：获得痛哭并使对方下盘不稳！\");\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 1. 给对方添加下盘不稳 (1回合)\nconst unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\nif (unstable && args.attacker) {\n    unstable.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, unstable);\n}\n\n// 2. 自身获得2层痛哭\nconst tongku = thisItem.effects.getName('痛哭').toObject();\ndelete tongku._id;\ntongku.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, tongku, 2);\n\nactor.showFloatyText(\"受阻，反馈痛哭！\", { fill: \"#FFA500\" });"
                         }
                     ]
                 },
@@ -131,8 +125,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>哭丧至极，若疯癫狂，抽打对目标造成伤害。如果你身上已经存在至少三层“痛哭”，可以选择消耗全部的“痛哭”，让这个招式不减少怒气值。</p>",
-                    "automationNote": "自动检测并消耗痛哭返还怒气。",
+                    "description": "<p>哭丧至极，若疯癫狂，抽打对目标造成 0.5 力量点外功伤害。</p><p>如果你身上已经存在至少三层“痛哭”，可以选择消耗全部的“痛哭”，让这个招式不减少怒气值。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "出招如果层数>=3会自动发卡片提醒。如果是因怒气不够而勾选了【无消耗施展】，请配合提醒手动扣除内力并删掉痛哭特效。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -153,15 +147,14 @@
                             7,
                             6,
                             5
-                        ],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
-                            "label": "痛哭免怒",
+                            "label": "提醒免怒提示",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const tongku = actor.effects.find(e => e.name === '痛哭');\nif (tongku && tongku.stacks >= 3) {\n    const refundRage = args.move.currentCost.rage;\n    await tongku.delete();\n    await actor.applyHealing({ amount: refundRage, type: 'rage', showScrolling: false });\n    ui.notifications.info(`${actor.name} 消耗全部痛哭，怒气已返还！`);\n}"
+                            "script": "const tongku = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tongku\");\nconst stacks = tongku ? (tongku.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (stacks >= 3) {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; color:#555;\"><p><i class=\"fas fa-exclamation-circle\" style=\"color:#8b0000;\"></i> <b>痛哭免怒提醒：</b><br>你当前拥有 <b>${stacks}</b> 层 [痛哭]，满足不消耗怒气的条件！</p><p>你现在可以手动删除所有的 [痛哭]，然后在上方卡片处点击<b>撤回消耗</b>来返还怒气。</p><p style=\"font-size:0.85em; color:#a569bd;\">（若你是勾选了免耗强制放出的本招式，请记得补扣内力并手动删掉痛哭即可。）</p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 }
@@ -171,6 +164,7 @@
             {
                 "name": "痛哭",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": false,
                 "description": "哭丧棒累计的悲伤情绪，最高叠加5层。",
                 "flags": {
                     "xjzl-system": {
@@ -178,11 +172,13 @@
                         "stackable": true,
                         "maxStacks": 5
                     }
-                }
+                },
+                "changes": []
             },
             {
                 "name": "哭丧",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/丐帮.png",
+                "transfer": false,
                 "description": "施展消耗动作的轻功时，流失内力。",
                 "duration": {
                     "rounds": 3
@@ -192,7 +188,8 @@
                         "slug": "kusang",
                         "stackable": false
                     }
-                }
+                },
+                "changes": []
             }
         ]
     },
