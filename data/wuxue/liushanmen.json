@@ -1239,7 +1239,7 @@
                     "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
                     "description": "<p>记载着一以贯通心法的总纲与行气路线。</p>",
                     "requirements": "",
-                    "automationNote": "被动效果已完全自动化。穴位打通需求需玩家自觉遵守。",
+                    "automationNote": "被动效果完全自动化。calc阶段提供面板预估，attack阶段根据真实耗蓝自动校准最终伤害并发送卡片。穴位打通需求需玩家自觉遵守。",
                     "weaponType": "none",
                     "progression": {
                         "mode": "custom",
@@ -1247,7 +1247,8 @@
                             1000,
                             2000,
                             4000
-                        ]
+                        ],
+                        "mappedStage": 0
                     },
                     "xpCostRatio": 1,
                     "costs": {
@@ -1276,10 +1277,16 @@
                         "slug": "yiyiguantong",
                         "scripts": [
                             {
-                                "label": "内力转化伤害",
+                                "label": "伤害预估 (预览用)",
                                 "trigger": "calc",
                                 "active": true,
-                                "script": "/**\n * 优化版脚本：内存查找，零IO损耗\n */\n// 1. 获取当前出招的基础内力消耗\n// 如果没有内力消耗，直接跳过\nconst mpCost = args.move.currentCost?.mp || 0;\nif (mpCost <= 0) return;\n\n// 2. 在 Actor 内存中直接查找源物品 (Item)\n// 假设招式名和书名一致，或者我们知道它叫'一以贯通'\n// 这里的 actor 就是 thisEffect.parent (因为 transfer=true)\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\n\n// 3. 查找招式数据\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nif (!passiveMove) return;\n\n// 4. 获取内存中的计算等级 (Computed Level)\nconst level = passiveMove.computedLevel || 0;\nif (level < 1) return;\n\n// 5. 计算倍率\nlet multiplier = level; // 1级=1倍, 2级=2倍, 3级=3倍\n// 如果后续规则有变(比如1级0.5倍)，可以在这里改 switch/if\nif (level > 3) multiplier = 3; // 封顶\n\n// 6. 应用增伤\nconst bonus = Math.floor(mpCost * multiplier);\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`一以贯通(Lv.${level}): +${bonus} (内力${mpCost} x ${multiplier})`);\n}"
+                                "script": "if (args.move.type === 'basic') return;\nconst mpCost = args.move.currentCost?.mp || 0;\nif (mpCost <= 0) return;\n\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\nconst bonus = Math.floor(mpCost * multiplier);\n\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`一以贯通(Lv.${level}): +${bonus} (基于面板消耗${mpCost}预估，不代表最终结果)`);\n}"
+                            },
+                            {
+                                "label": "真实伤害校准",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "if (args.move.type === 'basic') return;\nconst mpCost = args.move.currentCost?.mp || 0;\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\n\n// 1. 先把 calc 阶段加的预估值扣掉\nconst previewBonus = Math.floor(mpCost * multiplier);\nargs.flags.damageResult.damage -= previewBonus;\n\n// 2. 获取本次真正扣掉的内力 (含减耗、免费施法、濒死额外耗蓝)\nconst realMp = args.costConsumed?.mp || 0;\nconst realBonus = Math.floor(realMp * multiplier);\n\n// 3. 把真正的加值加进去\nargs.flags.damageResult.damage += realBonus;\n\n// 4. 更新卡片描述\nif (realBonus !== previewBonus) {\n    args.flags.damageResult.breakdown += `\\n+ 一以贯通 (实扣${realMp}内力): +${realBonus}`;\n}\n\n// 5. 只要造成了额外伤害，发一张带边距的卡片\nif (realBonus > 0) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bolt\"></i> 一以贯通 (Lv.${level})</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">实际消耗 ${realMp} 点内力，招式伤害提升 <span style=\"color:#8e44ad; font-weight:bold;\">${realBonus}</span> 点！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                             }
                         ]
                     }
