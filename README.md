@@ -399,12 +399,17 @@ await Macros.requestSave({
 
 #### 🩸 `hit_once` (全局结算)
 *   **时机**: 所有目标处理完毕后执行一次。
-*   **用途**: 群攻/群奶后的自身反馈 (如"每命中一人回1点气")。
+*   **用途**: 群攻/群奶后的自身反馈 (如"每命中一人回1点气"、根据真实耗蓝回血)。
 *   **参数 (`args`)**:
     *   `targets` (Array): 包含所有目标详细结果 (`summaryData`) 的数组。
     *   `hitCount` (Int): 命中的目标总数。
     *   `baseDamage` (Number): 面板伤害 (攻击模式下)。
     *   `totalHealAmount` (Number): (治疗模式下) 总治疗量。
+    *   `costConsumed` (Object): **本次出招的真实资源消耗** (包含减耗、免费施法、濒死一击额外耗蓝)。
+        *   `.mp` (Number): 实际消耗的内力总和。
+        *   `.hp` (Number): 实际消耗的气血。
+        *   `.rage` (Number): 实际消耗的怒气。
+        *   `.morale` (Number): 实际消耗的士气。
     *   `attacker`, `item`, `move`, `isManual`。
 
 ---
