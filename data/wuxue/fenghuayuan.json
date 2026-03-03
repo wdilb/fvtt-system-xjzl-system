@@ -268,10 +268,10 @@
                             "label": "格挡反制",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    let stacks = 1;\n    const qiren = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qiren\");\n    if (qiren) {\n        await qiren.delete();\n        stacks = 2;\n        ui.notifications.info(\"消耗气刃，额外施加失准！\");\n    }\n\n    // 循环叠加系统状态\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(args.attacker, \"shizhun\");\n    }\n}"
+                            "script": "if (!args.attacker || !Macros.checkStance(actor, args)) return;\n\nlet stacks = 1;\nconst qiren = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qiren\");\n\nif (qiren) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"消耗气刃\" },\n        content: \"<p>格挡成功！是否消耗【气刃】为目标额外添加一层【失准】？</p>\",\n        yes: { label: \"消耗气刃\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await qiren.delete();\n        stacks = 2;\n        actor.showFloatyText(\"气刃消散！\", {fill: \"#00ffff\"});\n    }\n}\n\nconst effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"shizhun\"));\nif (effectData) {\n    effectData.duration = { rounds: 99 };\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    }\n}"
                         }
                     ],
-                    "automationNote": "受击反制添加失准，自动检测并消耗气刃加层。",
+                    "automationNote": "受击反制添加失准，若有气刃将弹窗询问是否消耗以加层。",
                     "actionCost": "次要动作"
                 },
                 {
@@ -784,19 +784,21 @@
             "category": "wuxue",
             "sect": "fenghuayuan",
             "tier": 2,
-            "description": "<p>枫桦院绝技，飘逸轻盈，辗转腾挪间制服敌人，加之独特的凝气弓弦，实在让人防不胜防。</p><p>需求：奇门-弓，静院 属性：太极</p>",
-            "requirements": "弓",
+            "description": "<p>枫桦院绝技，飘逸轻盈，辗转腾挪间制服敌人，加之独特的凝气弓弦，实在让人防不胜防。</p><p><strong>需求：</strong>奇门-弓，静院 <strong>属性：</strong>太极</p>",
+            "requirements": "奇门-弓；静院",
             "moves": [
                 {
                     "name": "若隐若现",
                     "type": "qi",
                     "actionType": "buff",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "none",
                     "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "special",
-                    "description": "<p>自身必须装备“枫桦戒”方能施展此招。</p><p>主要动作，凝气于枫桦戒，化气为弓，自身获得“气弓”，持续到战斗脱离。</p><p>气弓：一把虚无弓弦，凝化于掌中，其武器类型为弓，伤害格挡特效参照当前装备的枫桦戒效果。</p><p>·手持气弓时闪避+4。</p><p>升级：释放动作降低一级（主要-次要-简要）。</p>",
                     "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p>自身必须装备“枫桦戒”方能施展此招。</p><p>主要动作，凝气于枫桦戒，化气为弓，自身获得“气弓”，持续到战斗脱离。</p><p><strong>气弓：</strong>一把虚无弓弦，凝化于掌中，其武器类型为弓，伤害格挡特效参照当前装备的枫桦戒效果。</p><p>·手持气弓时闪避+4。</p><p><strong>升级：</strong>释放动作降低一级（主要-次要-简要）。</p>",
+                    "automationNote": "施展时自动检测戒指并赋予[气弓]状态。由于动作消耗减免难以完全自动化，请玩家随着招式升级自行把握动作花费。",
                     "costs": {
                         "mp": [
                             5,
@@ -804,26 +806,30 @@
                             5
                         ]
                     },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "scripts": [
                         {
                             "label": "气弓状态",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const ring = actor.items.find(i => i.name.includes(\"枫桦戒\") && i.system.equipped);\nif (!ring) return ui.notifications.warn(\"未装备枫桦戒！\");\nconst effectData = thisItem.effects.getName(\"气弓\").toObject();\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n\n// 瞬发处理\nargs.flags.autoApplied = true;\nui.notifications.info(\"已化气为弓 (闪避+4)。\");"
+                            "script": "const ring = actor.items.find(i => i.name.includes(\"枫桦戒\") && i.system.equipped);\nif (!ring) return ui.notifications.warn(\"未装备枫桦戒，无法施展！\");\n\nconst effectData = thisItem.effects.getName(\"气弓\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n\nargs.flags.autoApplied = true;\nui.notifications.info(\"已化气为弓 (闪避+4)。\");"
                         }
-                    ],
-                    "automationNote": "闪避加成已处理。",
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "漫天飞羽",
                     "type": "real",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "neigong",
                     "element": "taiji",
+                    "damageType": "neigong",
                     "weaponType": "special",
-                    "description": "<p>当闪避攻击时，可消耗反应动作释放，腾空跃起（处于半空），散射飞矢，对范围内空格及其周围 2 米内所有敌方造成 0.4 身法点内功伤害。</p><p>·若自身具有“气弓”，可移除气弓，为命中目标添加“禁足”，持续一回合。</p><p>升级：招式伤害+10，内力消耗+4。</p>",
-                    "range": "5",
+                    "range": "5米",
+                    "targetInfo": "范围",
+                    "actionCost": "反应动作",
+                    "description": "<p>当闪避攻击时，可消耗反应动作释放，腾空跃起（处于半空），散射飞矢，对范围内空格及其周围 2 米内所有敌方造成 0.4 身法点内功伤害。</p><p>·若自身具有“气弓”，可移除气弓，为命中目标添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "出招时弹窗询问是否消耗气弓，若确认则全局附带禁足效果。由于闪避是前置条件，需玩家自行把握时机释放。",
                     "costs": {
                         "mp": [
                             4,
@@ -843,30 +849,30 @@
                     },
                     "scripts": [
                         {
-                            "label": "气弓禁足",
-                            "trigger": "hit",
+                            "label": "询问消耗气弓",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong && args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    ui.notifications.info(`${args.target.name} 被禁足。`);\n}"
+                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"漫天飞羽\" },\n        content: \"<p>是否消耗【气弓】使本次攻击对所有命中目标施加【禁足】？</p>\",\n        yes: { label: \"消耗气弓\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await qigong.delete();\n        args.flags.qiBowConsumed = true; // 传递给 hit 阶段\n        actor.showFloatyText(\"气弓消散！\", {fill: \"#ffffff\"});\n    }\n}"
                         },
                         {
-                            "label": "移除气弓",
-                            "trigger": "hit_once",
+                            "label": "施加禁足",
+                            "trigger": "hit",
                             "active": true,
-                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong && args.hitCount > 0) {\n    await qigong.delete();\n    ui.notifications.info(\"气弓已消耗。\");\n}"
+                            "script": "if (args.isHit && args.flags.qiBowConsumed) {\n    const rootEff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootEff) {\n        rootEff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rootEff);\n    }\n}"
                         }
-                    ],
-                    "automationNote": "禁足和消耗气弓已处理。闪避触发条件需玩家自行把握。",
-                    "actionCost": "反应动作"
+                    ]
                 },
                 {
                     "name": "秋风送寒",
                     "type": "feint",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "neigong",
                     "element": "taiji",
+                    "damageType": "neigong",
                     "weaponType": "special",
-                    "description": "<p>主要动作，轻盈之气，佯射目标，造成 0.4 身法点内功伤害，击破架招时，使目标陷入“下盘不稳”，持续三回合。</p><p>·若自身具有“气弓”，可移除气弓使虚招值+1。</p><p>升级：招式伤害+10，虚招值再+1，内力消耗+2。</p>",
-                    "range": "8",
+                    "range": "8米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，轻盈之气，佯射目标，造成 0.4 身法点内功伤害，击破架招时，使目标陷入“下盘不稳”，持续三回合。</p><p>·若自身具有“气弓”，可移除气弓使虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
+                    "automationNote": "出招前自动询问是否消耗气弓以增加动态虚招值。击破架招自动施加下盘不稳。",
                     "costs": {
                         "mp": [
                             2,
@@ -884,34 +890,39 @@
                             }
                         ]
                     },
-                    "baseFeint": 0,
                     "scripts": [
                         {
-                            "label": "气弓加成",
-                            "trigger": "calc",
+                            "label": "询问消耗气弓",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) {\n    output.feint += 1;\n    output.bonusDesc.push(\"气弓加成: 虚招+1\");\n}"
+                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"漫天飞羽\" },\n        content: \"<p>是否决定消耗【气弓】使本次攻击对所有命中目标施加【禁足】？</p>\",\n        yes: { label: \"决定消耗\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        // 写入持久化标记，跨阶段传递\n        await actor.setFlag(\"xjzl-system\", \"qiBowConsumed_mantian\", true);\n        actor.showFloatyText(\"锁定气弓威能\", {fill: \"#00ffff\"});\n    }\n}"
                         },
                         {
-                            "label": "击破特效与移除气弓",
+                            "label": "施加禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n    ui.notifications.info(\"目标下盘不稳。\");\n}\nconst qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    await qigong.delete();\n    ui.notifications.info(\"气弓已消耗。\");\n}"
+                            "script": "if (args.isHit && actor.getFlag(\"xjzl-system\", \"qiBowConsumed_mantian\")) {\n    const rootEff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootEff) {\n        rootEff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rootEff);\n    }\n}"
+                        },
+                        {
+                            "label": "清理与消耗",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (actor.getFlag(\"xjzl-system\", \"qiBowConsumed_mantian\")) {\n    const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\n    if (qigong) await qigong.delete();\n    // 清理标记\n    await actor.unsetFlag(\"xjzl-system\", \"qiBowConsumed_mantian\");\n    ui.notifications.info(\"气弓已消耗，威能释放完毕。\");\n}"
                         }
-                    ],
-                    "automationNote": "加成、状态、消耗均已自动。",
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "穿龙贯凤",
                     "type": "real",
                     "isUltimate": true,
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "neigong",
                     "element": "taiji",
+                    "damageType": "neigong",
                     "weaponType": "special",
-                    "description": "<p>蓄力动作，调息开步拉弓，射出贯穿气箭，对直线路径上所有敌方造成 0.7 身法点内功伤害，并为他们添加“缚身”，持续一回合。</p><p>·若自身具有“气弓”，招式暴击骰-1，且缚身的持续回合数变为三回合。</p><p>升级：招式伤害+20，暴击骰再-1，怒气消耗-1，内力消耗+8。</p>",
-                    "range": "10",
+                    "range": "10米",
+                    "targetInfo": "路径敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，调息开步拉弓，射出贯穿气箭，对直线路径上所有敌方造成 0.7 身法点内功伤害，并为他们添加“缚身”，持续一回合。</p><p>·若自身具有“气弓”，招式暴击骰-1，且缚身的持续回合数变为三回合。</p><p><strong>升级：</strong>招式伤害+20，暴击骰再-1，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "自动检测气弓并应用动态暴击加成及三回合缚身，不会消耗气弓。",
                     "costs": {
                         "mp": [
                             8,
@@ -939,17 +950,15 @@
                             "label": "气弓暴击修正",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) {\n    args.flags.critThresholdMod += 1;\n    ui.notifications.info(\"气弓修正: 暴击门槛-1\");\n}"
+                            "script": "const qigong = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const critBonus = lvl;\n    args.flags.critThresholdMod += critBonus;\n    ui.notifications.info(`气弓加持: 暴击门槛 -${critBonus}`);\n}"
                         },
                         {
                             "label": "施加缚身",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    let rounds = 1;\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) rounds = 3;\n    \n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    effectData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit) {\n    let rounds = 1;\n    // 因为不消耗气弓，所以直接重新检测 Actor 身上有没有气弓即可\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) {\n        rounds = 3;\n    }\n    \n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    if (effectData) {\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
                         }
-                    ],
-                    "automationNote": "暴击修正和加强版缚身均已处理。",
-                    "actionCost": "蓄力动作"
+                    ]
                 }
             ]
         },
@@ -959,18 +968,18 @@
                 "icon": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
                 "transfer": false,
                 "description": "闪避+4",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qigong"
+                    }
+                },
                 "changes": [
                     {
                         "key": "system.combat.dodge",
                         "mode": 2,
                         "value": "4"
                     }
-                ],
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "qigong"
-                    }
-                }
+                ]
             }
         ]
     },
@@ -982,55 +991,51 @@
             "category": "wuxue",
             "sect": "fenghuayuan",
             "tier": 2,
-            "description": "<p>情思难测，爱恨交织，悟透方得此功。</p><p>需求：徒手，尘院 属性：太极</p>",
-            "requirements": "徒手",
+            "description": "<p>情思难测，爱恨交织，悟透方得此功。</p><p><strong>需求：</strong>徒手，尘院 <strong>属性：</strong>太极</p>",
+            "requirements": "徒手；尘院",
             "moves": [
                 {
                     "name": "喜怒哀乐",
                     "type": "stance",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "neigong",
                     "element": "taiji",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "description": "<p>次要动作，心情跌宕，却不露声色，格挡成功后自身获得“悟情”，持续一回合或解除架招。</p><p>悟情：在你的每个回合初，可以改变自身性格，在持续结束后，恢复原性格。</p><p>·你不会因本招式而改变原性格给予的技能加成。</p><p>升级：格挡值+10，额外持续一回合，消耗+2。</p>",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>心情跌宕，却不露声色，格挡成功后自身获得“悟情”，持续一回合或解除架招。</p><p><strong>悟情：</strong>在你的每个回合初，可以改变自身性格，在持续结束后，恢复原性格。</p><p>·你不会因本招式而改变原性格给予的技能加成。</p><p><strong>升级：</strong>格挡值+10，额外持续一回合，消耗+2。</p>",
+                    "automationNote": "格挡自动获得状态。状态持续回合自动随等级增加。修改性格及技能无加成的限制需要玩家进行Roleplay手动扮演处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
                     "costs": {
                         "mp": [
                             2,
                             4,
                             6
                         ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10
                     },
                     "scripts": [
                         {
                             "label": "格挡悟情",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    \n    // 动态持续回合：1级1回合，2级2回合...\n    const lvl = Math.max(1, move.computedLevel || 1);\n    effectData.duration = { rounds: lvl };\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
-                    ],
-                    "automationNote": "格挡获得状态。改性格需玩家手动操作或Roleplay。",
-                    "actionCost": "次要动作"
+                    ]
                 },
                 {
                     "name": "悲欢离合",
                     "type": "real",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "neigong",
                     "element": "taiji",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
-                    "description": "<p>主要动作，十指击额，对目标造成 0.5 内息点内功伤害，然后你可以得知目标的具体性格。</p><p>·若你的性格与目标相同，目标受到伤害后还会大喜大悲，怒气-1 且陷入“迟滞”，持续一回合。</p><p>升级：招式伤害+10，内力消耗+2。</p>",
-                    "range": "1",
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>十指击额，对目标造成 0.5 内息点内功伤害，然后你可以得知目标的具体性格。</p><p>·若你的性格与目标相同，目标受到伤害后还会大喜大悲，怒气-1 且陷入“迟滞”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。智能读取性格物品Name；若共鸣，自动扣除怒气并施加持续1回合的[迟滞]。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1041,26 +1046,6 @@
                             }
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "性格判定",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isHit) {\n    const targetP = args.target.system.info?.personality || \"无\";\n    const myP = actor.system.info?.personality || \"无\";\n    ui.notifications.info(`目标性格: ${targetP}`);\n    \n    if (targetP === myP && targetP !== \"\") {\n        await game.xjzl.api.effects.addEffect(args.target, \"chizhi\");\n        await args.target.update({ \"system.resources.rage.value\": Math.max(0, args.target.system.resources.rage.value - 1) });\n        ui.notifications.info(\"性格共鸣！目标怒气-1，迟滞。\");\n    }\n}"
-                        }
-                    ],
-                    "automationNote": "自动比对性格字段并应用效果。",
-                    "actionCost": "主要动作"
-                },
-                {
-                    "name": "酸甜苦辣",
-                    "type": "counter",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "neigong",
-                    "element": "taiji",
-                    "weaponType": "unarmed",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作使用此招，压制虚招，拳脚相加，造成 0.6 内息点内功伤害。</p><p>若你的性格与目标相同，你可以选择一个该性格加成的属性技能与对方进行对抗检定，若你获胜，对方受到他的这项属性技能等级*10 的气血流失。</p><p>升级：招式伤害+10，内力消耗+2。</p>",
-                    "range": "2",
                     "costs": {
                         "mp": [
                             2,
@@ -1068,6 +1053,26 @@
                             6
                         ]
                     },
+                    "scripts": [
+                        {
+                            "label": "性格共鸣判定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && args.target) {\n    // 修正后的性格获取函数：直接读性格物品的名字\n    const getP = (act) => {\n        if (!act) return \"\";\n        if (act.itemTypes?.personality?.length > 0) {\n            return act.itemTypes.personality[0].name;\n        }\n        return act.system?.info?.personality || \"\";\n    };\n\n    const targetP = getP(args.target);\n    const myP = getP(actor);\n\n    // 1. 发送窥探性格的提示卡片\n    const pName = targetP ? targetP : \"无明显性格\";\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; margin-left: 4px; border-left: 4px solid #2980b9; background: rgba(41, 128, 185, 0.1);\">\n            <div style=\"font-size: 0.9em; color: #2c3e50;\"><i class=\"fas fa-eye\"></i> 窥探到目标性格：<b>${pName}</b></div>\n        </div>`\n    });\n    \n    // 2. 校验共鸣 (确保两者都不为空且相等)\n    if (targetP && myP && targetP === myP) {\n        // 扣除怒气\n        const currentRage = args.target.system.resources.rage.value;\n        if (currentRage > 0) {\n            await args.target.update({ \"system.resources.rage.value\": currentRage - 1 });\n        }\n        \n        // 施加迟滞 1回合\n        const chizhiConfig = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n        if (chizhiConfig) {\n            const chizhiData = foundry.utils.deepClone(chizhiConfig);\n            chizhiData.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, chizhiData);\n        }\n        \n        actor.showFloatyText(\"性格共鸣！\", { fill: \"#e056fd\" });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "酸甜苦辣",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作使用此招，压制虚招，拳脚相加，造成 0.6 内息点内功伤害。</p><p>若你的性格与目标相同，你可以选择一个该性格加成的属性技能与对方进行对抗检定，若你获胜，对方受到他的这项属性技能等级*10 的气血流失。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中时若性格相同，系统会发送高亮卡片提示玩家。后续对抗与流失伤害请遵循提示手动执行。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1078,27 +1083,39 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
                     "scripts": [
                         {
-                            "label": "性格对抗",
+                            "label": "共鸣提示卡片",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const targetP = args.target.system.info?.personality || \"\";\nconst myP = actor.system.info?.personality || \"\";\nif (args.isHit && targetP === myP && targetP !== \"\") {\n    ui.notifications.info(\"性格相同！请手动发起属性对抗，若获胜请手动应用流失伤害 (技能等级*10)。\");\n}"
+                            "script": "if (args.isHit && args.target) {\n    const getP = (act) => {\n        if (!act) return \"\";\n        if (act.itemTypes?.personality?.length > 0) {\n            return act.itemTypes.personality[0].name;\n        }\n        return act.system?.info?.personality || \"\";\n    };\n\n    const targetP = getP(args.target);\n    const myP = getP(actor);\n    \n    if (targetP && myP && targetP === myP) {\n        const msg = `\n            <div class=\"xjzl-chat-card\" style=\"margin-left: 4px; padding: 4px 8px; border-left: 4px solid #8e44ad; background: rgba(142, 68, 173, 0.1);\">\n                <div style=\"font-weight: bold; color: #8e44ad;\"><i class=\"fas fa-people-arrows\"></i> 性格共鸣触发！</div>\n                <div style=\"font-size: 0.9em; margin-top: 4px; color: #555;\">\n                    双方性格同为 <b>${myP}</b>。<br>\n                    <hr style=\"margin:4px 0;\">\n                    请手动发起一个【受该性格加成的属性技能】对抗。<br>\n                    若获胜，请手动对目标造成 <b>技能等级 × 10</b> 点气血流失。\n                </div>\n            </div>`;\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: msg\n        });\n    }\n}"
                         }
-                    ],
-                    "automationNote": "性格提示自动，对抗和流失需手动处理。",
-                    "actionCost": "反应动作"
+                    ]
                 },
                 {
                     "name": "幡然悔悟",
                     "type": "qi",
                     "actionType": "buff",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/枫华.png",
-                    "damageType": "none",
+                    "isUltimate": true,
                     "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "unarmed",
-                    "description": "<p>次要动作，大彻大悟，获得“悟情”持续到脱战。</p><p>·若自身已有“悟情”，方知真谛，以前所为，白日做梦尔，移除悟情，获得“悟”，持续到脱战。</p><p>悟：你的悟性+5（至多 30），同时你的招式命中和伤害获得等同于自身悟性的加值。</p><p>升级：提供悟性+5，怒气消耗-1，内力消耗+4。</p>",
                     "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>大彻大悟，获得“悟情”持续到脱战。</p><p>·若自身已有“悟情”，方知真谛，以前所为，白日做梦尔，移除悟情，获得“悟”，持续到脱战。</p><p><strong>悟：</strong>你的悟性+5（至多 30），同时你的招式命中和伤害获得等同于自身悟性的加值。</p><p><strong>升级：</strong>提供悟性+5，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。智能判定当前状态进行切换，且【悟】状态提供的悟性会随招式等级动态提升（5/10/15...）。【悟】状态会自动对全局招式加攻加伤。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
                             4,
@@ -1113,14 +1130,12 @@
                     },
                     "scripts": [
                         {
-                            "label": "顿悟状态切换",
+                            "label": "大彻大悟切换",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const wuqing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuqing\");\nif (wuqing) {\n    await wuqing.delete();\n    const wuEffect = thisItem.effects.getName(\"悟\").toObject();\n    wuEffect.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, wuEffect);\n    ui.notifications.info(\"顿悟！获得【悟】状态。\");\n} else {\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}\n\n// 瞬发处理\nargs.flags.autoApplied = true;"
+                            "script": "const wuqing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuqing\");\nconst lvl = Math.max(1, move.computedLevel || 1);\n\nif (wuqing) {\n    // 移除悟情\n    await game.xjzl.api.effects.removeEffect(actor, \"wuqing\", 1);\n    \n    // 获取并修改悟\n    const wuEffect = thisItem.effects.getName(\"悟\").toObject();\n    delete wuEffect._id;\n    wuEffect.origin = thisItem.uuid;\n    wuEffect.duration = { rounds: 99 }; // 持续到脱战\n    \n    // 动态计算悟性加成: 等级 * 5\n    const bonus = lvl * 5;\n    const wuxingChange = wuEffect.changes.find(c => c.key === \"system.stats.wuxing.mod\");\n    if (wuxingChange) {\n        wuxingChange.value = String(bonus);\n    }\n    wuEffect.description += ` (当前提供悟性 +${bonus})`;\n    \n    await game.xjzl.api.effects.addEffect(actor, wuEffect);\n    actor.showFloatyText(\"大彻大悟！\", { fill: \"#f1c40f\" });\n} else {\n    // 获得悟情\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 99 }; // 持续到脱战\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"获得悟情\", { fill: \"#e74c3c\" });\n}\n\n// 瞬发处理\nargs.flags.autoApplied = true;"
                         }
-                    ],
-                    "automationNote": "状态切换及悟性带来的动态加成均已实现。",
-                    "actionCost": "次要动作"
+                    ]
                 }
             ]
         },
@@ -1128,45 +1143,48 @@
             {
                 "name": "悟情",
                 "icon": "icons/svg/heart.svg",
+                "description": "在你的每个回合初，可以改变自身性格，在持续结束后，恢复原性格。",
                 "transfer": false,
-                "description": "回合初可临时改变性格",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "wuqing"
+                        "slug": "wuqing",
+                        "stackable": false
                     }
-                }
+                },
+                "changes": []
             },
             {
                 "name": "悟",
                 "icon": "icons/svg/sun.svg",
+                "description": "提高悟性上限及数值，同时你的招式命中和伤害获得等同于自身最终悟性的加值。",
                 "transfer": false,
-                "description": "悟性+5，招式命中和伤害获得悟性加值",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xin_wu",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "悟性加持伤害",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "const wuxing = actor.system.stats.wuxing.total || 0;\nargs.output.damage += wuxing;\nargs.output.bonusDesc.push(`悟性增伤 (+${wuxing})`);"
+                            },
+                            {
+                                "label": "悟性加持命中",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "const wuxing = actor.system.stats.wuxing.total || 0;\nargs.flags.bonusHit += wuxing;"
+                            }
+                        ]
+                    }
+                },
                 "changes": [
                     {
                         "key": "system.stats.wuxing.mod",
                         "mode": 2,
                         "value": "5"
                     }
-                ],
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wu",
-                        "scripts": [
-                            {
-                                "label": "悟性加持伤害",
-                                "trigger": "calc",
-                                "active": true,
-                                "script": "const wuxing = actor.system.stats.wuxing.total || 0; output.damage += wuxing; output.bonusDesc.push(`悟(+${wuxing})`);"
-                            },
-                            {
-                                "label": "悟性加持命中",
-                                "trigger": "attack",
-                                "active": true,
-                                "script": "args.flags.bonusHit += actor.system.stats.wuxing.total || 0;"
-                            }
-                        ]
-                    }
-                }
+                ]
             }
         ]
     },
