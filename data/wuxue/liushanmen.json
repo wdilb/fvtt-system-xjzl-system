@@ -94,7 +94,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双拳摆腰，开启架招，成功格挡后，获得“沉舟”，持续到战斗脱离。</p><p><strong>沉舟：</strong>下一次出招额外消耗 5 内力，招式伤害+5。</p><p><strong>升级：</strong>格挡值+5，沉舟的伤害再+5，内力消耗+1。</p>",
-                    "automationNote": "自动化: 开启架招; 格挡成功自动获Buff; Buff生效时自动扣除额外内力并加伤。",
+                    "automationNote": "完全自动化: 格挡后快照当前等级写进Buff，之后出招自动扣内力增加面板。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -110,7 +110,7 @@
                         {
                             "label": "格挡获沉舟",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName('沉舟');\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, data);\n        actor.showFloatyText(\"获得沉舟\", {fill: \"#00FFFF\"});\n    }\n}",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effect = thisItem.effects.getName('沉舟');\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        \n        // 计算当前等级应该提供的数值\n        const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n         const dmgBonus = 5 + (lvl - 1) * 5;\n        foundry.utils.setProperty(data, \"flags.xjzl-system.wuxue_chenzhouDmg\", dmgBonus);\n\n        await game.xjzl.api.effects.addEffect(actor, data);\n        actor.showFloatyText(\"获得沉舟\", {fill: \"#00FFFF\"});\n    }\n}",
                             "active": true
                         }
                     ]
@@ -126,7 +126,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>凝聚劲力，一发崩山，对目标造成伤害，并将其击退 3 米。</p><p>若命中无架招目标，还会给其添加“重创”，持续到战斗脱离。</p><p><strong>重创：</strong>下一次受到伤害时，额外流失 20 点气血。</p><p><strong>升级：</strong>招式伤害+10，额外流失+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "自动化: 伤害计算; 对无架招目标自动施加[重创]。命中发送击退卡片。",
+                    "automationNote": "完全自动化。应用重创时写入当前等级的流失值。下一次受伤检测后自动发作并销毁。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -153,7 +153,7 @@
                         {
                             "label": "击退与重创",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 1. 击退卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(255, 165, 0, 0.1); border-left:3px solid #FFA500; color:#d35400;\">\n                <strong>击退效果</strong><br>\n                ${args.target.name} 被击退 <b>3</b> 米。\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    \n    // 2. 施加重创\n    if (!args.target.system.martial.stanceActive) {\n        const effect = thisItem.effects.getName('重创');\n        if (effect) {\n            const data = effect.toObject();\n            delete data._id;\n            data.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 受到重创。`);\n        }\n    }\n}",
+                            "script": "if (args.isHit) {\n    // 1. 击退卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(255, 165, 0, 0.1); border-left:3px solid #FFA500; color:#d35400;\">\n                <strong>击退效果</strong><br>\n                ${args.target.name} 被击退 <b>3</b> 米。\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    \n    // 2. 施加重创\n    if (!args.target.system.martial.stanceActive) {\n        const effect = thisItem.effects.getName('重创');\n        if (effect) {\n            const data = effect.toObject();\n            delete data._id;\n            data.origin = thisItem.uuid;\n            \n            // 写入受等级影响的额外流失数值\n            const lvl = Math.max(1, move.computedLevel || 1);\n            const loss = 20 + (lvl - 1) * 10;\n            foundry.utils.setProperty(data, \"flags.xjzl-system.zhongchuangLoss\", loss);\n\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 受到重创。`);\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -163,26 +163,29 @@
                 {
                     "name": "沉舟",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
-                    "description": "下一次出招额外消耗 5 内力，招式伤害+5 (随等级成长)。",
+                    "description": "下一次出招额外消耗内力，招式伤害相应提升。",
                     "flags": {
                         "xjzl-system": {
                             "slug": "chenzhou",
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "沉舟消耗",
+                                    "label": "沉舟消耗兼拦截",
                                     "trigger": "attack",
-                                    "script": "const currentMp = actor.system.resources.mp.value;\n// 因为系统在 attack 阶段已经扣除了基础消耗，这里我们需要手动扣除额外的\nif (currentMp >= 5) {\n    await actor.update({ \"system.resources.mp.value\": currentMp - 5 });\n    // 飘字提示扣除\n    actor.showFloatyText(\"-5 内力 (沉舟)\", {fill: \"#0000FF\", fontSize: 24});\n} else {\n    ui.notifications.warn(\"沉舟生效，但内力不足以支付额外消耗！\");\n}"
+                                    "script": "if (args.move.type === 'basic') return;\nconst mpCost = 5;\nconst currentMp = actor.system.resources.mp.value;\n\nif (currentMp >= mpCost) {\n    await actor.update({ \"system.resources.mp.value\": currentMp - mpCost });\n    actor.showFloatyText(`-${mpCost} 内力 (沉舟)`, {fill: \"#0000FF\", fontSize: 24});\n} else {\n    args.flags.abort = true;\n    args.flags.abortReason = `[沉舟]发作，额外需消耗 ${mpCost} 点内力，目前内力不足！`;\n}",
+                                    "active": true
                                 },
                                 {
-                                    "label": "沉舟增伤",
+                                    "label": "沉舟同步增伤",
                                     "trigger": "calc",
-                                    "script": "const originItem = await fromUuid(thisEffect.origin);\n// 查找招式 '沉舟' 的等级\nconst lvl = Math.max(1, originItem?.system?.moves?.find(m => m.name === '沉舟')?.computedLevel || 1);\nconst bonus = 5 + (lvl - 1) * 5;\n\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`沉舟 +${bonus}`);"
+                                    "script": "if (args.move.type === 'basic') return;\nconst dmgBonus = thisEffect.getFlag(\"xjzl-system\", \"wuxue_chenzhouDmg\") || 5;\nargs.output.damage += dmgBonus;\nargs.output.bonusDesc.push(`沉舟 +${dmgBonus}`);",
+                                    "active": true
                                 },
                                 {
-                                    "label": "移除沉舟",
-                                    "trigger": "hit",
-                                    "script": "await thisEffect.delete();"
+                                    "label": "出招后移除沉舟",
+                                    "trigger": "hit_once",
+                                    "script": "if (args.move.type === 'basic') return;\nawait thisEffect.delete();",
+                                    "active": true
                                 }
                             ]
                         }
@@ -191,16 +194,17 @@
                 {
                     "name": "重创",
                     "icon": "icons/svg/ruins.svg",
-                    "description": "下一次受到伤害时，额外流失 20 点气血 (随等级成长)。",
+                    "description": "下一次受到伤害时，伤口崩裂额外流失气血。",
                     "flags": {
                         "xjzl-system": {
                             "slug": "zhongchuang",
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "重创流失",
-                                    "trigger": "preTake",
-                                    "script": "if (args.calcDamage > 0) {\n    const originItem = await fromUuid(thisEffect.origin);\n    const lvl = originItem?.system?.moves?.find(m => m.name === '开山拳')?.computedLevel || 1;\n    const loss = 20 + (lvl - 1) * 10;\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(139, 0, 0, 0.1); border-left:3px solid #8b0000; color:#8b0000;\">\n                <strong>重创发作</strong><br>\n                ${actor.name} 伤口崩裂，额外流失 <b>${loss}</b> 点气血！\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    \n    await actor.applyDamage({ amount: loss, type: 'liushi', isHit: true });\n    await thisEffect.delete();\n}"
+                                    "label": "重创发作流血",
+                                    "trigger": "damaged",
+                                    "script": "// 必须是受害者的防御端计算 (actor 是防御者)\n// 1. 过滤流失和无伤\nif (![\"waigong\", \"neigong\", \"fire\", \"poison\", \"mental\"].includes(args.type)) return;\nif ((args.hpLost + args.hutiLost) <= 0) return;\n// 2. 防止被自己触发的 applyDamage 死循环\nif (actor.isTakingZhongchuang) return;\n\nconst loss = thisEffect.getFlag(\"xjzl-system\", \"zhongchuangLoss\") || 20;\nactor.isTakingZhongchuang = true;\ntry {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px 5px 5px 10px; background:rgba(139, 0, 0, 0.1); border-left:3px solid #8b0000; color:#8b0000;\">\n                <strong>重创发作</strong><br>\n                ${actor.name} 伤口崩裂，额外流失 <b>${loss}</b> 点气血！\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    \n    await actor.applyDamage({ amount: loss, type: 'liushi', isHit: true, ignoreMinDamage: true });\n    await thisEffect.delete();\n} finally {\n    actor.isTakingZhongchuang = false;\n}",
+                                    "active": true
                                 }
                             ]
                         }
