@@ -88,7 +88,7 @@
             "sect": "liushanmen",
             "description": "<p>大理寺不传之秘，掌狱详刑所用，其功以知铐囚徒，分判罪事，思虑审察，正刑轻重。练至大成后，见细微，惑心神，寻常人所思所想难逃法眼。</p>",
             "requirement": "悟性4",
-            "automationNote": "完全自动化。进战自动投掷洞察检定，获得断案值AE。断案值AE包含命中加成和主动消耗脚本。",
+            "automationNote": "完全自动化。进战时会自动检定并赋予对应断案值AE，招式出招时会自动弹窗询问是否消耗。普攻不触发加伤消耗。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -115,7 +115,7 @@
                             "label": "罪恶断-洞察检定",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    // 动态修改数值\n    effData.changes[0].value = val;\n    effData.changes[1].value = val;\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`罪恶断：获得 ${val} 点断案值`);\n}"
+                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = String(val);\n    effData.changes[1].value = String(val);\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`【罪恶断】获得 ${val} 点断案值`);\n}"
                         }
                     ]
                 },
@@ -134,7 +134,7 @@
                             "label": "罪恶断-洞察检定(+5)",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total + 5;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = val;\n    effData.changes[1].value = val;\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`罪恶断：获得 ${val} 点断案值`);\n}"
+                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total + 5;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = String(val);\n    effData.changes[1].value = String(val);\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`【罪恶断】获得 ${val} 点断案值 (含圆满+5)`);\n}"
                         }
                     ]
                 }
@@ -164,25 +164,32 @@
                     {
                         "key": "system.combat.hit_waigong",
                         "mode": 2,
-                        "value": 0
+                        "value": "0"
                     },
                     {
                         "key": "system.combat.hit_neigong",
                         "mode": 2,
-                        "value": 0
+                        "value": "0"
                     }
                 ],
                 "flags": {
                     "xjzl-system": {
-                        "slug": "neigong_duananzhi"
-                    },
-                    "scripts": [
-                        {
-                            "trigger": "calc",
-                            "label": "消耗断案值加伤",
-                            "script": "const val = thisEffect.getFlag('xjzl-system', 'duanVal');\nconst confirm = await foundry.applications.api.DialogV2.confirm({content: `消耗断案值提升 ${val} 点伤害？`});\nif(confirm) {\n    args.output.damage += val;\n    args.output.bonusDesc.push(`断案值 +${val}`);\n    await thisEffect.delete();\n}"
-                        }
-                    ]
+                        "slug": "neigong_duananzhi",
+                        "scripts": [
+                            {
+                                "trigger": "calc",
+                                "label": "断案加伤预测",
+                                "active": true,
+                                "script": "if (args.move.type !== 'basic') {\n    const val = thisEffect.getFlag('xjzl-system', 'duanVal') || 0;\n    args.output.damage += val;\n    args.output.bonusDesc.push(`断案值预演 +${val}`);\n}"
+                            },
+                            {
+                                "trigger": "attack",
+                                "label": "确认消耗断案",
+                                "active": true,
+                                "script": "if (args.move.type !== 'basic') {\n    const val = thisEffect.getFlag('xjzl-system', 'duanVal') || 0;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"断案裁决\" },\n        content: `<p>当前具备 <b>${val}</b> 点断案威力。</p><p>是否在此次出招中消耗断案值？一旦使用该状态即会移除。</p>`,\n        yes: { label: \"消耗加伤\", icon: \"fas fa-check\" },\n        no: { label: \"保留状态\", icon: \"fas fa-times\" }\n    });\n    if(confirm) {\n        ui.notifications.info(\"已消耗断案值增强招式！\");\n        await thisEffect.delete();\n    } else {\n        args.flags.damageResult.damage -= val;\n        args.flags.damageResult.breakdown += `\\n- 放弃消耗断案值 (-${val})`;\n    }\n}"
+                            }
+                        ]
+                    }
                 }
             }
         ]
@@ -197,7 +204,7 @@
             "sect": "liushanmen",
             "description": "<p>六扇门核心内功，淬炼侠士坚强的意志力，凝练内劲轻如鸿毛，收发之法重逾泰山。练至大成后，内力如纤毫独特难防，专破真气。</p>",
             "requirement": "悟性4",
-            "automationNote": "完全自动化。出招时检测到内力足够，会弹窗询问是否发动特效。",
+            "automationNote": "耗蓝与减暴击效果需手动在特效列表中开启/关闭相对应的特效。圆满的破护体效果已自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -219,14 +226,7 @@
                         "shencai": 12
                     },
                     "description": "<p>小成运功特效：你出招时可以使招式消耗内力+5，然后该次出招暴击骰-2。</p>",
-                    "scripts": [
-                        {
-                            "label": "破罡-耗蓝特效",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "if (S.resources.mp.value >= (move.currentCost.mp + 5)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({ content: \"发动破罡神功？(耗内+5, 暴击-2)\" });\n    if (confirm) {\n        // 增加消耗\n        move.currentCost.mp += 5;\n        // 修正暴击\n        args.flags.critThresholdMod += 2; // 注意：暴击骰-2意味着阈值降低，更容易暴击，所以是 Advantage +2\n    }\n}"
-                        }
-                    ]
+                    "scripts": []
                 },
                 "stage3": {
                     "stats": {
@@ -240,16 +240,10 @@
                     "description": "<p>圆满运功特效：你出招时可以使招式消耗内力+5，然后该次出招暴击骰-3，若你攻击具有护体真气的目标，结算伤害前先减少其20点护体真气。</p><p>修满特效：修满[永久]：气血+40，内力+20，气感+5。</p>",
                     "scripts": [
                         {
-                            "label": "破罡-耗蓝特效(圆满)",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "if (S.resources.mp.value >= (move.currentCost.mp + 5)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({ content: \"发动破罡神功？(耗内+5, 暴击-3, 破护体)\" });\n    if (confirm) {\n        move.currentCost.mp += 5;\n        args.flags.critThresholdMod += 3;\n        args.flags.pogangActive = true; // 标记，供 hit 脚本使用\n    }\n}"
-                        },
-                        {
                             "label": "破罡-破护体",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "if (args.flags?.pogangActive) {\n    const tHuti = args.target.system.resources.huti || 0;\n    if (tHuti > 0) {\n        await args.target.update({ \"system.resources.huti\": Math.max(0, tHuti - 20) });\n        ui.notifications.info(`破罡神功：消融了 ${Math.min(20, tHuti)} 点护体！`);\n    }\n}"
+                            "script": "if (args.move.type !== 'basic') {\n    const tHuti = args.target.system.resources.huti || 0;\n    if (tHuti > 0) {\n        await args.target.update({ \"system.resources.huti\": Math.max(0, tHuti - 20) });\n        ui.notifications.info(`破罡神功：消融了 ${Math.min(20, tHuti)} 点护体！`);\n    }\n}"
                         }
                     ]
                 }
@@ -268,7 +262,57 @@
                     "value": 5
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "破罡神功 (小成)",
+                "icon": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+                "description": "出招耗蓝+5，暴击骰-2。需玩家在需要时手动开启。",
+                "transfer": true,
+                "disabled": true,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "-5"
+                    },
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-2"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
+            },
+            {
+                "name": "破罡神功 (圆满)",
+                "icon": "systems/xjzl-system/assets/icons/neigong/六扇门.png",
+                "description": "出招耗蓝+5，暴击骰-3。需玩家在需要时手动开启。",
+                "transfer": true,
+                "disabled": true,
+                "changes": [
+                    {
+                        "key": "system.combat.costs.neili.mod",
+                        "mode": 2,
+                        "value": "-5"
+                    },
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-3"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-3"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "《界元真气》",
