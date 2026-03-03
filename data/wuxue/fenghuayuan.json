@@ -34,7 +34,7 @@
                             "label": "格挡反制",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.outcome.isHit && !args.config.ignoreStance && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"残气\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    ui.notifications.info(`${actor.name} 的架招使 ${args.attacker.name} 沾染了残气！`);\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"残气\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n    ui.notifications.info(`${actor.name} 的架招使 ${args.attacker.name} 沾染了残气！`);\n}"
                         }
                     ],
                     "automationNote": "受击且未被破架时，自动给攻击者叠加残气。",
@@ -268,7 +268,7 @@
                             "label": "格挡反制",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.outcome.isHit && !args.config.ignoreStance && Macros.checkStance(actor, args)) {\n    let stacks = 1;\n    const qiren = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qiren\");\n    if (qiren) {\n        await qiren.delete();\n        stacks = 2;\n        ui.notifications.info(\"消耗气刃，额外施加失准！\");\n    }\n\n    // 循环叠加系统状态\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(args.attacker, \"shizhun\");\n    }\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    let stacks = 1;\n    const qiren = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qiren\");\n    if (qiren) {\n        await qiren.delete();\n        stacks = 2;\n        ui.notifications.info(\"消耗气刃，额外施加失准！\");\n    }\n\n    // 循环叠加系统状态\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(args.attacker, \"shizhun\");\n    }\n}"
                         }
                     ],
                     "automationNote": "受击反制添加失准，自动检测并消耗气刃加层。",
@@ -649,10 +649,10 @@
                             "label": "格挡反制",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.outcome.isHit && !args.config.ignoreStance && Macros.checkStance(actor, args)) {\n    const yanzou = args.attacker.system.arts?.yanzou?.total || 0;\n    if (yanzou < 2) {\n        await game.xjzl.api.effects.addEffect(args.attacker, \"deaf\");\n        ui.notifications.info(`${args.attacker.name} 演奏造诣不足，陷入耳鸣。`);\n        \n        // 追击判定\n        const qixiao = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qixiao\");\n        if (qixiao) {\n            ui.notifications.info(\"触发追击！请手动无消耗施展【知音难觅】。\");\n            await qixiao.delete();\n        }\n    }\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    // 正确获取当前架招的等级 (不能用 args.move)\n    const stanceId = actor.system.martial.stance;\n    const stanceMove = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, stanceMove?.computedLevel || 1);\n    \n    const yanzou = args.attacker.system.arts?.yanzou?.total || 0;\n    const reqLevel = 1 + lvl; // 1级需2，2级需3\n\n    if (yanzou < reqLevel) {\n        // 1. 施加耳鸣\n        const deafData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"deaf\"));\n        if (deafData) {\n            deafData.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.attacker, deafData);\n        }\n\n        // 2. 构建基础聊天卡片内容 (增加 margin-left 和 padding-left 防止边框遮挡)\n        let cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; padding-left:8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.1); margin-left:2px;\">\n                <div style=\"font-weight:bold; color:#8e44ad;\">\n                    <i class=\"fas fa-music\"></i> 曲高和寡\n                </div>\n                <div style=\"font-size:0.9em; margin-top:4px; color:#555;\">\n                    <b>${args.attacker.name}</b> 演奏造诣不足 (当前${yanzou}，需${reqLevel})，陷入 <b>[耳鸣]</b> 1 回合。\n                </div>\n            </div>`;\n        \n        // 3. 追击判定 (气箫)\n        const qixiao = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qixiao\");\n        if (qixiao) {\n            cardContent += `\n            <div style=\"padding:5px; padding-left:8px; border-left:4px solid #d35400; background:rgba(211,84,0,0.1); margin-left:2px; margin-top:5px;\">\n                <div style=\"font-weight:bold; color:#d35400;\">\n                    <i class=\"fas fa-bolt\"></i> 气箫共鸣\n                </div>\n                <div style=\"font-size:0.9em; margin-top:4px; color:#555;\">\n                    触发追击！请手动<b>无消耗</b>施展【知音难觅】。\n                </div>\n            </div>`;\n            \n            // 移除气箫\n            await game.xjzl.api.effects.removeEffect(actor, \"qixiao\", 1);\n        }\n\n        cardContent += `</div>`;\n\n        // 4. 发送公共聊天卡片\n        ChatMessage.create({\n            content: cardContent,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
                         }
                     ],
-                    "automationNote": "自动检测对方演奏等级施加耳鸣。追击需手动点击。",
+                    "automationNote": "完全自动化。格挡后自动检测对方演奏等级并施加耳鸣，若有气箫会自动扣除并发送追击卡片提示。",
                     "actionCost": "次要动作"
                 },
                 {
@@ -1009,7 +1009,7 @@
                             "label": "格挡悟情",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.outcome.isHit && !args.config.ignoreStance && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"悟情\").toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ],
                     "automationNote": "格挡获得状态。改性格需玩家手动操作或Roleplay。",
