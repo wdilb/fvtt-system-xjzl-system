@@ -1614,6 +1614,7 @@ export class XJZLItem extends Item {
         attacker: actor, // 明确语义，方便 copy 脚本到其他地方
         // 使用数值计数器，不再使用布尔值的flags
         // 核心 Flags (供脚本修改)
+        costConsumed: costConsumed,
         flags: {
           level: s.attackLevel || 0, // 使用数值计数器，不再使用布尔值的flags,初始值继承自 Actor
           feintLevel: s.feintLevel || 0, // 虚招自身等级

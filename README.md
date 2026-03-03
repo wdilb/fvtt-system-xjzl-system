@@ -260,6 +260,11 @@ await Macros.requestSave({
     *   `move` (Object): 当前招式数据。
     *   `item` (Item): 来源物品。
     *   `attacker` (Actor): 攻击者实例。
+    *   `costConsumed` (Object): **本次出招的真实资源消耗** (包含减耗、免费施法、濒死额外耗蓝)。
+        *   `.mp` (Number): 实际消耗的内力。
+        *   `.hp` (Number): 实际消耗的气血。
+        *   `.rage` (Number): 实际消耗的怒气。
+        *   `.morale` (Number): 实际消耗的士气。
     *   `flags` (Object, **可修改**):
         *   `damageResult` (Object): 伤害计算结果引用。
             *   `damage` (Number): 当前计算出的总伤害（含基础+武器+属性+手动修正+濒死加成）。**脚本直接修改此值即可改变最终伤害**。
