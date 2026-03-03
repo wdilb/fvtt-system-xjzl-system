@@ -1467,7 +1467,8 @@ export class ChatCardManager {
             // totalDamageDealt: summary.reduce((a, b) => a + (b.finalDamage || 0), 0), // 总造成伤害，感觉用不到，先注释掉
             attacker: attacker,
             item: item,
-            move: move
+            move: move,
+            costConsumed: flags.costConsumed
         };
 
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
@@ -2468,7 +2469,8 @@ export class ChatCardManager {
 
             type: isBuffType ? "buff" : "heal",
             isHeal: !isBuffType,
-            totalHealAmount: summaryData.reduce((acc, cur) => acc + cur.amount, 0) // 方便统计总奶量
+            totalHealAmount: summaryData.reduce((acc, cur) => acc + cur.amount, 0), // 方便统计总奶量
+            costConsumed: flags.costConsumed
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
         // =====================================================
