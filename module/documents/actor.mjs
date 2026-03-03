@@ -2029,6 +2029,7 @@ export class XJZLActor extends Actor {
       move: virtualMove,
       item: virtualItem, // 注入虚拟物品
       attacker: this,    // 明确 attacker
+      costConsumed: costConsumed,
       flags: {
         level: s.attackLevel || 0,
         feintLevel: 0, // 普攻没有虚招
