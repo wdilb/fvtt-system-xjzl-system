@@ -917,8 +917,8 @@
             "category": "wuxue",
             "sect": "jiangnange",
             "tier": 2,
-            "description": "<p>江南阁书法绝技，下笔如龙蛇飞动，笔力劲健，变化多端，意领神悟。</p>",
-            "requirements": "匕首-笔 属性：柔",
+            "description": "<p>江南阁书法绝技，下笔如龙蛇飞动，笔力劲健，变化多端，意领神悟。</p><p><strong>需求：</strong>匕首-笔</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "匕首-笔",
             "moves": [
                 {
                     "name": "颜筋柳骨",
@@ -939,24 +939,27 @@
                     "calculation": {
                         "base": 0
                     },
-                    "description": "<p>主要动作，雄强圆厚，挺拔见功，自身获得“颜体”，持续到战斗脱离或获得“柳体”。<br>颜体：你的下一次招式伤害提升[书写]等级*1 的数值，然后获得“柳体”，持续到战斗脱离或进入“颜体”。<br>柳体：你受到内外功伤害时，减少[书写]等级*1 的数值，然后获得“颜体”，持续到战斗脱离或获得“柳体”。</p>",
+                    "description": "<p>主要动作，雄强圆厚，挺拔见功，自身获得“颜体”，持续到战斗脱离或获得“柳体”。</p><p><strong>颜体：</strong>你的下一次招式伤害提升[书写]等级*1 的数值，然后获得“柳体”，持续到战斗脱离或进入“颜体”。</p><p><strong>柳体：</strong>你受到内外功伤害时，减少[书写]等级*1 的数值，然后获得“颜体”，持续到战斗脱离或获得“柳体”。</p><p><strong>升级：</strong>颜体柳体的书写等级系数+1，内力消耗+2。</p>",
                     "scripts": [
                         {
                             "label": "获得颜体",
-                            "trigger": "attack",
-                            "script": "const effect = thisItem.effects.getName(\"颜体\");\nawait game.xjzl.api.effects.addEffect(actor, effect.toObject());"
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const effect = thisItem.effects.getName(\"颜体\");\nif (effect) {\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const ratio = 1 + (lvl - 1);\n    \n    // 存入当前招式等级的系数，供AE中读取运算\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.yanti_ratio\", ratio);\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ],
-                    "automationNote": "颜体/柳体自动循环转化逻辑复杂，若自动失效请手动切换。",
-                    "actionCost": "主要动作"
+                    "automationNote": "纯自动化。增伤与减伤根据书写等级与随等级变化的系数自动调节。打出内外功伤害或受到内外功伤害后，颜体柳体会自动切换互补。",
+                    "actionCost": "主要动作",
+                    "targetInfo": "自身"
                 },
                 {
                     "name": "力透纸背",
                     "type": "stance",
                     "element": "rou",
+                    "damageType": "none",
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
-                    "range": "自身/1",
+                    "range": "自身/1米",
                     "costs": {
                         "mp": [
                             2,
@@ -968,16 +971,18 @@
                         "base": 0,
                         "growth": 10
                     },
-                    "description": "<p>次要动作，提蓄笔力，开启架招。格挡成功后，可消耗反应动作，对其施展【笔下生风】。</p>",
+                    "description": "<p>次要动作，提蓄笔力，开启架招。格挡成功后，可消耗反应动作，对其施展【笔下生风】。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
                     "scripts": [
                         {
                             "label": "反击提示",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"触发力透纸背：可反应释放【笔下生风】\");\n}"
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(`${actor.name} 触发力透纸背：可消耗反应动作对目标释放【笔下生风】`);\n}"
                         }
                     ],
-                    "automationNote": "反应释放需手动操作。",
-                    "actionCost": "次要动作"
+                    "automationNote": "反应动作释放【笔下生风】需玩家手动操作。",
+                    "actionCost": "次要动作",
+                    "targetInfo": "自身"
                 },
                 {
                     "name": "笔下生风",
@@ -986,7 +991,7 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
-                    "range": "3",
+                    "range": "3米",
                     "costs": {
                         "mp": [
                             2,
@@ -995,24 +1000,27 @@
                         ]
                     },
                     "calculation": {
+                        "base": 0,
+                        "growth": 10,
                         "scalings": [
                             {
                                 "prop": "liliang",
                                 "ratio": 0.4
                             }
-                        ],
-                        "growth": 10
+                        ]
                     },
-                    "description": "<p>主要动作，笔画狂放，龙蛇飞腾，奔至目标周围空格处，对其造成 0.4 力量点外功伤害。命中无架招目标时，为其添加“目盲”，持续两回合。</p>",
+                    "description": "<p>主要动作，笔画狂放，龙蛇飞腾，奔至目标周围空格处，对其造成 0.4 力量点外功伤害。命中无架招目标时，为其添加“目盲”，持续两回合。</p><p><strong>升级:</strong> 招式伤害+10，内力消耗+2。</p>",
                     "scripts": [
                         {
-                            "label": "添加目盲",
+                            "label": "施加目盲",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"blind\");\n}"
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const blind = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'blind'));\n    if (blind) {\n        blind.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, blind);\n        ui.notifications.info(`${args.target.name} 被笔锋迷眼，陷入目盲(2回合)！`);\n    }\n}"
                         }
                     ],
-                    "automationNote": "移动至目标周围空格需手动操作。",
-                    "actionCost": "主要动作"
+                    "automationNote": "奔赴目标周围空格需玩家手动位移，命中未开启架招者自动添加2回合目盲。",
+                    "actionCost": "主要动作",
+                    "targetInfo": "单体"
                 },
                 {
                     "name": "龙飞凤舞",
@@ -1022,7 +1030,7 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
-                    "range": "2",
+                    "range": "2米",
                     "costs": {
                         "mp": [
                             8,
@@ -1036,24 +1044,33 @@
                         ]
                     },
                     "calculation": {
+                        "base": 0,
+                        "growth": 20,
                         "scalings": [
                             {
                                 "prop": "liliang",
                                 "ratio": 0.6
                             }
-                        ],
-                        "growth": 20
+                        ]
                     },
-                    "description": "<p>蓄力动作，千回百转，迂回盘绕，对周围敌人造成 0.6 力量点外功伤害。<br>若你处于“颜体”，招式击飞所有敌人 3 米。<br>若你处于“柳体”，自身和周围友方获得 20 点护体真气，持续到战斗脱离。</p>",
+                    "description": "<p>蓄力动作，千回百转，迂回盘绕，对周围敌人造成 0.6 力量点外功伤害。</p><p>若你处于“颜体”，招式击飞所有敌人 3 米。</p><p>若你处于“柳体”，自身和周围友方获得 20 点护体真气，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
                     "scripts": [
                         {
-                            "label": "颜柳特效",
-                            "trigger": "hit",
-                            "script": "const hasYanti = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yanti');\nconst hasLiuti = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'liuti');\n\nif (hasYanti && args.isHit) {\n    ui.notifications.info(`${args.target.name} 被击飞 3 米！`);\n}\nif (hasLiuti) {\n    // 友方护体需手动，此处给自身加\n    await actor.applyHealing({ amount: 20, type: 'huti', showScrolling: true });\n    ui.notifications.info(\"柳体触发：自身及周围友方获得 20 护体（友方需手动）\");\n}"
+                            "label": "探测颜柳状态",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "args.flags.damageResult.yantiTrigger = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yanti');\nargs.flags.damageResult.liutiTrigger = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'liuti');"
+                        },
+                        {
+                            "label": "颜柳特效与提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const isYanti = args.damageResult?.yantiTrigger;\nconst isLiuti = args.damageResult?.liutiTrigger;\nlet contentHtml = \"\";\n\nif (isYanti) {\n    contentHtml += \"<li><span style='color:#c0392b;font-weight:bold;'>颜体刚猛</span>：将击中的敌人击飞 3 米！(请手动进行位移操作)</li>\";\n}\nif (isLiuti) {\n    await actor.applyHealing({ amount: 20, type: 'huti', showScrolling: true });\n    contentHtml += \"<li><span style='color:#27ae60;font-weight:bold;'>柳体生息</span>：自身已获得 20 点护体真气！<br><span style='color:#555;'>(周围友方请手动操作增加 20 护体)</span></li>\";\n}\n\nif (contentHtml !== \"\") {\n    const msg = `<div class=\"xjzl-chat-card\">\n        <div style=\"font-weight:bold; border-bottom:1px solid #ccc; padding-bottom:3px; margin-bottom:5px;\">\n            <i class=\"fas fa-paint-brush\"></i> 龙飞凤舞 意象触发\n        </div>\n        <ul style=\"padding-left: 20px; font-size: 0.9em; color: #444;\">\n            ${contentHtml}\n        </ul>\n    </div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
                         }
                     ],
-                    "automationNote": "击飞及友方护体需手动处理。",
-                    "actionCost": "蓄力动作"
+                    "automationNote": "绝招预判状态防止执行时冲突。自身护体增加自动响应，击飞位移与友方护体增加全靠玩家手动处理。",
+                    "actionCost": "蓄力动作",
+                    "targetInfo": "范围"
                 }
             ]
         },
@@ -1061,15 +1078,23 @@
             {
                 "name": "颜体",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
-                "description": "你的下一次招式伤害提升[书写]等级*1 的数值，然后获得“柳体”。",
+                "description": "你的下一次招式伤害提升[书写]等级*对应系数的数值，然后转化为“柳体”。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "yanti",
+                        "stackable": false,
                         "scripts": [
                             {
                                 "label": "颜体增伤",
                                 "trigger": "calc",
-                                "script": "const skillLevel = actor.system.arts.shuxie.total || 0;\nconst level = args.move.computedLevel || 1;\nconst ratio = 1 + (level - 1);\nconst bonus = skillLevel * ratio;\nargs.output.damage += bonus; args.output.bonusDesc.push(`颜体 +${bonus}`);"
+                                "active": true,
+                                "script": "const ratio = thisEffect.getFlag('xjzl-system', 'yanti_ratio') || 1;\nconst skillLevel = actor.system.skills.shuxie?.total || actor.system.arts.shuxie?.total || 0;\nconst bonus = skillLevel * ratio;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`颜体增伤 +${bonus}`);"
+                            },
+                            {
+                                "label": "颜体转柳体",
+                                "trigger": "hit_once",
+                                "active": true,
+                                "script": "if (['waigong','neigong'].includes(args.move.damageType)) {\n    const ratio = thisEffect.getFlag('xjzl-system', 'yanti_ratio') || 1;\n    const liuti = thisItem.effects.getName(\"柳体\");\n    if (liuti) {\n        const effData = liuti.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        foundry.utils.setProperty(effData, \"flags.xjzl-system.liuti_ratio\", ratio);\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n    await thisEffect.delete();\n    actor.showFloatyText(\"颜体 ➔ 柳体\", {fill: \"#3498db\"});\n}"
                             }
                         ]
                     }
@@ -1079,15 +1104,23 @@
             {
                 "name": "柳体",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
-                "description": "你受到内外功伤害时，减少[书写]等级*1 的数值，然后获得“颜体”。",
+                "description": "你受到内外功伤害时，减少[书写]等级*对应系数的数值，然后转化为“颜体”。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "liuti",
+                        "stackable": false,
                         "scripts": [
                             {
                                 "label": "柳体减伤",
                                 "trigger": "preTake",
-                                "script": "if(['waigong','neigong'].includes(args.type)) {\n    const skillLevel = actor.system.arts.shuxie.total || 0;\n    // 这里没有 level 参数，暂时取1或者读取来源武学等级，这里简化取1\n    const bonus = skillLevel * 1;\n    args.output.damage = Math.max(0, args.output.damage - bonus);\n}"
+                                "active": true,
+                                "script": "if (['waigong','neigong'].includes(args.type)) {\n    const ratio = thisEffect.getFlag('xjzl-system', 'liuti_ratio') || 1;\n    const skillLevel = actor.system.skills.shuxie?.total || actor.system.arts.shuxie?.total || 0;\n    const reduction = skillLevel * ratio;\n    \n    args.output.damage = Math.max(0, args.output.damage - reduction);\n    \n    const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#27ae60;\"><i class=\"fas fa-shield-alt\"></i> 柳体护身，减免了 <b>${reduction}</b> 点伤害！</div></div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
+                            },
+                            {
+                                "label": "柳体转颜体",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "if (['waigong','neigong'].includes(args.type)) {\n    const ratio = thisEffect.getFlag('xjzl-system', 'liuti_ratio') || 1;\n    const yanti = thisItem.effects.getName(\"颜体\");\n    if (yanti) {\n        const effData = yanti.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        foundry.utils.setProperty(effData, \"flags.xjzl-system.yanti_ratio\", ratio);\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n    await thisEffect.delete();\n    actor.showFloatyText(\"柳体 ➔ 颜体\", {fill: \"#e74c3c\"});\n}"
                             }
                         ]
                     }
@@ -1420,18 +1453,18 @@
             "category": "wuxue",
             "sect": "jiangnange",
             "tier": 2,
-            "description": "<p>悠悠春水，姑苏情意，此曲以昆曲为旋律音调，典雅秀美，别具一番江南风味。</p>",
-            "requirements": "乐器-笛 属性：柔",
+            "description": "<p>悠悠春水，姑苏情意，此曲以昆曲为旋律音调，典雅秀美，别具一番江南风味。</p><p><strong>需求：</strong>乐器-笛</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "乐器-笛",
             "moves": [
                 {
                     "name": "粉墙黛瓦",
                     "type": "qi",
-                    "actionType": "attack",
+                    "actionType": "buff",
                     "element": "rou",
                     "damageType": "none",
                     "weaponType": "instrument",
                     "weaponSubtype": "笛",
-                    "range": "10",
+                    "range": "10米",
                     "costs": {
                         "mp": [
                             4,
@@ -1442,20 +1475,24 @@
                     "calculation": {
                         "base": 0
                     },
-                    "description": "<p>蓄力动作，笛音宽厚圆润，直线上敌方进行[定力]检定（难度 15），失败陷入“禁足”一回合。<br>·若目标已处于禁足状态，则其眼中出现白墙黑瓦迷乱视野，陷入“目盲”一回合。</p>",
+                    "description": "<p>蓄力动作，笛音宽厚圆润，直线上敌方进行[定力]检定（难度 15），失败陷入“禁足”一回合。</p><p>·若目标已处于禁足状态，则其眼中出现白墙黑瓦迷乱视野，陷入“目盲”一回合。</p><p><strong>升级：</strong>难度+1，禁足、目盲的回合数+1，消耗+4。</p>",
                     "scripts": [
                         {
-                            "label": "定力检定",
+                            "label": "定力判定与控制",
                             "trigger": "hit",
-                            "script": "const diff = 15 + (args.move.computedLevel - 1);\nconst hasRoot = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'root');\nconst effectId = hasRoot ? 'blind' : 'root';\nconst effectData = {\n    id: effectId,\n    duration: { rounds: 1 + (args.move.computedLevel - 1) }\n};\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: diff,\n    label: \"抵抗粉墙黛瓦\",\n    onFail: effectData\n});"
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst diff = 15 + (lvl - 1);\nconst rounds = 1 + (lvl - 1);\n\nconst hasRoot = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'root');\nconst targetEffectId = hasRoot ? 'blind' : 'root';\n\nconst effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === targetEffectId));\nif (effectData) {\n    effectData.duration = { rounds: rounds };\n}\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: diff,\n    label: \"抵抗粉墙黛瓦\",\n    onFail: effectData\n});"
                         }
                     ],
-                    "actionCost": "蓄力动作"
+                    "automationNote": "对抗和状态切换全自动。目标如果有禁足，失败自动挂目盲，否则挂禁足。",
+                    "actionCost": "蓄力动作",
+                    "targetInfo": "直线敌方"
                 },
                 {
                     "name": "小桥流水",
                     "type": "stance",
                     "element": "rou",
+                    "damageType": "none",
                     "weaponType": "instrument",
                     "weaponSubtype": "笛",
                     "range": "自身",
@@ -1470,16 +1507,18 @@
                         "base": 0,
                         "growth": 10
                     },
-                    "description": "<p>次要动作，旋律灵动，开启架招。格挡成功后，为自身及周围 1 米范围内的友方回复 5 点内力。</p>",
+                    "description": "<p>次要动作，旋律灵动，开启架招。格挡成功后，为自身及周围 1 米范围内的友方回复 5 点内力。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
                     "scripts": [
                         {
                             "label": "回内",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n    ui.notifications.info(\"小桥流水触发：自身及周围1米友方回内5点（友方需手动）\");\n}"
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n    \n    const msg = `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; border-left:3px solid #3498db; background:rgba(52,152,219,0.1);\">\n            <p><i class=\"fas fa-music\"></i> <b>小桥流水</b> 格挡生效！</p>\n            <p>自身已回复 5 点内力。<span style=\"color:#d35400;\">请周围 1 米内友方手动回复 5 点内力。</span></p>\n        </div>\n    </div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
                         }
                     ],
-                    "automationNote": "友方回内需手动处理。",
-                    "actionCost": "次要动作"
+                    "automationNote": "自身回内自动，友方自动提示手动恢复内力。",
+                    "actionCost": "次要动作",
+                    "targetInfo": "自身/周围1米友方"
                 },
                 {
                     "name": "江枫渔火",
@@ -1488,7 +1527,7 @@
                     "damageType": "neigong",
                     "weaponType": "instrument",
                     "weaponSubtype": "笛",
-                    "range": "5",
+                    "range": "5米",
                     "costs": {
                         "mp": [
                             2,
@@ -1497,23 +1536,27 @@
                         ]
                     },
                     "calculation": {
+                        "base": 0,
+                        "growth": 10,
                         "scalings": [
                             {
                                 "prop": "neixi",
                                 "ratio": 0.4
                             }
-                        ],
-                        "growth": 10
+                        ]
                     },
-                    "description": "<p>主要动作，长音短音错错落落，对目标造成 0.4 内息点内功伤害，之后目标进行[定力]检定（难度 15），失败则陷入“剧痛”，持续五回合。<br>击破架招时，目标进行的[定力]检定必定失败。</p>",
+                    "description": "<p>主要动作，长音短音错错落落，对目标造成 0.4 内息点内功伤害，之后目标进行[定力]检定（难度 15），失败则陷入“剧痛”，持续五回合。</p><p>击破架招时，目标进行的[定力]检定必定失败。</p><p><strong>升级：</strong>伤害+10，剧痛持续回合数+5，消耗+2。</p>",
                     "scripts": [
                         {
                             "label": "剧痛判定",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const rounds = 5 + (args.move.computedLevel - 1) * 5;\n    const painEffect = { id: 'pain', duration: { rounds: rounds } };\n    \n    if (args.isBroken) {\n        await game.xjzl.api.effects.addEffect(args.target, painEffect);\n        ui.notifications.info(\"击破架招！直接施加剧痛。\");\n    } else {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"dingli\",\n            dc: 15,\n            label: \"抵抗剧痛\",\n            onFail: painEffect\n        });\n    }\n}"
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 5 + (lvl - 1) * 5;\n    const painData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'pain'));\n    if (painData) painData.duration = { rounds: rounds };\n    \n    if (args.isBroken) {\n        await game.xjzl.api.effects.addEffect(args.target, painData);\n        ui.notifications.info(`${args.target.name} 被击破架招，直接陷入剧痛！`);\n    } else {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"dingli\",\n            dc: 15,\n            label: \"抵抗江枫渔火\",\n            onFail: painData\n        });\n    }\n}"
                         }
                     ],
-                    "actionCost": "主要动作"
+                    "automationNote": "完全自动化。定力检定或击破必输逻辑已处理，剧痛持续回合随等级提升自动变动。",
+                    "actionCost": "主要动作",
+                    "targetInfo": "单体"
                 },
                 {
                     "name": "锦绣江南",
@@ -1523,7 +1566,7 @@
                     "damageType": "neigong",
                     "weaponType": "instrument",
                     "weaponSubtype": "笛",
-                    "range": "10",
+                    "range": "10米",
                     "costs": {
                         "mp": [
                             4,
@@ -1537,24 +1580,27 @@
                         ]
                     },
                     "calculation": {
+                        "base": 0,
+                        "growth": 20,
                         "scalings": [
                             {
                                 "prop": "neixi",
                                 "ratio": 0.7
                             }
-                        ],
-                        "growth": 20
+                        ]
                     },
-                    "description": "<p>主要动作，曲调华美秀丽，使人迷醉，流连忘返，对目标造成 0.7 内息点内功伤害。<br>·范围内所有友方获得“锦绣”，持续三回合。<br>锦绣：免疫下盘不稳、禁足、缚身、流血、剧痛，且受到《趁虚而入》攻击后速度不会归零。</p>",
+                    "description": "<p>主要动作，曲调华美秀丽，使人迷醉，流连忘返，对目标造成 0.7 内息点内功伤害。</p><p>·范围内所有友方获得“锦绣”，持续三回合。</p><p><strong>锦绣：</strong>免疫下盘不稳、禁足、缚身、流血、剧痛，且受到《趁虚而入》攻击后速度不会归零。</p><p><strong>升级：</strong>招式伤害+20，锦绣持续回合数+1，怒气消耗-1，内力消耗+4。</p>",
                     "scripts": [
                         {
-                            "label": "添加锦绣",
-                            "trigger": "hit",
-                            "script": "const effect = thisItem.effects.getName(\"锦绣\");\nawait game.xjzl.api.effects.addEffect(actor, effect.toObject());\nui.notifications.info(\"已为自身添加锦绣，请手动为范围内友方添加。\");"
+                            "label": "添加锦绣并提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"锦绣\");\n\nif (eff) {\n    const effData = eff.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: rounds };\n    \n    await game.xjzl.api.effects.addEffect(actor, effData);\n    \n    const msg = `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; border-left:3px solid #e74c3c; background:rgba(231,76,60,0.1);\">\n            <p><i class=\"fas fa-fan\"></i> <b>锦绣江南触发！</b></p>\n            <p>已为自身添加 [锦绣] 状态。</p>\n            <p style=\"color:#d35400; font-weight:bold;\">请手动为范围内其余友方添加该状态（持续 ${rounds} 回合）。</p>\n        </div>\n    </div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
                         }
                     ],
-                    "automationNote": "友方状态需手动添加。",
-                    "actionCost": "主要动作"
+                    "automationNote": "绝招打出即对自己增加锦绣，友方请GM手动施加。免疫部分请由玩家自身结合系统显示手动判断。",
+                    "actionCost": "主要动作",
+                    "targetInfo": "单体 (友方范围)"
                 }
             ]
         },
@@ -1565,7 +1611,8 @@
                 "description": "免疫下盘不稳、禁足、缚身、流血、剧痛，且受到《趁虚而入》攻击后速度不会归零。",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "jinxiu"
+                        "slug": "jinxiu",
+                        "stackable": false
                     }
                 },
                 "transfer": false
