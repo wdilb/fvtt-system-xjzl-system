@@ -201,32 +201,11 @@
         "name": "雁羽翎",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-        "effects": [
-            {
-                "name": "雁行有序",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                "description": "下一次暗器普攻伤害翻倍。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_yanxing_buff",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "普攻翻倍",
-                                "trigger": "calc",
-                                "active": true,
-                                "script": "if (args.move.type === \"basic\" && args.move.weaponType === \"hidden\") {\n    args.output.damage *= 2;\n    args.output.bonusDesc.push(\"雁行有序：伤害翻倍\");\n    await thisEffect.delete();\n}"
-                            }
-                        ]
-                    }
-                }
-            }
-        ],
         "system": {
             "category": "wuxue",
             "sect": "sihaibiaomeng",
             "tier": 1,
-            "description": "四海镖盟飞镖绝技，可穿叶飞花，击敌不备。",
+            "description": "<p>四海镖盟飞镖绝技，可穿叶飞花，击敌不备。</p><p><strong>需求：</strong>暗器-飞镖 <strong>属性：</strong>太极</p>",
             "requirements": "暗器-飞镖",
             "moves": [
                 {
@@ -235,9 +214,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "8",
+                    "range": "8米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "手腕轻抖，翎出雁鸣，对目标造成 0.4 身法点外功伤害。",
+                    "description": "<p>手腕轻抖，翎出雁鸣，对目标造成 0.4 身法点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化，消耗飞镖请手动。",
                     "costs": {
                         "mp": [
                             1,
@@ -257,15 +238,7 @@
                             }
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "消耗飞镖",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
-                        }
-                    ],
-                    "automationNote": "自动消耗名为“飞镖”的消耗品。"
+                    "scripts": []
                 },
                 {
                     "name": "雁影纷飞",
@@ -273,9 +246,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "8",
+                    "range": "8米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "洒出雁羽，杀机暗藏。对目标造成 0.3 身法点外功伤害。击破架招时，为目标添加“易伤”，至多三层，持续到战斗脱离。<br>易伤：受到伤害时（包括特殊伤害），每有一层“易伤”流失 10 点气血。",
+                    "description": "<p>洒出雁羽，杀机暗藏。对目标造成 0.3 身法点外功伤害。击破架招时，为目标添加“易伤”，至多三层，持续到战斗脱离。</p><p><strong>易伤：</strong>受到伤害时（包括特殊伤害），每有一层“易伤”流失 10 点气血。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。消耗飞镖请手动。击破后自动施加易伤并限制最大3层。",
                     "costs": {
                         "mp": [
                             1,
@@ -297,16 +272,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗飞镖",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
-                        },
-                        {
-                            "label": "易伤",
+                            "label": "击破施加易伤",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const effect = await game.xjzl.api.effects.addEffect(args.target, \"yishang\");\n    // 确保最大层数为3\n    if (effect && effect.getFlag('xjzl-system', 'maxStacks') !== 3) {\n        await effect.update({ \"flags.xjzl-system.maxStacks\": 3 });\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const yishang = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yishang\"));\n    if (yishang) {\n        foundry.utils.setProperty(yishang, \"flags.xjzl-system.maxStacks\", 3);\n        await game.xjzl.api.effects.addEffect(args.target, yishang);\n    }\n}"
                         }
                     ]
                 },
@@ -314,10 +283,13 @@
                     "name": "雁行有序",
                     "type": "stance",
                     "element": "taiji",
+                    "damageType": "none",
                     "weaponType": "hidden",
                     "range": "自身",
+                    "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "排羽待发，开启架招。<br>格挡成功后，你的下一次暗器普攻伤害翻倍。",
+                    "description": "<p>排羽待发，开启架招。</p><p>格挡成功后，你的下一次暗器普攻伤害翻倍。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。格挡后自身获得Buff，下一次符合条件的普攻将在预览/结算时自动翻倍并消耗该Buff。",
                     "costs": {
                         "mp": [
                             1,
@@ -333,16 +305,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗飞镖",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
-                        },
-                        {
-                            "label": "雁行Buff",
+                            "label": "获得雁行增伤Buff",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"雁行有序\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"雁行有序\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 },
@@ -353,9 +319,11 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "10",
+                    "range": "10米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "雁翎尖啸而出，对目标造成 0.6 身法点外功伤害。同时给目标添加“禁足”，持续一回合。",
+                    "description": "<p>雁翎尖啸而出，对目标造成 0.6 身法点外功伤害。同时给目标添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。消耗飞镖请手动",
                     "costs": {
                         "mp": [
                             2,
@@ -381,21 +349,37 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗飞镖",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const ammo = actor.items.find(i => i.name === \"飞镖\" && i.type === \"consumable\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({\"system.quantity\": ammo.system.quantity - 1});\n}"
-                        },
-                        {
-                            "label": "禁足",
+                            "label": "施加禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"root\");"
+                            "script": "if (args.isHit) {\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (root) {\n        root.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, root);\n    }\n}"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "雁行有序",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                "description": "下一次暗器普攻伤害翻倍。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_yanxing_buff",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "普攻翻倍并消耗",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "if (args.move.type === \"basic\" && args.move.weaponType === \"hidden\") {\n    args.output.damage *= 2;\n    args.output.bonusDesc.push(\"雁行有序：伤害翻倍\");\n    await thisEffect.delete();\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     },
     {
         "name": "破阴枪",
@@ -405,7 +389,7 @@
             "category": "wuxue",
             "sect": "sihaibiaomeng",
             "tier": 1,
-            "description": "四海镖局枪法，枪落风啸，精准狠辣。",
+            "description": "<p>四海镖局枪法，枪落风啸，精准狠辣。</p><p><strong>需求：</strong>棍-长枪 <strong>属性：</strong>阴</p>",
             "requirements": "棍-长枪",
             "moves": [
                 {
@@ -414,9 +398,11 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "staff",
-                    "range": "2",
+                    "range": "2米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "枪出随风，阴冷异常，造成 0.3 力量点外功伤害，击破架招时将其击倒。",
+                    "description": "<p>枪出随风，阴冷异常，造成 0.3 力量点外功伤害，击破架招时将其击倒。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。击破架招后自动施加[倒地]状态。",
                     "costs": {
                         "mp": [
                             1,
@@ -438,7 +424,7 @@
                     },
                     "scripts": [
                         {
-                            "label": "击倒",
+                            "label": "击破倒地",
                             "trigger": "hit",
                             "active": true,
                             "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
@@ -451,10 +437,11 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "staff",
-                    "range": "2",
+                    "range": "2米",
                     "targetInfo": "周围2个目标",
                     "actionCost": "蓄力动作",
-                    "description": "挥舞枪尖，对周围至多两个目标造成 0.4 力量点外功伤害。<br>若目标处于“下盘不稳”或倒地，招式伤害+10 点。",
+                    "description": "<p>挥舞枪尖，对周围至多两个目标造成 0.4 力量点外功伤害。</p><p>若目标处于“下盘不稳”或倒地，招式伤害+10 点。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "请手动选中至多2个目标。伤害加成完全自动化。",
                     "costs": {
                         "mp": [
                             2,
@@ -489,9 +476,10 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "staff",
-                    "range": "2",
+                    "range": "2米",
+                    "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，抖动枪尖，刺击目标造成 0.5 力量点外功伤害。",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，抖动枪尖，刺击目标造成 0.5 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
                     "costs": {
                         "mp": [
                             1,
@@ -511,16 +499,19 @@
                             }
                         ]
                     },
-                    "automationNote": "反应动作需手动触发。"
+                    "automationNote": "反应动作需玩家手动判断并点击使用。"
                 },
                 {
                     "name": "皓月长风",
                     "type": "stance",
                     "element": "yin",
+                    "damageType": "none",
                     "weaponType": "staff",
                     "range": "自身",
+                    "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "金风当月，寒枪临空，开启架招。格挡成功时，对方陷入“下盘不稳”，持续一回合，若目标已经处于下盘不稳，则使其倒地。",
+                    "description": "<p>金风当月，寒枪临空，开启架招。格挡成功时，对方陷入“下盘不稳”，持续一回合，若目标已经处于下盘不稳，则使其倒地。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。检测目标状态并自动施加下盘不稳或倒地。",
                     "costs": {
                         "mp": [
                             1,
@@ -536,10 +527,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "反击特效",
+                            "label": "格挡反击",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const target = args.attacker;\n    if (target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\")) {\n        await game.xjzl.api.effects.addEffect(target, \"prone\");\n    } else {\n        await game.xjzl.api.effects.addEffect(target, \"unstable\");\n    }\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const target = args.attacker;\n    if (target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\")) {\n        await game.xjzl.api.effects.addEffect(target, \"prone\");\n    } else {\n        const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n        if (unstable) {\n            unstable.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(target, unstable);\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -550,9 +541,11 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "staff",
-                    "range": "3",
+                    "range": "3米",
+                    "targetInfo": "范围",
                     "actionCost": "主要动作",
-                    "description": "持枪刺出，风吹云散，对目标造成 0.6 力量点外功伤害。同时将周围所有“下盘不稳”和倒地的目标击飞 1 米。",
+                    "description": "<p>持枪刺出，风吹云散，对目标造成 0.6 力量点外功伤害。同时将周围所有“下盘不稳”和倒地的目标击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "伤害计算自动化。击飞位移请结合卡片提示手动在场景中拖拽Token。",
                     "costs": {
                         "mp": [
                             2,
@@ -581,10 +574,9 @@
                             "label": "击飞提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const t = args.target;\nif (t.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n    ui.notifications.info(`${t.name} 被击飞 1 米`);\n}"
+                            "script": "const t = args.target;\nif (t.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c0392b; font-weight:bold;\"><i class=\"fas fa-wind\"></i> ${t.name} 被击飞 1 米！请手动位移。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
-                    ],
-                    "automationNote": "伤害自动化。击飞位移需手动处理。"
+                    ]
                 }
             ]
         }
