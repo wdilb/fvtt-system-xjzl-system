@@ -874,34 +874,40 @@
             "category": "sanshou",
             "sect": "shenfengbang",
             "tier": 2,
-            "description": "神风帮弟子在外独行孤僻，从不与人好勇斗狠，而是杀伐果断。对于可杀之人，先斩之，不问后果，全由帮会负责善后。",
+            "description": "<p>神风帮弟子在外独行孤僻，从不与人好勇斗狠，而是杀伐果断。对于可杀之人，先斩之，不问后果，全由帮会负责善后。</p><p><strong>需求：</strong>《杀无道》修炼圆满。</p>",
             "requirements": "《杀无道》修炼圆满。",
             "moves": [
                 {
                     "name": "杀意动",
                     "type": "qi",
                     "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
                     "range": "自身",
-                    "description": "一天一次，花费十分钟，静坐室内，凝练杀意，你的杀戮值+10（至多加到 90，即你不能以此散手增长杀孽），并获得“杀念”，持续一天。<br>杀念：你每次出招时可以消耗 20 点杀戮值，使招式伤害+10。<br>·每有 1 点杀孽，杀念招式伤害+1（至多+10）。<br>升级：静坐获得的杀戮值+10，杀孽提供的招式伤害上限+10。",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p>一天一次，花费十分钟，静坐室内，凝练杀意，你的杀戮值+10（至多加到 90，即你不能以此散手增长杀孽），并获得“杀念”，持续一天。</p><p><strong>杀念：</strong>你每次出招时可以消耗 20 点杀戮值，使招式伤害+10。</p><p>·每有 1 点杀孽，杀念招式伤害+1（至多+10）。</p><p><strong>升级：</strong>静坐获得的杀戮值+10，杀孽提供的招式伤害上限+10。</p>",
+                    "automationNote": "杀戮值增加需根据提示手动调整。杀念Buff应用自动。出招消耗杀戮增伤自动（预览并带弹窗确认）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
                     },
                     "costs": {
                         "mp": [
+                            0,
+                            0,
                             0
                         ]
                     },
-                    "automationNote": "杀戮值增加手动。杀念Buff应用自动。出招消耗杀戮增伤自动（带弹窗）。",
                     "scripts": [
                         {
                             "label": "添加杀念Buff",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effectData = thisItem.effects.getName(\"杀念\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n// 增加杀戮值逻辑 (仅提示)\nconst currentShalu = system.resources.shalu.value;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 10 + (lvl - 1) * 10;\nui.notifications.info(`杀意凝练完成！请手动将杀戮值增加 ${gain} (上限90)。`);"
+                            "script": "const effectData = thisItem.effects.getName(\"杀念\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 10 + (lvl - 1) * 10;\n\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n    <div style=\"border-left: 4px solid #8b0000; background: rgba(139, 0, 0, 0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#8b0000; margin-bottom: 4px;\"><i class=\"fas fa-skull\"></i> 杀意凝练完成</div>\n        <div style=\"font-size: 0.9em; color: #555;\">\n            请手动将 <b>杀戮值</b> 增加 <span style=\"color:red; font-weight:bold;\">${gain}</span> 点。<br>\n            <span style=\"font-size: 0.85em; color: #888;\">（注：上限加至 90，不可因此增长杀孽）</span>\n        </div>\n    </div>\n</div>`;\nChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
-                    ],
-                    "actionCost": "无"
+                    ]
                 }
             ],
             "effects": [
@@ -913,28 +919,24 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "shanian",
+                            "stackable": false,
                             "scripts": [
+                                {
+                                    "label": "杀念预览",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "const shanie = actor.system.resources.shanie || 0;\nconst lvl = Math.max(1, thisItem.system.moves.find(m => m.name === \"杀意动\")?.computedLevel || 1);\nconst maxExtra = 10 + (lvl - 1) * 10;\nconst extra = Math.min(maxExtra, shanie);\nconst bonus = 10 + extra;\n\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`杀念: +${bonus} (需消耗20杀戮)`);"
+                                },
                                 {
                                     "label": "消耗杀戮增伤",
                                     "trigger": "attack",
                                     "active": true,
-                                    "script": "const shalu = system.resources.shalu.value;\nif (shalu >= 20) {\n    const use = await foundry.applications.api.DialogV2.confirm({ window: { title: '杀念' }, content: '消耗 20 杀戮值使伤害+10？', rejectClose: false });\n    if (use) {\n        await actor.update({ 'system.resources.shalu.value': shalu - 20 });\n        const shanie = system.resources.shanie || 0;\n        const extra = Math.min(10, shanie);\n        // 使用临时Flag传递给preDamage\n        args.flags.wuxue_shanian_bonus = 10 + extra;\n        ui.notifications.info(`杀意涌动！伤害+${10+extra}`);\n    }\n}"
-                                },
-                                {
-                                    "label": "伤害加成",
-                                    "trigger": "preDamage",
-                                    "active": true,
-                                    "script": "const bonus = args.flags.wuxue_shanian_bonus;\nif (bonus) {\n    args.config.amount += bonus;\n}"
-                                },
-                                {
-                                    "label": "面板预览",
-                                    "trigger": "calc",
-                                    "active": true,
-                                    "script": "const bonus = args.flags.wuxue_shanian_bonus;\nif (bonus) {\n    args.output.bonusDesc.push(`杀念: +${bonus}`);\n}"
+                                    "script": "const shalu = actor.system.resources.shalu.value;\nconst shanie = actor.system.resources.shanie || 0;\nconst lvl = Math.max(1, thisItem.system.moves.find(m => m.name === \"杀意动\")?.computedLevel || 1);\nconst maxExtra = 10 + (lvl - 1) * 10;\nconst extra = Math.min(maxExtra, shanie);\nconst bonus = 10 + extra;\n\nif (shalu >= 20) {\n    const use = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '杀念', icon: 'fas fa-skull' },\n        content: `<p>预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗 20 点杀戮值以生效此加成？</p>`,\n        yes: { label: \"消耗 (保留加成)\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗 (移除加成)\", icon: \"fas fa-times\" }\n    });\n    if (use) {\n        await actor.update({ 'system.resources.shalu.value': shalu - 20 });\n        \n        const content = `\n        <div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\">\n            <div style=\"border-left: 4px solid #8b0000; background: rgba(139, 0, 0, 0.05); padding: 5px;\">\n                <span style=\"color:#8b0000; font-weight:bold;\"><i class=\"fas fa-tint\"></i> 杀意涌动！伤害+${bonus}</span>\n            </div>\n        </div>`;\n        ChatMessage.create({\n            user: game.user.id,\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: content\n        });\n    } else {\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗：移除杀念加成 (-${bonus})`;\n    }\n} else {\n    args.flags.damageResult.damage -= bonus;\n    args.flags.damageResult.breakdown += `\\n- 未消耗：杀戮值不足 (-${bonus})`;\n}"
                                 }
                             ]
                         }
-                    }
+                    },
+                    "changes": []
                 }
             ]
         }
