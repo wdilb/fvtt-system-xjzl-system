@@ -178,8 +178,8 @@
             "category": "wuxue",
             "sect": "shenfengbang",
             "tier": 1,
-            "description": "神风帮武学，揣摩荆轲之古武刺法，招式决绝。",
-            "requirements": "匕首，杀意堂 属性：阴",
+            "description": "<p>神风帮武学，揣摩荆轲之古武刺法，招式决绝。</p><p><strong>需求：</strong>匕首，杀意堂 <strong>属性：</strong>阴</p>",
+            "requirements": "匕首；杀意堂",
             "moves": [
                 {
                     "name": "风萧萧",
@@ -187,8 +187,11 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "element": "yin",
-                    "range": "1",
-                    "description": "主要动作，借风把袖，右手揕之，对目标造成 0.4 力量点外功伤害。若招式造成暴击，自身获得“易水寒”，持续到战斗结束。<br>易水寒：下一次施展《易水诀》招式时，可以消耗此状态，选择以下任意一个效果生效：<br>易水湭寒：使周围 1 米范围内目标倒地。<br>慷慨送行：招式提升 10 点伤害。<br>壮士断腕：怒气+1。<br>升级：招式伤害+5，内力消耗+1。",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>借风把袖，右手揕之，对目标造成 0.4 力量点外功伤害。若招式造成暴击，自身获得“易水寒”，持续到战斗结束。</p><p><strong>易水寒：</strong>下一次施展《易水诀》招式时，可以消耗此状态，选择以下任意一个效果生效：</p><p>易水湭寒：使周围 1 米范围内目标倒地。</p><p>慷慨送行：招式提升 10 点伤害。</p><p>壮士断腕：怒气+1。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "暴击自动获得易水寒。施展时自动弹窗检测并消耗易水寒，可选择生效效果。易水湭寒由于是范围效果，将由系统自动发送卡片提示，请GM手动对周围目标应用倒地。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -206,40 +209,38 @@
                             3
                         ]
                     },
-                    "automationNote": "暴击自动获得易水寒。消耗逻辑在各招式中触发。",
                     "scripts": [
                         {
-                            "label": "易水寒特效",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const use = await foundry.applications.api.DialogV2.confirm({ window: { title: \"易水寒\" }, content: \"消耗易水寒触发特效？\", rejectClose: false });\n    if (use) {\n        await han.delete();\n        const choice = await new Promise(resolve => {\n            new Dialog({\n                title: \"选择效果\",\n                buttons: {\n                    1: { label: \"倒地(周围)\", callback: () => resolve(1) },\n                    2: { label: \"伤害+10\", callback: () => resolve(2) },\n                    3: { label: \"怒气+1\", callback: () => resolve(3) }\n                },\n                close: () => resolve(0)\n            }).render(true);\n        });\n        if (choice === 2) args.flags.wuxue_yishui_dmg = true;\n        if (choice === 3) args.flags.wuxue_yishui_rage = true;\n        if (choice === 1) args.flags.wuxue_yishui_prone = true;\n        \n        if (choice === 3) {\n             const curRage = system.resources.rage.value;\n             const maxRage = system.resources.rage.max;\n             if (curRage < maxRage) await actor.update({ \"system.resources.rage.value\": curRage + 1 });\n        }\n    }\n}"
-                        },
-                        {
-                            "label": "伤害加成",
-                            "trigger": "preDamage",
-                            "active": true,
-                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.config.amount += 10;\n}"
-                        },
-                        {
-                            "label": "面板预览",
+                            "label": "易水寒提示",
                             "trigger": "calc",
                             "active": true,
-                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.output.bonusDesc.push(\"易水寒: +10\");\n}"
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    args.output.bonusDesc.push(\"可消耗[易水寒]触发额外效果\");\n}"
                         },
                         {
-                            "label": "应用倒地/暴击获得",
+                            "label": "消耗易水寒",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const choice = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"消耗易水寒\" },\n        content: `<p>是否消耗[易水寒]？请选择效果：</p>\n                  <div style=\"display:flex; flex-direction:column; gap:5px;\">\n                    <label><input type=\"radio\" name=\"eff\" value=\"1\"> 易水湭寒: 1米内目标倒地</label>\n                    <label><input type=\"radio\" name=\"eff\" value=\"2\"> 慷慨送行: 本招伤害+10</label>\n                    <label><input type=\"radio\" name=\"eff\" value=\"3\"> 壮士断腕: 怒气+1</label>\n                    <label><input type=\"radio\" name=\"eff\" value=\"0\" checked> 不消耗</label>\n                  </div>`,\n        buttons:[{ action: \"ok\", label: \"确定\", icon: \"fas fa-check\", callback: (e, b) => b.form.elements.eff.value }],\n        rejectClose: false\n    });\n    if (choice && choice !== \"0\") {\n        await han.delete();\n        if (choice === \"2\") {\n            args.flags.damageResult.damage += 10;\n            args.flags.damageResult.breakdown += \"\\n+ 易水寒(慷慨送行): 10\";\n        } else if (choice === \"3\") {\n            const r = S.resources.rage;\n            if (r.value < r.max && !actor.xjzlStatuses.noRecoverRage) {\n                await actor.update({ \"system.resources.rage.value\": r.value + 1 });\n                actor.showFloatyText(\"怒气 +1\", { fill: \"#ff4500\" });\n            }\n        } else if (choice === \"1\") {\n            args.flags.yishui_prone = true;\n        }\n    }\n}"
+                        },
+                        {
+                            "label": "暴击获取/倒地应用",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && args.isCrit) {\n    const effectData = thisItem.effects.getName(\"易水寒\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}\nif (args.flags.wuxue_yishui_prone && args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    ui.notifications.info(\"易水寒：目标倒地！请手动检查周围1米其他目标。\");\n}"
+                            "script": "if (args.isHit && args.isCrit) {\n    const eff = thisItem.effects.getName(\"易水寒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nif (args.flags.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
                         }
-                    ],
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "取图奉之",
                     "type": "stance",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "element": "yin",
                     "range": "自身",
-                    "description": "次要动作，双手平展，作献图状，开启架招。架招被击破时，可不消耗动作立即施展【图穷匕见】，并且自身获得“易水寒”，持续到战斗结束。<br>升级：格挡值+5，内力消耗+1。",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双手平展，作献图状，开启架招。架招被击破时，可不消耗动作立即施展【图穷匕见】，并且自身获得“易水寒”，持续到战斗结束。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "架招被破自动获得易水寒，免费施展图穷匕见需玩家手动操作不勾选消耗。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -251,17 +252,14 @@
                             3
                         ]
                     },
-                    "automationNote": "架招被破自动获得易水寒。免费施展需手动。",
                     "scripts": [
                         {
                             "label": "架招被破",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.isBroken && Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"易水寒\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.warn(\"架招被破！获得易水寒，可立即施展【图穷匕见】！\");\n}"
+                            "script": "if (args.isBroken && Macros.checkStance(actor, args)) {\n    const eff = thisItem.effects.getName(\"易水寒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.warn(\"架招被破！获得易水寒，可立即施展【图穷匕见】！\");\n}"
                         }
-                    ],
-                    "weaponType": "dagger",
-                    "actionCost": "次要动作"
+                    ]
                 },
                 {
                     "name": "图穷匕见",
@@ -269,8 +267,11 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "element": "yin",
-                    "range": "1",
-                    "description": "主要动作，弃图追击，对目标造成 0.3 力量点外功伤害。击破架招时，可将目标击倒，并获得“连击”，持续到战斗脱离。<br>连击：你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。<br>升级：招式伤害+5，内力消耗+1。",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>弃图追击，对目标造成 0.3 力量点外功伤害。击破架招时，可将目标击倒，并获得“连击”，持续到战斗脱离。</p><p><strong>连击：</strong>你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "易水寒特效全自动化。击破架招自动应用倒地和连击状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -288,34 +289,26 @@
                             3
                         ]
                     },
-                    "automationNote": "易水寒通用逻辑同上。击破架招自动应用倒地和连击。",
                     "scripts": [
                         {
-                            "label": "易水寒特效",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const use = await foundry.applications.api.DialogV2.confirm({ window: { title: \"易水寒\" }, content: \"消耗易水寒触发特效？\", rejectClose: false });\n    if (use) {\n        await han.delete();\n        const choice = await new Promise(resolve => {\n            new Dialog({\n                title: \"选择效果\",\n                buttons: {\n                    1: { label: \"倒地(周围)\", callback: () => resolve(1) },\n                    2: { label: \"伤害+10\", callback: () => resolve(2) },\n                    3: { label: \"怒气+1\", callback: () => resolve(3) }\n                },\n                close: () => resolve(0)\n            }).render(true);\n        });\n        if (choice === 2) args.flags.wuxue_yishui_dmg = true;\n        if (choice === 3) args.flags.wuxue_yishui_rage = true;\n        if (choice === 1) args.flags.wuxue_yishui_prone = true;\n        if (choice === 3) {\n             const curRage = system.resources.rage.value;\n             const maxRage = system.resources.rage.max;\n             if (curRage < maxRage) await actor.update({ \"system.resources.rage.value\": curRage + 1 });\n        }\n    }\n}"
-                        },
-                        {
-                            "label": "伤害加成",
-                            "trigger": "preDamage",
-                            "active": true,
-                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.config.amount += 10;\n}"
-                        },
-                        {
-                            "label": "面板预览",
+                            "label": "易水寒提示",
                             "trigger": "calc",
                             "active": true,
-                            "script": "if (args.flags.wuxue_yishui_dmg) {\n    args.output.bonusDesc.push(\"易水寒: +10\");\n}"
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    args.output.bonusDesc.push(\"可消耗[易水寒]触发额外效果\");\n}"
+                        },
+                        {
+                            "label": "消耗易水寒",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const choice = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"消耗易水寒\" },\n        content: `<p>是否消耗[易水寒]？请选择效果：</p>\n                  <div style=\"display:flex; flex-direction:column; gap:5px;\">\n                    <label><input type=\"radio\" name=\"eff\" value=\"1\"> 易水湭寒: 1米内目标倒地</label>\n                    <label><input type=\"radio\" name=\"eff\" value=\"2\"> 慷慨送行: 本招伤害+10</label>\n                    <label><input type=\"radio\" name=\"eff\" value=\"3\"> 壮士断腕: 怒气+1</label>\n                    <label><input type=\"radio\" name=\"eff\" value=\"0\" checked> 不消耗</label>\n                  </div>`,\n        buttons:[{ action: \"ok\", label: \"确定\", icon: \"fas fa-check\", callback: (e, b) => b.form.elements.eff.value }],\n        rejectClose: false\n    });\n    if (choice && choice !== \"0\") {\n        await han.delete();\n        if (choice === \"2\") {\n            args.flags.damageResult.damage += 10;\n            args.flags.damageResult.breakdown += \"\\n+ 易水寒(慷慨送行): 10\";\n        } else if (choice === \"3\") {\n            const r = S.resources.rage;\n            if (r.value < r.max && !actor.xjzlStatuses.noRecoverRage) {\n                await actor.update({ \"system.resources.rage.value\": r.value + 1 });\n                actor.showFloatyText(\"怒气 +1\", { fill: \"#ff4500\" });\n            }\n        } else if (choice === \"1\") {\n            args.flags.yishui_prone = true;\n        }\n    }\n}"
                         },
                         {
                             "label": "击破/易水寒效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    await game.xjzl.api.effects.toggleStatus(actor, \"lianji\", true);\n    ui.notifications.info(\"图穷匕见！击倒目标并获得连击。\");\n}\nif (args.flags.wuxue_yishui_prone) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    ui.notifications.info(\"易水寒：目标倒地！请手动检查周围1米其他目标。\");\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    const lianji = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"lianji\"));\n    await game.xjzl.api.effects.addEffect(actor, lianji);\n    ui.notifications.info(\"图穷匕见！击倒目标并获得连击。\");\n}\nif (args.flags.yishui_prone && args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(\"易水寒：目标已倒地，若1米内有其他目标请手动施加倒地！\");\n}"
                         }
-                    ],
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "不复还",
@@ -324,8 +317,11 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "element": "yin",
-                    "range": "2",
-                    "description": "主要动作，仰天呼气，瞬息一刺，对敌人造成 0.6 力量点外功伤害。<br>若你具有“易水寒”，可将之移除，然后对目标发动“濒死一击”，该次濒死一击暴击骰-2。<br>升级：招式伤害+10，怒气消耗-1，内力消耗+2。",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>仰天呼气，瞬息一刺，对敌人造成 0.6 力量点外功伤害。</p><p>若你具有“易水寒”，可将之移除，然后对目标发动“濒死一击”，该次濒死一击暴击骰-2。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "预览时乐观显示易水寒附加伤害，施展时自动弹窗询问是否消耗，确认后自动清空内力、应用加伤并修正常局暴击阈值。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -348,28 +344,20 @@
                             5
                         ]
                     },
-                    "automationNote": "自动询问消耗易水寒。若确认，自动清空内力、增加伤害、修正暴击阈值。",
                     "scripts": [
                         {
-                            "label": "易水寒濒死一击",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"易水寒\" },\n        content: \"消耗易水寒发动濒死一击？(内力清空转为伤害，暴击阈值-2)\",\n        rejectClose: false\n    });\n    if (confirm) {\n        await han.delete();\n        const mp = system.resources.mp.value;\n        await actor.update({ \"system.resources.mp.value\": 0 });\n        args.flags.wuxue_desperate_bonus = mp;\n        args.flags.critThresholdMod += 2;\n        ui.notifications.info(`易水寒发动！濒死一击附加 ${mp} 伤害！`);\n    }\n}"
-                        },
-                        {
-                            "label": "伤害附加",
-                            "trigger": "preDamage",
-                            "active": true,
-                            "script": "const bonus = args.flags.wuxue_desperate_bonus || 0;\nif (bonus > 0) {\n    args.config.amount += bonus;\n}"
-                        },
-                        {
-                            "label": "面板预览",
+                            "label": "易水寒预览",
                             "trigger": "calc",
                             "active": true,
-                            "script": "const bonus = args.flags.wuxue_desperate_bonus || 0;\nif (bonus > 0) {\n    args.output.bonusDesc.push(`濒死一击: +${bonus}`);\n}"
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const mp = S.resources.mp.value;\n    args.output.damage += mp;\n    args.output.bonusDesc.push(`预估 易水寒(濒死一击): +${mp}`);\n}"
+                        },
+                        {
+                            "label": "消耗易水寒",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const han = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishui_han\");\nif (han) {\n    const mp = S.resources.mp.value;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"不复还\" },\n        content: `<p>是否消耗[易水寒]发动濒死一击？</p><p>将清空所有内力(${mp})转为伤害，暴击阈值-2。</p>`,\n        rejectClose: false\n    });\n    if (confirm) {\n        await han.delete();\n        await actor.update({ \"system.resources.mp.value\": 0 });\n        args.flags.critThresholdMod += 2;\n        args.flags.damageResult.breakdown += `\\n+ 易水寒(濒死一击): ${mp}`;\n    } else {\n        args.flags.damageResult.damage -= mp;\n        args.flags.damageResult.breakdown += `\\n- 拒绝消耗易水寒: -${mp}`;\n    }\n}"
                         }
-                    ],
-                    "actionCost": "主要动作"
+                    ]
                 }
             ],
             "effects": [
@@ -396,14 +384,20 @@
             "category": "wuxue",
             "sect": "shenfengbang",
             "tier": 2,
-            "description": "神风帮绝学，出其不意，攻敌不备，轻巧灵活。",
-            "requirements": "匕首，杀意堂 属性：阴",
+            "description": "<p>神风帮绝学，出其不意，攻敌不备，轻巧灵活。</p><p><strong>需求：</strong>匕首，杀意堂 <strong>属性：</strong>阴</p>",
+            "requirements": "匕首；杀意堂",
             "moves": [
                 {
                     "name": "风吹拂柳",
                     "type": "stance",
-                    "range": "自身/5 米",
-                    "description": "次要动作，拂袖挥风，开启架招。格挡成功时，气纳四方，将范围内一把落在地上的匕首摄入手中，然后获得一层“回风”，至多三层，持续到脱战。<br>回风：每层使施展带有“风”字的招式暴击骰-1。<br>升级：格挡值+10，内力消耗+2。",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "element": "yin",
+                    "range": "自身/5米",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>拂袖挥风，开启架招。格挡成功时，气纳四方，将范围内一把落在地上的匕首摄入手中，然后获得一层“回风”，至多三层，持续到脱战。</p><p><strong>回风：</strong>每层使施展带有“风”字的招式暴击骰-1。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "格挡成功自动叠加一层回风，场上掉落的匕首收取需玩家在跑团时自行把控。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -415,17 +409,14 @@
                             6
                         ]
                     },
-                    "automationNote": "格挡成功自动获得回风。摄入匕首/范围判定手动。",
                     "scripts": [
                         {
                             "label": "格挡获得回风",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effectData = thisItem.effects.getName(\"回风\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nui.notifications.info(\"风吹拂柳！摄入匕首并获得回风。\");"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"回风\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"气纳四方，获得回风\", { fill: \"#00ff00\" });"
                         }
-                    ],
-                    "weaponType": "dagger",
-                    "actionCost": "次要动作"
+                    ]
                 },
                 {
                     "name": "袖里回风",
@@ -433,8 +424,11 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "element": "yin",
-                    "range": "5",
-                    "description": "主要动作，袖里藏风，掷出匕首，对敌人造成 0.5 身法点外功伤害。命中无架招目标时，为自身添加一层“回风”，至多三层，持续到战斗脱离。<br>若有目标在半空中，可以消耗反应动作施展此招，立于原地掷出匕首，对其造成伤害。<br>·施展此招后，你的[匕首]武器视作脱手,掉落在目标所处空格处。<br>升级：招式伤害+10，内力消耗+2。",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>（可使用反应动作释放）袖里藏风，掷出匕首，对敌人造成 0.5 身法点外功伤害。命中无架招目标时，为自身添加一层“回风”，至多三层，持续到战斗脱离。</p><p>若有目标在半空中，可以消耗反应动作施展此招，立于原地掷出匕首，对其造成伤害。</p><p>·施展此招后，你的[匕首]武器视作脱手,掉落在目标所处空格处。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "招式名带风字，自动获得回风的暴击加成。命中无架招目标自动叠回风。武器脱手效果请手动卸下装备。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -452,22 +446,20 @@
                             6
                         ]
                     },
-                    "automationNote": "回风暴击检测自动。命中无架招自动获得回风。武器脱手/反应动作手动。",
                     "scripts": [
                         {
-                            "label": "回风修正暴击",
+                            "label": "回风修暴击",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf && args.move.name.includes(\"风\")) {\n    args.flags.critThresholdMod += (hf.getFlag(\"xjzl-system\", \"stacks\") || 1);\n}"
+                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf && args.move.name.includes(\"风\")) {\n    const stacks = hf.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.critThresholdMod += stacks;\n}"
                         },
                         {
-                            "label": "获得回风",
+                            "label": "命中叠回风",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effectData = thisItem.effects.getName(\"回风\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const eff = thisItem.effects.getName(\"回风\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
                         }
-                    ],
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "无风起浪",
@@ -475,8 +467,11 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "element": "yin",
-                    "range": "5",
-                    "description": "主要动作，抬臂轻甩，暗刺急出，对目标造成 0.4 身法点外功伤害。击破架招时击倒敌人，并为其添加“迟滞”，持续两回合。<br>·每消耗一层“回风”，虚招值+1。<br>·施展此招后，你的[匕首]武器视作脱手,掉落在目标所处空格处。<br>升级：招式伤害+10，内力消耗+2。",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>抬臂轻甩，暗刺急出，对目标造成 0.4 身法点外功伤害。击破架招时击倒敌人，并为其添加“迟滞”，持续两回合。</p><p>·每消耗一层“回风”，虚招值+1。</p><p>·施展此招后，你的[匕首]武器视作脱手,掉落在目标所处空格处。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "招式出招时弹窗询问消耗几层回风，自动计算增加的虚招值。同时应用回风的暴击加成。击破架招自动击倒并附加迟滞。武器脱手需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -494,22 +489,26 @@
                             6
                         ]
                     },
-                    "automationNote": "自动消耗回风增加虚招。击破自动应用效果。武器脱手手动。",
                     "scripts": [
                         {
-                            "label": "消耗回风与修正",
+                            "label": "回风提示",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf) {\n    args.output.bonusDesc.push(`可消耗回风提升虚招值 (每层+1)`);\n}"
+                        },
+                        {
+                            "label": "消耗回风及修暴击",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf) {\n    const stacks = hf.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.bonusFeint += stacks;\n    if (args.move.name.includes(\"风\")) args.flags.critThresholdMod += stacks;\n    await hf.delete();\n    ui.notifications.info(`消耗 ${stacks} 层回风，虚招值+${stacks}`);\n}"
+                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf) {\n    const maxStacks = hf.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    if (args.move.name.includes(\"风\")) {\n        args.flags.critThresholdMod += maxStacks;\n    }\n    \n    const result = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"无风起浪\" },\n        content: `<p>当前拥有 ${maxStacks} 层[回风]。</p><label>输入要消耗的层数以增加虚招值 (0不消耗):</label>\n                  <input type=\"number\" name=\"consume\" value=\"0\" min=\"0\" max=\"${maxStacks}\">`,\n        ok: { callback: (e, b) => parseInt(b.form.elements.consume.value) || 0 },\n        rejectClose: false\n    });\n    if (result > 0) {\n        const consume = Math.min(result, maxStacks);\n        await game.xjzl.api.effects.removeEffect(actor, \"huifeng\", consume);\n        args.flags.bonusFeint += consume;\n        ui.notifications.info(`消耗 ${consume} 层回风，虚招值 +${consume}`);\n    }\n}"
                         },
                         {
                             "label": "击破效果",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    await game.xjzl.api.effects.addEffect(args.target, \"chizhi\");\n    const eff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chizhi\");\n    if(eff) await eff.update({ duration: { rounds: 2 } });\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const chizhi = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chizhi\"));\n    if (chizhi) {\n        chizhi.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, chizhi);\n    }\n}"
                         }
-                    ],
-                    "actionCost": "主要动作"
+                    ]
                 },
                 {
                     "name": "风起八方",
@@ -518,8 +517,11 @@
                     "damageType": "waigong",
                     "weaponType": "dagger",
                     "element": "yin",
-                    "range": "10",
-                    "description": "蓄力动作，随风而动，贯穿八方，对东南西北四条直线以及东南、东北、西南、西北四条斜线上的所有敌人造成 0.7 身法点外功伤害。同时将范围内所有落在地上的匕首摄入手中，每摄入一把获得一层“回风”，且招式伤害+10 点。<br>升级:招式伤害+20，怒气消耗-1，内力消耗+8。",
+                    "range": "10米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>随风而动，贯穿八方，对东南西北四条直线以及东南、东北、西南、西北四条斜线上的所有敌人造成 0.7 身法点外功伤害。同时将范围内所有落在地上的匕首摄入手中，每摄入一把获得一层“回风”，且招式伤害+10 点。</p><p><strong>升级:</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "回风暴击修正自动。摄入匕首数量通过弹窗询问，自动计算伤害和回风层数并应用。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -542,28 +544,20 @@
                             5
                         ]
                     },
-                    "automationNote": "回风暴击修正自动。摄入匕首数量通过弹窗询问，自动计算伤害和回风层数。AOE目标手动选择。",
                     "scripts": [
                         {
-                            "label": "回风暴击与匕首摄入",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf) {\n    args.flags.critThresholdMod += (hf.getFlag(\"xjzl-system\", \"stacks\") || 1);\n}\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"风起八方\" },\n    content: \"<label>摄入匕首数量</label><input type='number' name='cnt' value='0'>\",\n    ok: { callback: (e, b) => b.form.elements.cnt.value }\n});\nif (count > 0) {\n    args.flags.wuxue_dagger_bonus = parseInt(count);\n    const effectData = thisItem.effects.getName(\"回风\").toObject();\n    for(let i=0; i<count; i++) await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
-                        },
-                        {
-                            "label": "伤害加成",
-                            "trigger": "preDamage",
-                            "active": true,
-                            "script": "const count = args.flags.wuxue_dagger_bonus || 0;\nif (count > 0) {\n    args.config.amount += count * 10;\n}"
-                        },
-                        {
-                            "label": "面板预览",
+                            "label": "回风提示",
                             "trigger": "calc",
                             "active": true,
-                            "script": "const count = args.flags.wuxue_dagger_bonus || 0;\nif (count > 0) {\n    args.output.bonusDesc.push(`摄入${count}把匕首: +${count*10}`);\n}"
+                            "script": "args.output.bonusDesc.push(`每摄入1把匕首伤害+10`);"
+                        },
+                        {
+                            "label": "回风修暴与吸收",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huifeng\");\nif (hf && args.move.name.includes(\"风\")) {\n    const stacks = hf.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.critThresholdMod += stacks;\n}\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"风起八方\" },\n    content: `<label>摄入地上的匕首数量 (每把伤害+10，并获得1层回风):</label><input type=\"number\" name=\"cnt\" value=\"0\" min=\"0\">`,\n    ok: { callback: (e, b) => parseInt(b.form.elements.cnt.value) || 0 },\n    rejectClose: false\n});\nif (count > 0) {\n    args.flags.damageResult.damage += (count * 10);\n    args.flags.damageResult.breakdown += `\\n+ 摄入匕首 x${count}: ${count * 10}`;\n    const eff = thisItem.effects.getName(\"回风\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff, count);\n    actor.showFloatyText(`吸收匕首 x${count}`, { fill: \"#00ff00\" });\n}"
                         }
-                    ],
-                    "actionCost": "蓄力动作"
+                    ]
                 }
             ],
             "effects": [
