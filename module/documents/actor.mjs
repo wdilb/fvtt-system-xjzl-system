@@ -477,8 +477,6 @@ export class XJZLActor extends Actor {
     const isArmorBroken = this.getFlag("xjzl-system", "ignoreArmorEffects");
 
     // 定义受破衣影响的部位
-    // 假设你的 Armor DataModel 里，部位存储在 system.type 中
-    // 如果存在 system.slot，请替换为 i.system.slot
     const bodySlots = ["head", "top", "bottom", "shoes"];
 
     const equipments = this.items.filter(i =>
@@ -620,6 +618,41 @@ export class XJZLActor extends Actor {
           });
         }
       });
+    }
+
+    // =====================================================
+    // 7. 战斗开始、回合开始、回合结束，全部武学都可以触发
+    // =====================================================
+    // 使用 appliedEffects 自动获得过滤后的列表 (已剔除禁用/未装备/过期)
+    // 如果没有 appliedEffects (旧版本)，使用 this.effects.filter(...)
+    const GLOBAL_WUXUE_TRIGGERS = [
+      SCRIPT_TRIGGERS.COMBAT_START,
+      SCRIPT_TRIGGERS.TURN_START,
+      SCRIPT_TRIGGERS.TURN_END
+    ];
+    if (GLOBAL_WUXUE_TRIGGERS.includes(trigger)) {
+      // 获取这名角色身上所有的武学物品
+      const wuxueItems = this.itemTypes.wuxue;
+      for (const item of wuxueItems) {
+        // 遍历这些武学下的所有招式
+        for (const move of item.system.moves) {
+          // 直接跳过未入门的招式 (层数<=0不生效)
+          if ((move.computedLevel || 0) <= 0) continue;
+          
+          if (!move.scripts || move.scripts.length === 0) continue;
+          for (const s of move.scripts) {
+            // 匹配 trigger 且 脚本处于激活状态
+            if (s.trigger === trigger && s.active) {
+              scripts.push({
+                script: s.script,
+                label: `${s.label} (${move.name} - ${item.name})`,
+                source: item, // 源头依然是 Item
+                contextData: move
+              });
+            }
+          }
+        }
+      }
     }
 
     return scripts;
