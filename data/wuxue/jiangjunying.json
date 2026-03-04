@@ -1297,8 +1297,8 @@
             "category": "wuxue",
             "sect": "jiangjunying",
             "tier": 2,
-            "description": "<p>平战乱，定乾坤，夺旗斩将，陷阵先登。</p>",
-            "requirements": "刀，尽忠营",
+            "description": "<p>平战乱，定乾坤，夺旗斩将，陷阵先登。</p><p><strong>需求：</strong>刀，尽忠营</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "刀；尽忠营",
             "moves": [
                 {
                     "name": "披坚执锐",
@@ -1306,9 +1306,11 @@
                     "element": "gang",
                     "weaponType": "blade",
                     "damageType": "none",
-                    "description": "<p>次要动作，持刀不退，开启架招。格挡成功时，获得一层“战意”，至多三层，持续到战斗脱离。<br>战意：每层使你在回合初士气+5。</p>",
+                    "description": "<p>次要动作，持刀不退，开启架招。格挡成功时，获得一层“战意”，至多三层，持续到战斗脱离。</p><p><strong>战意：</strong>每层使你在回合初士气+5。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
                     "actionCost": "次要动作",
                     "range": "自身",
+                    "targetInfo": "自身",
+                    "automationNote": "完全自动化。格挡后自动获得战意。士气回复已采用防冲突机制，可与其他心法完美叠加。",
                     "costs": {
                         "mp": [
                             2,
@@ -1324,7 +1326,7 @@
                         {
                             "label": "格挡获战意",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"战意\"));\n}",
+                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    const eff = thisItem.effects.getName(\"战意\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ]
@@ -1335,9 +1337,11 @@
                     "element": "gang",
                     "weaponType": "blade",
                     "damageType": "waigong",
-                    "description": "<p>主要动作，挥刀砍杀，对目标造成 0.4 力量点外功伤害。击破对方架招时，使对方陷入“溃散”，持续一回合，你还可以消耗一层“战意”，将对方击飞 1 米。<br>溃散：你每回合初士气-20。</p>",
+                    "description": "<p>主要动作，挥刀砍杀，对目标造成 0.4 力量点外功伤害。击破对方架招时，使对方陷入“溃散”，持续一回合，你还可以消耗一层“战意”，将对方击飞 1 米。</p><p><strong>溃散：</strong>你每回合初士气-20。</p><p><strong>升级：</strong>招式伤害+10，溃散持续回合+1，消耗+2。</p>",
                     "actionCost": "主要动作",
                     "range": "1米",
+                    "targetInfo": "单体",
+                    "automationNote": "击破后自动计算招式等级施加[溃散]。弹窗询问是否消耗战意击飞。",
                     "costs": {
                         "mp": [
                             2,
@@ -1357,9 +1361,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破施加溃散与击飞",
+                            "label": "击破溃散与击飞",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, thisItem.effects.getName(\"溃散\"));\n    \n    if (game.xjzl.api.effects.removeEffect(actor, \"战意\", 1)) {\n        ChatMessage.create({ content: `${args.target.name} 被战意击飞 1 米！` });\n    }\n}",
+                            "script": "if (args.isBroken) {\n    // 动态计算溃散持续时间\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const kuisanData = thisItem.effects.getName(\"溃散\").toObject();\n    delete kuisanData._id;\n    kuisanData.origin = thisItem.uuid;\n    kuisanData.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, kuisanData);\n    \n    // 询问是否击飞\n    const zhanyi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhanyi\");\n    if (zhanyi) {\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"战意击飞\" },\n            content: `<p>目标已被破防，是否消耗 1 层 <b>[战意]</b> 将其击飞 1 米？</p>`,\n            yes: { label: \"击飞\" },\n            no: { label: \"保留战意\" }\n        });\n        if (confirm) {\n            await game.xjzl.api.effects.removeEffect(actor, \"zhanyi\", 1);\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\"><div style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-wind\"></i> 消耗战意，将 ${args.target.name} 击飞 1 米！</div></div>` });\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1370,9 +1374,10 @@
                     "element": "gang",
                     "weaponType": "blade",
                     "damageType": "waigong",
-                    "description": "<p>主要动作，奋勇不惧，拼死杀敌，对目标造成 0.5 力量点外功伤害。<br>若有人处于半空中，可以消耗反应动作释放此招，猛跃而起，在半空中冲锋追砍，造成伤害。</p>",
-                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，奋勇不惧，拼死杀敌，对目标造成 0.5 力量点外功伤害。<br>若有人处于半空中，可以消耗反应动作释放此招，猛跃而起，在半空中冲锋追砍，造成伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "actionCost": "主要/反应动作",
                     "range": "1米",
+                    "targetInfo": "单体",
                     "costs": {
                         "mp": [
                             2,
@@ -1397,10 +1402,12 @@
                     "isUltimate": true,
                     "element": "gang",
                     "weaponType": "blade",
-                    "description": "<p>蓄力动作，军旗摇动，擂鼓怒吼，对周围敌人造成 0.6 力量点内功伤害，给范围内友方添加“金鼓”，持续三回合；给范围内敌人添加“溃散”，持续三回合。<br>金鼓：每回合初获得 10 点士气。<br>·你每消耗一层战意，本招式命中提升 10 点，金鼓提供的士气+10。<br>溃散：你每回合初士气-20。</p>",
+                    "damageType": "neigong",
+                    "description": "<p>蓄力动作，军旗摇动，擂鼓怒吼，对周围敌人造成 0.6 力量点内功伤害，给范围内友方添加“金鼓”，持续三回合；给范围内敌人添加“溃散”，持续三回合。</p><p><strong>金鼓：</strong>每回合初获得 10 点士气。</p><p>·你每消耗一层战意，本招式命中提升 10 点，金鼓提供的士气+10。</p><p><strong>溃散：</strong>你每回合初士气-20。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
                     "actionCost": "蓄力动作",
                     "range": "5米",
-                    "damageType": "neigong",
+                    "targetInfo": "周围范围",
+                    "automationNote": "出招时自动消耗所有战意增加命中，并发送卡片提示友方手动应用[金鼓]（包含动态加成）。击中敌人自动施加 3 回合的溃散。",
                     "costs": {
                         "mp": [
                             8,
@@ -1425,81 +1432,87 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗战意增强命中",
+                            "label": "消耗战意与金鼓提示",
                             "trigger": "attack",
-                            "script": "const effect = actor.effects.find(e => e.name === \"战意\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.bonusHit += stacks * 10;\n    await effect.delete();\n    ui.notifications.info(`消耗 ${stacks} 层战意，命中+${stacks*10}`);\n}",
+                            "script": "const zhanyi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhanyi\");\nlet stacks = 0;\nif (zhanyi) {\n    stacks = zhanyi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.bonusHit += stacks * 10;\n    await zhanyi.delete();\n    actor.showFloatyText(`命中+${stacks*10}`, {fill: \"#00ff00\"});\n}\n\n// 动态金鼓数值\nconst jinguBonus = 10 + (stacks * 10);\nconst msg = `\n<div class=\"xjzl-chat-card\">\n    <div style=\"font-weight:bold; color:#c0392b; border-bottom:1px solid #ccc; margin-bottom:5px;\">\n        <i class=\"fas fa-drum\"></i> 战鼓宣天！\n    </div>\n    <div style=\"font-size:0.9em;\">\n        消耗了 <b>${stacks}</b> 层战意，全军振奋！<br>\n        请周围友方手动为自己添加 <b>[金鼓]</b> 状态，此状态每回合初将恢复 <b style=\"color:green;\">${jinguBonus}</b> 点士气 (持续3回合)。\n    </div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         },
                         {
-                            "label": "施加状态",
+                            "label": "施加绝招溃散",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, thisItem.effects.getName(\"溃散\"));\n}",
+                            "script": "if (args.isHit) {\n    const kuisanData = thisItem.effects.getName(\"溃散\").toObject();\n    delete kuisanData._id;\n    kuisanData.origin = thisItem.uuid;\n    kuisanData.duration = { rounds: 3 }; // 绝招固定3回合\n    await game.xjzl.api.effects.addEffect(args.target, kuisanData);\n}",
                             "active": true
                         }
-                    ],
-                    "automationNote": "友方金鼓状态需手动添加。消耗战意带来的金鼓加成需手动调整。"
-                }
-            ],
-            "effects": [
-                {
-                    "name": "战意",
-                    "icon": "icons/svg/combat.svg",
-                    "description": "每层使你在回合初士气+5。",
-                    "flags": {
-                        "xjzl-system": {
-                            "stackable": true,
-                            "maxStacks": 3,
-                            "slug": "zhanyi",
-                            "scripts": [
-                                {
-                                    "trigger": "turnStart",
-                                    "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1; await actor.update({'system.resources.morale.value': S.resources.morale.value + (5 * stacks)}); ui.notifications.info('战意回复士气');"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "溃散",
-                    "icon": "icons/svg/downgrade.svg",
-                    "description": "每回合初士气-20。",
-                    "duration": {
-                        "rounds": 1
-                    },
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "kuisan",
-                            "scripts": [
-                                {
-                                    "trigger": "turnStart",
-                                    "script": "if(S.resources.morale) await actor.update({'system.resources.morale.value': Math.max(0, S.resources.morale.value - 20)}); ui.notifications.info('溃散流失士气');"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "金鼓",
-                    "icon": "icons/svg/sound.svg",
-                    "description": "每回合初获得 10 点士气。",
-                    "duration": {
-                        "rounds": 3
-                    },
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "jingu",
-                            "scripts": [
-                                {
-                                    "trigger": "turnStart",
-                                    "script": "await actor.update({'system.resources.morale.value': S.resources.morale.value + 10});"
-                                }
-                            ]
-                        }
-                    }
+                    ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "战意",
+                "icon": "icons/svg/combat.svg",
+                "description": "每层使你在回合初士气+5。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "stackable": true,
+                        "maxStacks": 3,
+                        "slug": "zhanyi",
+                        "scripts": [
+                            {
+                                "label": "战意回气(防冲突版)",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nconst gain = 5 * stacks;\nactor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) + gain;\nif (!actor._moraleTimer) {\n    actor._moraleTimer = setTimeout(async () => {\n        const totalDelta = actor._pendingMoraleDelta;\n        actor._pendingMoraleDelta = 0;\n        actor._moraleTimer = null;\n        const cur = actor.system.resources.morale?.value || 0;\n        const newVal = Math.min(100, cur + totalDelta);\n        if (newVal !== cur) {\n            await actor.update({'system.resources.morale.value': newVal});\n            actor.showFloatyText(`士气 +${totalDelta}`, {fill: \"#00ff00\"});\n        }\n    }, 50);\n}"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "溃散",
+                "icon": "icons/svg/downgrade.svg",
+                "description": "每回合初士气-20。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuisan",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "溃散掉气(防冲突版)",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) - 20;\nif (!actor._moraleTimer) {\n    actor._moraleTimer = setTimeout(async () => {\n        const totalDelta = actor._pendingMoraleDelta;\n        actor._pendingMoraleDelta = 0;\n        actor._moraleTimer = null;\n        const cur = actor.system.resources.morale?.value || 0;\n        const newVal = Math.max(0, cur + totalDelta);\n        if (newVal !== cur) {\n            await actor.update({'system.resources.morale.value': newVal});\n            actor.showFloatyText(`士气 ${totalDelta}`, {fill: \"#ff0000\"});\n        }\n    }, 50);\n}"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "金鼓",
+                "icon": "icons/svg/sound.svg",
+                "description": "每回合初获得士气。",
+                "duration": {
+                    "rounds": 3
+                },
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jingu",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "金鼓提示",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}), \n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px; border-left:3px solid #f1c40f;\"><b>金鼓齐鸣</b>: 你的回合开始了，请按照战鼓宣天的提示手动增加士气！</div>`\n});"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     },
     {
         "name": "漫天箭雨",
@@ -1545,8 +1558,9 @@
             "category": "sanshou",
             "sect": "jiangjunying",
             "tier": 1,
-            "description": "<p>将军营士卒因其意志坚定，斗志昂扬，士气极盛，常以一鼓作气击败敌人，难以被挫折击败。</p>",
+            "description": "<p>将军营士卒因其意志坚定，斗志昂扬，士气极盛，常以一鼓作气击败敌人，难以被挫折击败。</p><p><strong>需求：</strong>《百战诀》修炼圆满</p>",
             "requirements": "《百战诀》修炼圆满",
+            "automationNote": "完全自动化。进战及击倒敌人时均会自动恢复士气（数值随此招式等级成长，并采用了防并发覆盖机制）。",
             "moves": [
                 {
                     "name": "士气如虹",
@@ -1554,7 +1568,9 @@
                     "damageType": "none",
                     "weaponType": "none",
                     "description": "<p>你进入战斗时，获得 10 点士气。<br>你出招将敌人打入濒死时，获得 10 点士气。<br><strong>升级：</strong>进入战斗和将人打入濒死获得的士气+5。</p>",
-                    "automationNote": "完全自动化。",
+                    "actionCost": "无",
+                    "range": "自身",
+                    "targetInfo": "自身",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1563,15 +1579,16 @@
                         {
                             "label": "士气如虹-进战",
                             "trigger": "combatStart",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst gain = 10 + (lvl - 1) * 5;\nawait actor.update({'system.resources.morale.value': S.resources.morale.value + gain});\nui.notifications.info(`${actor.name} 士气如虹：进入战斗获得 ${gain} 点士气`);"
+                            "active": true,
+                            "script": "const moveData = typeof move !== 'undefined' ? move : thisItem.system.moves[0];\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst gain = 10 + (lvl - 1) * 5;\nactor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) + gain;\nif (!actor._moraleTimer) {\n    actor._moraleTimer = setTimeout(async () => {\n        const totalDelta = actor._pendingMoraleDelta;\n        actor._pendingMoraleDelta = 0;\n        actor._moraleTimer = null;\n        const cur = actor.system.resources.morale?.value || 0;\n        const newVal = Math.min(100, cur + totalDelta);\n        if (newVal !== cur) {\n            await actor.update({'system.resources.morale.value': newVal});\n            actor.showFloatyText(`进战士气+${totalDelta}`, {fill: \"#00ff00\"});\n        }\n    }, 50);\n}"
                         },
                         {
-                            "label": "士气如虹-击倒反馈",
+                            "label": "士气如虹-击倒",
                             "trigger": "hit",
-                            "script": "if (args.isDying) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const gain = 10 + (lvl - 1) * 5;\n    await actor.update({'system.resources.morale.value': S.resources.morale.value + gain});\n    ui.notifications.info(`${actor.name} 士气如虹：击倒敌人获得 ${gain} 点士气`);\n}"
+                            "active": true,
+                            "script": "if (args.isDying) {\n    const lvl = Math.max(1, move?.computedLevel || 1);\n    const gain = 10 + (lvl - 1) * 5;\n    actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) + gain;\n    if (!actor._moraleTimer) {\n        actor._moraleTimer = setTimeout(async () => {\n            const totalDelta = actor._pendingMoraleDelta;\n            actor._pendingMoraleDelta = 0;\n            actor._moraleTimer = null;\n            const cur = actor.system.resources.morale?.value || 0;\n            const newVal = Math.min(100, cur + totalDelta);\n            if (newVal !== cur) {\n                await actor.update({'system.resources.morale.value': newVal});\n                actor.showFloatyText(`击倒士气+${totalDelta}`, {fill: \"#00ff00\"});\n            }\n        }, 50);\n    }\n}"
                         }
-                    ],
-                    "actionCost": "无"
+                    ]
                 }
             ]
         }
@@ -1886,8 +1903,8 @@
             "category": "sanshou",
             "sect": "jiangjunying",
             "tier": 3,
-            "description": "<p>将军营治军严明，兵卒谨守兵律，令行禁止，军容严正，千总掌一营官兵，莫无不从。</p>",
-            "requirements": "号旗（棍），《将星录》修炼圆满",
+            "description": "<p>将军营治军严明，兵卒谨守兵律，令行禁止，军容严正，千总掌一营官兵，莫无不从。</p><p><strong>需求：</strong>号旗（棍），《将星录》修炼圆满</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "号旗（棍）；《将星录》修炼圆满",
             "moves": [
                 {
                     "name": "号令千军",
@@ -1896,10 +1913,11 @@
                     "element": "taiji",
                     "damageType": "none",
                     "weaponType": "staff",
-                    "requirements": "号旗（棍）",
-                    "range": "10",
-                    "description": "<p>蓄力动作，手持号旗，指挥若定，调兵遣将，消耗自身士气，然后向周围友方（包括自己）添加以下任意一个“号令”状态，持续三回合。<br>·若友方已有“号令”，则替换为新的号令效果。<br>·若友方士气不足，部分号令无法对其生效。<br><strong>号令-一鼓作气：</strong>每回合初获得 10 点士气。<br><strong>号令-全军冲锋：</strong>可以选择在回合初-5 士气，然后移动速度+5。<br><strong>号令-迎敌备战：</strong>内外功防御+10。<br><strong>号令-诱敌深入：</strong>闪避+10。<br><strong>号令-包抄夹击：</strong>招式命中后添加“下盘不稳”一回合。<br><strong>号令-破军诛将：</strong>招式伤害+10。<br><strong>号令-合军聚众：</strong>可以选择每回合末-5 士气，然后回复 5 气血。<br><strong>号令-鸣金收兵：</strong>可以选择每回合末-5 士气，然后可以朝你的方向不消耗速度移动至多 3 米。<br><strong>升级：</strong>释放范围+5，士气消耗-5。</p>",
-                    "automationNote": "出招自动扣除士气。命中时弹出选择框添加Buff。回合末选择性效果需手动。",
+                    "range": "10米",
+                    "targetInfo": "周围友方",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>手持号旗，指挥若定，调兵遣将，消耗自身士气，然后向周围友方（包括自己）添加以下任意一个“号令”状态，持续三回合。</p><p>·若友方已有“号令”，则替换为新的号令效果。</p><p>·若友方士气不足，部分号令无法对其生效。</p><p><strong>号令-一鼓作气：</strong>每回合初获得 10 点士气。</p><p><strong>号令-全军冲锋：</strong>可以选择在回合初-5 士气，然后移动速度+5。</p><p><strong>号令-迎敌备战：</strong>内外功防御+10。</p><p><strong>号令-诱敌深入：</strong>闪避+10。</p><p><strong>号令-包抄夹击：</strong>招式命中后添加“下盘不稳”一回合。</p><p><strong>号令-破军诛将：</strong>招式伤害+10。</p><p><strong>号令-合军聚众：</strong>可以选择每回合末-5 士气，然后回复 5 气血。</p><p><strong>号令-鸣金收兵：</strong>可以选择每回合末-5 士气，然后可以朝你的方向不消耗速度移动至多 3 米。</p><p><strong>升级：</strong>释放范围+5，士气消耗-5。</p>",
+                    "automationNote": "出招自动扣除士气。命中时弹出选择框向目标下达号令。冲锋/合军/鸣金 等可选效果，回合初/末会自动弹窗询问，若玩家选择“不消耗”则该状态自动解除。",
                     "costs": {
                         "mp": [
                             0
@@ -1911,24 +1929,25 @@
                     },
                     "scripts": [
                         {
-                            "label": "号令千军-士气扣除",
+                            "label": "前置校验与扣除",
                             "trigger": "attack",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst cost = Math.max(0, 25 - (lvl - 1) * 5);\nif (S.resources.morale.value < cost) {\n    ui.notifications.warn(`士气不足！需要 ${cost}`);\n    args.flags.abort = true;\n} else {\n    await actor.update({ 'system.resources.morale.value': S.resources.morale.value - cost });\n}"
+                            "active": true,
+                            "script": "if (!args.config?.isFree) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const cost = Math.max(0, 25 - (lvl - 1) * 5);\n    const cur = S.resources.morale?.value || 0;\n    if (cur < cost) {\n        args.flags.abort = true;\n        args.flags.abortReason = `施展号令千军需要 ${cost} 点士气！`;\n    } else {\n        await actor.update({ 'system.resources.morale.value': cur - cost });\n        actor.showFloatyText(`消耗士气 -${cost}`, {fill: \"#888888\"});\n    }\n}"
                         },
                         {
-                            "label": "号令千军-应用",
+                            "label": "选择并下达号令",
                             "trigger": "hit",
-                            "script": "const options = [\n    { label: '一鼓作气 (+10士气/回合)', slug: 'haoling_1' },\n    { label: '全军冲锋 (速度+5)', slug: 'haoling_2' },\n    { label: '迎敌备战 (防御+10)', slug: 'haoling_3' },\n    { label: '诱敌深入 (闪避+10)', slug: 'haoling_4' },\n    { label: '包抄夹击 (命中附带下盘不稳)', slug: 'haoling_5' },\n    { label: '破军诛将 (伤害+10)', slug: 'haoling_6' },\n    { label: '合军聚众 (回血)', slug: 'haoling_7' },\n    { label: '鸣金收兵 (移动)', slug: 'haoling_8' }\n];\n\nconst content = options.map((o, i) => `<div class=\"form-group\"><input type=\"radio\" name=\"choice\" value=\"${i}\" ${i===0?'checked':''}> <label>${o.label}</label></div>`).join('');\n\nconst idx = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '选择号令' },\n    content: content,\n    ok: { label: '下令', callback: (e, b) => new FormData(b.form).get('choice') }\n});\n\nif (idx !== null) {\n    const choice = options[parseInt(idx)];\n    const effectData = thisItem.effects.find(e => e.flags?.['xjzl-system']?.slug === choice.slug);\n    if (effectData) {\n        await game.xjzl.api.effects.addEffect(args.target, effectData.toObject());\n        ui.notifications.info(`已对 ${args.target.name} 下达: ${choice.label}`);\n    }\n}"
+                            "active": true,
+                            "script": "const options =[\n    { label: '一鼓作气 (+10士气/回合)', slug: 'haoling_1' },\n    { label: '全军冲锋 (需扣士气,速度+5)', slug: 'haoling_2' },\n    { label: '迎敌备战 (防御+10)', slug: 'haoling_3' },\n    { label: '诱敌深入 (闪避+10)', slug: 'haoling_4' },\n    { label: '包抄夹击 (招式命中附带下盘不稳)', slug: 'haoling_5' },\n    { label: '破军诛将 (伤害+10)', slug: 'haoling_6' },\n    { label: '合军聚众 (需扣士气,回合末回血)', slug: 'haoling_7' },\n    { label: '鸣金收兵 (需扣士气,回合末位移)', slug: 'haoling_8' }\n];\n\nconst content = options.map((o, i) => `<div class=\"form-group\"><input type=\"radio\" name=\"choice\" value=\"${i}\" ${i===0?'checked':''}> <label>${o.label}</label></div>`).join('');\n\nconst idx = await foundry.applications.api.DialogV2.prompt({\n    window: { title: `向 ${args.target.name} 下令` },\n    content: content,\n    ok: { label: '下达', callback: (e, b) => new FormData(b.form).get('choice') }\n});\n\nif (idx !== null) {\n    const choice = options[parseInt(idx)];\n    const effectData = foundry.utils.deepClone(thisItem.effects.find(e => e.flags?.['xjzl-system']?.slug === choice.slug).toObject());\n    if (effectData) {\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`已对 ${args.target.name} 下达: ${choice.label}`);\n    }\n}"
                         }
-                    ],
-                    "actionCost": "蓄力动作"
+                    ]
                 }
             ]
         },
         "effects": [
             {
                 "name": "号令-一鼓作气",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                "icon": "icons/svg/sound.svg",
                 "description": "每回合初获得 10 点士气。",
                 "transfer": false,
                 "duration": {
@@ -1937,21 +1956,22 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "haoling_1",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "一鼓作气回气",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) + 10;\nif (!actor._moraleTimer) {\n    actor._moraleTimer = setTimeout(async () => {\n        const totalDelta = actor._pendingMoraleDelta;\n        actor._pendingMoraleDelta = 0;\n        actor._moraleTimer = null;\n        const cur = actor.system.resources.morale?.value || 0;\n        const newVal = Math.min(100, cur + totalDelta);\n        if (newVal !== cur) {\n            await actor.update({'system.resources.morale.value': newVal});\n            actor.showFloatyText(`士气 +${totalDelta}`, {fill: \"#00ff00\"});\n        }\n    }, 50);\n}"
+                            }
+                        ]
                     }
-                },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.regenMoraleTurnStart",
-                        "mode": 2,
-                        "value": "10"
-                    }
-                ]
+                }
             },
             {
                 "name": "号令-全军冲锋",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
-                "description": "可以选择在回合初-5 士气，然后移动速度+5。",
+                "icon": "icons/svg/wing.svg",
+                "description": "移动速度+5。*(回合初需选择扣除5点士气，若不消耗则解除此状态)*",
                 "transfer": false,
                 "duration": {
                     "rounds": 3
@@ -1959,7 +1979,15 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "haoling_2",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "冲锋士气消耗确认",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "const cur = actor.system.resources.morale?.value || 0;\nif (cur >= 5) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: {title: \"全军冲锋\"},\n        content: `<p>是否消耗 5 点士气以维持本回合的 <b>[全军冲锋]</b> (速度+5)？</p>`,\n        yes: {label: \"消耗\"}, no: {label: \"不消耗\"}\n    });\n    if (confirm) {\n        actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) - 5;\n        if (!actor._moraleTimer) {\n            actor._moraleTimer = setTimeout(async () => {\n                const totalDelta = actor._pendingMoraleDelta;\n                actor._pendingMoraleDelta = 0;\n                actor._moraleTimer = null;\n                const c = actor.system.resources.morale?.value || 0;\n                await actor.update({'system.resources.morale.value': Math.max(0, c + totalDelta)});\n                actor.showFloatyText(`士气 ${totalDelta}`, {fill: \"#ff0000\"});\n            }, 50);\n        }\n    } else {\n        await thisEffect.delete();\n        ui.notifications.info(\"[全军冲锋] 状态解除。\");\n    }\n} else {\n    await thisEffect.delete();\n    ui.notifications.warn(\"士气不足，[全军冲锋] 状态解除。\");\n}"
+                            }
+                        ]
                     }
                 },
                 "changes": [
@@ -1972,7 +2000,7 @@
             },
             {
                 "name": "号令-迎敌备战",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                "icon": "icons/svg/shield.svg",
                 "description": "内外功防御+10。",
                 "transfer": false,
                 "duration": {
@@ -1999,7 +2027,7 @@
             },
             {
                 "name": "号令-诱敌深入",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                "icon": "icons/svg/daze.svg",
                 "description": "闪避+10。",
                 "transfer": false,
                 "duration": {
@@ -2021,8 +2049,8 @@
             },
             {
                 "name": "号令-包抄夹击",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
-                "description": "招式命中后添加“下盘不稳”一回合。",
+                "icon": "icons/svg/target.svg",
+                "description": "非普攻招式命中后添加“下盘不稳”一回合。",
                 "transfer": false,
                 "duration": {
                     "rounds": 3
@@ -2033,9 +2061,10 @@
                         "stackable": false,
                         "scripts": [
                             {
-                                "label": "包抄夹击-触发",
+                                "label": "夹击触发不稳",
                                 "trigger": "hit",
-                                "script": "if (args.type === 'attack' && args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'unstable');\n}"
+                                "active": true,
+                                "script": "if (args.isHit && args.move?.type !== 'basic') {\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    unstable.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, unstable);\n    actor.showFloatyText(\"包抄成功\", {fill: \"#e74c3c\"});\n}"
                             }
                         ]
                     }
@@ -2043,7 +2072,7 @@
             },
             {
                 "name": "号令-破军诛将",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                "icon": "icons/svg/combat.svg",
                 "description": "招式伤害+10。",
                 "transfer": false,
                 "duration": {
@@ -2065,7 +2094,7 @@
             },
             {
                 "name": "号令-合军聚众",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                "icon": "icons/svg/heal.svg",
                 "description": "可以选择每回合末-5 士气，然后回复 5 气血。",
                 "transfer": false,
                 "duration": {
@@ -2074,14 +2103,22 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "haoling_7",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "聚众回血确认",
+                                "trigger": "turnEnd",
+                                "active": true,
+                                "script": "const cur = actor.system.resources.morale?.value || 0;\nif (cur >= 5) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: {title: \"合军聚众\"},\n        content: `<p>回合结束。是否消耗 5 点士气回复 5 点气血？</p>`,\n        yes: {label: \"消耗\"}, no: {label: \"不消耗\"}\n    });\n    if (confirm) {\n        actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) - 5;\n        if (!actor._moraleTimer) {\n            actor._moraleTimer = setTimeout(async () => {\n                const totalDelta = actor._pendingMoraleDelta;\n                actor._pendingMoraleDelta = 0;\n                actor._moraleTimer = null;\n                const c = actor.system.resources.morale?.value || 0;\n                await actor.update({'system.resources.morale.value': Math.max(0, c + totalDelta)});\n            }, 50);\n        }\n        await actor.applyHealing({amount: 5, type: 'hp', showScrolling: true});\n    }\n}"
+                            }
+                        ]
                     }
                 }
             },
             {
                 "name": "号令-鸣金收兵",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
-                "description": "可以选择每回合末-5 士气，然后可以朝你的方向不消耗速度移动至多 3 米。",
+                "icon": "icons/svg/direction.svg",
+                "description": "可以选择每回合末-5 士气，然后可以朝发令者方向不消耗速度移动至多 3 米。",
                 "transfer": false,
                 "duration": {
                     "rounds": 3
@@ -2089,7 +2126,15 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "haoling_8",
-                        "stackable": false
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "收兵消耗确认",
+                                "trigger": "turnEnd",
+                                "active": true,
+                                "script": "const cur = actor.system.resources.morale?.value || 0;\nif (cur >= 5) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: {title: \"鸣金收兵\"},\n        content: `<p>回合结束。是否消耗 5 点士气，向发令者无消耗移动 3 米？</p>`,\n        yes: {label: \"消耗\"}, no: {label: \"不消耗\"}\n    });\n    if (confirm) {\n        actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) - 5;\n        if (!actor._moraleTimer) {\n            actor._moraleTimer = setTimeout(async () => {\n                const totalDelta = actor._pendingMoraleDelta;\n                actor._pendingMoraleDelta = 0;\n                actor._moraleTimer = null;\n                const c = actor.system.resources.morale?.value || 0;\n                await actor.update({'system.resources.morale.value': Math.max(0, c + totalDelta)});\n                actor.showFloatyText(`士气 -5`, {fill: \"#ff0000\"});\n            }, 50);\n        }\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\"><b>鸣金收兵</b>: ${actor.name} 消耗了士气，请自行移动至多3米。</div>`});\n    }\n}"
+                            }
+                        ]
                     }
                 }
             }
