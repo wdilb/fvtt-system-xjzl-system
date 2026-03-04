@@ -2535,7 +2535,7 @@
             "sect": "jianghushili",
             "description": "<p>以道家三灾之“火灾”而创的左道功法。修行时燃烧躯体，若能大成，可将内力外，宛若火焰升腾，可稍有不慎，便是五脏成灰，四肢皆朽，将自己炼成人干，极为癫狂。</p>",
             "requirement": "悟性12",
-            "automationNote": "1. 引燃状态：完全自动化（进战获得）。\n2. 附带伤害：完全自动化（hit脚本）。\n3. 自伤：完全自动化（turnStart脚本）。\n4. 烧毁物品：需玩家手动操作。",
+            "automationNote": "【引燃状态】进战自动对自己施加。回合初自动扣除10火伤。<br>【附带火伤/传染】出招命中自动结算（由内功脚本控制，不会因为敌人中引燃而产生连带反应）。<br>【需手动】每五回合损毁物品需手动处理；身体接触造成火伤需手动；花费主要动作扑灭火焰需手动移除状态。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -2546,14 +2546,20 @@
                         "qigan": 30,
                         "shencai": 10
                     },
-                    "description": "<p>领悟运功特效：你进入战斗后陷入“引燃”，持续到战斗脱离。你处于“引燃”状态时，每次出招命中目标时，额外对目标造成10点火焰伤害。<br>引燃：在每回合初受到10点火焰伤害。<br>·陷入“引燃”后，每过五回合，你身上的防具、<br>包裹物品随机损毁一件/套/份。<br>·如果你在“引燃”状态下用身体接触到其他目标，会给对方造成10点火焰伤害。<br>·你可以花费一个主要动作扑灭身上的火焰。</p>",
+                    "description": "<p>领悟运功特效：你进入战斗后陷入“引燃”，持续到战斗脱离。你处于“引燃”状态时，每次出招命中目标时，额外对目标造成10点火焰伤害。<br>引燃：在每回合初受到10点火焰伤害。<br>·陷入“引燃”后，每过五回合，你身上的防具、包裹物品随机损毁一件/套/份。<br>·如果你在“引燃”状态下用身体接触到其他目标，会给对方造成10点火焰伤害。<br>·你可以花费一个主要动作扑灭身上的火焰。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "自我引燃",
+                            "label": "进战自焚",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const effect = thisItem.effects.getName('引燃');\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject());"
+                            "script": "const effect = thisItem.effects.getName('引燃');\nif (effect) {\n    const effData = effect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}"
+                        },
+                        {
+                            "label": "引燃附加火伤(10)",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst hasYinran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinran\");\nif (hasYinran) {\n    await args.target.applyDamage({ amount: 10, type: 'fire', attacker: actor, isHit: true });\n}"
                         }
                     ]
                 },
@@ -2566,14 +2572,20 @@
                         "qigan": 50,
                         "shencai": 20
                     },
-                    "description": "<p>小成运功特效：你进入战斗后陷入“引燃”，持续到战斗脱离。你处于“引燃”状态时，每次出招命中目标时，额外对目标造成15点火焰伤害。<br>引燃：在每回合初受到10点火焰伤害。<br>·陷入“引燃”后，每过五回合，你身上的防具、<br>包裹物品随机损毁一件/套/份。<br>·如果你在“引燃”状态下用身体接触到其他目标，会给对方造成10点火焰伤害。<br>·你可以花费一个主要动作扑灭身上的火焰。</p>",
+                    "description": "<p>小成运功特效：你进入战斗后陷入“引燃”，持续到战斗脱离。你处于“引燃”状态时，每次出招命中目标时，额外对目标造成15点火焰伤害。<br>引燃：在每回合初受到10点火焰伤害。<br>·陷入“引燃”后，每过五回合，你身上的防具、包裹物品随机损毁一件/套/份。<br>·如果你在“引燃”状态下用身体接触到其他目标，会给对方造成10点火焰伤害。<br>·你可以花费一个主要动作扑灭身上的火焰。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "自我引燃II",
+                            "label": "进战自焚",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const effect = thisItem.effects.getName('引燃II');\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject());"
+                            "script": "const effect = thisItem.effects.getName('引燃');\nif (effect) {\n    const effData = effect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}"
+                        },
+                        {
+                            "label": "引燃附加火伤(15)",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst hasYinran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinran\");\nif (hasYinran) {\n    await args.target.applyDamage({ amount: 15, type: 'fire', attacker: actor, isHit: true });\n}"
                         }
                     ]
                 },
@@ -2586,14 +2598,20 @@
                         "qigan": 90,
                         "shencai": 30
                     },
-                    "description": "<p>圆满运功特效：你进入战斗后陷入“引燃”，持续到战斗脱离。你处于“引燃”状态时，每次出招命中目标时，额外对目标造成20点火焰伤害，并使目标也陷入“引燃”，持续到战斗脱离。<br>引燃：在每回合初受到10点火焰伤害。<br>·陷入“引燃”后，每过五回合，你身上的防具、<br>包裹物品随机损毁一件/套/份。<br>·如果你在“引燃”状态下用身体接触到其他目标，会给对方造成10点火焰伤害。<br>·你可以花费一个主要动作扑灭身上的火焰。</p><p>修满特效：修满[永久]：气血+80，内力+40。</p>",
+                    "description": "<p>圆满运功特效：你进入战斗后陷入“引燃”，持续到战斗脱离。你处于“引燃”状态时，每次出招命中目标时，额外对目标造成20点火焰伤害，并使目标也陷入“引燃”，持续到战斗脱离。<br>引燃：在每回合初受到10点火焰伤害。<br>·陷入“引燃”后，每过五回合，你身上的防具、包裹物品随机损毁一件/套/份。<br>·如果你在“引燃”状态下用身体接触到其他目标，会给对方造成10点火焰伤害。<br>·你可以花费一个主要动作扑灭身上的火焰。</p><p>修满特效：修满[永久]：气血+80，内力+40。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "自我引燃III",
+                            "label": "进战自焚",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const effect = thisItem.effects.getName('引燃III');\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject());"
+                            "script": "const effect = thisItem.effects.getName('引燃');\nif (effect) {\n    const effData = effect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}"
+                        },
+                        {
+                            "label": "引燃火伤与传染(20)",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst hasYinran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinran\");\nif (hasYinran) {\n    await args.target.applyDamage({ amount: 20, type: 'fire', attacker: actor, isHit: true });\n    \n    // 圆满特有：传染引燃\n    const effect = thisItem.effects.getName('引燃');\n    if (effect) {\n        const effData = effect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n        ui.notifications.info(`${args.target.name} 被劫火点燃！`);\n    }\n}"
                         }
                     ]
                 }
@@ -2608,19 +2626,13 @@
                     "key": "resources.mp.bonus",
                     "value": 40
                 }
-            ],
-            "xpInvested": 0,
-            "active": false,
-            "sourceBreakdown": {
-                "general": 0,
-                "specific": 0
-            }
+            ]
         },
         "effects": [
             {
                 "name": "引燃",
                 "icon": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
-                "description": "身缠烈火，伤人伤己。",
+                "description": "在每回合初受到10点火焰伤害。<br>*(每过五回合毁坏防具/物品等效果请手动结算)*",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -2628,64 +2640,10 @@
                         "stackable": false,
                         "scripts": [
                             {
-                                "trigger": "hit",
-                                "active": true,
-                                "script": "await args.target.applyDamage({amount: 10, type: 'fire', isHit: true});"
-                            },
-                            {
+                                "label": "回合初自伤",
                                 "trigger": "turnStart",
                                 "active": true,
-                                "script": "await actor.applyDamage({amount: 10, type: 'fire', isHit: true});"
-                            }
-                        ]
-                    }
-                },
-                "changes": []
-            },
-            {
-                "name": "引燃II",
-                "icon": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
-                "description": "身缠烈火，伤人伤己。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "yinran",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "trigger": "hit",
-                                "active": true,
-                                "script": "await args.target.applyDamage({amount: 15, type: 'fire', isHit: true});"
-                            },
-                            {
-                                "trigger": "turnStart",
-                                "active": true,
-                                "script": "await actor.applyDamage({amount: 10, type: 'fire', isHit: true});"
-                            }
-                        ]
-                    }
-                },
-                "changes": []
-            },
-            {
-                "name": "引燃III",
-                "icon": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
-                "description": "身缠烈火，伤人伤己。命中会传染烈火。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "yinran",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "trigger": "hit",
-                                "active": true,
-                                "script": "await args.target.applyDamage({amount: 20, type: 'fire', isHit: true}); const effect = thisItem.effects.getName('引燃'); if(effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());"
-                            },
-                            {
-                                "trigger": "turnStart",
-                                "active": true,
-                                "script": "await actor.applyDamage({amount: 10, type: 'fire', isHit: true});"
+                                "script": "await actor.applyDamage({ amount: 10, type: 'fire', isHit: true, ignoreDefense: true });\nactor.showFloatyText(\"火焰灼烧\", { fill: \"#ff4500\" });\n\n// 随机发送一个提示，提醒可能需要毁物\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div style=\"font-size:0.85em; color:#d35400;\"><i>[系统提示] ${actor.name} 正受烈火焚身，请留意引燃回合数，每满5回合须随机损毁一件物品。</i></div>`\n});"
                             }
                         ]
                     }
