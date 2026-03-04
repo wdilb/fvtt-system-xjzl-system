@@ -362,7 +362,7 @@
             "sect": "jiangjunying",
             "description": "<p>兵家顶级内功，为将者守五德，“智、信、仁、勇、严”缺一不可，此功以千年来名将为范，行正道，收百姓，整军心，明大义。练至大成，一军如若一人，众志成城，万无不胜。</p>",
             "requirement": "悟性11",
-            "automationNote": "半自动化。回合初自动加士气（给自己），队友需手动。标记敌人需手动。剿灭效果结算需手动。",
+            "automationNote": "自身增加士气自动，其他请手动。<br>【剿灭】的减益（闪避-10，看破-2）设定为常驻，若攻击者无士气，请手动补回。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -376,10 +376,10 @@
                     "description": "<p>领悟运功特效：你的回合初所有友方士气+5。</p>",
                     "scripts": [
                         {
-                            "label": "将星录-士气光环",
+                            "label": "将星录-领悟光环",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const cur = system.resources.morale.value;\nawait actor.update({ \"system.resources.morale.value\": Math.min(100, cur + 5) });\nui.notifications.info(\"将星录：士气+5\");"
+                            "script": "const cur = S.resources.morale?.value || 0;\nconst max = S.resources.morale?.max || 100;\nif (cur < max) {\n    await actor.update({ \"system.resources.morale.value\": Math.min(max, cur + 5) });\n}\n\nconst content = `\n<div class=\"xjzl-chat-card\">\n    <div style=\" border-left: 3px solid #27ae60;font-weight:bold; color:#d35400; margin-bottom:5px; border-bottom:1px solid #ccc; padding-bottom:3px;\">\n        <i class=\"fas fa-flag\"></i> 将星录 - 军心大振\n    </div>\n    <div style=\"font-size:0.9em; line-height:1.4;\">\n        你的回合开始，所有友方士气 <b style=\"color:green;\">+5</b>！<br>\n        <span style=\"color:#888; font-size:0.9em;\">(自身已自动增加，请提醒队友手动增加。多人运行将星录仅一人可生效)</span>\n    </div>\n</div>`;\n\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 },
@@ -395,10 +395,10 @@
                     "description": "<p>小成运功特效：你的回合初所有友方士气+5，并选择一个敌人为其添加“剿灭”，持续到脱战。</p>",
                     "scripts": [
                         {
-                            "label": "将星录-士气光环",
+                            "label": "将星录-小成光环",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const cur = system.resources.morale.value;\nawait actor.update({ \"system.resources.morale.value\": Math.min(100, cur + 5) });"
+                            "script": "const cur = S.resources.morale?.value || 0;\nconst max = S.resources.morale?.max || 100;\nif (cur < max) {\n    await actor.update({ \"system.resources.morale.value\": Math.min(max, cur + 5) });\n}\n\nconst content = `\n<div class=\"xjzl-chat-card\">\n    <div style=\" border-left: 3px solid #27ae60;font-weight:bold; color:#d35400; margin-bottom:5px; border-bottom:1px solid #ccc; padding-bottom:3px;\">\n        <i class=\"fas fa-flag\"></i> 将星录 - 军心大振\n    </div>\n    <div style=\"font-size:0.9em; line-height:1.4; margin-bottom:5px;\">\n        你的回合开始，所有友方士气 <b style=\"color:green;\">+5</b>！<br>\n        <span style=\"color:#888; font-size:0.9em;\">(自身已自动增加，请提醒队友手动增加。多人运行将星录仅一人可生效)</span>\n    </div>\n    <div style=\"font-size:0.9em; color:#8b0000; border-top:1px dashed #ccc; padding-top:5px;\">\n        <i class=\"fas fa-crosshairs\"></i> 请选择 <b>1</b> 个敌人，手动为其施加 <b>[剿灭]</b> 状态。\n    </div>\n</div>`;\n\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 },
@@ -411,13 +411,13 @@
                         "qigan": 45,
                         "shencai": 45
                     },
-                    "description": "<p>圆满运功特效：你的回合初所有友方士气+10，并选择两个敌人为其添加“剿灭”持续到脱战。<br>剿灭：受到具有士气的目标的招式攻击时，闪避降低10点，看破值-2。<br>注：若场上有多名修炼《将星录》的友方，只有一人的士气增加效果可以生效，由你们自己决定。</p><p>修满特效：修满[永久]：气血+80，内力+40。</p>",
+                    "description": "<p>圆满运功特效：你的回合初所有友方士气+10，并选择两个敌人为其添加“剿灭”持续到脱战。<br><strong>剿灭：</strong>受到具有士气的目标的招式攻击时，闪避降低10点，看破值-2。<br>注：若场上有多名修炼《将星录》的友方，只有一人的士气增加效果可以生效，由你们自己决定。</p><p>修满[永久]：气血+80，内力+40。</p>",
                     "scripts": [
                         {
-                            "label": "将星录-士气光环(10)",
+                            "label": "将星录-圆满光环",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const cur = system.resources.morale.value;\nawait actor.update({ \"system.resources.morale.value\": Math.min(100, cur + 10) });"
+                            "script": "const cur = S.resources.morale?.value || 0;\nconst max = S.resources.morale?.max || 100;\nif (cur < max) {\n    await actor.update({ \"system.resources.morale.value\": Math.min(max, cur + 10) });\n}\n\nconst content = `\n<div class=\"xjzl-chat-card\">\n    <div style=\" border-left: 3px solid #27ae60;font-weight:bold; color:#d35400; margin-bottom:5px; border-bottom:1px solid #ccc; padding-bottom:3px;\">\n        <i class=\"fas fa-flag\"></i> 将星录 - 军心大振\n    </div>\n    <div style=\"font-size:0.9em; line-height:1.4; margin-bottom:5px;\">\n        你的回合开始，所有友方士气 <b style=\"color:green;\">+10</b>！<br>\n        <span style=\"color:#888; font-size:0.9em;\">(自身已自动增加，请提醒队友手动增加。多人运行将星录仅一人可生效)</span>\n    </div>\n    <div style=\"font-size:0.9em; color:#8b0000; border-top:1px dashed #ccc; padding-top:5px;\">\n        <i class=\"fas fa-crosshairs\"></i> 请选择 <b>2</b> 个敌人，手动为其施加 <b>[剿灭]</b> 状态。\n    </div>\n</div>`;\n\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 }
@@ -438,12 +438,25 @@
                 "name": "剿灭",
                 "icon": "systems/xjzl-system/assets/icons/neigong/将军营.png",
                 "transfer": false,
-                "description": "受到具有士气的目标的招式攻击时，闪避降低10点，看破值-2。",
+                "description": "受到具有士气的目标的招式攻击时，闪避降低10点，看破值-2。<br>*(注：系统设定为常驻扣除，若攻击者无士气，请自行加回该数值)*",
                 "flags": {
                     "xjzl-system": {
-                        "slug": "neigong_jiaomie"
+                        "slug": "neigong_jiaomie",
+                        "stackable": false
                     }
-                }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
             }
         ]
     }
