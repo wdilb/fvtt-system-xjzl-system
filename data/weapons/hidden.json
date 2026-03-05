@@ -1168,14 +1168,14 @@
             "price": 7000,
             "damage": 22,
             "block": 0,
-            "description": "玄铁打造，直径两寸，七道边刃，锋利无比。<br><strong>效果：</strong>命中后给目标一层“七邪”，持续到脱战。七邪：每层使你暴击骰+1，叠加满七层后，流失自身怒气值*70点气血，然后移除所有七邪。",
-            "automationNote": "完全自动化：自动叠加层数、修正暴击阈值、满层爆发伤害。",
+            "description": "<p>玄铁打造，直径两寸，七道边刃，锋利无比。</p><p><strong>效果：</strong>命中后给目标一层“七邪”，持续到脱战。</p><p><strong>七邪：</strong>每层使你暴击骰+1，叠加满七层后，流失自身怒气值*70点气血，然后移除所有七邪。</p>",
+            "automationNote": "完全自动化：自动叠加层数、自带Debuff使目标难以暴击、满层自动引爆流失伤害。",
             "scripts": [
                 {
-                    "label": "七邪",
+                    "label": "七邪附体与引爆",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit) {\n    const sourceEffect = thisItem.effects.getName(\"七邪\");\n    if (sourceEffect) {\n        // 1. 添加/叠加特效\n        const effect = await game.xjzl.api.effects.addEffect(args.target, sourceEffect.toObject());\n\n        // 2. 检查层数是否爆炸\n        const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        if (stacks >= 7) {\n            // 爆发逻辑\n            const rage = args.target.system.resources.rage.value || 0;\n            const damage = rage * 70;\n            ui.notifications.warn(`${args.target.name} 七邪发作！受到 ${damage} 点爆发伤害！`);\n            \n            // 造成伤害\n            await args.target.applyDamage({ amount: damage, type: \"true\", isHit: true });\n            \n            // 移除特效\n            await effect.delete();\n        }\n    }\n}"
+                    "script": "if (args.isHit) {\n    const sourceEffect = thisItem.effects.getName(\"七邪\");\n    if (sourceEffect) {\n        const effData = sourceEffect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        \n        // 1. 叠加状态\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n        \n        // 2. 检查是否达到7层\n        const qixie = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qixie\");\n        const stacks = qixie ? (qixie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n        \n        if (stacks >= 7) {\n            const rage = args.target.system.resources.rage.value || 0;\n            const dmg = rage * 70;\n            \n            // 发送引爆卡片\n            const content = `<div class=\"xjzl-chat-card\"><div style=\"padding:6px; border-left:4px solid #8e44ad; background:rgba(142, 68, 173, 0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8e44ad; font-size:1.1em;\"><i class=\"fas fa-biohazard\"></i> 七邪毒发！</div><div style=\"font-size:0.9em; margin-top:4px; color:#555;\">目标体内七邪之力引爆怒气，流失 <span style=\"font-weight:bold; color:#c0392b;\">${dmg}</span> 点气血！</div></div></div>`;\n            ChatMessage.create({\n                speaker: ChatMessage.getSpeaker({actor: args.target}),\n                content: content\n            });\n            \n            // 造成流失伤害\n            await args.target.applyDamage({ amount: dmg, type: \"liushi\", attacker: actor });\n            \n            // 移除所有七邪\n            await game.xjzl.api.effects.removeEffect(args.target, \"qixie\", 99);\n        }\n    }\n}"
                 }
             ]
         },
@@ -1183,6 +1183,7 @@
             {
                 "name": "七邪",
                 "icon": "icons/svg/skull.svg",
+                "description": "每层使暴击骰+1(更难暴击)。满七层引爆。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -1191,24 +1192,18 @@
                         "maxStacks": 7
                     }
                 },
-                "changes": []
-            },
-            {
-                "name": "七邪监听",
-                "transfer": true,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "qixie-passive",
-                        "scripts": [
-                            {
-                                "label": "七邪阈值",
-                                "trigger": "check",
-                                "active": true,
-                                "script": "// 仅当目标拥有七邪状态时生效\nconst qixie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qixie\");\nif (qixie) {\n    const stacks = qixie.getFlag(\"xjzl-system\", \"stacks\") || 0;\n    // 每层使暴击骰+1 (阈值降低，更容易暴击)\n    args.flags.critThresholdMod += stacks;\n}"
-                            }
-                        ]
+                "changes": [
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "1"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "1"
                     }
-                }
+                ]
             }
         ]
     },
@@ -1292,14 +1287,14 @@
             "price": 600,
             "damage": 13,
             "block": 0,
-            "description": "弯曲如小蛇，浸润毒液。<br><strong>效果：</strong>命中目标后造成额外10点毒素伤害。",
-            "automationNote": "完全自动化：命中后自动追加伤害。",
+            "description": "<p>弯曲如小蛇，浸润毒液。</p><p><strong>效果：</strong>命中目标后造成额外10点毒素伤害。</p>",
+            "automationNote": "完全自动化：命中后自动追加毒素伤害并发送提示卡片。",
             "scripts": [
                 {
-                    "label": "毒蛇",
+                    "label": "毒蛇淬毒",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit) {\n    await args.target.applyDamage({ amount: 10, type: \"poison\", isHit: true });\n}"
+                    "script": "if (args.isHit) {\n    await args.target.applyDamage({ amount: 10, type: \"poison\", attacker: actor, isHit: true });\n    const cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:4px 8px; border-left:4px solid #27ae60; background:rgba(39, 174, 96, 0.1); margin-left:2px;\">\n                <div style=\"font-weight:bold; color:#1e8449; font-size:1.05em;\">\n                    <i class=\"fas fa-spider\"></i> 毒蛇淬毒\n                </div>\n                <div style=\"font-size:0.9em; margin-top:2px; color:#555;\">\n                    对 ${args.target.name} 附加 <span style=\"font-weight:bold; color:#27ae60;\">10</span> 点毒素伤害！\n                </div>\n            </div>\n        </div>`;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: cardContent\n    });\n}"
                 }
             ]
         }
@@ -1315,14 +1310,14 @@
             "price": 300,
             "damage": 12,
             "block": 0,
-            "description": "锐利飞镖，边缘带双刃，如鸟翅。<br><strong>效果：</strong>你对速度低于你的目标出招时暴击骰-2。",
-            "automationNote": "完全自动化：自动比对双方速度并修正暴击阈值。",
+            "description": "<p>锐利飞镖，边缘带双刃，如鸟翅。</p><p><strong>效果：</strong>你对速度低于你的目标出招时暴击骰-2。</p>",
+            "automationNote": "完全自动化：在 Check 阶段比对速度，并自动降低目标暴击阈值。",
             "scripts": [
                 {
                     "label": "鹤翼追击",
                     "trigger": "check",
                     "active": true,
-                    "script": "const selfSpeed = actor.system.combat.speedTotal || 0;\nconst targetSpeed = args.target.system.combat.speedTotal || 0;\nif (targetSpeed < selfSpeed) {\n    // 暴击骰-2 意味着更难暴击？通常语境是“更容易”。\n    // 假设语境是 Threshold 降低 (更容易)，如 20 -> 18.\n    // 系统中 critThresholdMod 正数表示更容易。\n    args.flags.critThresholdMod += 2;\n}"
+                    "script": "const mySpeed = actor.system.combat.speedTotal || 0;\nconst targetSpeed = args.target.system.combat.speedTotal || 0;\n\nif (mySpeed > targetSpeed) {\n    // 暴击骰-2，即阈值降低，在系统中 critThresholdMod 加正数表示更容易暴击\n    args.flags.critThresholdMod += 2;\n    // 添加飘字以确认生效\n    actor.showFloatyText(\"鹤翼\", { fill: \"#00FFFF\", fontSize: 24 });\n}"
                 }
             ]
         }
@@ -1475,14 +1470,14 @@
             "price": 4000,
             "damage": 20,
             "block": 0,
-            "description": "纯金打造，一发金光耀目，华丽绝伦。<br><strong>效果：</strong>攻击被目标格挡时，为其添加“目盲”，持续一回合。",
-            "automationNote": "完全自动化：检测攻击类型及架招状态，若被格挡则自动致盲。",
+            "description": "<p>纯金打造，一发金光耀目，华丽绝伦。</p><p><strong>效果：</strong>攻击被目标格挡时，为其添加“目盲”，持续一回合。</p>",
+            "automationNote": "完全自动化：精准检测目标架招状态，被格挡且未破招时自动致盲。",
             "scripts": [
                 {
                     "label": "灿金致盲",
                     "trigger": "hit",
                     "active": true,
-                    "script": "// 判定格挡：造成了外/内功伤害 AND 目标架招未被击破\nif ([\"waigong\", \"neigong\"].includes(args.damageType)) {\n    // 如果 isBroken 为 false，说明格挡成功/未破防\n    // 注意：damageResult.isBroken 为 true 时代表破招\n    if (!args.isBroken) {\n         await game.xjzl.api.effects.addEffect(args.target, \"blind\");\n         ui.notifications.info(\"灿金飞刀：攻击被格挡，目标致盲！\");\n    }\n}"
+                    "script": "// 必须是内外功，且命中\nif (args.isHit && [\"waigong\", \"neigong\"].includes(move.damageType)) {\n    // 判定格挡：目标开了架招 + 本次攻击未击破 + 本次攻击未无视架招\n    if (args.target.system.martial?.stanceActive && !args.isBroken && !args.ignoreStance) {\n         const blind = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"blind\"));\n         if (blind) {\n             blind.duration = { rounds: 1 };\n             await game.xjzl.api.effects.addEffect(args.target, blind);\n             actor.showFloatyText(\"金光耀目\", { fill: \"#FFD700\" });\n         }\n    }\n}"
                 }
             ]
         }
