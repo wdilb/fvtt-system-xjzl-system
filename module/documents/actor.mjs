@@ -311,7 +311,7 @@ export class XJZLActor extends Actor {
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     // 需要特殊处理为数字的 Key 列表 (战斗类)
     const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel",
-      "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel"];
+      "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel", "mpCostMultiplier"];
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
       // 如果是那数值型的 Key，单独处理，否则按布尔处理

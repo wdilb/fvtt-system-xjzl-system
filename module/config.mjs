@@ -518,6 +518,7 @@ XJZL.statusFlags = {
   forceSpeedZero: "XJZL.Status.ForceSpeedZero", // 速度归零 (禁足/定身)
   forceDodgeZero: "XJZL.Status.ForceDodgeZero", // 闪避归零 (禁足/定身)
   bloodLossLevel: "XJZL.Status.BloodLossLevel", // 失血层数
+  mpCostMultiplier: "XJZL.Status.MpCostMultiplier", // 内力消耗额外倍率
 
   // --- F. 攻击穿透类 (Attacker Penetration) ---
   // 攻击者拥有此状态时，其攻击将获得对应效果

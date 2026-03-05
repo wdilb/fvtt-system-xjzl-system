@@ -1499,9 +1499,12 @@ export class XJZLItem extends Item {
       // 应该放在执行出招脚本前面，资源不足直接出招失败了
       const costs = move.currentCost; // { mp: 10, rage: 0, hp: 0 }
       const costReductions = actor.system.combat.costs; // { mp: {total: 5}, rage: ... }
+      // 获取内力消耗额外倍率 (默认为0。1层=1, 2层=2)
+      const mpMultiplier = 1 + (s.mpCostMultiplier || 0);
 
       let finalCost = {
-        mp: Math.max(0, costs.mp - (costReductions?.neili?.total || 0)),
+        // 先减耗，再乘倍率，防止出现负数
+        mp: Math.max(0, Math.floor((costs.mp - (costReductions?.neili?.total || 0)) * mpMultiplier)),
         rage: Math.max(0, costs.rage - (costReductions?.rage?.total || 0)),
         hp: costs.hp // 气血通常不享受减耗
       };
