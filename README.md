@@ -617,6 +617,7 @@ await Macros.requestContest({
 | **`bleedOnHit`** | Number | **撕裂**。受击时额外流失 X 点气血。 |
 | **`wuxueBleedOnHit`** | Number | **旧疾**。仅受内外功伤害时流失 X 点气血。 |
 | **`bloodLossLevel`** | Number | **失血**。每层减少 10% 气血上限。 |
+| **`mpCostMultiplier`** | Number | **内力消耗**。每层增加一倍内力消耗。 |
 
 ### D. 自动化回复 (数值型, ADD)
 > **命名规则**: `regen` + 资源 + 时机。正数回复，负数流失。
