@@ -1118,6 +1118,15 @@ XJZL.statusEffects = [
     ]
   },
   {
+    id: "endless_bleed", // 血流不止
+    name: "XJZL.Status.EndlessBleed", // 血流不止
+    description: "XJZL.Status.EndlessBleedDesc",
+    img: "icons/svg/blood.svg",
+    flags: { "xjzl-system": { slug: "endless_bleed", stackable: false } },
+    changes: [
+    ]
+  },
+  {
     id: "pain",
     name: "XJZL.Status.Pain", // 剧痛
     description: "XJZL.Status.PainDesc",
