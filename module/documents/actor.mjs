@@ -638,7 +638,7 @@ export class XJZLActor extends Actor {
         for (const move of item.system.moves) {
           // 直接跳过未入门的招式 (层数<=0不生效)
           if ((move.computedLevel || 0) <= 0) continue;
-          
+
           if (!move.scripts || move.scripts.length === 0) continue;
           for (const s of move.scripts) {
             // 匹配 trigger 且 脚本处于激活状态
@@ -1393,7 +1393,7 @@ export class XJZLActor extends Actor {
     // 检查是否允许伤害归零 (默认为 false，即保底 1)
     // 某些情况下我们允许伤害归零
     // 或者不是内外功伤害，保底也为0
-    const minDamage = (data.ignoreMinDamage || !["waigong", "neigong"].includes(type)) ? 0 : 1; 
+    const minDamage = (data.ignoreMinDamage || !["waigong", "neigong"].includes(type)) ? 0 : 1;
     reducedDamage = Math.max(minDamage, reducedDamage);
     // =====================================================
     // 6. 受伤前置/护盾脚本 (Trigger: PRE_TAKE)
@@ -2360,6 +2360,36 @@ export class XJZLActor extends Actor {
     if (attackRoll && game.dice3d) {
       game.dice3d.showForRoll(attackRoll, game.user, true);
     }
+
+    // =====================================================
+    // 10. Automated Animations 模组对接
+    // =====================================================
+    if (game.modules.get("autoanimations")?.active) {
+      // 获取场景中的 Token 对象
+      const tokens = this.isToken ? [this.token.object] : this.getActiveTokens();
+      const sourceToken = tokens.length > 0 ? tokens[0] : null;
+
+      if (sourceToken) {
+        // 使用 virtualMove 的名称 (例如 "普通攻击 (徒手)" 或 "趁虚而入 (金蛇剑)")
+        const safeName = virtualMove.name.trim();
+
+        // 构建伪造 Item 对象
+        const pseudoItem = {
+          name: safeName,
+          type: "weapon", // 普攻均视为物理武器攻击
+          img: virtualMove.img,
+          hasAttack: true,
+          hasDamage: true,
+          system: {
+            actionType: "mwak" // mwak = 近战武器攻击
+          }
+        };
+
+        // 播放动画
+        AutomatedAnimations.playAnimation(sourceToken, pseudoItem, { targets: targets });
+      }
+    }
+
     // 插入 Hook：允许后续逻辑（如自动播放特效、自动化模组监听）
     Hooks.callAll("xjzl.basicAttack", this, virtualMove, message, calcResult);
   }
