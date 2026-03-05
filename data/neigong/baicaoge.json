@@ -255,7 +255,7 @@
             "sect": "baicaoge",
             "description": "<p>此功相传源自上古神农氏，亲尝百草，一度应一日，以成一岁。练成后，遇血脉未乱、精神未散者，驱邪愈病，服药必治，宛如神农再世。</p>",
             "requirement": "悟性 11",
-            "automationNote": "完全自动化。治疗量加成已自动计算。圆满特效的额外目标需要玩家手动在聊天卡片中选择。",
+            "automationNote": "完全自动化。治疗量追加已转移至受击(Hit)阶段通过聊天卡片自动触发。圆满特效的额外目标需要玩家手动在场景中多选中一个目标。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -270,9 +270,9 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "神农医术加成",
-                            "trigger": "calc",
-                            "script": "if (args.move.actionType === 'heal') {\n    const yishu = S.arts.yishu.total || 0;\n    args.output.damage += yishu * 1;\n}",
+                            "label": "神农医术追加(1倍)",
+                            "trigger": "hit",
+                            "script": "if (args.type === 'heal') {\n    const yishu = S.arts.yishu.total || 0;\n    const bonus = yishu * 1;\n    if (bonus > 0) {\n        await args.target.applyHealing({ amount: bonus, type: 'hp', showScrolling: false });\n        const cardContent = '<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; border-left:4px solid #27ae60; background:rgba(39,174,96,0.1); margin-left: 2px;\"><div style=\"font-weight:bold; color:#27ae60; font-size:1.1em;\"><i class=\"fas fa-leaf\"></i> 神农本草加成</div><div style=\"font-size:0.9em; margin-top:5px; color:#555;\">医术生效，额外回复 <span style=\"font-weight:bold; color:#27ae60;\">' + bonus + '</span> 点气血。</div></div></div>';\n        ChatMessage.create({ content: cardContent, speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -290,9 +290,9 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "神农医术加成",
-                            "trigger": "calc",
-                            "script": "if (args.move.actionType === 'heal') {\n    const yishu = S.arts.yishu.total || 0;\n    args.output.damage += yishu * 2;\n}",
+                            "label": "神农医术追加(2倍)",
+                            "trigger": "hit",
+                            "script": "if (args.type === 'heal') {\n    const yishu = S.arts.yishu.total || 0;\n    const bonus = yishu * 2;\n    if (bonus > 0) {\n        await args.target.applyHealing({ amount: bonus, type: 'hp', showScrolling: false });\n        const cardContent = '<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; border-left:4px solid #27ae60; background:rgba(39,174,96,0.1); margin-left: 2px;\"><div style=\"font-weight:bold; color:#27ae60; font-size:1.1em;\"><i class=\"fas fa-leaf\"></i> 神农本草加成</div><div style=\"font-size:0.9em; margin-top:5px; color:#555;\">医术生效，额外回复 <span style=\"font-weight:bold; color:#27ae60;\">' + bonus + '</span> 点气血。</div></div></div>';\n        ChatMessage.create({ content: cardContent, speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -310,9 +310,9 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "神农医术加成",
-                            "trigger": "calc",
-                            "script": "if (args.move.actionType === 'heal') {\n    const yishu = S.arts.yishu.total || 0;\n    args.output.damage += yishu * 3;\n}",
+                            "label": "神农医术追加(3倍)",
+                            "trigger": "hit",
+                            "script": "if (args.type === 'heal') {\n    const yishu = S.arts.yishu.total || 0;\n    const bonus = yishu * 3;\n    if (bonus > 0) {\n        await args.target.applyHealing({ amount: bonus, type: 'hp', showScrolling: false });\n        const cardContent = '<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; border-left:4px solid #27ae60; background:rgba(39,174,96,0.1); margin-left: 2px;\"><div style=\"font-weight:bold; color:#27ae60; font-size:1.1em;\"><i class=\"fas fa-leaf\"></i> 神农本草加成</div><div style=\"font-size:0.9em; margin-top:5px; color:#555;\">医术生效，额外回复 <span style=\"font-weight:bold; color:#27ae60;\">' + bonus + '</span> 点气血。</div></div></div>';\n        ChatMessage.create({ content: cardContent, speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -329,7 +329,7 @@
                     "value": 40
                 },
                 {
-                    "key": "arts.yishu.value",
+                    "key": "arts.yishu.mod",
                     "value": 2
                 }
             ],
@@ -438,8 +438,8 @@
                     "scripts": [
                         {
                             "label": "仁心回怒",
-                            "trigger": "hit_once",
-                            "script": "// 检查是否有任意一个目标不是自己且治疗量大于0\nconst healedOthers = args.targets.some(t => t.target.id !== args.attacker.id && t.amount > 0);\nif (healedOthers) {\n    const r = S.resources.rage;\n    if (r.value < r.max) await actor.update({\"system.resources.rage.value\": r.value + 1});\n}",
+                            "trigger": "attack",
+                            "script": "if (args.move && args.move.actionType === 'heal') {\n    const r = S.resources.rage;\n    if (r.value < r.max) await actor.update({'system.resources.rage.value': r.value + 1});\n}",
                             "active": true
                         }
                     ]
@@ -458,14 +458,14 @@
                     "scripts": [
                         {
                             "label": "仁心回怒",
-                            "trigger": "hit_once",
-                            "script": "const healedOthers = args.targets.some(t => t.target.id !== args.attacker.id && t.amount > 0);\nif (healedOthers) {\n    const r = S.resources.rage;\n    if (r.value < r.max) await actor.update({\"system.resources.rage.value\": r.value + 1});\n}",
+                            "trigger": "attack",
+                            "script": "if (args.move && args.move.actionType === 'heal') {\n    const r = S.resources.rage;\n    if (r.value < r.max) await actor.update({'system.resources.rage.value': r.value + 1});\n}",
                             "active": true
                         },
                         {
                             "label": "濒死救治反馈",
                             "trigger": "hit",
-                            "script": "if (args.type === 'heal' && args.target.statuses.has(\"dying\")) {\n    await actor.applyHealing({amount: 20, type: \"hp\"});\n}",
+                            "script": "if (args.type === 'heal' && args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dying\")) {\n    await actor.applyHealing({amount: 20, type: \"hp\", showScrolling: true});\n}",
                             "active": true
                         }
                     ]
@@ -484,14 +484,14 @@
                     "scripts": [
                         {
                             "label": "仁心回怒",
-                            "trigger": "hit_once",
-                            "script": "const healedOthers = args.targets.some(t => t.target.id !== args.attacker.id && t.amount > 0);\nif (healedOthers) {\n    const r = S.resources.rage;\n    if (r.value < r.max) await actor.update({\"system.resources.rage.value\": r.value + 1});\n}",
+                            "trigger": "attack",
+                            "script": "if (args.move && args.move.actionType === 'heal') {\n    const r = S.resources.rage;\n    if (r.value < r.max) await actor.update({'system.resources.rage.value': r.value + 1});\n}",
                             "active": true
                         },
                         {
                             "label": "濒死救治反馈",
                             "trigger": "hit",
-                            "script": "if (args.type === 'heal' && args.target.statuses.has(\"dying\")) {\n    await actor.applyHealing({amount: 20, type: \"hp\"});\n    await actor.applyHealing({amount: 20, type: \"mp\"});\n}",
+                            "script": "if (args.type === 'heal' && args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dying\")) {\n    await actor.applyHealing({amount: 20, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({amount: 20, type: \"mp\", showScrolling: true});\n}",
                             "active": true
                         }
                     ]
