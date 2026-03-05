@@ -962,16 +962,17 @@
             "damage": 20,
             "block": 10,
             "description": "秦失其鹿，天下共逐，唯胜者得鹿而割之。战国时徐鲁子铸成，刀光如虹，刀锋晶莹，滴血不沾。<br>唯有侠义值500以上方能拔出并装备此刀。<br>·此刀暴击时，若目标使用金品及以下的武器格挡，则为其添加“缴械”，持续一回合。",
-            "automationNote": "完全自动化：暴击触发缴械（简化为不判断目标武器品质，因为难以获取防御武器信息）。",
+            "automationNote": "半自动化：暴击时自动检测目标装备的武器品质，若为金品(品质<=3)及以下则自动施加[缴械]。侠义值500的装备限制需要玩家自觉遵守。",
             "scripts": [
                 {
                     "label": "割鹿-卸甲",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isCrit) {\n    const effect = CONFIG.statusEffects.find(e => e.id === 'jiaoxie');\n    const data = foundry.utils.deepClone(effect);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n    ui.notifications.info('割鹿神刀：斩断兵刃！');\n}"
+                    "script": "if (args.isCrit && args.target) {\n    // 获取目标当前装备的武器\n    const targetWeapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    // 金品及以下(quality <= 3)\n    if (targetWeapon && targetWeapon.system.quality <= 3) {\n        const effect = CONFIG.statusEffects.find(e => e.id === 'jiaoxie');\n        if (effect) {\n            const data = foundry.utils.deepClone(effect);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            actor.showFloatyText(\"斩断兵刃！\", { fill: \"#ff0000\" });\n        }\n    }\n}"
                 }
             ]
-        }
+        },
+        "effects": []
     },
     {
         "name": "永灵刀",
@@ -1113,13 +1114,13 @@
             "damage": 18,
             "block": 12,
             "description": "裹赤帻，跨花鬃马，横古锭刀。三国东吴家传宝刀，刀身细长轻薄，极为锋利。<br>命中敌人时，若敌人双手未持握武器，招式伤害+20。",
-            "automationNote": "完全自动化：Hit 阶段检测目标装备。",
+            "automationNote": "完全自动化。",
             "scripts": [
                 {
                     "label": "古锭-欺弱",
-                    "trigger": "hit",
+                    "trigger": "preDamage",
                     "active": true,
-                    "script": "if (args.isHit) {\n    const hasWeapon = args.target.items.some(i => i.type === 'weapon' && i.system.equipped);\n    if (!hasWeapon) {\n        await args.target.applyDamage({\n            amount: 20,\n            type: 'waigong',\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: false\n        });\n        ui.notifications.info('古锭刀：手无寸铁者斩！');\n    }\n}"
+                    "script": "if (!args.outcome.isHit) return;\nif (args.move && args.move.type === 'basic') return; // 不对普通攻击生效\n\n// 检查敌人是否装备了武器\nconst hasWeapon = args.target.itemTypes.weapon.some(w => w.system.equipped);\nif (!hasWeapon) {\n    args.config.amount += 20;\n    // 发送卡片提示\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; color:#8b0000; font-weight:bold;\">\n                <i class=\"fas fa-skull\"></i> 古锭刀：手无寸铁者斩！(伤害+20)\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                 }
             ]
         }

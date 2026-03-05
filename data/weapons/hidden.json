@@ -877,25 +877,27 @@
             "damage": 20,
             "block": 0,
             "description": "以毒液炼成，锋利无比的小剑，见血封喉。<br><strong>效果：</strong>特效：如果你装备五毒神剑，则《狂蛇锥法》套路和《狂蛇剑法》之间无需遵循武学切换规则。<br>·以该锥施展《狂蛇锥法》每次造成伤害时，都可获得一层“狂蛇”，持续到战斗脱离。<br>·此暗器一枚一买，而不是通常的一次性20枚，且可以回收。",
-            "automationNote": "半自动化：命中特定招式后自动叠加Buff。套装切换逻辑需手动。",
+            "automationNote": "半自动化：命中后自动叠加[狂蛇]Buff。套装切换规则及单枚购买回收机制需玩家手动处理。",
             "scripts": [
                 {
                     "label": "狂蛇累积",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (!args.isHit || !args.move) return;\n// 检查招式名称\nif (args.move.name.includes(\"狂蛇锥法\") && args.damageResult.finalDamage > 0) {\n    const sourceEffect = thisItem.effects.getName(\"狂蛇\");\n    if (sourceEffect) {\n        await game.xjzl.api.effects.addEffect(actor, sourceEffect.toObject());\n    }\n}"
+                    "script": "if (!args.isHit || !args.item) return;\n// 检查武学(Item)名称是否包含\"狂蛇锥法\"，并且造成了实际伤害\nif (args.item.name.includes(\"狂蛇锥法\") && args.finalDamage > 0) {\n    const sourceEffect = thisItem.effects.getName(\"狂蛇\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n    }\n}"
                 }
             ]
         },
         "effects": [
             {
                 "name": "狂蛇",
-                "icon": "icons/svg/biohazard.svg",
+                "icon": "isystems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "5层时可免费施展招式。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "kuangshe",
-                        "stackable": true
+                        "stackable": true,
+                        "maxStacks": 5
                     }
                 },
                 "changes": []
@@ -1265,13 +1267,13 @@
             "damage": 14,
             "block": 0,
             "description": "纯钢厚重，双面血槽，触之飙血。<br><strong>效果：</strong>暴击时给目标添加“血流不止”，持续到战斗脱离。",
-            "automationNote": "完全自动化：暴击后自动施加流血。",
+            "automationNote": "完全自动化。",
             "scripts": [
                 {
                     "label": "血鸦",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit && args.isCrit) {\n    // 复用流血状态\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n    ui.notifications.info(\"血鸦镖造成重创，目标血流不止！\");\n}"
+                    "script": "if (args.isHit && args.isCrit) {\n    // 复用流血状态\n    await game.xjzl.api.effects.addEffect(args.target, \"endless_bleed\");\n    ui.notifications.info(\"血鸦镖造成重创，目标血流不止！\");\n}"
                 }
             ]
         }
@@ -1363,7 +1365,7 @@
                     "label": "棋圣",
                     "trigger": "check",
                     "active": true,
-                    "script": "// 获取目标棋术等级\nconst qishu = args.target.system.arts?.qishu?.total || 0;\nif (qishu <= 0) {\n    // 强制暴击：大幅降低阈值 (例如 +20，使得 20-20=0，任何骰值都暴击)\n    args.flags.critThresholdMod += 20;\n    // ui.notifications.info(\"对手不懂棋术，破绽百出！(必定暴击)\");\n}"
+                    "script": "if (args.move.type === 'basic') return;\n // 获取目标棋术等级\nconst qishu = args.target.system.arts?.qishu?.total || 0;\nif (qishu <= 0) {\n    // 强制暴击：大幅降低阈值 (例如 +20，使得 20-20=0，任何骰值都暴击)\n    args.flags.critThresholdMod += 20;\n    // ui.notifications.info(\"对手不懂棋术，破绽百出！(必定暴击)\");\n}"
                 }
             ]
         }
@@ -1494,16 +1496,17 @@
             "damage": 15,
             "block": 0,
             "description": "不胜凄断，杜鹃啼血，飞刀回旋出凄厉之声。<br><strong>效果：</strong>命中处于“流血”和“血流不止”的单位时，招式伤害+10。",
-            "automationNote": "完全自动化：Check阶段检测流血状态并赋予伤害加成。",
+            "automationNote": "完全自动化：在伤害结算前(preDamage)检测目标流血/血流不止状态，并自动增加10点面板伤害。",
             "scripts": [
                 {
                     "label": "啼血",
-                    "trigger": "check",
+                    "trigger": "preDamage",
                     "active": true,
-                    "script": "// 检测目标是否有流血类特效 (slug匹配)\nconst hasBleed = args.target.effects.some(e => \n    e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\" || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"sielie\"\n);\nif (hasBleed) {\n    // 赋予10点额外伤害 (Flags需系统支持)\n    args.flags.bonusDamage = 10;\n}"
+                    "script": "if (!args.outcome.isHit) return;\n// 检测目标是否有流血或血流不止特效\nconst hasBleed = args.target.effects.some(e => \n    e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\" || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"endless_bleed\"\n);\nif (hasBleed) {\n    args.config.amount += 10;\n}"
                 }
             ]
-        }
+        },
+        "effects": []
     },
     {
         "name": "落霞飞刀",
