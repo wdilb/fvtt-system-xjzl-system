@@ -2271,6 +2271,7 @@ export class XJZLActor extends Actor {
         ignoreBlock: ctx.ignoreBlock,
         ignoreDefense: ctx.ignoreDefense,
         ignoreStance: ctx.ignoreStance,
+        critThresholdMod: ctx.critThresholdMod || 0,
         forceHit: isTargetForceHit
       };
     });
