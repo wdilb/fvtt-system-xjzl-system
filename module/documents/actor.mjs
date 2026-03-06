@@ -311,7 +311,7 @@ export class XJZLActor extends Actor {
     const statusFlags = CONFIG.XJZL.statusFlags || {}; // 安全防空
     // 需要特殊处理为数字的 Key 列表 (战斗类)
     const numericCombatFlags = ["attackLevel", "grantAttackLevel", "feintLevel", "defendFeintLevel",
-      "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel", "mpCostMultiplier"];
+      "bleedOnHit", "wuxueBleedOnHit", "bloodLossLevel", "mpCostMultiplier", "takeBleedDamageTurnStart"];
     for (const key of Object.keys(statusFlags)) {
       // 检查当前是否有这个 Flag
       // 如果是那数值型的 Key，单独处理，否则按布尔处理
@@ -1938,6 +1938,53 @@ export class XJZLActor extends Actor {
           content: `<div style="font-size:0.8em; color:#555;">${flavor}</div>`
         });
 
+      }
+    }
+    // 专门处理回合初造成流血伤害
+    if (timing === "TurnStart") {
+      const bleedDmg = this.xjzlStatuses.takeBleedDamageTurnStart || 0;
+
+      if (bleedDmg > 0) {
+        // 调用 applyDamage，系统会自动减去目标的流血抗性 (凝血)
+        const dmgRes = await this.applyDamage({
+          amount: bleedDmg,
+          type: "bleed",      // 设定为流血伤害
+          isHit: true,        // 状态伤害必定命中
+          ignoreBlock: true,  // 无法被格挡
+          ignoreStance: true, // 无视架招反击
+          ignoreDefense: true // 无视常规内外功护甲，仅拼抗性
+        });
+
+        // 构造专属的流血战报发送给聊天栏
+        let contentHtml = "";
+        if (dmgRes.finalDamage > 0) {
+          contentHtml = `
+            <div class="xjzl-chat-card" style="padding:4px 8px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);">
+                <div style="color:#8b0000; font-weight:bold; font-size:0.9em; margin-bottom: 2px;">
+                    <i class="fas fa-tint"></i> 伤口流血
+                </div>
+                <div style="font-size:0.85em; color:#555;">
+                    受到 <b style="color:red;">${dmgRes.finalDamage}</b> 点流血伤害。<br>
+                    <span style="color:#888;">(面板伤害 ${bleedDmg} - 凝血抗性)</span>
+                </div>
+            </div>`;
+        } else {
+          // 如果被抗性完全抵挡，也发一条绿色的提示给玩家正反馈
+          contentHtml = `
+            <div class="xjzl-chat-card" style="padding:4px 8px; border-left:3px solid #27ae60; background:rgba(39,174,96,0.05);">
+                <div style="color:#27ae60; font-weight:bold; font-size:0.9em; margin-bottom: 2px;">
+                    <i class="fas fa-shield-alt"></i> 凝血生效
+                </div>
+                <div style="font-size:0.85em; color:#555;">
+                    凭借强悍的凝血能力，完全止住了 <b>${bleedDmg}</b> 点流血伤害。
+                </div>
+            </div>`;
+        }
+
+        ChatMessage.create({
+          speaker: ChatMessage.getSpeaker({ actor: this }),
+          content: contentHtml
+        });
       }
     }
 

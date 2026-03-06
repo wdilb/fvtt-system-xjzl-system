@@ -534,6 +534,7 @@ XJZL.statusFlags = {
   regenHpTurnStart: "XJZL.Status.RegenHpTurnStart",
   regenMpTurnStart: "XJZL.Status.RegenMpTurnStart",
   regenRageTurnStart: "XJZL.Status.RegenRageTurnStart",
+  takeBleedDamageTurnStart: "XJZL.Status.TakeBleedDamageTurnStart", // 回合初流血伤害
 
   // 2. 回合结束 (Turn End)
   regenHpTurnEnd: "XJZL.Status.RegenHpTurnEnd",
@@ -1113,8 +1114,8 @@ XJZL.statusEffects = [
     img: "icons/svg/blood.svg",
     flags: { "xjzl-system": { slug: "bleed_stack", stackable: true, maxStacks: 0 } },
     changes: [
-      // 每层回合初流失 10 气血 -> 负数回复
-      { key: "flags.xjzl-system.regenHpTurnStart", mode: 2, value: "-10" }
+      // 每层回合初造成 10 点流血伤害 (正数，因为我们在代码里是作为伤害量处理)
+      { key: "flags.xjzl-system.takeBleedDamageTurnStart", mode: 2, value: "10" }
     ]
   },
   {
