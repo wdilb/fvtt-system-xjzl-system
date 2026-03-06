@@ -2239,7 +2239,7 @@
             "category": "sanshou",
             "sect": "jianghushili",
             "tier": 2,
-            "description": "<p>由鹿城白鹿三义所创，义溪镖局的合击绝学，需同步吐纳，而后连环爆发，交织衔接，瞬间克敌。</p><p><strong>需求：</strong>悟性5</p><p><strong>级别：</strong>地级</p><p><strong>武器类型：</strong>徒手</p><p><strong>招式属性：</strong>太极</p><p><em>*注：此武学有内功/外功两个版本。本卡默认为外功伤害，如需造成内功伤害，请在出招配置弹窗中手动修改伤害类型。</em></p>",
+            "description": "<p>由鹿城白鹿三义所创，义溪镖局的合击绝学，需同步吐纳，而后连环爆发，交织衔接，瞬间克敌。</p><p><strong>需求：</strong>悟性5</p><p><strong>级别：</strong>地级</p><p><strong>武器类型：</strong>徒手</p><p><strong>招式属性：</strong>太极</p><p><em>*注：此武学有内功/外功两个版本，请自行选择招式。</em></p>",
             "requirements": "悟性5",
             "moves": [
                 {
@@ -2259,6 +2259,54 @@
                         "scalings": [
                             {
                                 "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            2,
+                            2,
+                            2
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "合击增伤",
+                            "trigger": "attack",
+                            "script": "const result = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"合击增伤计算\", icon: \"fas fa-users\" },\n    content: `<p>本回合内，有多少<b>其他友方</b>已攻击过该目标？</p><input type='number' name='count' value='0' style='text-align:center;' autofocus>`,\n    ok: { label: \"确认\", callback: (event, button) => button.form.elements.count.value },\n    rejectClose: false\n});\n\nconst count = parseInt(result) || 0;\nif (count > 0) {\n    const bonus = count * 10;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 合击增伤: ${bonus} (${count}人)`;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "击倒与连携",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    // 1. 击倒 (Prone)\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (prone) {\n        await game.xjzl.api.effects.addEffect(args.target, prone);\n    }\n\n    // 2. 连携判定 (下盘不稳)\n    // 由于无法自动检测动作类型（主要/反应），需询问玩家\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"连携判定\", icon: \"fas fa-link\" },\n        content: `<p>本次攻击是否为<b>连携攻击</b>（消耗反应动作施展）？</p><p>如果是，将额外施加 [下盘不稳]。</p>`,\n        yes: { label: \"是 (连携)\", icon: \"fas fa-check\" },\n        no: { label: \"否 (普通)\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n        if (unstable) {\n            const data = foundry.utils.deepClone(unstable);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 下盘不稳 (连携效果)`);\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "鹿衔花",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米 (+1/级)",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>掌腿连环并用，对敌人造成 0.5内息 点内功伤害，并将其击倒。</p><p>·当友方施展此招攻击距你2米范围内的敌人时，可以消耗反应动作施展此招，衔接合力，攻击同一个敌人，并为其添加“下盘不稳”，持续一回合。</p><p>·在本回合内，每有一个其他友方攻击过该敌人，你施展此招的伤害+10。</p><p>·即使你双手持握武器，依旧可以施展此招。</p><p><strong>升级：</strong>伤害加成20。</p>",
+                    "automationNote": "出招前弹窗询问友方攻击人数以计算增伤。命中后自动应用击倒。命中后弹窗询问是否为连携攻击（反应动作），若是则自动应用下盘不稳。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
                                 "ratio": 0.5
                             }
                         ]
