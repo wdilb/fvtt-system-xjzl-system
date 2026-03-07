@@ -1,6 +1,7 @@
 import { XJZL } from "../config.mjs";
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
+import { ActionTracker } from "../applications/action-tracker.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 
@@ -1561,6 +1562,11 @@ export class XJZLItem extends Item {
 
       if (!foundry.utils.isEmpty(resourceUpdates)) {
         await actor.update(resourceUpdates);
+      }
+
+      // 读取招式配置的 actionCost (比如 "主要动作")
+      if (move.actionCost) {
+        ActionTracker.consumeAction(actor, move.actionCost);
       }
 
       // =====================================================

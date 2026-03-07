@@ -2092,6 +2092,9 @@ export class XJZLActor extends Actor {
     if (isOpportunity) await this.processRegen("Attack");
     // TODO 暂时来说没有普通攻击触发的，以后会有吗？
 
+    // === 消耗次要动作 ===
+    ActionTracker.consumeAction(this, "次要动作");
+
     // =====================================================
     // 4·5 提前计算基础伤害
     // =====================================================

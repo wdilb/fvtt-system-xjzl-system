@@ -54,6 +54,7 @@ import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
 import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
 import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
+import { ActionTracker } from "./module/applications/action-tracker.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -405,6 +406,17 @@ Hooks.once("init", async function () {
     default: 10, // 默认每 10 点溢出伤害扣 1 体力
     requiresReload: false
   });
+
+  // 是否打开动作计数器
+  game.settings.register("xjzl-system", "enableActionTracker", {
+    name: "开启战斗动作计数器",
+    hint: "在屏幕上显示当前选中角色的动作状态（主/次/反/简），并在出招和回合开始时自动扣除/重置。",
+    scope: "world", // 世界级别，GM统一开关
+    config: true,
+    type: Boolean,
+    default: true,
+    requiresReload: true
+  });
 });
 
 // 在 Hooks.once("init") 之后的合适位置，添加这个钩子
@@ -455,6 +467,11 @@ Hooks.once("ready", async function () {
   if (game.user.isGM) {
     game.xjzl.seed = SeedingManager;
   }
+
+  // 4·加载动作计数器
+  if (game.settings.get("xjzl-system", "enableActionTracker")) {
+        ActionTracker.init();
+    }
   console.log("侠界之旅系统 - 准备就绪");
 });
 
