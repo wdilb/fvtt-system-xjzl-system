@@ -133,7 +133,7 @@ export async function seedWeapons() {
                 quantity: d.system.quantity ?? 1,
                 price: d.system.price ?? 0,
                 quality: d.system.quality ?? 0, // 0-4 (凡/铜/银/金/玉)
-
+                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
                 // --- 核心属性 ---
                 type: d.system.type,    // sword, blade...
                 subtype: d.system.subtype || "", // 重剑, 软剑...

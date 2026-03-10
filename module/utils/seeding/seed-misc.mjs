@@ -51,6 +51,7 @@ export async function seedMisc() {
         system: {
             quantity: d.system?.quantity ?? 1,
             price: d.system?.price ?? 0,
+            isOfficial: d.system.isOfficial ?? true, //默认是官方资源
             quality: d.system?.quality ?? 0,
             description: d.system?.description ?? ""
         },

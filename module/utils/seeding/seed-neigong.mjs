@@ -165,6 +165,7 @@ export async function seedNeigong() {
             img: d.img,
             folder: folders[d.system.sect], // 放入对应门派文件夹
             system: {
+                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
                 // 静态配置
                 tier: d.system.tier ?? 1,      // 1=人, 2=地, 3=天
                 element: d.system.element || "taiji", // yin, yang, taiji

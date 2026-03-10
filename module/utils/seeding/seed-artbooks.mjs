@@ -82,7 +82,10 @@ export async function seedArtBooks() {
         type: "art_book",
         img: d.img,
         folder: folders[d.system.artType], // 放入对应文件夹
-        system: d.system // 直接使用 JSON 中准备好的 system 数据
+        system: { 
+            ...d.system, 
+            isOfficial: d.system?.isOfficial ?? true //默认是官方资源
+        } // 直接使用 JSON 中准备好的 system 数据
     }));
 
     // 6. 批量写入

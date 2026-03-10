@@ -135,7 +135,7 @@ export async function seedArmor() {
                 quality: d.system.quality ?? 0, // 0-4
                 quantity: d.system.quantity ?? 1,
                 equipped: false, // 导入时默认未装备
-
+                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
                 // 描述与备注
                 description: d.system.description || "",
                 automationNote: d.system.automationNote || "",

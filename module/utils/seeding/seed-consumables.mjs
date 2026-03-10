@@ -98,6 +98,7 @@ export async function seedConsumables() {
                 price: d.system.price,
                 quality: d.system.quality,
                 type: d.system.type,
+                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
                 description: d.system.description,
                 usageScript: d.system.usageScript,
                 automationNote: d.system.automationNote,

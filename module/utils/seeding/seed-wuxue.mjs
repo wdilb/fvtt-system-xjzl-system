@@ -360,6 +360,7 @@ export async function seedWuxue() {
             img: d.img,
             folder: folders[d.system.sect],
             system: {
+                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
                 // 总纲配置
                 category: d.system.category || "wuxue", // wuxue, sanshou, qinggong, zhenfa
                 sect: d.system.sect || "none",
