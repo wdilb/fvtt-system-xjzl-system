@@ -41,10 +41,11 @@ export async function seedNeigong() {
         let filesToFetch = [];
 
         if (sect === "jianghushili") {
-            // 如果是江湖势力，尝试读取 1-10 号文件（可以根据需求调整范围）
+            // 如果是江湖势力，尝试读取 1-5 号文件（可以根据需求调整范围）
             for (let i = 1; i <= 5; i++) {
                 filesToFetch.push(`systems/xjzl-system/data/neigong/${sect}${i}.json`);
             }
+            filesToFetch.push(`systems/xjzl-system/data/neigong/xiao.json`); //关山、征越等模组资源
         } else {
             // 普通门派只读取一个文件
             filesToFetch.push(`systems/xjzl-system/data/neigong/${sect}.json`);
