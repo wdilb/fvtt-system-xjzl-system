@@ -76,7 +76,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         "img", "system.quantity", "system.price", "system.quality",
         "system.type", "system.subtype", "system.tier",
         "system.sect", "system.element", "system.category",
-        "system.moves", "system.artType", "system.damageType", "system.weaponType"
+        "system.moves", "system.artType", "system.damageType", "system.weaponType",
+        "system.isOfficial"
     ];
 
     /**
@@ -86,8 +87,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const C = CONFIG.XJZL;
         const elemOpts = { taiji: "太极", yin: "阴", yang: "阳", gang: "刚", rou: "柔", none: "无" };
         const neigongOpts = { taiji: "太极", yin: "阴柔", yang: "阳刚" };
-
-        return {
+        const officialOpts = { "true": "是", "false": "否" };
+        const config = {
             weapon: [
                 { key: "type", label: "武器类型", type: "checkbox", options: C.weaponTypes },
                 { key: "quality", label: "品质", type: "checkbox", options: C.qualities },
@@ -117,6 +118,17 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             ],
             art_book: [{ key: "artType", label: "技艺类型", type: "checkbox", options: C.arts }]
         };
+
+        for (const tab in config) {
+            config[tab].unshift({
+                key: "isOfficial",
+                label: "官方资源",
+                type: "checkbox",
+                options: officialOpts
+            });
+        }
+
+        return config;
     }
 
     /* -------------------------------------------- */
@@ -142,7 +154,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                         // 预计算小写名称，搜索性能提升
                         entry._searchName = (entry.name || "").toLowerCase();
                         entry.packLabel = pack.metadata.label;
-
+                        if (entry.system) {
+                            // 如果底层数据没有 isOfficial，默认视为 true (官方资源)
+                            entry.system.isOfficial = entry.system.isOfficial ?? true;
+                        }
                         tempCache[entry.type].push(entry);
                     }
                 }
