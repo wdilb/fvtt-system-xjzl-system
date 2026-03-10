@@ -9,6 +9,11 @@ export class XJZLConsumableData extends foundry.abstract.TypeDataModel {
     const fields = foundry.data.fields;
 
     return {
+      // 是否官方资源标签
+      isOfficial: new fields.BooleanField({
+        initial: true,
+        label: "XJZL.Item.IsOfficial"
+      }),
       // === 基础属性 ===
       // 堆叠数量
       quantity: new fields.NumberField({ initial: 1, min: 0, integer: true, label: "XJZL.Equipment.Quantity" }),
@@ -64,7 +69,7 @@ export class XJZLConsumableData extends foundry.abstract.TypeDataModel {
       autoReplace: new fields.BooleanField({
         required: true,
         initial: true,
-        label: "XJZL.Consumable.AutoReplaceLabel" 
+        label: "XJZL.Consumable.AutoReplaceLabel"
       }),
     };
   }

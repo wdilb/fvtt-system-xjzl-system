@@ -46,6 +46,11 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
     }, { label: label });
 
     return {
+      // 是否官方资源标签
+      isOfficial: new fields.BooleanField({
+        initial: true,
+        label: "XJZL.Item.IsOfficial"
+      }),
       // === 1. 静态配置 (GM设定) ===
 
       // 品阶: 1=人, 2=地, 3=天
@@ -172,9 +177,9 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       if (stageConfig) {
         this.current.stats = { ...stageConfig.stats };
         this.current.effect = stageConfig.effect;
-        this.current.description = stageConfig.description; 
+        this.current.description = stageConfig.description;
         // 复制数组 (浅拷贝即可，因为里面的对象通常只读)
-        this.current.scripts = stageConfig.scripts || []; 
+        this.current.scripts = stageConfig.scripts || [];
       }
 
       // 如果圆满，激活圆满特效

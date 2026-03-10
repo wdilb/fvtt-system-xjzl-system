@@ -35,10 +35,10 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
         label: "XJZL.ArtBook.ChapterCost"
       }),
 
-       // 该章节的修炼消耗系数
-      xpCostRatio: new fields.NumberField({ 
-        required: true, initial: 1, min: 0, 
-        label: "XJZL.ArtBook.XPCostRatio" 
+      // 该章节的修炼消耗系数
+      xpCostRatio: new fields.NumberField({
+        required: true, initial: 1, min: 0,
+        label: "XJZL.ArtBook.XPCostRatio"
       }),
 
       // 奖励 (读完这一篇给什么)
@@ -49,6 +49,11 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
     });
 
     return {
+      // 是否官方资源标签
+      isOfficial: new fields.BooleanField({
+        initial: true,
+        label: "XJZL.Item.IsOfficial"
+      }),
       // === 技艺书总纲 ===
 
       // 1. 基本信息
@@ -104,7 +109,7 @@ export class XJZLArtBookData extends foundry.abstract.TypeDataModel {
       // --- 计算实际消耗 ---
       const rawCost = chapter.cost || 0;
       const ratio = chapter.xpCostRatio ?? 1;
-      
+
       // 这一章实际需要填的坑
       const chapterCost = Math.floor(rawCost * ratio);
 

@@ -7,6 +7,11 @@ export class XJZLArmorData extends foundry.abstract.TypeDataModel {
     const fields = foundry.data.fields;
 
     return {
+      // 是否官方资源标签
+      isOfficial: new fields.BooleanField({
+        initial: true,
+        label: "XJZL.Item.IsOfficial"
+      }),
       // === 基础状态 ===
       equipped: new fields.BooleanField({ initial: false, label: "XJZL.Equipment.Equipped" }), // 是否已装备
       quantity: new fields.NumberField({ initial: 1, min: 0, integer: true, label: "XJZL.Equipment.Quantity" }), // 品质

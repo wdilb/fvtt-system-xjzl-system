@@ -79,10 +79,10 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       targetInfo: new fields.StringField({ initial: "单体", label: "XJZL.Wuxue.Moves.Target" }),
       actionCost: new fields.StringField({ initial: "主要动作", label: "XJZL.Wuxue.Moves.ActionCost" }),
       // === 招式学习需求 ===
-      requirements: new fields.HTMLField({ 
-        initial: "", 
+      requirements: new fields.HTMLField({
+        initial: "",
         required: false,
-        label: "XJZL.Wuxue.Moves.Requirements" 
+        label: "XJZL.Wuxue.Moves.Requirements"
       }),
 
       // 自动化说明 (Automation Note)
@@ -163,6 +163,11 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
     });
 
     return {
+      // 是否官方资源标签
+      isOfficial: new fields.BooleanField({
+        initial: true,
+        label: "XJZL.Item.IsOfficial"
+      }),
       // === 武学套路总纲 ===
 
       // 1. 分类与来源
