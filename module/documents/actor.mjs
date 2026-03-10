@@ -4,6 +4,7 @@
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { ActionTracker } from "../applications/action-tracker.mjs";
 
 // 尝试突破经脉花费固定为500
 const JINGMAI_ATTEMPT_COST = 500;
