@@ -2686,14 +2686,32 @@ export class XJZLActor extends Actor {
     }
 
     const scriptBonus = Math.floor(calcOutput.damage) - preScriptDmg;
-    if (scriptBonus !== 0) {
-      breakdownText += `\n+ 特效修正: ${scriptBonus}`;
-    }
     if (config.bonusDamage !== 0) {
       breakdownText += `\n+ 手动修正: ${config.bonusDamage}`;
     }
     if (isOpportunity && moraleSpent > 0) {
       breakdownText += ` (含士气 ${moraleSpent})`;
+    }
+
+    const hasScriptChange = scriptBonus !== 0;
+    const hasScriptDesc = calcOutput.bonusDesc && calcOutput.bonusDesc.length > 0;
+
+    if (hasScriptChange || hasScriptDesc) {
+      const sign = scriptBonus > 0 ? "\n+" : "";
+      // 显示总的数值变化
+      breakdownText += `${sign} 特效修正: ${scriptBonus}`;
+
+      // 如果有详细描述，遍历显示
+      if (hasScriptDesc) {
+        breakdownText += `\n`; // 换行开始列出详情
+        calcOutput.bonusDesc.forEach(desc => {
+          // 使用缩进符号 (└) 让层级更清晰
+          breakdownText += `   └ ${desc}\n`;
+        });
+      } else {
+        // 如果没有描述但有数值变化，保留原来的通用提示
+        breakdownText += ` (计算/被动特效)\n`;
+      }
     }
 
     return {
