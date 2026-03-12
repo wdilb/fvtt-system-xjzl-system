@@ -1463,21 +1463,20 @@
             "category": "wuxue",
             "sect": "qingtianmen",
             "tier": 3,
-            "description": "天下第一刚猛的剑法，攻守快慢兼备。天下武林之中，无可匹敌，一剑之威，傲视天下！",
-            "requirements": "剑-重剑 属性：刚",
+            "description": "<p>天下第一刚猛的剑法，攻守快慢兼备。天下武林之中，无可匹敌，一剑之威，傲视天下！</p><p><strong>需求：</strong>剑-重剑</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "剑-重剑",
             "moves": [
                 {
                     "name": "攻势-剑破万法",
                     "type": "real",
+                    "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "range": "2",
+                    "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "-一力降十会，一剑破万法- 主要动作，神剑劈杀，剑势纵横，对目标造成 0.7 力量点外功伤害，并使目标周围 1 米地面因剑气破坏成为困难地形。若将开启架招中的敌人打入濒死，且其武器品级低于自己的武器，则损坏对手武器。<br>损坏：无法使用，需花费原价一半的银两修复。",
-                    "automationNote": "伤害自动计算。地形破坏、损坏武器逻辑过于复杂，需GM手动处理。",
+                    "description": "<p>神剑劈杀，剑势纵横，对目标造成 0.7 力量点外功伤害，并使目标周围 1 米地面因剑气破坏成为困难地形。若将开启架招中的敌人打入濒死，且其武器品级低于自己的武器，则损坏对手武器。</p><p><strong>损坏：</strong>无法使用，需花费原价一半的银两修复。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害自动计算。地形破坏与损坏武器判定逻辑需GM手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1495,32 +1494,22 @@
                             12,
                             16
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    }
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": []
                 },
                 {
                     "name": "守势-铁桶江山",
                     "type": "stance",
+                    "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "-无名如山岳，巍然立惊天- 次要动作，运剑而立，开启架招。格挡成功时，进入“泰山磐石”状态，持续一回合或被击破架招。<br>泰山磐石：你免疫所有敌人添加的状态。",
-                    "automationNote": "架招格挡值自动。'泰山磐石'反击自动添加，但'免疫所有状态'需玩家/GM手动处理。",
+                    "description": "<p>运剑而立，开启架招。格挡成功时，进入“泰山磐石”状态，持续一回合或被击破架招。</p><p><strong>泰山磐石：</strong>你免疫所有敌人添加的状态。</p><p><strong>升级：</strong>格挡值+10，持续回合数+1，内力消耗+4。</p>",
+                    "automationNote": "架招格挡值自动。格挡成功自动获得'泰山磐石'。但'免疫状态'因系统底层无完全拦截机制，需玩家/GM手动拒绝新状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1533,40 +1522,29 @@
                             12,
                             16
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "反击获得泰山磐石",
+                            "label": "格挡获泰山磐石",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算持续时间\nconst stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst panshi = thisItem.effects.getName(\"泰山磐石\");\nif (panshi) {\n    const effectData = panshi.toObject();\n    effectData.duration.rounds = durationRounds;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【泰山磐石】\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 背景防御时 args.move 是敌人的招式，必须自己找本架招\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst panshi = thisItem.effects.getName(\"泰山磐石\");\nif (panshi) {\n    const effectData = panshi.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration.rounds = durationRounds;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"触发：泰山磐石\", { fill: \"#f39c12\" });\n}"
                         }
                     ]
                 },
                 {
                     "name": "快势-惊雷闪电",
                     "type": "feint",
+                    "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "sword",
-                    "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "range": "6",
+                    "range": "6米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "-阴阳相互幻，变化势无匹- 主要动作，剑气电闪，飞射而出，对目标造成 0.6 力量点外功伤害，若击破架招，使其陷入“禁足”“缚身”，持续一回合。<br>·当你看破对方虚招时，可消耗反应动作对目标施展此招，且招式必定命中。（这不是反击，不会压制目标虚招。）",
-                    "automationNote": "伤害自动计算。击破架招自动添加'禁足'和'缚身'。看破后必中需手动开启出招配置中的'强制命中'。",
+                    "description": "<p>（可消耗反应动作释放）剑气电闪，飞射而出，对目标造成 0.6 力量点外功伤害，若击破架招，使其陷入“禁足”“缚身”，持续一回合。</p><p>·当你看破对方虚招时，可消耗反应动作对目标施展此招，且招式必定命中。（这不是反击，不会压制目标虚招。）</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害自动计算。击破架招全自动施加'禁足'和'缚身'。若是看破虚招后作为反应动作打出，请在出招弹窗勾选[单体必中]。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1584,25 +1562,15 @@
                             12,
                             16
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "破架施加控制",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n    ui.notifications.info(`${args.target.name} 被破架，陷入【禁足】和【缚身】。`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n    ui.notifications.info(`${args.target.name} 被破架，陷入【禁足】和【缚身】。`);\n}"
                         }
                     ]
                 },
@@ -1611,15 +1579,14 @@
                     "type": "qi",
                     "actionType": "buff",
                     "isUltimate": true,
+                    "element": "gang",
                     "damageType": "none",
                     "weaponType": "sword",
-                    "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "简要动作",
-                    "description": "-千锤百炼，大象无形- 简要动作，凝气化神，遗忘一切，进入“神剑”姿态，持续一回合。<br>神剑：你只能持一把重剑，并解除自身架招。你使用该重剑进行普通攻击的伤害变为造成 0.4 力量点外功伤害，且属于招式。",
-                    "automationNote": "获得'神剑'状态自动。已额外生成【神剑普攻】招式供使用。",
+                    "description": "<p>简要动作，凝气化神，遗忘一切，进入“神剑”姿态，持续一回合。</p><p><strong>神剑：</strong>你只能持一把重剑，并解除自身架招。你使用该重剑进行普通攻击的伤害变为造成 0.4 力量点外功伤害，且属于招式。</p><p><strong>升级：</strong>神剑状态持续回合数+1，普攻伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "完全自动化！点击应用解除架招并获得BUFF。",
                     "calculation": {
                         "base": 0,
                         "growth": 0,
@@ -1638,97 +1605,61 @@
                             6,
                             5
                         ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "进入神剑姿态",
-                            "trigger": "attack",
-                            "script": "// 解除架招\nawait actor.stopStance();\n\n// 获取等级计算持续时间\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\nconst shenjian = thisItem.effects.getName(\"神剑\");\nif (shenjian) {\n    const effectData = shenjian.toObject();\n    effectData.duration.rounds = durationRounds;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"进入【神剑】姿态。请使用【神剑普攻】招式。\");\n}",
-                            "active": true
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 1. 解除架招\nawait actor.stopStance();\n\n// 2. 计算动态时间与等级快照\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst durationRounds = 1 + (lvl - 1);\n\n// 3. 赋予神剑AE\nconst shenjian = thisItem.effects.getName(\"神剑\");\nif (shenjian) {\n    const effectData = shenjian.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration.rounds = durationRounds;\n    \n    // 核心：把当前绝招的等级注入 AE，让普攻知道自己该加多少伤害\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.shenjianLevel\", lvl);\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(`进入【神剑】姿态，持续 ${durationRounds} 回合！`);\n}"
                         }
                     ]
-                },
-                {
-                    "name": "神剑普攻",
-                    "type": "real",
-                    "damageType": "waigong",
-                    "weaponType": "sword",
-                    "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "range": "1",
-                    "targetInfo": "单体",
-                    "actionCost": "主要动作",
-                    "description": "神剑姿态下的普通攻击。造成 0.4 力量点外功伤害，且属于招式。",
-                    "automationNote": "额外生成的招式，用于模拟神剑姿态下的普攻。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.4
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    }
-                }
-            ],
-            "effects": [
-                {
-                    "name": "泰山磐石",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "description": "你免疫所有敌人添加的状态。",
-                    "duration": {
-                        "rounds": 1
-                    },
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "taishanpanshi"
-                        }
-                    }
-                },
-                {
-                    "name": "神剑",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "description": "只能持一把重剑，解除架招。重剑普攻伤害变为 0.4 力量系数，且属于招式。",
-                    "duration": {
-                        "rounds": 1
-                    },
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "shenjian"
-                        }
-                    }
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "泰山磐石",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "description": "免疫所有敌人添加的状态。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 1
+                },
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "taishanpanshi",
+                        "stackable": false
+                    }
+                }
+            },
+            {
+                "name": "神剑",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                "description": "只能持一把重剑，解除架招。重剑普攻伤害附加 0.4 力量系数及技能等级加成，且视为招式。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 1
+                },
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shenjian",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "神剑双重加成",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "if (args.move.type === \"basic\") {\n    const S = actor.system;\n    // 读取开启神剑时打入的等级快照\n    const lvl = thisEffect.getFlag(\"xjzl-system\", \"shenjianLevel\") || 1;\n    \n    // 1. 升级成长带来的额外伤害 (普攻伤害+20/级)\n    const baseGrowth = (lvl - 1) * 20;\n    \n    // 2. 力量加成 (0.4力量)\n    const strBonus = Math.floor((S.stats.liliang.total || 0) * 0.4);\n    \n    // 3. 视为招式 (直接累加招式增伤，无需减去普攻增伤，因为它“也”是普攻)\n    const skillDmg = S.combat.damages.skill?.total || 0;\n    \n    args.output.damage += (baseGrowth + strBonus + skillDmg);\n    \n    args.output.bonusDesc.push(`神剑姿态: +${strBonus} (0.4力量)`);\n    if (baseGrowth > 0) args.output.bonusDesc.push(`神剑升级成长: +${baseGrowth}`);\n    if (skillDmg > 0) args.output.bonusDesc.push(`视作招式: +${skillDmg} (招式增伤)`);\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     },
     {
         "name": "踵息诀（地级）",
@@ -1909,26 +1840,33 @@
         ]
     },
     {
-        "name": "剑嶽临渊（天级）",
+        "name": "剑嶽临渊",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
         "system": {
             "category": "sanshou",
             "sect": "qingtianmen",
             "tier": 3,
-            "description": "<p>擎天门不传之秘。<br>夫剑者，侠之刃也，宁折不屈，锋芒所向，无所畏惧，剑势巍峨如山岳，如履深渊。</p>",
-            "requirements": "《崭天诀》修炼圆满，剑-重剑",
+            "description": "<p>擎天门不传之秘。</p><p>夫剑者，侠之刃也，宁折不屈，锋芒所向，无所畏惧，剑势巍峨如山岳，如履深渊。</p><p><strong>需求：</strong>《崭天诀》修炼圆满，剑-重剑</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "《崭天诀》修炼圆满；剑-重剑",
             "moves": [
                 {
                     "name": "剑嶽",
                     "type": "qi",
                     "actionType": "buff",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "element": "gang",
-                    "description": "<p>主要动作，矗剑于地，山峙渊渟，在自身周围 2 米范围内形成‘剑嶽’，持续到战斗脱离。<br>剑嶽：区域内的敌人感受到磅礴沉重的压力，视作处于困难地形之中。‘剑嶽’范围外的敌人在你的每个回合末，向中心被拉扯 1 米。<br>升级：‘剑嶽’的范围扩大 1 米，‘剑嶽’范围外的敌人被拉扯的距离增加 1 米，内力消耗+10。</p>",
+                    "damageType": "none",
+                    "weaponType": "sword",
                     "range": "2米",
+                    "targetInfo": "自身",
                     "actionCost": "主要动作",
-                    "automationNote": "点击应用给自己添加[剑嶽]状态作为提示。地形与拉扯效果需手动处理。",
+                    "description": "<p>矗剑于地，山峙渊渟，在自身周围 2 米范围内形成‘剑嶽’，持续到战斗脱离。</p><p><strong>剑嶽：</strong>区域内的敌人感受到磅礴沉重的压力，视作处于困难地形之中。‘剑嶽’范围外的敌人在你的每个回合末，向中心被拉扯 1 米。</p><p>·你可以消耗次要动作拔起重剑，挥舞剑气，对‘剑嶽’范围内的每一个敌人分别进行一次普通攻击，且这次攻击无视目标架招（视作目标无架招）。</p><p><strong>升级：</strong>‘剑嶽’的范围扩大 1 米，‘剑嶽’范围外的敌人被拉扯的距离增加 1 米，内力消耗+10。</p>",
+                    "automationNote": "完全自动化！点击应用获得[剑嶽]BUFF。当你进行【普通攻击】时，系统会弹窗询问是否发动【挥舞剑气】。若选择是，将自动获得无视架招效果并在结算后发送专属卡片提示。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
                     "costs": {
                         "mp": [
                             10,
@@ -1936,70 +1874,15 @@
                             30,
                             40
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "开启剑嶽",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"剑嶽\");\nif (!eff) return ui.notifications.warn(\"未找到特效数据\");\nconst lvl = args.move.computedLevel || 1;\nconst range = 1 + lvl;\nconst pull = lvl;\nconst effectData = eff.toObject();\neffectData.description = `周围${range}米困难地形。回合末范围外敌人向中心拉扯${pull}米。`;\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "挥舞剑气",
-                    "type": "real",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "element": "gang",
-                    "damageType": "waigong",
-                    "weaponType": "sword",
-                    "description": "<p>消耗次要动作拔起重剑，挥舞剑气，对‘剑嶽’范围内的每一个敌人分别进行一次普通攻击，且这次攻击无视目标架招（视作目标无架招）。</p>",
-                    "range": "剑嶽范围内",
-                    "actionCost": "次要动作",
-                    "automationNote": "已自动应用[无视架招]。请手动选中范围内所有敌人进行结算。",
-                    "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "rage": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 0,
-                        "scalings": []
-                    },
-                    "scripts": [
-                        {
-                            "label": "无视架招",
-                            "trigger": "attack",
-                            "script": "args.flags.ignoreStance = true;",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"剑嶽\");\nif (!eff) return ui.notifications.warn(\"未找到特效数据\");\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst range = 1 + lvl;\nconst pull = lvl;\n\nconst effectData = eff.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.description = `周围 ${range} 米视为困难地形。回合末范围外敌人向中心拉扯 ${pull} 米。`;\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ]
                 }
@@ -2011,14 +1894,31 @@
                 "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                 "description": "周围形成剑嶽领域，造成困难地形与拉扯效果。",
                 "transfer": false,
-                "duration": {
-                    "rounds": 10
-                },
                 "changes": [],
                 "flags": {
                     "xjzl-system": {
-                        "slug": "jianyue",
-                        "stackable": false
+                        "slug": "jianyue_aura",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "挥舞剑气-询问并打标",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "if (args.move.type === \"basic\") {\n    // 清理可能残留的历史标记（自愈机制）\n    await actor.unsetFlag(\"xjzl-system\", \"tempJianyue\");\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"剑嶽 - 挥舞剑气\" },\n        content: \"<p>是否消耗<b>次要动作</b>施展【挥舞剑气】？</p><p style='color:#666;'>(本次普攻将无视目标架招)</p>\",\n        yes: { label: \"是 (无视架招)\", icon: \"fas fa-check\" },\n        no: { label: \"否 (普通平A)\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        await actor.setFlag(\"xjzl-system\", \"tempJianyue\", true);\n        args.flags.damageResult.breakdown += \"\\n+ 剑嶽效果: 附加无视架招\";\n    }\n}"
+                            },
+                            {
+                                "label": "挥舞剑气-应用穿透",
+                                "trigger": "check",
+                                "active": true,
+                                "script": "if (args.move.type === \"basic\" && actor.getFlag(\"xjzl-system\", \"tempJianyue\")) {\n    args.flags.ignoreStance = true;\n}"
+                            },
+                            {
+                                "label": "挥舞剑气-清理与提示",
+                                "trigger": "hit_once",
+                                "active": true,
+                                "script": "if (args.move.type === \"basic\" && actor.getFlag(\"xjzl-system\", \"tempJianyue\")) {\n    await actor.unsetFlag(\"xjzl-system\", \"tempJianyue\");\n    \n    // 发送精美的提示卡片（左边距+边框设计）\n    const content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"margin-left: 4px; padding: 6px 8px; border-left: 4px solid #5d4037; background: rgba(93, 64, 55, 0.08); border-radius: 0 4px 4px 0;\">\n            <div style=\"font-weight: bold; color: #4e342e; margin-bottom: 3px;\">\n                <i class=\"fas fa-wind\"></i> 挥舞剑气\n            </div>\n            <div style=\"font-size: 0.9em; color: #555;\">\n                本次普通攻击触发了<span style=\"color:#d35400; font-weight:bold;\">无视架招</span>效果！\n            </div>\n        </div>\n    </div>`;\n    \n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n}"
+                            }
+                        ]
                     }
                 }
             }
