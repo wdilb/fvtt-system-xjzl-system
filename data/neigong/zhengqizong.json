@@ -53,7 +53,7 @@
                             "label": "正气歌-属性检定优势",
                             "trigger": "passive",
                             "active": true,
-                             "script": "// 1. 定义受影响的六大属性\nconst validStats = [\"liliang\", \"shenfa\", \"tipo\", \"neixi\", \"qigan\", \"shencai\"];\n\n// 2. 给属性本身加优势\nfor (const s of validStats) {\n    const flag = s + \"CheckLevel\";\n    actor.xjzlStatuses[flag] = (actor.xjzlStatuses[flag] || 0) + 1;\n}\n\n// 3. 给对应的技能加优势 (排除悟性系技能)\n// 悟性系技能列表 (硬编码排除，比判断属性归属更直接)\nconst wuxingSkills = [\"wuxue\", \"jianding\", \"bagua\", \"shili\"];\n\nfor (const sk of Object.keys(CONFIG.XJZL.skills)) {\n    if (!wuxingSkills.includes(sk)) {\n        const flag = sk + \"CheckLevel\";\n        actor.xjzlStatuses[flag] = (actor.xjzlStatuses[flag] || 0) + 1;\n    }\n}"
+                            "script": "// 1. 定义受影响的六大属性\nconst validStats = [\"liliang\", \"shenfa\", \"tipo\", \"neixi\", \"qigan\", \"shencai\"];\n\n// 2. 给属性本身加优势\nfor (const s of validStats) {\n    const flag = s + \"CheckLevel\";\n    actor.xjzlStatuses[flag] = (actor.xjzlStatuses[flag] || 0) + 1;\n}\n\n// 3. 给对应的技能加优势 (排除悟性系技能)\n// 悟性系技能列表 (硬编码排除，比判断属性归属更直接)\nconst wuxingSkills = [\"wuxue\", \"jianding\", \"bagua\", \"shili\"];\n\nfor (const sk of Object.keys(CONFIG.XJZL.skills)) {\n    if (!wuxingSkills.includes(sk)) {\n        const flag = sk + \"CheckLevel\";\n        actor.xjzlStatuses[flag] = (actor.xjzlStatuses[flag] || 0) + 1;\n    }\n}"
                         }
                     ]
                 }
@@ -1037,9 +1037,9 @@
             "tier": 3,
             "element": "taiji",
             "sect": "zhengqizong",
-            "description": "法家顶级内功，为管仲所作，将法理刑名通彻于心，刑过不避大臣，赏善不遗匹夫，并以“势立威”、“术驭臣”、“法制民”糅合，修炼条框极多，行功路线死板繁琐之至，大成后却几无破绽。",
+            "description": "<p>法家顶级内功，为管仲所作，将法理刑名通彻于心，刑过不避大臣，赏善不遗匹夫，并以“势立威”、“术驭臣”、“法制民”糅合，修炼条框极多，行功路线死板繁琐之至，大成后却几无破绽。</p><p>·该内功影响的投掷结果仅包括属性检定、技能检定、命中检定、虚招对抗、残疾检定、死亡检定。</p>",
             "requirement": "悟性需求：11",
-            "automationNote": "部分自动化。自动应用提示状态，数值需手动。",
+            "automationNote": "大部分自动化。进战后自动根据自身阵营筛选敌我并施加对应级别的【刑】和【赏】。[命中、看破、虚招]的数值修正已在AE中自动实现；[属性/技能/残疾/死亡检定]请根据AE提示在检定弹窗中手动增减。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1050,14 +1050,14 @@
                         "qigan": 16,
                         "shencai": 10
                     },
-                    "description": "领悟运功特效：进战后，为所有敌方添加“刑”，持续到战斗脱离。\n刑：目标战斗中的投掷检定结果-1。",
+                    "description": "<p><strong>领悟运功特效：</strong>进战后，为所有敌方添加“刑”，持续到战斗脱离。</p><p><strong>刑：</strong>目标战斗中的投掷检定结果-1。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "法禁-刑(领悟)",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "if (game.combat) {\n    const enemies = game.combat.combatants.filter(c => c.token.disposition === -1).map(c => c.actor);\n    const effectData = {\n        name: \"刑(检定-1)\",\n        icon: \"icons/svg/skull.svg\",\n        description: \"投掷检定结果-1（请手动调整）。\",\n        changes: []\n    };\n    for (const enemy of enemies) {\n        await game.xjzl.api.effects.addEffect(enemy, effectData);\n    }\n}"
+                            "script": "if (!game.combat) return;\nconst myDisp = actor.token?.disposition ?? actor.prototypeToken?.disposition ?? 1;\nconst enemies = game.combat.combatants.filter(c => c.actor && c.token.disposition !== myDisp && c.token.disposition !== 0).map(c => c.actor);\n\nconst sourceEffect = thisItem.effects.getName(\"刑（领悟）\");\nif (sourceEffect) {\n    const eff = sourceEffect.toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    for (const enemy of enemies) {\n        await game.xjzl.api.effects.addEffect(enemy, eff);\n    }\n    actor.showFloatyText(\"法禁·立威！\", { fill: \"#ff0000\" });\n}"
                         }
                     ]
                 },
@@ -1070,14 +1070,14 @@
                         "qigan": 32,
                         "shencai": 20
                     },
-                    "description": "小成运功特效：进战后，为所有敌方添加“刑”，持续到战斗脱离。\n刑：目标战斗中的投掷检定结果-2。",
+                    "description": "<p><strong>小成运功特效：</strong>进战后，为所有敌方添加“刑”，持续到战斗脱离。</p><p><strong>刑：</strong>目标战斗中的投掷检定结果-2。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "法禁-刑(小成)",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "if (game.combat) {\n    const enemies = game.combat.combatants.filter(c => c.token.disposition === -1).map(c => c.actor);\n    const effectData = {\n        name: \"刑(检定-2)\",\n        icon: \"icons/svg/skull.svg\",\n        description: \"投掷检定结果-2（请手动调整）。\",\n        changes: []\n    };\n    for (const enemy of enemies) {\n        await game.xjzl.api.effects.addEffect(enemy, effectData);\n    }\n}"
+                            "script": "if (!game.combat) return;\nconst myDisp = actor.token?.disposition ?? actor.prototypeToken?.disposition ?? 1;\nconst enemies = game.combat.combatants.filter(c => c.actor && c.token.disposition !== myDisp && c.token.disposition !== 0).map(c => c.actor);\n\nconst sourceEffect = thisItem.effects.getName(\"刑\");\nif (sourceEffect) {\n    const eff = sourceEffect.toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    for (const enemy of enemies) {\n        await game.xjzl.api.effects.addEffect(enemy, eff);\n    }\n    actor.showFloatyText(\"法禁·制民！\", { fill: \"#ff0000\" });\n}"
                         }
                     ]
                 },
@@ -1090,27 +1090,27 @@
                         "qigan": 48,
                         "shencai": 30
                     },
-                    "description": "圆满运功特效：进战后，为所有敌方添加“刑”，为所有友方添加“赏”，持续到战斗脱离。\n刑：目标战斗中的投掷检定结果-2。\n赏：目标战斗中的投掷检定结果+2。\n修满特效：修满[永久]：气血+80，内力+40。",
+                    "description": "<p><strong>圆满运功特效：</strong>进战后，为所有敌方添加“刑”，为所有友方添加“赏”，持续到战斗脱离。</p><p><strong>刑：</strong>目标战斗中的投掷检定结果-2。</p><p><strong>赏：</strong>目标战斗中的投掷检定结果+2。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "法禁-赏罚(圆满)",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "if (game.combat) {\n    const enemies = game.combat.combatants.filter(c => c.token.disposition === -1).map(c => c.actor);\n    const allies = game.combat.combatants.filter(c => c.token.disposition === 1).map(c => c.actor);\n    \n    const xing = {\n        name: \"刑(检定-2)\",\n        icon: \"icons/svg/skull.svg\",\n        description: \"投掷检定结果-2（请手动调整）。\",\n        changes: []\n    };\n    const shang = {\n        name: \"赏(检定+2)\",\n        icon: \"icons/svg/angel.svg\",\n        description: \"投掷检定结果+2（请手动调整）。\",\n        changes: []\n    };\n\n    for (const e of enemies) await game.xjzl.api.effects.addEffect(e, xing);\n    for (const a of allies) await game.xjzl.api.effects.addEffect(a, shang);\n}"
+                            "script": "if (!game.combat) return;\nconst myDisp = actor.token?.disposition ?? actor.prototypeToken?.disposition ?? 1;\nconst enemies = game.combat.combatants.filter(c => c.actor && c.token.disposition !== myDisp && c.token.disposition !== 0).map(c => c.actor);\nconst allies = game.combat.combatants.filter(c => c.actor && c.token.disposition === myDisp).map(c => c.actor);\n\nconst sourceXing = thisItem.effects.getName(\"刑\");\nif (sourceXing) {\n    const effXing = sourceXing.toObject();\n    delete effXing._id;\n    effXing.origin = thisItem.uuid;\n    for (const enemy of enemies) await game.xjzl.api.effects.addEffect(enemy, effXing);\n}\n\nconst sourceShang = thisItem.effects.getName(\"赏\");\nif (sourceShang) {\n    const effShang = sourceShang.toObject();\n    delete effShang._id;\n    effShang.origin = thisItem.uuid;\n    for (const ally of allies) await game.xjzl.api.effects.addEffect(ally, effShang);\n}\n\nactor.showFloatyText(\"法禁·赏罚分明！\", { fill: \"#f1c40f\" });"
                         }
                     ]
                 }
             },
-            "masteryEffect": "修满[永久]：气血+80，内力+40。",
+            "masteryEffect": "<p>修满[永久]：气血+80，内力+40。</p>",
             "masteryChanges": [
                 {
-                    "key": "resources.hp.bonus",
+                    "key": "system.resources.hp.bonus",
                     "value": 80,
                     "label": "法禁-气血"
                 },
                 {
-                    "key": "resources.mp.bonus",
+                    "key": "system.resources.mp.bonus",
                     "value": 40,
                     "label": "法禁-内力"
                 }
@@ -1121,7 +1121,111 @@
                 "general": 0,
                 "specific": 0
             }
-        }
+        },
+        "effects": [
+            {
+                "name": "刑（领悟）",
+                "icon": "systems/xjzl-system/assets/icons/neigong/正气.png",
+                "description": "投掷检定结果-1。\n命中、虚招、看破已自动化扣除。\n属性、技能、残疾、死亡等检定请在掷骰前手动减去 1 点。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "fajin_xing_1",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-1"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-1"
+                    },
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "-1"
+                    },
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            },
+            {
+                "name": "刑",
+                "icon": "systems/xjzl-system/assets/icons/neigong/正气.png",
+                "description": "投掷检定结果-2。\n命中、虚招、看破已自动化扣除。\n属性、技能、残疾、死亡等检定请在掷骰前手动减去 2 点。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "fajin_xing_2",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-2"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-2"
+                    },
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "-2"
+                    },
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
+            },
+            {
+                "name": "赏",
+                "icon": "systems/xjzl-system/assets/icons/neigong/正气.png",
+                "description": "投掷检定结果全面 +2。\n命中、虚招、看破已自动化增加。\n属性、技能、残疾、死亡等检定请在掷骰前手动增加 2 点。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "fajin_shang",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "《辨经》",
