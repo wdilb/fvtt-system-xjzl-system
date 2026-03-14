@@ -1523,7 +1523,9 @@ export class XJZLItem extends Item {
         ui.notifications.warn("怒气不足！");
         return;
       }
-      if (actor.system.resources.hp.value <= finalCost.hp) {
+      // 仅当招式确实消耗气血时，才判断气血是否足够 (防止自杀)。
+      // 如果消耗为0，则哪怕在濒死(气血=0)状态下也允许出招。
+      if (finalCost.hp > 0 && actor.system.resources.hp.value <= finalCost.hp) {
         ui.notifications.warn("气血不足，无法施展！");
         return;
       }

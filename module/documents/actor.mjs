@@ -1551,7 +1551,13 @@ export class XJZLActor extends Actor {
         } else {
           const hasDying = this.effects.some(e => e.statuses.has("dying"));
           //因为可能存在一些脚本不阻止濒死，但会回血，所以不能挂上濒死状态（对，就是我们的合欢宗），但是需要发送濒死卡片
-          if (!hasDying && this.system.resources.hp.value <= 0) await this.toggleStatusEffect("dying", { active: true });
+          if (!hasDying && this.system.resources.hp.value <= 0) {
+            await this.toggleStatusEffect("dying", { active: true });
+            // 濒死时自动解除架招
+            if (this.system.martial?.stanceActive) {
+              await this.stopStance();
+            }
+          }
 
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: false });
           ChatMessage.create({
