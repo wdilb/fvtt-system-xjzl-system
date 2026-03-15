@@ -425,20 +425,59 @@
             "automationNote": "受击/攻击触发特效已自动化。狂蛇剑法联动已自动化。",
             "scripts": [
                 {
-                    "label": "五毒神剑 - 碧光护体",
-                    "trigger": "damaged",
-                    "active": true,
-                    "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const eff = {\n        name: '碧光',\n        icon: thisItem.img,\n        changes: [\n            { key: 'flags.xjzl-system.feintLevel', mode: 2, value: 3 },\n            { key: 'flags.xjzl-system.defendFeintLevel', mode: 2, value: 3 }\n        ],\n        duration: { seconds: 9999 },\n        flags: { 'xjzl-system': { slug: 'weapon_wudu_light' } }\n    };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
-                },
-                {
-                    "label": "五毒神剑 - 嗜血",
+                    "label": "碧光护体与狂蛇联动",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit && (args.hpLost > 0 || args.hutiLost > 0)) {\n    // 触发碧光\n    const eff = {\n        name: '碧光',\n        icon: thisItem.img,\n        changes: [\n            { key: 'flags.xjzl-system.feintLevel', mode: 2, value: 3 },\n            { key: 'flags.xjzl-system.defendFeintLevel', mode: 2, value: 3 }\n        ],\n        duration: { seconds: 9999 },\n        flags: { 'xjzl-system': { slug: 'weapon_wudu_light' } }\n    };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    // 狂蛇剑法联动\n    if (args.move && args.move.name.includes('狂蛇')) {\n        const snakeEff = {\n            name: '狂蛇',\n            icon: 'icons/creatures/reptiles/snake-cobra-hood-green.webp',\n            changes: [],\n            duration: { seconds: 9999 },\n            flags: { 'xjzl-system': { slug: 'weapon_wudu_snake', stackable: true } }\n        };\n        await game.xjzl.api.effects.addEffect(actor, snakeEff);\n        ui.notifications.info('狂蛇剑法：获得一层狂蛇');\n    }\n}"
+                    "script": "if (args.isHit && (args.hpLost > 0 || args.hutiLost > 0)) {\n    const lightEff = thisItem.effects.getName('碧光').toObject();\n    delete lightEff._id;\n    lightEff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, lightEff);\n\n    if (args.move && args.move.name.includes('狂蛇')) {\n        const snakeEff = thisItem.effects.getName('狂蛇').toObject();\n        delete snakeEff._id;\n        snakeEff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, snakeEff);\n    }\n}"
+                },
+                {
+                    "label": "受击触发碧光",
+                    "trigger": "damaged",
+                    "active": true,
+                    "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const lightEff = thisItem.effects.getName('碧光').toObject();\n    delete lightEff._id;\n    lightEff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, lightEff);\n}"
                 }
             ]
         },
-        "effects": []
+        "effects": [
+            {
+                "name": "碧光",
+                "icon": "systems/xjzl-system/assets/icons/weapons/剑3.png",
+                "description": "虚招对抗+3。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_wudu_light",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "3"
+                    },
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            },
+            {
+                "name": "狂蛇",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "5层时可免费施展招式。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuangshe",
+                        "stackable": true,
+                        "maxStacks": 5
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "清风剑",
