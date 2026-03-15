@@ -891,9 +891,10 @@ export class ChatCardManager {
 
         // B. 外来影响: 攻击者状态赋予防御者的修正 (例如攻击者动作迟缓)
         let grantLevel = 0;
-        if (attackerActor) {
-            grantLevel = attackerActor.xjzlStatuses?.defendFeintLevel || 0;
-        }
+        // if (attackerActor) {
+        //     grantLevel = attackerActor.xjzlStatuses?.defendFeintLevel || 0;
+        // }
+        // 这个flag应该无法增加看破的优势，这里只可能通过脚本来修改。
 
         // C. 汇总自动层级
         const autoLevel = selfLevel + grantLevel;
@@ -1643,6 +1644,32 @@ export class ChatCardManager {
                 applyCritDamage: config.applyCritDamage,
                 ignoreMinDamage: false  // 默认为 false (保底1点伤害)
             };
+
+            // =====================================================
+            // 处理手动应用伤害时击破架招效果
+            // =====================================================
+            if (isHit && config.isBroken && targetActor.system.martial?.stanceActive) {
+                // A. 移除架招状态
+                await ChatCardManager._safeUpdateDocument(targetActor, { "system.martial.stanceActive": false });
+                
+                // B. 应用 "破防" 状态
+                const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
+                if (statusConfig) {
+                    const breakEffectData = {
+                        ...statusConfig,
+                        name: game.i18n.localize(statusConfig.name),
+                        description: game.i18n.localize(statusConfig.description),
+                        origin: attacker ? attacker.uuid : message.uuid
+                    };
+                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect",[breakEffectData]);
+                }
+                
+                // C. 视觉反馈
+                if (targetActor.showFloatyText) {
+                    targetActor.showFloatyText("被击破架招！", { fill: "#ff0000" });
+                }
+            }
+            // =====================================================
 
             // 执行 PRE_DAMAGE 脚本
             if (isHit) {
