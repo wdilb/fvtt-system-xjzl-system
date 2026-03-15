@@ -1026,7 +1026,7 @@
                         {
                             "label": "转化护体",
                             "trigger": "hit",
-                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nif (current <= 0) return ui.notifications.warn(\"没有不死气！\");\n\nawait actor.applyHealing({ amount: current, type: \"huti\", showScrolling: true });\nawait thisItem.update({\"flags.xjzl-system.undyingQi\": 0});\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #2e7d32; background: rgba(46, 125, 50, 0.05);\">\n            <div style=\"font-weight:bold; color: #2e7d32;\">阎王不死印 - 借力</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                不死气转化为护体。<br>\n                消耗: <b>${current}</b>\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
+                            "script": "const current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nif (current <= 0) return ui.notifications.warn(\"没有不死气！\");\n\nawait actor.applyHealing({ amount: current, type: \"huti\", showScrolling: true });\nawait actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", 0);\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #2e7d32; background: rgba(46, 125, 50, 0.05);\">\n            <div style=\"font-weight:bold; color: #2e7d32;\">阎王不死印 - 借力</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                不死气转化为护体。<br>\n                消耗: <b>${current}</b>\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
                             "active": true
                         }
                     ]
@@ -1065,7 +1065,7 @@
                         {
                             "label": "消耗不死气",
                             "trigger": "hit",
-                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\n\nconst result = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"化劲 - 抵消伤害\" },\n    content: `<p>当前不死气: <b>${current}</b></p><p>请输入要抵消的伤害数值（将扣除等量不死气）：</p><input type=\"number\" name=\"amount\" value=\"${current}\" min=\"1\" max=\"${current}\">`,\n    ok: { label: \"执行\", callback: (event, button) => button.form.elements.amount.value }\n});\n\nconst cost = parseInt(result) || 0;\nif (cost <= 0) return;\nif (cost > current) return ui.notifications.warn(\"不死气不足。\");\n\nawait thisItem.update({\"flags.xjzl-system.undyingQi\": current - cost});\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #1976d2; background: rgba(25, 118, 210, 0.05);\">\n            <div style=\"font-weight:bold; color: #1976d2;\">阎王不死印 - 化劲</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                使用不死气抵消伤害。<br>\n                消耗: <b>${cost}</b> (剩余: ${current - cost})\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
+                            "script": "const current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\n\nconst result = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"化劲 - 抵消伤害\" },\n    content: `<p>当前不死气: <b>${current}</b></p><p>请输入要抵消的伤害数值（将扣除等量不死气）：</p><input type=\"number\" name=\"amount\" value=\"${current}\" min=\"1\" max=\"${current}\">`,\n    ok: { label: \"执行\", callback: (event, button) => button.form.elements.amount.value }\n});\n\nconst cost = parseInt(result) || 0;\nif (cost <= 0) return;\nif (cost > current) return ui.notifications.warn(\"不死气不足。\");\n\nawait actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", current - cost);\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #1976d2; background: rgba(25, 118, 210, 0.05);\">\n            <div style=\"font-weight:bold; color: #1976d2;\">阎王不死印 - 化劲</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                使用不死气抵消伤害。<br>\n                消耗: <b>${cost}</b> (剩余: ${current - cost})\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
                             "active": true
                         }
                     ]
@@ -1104,13 +1104,13 @@
                         {
                             "label": "设置治疗量",
                             "trigger": "calc",
-                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nargs.output.damage = current;\nargs.output.bonusDesc.push(`不死气转化: ${current}`);",
+                            "script": "const current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nargs.output.damage = current;\nargs.output.bonusDesc.push(`不死气转化: ${current}`);",
                             "active": true
                         },
                         {
                             "label": "清空不死气",
                             "trigger": "hit_once",
-                            "script": "await thisItem.update({\"flags.xjzl-system.undyingQi\": 0});\nui.notifications.info(\"不死气已清空\");",
+                            "script": "await actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", 0);\nui.notifications.info(\"不死气已清空\");",
                             "active": true
                         }
                     ]
@@ -1149,13 +1149,13 @@
                         {
                             "label": "设置伤害量",
                             "trigger": "calc",
-                            "script": "const current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nargs.output.damage = current;\nargs.output.bonusDesc.push(`不死气转化: ${current}`);",
+                            "script": "const current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nargs.output.damage = current;\nargs.output.bonusDesc.push(`不死气转化: ${current}`);",
                             "active": true
                         },
                         {
                             "label": "清空不死气",
                             "trigger": "hit_once",
-                            "script": "await thisItem.update({\"flags.xjzl-system.undyingQi\": 0});\nui.notifications.info(\"不死气已清空\");",
+                            "script": "await actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", 0);\nui.notifications.info(\"不死气已清空\");",
                             "active": true
                         }
                     ]
@@ -1175,7 +1175,7 @@
                                 {
                                     "label": "积累不死气",
                                     "trigger": "damaged",
-                                    "script": "const damage = args.hpLost + (args.hutiLost || 0);\nif (damage <= 0) return;\nconst gain = Math.floor(damage / 2);\n\nlet current = thisItem.getFlag(\"xjzl-system\", \"undyingQi\") || 0;\nconst max = actor.system.resources.mp.max;\nlet newVal = Math.min(current + gain, max);\n\nawait thisItem.update({\"flags.xjzl-system.undyingQi\": newVal});\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #4a148c; background: rgba(74, 20, 140, 0.05);\">\n            <div style=\"font-weight:bold; color: #4a148c;\">阎王不死印 - 吸纳死气</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                承受伤害转化。<br>\n                不死气: <b>+${gain}</b> (当前: ${newVal})\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
+                                    "script": "const damage = args.hpLost + (args.hutiLost || 0);\nif (damage <= 0) return;\nconst gain = Math.floor(damage / 2);\n\nlet current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nconst max = actor.system.resources.mp.max;\nlet newVal = Math.min(current + gain, max);\n\nawait actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", newVal);\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #4a148c; background: rgba(74, 20, 140, 0.05);\">\n            <div style=\"font-weight:bold; color: #4a148c;\">阎王不死印 - 吸纳死气</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                承受伤害转化。<br>\n                不死气: <b>+${gain}</b> (当前: ${newVal})\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
                                     "active": true
                                 }
                             ]
