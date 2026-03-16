@@ -1521,7 +1521,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>佛露恶念，内力颠转，获得“魔佛”，持续一回合。</p><p><strong>魔佛：</strong>你施展佛门武学的招式，造成伤害时，伤害类型变为毒素伤害。</p><p><strong>升级：</strong>魔佛持续的回合数+1，消耗+4。</p>",
-                    "automationNote": "自动获得魔佛状态。伤害转化自动生效(需招式名含\"佛\"或门派为万佛寺)。",
+                    "automationNote": "自动获得魔佛状态。伤害转化自动生效(需满足佛门武学特征)。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1559,7 +1559,7 @@
                                     "label": "毒素转化",
                                     "trigger": "preDamage",
                                     "active": true,
-                                    "script": "const moveName = args.move.name || \"\";\nconst sect = args.item.system.sect || \"\";\nif (moveName.includes(\"佛\") || sect === \"wanfosi\") {\n    args.config.type = \"poison\";\n    ui.notifications.info(\"魔佛：伤害转化为毒素！\");\n}"
+                                    "script": "const moveName = args.move?.name || \"\";\nconst itemName = args.item?.name || \"\";\nconst sect = args.item?.system?.sect || \"\";\n\n// 大悲寺专属武学枚举（仅需检查武学名是否包含这些关键词，可自动兼容带品阶后缀的情况）\nconst daBeiItems =[\"如来千叶手\", \"大悲手\"];\n\n// 综合佛门判定条件：门派为万佛寺、招式带佛、武学带佛、武学名包含大悲寺特有武学\nconst isBuddhist = \n    sect === \"wanfosi\" || \n    moveName.includes(\"佛\") || \n    itemName.includes(\"佛\") ||\n    daBeiItems.some(name => itemName.includes(name));\n\nif (isBuddhist) {\n    args.config.type = \"poison\";\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"padding: 2px;\">\n        <div style=\"border-left: 4px solid #8e44ad; background: rgba(142, 68, 173, 0.1); padding: 6px 10px; margin-left: 3px; border-radius: 4px;\">\n            <div style=\"font-weight: bold; color: #6c3483; font-size: 1.05em;\">\n                <i class=\"fas fa-skull-crossbones\"></i> 魔佛生效！\n            </div>\n            <div style=\"font-size: 0.9em; margin-top: 4px; color: #555;\">\n                佛门招式 <b>${moveName}</b> 沾染魔气，伤害转化为<span style=\"color: purple; font-weight: bold;\">毒素伤害</span>！\n            </div>\n        </div>\n    </div>`;\n    \n    ChatMessage.create({\n        content: msg,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                                 }
                             ]
                         }
