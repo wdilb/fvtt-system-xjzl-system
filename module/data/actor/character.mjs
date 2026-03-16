@@ -459,6 +459,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     if (!this.combat.costs) this.combat.costs = {};
     this.combat.costs.neili = makeRuntimeMod();
     this.combat.costs.rage = makeRuntimeMod();
+    this.combat.costs.ultimateRageDiscount = makeRuntimeMod(); //绝招专属怒气减免（至少1）
 
     // === 4. 重建 Arts 的临时字段 ===
     // Arts Schema 中保留了 value，这里补全其他字段
@@ -1418,6 +1419,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     //消耗减少
     combat.costs.neili.total = (combat.costs.neili.value || 0) + (combat.costs.neili.mod || 0);
     combat.costs.rage.total = (combat.costs.rage.value || 0) + (combat.costs.rage.mod || 0);
+    combat.costs.ultimateRageDiscount.total = (combat.costs.ultimateRageDiscount.value || 0) + (combat.costs.ultimateRageDiscount.mod || 0);
 
     // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
     // 士气不影响全局暴击，不在这里计算了

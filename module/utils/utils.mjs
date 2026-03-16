@@ -199,6 +199,7 @@ export function getModifierChoices() {
   const groupCost = "消耗减少"; // game.i18n.localize("XJZL.Combat.ReduceCost")
   add(groupCost, "combat.costs.neili.mod", "内力消耗减少 (Mod)");
   add(groupCost, "combat.costs.rage.mod", "怒气消耗减少 (Mod)");
+  add(groupCost, "combat.costs.ultimateRageDiscount.mod", "绝招怒气消耗减少 (至少1)");
 
   // 7. 技能 (Skills)
   const groupSkills = game.i18n.localize("XJZL.Skills.Label");

@@ -1510,6 +1510,17 @@ export class XJZLItem extends Item {
         hp: costs.hp // 气血通常不享受减耗
       };
 
+      // --- 处理绝招特化减耗 (至少1) ---
+      let finalRageCost = finalCost.rage;
+      if (move.isUltimate && finalRageCost > 0) { 
+        const ultDiscount = costReductions?.ultimateRageDiscount?.total || 0;
+        if (ultDiscount > 0) {
+            // 绝招特化减免，下限保底为 1
+            finalRageCost = Math.max(1, finalRageCost - ultDiscount);
+        }
+      }
+      finalCost.rage = finalRageCost;
+
       if (config.isFree) {
         finalCost = { mp: 0, rage: 0, hp: 0 };
       }
