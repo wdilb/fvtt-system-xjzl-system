@@ -16,6 +16,7 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
     // [Helper] 伤害/数值计算公式模板
     // 公式: 最终值 = (基础 + 成长 * (等级-1)) + Sum(属性 * 系数)
     const makeCalculationSchema = () => new fields.SchemaField({
+      isFixed: new fields.BooleanField({ initial: false, label: "XJZL.Wuxue.Calc.IsFixed" }), // 动态固定值标记
       base: new fields.NumberField({ initial: 0, label: "XJZL.Wuxue.Calc.Base" }),
       growth: new fields.NumberField({ initial: 0, label: "XJZL.Wuxue.Calc.Growth" }), // 每级成长
       // 属性加成 (支持多个属性混合加成，如: 0.5*力量 + 0.3*内息)

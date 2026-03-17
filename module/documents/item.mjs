@@ -996,6 +996,60 @@ export class XJZLItem extends Item {
     // 先去掉气招的条件，无系数的应该都不吃加成
     const hasScalings = move.calculation.scalings && move.calculation.scalings.length > 0;
     if (!hasScalings) {
+      // 2.1 动态固定值 (isFixed = true) -> 仅运行招式自身的 CALC 脚本获取数值
+      if (move.calculation.isFixed) {
+        const calcOutput = {
+          damage: Math.floor(moveBaseDmg),
+          feint: 0,
+          bonusDesc: []
+        };
+
+        // 仅提取该招式自带的 CALC 脚本，隔绝外界(内功/装备)的所有脚本
+        if (move.scripts && move.scripts.length > 0) {
+          const localScripts = move.scripts
+            .filter(s => s.trigger === SCRIPT_TRIGGERS.CALC && s.active)
+            .map(s => ({
+              script: s.script,
+              label: s.label,
+              source: this,
+              contextData: move
+            }));
+
+          if (localScripts.length > 0) {
+            const context = {
+              move: move,
+              item: this,
+              baseData: { base: moveBaseDmg, weapon: 0, level: lvl, isWeaponMatch: true },
+              output: calcOutput
+            };
+
+            // 构建局部沙盒，直接调用内部同步执行器
+            const sandbox = {
+              ...context, args: context, actor: actor, system: actor.system, S: actor.system,
+              console: console, game: game, ui: ui, trigger: SCRIPT_TRIGGERS.CALC, Macros: XJZLMacros
+            };
+
+            actor._runScriptsSync(localScripts, sandbox);
+          }
+        }
+
+        let breakdownText = `固定数值（不享受其他加成）: ${Math.floor(calcOutput.damage)}`;
+        if (calcOutput.bonusDesc.length > 0) {
+          breakdownText += `\n` + calcOutput.bonusDesc.map(d => `   └ ${d}`).join(`\n`);
+        }
+
+        return {
+          damage: Math.floor(calcOutput.damage),
+          feint: Math.floor(calcOutput.feint),
+          breakdown: breakdownText,
+          feintBreakdown: "固定值",
+          neigongBonus: "",
+          cost: move.currentCost || { mp: 0, rage: 0, hp: 0 },
+          isWeaponMatch: true
+        };
+      }
+
+      // 2.2 纯固定值 (isFixed = false/undefined) -> 维持老逻辑，直接返回
       return {
         damage: Math.floor(moveBaseDmg),
         feint: 0,
@@ -1512,11 +1566,11 @@ export class XJZLItem extends Item {
 
       // --- 处理绝招特化减耗 (至少1) ---
       let finalRageCost = finalCost.rage;
-      if (move.isUltimate && finalRageCost > 0) { 
+      if (move.isUltimate && finalRageCost > 0) {
         const ultDiscount = costReductions?.ultimateRageDiscount?.total || 0;
         if (ultDiscount > 0) {
-            // 绝招特化减免，下限保底为 1
-            finalRageCost = Math.max(1, finalRageCost - ultDiscount);
+          // 绝招特化减免，下限保底为 1
+          finalRageCost = Math.max(1, finalRageCost - ultDiscount);
         }
       }
       finalCost.rage = finalRageCost;
