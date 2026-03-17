@@ -148,6 +148,7 @@ const processMoves = (rawMoves, bookReqs = "", defaultTier = null) => {
 
             // 5. 数值计算公式 (Calculation)
             calculation: {
+                isFixed: m.calculation?.isFixed || false, //默认 false
                 base: m.calculation?.base || 0,
                 growth: m.calculation?.growth || 0,
                 // 属性加成数组 [{prop: "liliang", ratio: 0.5}]
