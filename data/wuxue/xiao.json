@@ -1589,5 +1589,967 @@
                 ]
             }
         ]
+    },
+    {
+        "name": "霓裳羽衣剑舞",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>相传此曲乃玄宗望见女儿山后悠然神往，回宫后根据幻想所作，后被公孙大娘修改而成，使之更适合战斗。</p><p><strong>需求：</strong>剑-双剑 <strong>属性：</strong>阴</p>",
+            "requirements": "剑-双剑；【表演】到达4",
+            "moves": [
+                {
+                    "name": "王母挥袂",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>挥动宽大的袖子，剑鞘随之摆动，剑光闪烁间攻向敌人，造成伤害，击破架招则为其添加“惭愧”，持续一回合。</p><p><strong>惭愧：</strong>无法以状态添加者为攻击目标。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破架招后自动施加惭愧（嘲讽）。因机制限制，需玩家自觉遵守不攻击原施加者的规则。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shencai",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加惭愧",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"惭愧\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 心生惭愧！`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "回雪飘摇",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "4米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>双剑在空中快速挥动，划出一道道灵动的轨迹，似雪花飞舞，对周围敌人造成伤害。若自身存在‘剑舞’，每击中一名无架招敌人，可以回复一名友方单位自身 0.4 神采点气血。</p><p><strong>升级：</strong>招式伤害+10，回复气血+10，内力消耗+4。</p>",
+                    "automationNote": "命中且敌人无架招时，若自身有[剑舞]，将发送卡片提示可分配的治疗次数及每次的治疗量，请手动应用治疗。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shencai",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "剑舞回血判定",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const hasJianwu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianwu\");\nif (hasJianwu) {\n    let validHits = 0;\n    args.targets.forEach(t => {\n        if (t.isHit && !t.target.system.martial.stanceActive) {\n            validHits++;\n        }\n    });\n    if (validHits > 0) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const baseHeal = Math.floor(actor.system.stats.shencai.total * 0.4) + (lvl - 1) * 10;\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #4caf50; background:rgba(76,175,80,0.1); margin-left:2px;\"><b>回雪飘摇：</b><br>命中 ${validHits} 名无架招敌人，请手动选择友方回复气血 <b>${validHits}</b> 次，每次 <b>${baseHeal}</b> 点。</div></div>`\n        });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "上元点鬟",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>精心梳理发鬟，手持双剑在身前轻点。开启架招，格挡成功时，获得‘剑舞’，持续一回合。</p><p><strong>剑舞：</strong>你的反应动作可以当作主要动作使用。</p><p><strong>升级：</strong>格挡值+10，剑舞持续回合+1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。格挡后自动获得剑舞，持续时间动态成长。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6,
+                            8
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡获剑舞",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"剑舞\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        eff.duration = { rounds: lvl };\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "跳珠憾玉",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "周围5米友方",
+                    "actionCost": "全回合动作",
+                    "description": "<p>双剑交击，似玉佩撞击，发出清脆的声响，蕴含剑意。可移除周身 5m 范围友方单位身上一个状态。若自身存在‘剑舞’，消耗动作降低一级。</p><p><strong>升级：</strong>释放动作降低一级（手动应用），内力消耗+5。</p>",
+                    "automationNote": "手动。施展后会发送卡片提示移除友方状态，以及动作降级的情况。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "驱散提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const hasJianwu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianwu\");\nconst lvl = Math.max(1, move.computedLevel || 1);\nlet actionNote = \"消耗: \";\nif (hasJianwu) {\n    actionNote += \"已降低 1 级 (因剑舞)\";\n} else {\n    actionNote += \"全回合动作\";\n}\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #03a9f4; background:rgba(3,169,244,0.1); margin-left:2px;\"><b>跳珠憾玉：</b><br>${actionNote}<br>请手动移除 5m 范围内友方的一个状态！</div></div>`\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "缤纷落英",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>轻灵地向前跃起，双剑在空中划出优美的弧线，剑身闪烁着光芒，如同落英纷飞。对周围敌人造成伤害。造成伤害后获得‘剑舞’，持续一回合。若自身已存在‘剑舞’，则额外造成自身神采点精神伤害，同时与被命中敌人进行一次‘定力’对抗，获胜则敌人被迷住，陷入走火入魔，持续一回合。</p><p><strong>升级：</strong>招式伤害+20，剑舞持续回合+1，定力对抗结果+2，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "命中且造成伤害自动处理剑舞获取、额外精神伤害、并发起定力对抗（包含随等级提升的对抗加值）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "shencai",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24,
+                            32
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5,
+                            4
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "落英效果",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const hasJianwu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianwu\");\n    if (hasJianwu) {\n        // 额外精神伤害\n        const shencai = actor.system.stats.shencai.total;\n        await args.target.applyDamage({ amount: shencai, type: \"mental\", attacker: actor, isHit: true });\n        \n        // 定力对抗\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const contestBonus = (lvl - 1) * 2;\n        await Macros.requestContest({\n            attacker: actor,\n            defender: args.target,\n            type: \"dingli\",\n            label: `缤纷落英 (我方对抗+${contestBonus})`,\n            outcome: {\n                win: {\n                    text: \"被舞姿迷住，走火入魔！\",\n                    targetEffect: { id: \"rage\", duration: { rounds: 1 } }\n                },\n                lose: { text: \"目标心如止水。\" }\n            }\n        });\n    }\n}"
+                        },
+                        {
+                            "label": "命中获剑舞",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (args.hitCount > 0) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"剑舞\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        eff.duration = { rounds: lvl }; // 基础1 + (lvl-1)\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "惭愧",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "无法以状态添加者为攻击目标。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "cankui"
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "剑舞",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "你的反应动作可以当作主要动作使用。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jianwu"
+                    }
+                },
+                "changes": []
+            }
+        ]
+    },
+    {
+        "name": "霓裳飘飘",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "sanshou",
+            "isOfficial": false,
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>霓裳飘飘，舞动乾坤。</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "【表演】到达 3",
+            "moves": [
+                {
+                    "name": "霓裳飘飘",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>舞者双手持剑，在身前轻轻挥舞，如同霓裳羽衣般飘逸，使自身获得“霓裳”状态，持续三回合，内外功防御+2，速度+1。</p><p><strong>升级：</strong>内外功防御+2，速度+1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。基于等级动态赋予防、速加成。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得霓裳",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst defBonus = lvl * 2;\nconst spdBonus = lvl * 1;\n\nconst eff = foundry.utils.deepClone(thisItem.effects.getName(\"霓裳\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 3 };\n    eff.changes.find(c => c.key === \"system.combat.def_waigong\").value = String(defBonus);\n    eff.changes.find(c => c.key === \"system.combat.def_neigong\").value = String(defBonus);\n    eff.changes.find(c => c.key === \"system.combat.speed\").value = String(spdBonus);\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "霓裳",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "内外功防御、速度提升。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "nishang"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "0"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "0"
+                    },
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "0"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "幻影剑舞",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "sanshou",
+            "isOfficial": false,
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>剑舞幻影，灵动飘逸，如梦似幻，以剑舞之姿迷惑敌人。</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "【表演】到达 5",
+            "moves": [
+                {
+                    "name": "幻影剑舞",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "none",
+                    "range": "6米",
+                    "targetInfo": "路径",
+                    "actionCost": "主要动作",
+                    "description": "<p>舞者轻点脚尖，跃至 6m 内一处空地，手中双剑在身侧快速划出优美的弧线，剑尖闪烁着寒光，对经过的目标造成 0.5 神采点内功伤害，受到伤害后，目标陷入“幻影”状态，持续一回合，使其攻击命中-10，且命中劣势。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+3。</p>",
+                    "automationNote": "完全自动化。造成伤害自动施加幻影。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "shencai",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            3,
+                            6,
+                            9,
+                            12
+                        ],
+                        "rage": [
+                            1,
+                            1,
+                            1,
+                            1
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加幻影",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const eff = foundry.utils.deepClone(thisItem.effects.getName(\"幻影\"));\n    if (eff) {\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "幻影",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "命中-10，命中劣势。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huanying"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "flags.xjzl-system.attackLevel",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "霓裳翩跹",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "qinggong",
+            "isOfficial": false,
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>霓裳翩跹，剑舞九天，翩若惊鸿，婉若游龙。</p><p>七秀轻功，剑舞身法，灵动飘逸，姿态万千。融合七秀坊剑舞的灵动与优雅，在战斗中如翩翩仙子，既能快速闪避敌人攻击，又能以优美的姿态反击，是七秀坊弟子的招牌轻功。</p><p><strong>效果：</strong>你的速度+2。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "霓裳翩跹",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双剑划出优雅弧线，身体轻盈跃起，如同霓裳羽衣舞动，获得“翩跹”状态，持续两回合。</p><p><strong>翩跹：</strong>移动速度提高 5 米，且在移动过程中可留下剑光残影，残影可对敌人造成自身神采点精神伤害。</p>",
+                    "automationNote": "被动速度加成及主动翩跹状态自动赋予。移动留残影的伤害需手动触发和应用。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "被动速度",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "if ((args.move.computedLevel || 0) >= 1) {\n    actor.system.combat.speed += 2;\n}"
+                        },
+                        {
+                            "label": "获得翩跹",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const eff = foundry.utils.deepClone(thisItem.effects.getName(\"翩跹\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "翩跹",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "移动速度提高 5 米，移动中残影可对敌人造成精神伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "pianxian",
+                        "scripts": [
+                            {
+                                "label": "残影伤害提示",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "const shencai = actor.system.stats.shencai.total;\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #9c27b0; background:rgba(156,39,176,0.1); margin-left:2px;\"><b>翩跹残影：</b><br>移动过程中可留下剑光残影。<br>请手动对触碰残影的敌人造成 <b>${shencai}</b> 点精神伤害。</div></div>`\n});"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "断天命",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "isOfficial": false,
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>白良玉所创之剑法，勇往无前之剑，使用者要心中有着天下无物不可斩的信念，斩天命，破岁月。</p><p><strong>需求：</strong>剑-单剑 <strong>属性：</strong>太极</p>",
+            "requirements": "剑-单剑",
+            "moves": [
+                {
+                    "name": "斩万物",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>内力灌注武器。获得“断”状态，持续一回合。在此状态下，招式伤害无视内功防御，攻击距离+4，且最多可以选中三个目标。</p><p><strong>升级：</strong>‘断’持续回合+1，攻击距离+2，内力消耗+10。</p>",
+                    "automationNote": "点击获得“断”状态（自动计算回合数并赋予无视防御效果）。距离增加和多目标选择需手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [
+                            2,
+                            2,
+                            2,
+                            2
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得断状态",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"断\").toObject();\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                        }
+                    ]
+                },
+                {
+                    "name": "绝生机",
+                    "type": "feint",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "4米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>挥舞刺出，剑尖绽放出剑气。对目标造成 0.6 内息点内功伤害。击破架招，目标陷入“禁疗”状态，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4，合一后“禁疗”额外持续一回合。</p>",
+                    "automationNote": "击破架招后自动给目标施加禁疗，合一等级自动延长回合。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破禁疗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl >= 4 ? 1 : 0);\n    const jinliao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinliao\"));\n    if (jinliao) {\n        jinliao.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, jinliao);\n        ui.notifications.info(`${args.target.name} 被击破架招，陷入禁疗！`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "破万法",
+                    "type": "counter",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "8米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破敌人的虚招时，可消耗反应动作施展此招，剑气穿刺，压制虚招，对目标造成 0.8 内息点内功伤害，并可以消除目标身上一个状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "命中后发送卡片提示手动消除目标状态。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.8
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "消除状态提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #3498db;\"><p><b>破万法触发</b><br>请手动选择并消除目标 <b>${args.target.name}</b> 身上的一个状态。</p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "除厄运",
+                    "type": "real",
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>汇聚内力，斩出一道气芒。对目标造成 0.7 内息点内功伤害。命中无架招目标后自身处于‘断’状态，自身进入“幸”状态，持续一回合。</p><p><strong>幸：</strong>任意对抗具有优势。</p><p>当有人在半空中，可消耗反应动作原地释放气浪攻击并击落敌人。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4，合一后“幸”额外持续一回合。</p>",
+                    "automationNote": "命中且目标无架招且自身有[断]时自动获得[幸]状态（回合自动计算）。[幸]的对抗优势需手动。反应动作击落会发送聊天卡片提示手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "状态获取与提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    if (!args.target.system.martial.stanceActive) {\n        const hasDuan = actor.effects.some(e => e.name === \"断\");\n        if (hasDuan) {\n            const lvl = Math.max(1, move.computedLevel || 1);\n            const rounds = 1 + (lvl >= 4 ? 1 : 0);\n            const eff = thisItem.effects.getName(\"幸\").toObject();\n            eff.duration = { rounds: rounds };\n            game.xjzl.api.effects.addEffect(actor, eff);\n        }\n    }\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #e67e22;\"><p><b>除厄运·气浪击落</b><br>若目标在半空中，可消耗反应动作释放气浪将其击落（请手动扣除反应动作及施加倒地状态）。</p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "断天命",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>将‘气’与‘意’完美融合，发出最为强大的一击。对目标造成 0.9 内息点内功伤害。造成伤害后同敌人进行武学内功对抗，成功则对该敌人招式必中，且暴击伤害提高 20%，持续到战斗结束。</p><p><strong>升级：</strong>招式伤害+20，武学内功对抗结果+1，暴击伤害提高 10%，内力消耗+10，怒气-1。</p>",
+                    "automationNote": "造成伤害后自动请求武学内功对抗，成功后自动给目标施加包含暴伤加深的AE（受击暴击时自动增伤）。[必中]效果请在之后攻击该目标时手动勾选。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.9
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "对抗与锁定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const critBonus = 0.2 + (lvl - 1) * 0.1;\n    \n    const eff = thisItem.effects.getName(\"断天命锁定\").toObject();\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.critBonus\", critBonus);\n    eff.description += ` (受到原施加者暴击时承受额外 ${Math.round(critBonus * 100)}% 基础伤害)`;\n    \n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"wuxue\",\n        label: \"断天命 - 武学对抗\",\n        outcome: {\n            win: {\n                text: `对抗胜利！对 ${args.target.name} 的招式必中(请手动勾选)，且暴击伤害提升。`,\n                targetEffect: eff\n            },\n            lose: {\n                text: \"对抗失败。\"\n            }\n        }\n    });\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "断",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "招式伤害无视内功防御，攻击距离+4，最多可选三个目标(距离与多目标需手动)。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "duan",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.ignoreDefense",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            },
+            {
+                "name": "幸",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "任意对抗具有优势 (请手动应用)。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xing",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "断天命锁定",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "原施加者对你招式必中 (攻击者需手动勾选)。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "duantianming_lock",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "暴伤加深",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "const originActorUuid = thisEffect.origin.split('.Item.')[0];\nif (args.attacker && args.attacker.uuid === originActorUuid) {\n    if (args.isCrit) {\n        const critBonus = thisEffect.getFlag('xjzl-system', 'critBonus') || 0.2;\n        const extra = Math.floor(args.baseDamage * critBonus);\n        args.output.damage += extra;\n        actor.showFloatyText('天命暴杀', { fill: '#ff0000', fontSize: 24 });\n    }\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
+    },
+    {
+        "name": "长生锻骨",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "sanshou",
+            "isOfficial": false,
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>姜家先祖观长生图谱所悟，“长生之躯，万法不侵”。一组古怪的健身动作，不明所以。</p><p><strong>需求：</strong>10000 修为（不可升级）。</p><p><strong>异常抵抗：</strong>练成后，受到特殊伤害死亡检定前（残疾检定后，死亡检定前），回复 100 气血，100 内力，不用进行死亡检定，同时永久免疫该特殊伤害。（仅一次）</p><p>·若受到内外功伤害死亡检定前，同样回复 100 气血，100 内力，不用进行死亡检定，但不免疫内外功伤害。（仅一次）</p><p>·悟性+1</p>",
+            "requirements": "10000 修为",
+            "moves": [
+                {
+                    "name": "长生锻骨",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "被动",
+                    "description": "<p>受到特殊伤害死亡检定前（残疾检定后，死亡检定前），回复 100 气血，100 内力，不用进行死亡检定，同时永久免疫该特殊伤害。（仅一次）</p><p>·若受到内外功伤害死亡检定前，同样回复 100 气血，100 内力，不用进行死亡检定，但不免疫内外功伤害。（仅一次）</p><p>·悟性+1</p>",
+                    "automationNote": "悟性加成自动生效。濒死免死提示自动触发，因为“仅一次”和“永久免疫”由玩家决定是否使用，所以完全手动应用恢复和免疫记录。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            10000
+                        ]
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "悟性+1",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "S.stats.wuxing.mod += 1;"
+                        },
+                        {
+                            "label": "免死提示",
+                            "trigger": "dying",
+                            "active": true,
+                            "script": "if (args.preventDying) return;\nconst isSpecial = ![\"waigong\", \"neigong\"].includes(args.type);\nlet msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left:5px;\"><p><b><i class=\"fas fa-heartbeat\"></i> 长生锻骨触发！</b></p><p>你可以选择免除本次濒死/死亡，回复100气血与100内力。</p>`;\nif (isSpecial) {\n    msg += `<p style=\"color:#8b0000;\"><b>特别注意：</b>若你使用此效果，你将永久免疫该特殊伤害 [${args.type}]，请手动记录！（此效果仅触发一次）</p>`;\n} else {\n    msg += `<p style=\"color:#8b0000;\"><b>特别注意：</b>此免死效果仅可使用一次，请手动记录！</p>`;\n}\nmsg += `</div></div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });"
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    {
+        "name": "影色舞",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "qinggong",
+            "isOfficial": false,
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>自在门人所创轻功，身融于影，潜影无声，行动自如，乃渗透、潜行之优良法门。</p><p>·你的速度+2，先攻+1。</p><p>·处于无光之处时[潜行]优势，命中与伤害获得等同于[潜行]技能数值的加值。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "影色舞",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "被动",
+                    "description": "<p>·你的速度+2，先攻+1。</p><p>·处于无光之处时[潜行]优势，命中与伤害获得等同于[潜行]技能数值的加值。</p>",
+                    "automationNote": "基础速度与先攻加成自动生效。无光环境下的潜行优势及命中、伤害加成已在AE中完全实现，请在无光时手动在角色界面开启【影色舞·无光】特效。",
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "被动速度先攻",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "S.combat.speed += 2;\nS.combat.initiative += 1;"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "影色舞·无光",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "处于无光之处，潜行获得优势。命中与伤害获得等同于[潜行]数值的加值。",
+                "transfer": true,
+                "disabled": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yingsewu_wuguang",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "无光加成",
+                                "trigger": "passive",
+                                "active": true,
+                                "script": "const qianxing = S.skills.qianxing.total || 0;\nS.combat.hit_waigong += qianxing;\nS.combat.hit_neigong += qianxing;\nS.combat.damages.global.mod += qianxing;"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.qianxingCheckLevel",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "九霄云梯",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "category": "qinggong",
+            "isOfficial": false,
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>“身化灵鹤冲九霄，踏云登梯任逍遥。” 此轻功运转时，身形飘忽如云中仙鹤，可在虚空中幻化出层层云梯，借力腾空而起，穿梭于天地之间，仿若能触及那九霄云层，超凡脱俗，灵动异常。</p>",
+            "requirements": "",
+            "moves": [
+                {
+                    "name": "九霄云梯",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p><strong>效果：</strong>速度 +3</p><p>施展时，先以特殊呼吸法门引气归元，再以足尖轻点地面，念动真言，瞬间在身前幻化出一道虚幻云梯。消耗主要动作，不消耗移动速度，让自己沿着云梯腾空跃起（最高 15 米），并在空中做出一次 8 米横向移动，整个过程中处于“云游”状态。</p><p><strong>云游：</strong>处于该状态时，攻击你的命中劣势。</p>",
+                    "automationNote": "被动速度加成自动生效。主动使用扣除内力并获得一回合的[云游]状态，空中移动请玩家手动在地图上执行。",
+                    "costs": {
+                        "mp": [
+                            10
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "scripts": [
+                        {
+                            "label": "被动速度",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "S.combat.speed += 3;"
+                        },
+                        {
+                            "label": "施展云游",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"云游\").toObject();\neff.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left:5px;\"><b>九霄云梯：</b>腾空跃起最高 15 米，并在空中进行一次 8 米横向移动（不消耗移动速度，请手动移动Token）。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "云游",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "处于该状态时，攻击你的命中劣势。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yunyou",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.grantAttackLevel",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            }
+        ]
     }
 ]

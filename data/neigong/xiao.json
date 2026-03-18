@@ -736,5 +736,227 @@
                 }
             ]
         }
+    },
+    {
+        "name": "《冰玉诀》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "tier": 2,
+            "element": "yin",
+            "sect": "jianghushili",
+            "description": "<p>练成后飘逸轻盈，若九天飞仙，且攻势凌厉，厉害非常。据传乃是唐时公孙大娘之师所创，旁人问及，大娘只是笑而不答。</p>",
+            "requirement": "悟性：4",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 4,
+                        "shenfa": 10,
+                        "tipo": 6,
+                        "neixi": 6,
+                        "qigan": 6,
+                        "shencai": 16
+                    },
+                    "description": "无运功特效。"
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 8,
+                        "shenfa": 20,
+                        "tipo": 12,
+                        "neixi": 12,
+                        "qigan": 12,
+                        "shencai": 32
+                    },
+                    "description": "每次出招后，获得一层“冰玉”，持续到战斗结束。",
+                    "scripts": [
+                        {
+                            "label": "获得冰玉(小成)",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const eff = foundry.utils.deepClone(thisItem.effects.getName(\"冰玉\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff, 1);\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 12,
+                        "shenfa": 30,
+                        "tipo": 18,
+                        "neixi": 18,
+                        "qigan": 18,
+                        "shencai": 48
+                    },
+                    "description": "每次出招后，获得三层“冰玉”，持续到战斗结束。",
+                    "scripts": [
+                        {
+                            "label": "获得冰玉(圆满)",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const eff = foundry.utils.deepClone(thisItem.effects.getName(\"冰玉\"));\nif (eff) {\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff, 3);\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "气血+30，内力+30，神采+5，练成后冰肌玉骨，肤白貌美。",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 30
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 30
+                },
+                {
+                    "key": "stats.shencai.mod",
+                    "value": 5
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "冰玉",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
+                "description": "出招时可消耗‘冰玉’，每消耗一层“冰玉”，招式伤害+5。消耗三层“冰玉”，移除自身一个不想要的状态。（消耗三层时，增伤和移除状态二选一）",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "bingyu",
+                        "stackable": true,
+                        "scripts": [
+                            {
+                                "label": "冰玉抉择",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "const stacks = thisEffect.stacks;\nif (stacks > 0) {\n    let content = `<p>当前拥有 ${stacks} 层 <b>冰玉</b>。</p><p>请选择消耗方式：</p>`;\n    content += `<div style=\"margin-bottom:5px;\"><label>消耗层数加伤(每层+5)：</label><input type=\"number\" id=\"dmgStacks\" value=\"0\" min=\"0\" max=\"${stacks}\"></div>`;\n    if(stacks >= 3) {\n        content += `<div><label><input type=\"checkbox\" id=\"removeStatus\"> 消耗3层移除一个状态 (互斥)</label></div>`;\n    }\n    const result = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"冰玉抉择\" },\n        content: content,\n        ok: {\n            callback: (ev, btn) => {\n                const form = btn.form;\n                const dmgStacks = parseInt(form.querySelector(\"#dmgStacks\").value) || 0;\n                const removeStatus = form.querySelector(\"#removeStatus\")?.checked || false;\n                return { dmgStacks, removeStatus };\n            }\n        },\n        rejectClose: false\n    });\n    if (result) {\n        let consumed = 0;\n        if (result.removeStatus && stacks >= 3) {\n            consumed = 3;\n            ChatMessage.create({\n                speaker: ChatMessage.getSpeaker({actor: actor}),\n                content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #00ffff; background:rgba(0,255,255,0.1); margin-left:2px;\"><b>冰玉净化：</b><br>已消耗3层冰玉，请手动移除自身一个不想要的状态。</div></div>`\n            });\n        } else if (result.dmgStacks > 0) {\n            consumed = Math.min(result.dmgStacks, stacks);\n            const bonus = consumed * 5;\n            args.flags.damageResult.damage += bonus;\n            args.flags.damageResult.breakdown += `\\n+ 冰玉加伤: ${bonus} (消耗 ${consumed} 层)`;\n            ui.notifications.info(`消耗 ${consumed} 层冰玉，招式伤害 +${bonus}`);\n        }\n        if (consumed > 0) {\n            await game.xjzl.api.effects.removeEffect(actor, \"bingyu\", consumed);\n        }\n    }\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "《云华心经》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+        "system": {
+            "isOfficial": false,
+            "tier": 3,
+            "element": "yin",
+            "sect": "jianghushili",
+            "description": "<p>七绣坊顶级心法，此功舞乐相合，水乳交融。若凤鸣、若蝶舞、若莺啼、若雨滴，观之怡情，赏之悦目。不仅能令自身精神振奋，亦可增益他人。</p>",
+            "requirement": "悟性：15",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 10,
+                        "shenfa": 30,
+                        "tipo": 10,
+                        "neixi": 15,
+                        "qigan": 25,
+                        "shencai": 30
+                    },
+                    "description": "进战后获得‘花月’，持续到战斗结束。",
+                    "scripts": [
+                        {
+                            "label": "花月提示(领悟)",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c2185b; margin-left:2px;\"><b>《云华心经》：</b>战斗开始，请手动为自己添加 [花月] 状态。</div></div>`});"
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 20,
+                        "shenfa": 60,
+                        "tipo": 20,
+                        "neixi": 30,
+                        "qigan": 50,
+                        "shencai": 60
+                    },
+                    "description": "进战后获得‘花月’，持续到战斗结束，可额外选择一个人获得‘花月’。",
+                    "scripts": [
+                        {
+                            "label": "花月提示(小成)",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c2185b; margin-left:2px;\"><b>《云华心经》：</b>战斗开始，请手动为自己及额外 1 名队友添加 [花月] 状态。</div></div>`});"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 90,
+                        "tipo": 30,
+                        "neixi": 45,
+                        "qigan": 75,
+                        "shencai": 90
+                    },
+                    "description": "进战后获得‘花月’，持续到战斗结束，可额外选择两个人获得‘花月’。",
+                    "scripts": [
+                        {
+                            "label": "花月提示(圆满)",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c2185b; margin-left:2px;\"><b>《云华心经》：</b>战斗开始，请手动为自己及额外 2 名队友添加 [花月] 状态。</div></div>`});"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "增加气血 60，内力 60 点，神采+10。",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "stats.shencai.mod",
+                    "value": 10
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "花月",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+                "description": "回合末回复 5 点气血，5 点内力。每次出招额外造成自身 0.4 神采点的精神伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huayue",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "花月精神伤害",
+                                "trigger": "hit",
+                                "active": true,
+                                "script": "if (args.isHit && args.type !== \"buff\" && args.type !== \"heal\") {\n    const dmg = Math.floor(actor.system.stats.shencai.total * 0.4);\n    if (dmg > 0) {\n        await args.target.applyDamage({ amount: dmg, type: \"mental\", attacker: actor, isHit: true });\n        actor.showFloatyText(`花月伤害: ${dmg}`, {fill: \"#e91e63\"});\n    }\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
     }
 ]
