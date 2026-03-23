@@ -321,132 +321,9 @@
             "category": "wuxue",
             "sect": "jianghushili",
             "tier": 2,
-            "description": "<p>一套诡异的双刀技法，适合身材娇小之人施展，可在战阵中闪转腾挪，刀过如雀飞，眨眼取人性命。</p>",
-            "requirements": "",
+            "description": "<p>一套诡异的双刀技法，适合身材娇小之人施展，可在战阵中闪转腾挪，刀过如雀飞，眨眼取人性命。</p><p><strong>需求：</strong>刀-双刀</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "刀-双刀",
             "moves": [
-                {
-                    "name": "百鸟遗风",
-                    "type": "counter",
-                    "element": "yin",
-                    "damageType": "neigong",
-                    "weaponType": "blade",
-                    "range": "范围",
-                    "targetInfo": "周围所有敌人",
-                    "actionCost": "反应动作",
-                    "description": "<p>-白鹤之鸟，展舒羽翼- 看破虚招时，消耗反应，双刀聚气，而后刀气爆发，散成碎片，对周围所有敌人造成0.4力量+0.4内息点内功伤害。<br>·每有一层“聚气”，此招式范围+1<br>·若你存在“轻灵”状态，你可以直接旋身踏步，掠至目标位置，招式攻击路径范围内所有敌人。<br><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害计算自动。位移需手动。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.4
-                            },
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.4
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            4,
-                            8,
-                            12
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "范围与位移提示",
-                            "trigger": "calc",
-                            "script": "const juqi = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'juqi');\nconst stacks = juqi ? (juqi.getFlag('xjzl-system', 'stacks') || 1) : 0;\nconst range = 1 + stacks;\nargs.output.bonusDesc.push(`当前范围: ${range}米 (聚气加成)`);\nconst qingling = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'qingling');\nif (qingling) args.output.bonusDesc.push('轻灵激活：可掠至目标位置并攻击路径敌人。');",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "千秋飞历",
-                    "type": "real",
-                    "element": "yin",
-                    "damageType": "neigong",
-                    "weaponType": "blade",
-                    "range": "范围",
-                    "targetInfo": "周围所有敌人",
-                    "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，刀光翻飞，对周围所有敌人造成0.3力量+0.3内息点内功伤害，击中未招架敌人时，你可以消耗至多三层“聚气”，给目标添加等层数的“流血”，持续到战斗脱离。<br>若你存在“轻灵”状态，此招可以在移动中施展，攻击路径范围内所有敌人。<br><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "命中未招架敌人时，弹窗询问消耗聚气施加流血。移动施展手动。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.3
-                            },
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.3
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            2,
-                            6,
-                            10
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "聚气化血",
-                            "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const juqi = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'juqi');\n    if (juqi) {\n        const currentStacks = juqi.getFlag('xjzl-system', 'stacks') || 1;\n        const maxSpend = Math.min(currentStacks, 3);\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: '千秋飞历' },\n            content: `<p>击中未招架敌人！是否消耗至多 ${maxSpend} 层聚气施加流血？</p>`,\n            rejectClose: false\n        });\n        if (confirm) {\n            await game.xjzl.api.effects.removeEffect(actor, 'juqi', maxSpend);\n            const bleedData = CONFIG.statusEffects.find(e => e.id === 'bleed_stack');\n            await game.xjzl.api.effects.addEffect(args.target, bleedData, maxSpend);\n            ui.notifications.info(`${actor.name} 消耗 ${maxSpend} 层聚气，使目标流血！`);\n        }\n    }\n}",
-                            "active": true
-                        }
-                    ]
-                },
-                {
-                    "name": "太白噬月",
-                    "type": "feint",
-                    "element": "yin",
-                    "damageType": "neigong",
-                    "weaponType": "blade",
-                    "range": "1米",
-                    "targetInfo": "单体",
-                    "actionCost": "主要动作",
-                    "description": "<p>主要动作，双刀斩出四道刀气，直指天池、天枢要害，对目标造成0.3力量+0.2内息点内功伤害，若击破目标招架，获得一层“轻灵”，持续到战斗结束。<br>轻灵：每层使你的闪避+5。<br><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破架招自动获得轻灵。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.3
-                            },
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.2
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "身轻如燕",
-                            "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === 'qingling');\n    if(eff) await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
-                        }
-                    ]
-                },
                 {
                     "name": "箕子授书",
                     "type": "stance",
@@ -456,8 +333,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>次要动作，双刀归鞘，气沉似海，开启架招。格挡成功后，获得一层“聚气”，持续到战斗脱离。<br>聚气：每层使你回合末回复 5 点内力。<br><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡成功自动获得聚气。",
+                    "description": "<p>双刀归鞘，气沉似海，开启架招。格挡成功后，获得一层“聚气”，持续到战斗脱离。</p><p><strong>聚气：</strong>每层使你回合末回复 5 点内力。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。格挡成功自动获得聚气。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -473,13 +350,231 @@
                         {
                             "label": "格挡聚气",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = CONFIG.statusEffects.find(e => e.id === 'juqi');\n    if(eff) await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = thisItem.effects.getName(\"聚气\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "太白噬月",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>刀劈周身要害，对目标造成 0.3 力量+0.3 内息点内功伤害，击破架招时，获得一层“轻灵”，持续到战斗结束。</p><p><strong>轻灵：</strong>每层使你的闪避+5。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破架招自动获得轻灵。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破轻灵",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"轻灵\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "千秋飞历",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "3米",
+                    "targetInfo": "周围所有敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>刀光翻飞，劈出四道刀气，对周围所有敌人造成 0.3 力量+0.3 内息点内功伤害。</p><p>·若你存在“轻灵”，此招可移动释放，对移动路径上周围 3 米范围内的敌人造成伤害。（不会重复造成伤害）</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害计算自动。移动施展请配合模组或手动框选路径目标。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.3
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "轻灵移动提示",
+                            "trigger": "calc",
+                            "script": "const qingling = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'qingling');\nif (qingling) args.output.bonusDesc.push('【轻灵】激活：可移动释放，攻击路径周围 3 米内所有敌人。');",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "百鸟遗风",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "5米",
+                    "targetInfo": "周围2米所有敌人",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，刀气凌厉四溢，对自身周围 2 米所有敌人造成 0.4 力量+0.4 内息点内功伤害。</p><p>·若你存在“轻灵”，可旋身踏步，不消耗速度掠至目标位置，招式攻击路径范围内所有敌人。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害计算自动。踏步位移需手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            6,
+                            10
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "轻灵突进提示",
+                            "trigger": "calc",
+                            "script": "const qingling = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'qingling');\nif (qingling) args.output.bonusDesc.push('【轻灵】激活：可无消耗掠至目标位置，攻击路径范围内敌人。');",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "凤凰山鸣",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "blade",
+                    "range": "2米",
+                    "targetInfo": "周围所有敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>刀现惊芒，聚气爆发，对周围所有敌人造成 0.5 力量+0.4 内息点内功伤害，并击飞 5 米。</p><p>·每有一层“聚气”，此招式范围+1。</p><p>·击中无架招敌人时，可消耗至多三层“聚气”，给敌人添加等层数的“流血”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+8。</p>",
+                    "automationNote": "范围加成自动计算并提示。命中无架招目标弹窗询问消耗聚气施加流血。击飞请手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "聚气范围加成",
+                            "trigger": "calc",
+                            "script": "const juqi = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'juqi');\nconst stacks = juqi ? (juqi.getFlag('xjzl-system', 'stacks') || 1) : 0;\nif(stacks > 0) args.output.bonusDesc.push(`【聚气】范围加成: +${stacks} 米`);",
+                            "active": true
+                        },
+                        {
+                            "label": "消耗聚气与击飞提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    ui.notifications.info(`请手动将 ${args.target.name} 击飞 5 米。`);\n    if (!args.target.system.martial.stanceActive) {\n        const juqi = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'juqi');\n        if (juqi) {\n            const currentStacks = juqi.getFlag('xjzl-system', 'stacks') || 1;\n            const maxSpend = Math.min(currentStacks, 3);\n            const confirm = await foundry.applications.api.DialogV2.confirm({\n                window: { title: '凤凰山鸣' },\n                content: `<p>击中未招架敌人！是否消耗至多 ${maxSpend} 层聚气施加流血？</p>`,\n                rejectClose: false\n            });\n            if (confirm) {\n                await game.xjzl.api.effects.removeEffect(actor, 'juqi', maxSpend);\n                const bleedData = CONFIG.statusEffects.find(e => e.id === 'bleed_stack');\n                if(bleedData) await game.xjzl.api.effects.addEffect(args.target, bleedData, maxSpend);\n                ui.notifications.info(`${actor.name} 消耗 ${maxSpend} 层聚气，使目标流血！`);\n            }\n        }\n    }\n}",
                             "active": true
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "聚气",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "回合末回复内力。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "juqi",
+                        "stackable": true,
+                        "maxStacks": 0
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "轻灵",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "提升闪避值。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qingling",
+                        "stackable": true,
+                        "maxStacks": 0
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "兴霸刀法",
@@ -578,11 +673,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "blade",
-                    "range": "1米",
+                    "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，闪身突至目标身前，提刀扫腰，对目标造成0.5力量点外功伤害。<br>若有敌人在你的招式范围内攻击其他友方角色，你可以消耗一层“绵劲”和反应动作，施展此招攻击该敌人。<br><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "伤害计算自动。反应施展需手动。",
+                    "description": "<p>闪身突至目标身前，提刀扫腰，对目标造成 0.5 力量点外功伤害，击中未招架目标时，使目标陷入“错骨”，持续三回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。击中未招架目标自动施加错骨 3 回合。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -600,7 +695,14 @@
                             6
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "未招架错骨",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'cuogu'));\n    if (eff) {\n        eff.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "耽罗屏",
