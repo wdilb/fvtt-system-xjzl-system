@@ -17,7 +17,7 @@ const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2) {
-  
+
   /**
    *  核心配置 (V13 Standard)
    */
@@ -25,15 +25,15 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     tag: "form",
     id: "xjzl-damage-tool",
     // 样式类名：xjzl-window (通用窗口样式), damage-tool (本窗口专用)
-    classes: ["damage-tool", "theme-dark"], 
-    position: { 
-      width: 420, 
-      height: "auto" 
+    classes: ["damage-tool", "theme-dark"],
+    position: {
+      width: 420,
+      height: "auto"
     },
-    window: { 
-      title: "⚔️ 通用伤害工具", 
+    window: {
+      title: "⚔️ 通用伤害工具",
       icon: "fas fa-meteor", // 陨石图标，代表天降伤害
-      resizable: false 
+      resizable: false
     },
     actions: {
       // 绑定按钮动作
@@ -45,8 +45,8 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
    *  模板定义
    */
   static PARTS = {
-    form: { 
-      template: "systems/xjzl-system/templates/apps/damage-tool.hbs" 
+    form: {
+      template: "systems/xjzl-system/templates/apps/damage-tool.hbs"
     }
   };
 
@@ -58,13 +58,28 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     // 获取伤害类型配置 (包含 Key 和 本地化 Key)
     // 格式: { waigong: "XJZL.Damage.Waigong", ... }
     const damageTypes = {};
-    
+
     for (const [key, labelKey] of Object.entries(CONFIG.XJZL.damageTypes)) {
       damageTypes[key] = game.i18n.localize(labelKey);
     }
 
+    // === 获取当前场景中进入战斗的 Token ===
+    const combatants = [];
+    if (game.combat && game.combat.combatants) {
+      game.combat.combatants.forEach(c => {
+        // 过滤掉没有 Actor 的无效 combatant
+        if (c.actor) {
+          combatants.push({
+            id: c.actor.id,
+            name: c.name // 默认使用 combatant 的名字（通常等于 Token 名字）
+          });
+        }
+      });
+    }
+
     return {
       damageTypes: damageTypes,
+      combatants: combatants, // 传入 Token 列表
       // 默认选中的类型
       defaultType: "waigong",
       // 默认理由
@@ -81,14 +96,19 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
    */
   async _onApply(event, target) {
     event.preventDefault();
-    
+
     // 1. 获取表单数据 (使用 FormData API)
     const formData = new FormData(this.element);
-    
+
     const amount = parseInt(formData.get("amount")) || 0;
     const type = formData.get("type");
     const reason = formData.get("reason") || "神秘伤害";
-    
+    const attackerId = formData.get("attackerId");
+    let attackerActor = null;
+    if (attackerId && attackerId !== "none") {
+      attackerActor = game.actors.get(attackerId);
+    }
+
     // 获取开关状态 (checkbox 在 formData 中仅当选中时存在且为 "on")
     const config = {
       ignoreDefense: formData.get("ignoreDefense") === "on",
@@ -118,12 +138,12 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     for (const token of tokens) {
       // 容错：万一选中了个没有 Actor 的 Token (虽少见但存在)
       if (!token.actor) continue;
-      
+
       // 逻辑：Token 名字 > Actor 名字
       const displayName = token.name || token.actor.name;
-      
+
       // 注意：这里传 token.actor 以便调用方法，同时传 displayName
-      await this._applyToActor(token.actor, amount, type, reason, config, displayName, token);
+      await this._applyToActor(token.actor, amount, type, reason, config, displayName, token, attackerActor);
     }
 
     // 提示完成
@@ -133,14 +153,14 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
   /**
    *  内部核心：单体应用逻辑
    */
-  async _applyToActor(actor, amount, type, reason, config, displayName, token) {
+  async _applyToActor(actor, amount, type, reason, config, displayName, token, attackerActor) {
     try {
       // 1. 调用 Actor 核心伤害接口
       // 注意：attacker 传 null，代表无来源/环境
       const result = await actor.applyDamage({
         amount: amount,
         type: type,
-        attacker: null, 
+        attacker: attackerActor,
         isHit: true,        // 默认命中
         isCrit: config.isCrit,
         applyCritDamage: config.applyCritDamage,
@@ -150,7 +170,6 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         ignoreStance: config.ignoreStance,
         isSkill: config.isSkill
       });
-      console.log(result);
 
       // 2. 准备聊天卡片数据 (复用 damage-card.hbs)
       // 获取 Token 图片用于显示，如果没有 Token 则用 Actor 头像
@@ -169,7 +188,6 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         rageGained: result.rageGained,
         isCrit: config.isCrit
       };
-      console.log(templateData);
 
       const content = await renderTemplate(
         "systems/xjzl-system/templates/chat/damage-card.hbs",
@@ -190,11 +208,15 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       };
 
       // 4. 发送聊天消息
+      let flavorHtml = `<span style="font-weight:bold">${reason}</span> <span style="font-size:0.8em; color:#666">(${typeLabel})</span>`;
+      if (attackerActor) {
+        flavorHtml = `<span style="color:#8b0000;">来自 <b>${attackerActor.name}</b> 的</span> ` + flavorHtml;
+      }
+
       ChatMessage.create({
         user: game.user.id,
         speaker: ChatMessage.getSpeaker({ actor: actor }),
-        // Flavor 文本：显示伤害来源和类型
-        flavor: `<span style="font-weight:bold">${reason}</span> <span style="font-size:0.8em; color:#666">(${typeLabel})</span>`,
+        flavor: flavorHtml,
         content: content,
         flags: {
           "xjzl-system": {
