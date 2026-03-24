@@ -1960,23 +1960,39 @@
             "category": "qinggong",
             "sect": "jianghushili",
             "tier": 2,
-            "description": "霸刀堂高深轻功，施展之时，步法助势，使刀法如破竹之势力。",
+            "description": "<p>霸刀堂高深轻功，施展之时，步法助势，使刀法如破竹之势力。</p><p>你每次被《趁虚而入》攻击后，依旧可以不消耗速度朝任意方向移动一米，同时获得一层“劲力”，至多三层，持续到战斗结束。</p><p><strong>劲力：</strong>每层提高招式伤害 5 点。</p>",
             "requirements": "悟性5",
             "moves": [
                 {
                     "name": "破锋步",
                     "type": "qi",
                     "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
                     "range": "自身",
                     "targetInfo": "自身",
-                    "actionCost": "次要动作",
-                    "description": "次要动作，施展步法，本回合中，你的受到趁虚而入不会使移动力归0，你在回合中每受到过一次伤害，你的招式伤害提高10点，最多提高30点。",
-                    "automationNote": "纯手动：请自行统计受击次数并调整伤害。",
+                    "actionCost": "无",
+                    "description": "<p>霸刀堂高深轻功，施展之时，步法助势，使刀法如破竹之势力。</p><p>你每次被《趁虚而入》攻击后，依旧可以不消耗速度朝任意方向移动一米，同时获得一层“劲力”，至多三层，持续到战斗结束。</p><p><strong>劲力：</strong>每层提高招式伤害 5 点。</p>",
+                    "automationNote": "完全自动化。被《趁虚而入》攻击后自动获得一层系统[劲力]状态（上限3层），并在聊天栏发卡片提示免费移动。",
                     "costs": {
                         "mp": [
                             0
                         ]
-                    }
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "被趁虚而入攻击",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (args.move && args.move.id === 'opportunity-attack') {\n    const jinli = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'jinli'));\n    if (jinli) {\n        // 覆盖最大层数为3\n        foundry.utils.setProperty(jinli, 'flags.xjzl-system.maxStacks', 3);\n        await game.xjzl.api.effects.addEffect(actor, jinli);\n        \n        actor.showFloatyText(\"步法助势 (劲力)\", {fill: \"#00FF00\"});\n        \n        const cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding: 6px; padding-left: 10px; border-left: 3px solid #2e7d32; background: rgba(46, 125, 50, 0.05);\">\n                <b style=\"color: #2e7d32;\"><i class=\"fas fa-shoe-prints\"></i> 破锋步触发：</b><br>\n                <span style=\"font-size: 0.9em; color: #555;\">\n                    受到《趁虚而入》攻击，获得一层[劲力]。<br>\n                    你可以不消耗速度，朝任意方向移动 1 米。\n                </span>\n            </div>\n        </div>`;\n        \n        ChatMessage.create({\n            content: cardContent,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
+                        }
+                    ]
                 }
             ]
         }
