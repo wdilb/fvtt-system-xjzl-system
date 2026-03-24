@@ -917,6 +917,163 @@
         "name": "纵横剑术",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+        "system": {
+            "sect": "zhengqizong",
+            "category": "wuxue",
+            "tier": 2,
+            "description": "<p>先秦百家之中，纵横家精研武术，难逢敌手，纵横剑术大开大合，是以少胜多的搏杀之剑。</p><p><strong>需求：</strong>剑-单剑，纵横家 <strong>属性：</strong>阳</p>",
+            "requirements": "剑-单剑；纵横家",
+            "moves": [
+                {
+                    "name": "中天纵剑",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>扬剑指天，一劈而下。对目标造成伤害，之后你进入“纵剑”姿态，持续到战斗脱离或改为“横剑”姿态。</p><p><strong>纵剑：</strong>施展剑法时招式伤害+5 且暴击骰-2。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化：命中后移除横剑并自动进入纵剑姿态。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "切换纵剑",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"hengjian\", 99);\nconst source = thisItem.effects.getName(\"纵剑\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"进入纵剑姿态！\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "游龙入地",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>龙翔浅底，剑抖而出，对目标造成伤害。击破架招则将目标击退至你面朝方向 5 米扇形范围内任意一个未被占据的空格并使其陷入“禁足”，持续两回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "部分自动化：自动施加系统禁足状态。击退位移需手动操作。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "禁足特效",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const rootEffect = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    rootEffect.duration = { rounds: 2 };\n    rootEffect.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, rootEffect);\n    ui.notifications.info(`${args.target.name} 被击退并禁足！(位移需手动)`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "池横不顾",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>横剑而立，开启架招。同时进入“横剑”姿态，持续到战斗脱离或改为“纵剑”姿态。</p><p><strong>横剑：</strong>当对方以你为目标出招时，你的闪避提高 4 点，若对方没有命中你，你可以不消耗速度朝任意方向纵跃 3 米（处于半空中），然后你的闪避恢复正常。</p><p><strong>升级：</strong>格挡值+10，横剑提供的闪避额外提高 3 点，内力消耗+2。</p>",
+                    "automationNote": "部分自动化：架招开启时自动切换状态。闪避成功后提示移动并自动移除横剑。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "切换横剑",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"zongjian\", 99);\nconst source = thisItem.effects.getName(\"横剑\");\nif (source) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础4，升级+3 -> 4 + (lvl-1)*3\n    const dodgeBonus = 4 + (lvl - 1) * 3; \n    const effectData = source.toObject();\n    \n    // 动态修改 changes 中的闪避值\n    const changeIdx = effectData.changes.findIndex(c => c.key === \"system.combat.dodge\");\n    if (changeIdx !== -1) {\n        effectData.changes[changeIdx].value = String(dodgeBonus);\n    }\n    \n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"进入横剑姿态！\");\n}"
+                        },
+                        {
+                            "label": "闪避跳跃",
+                            "trigger": "avoided",
+                            "active": true,
+                            "script": "const hasHengjian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"hengjian\");\nif (hasHengjian) {\n    ui.notifications.info(\"横剑闪避成功！可免费移动3米。\");\n    await game.xjzl.api.effects.removeEffect(actor, \"hengjian\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "百步飞剑",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "10米",
+                    "targetInfo": "直线群体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>选择范围内一个空格，一往无前持剑腾跃而去（处于在半空中），对直线路径上的敌人造成伤害。</p><p>直线上每有一个敌人，招式伤害提高 10 点。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "纯手动：路径敌人增伤请在出招配置的[伤害修正]中手动增加(如+10/20)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": []
+                }
+            ]
+        },
         "effects": [
             {
                 "name": "纵剑",
@@ -965,168 +1122,7 @@
                     }
                 ]
             }
-        ],
-        "system": {
-            "sect": "zhengqizong",
-            "category": "wuxue",
-            "tier": 2,
-            "description": "<p>先秦百家之中，纵横家精研武术，难逢敌手，纵横剑术大开大合，是以少胜多的搏杀之剑。<br>需求：剑-单剑，纵横家 属性：阳</p>",
-            "requirements": "剑-单剑；纵横家",
-            "moves": [
-                {
-                    "name": "中天纵剑",
-                    "type": "real",
-                    "element": "yang",
-                    "damageType": "waigong",
-                    "weaponType": "sword",
-                    "range": "2米",
-                    "targetInfo": "单体",
-                    "actionCost": "主要动作",
-                    "description": "<p>扬剑指天，一劈而下。对目标造成伤害，之后你进入“纵剑”姿态，持续到战斗脱离或改为“横剑”姿态。<br>纵剑：施展剑法时招式伤害+5 且暴击骰-2。</p>",
-                    "requirements": "剑-单剑；纵横家",
-                    "automationNote": "完全自动化：命中后移除横剑，根据等级计算数值并写入纵剑Flag。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.5
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "切换纵剑",
-                            "trigger": "hit_once",
-                            "active": true,
-                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"hengjian\", 99);\nconst source = thisItem.effects.getName(\"纵剑\");\nif (source) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础5，升级+10 -> 5 + (lvl-1)*10\n    const dmgBonus = 5 + (lvl - 1) * 10;\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    \n    // 将动态数值写入 Flag，供 AE 内部脚本读取\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.zongjianDmg\", dmgBonus);\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"进入纵剑姿态！\");\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "游龙入地",
-                    "type": "feint",
-                    "element": "yang",
-                    "damageType": "waigong",
-                    "weaponType": "sword",
-                    "range": "1米",
-                    "targetInfo": "单体",
-                    "actionCost": "主要动作",
-                    "description": "<p>龙翔浅底，剑抖而出，对目标造成伤害。击破架招则将目标击退至你面朝方向 5 米扇形范围内任意一个未被占据的空格并使其陷入“禁足”，持续两回合。</p>",
-                    "requirements": "剑-单剑；纵横家",
-                    "automationNote": "部分自动化：自动施加系统禁足状态。击退位移需手动操作。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.4
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "禁足特效",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.isBroken) {\n    const rootEffect = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    rootEffect.duration = { rounds: 2 };\n    rootEffect.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, rootEffect);\n    ui.notifications.info(`${args.target.name} 被击退并禁足！(位移需手动)`);\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "池横不顾",
-                    "type": "stance",
-                    "element": "yang",
-                    "damageType": "waigong",
-                    "weaponType": "sword",
-                    "range": "自身",
-                    "targetInfo": "自身",
-                    "actionCost": "次要动作",
-                    "description": "<p>横剑而立，开启架招。同时进入“横剑”姿态，持续到战斗脱离或改为“纵剑”姿态。<br>横剑：当对方以你为目标出招时，你的闪避提高 4 点，若对方没有命中你，你可以不消耗速度朝任意方向纵跃 3 米（处于半空中），然后你的闪避恢复正常。</p>",
-                    "requirements": "剑-单剑；纵横家",
-                    "automationNote": "部分自动化：架招开启时自动切换状态。闪避成功后提示移动并自动移除横剑。",
-                    "calculation": {
-                        "base": 10,
-                        "growth": 10,
-                        "scalings": []
-                    },
-                    "costs": {
-                        "mp": [
-                            2,
-                            4,
-                            6
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "切换横剑",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"zongjian\", 99);\nconst source = thisItem.effects.getName(\"横剑\");\nif (source) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础4，升级+3 -> 4 + (lvl-1)*3\n    const dodgeBonus = 4 + (lvl - 1) * 3; \n    const effectData = source.toObject();\n    \n    // 动态修改 changes 中的闪避值 (稳健写法：查找 key)\n    const changeIdx = effectData.changes.findIndex(c => c.key === \"system.combat.dodge\");\n    if (changeIdx !== -1) {\n        effectData.changes[changeIdx].value = String(dodgeBonus);\n    }\n    \n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"进入横剑姿态！\");\n}"
-                        },
-                        {
-                            "label": "闪避跳跃",
-                            "trigger": "avoided",
-                            "active": true,
-                            "script": "const hasHengjian = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"hengjian\");\nif (hasHengjian) {\n    ui.notifications.info(\"横剑闪避成功！可免费移动3米。\");\n    await game.xjzl.api.effects.removeEffect(actor, \"hengjian\");\n}"
-                        }
-                    ]
-                },
-                {
-                    "name": "百步飞剑",
-                    "type": "real",
-                    "isUltimate": true,
-                    "element": "yang",
-                    "damageType": "waigong",
-                    "weaponType": "sword",
-                    "range": "10米",
-                    "targetInfo": "直线群体",
-                    "actionCost": "蓄力动作",
-                    "description": "<p>选择范围内一个空格，一往无前持剑腾跃而去（处于在半空中），对直线路径上的敌人造成伤害。<br>直线上每有一个敌人，招式伤害提高 10 点。</p>",
-                    "requirements": "剑-单剑；纵横家",
-                    "automationNote": "纯手动：路径敌人增伤请在出招配置的[伤害修正]中手动增加(如+10/20)。",
-                    "calculation": {
-                        "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.7
-                            }
-                        ]
-                    },
-                    "costs": {
-                        "mp": [
-                            8,
-                            16,
-                            24
-                        ],
-                        "rage": [
-                            7,
-                            6,
-                            5
-                        ]
-                    },
-                    "scripts": []
-                }
-            ]
-        }
+        ]
     },
     {
         "name": "法剑四诀",
