@@ -2551,5 +2551,1268 @@
                 ]
             }
         ]
+    },
+    {
+        "name": "战王刀法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>缅甸刀法，十分凌厉，适合在复杂地形中作战。</p><p><strong>需求：</strong>刀 <strong>属性：</strong>刚</p>",
+            "requirements": "刀-单刀/大刀/双刀",
+            "moves": [
+                {
+                    "name": "狩猎时刻",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，士兵们模仿猛兽的伏击姿态，弯刀隐于身后，全身戒备。开启架招，若成功格挡敌人攻击，则可借力打力，进入“野兽反击”状态，持续三回合或解除架招。</p><p><strong>野兽反击：</strong>招式伤害+5</p><p><strong>升级：</strong>格挡值+10，内力消耗+2，野兽反击提高的伤害+5。</p>",
+                    "automationNote": "开启架招自动。格挡成功后自动获得[野兽反击]。解除架招需手动移除该状态。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反击",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst bonus = lvl * 5;\nconst eff = thisItem.effects.getName(\"野兽反击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: 3 };\neff.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"野兽反击！\", { fill: \"#FFA500\" });"
+                        }
+                    ]
+                },
+                {
+                    "name": "咆哮如雷",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，将内力注入刀刃，如野兽咆哮般地攻向敌人。对目标造成 0.5 力量点外功伤害，若自身处于‘野兽反击’状态，可击退周围 1 米内的敌人 1 米并陷入‘下盘不稳’，持续一回合。有敌人位于半空中，可消耗反应动作原地射出刀气。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "若有[野兽反击]，命中自动施加[下盘不稳]并发送击退卡片。若敌人位于半空消耗反应动作请手动处理。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "反击判定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst hasBuff = actor.effects.some(e => e.name === \"野兽反击\");\nif (hasBuff) {\n    await actor.toggleStatusEffect(\"unstable\", {active: true});\n    const cardHtml = `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left: 4px solid var(--c-cinnabar); padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n            <strong style=\"color: var(--c-cinnabar);\">咆哮如雷触发！</strong><br>\n            <span style=\"color:#555;\">你击退了周围 1 米内的敌人 <b>1 米</b>！并陷入了下盘不稳。</span>\n        </div>\n    </div>`;\n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: cardHtml\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "狂野之击",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，以狂野的刀势砍向敌人，刀刃划过空气产生尖锐的破空声。造成 0.4 力量点外功伤害。击破架招，降低目标内外功防御 10 点，直到战斗结束。若自身处于“野兽反击”状态，则为敌人添加错骨一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2，错骨持续回合+1</p>",
+                    "automationNote": "击破架招自动破防。有[野兽反击]自动施加错骨。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破降防",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const defDrop = thisItem.effects.getName(\"狂野破甲\").toObject();\n    delete defDrop._id;\n    defDrop.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, defDrop);\n    if (actor.effects.some(e => e.name === \"野兽反击\")) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n        if(cuogu) {\n            cuogu.duration = { rounds: lvl };\n            await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        }\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "猛虎下山",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "blade",
+                    "range": "5米",
+                    "targetInfo": "路径",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，如猛兽般发起冲锋，刀光闪耀。对路径上的敌人造成 0.7 力量点外功伤害并击飞 2 米。若命中的敌人数量大于等于 3 人，额外提高招式伤害+5。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+3。额外伤害+5</p>",
+                    "automationNote": "选择≥3人出招时自动追加群体伤害！命中后自动发送击飞提示卡片。",
+                    "costs": {
+                        "mp": [
+                            3,
+                            6,
+                            9
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "群体追伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (game.user.targets.size >= 3) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extra = 5 * lvl;\n    args.flags.damageResult.damage += extra;\n    args.flags.damageResult.breakdown += `\\n+ 群体追伤(≥3人): ${extra}`;\n}"
+                        },
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const cardHtml = `<div class=\"xjzl-chat-card\">\n    <div style=\"border-left: 4px solid #f39c12; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n        <strong style=\"color: #f39c12;\">猛虎下山！</strong><br>\n        <span style=\"color:#555;\">所有被命中的敌人被 <b>击飞 2 米</b>！</span>\n    </div>\n</div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "野兽反击",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "架招反击状态，增加招式伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yeshoufanji",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "0"
+                    }
+                ]
+            },
+            {
+                "name": "狂野破甲",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "降低内外功防御。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuangyepojia",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "战王枪法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 2,
+            "description": "<p>缅甸枪法，十分凌厉，适合在复杂地形中作战。</p><p><strong>需求：</strong>枪 <strong>属性：</strong>刚</p>",
+            "requirements": "棍-长枪",
+            "moves": [
+                {
+                    "name": "狩猎时刻",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，士兵们模仿猛兽的伏击姿态，长枪隐于身后，全身戒备。开启架招，若成功格挡敌人攻击，则可借力打力，进入“野兽反击”状态，持续三回合或解除架招。</p><p><strong>野兽反击：</strong>招式伤害+5</p><p><strong>升级：</strong>格挡值+10，内力消耗+2，野兽反击提高的伤害+5。</p>",
+                    "automationNote": "开启架招自动。格挡成功后自动获得[野兽反击]。解除架招需手动移除该状态。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡反击",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst bonus = lvl * 5;\nconst eff = thisItem.effects.getName(\"野兽反击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: 3 };\neff.changes[0].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"野兽反击！\", { fill: \"#FFA500\" });"
+                        }
+                    ]
+                },
+                {
+                    "name": "咆哮如雷",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，将内力注入枪刃，如野兽咆哮般地攻向敌人。对目标造成 0.5 力量点外功伤害，若自身处于‘野兽反击’状态，可击退周围 1 米内的敌人 1 米并陷入‘下盘不稳’，持续一回合。有敌人位于半空中，可消耗反应动作原地射出枪气。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "若有[野兽反击]，命中自动施加[下盘不稳]并发送击退卡片。若敌人位于半空消耗反应动作请手动处理。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "反击判定",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst hasBuff = actor.effects.some(e => e.name === \"野兽反击\");\nif (hasBuff) {\n    await actor.toggleStatusEffect(\"unstable\", {active: true});\n    const cardHtml = `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left: 4px solid var(--c-cinnabar); padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n            <strong style=\"color: var(--c-cinnabar);\">咆哮如雷触发！</strong><br>\n            <span style=\"color:#555;\">你击退了周围 1 米内的敌人 <b>1 米</b>！并陷入了下盘不稳。</span>\n        </div>\n    </div>`;\n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: cardHtml\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "狂野之击",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，以狂野的枪势攻向敌人，枪刃划过空气产生尖锐的破空声。造成 0.4 力量点外功伤害。击破架招，降低目标内外功防御 10 点，直到战斗结束。若自身处于“野兽反击”状态，则为敌人添加错骨一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2，错骨持续回合+1</p>",
+                    "automationNote": "击破架招自动破防。有[野兽反击]自动施加错骨。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破降防",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const defDrop = thisItem.effects.getName(\"狂野破甲\").toObject();\n    delete defDrop._id;\n    defDrop.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, defDrop);\n    if (actor.effects.some(e => e.name === \"野兽反击\")) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n        if(cuogu) {\n            cuogu.duration = { rounds: lvl };\n            await game.xjzl.api.effects.addEffect(args.target, cuogu);\n        }\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "猛虎下山",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "5米",
+                    "targetInfo": "路径",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，如猛兽般发起冲锋，枪光闪耀。对路径上的敌人造成 0.7 力量点外功伤害并击飞 2 米。若命中的敌人数量大于等于 3 人，额外提高招式伤害+5。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+3。额外伤害+5</p>",
+                    "automationNote": "选择≥3人出招时自动追加群体伤害！命中后自动发送击飞提示卡片。",
+                    "costs": {
+                        "mp": [
+                            3,
+                            6,
+                            9
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "群体追伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (game.user.targets.size >= 3) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extra = 5 * lvl;\n    args.flags.damageResult.damage += extra;\n    args.flags.damageResult.breakdown += `\\n+ 群体追伤(≥3人): ${extra}`;\n}"
+                        },
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const cardHtml = `<div class=\"xjzl-chat-card\">\n    <div style=\"border-left: 4px solid #f39c12; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n        <strong style=\"color: #f39c12;\">猛虎下山！</strong><br>\n        <span style=\"color:#555;\">所有被命中的敌人被 <b>击飞 2 米</b>！</span>\n    </div>\n</div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "野兽反击",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "架招反击状态，增加招式伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yeshoufanji",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "0"
+                    }
+                ]
+            },
+            {
+                "name": "狂野破甲",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "降低内外功防御。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuangyepojia",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "-10"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "-10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "凶兽枪法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>枪法大开大合，刚猛无匹，招招进逼，式式抢攻，如化身为凶猛的野兽，席卷一切敌人。</p><p><strong>需求：</strong>棍-枪 <strong>属性：</strong>刚</p>",
+            "requirements": "棍-长枪",
+            "moves": [
+                {
+                    "name": "猪突猛进",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>（可反应动作释放）持枪冲刺，枪尖裹挟着狂暴的内力，如同猛兽的尖牙直刺敌人。对目标造成 0.6 力量点外功伤害。命中无架招目标，为目标添加‘破甲’状态，持续一回合。若有目标处于半空状态，可消耗反应动作，枪芒冲天，对其造成伤害。</p><p>·破甲：外功防御归零。</p><p><strong>升级效果：</strong>招式伤害+10，破甲持续回合+1，内力消耗+4。</p>",
+                    "automationNote": "命中无架招目标自动施加[破甲]。对空反应请根据战况手动处理。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "命中破甲",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const pojia = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n    if (pojia) {\n        pojia.duration = { rounds: lvl };\n        await game.xjzl.api.effects.addEffect(args.target, pojia);\n        ui.notifications.info(`${args.target.name} 被破甲！`);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "猛龙摆尾",
+                    "type": "feint",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "2米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，挥舞长枪，在身前舞出一道力道强劲的圆弧，枪影如狂风扫落叶般扫向周围敌人。对目标及其周围 2 米内的敌人造成 0.6 力量点外功伤害。若击破架招，击飞敌人 2 米。</p><p><strong>升级效果：</strong>招式伤害+10，内力消耗+4，击飞距离+1。</p>",
+                    "automationNote": "击破架招后自动发送击飞提示卡片。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12,
+                            16
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破击飞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dist = 1 + lvl;\n    const cardHtml = `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left: 4px solid var(--c-cinnabar); padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n            <strong style=\"color: var(--c-cinnabar);\">神龙摆尾！</strong><br>\n            <span style=\"color:#555;\">你将 ${args.target.name} <b>击飞 ${dist} 米</b>！</span>\n        </div>\n    </div>`;\n    ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "狂飙怒吼",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "gang",
+                    "damageType": "none",
+                    "weaponType": "staff",
+                    "range": "自身",
+                    "targetInfo": "范围",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，持枪原地快速旋转，枪身带动气流形成旋风，狂暴内力波及周身。使自身和周围 3 米内的友方单位获得“怒吼”状态，持续一回合。</p><p>·怒吼：伤害+10，虚招对抗+1。</p><p><strong>升级：</strong>怒吼的伤害+10，虚招对抗+1，消耗+10，合一额外持续一回合，怒气-1。</p>",
+                    "automationNote": "请手动选中范围内友方施放。自动施加[怒吼]状态。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [
+                            3,
+                            3,
+                            3,
+                            2
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "怒吼Buff",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = lvl * 10;\nconst feintBonus = lvl;\nconst rounds = (lvl >= 4) ? 2 : 1;\nconst eff = thisItem.effects.getName(\"怒吼\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\neff.changes.find(c => c.key === \"system.combat.damages.skill.mod\").value = String(dmgBonus);\neff.changes.find(c => c.key === \"system.combat.xuzhao\").value = String(feintBonus);\neff.changes.find(c => c.key === \"system.combat.kanpo\").value = String(feintBonus);\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                        }
+                    ]
+                },
+                {
+                    "name": "触机落阱",
+                    "type": "counter",
+                    "element": "gang",
+                    "damageType": "neigong",
+                    "weaponType": "staff",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破虚招时，可消耗反应动作施展此招。压制虚招，对敌人造成 0.7 力量点内功伤害，同时为敌方添加‘破甲’状态。若敌人已经存在‘破甲’状态，则为敌人添加‘破衣’状态，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+5</p>",
+                    "automationNote": "命中时自动判定目标破甲状态，并施加[破甲]或[破衣]。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "破甲进阶",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst hasPojia = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pojia\");\nlet statusId = hasPojia ? \"poyi\" : \"pojia\";\nconst statusObj = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === statusId));\nif (statusObj) {\n    statusObj.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, statusObj);\n    ui.notifications.info(`${args.target.name} 被施加了 ${statusObj.name}！`);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "野兽之难",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "staff",
+                    "range": "8米",
+                    "targetInfo": "路径",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，如猛兽出笼，持枪发起高速冲锋，枪尖撕裂空气发出尖锐破空声。对一条直线上敌人造成 0.9 力量点外功伤害并击飞 3 米，落地后倒地，同时为所有命中的敌人添加‘禁疗’，持续一回合。若敌人数量大于等于 3 人，伤害额外提升 10 点。</p><p><strong>升级：</strong>招式伤害+20，伤害额外提升+10，内力消耗+10，怒气消耗-1。</p>",
+                    "automationNote": "选择≥3人出招时自动追加群体伤害！命中自动施加倒地与禁疗，发送击飞提示。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.9
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "群体追伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (game.user.targets.size >= 3) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extra = 10 * lvl;\n    args.flags.damageResult.damage += extra;\n    args.flags.damageResult.breakdown += `\\n+ 凶兽追伤(≥3人): ${extra}`;\n}"
+                        },
+                        {
+                            "label": "群体控制与击飞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\nconst jinliao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinliao\"));\njinliao.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, prone);\nawait game.xjzl.api.effects.addEffect(args.target, jinliao);"
+                        },
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const cardHtml = `<div class=\"xjzl-chat-card\">\n    <div style=\"border-left: 4px solid var(--c-cinnabar); padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n        <strong style=\"color: var(--c-cinnabar);\">野兽之难！</strong><br>\n        <span style=\"color:#555;\">所有被命中的敌人被 <b>击飞 3 米</b>！</span>\n    </div>\n</div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "怒吼",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "伤害和虚招对抗增加。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "nuhou",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "0"
+                    },
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "0"
+                    },
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "0"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "善恶归元掌·佛",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "wanfosi",
+            "tier": 3,
+            "description": "<p>缅甸佛教顶级武学，与《善恶归元经》相得益彰。掌法刚柔并济，变化莫测。</p><p><strong>需求：</strong>徒手-掌，《善恶归元经》圆满 <strong>属性：</strong>阳</p>",
+            "requirements": "徒手-拳/掌/指/爪；《善恶归元经》圆满",
+            "moves": [
+                {
+                    "name": "佛光初现",
+                    "type": "qi",
+                    "actionType": "heal",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "4米",
+                    "targetInfo": "单体(友方)",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作。掌心佛光涌动，回复一名其他友方出招者内息点数的气血。</p><p><strong>升级：</strong>额外恢复+10，内力消耗+5。</p>",
+                    "automationNote": "完全自动化治疗，治疗量基于自身内息并随等级成长。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 1.0
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "佛光照身",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体(友方)",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作。掌风中带着柔和佛力，使目标立即回复自身架招或刷新架招效果。</p><p><strong>升级：</strong>内力消耗+5。</p>",
+                    "automationNote": "请手动选中目标，发送卡片提示目标手动操作架招刷新。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "刷新架招提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const cardHtml = `<div class=\"xjzl-chat-card\">\n    <div style=\"border-left: 4px solid #f1c40f; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n        <strong style=\"color: #f39c12;\">佛光照身</strong><br>\n        <span style=\"color:#555;\">${args.target.name}，请手动立即回复或刷新你的架招效果！</span>\n    </div>\n</div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: args.target}), content: cardHtml });"
+                        }
+                    ]
+                },
+                {
+                    "name": "六道轮回·佛",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作。开启架招，佛光环绕周身。成功格挡后，使周围 1 米内的友方单位恢复 10 点气血。</p><p><strong>升级：</strong>格挡值+10，治疗量+10，内力消耗+5。</p>",
+                    "automationNote": "格挡后发送卡片提示群体恢复（需玩家自行确认目标并执行）。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡群疗",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst heal = lvl * 10;\nconst cardHtml = `<div class=\"xjzl-chat-card\">\n    <div style=\"border-left: 4px solid #2ecc71; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n        <strong style=\"color: #27ae60;\">六道轮回·佛</strong><br>\n        <span style=\"color:#555;\">佛光普照，请手动令周围 1 米内的友方单位恢复 <b>${heal}</b> 点气血！</span>\n    </div>\n</div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });"
+                        }
+                    ]
+                },
+                {
+                    "name": "佛光涤罪",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当受到敌人攻击且成功看破虚招时，可消耗反应动作施展此招。佛光顺着掌心爆发，击飞敌人 1 米并恢复自身内息点数值的气血，同时清除自身一个负面状态。</p><p><strong>升级：</strong>内力消耗+10。</p>",
+                    "automationNote": "自动恢复气血。击飞及清除负面状态将发卡片提醒手动操作。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "自回与净化",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const healVal = actor.system.stats.neixi.total;\nawait actor.applyHealing({ amount: healVal, type: \"hp\", showScrolling: true });\nconst cardHtml = `<div class=\"xjzl-chat-card\">\n    <div style=\"border-left: 4px solid #f39c12; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n        <strong style=\"color: #d35400;\">佛光涤罪！</strong><br>\n        <span style=\"color:#555;\">将 ${args.target.name} <b>击飞 1 米</b>，并请手动清除自身一个负面状态！</span>\n    </div>\n</div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });"
+                        }
+                    ]
+                },
+                {
+                    "name": "轮回审判·佛",
+                    "type": "qi",
+                    "isUltimate": true,
+                    "actionType": "heal",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "10米",
+                    "targetInfo": "范围(至多4人)",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作。双手高举过顶，佛光汇聚成巨大的轮盘状。回复周围 5 米内的目标（可选，不超过 4 人）出招者内息点数值的气血。同时让所有友方单位进入‘佛光环绕’状态，每回合初回复 10 点气血，持续一回合。</p><p><strong>升级：</strong>佛光环绕持续回合+1，内力消耗+10，怒气消耗-1。</p>",
+                    "automationNote": "治疗量自动计算。自动为命中的友方施加[佛光环绕]状态进行回合初恢复。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 1.0
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "佛光环绕",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst eff = thisItem.effects.getName(\"佛光环绕\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: lvl };\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "佛光环绕",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "佛光庇护，每回合初回复 10 点气血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "foguanghuanrao",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "name": "善恶归元掌·魔",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "wanfosi",
+            "tier": 3,
+            "description": "<p>缅甸佛教顶级武学，与《善恶归元经》相得益彰。掌法刚柔并济，变化莫测。</p><p><strong>需求：</strong>徒手-掌，《善恶归元经》圆满 <strong>属性：</strong>阴</p>",
+            "requirements": "徒手-拳/掌/指/爪；《善恶归元经》圆满",
+            "moves": [
+                {
+                    "name": "魔影初现",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "4米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作。掌心魔焰翻腾，对目标造成 0.5 内息点火焰伤害（内功命中，内功暴击），命中无架招目标，额外造成 10 点火焰伤害。</p><p><strong>升级：</strong>招式伤害+10，额外火焰伤害+10，内力消耗+5。</p>",
+                    "automationNote": "自动转换为火焰伤害结算。若目标无架招自动追加火焰伤害。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "转为火伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.outcome.isHit) {\n    args.config.type = \"fire\";\n}"
+                        },
+                        {
+                            "label": "无架招追伤",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extraDmg = lvl * 10;\n    await args.target.applyDamage({ amount: extraDmg, type: \"fire\", attacker: actor });\n    actor.showFloatyText(`追加火伤 ${extraDmg}`, { fill: \"#e74c3c\" });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "魔焰焚身",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作。掌风中带着愤怒魔焰，对目标造成 0.4 内息点火焰伤害（内功命中，内功暴击），击破架招，目标陷入“引燃”状态，持续一回合。</p><p><strong>引燃：</strong>你在自己的每回合初受到 10 点火焰伤害。每经过五回合，你身上的防具、包裹物品随机损毁一件/套/份。</p><p><strong>升级：</strong>招式伤害+10，引燃持续回合+1，内力消耗+5。</p>",
+                    "automationNote": "转为火伤结算。击破架招自动施加[引燃]状态。毁物需玩家自觉执行。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "转为火伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.outcome.isHit) {\n    args.config.type = \"fire\";\n}"
+                        },
+                        {
+                            "label": "引燃",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const eff = thisItem.effects.getName(\"引燃\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: lvl };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "六道轮回·魔",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作。开启架招，魔焰环绕周身。成功格挡攻击后，对周围 1 米内的敌人造成 10 点火焰伤害。</p><p><strong>升级：</strong>格挡值+10，伤害+10，内力消耗+5。</p>",
+                    "automationNote": "格挡后发送卡片提示对周围敌人造成伤害（需手动操作）。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            10,
+                            15,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡火伤",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst dmg = lvl * 10;\nconst cardHtml = `<div class=\"xjzl-chat-card\">\n    <div style=\"border-left: 4px solid #e74c3c; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n        <strong style=\"color: #c0392b;\">六道轮回·魔</strong><br>\n        <span style=\"color:#555;\">魔焰爆发，请对周围 1 米内的敌人造成 <b>${dmg}</b> 点火焰伤害！</span>\n    </div>\n</div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });"
+                        }
+                    ]
+                },
+                {
+                    "name": "魔焰涤罪",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "fire",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当受到敌人攻击且成功看破虚招时，可消耗反应动作施展此招。魔焰顺着掌心爆发，震开敌人 1 米并造成 0.6 内息点火焰伤害（内功命中，内功暴击），并为敌人添加‘引燃’，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+10。</p>",
+                    "automationNote": "直接使用火焰伤害类型结算（必定命中无暴击），命中自动施加引燃，震退请手动处理。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "震退与引燃",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"引燃\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    const cardHtml = `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left: 4px solid #e74c3c; padding-left: 8px; margin-left: 2px; background: rgba(0,0,0,0.05);\">\n            <strong style=\"color: #c0392b;\">魔焰涤罪！</strong><br>\n            <span style=\"color:#555;\">震开敌人 <b>1 米</b>！</span>\n        </div>\n    </div>`;\n    ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "轮回审判·魔",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "10米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>双手高举过顶，魔焰汇聚成巨大的轮盘状。对目标及其周围 5 米内的所有敌人造成 0.7 内息点火焰伤害（内功命中，内功暴击）。使敌人陷入“魔焰审判”效果，每回合初受到 10 点火焰伤害，持续一回合。</p><p><strong>升级：</strong>招式伤害+20，魔焰审判持续回合+1，内力消耗+10，怒气消耗-1。</p>",
+                    "automationNote": "转为火伤结算。命中自动施加[魔焰审判]状态进行回合初伤害。",
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ],
+                        "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "转为火伤",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.outcome.isHit) {\n    args.config.type = \"fire\";\n}"
+                        },
+                        {
+                            "label": "魔焰审判",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const eff = thisItem.effects.getName(\"魔焰审判\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: lvl };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "引燃",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "每回合初受到 10 点火焰伤害。每五回合随机损毁装备/物品。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yinran",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "灼烧伤害",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "await actor.applyDamage({ amount: 10, type: \"fire\", ignoreDefense: true, attacker: actor });"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "魔焰审判",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "每回合初受到 10 点火焰伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "moyanshenpan",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "审判伤害",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "await actor.applyDamage({ amount: 10, type: \"fire\", ignoreDefense: true, attacker: actor });"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
+    },
+    {
+        "name": "佛魔轮回",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>双手结印，佛魔双色，交替轮回</p><p><strong>需求：</strong>4000 修为领悟（不可升级），《善恶归元经》圆满</p>",
+            "requirements": "4000 修为领悟（不可升级）；《善恶归元经》圆满",
+            "moves": [
+                {
+                    "name": "佛魔轮回",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "回合初/自由动作",
+                    "description": "<p>每回合初可以自由切换‘佛’状态和‘魔’状态。</p>",
+                    "automationNote": "完全手动。请在回合初于《善恶归元经》内功中手动开启/关闭内置的“佛”与“魔”AE特效。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            4000
+                        ],
+                        "mappedStage": 1
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            0
+                        ],
+                        "rage": [
+                            0
+                        ],
+                        "hp": [
+                            0
+                        ]
+                    },
+                    "scripts": []
+                }
+            ],
+            "scripts": []
+        },
+        "effects": []
     }
 ]
