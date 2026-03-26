@@ -91,8 +91,9 @@ Hooks.once("init", async function () {
   const useCustomRule = game.settings.get("xjzl-system", "customDistanceRule");
   if (useCustomRule) {
 
-    //替换系统的测量模板
+    // 替换系统的测量模板
     CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
+
     // 替换FVTT自带的一定距离计算方式
     const SquareGrid = foundry.grid.SquareGrid;
 
@@ -101,6 +102,9 @@ Hooks.once("init", async function () {
       return;
     }
 
+    // ==========================================
+    //  第一部分：Token 拖拽计算 (你完美的原始代码，原封不动)
+    // ==========================================
     // 2. 保存原始方法 (说不定后面要用到)
     const originalMeasurePath = SquareGrid.prototype.measurePath;
 
@@ -136,27 +140,17 @@ Hooks.once("init", async function () {
         const straightSteps = Math.abs(ny - nx);
 
         // === 核心计费逻辑 (1-2-2-2...) ===
-        let segGridCost = straightSteps;
-
-        for (let j = 0; j < diagonalSteps; j++) {
-          // 第一步斜行算1，之后所有斜行都算2 (1-2-2-2 规则)
-          if (globalDiagonalCount === 0) {
-            segGridCost += 1;
-          } else {
-            segGridCost += 2;
-          }
-          globalDiagonalCount++;
+        // 每步斜向按 2 计算，第一步全局斜向扣除 1 (即 1-2-2-2 逻辑)
+        let segGridCost = straightSteps + (diagonalSteps * 2);
+        if (globalDiagonalCount === 0 && diagonalSteps > 0) {
+          segGridCost -= 1;
         }
+        globalDiagonalCount += diagonalSteps;
 
         // 提取地形倍率 (Terrain Factor)
-        // 仅在对角线规则设为 "等距 (1-1-1)"下才不会出错
-        // 那么原始方法认为的“标准几何步数”就是切比雪夫距离：Max(nx, ny)
         const standardGeometricSteps = Math.max(nx, ny);
-
         let terrainMultiplier = 1;
 
-        // 如果原始距离与标准几何距离不符，说明有地形消耗（例如困难地形 x2）
-        // 我们通过除法把这个倍率提取出来
         if (standardGeometricSteps > 0 && typeof s.cost === "number") {
           terrainMultiplier = s.cost / standardGeometricSteps;
         }
@@ -172,8 +166,7 @@ Hooks.once("init", async function () {
         }
 
         // 更新显示的标签
-        // V13 这里的 label 属性直接控制 Ruler 上的显示
-        s.label = String(Math.round(finalSegDistance * 100) / 100); // 加个取整防止浮点数精度问题
+        s.label = String(Math.round(finalSegDistance * 100) / 100);
 
         runningTotal += finalSegDistance;
       }
@@ -185,7 +178,76 @@ Hooks.once("init", async function () {
       return result;
     };
 
-    console.log("XJZL | 已成功应用自定义距离移动计算 (SquareGrid Prototype)。");
+
+    // ==========================================
+    //  第二部分：测量尺 (快捷键 R) 的表现层劫持补丁
+    // ==========================================
+    // V13 中，独立的测量标尺 (Ruler) 被设计为测量纯物理距离，完全绕过了 measurePath
+    // 这导致它会产生 0.5 这样的小数，且不受 1-2-2-2 规则约束。
+    // 我们在此拦截标尺生成数字标签的函数，提取它的坐标，重新计算！
+    if (CONFIG.Canvas?.rulerClass?.prototype?._getWaypointLabelContext) {
+      const originalGetLabel = CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext;
+
+      CONFIG.Canvas.rulerClass.prototype._getWaypointLabelContext = function (waypoint, state) {
+        // 先获取原生渲染上下文
+        const context = originalGetLabel.call(this, waypoint, state);
+        if (!context) return context;
+
+        // 提取测量尺画出的所有路径点 (V13 API 存在 this.path 中)
+        const points = this.path || [];
+        if (points.length < 2) return context;
+        const d = canvas.dimensions;
+        let globalDiagonalCount = 0;
+        let runningTotalGrid = 0;// 只记录纯格子数，延迟做乘法
+
+        // 重新遍历路径，用侠界之旅的 1-2-2-2 逻辑强制覆写
+        for (let i = 0; i < points.length - 1; i++) {
+          const p0 = points[i];
+          const p1 = points[i + 1];
+
+          // 和 token 移动一样，通过除以 d.size 并取整 (Math.round)，
+          // 强制将任何 0.5 格子这类的“物理距离”坍缩为整数“逻辑格子步数”
+          const dxPixels = p1.x - p0.x;
+          const dyPixels = p1.y - p0.y;
+          const nx = Math.round(Math.abs(dxPixels) / d.size);
+          const ny = Math.round(Math.abs(dyPixels) / d.size);
+
+          const diagonalSteps = Math.min(nx, ny);
+          const straightSteps = Math.abs(ny - nx);
+
+          let segGridCost = straightSteps + (diagonalSteps * 2);
+          if (globalDiagonalCount === 0 && diagonalSteps > 0) {
+            segGridCost -= 1;
+          }
+          globalDiagonalCount += diagonalSteps;
+          // 累加距离 (独立 Ruler 不算地形影响，直接乘以单位距离)
+          runningTotalGrid += segGridCost;
+          // 当算到当前需要显示的那个坐标节点时，拦截并替换它的显示文本
+          if (Math.abs(p1.x - waypoint.x) < 1 && Math.abs(p1.y - waypoint.y) < 1) {
+            const finalDist = Math.round((runningTotalGrid * d.distance) * 100) / 100;
+            if (context.distance && typeof context.distance === "object") {
+              context.distance.total = String(finalDist); // 修改内部的值
+            } else {
+              // 兼容兜底：万一它没生成对象，我们给它补上
+              context.distance = { total: String(finalDist) };
+            }
+
+            // 同理，保留 text 和 label 的同步更新（如果有的话），防范其他插件读取
+            if (context.label !== undefined) {
+              const unit = canvas.grid.units ? ` ${canvas.grid.units}` : "";
+              context.label = `${finalDist}${unit}`;
+            }
+            if (context.text !== undefined) {
+              context.text = String(finalDist);
+            }
+            break;
+          }
+        }
+        return context;
+      };
+    }
+
+    console.log("XJZL | 已成功应用自定义距离移动计算。");
   }
 
   // 注销默认表单
@@ -470,8 +532,8 @@ Hooks.once("ready", async function () {
 
   // 4·加载动作计数器
   if (game.settings.get("xjzl-system", "enableActionTracker")) {
-        ActionTracker.init();
-    }
+    ActionTracker.init();
+  }
   console.log("侠界之旅系统 - 准备就绪");
 });
 
