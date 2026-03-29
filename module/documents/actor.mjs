@@ -2627,6 +2627,7 @@ export class XJZLActor extends Actor {
     }
 
     // 3. 固定增伤 (Flat Bonuses)
+    let cxBonus = 0;
     const wType = virtualMove.weaponType;
     let flatBonus = 0;
     if (sys.combat?.damages) {
@@ -2644,6 +2645,21 @@ export class XJZLActor extends Actor {
         flatBonus += (sys.combat.damages.skill?.total || 0); //趁虚而入还能享受到招式伤害加成
         // 使用传入的已消耗士气，而不是读取 system
         flatBonus += moraleSpent;
+        //处理趁虚而入的升级伤害加成
+        // 查找身上是否有趁虚而入招式以获取升级加成
+        for (const w of this.itemTypes.wuxue) {
+          // 趁虚而入是散手，直接跳过普通武学、轻功等
+          if (w.system.category !== "sanshou") continue;
+          const cxMove = w.system.moves?.find(m => m.name === "趁虚而入");
+          if (cxMove) {
+            const lvl = Math.max(1, cxMove.computedLevel || 1);
+            if (lvl > 1) {
+              cxBonus = (lvl - 1) * 5;
+              flatBonus += cxBonus;
+            }
+            break;
+          }
+        }
       }
       //新增了内功伤害和外功伤害的加成
       if (virtualMove.damageType && virtualMove.damageType === "neigong") {
@@ -2688,6 +2704,9 @@ export class XJZLActor extends Actor {
       breakdownText += ` (含招式加成)`; // 提示文本
       if (sys.resources.morale?.value > 0) {
         breakdownText += ` (含士气 ${sys.resources.morale.value})`;
+      }
+      if (cxBonus > 0) {
+        breakdownText += `\n+ 趁虚而入升级加成: ${cxBonus}`;
       }
     }
 
