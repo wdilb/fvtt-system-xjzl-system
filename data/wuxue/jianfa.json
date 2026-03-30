@@ -4785,7 +4785,8 @@
                     "automationNote": "开启自动获剑醒(单场战斗一次判断需手动)。",
                     "calculation": {
                         "base": 0,
-                        "growth": 10
+                        "growth": 10,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -4813,10 +4814,12 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，扬剑直刺，剑光一分为二，对目标造成武器伤害*2 点外功伤害，击破架招时，使目标陷入“弃武”状态，持续一回合。</p><p><strong>弃武：</strong>你失去武器的伤害、格挡和效果。</p><p>·命中前，你可以选择消耗“剑醒”状态，使此次虚招对抗具有优势。</p><p><strong>升级：</strong>武器伤害系数+1，内力消耗+2。</p>",
-                    "automationNote": "伤害计算自动(脚本修正)。击破弃武(应用缴械状态)自动。消耗剑醒获优势会弹窗询问。",
+                    "automationNote": "伤害计算完全基于武器锐度与等级(isFixed自动跳过系统属性加成)。击破弃武(应用缴械状态)自动。消耗剑醒获优势会弹窗询问。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
-                        "growth": 0
+                        "growth": 0,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -4827,21 +4830,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "武器伤害计算",
+                            "label": "纯武器伤害倍率计算",
                             "trigger": "calc",
-                            "script": "// 基础是 2 倍，升级后系数+1\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst multiplier = 1 + (lvl - 1);\nconst weaponDmg = args.baseData.weapon || 0;\n\n// 系统已算了一倍，我们补剩下的\nargs.output.damage += weaponDmg * (1 + multiplier);\nargs.output.bonusDesc.push(`武器倍率修正 +${weaponDmg * (1 + multiplier)}`);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst multiplier = 2 + (lvl - 1); // 1级2倍，2级3倍\n\nlet wDmg = args.baseData.weapon || 0;\nlet wRankBonus = 0;\n\n// 提取武器等级增伤\nif (args.baseData.isWeaponMatch && move.weaponType && actor.system.combat.weaponRanks) {\n    const rank = actor.system.combat.weaponRanks[move.weaponType]?.total || 0;\n    if (rank <= 4) wRankBonus = rank * 1;\n    else if (rank <= 8) wRankBonus = rank * 2;\n    else wRankBonus = rank * 3;\n}\n\n// 提取武器固伤(如剑醒的+10或剑匣加成)\nlet wFlatBonus = actor.system.combat.damages.weapon?.total || 0;\nif (move.weaponType && actor.system.combat.damages.weaponTypes) {\n    wFlatBonus += actor.system.combat.damages.weaponTypes[move.weaponType]?.total || 0;\n}\n\nconst totalWeapon = wDmg + wRankBonus + wFlatBonus;\nconst finalDmg = totalWeapon * multiplier;\n\nargs.output.damage += finalDmg;\nargs.output.bonusDesc.push(`剑法锐度 (${totalWeapon} x ${multiplier}倍): +${finalDmg}`);",
                             "active": true
                         },
                         {
                             "label": "消耗剑醒",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianxing\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"剑起有双龙\" },\n        content: `<p>是否消耗 [剑醒] 以获得 <b>虚招优势</b>？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await buff.delete();\n        args.flags.feintLevel += 1;\n        ui.notifications.info(\"已消耗 [剑醒]，虚招获优势\");\n    }\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianxing\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"剑起有双龙\" },\n        content: `<p>是否消耗 [剑醒] 以获得 <b>虚招优势</b>？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"jianxing\", 1);\n        args.flags.feintLevel += 1;\n        ui.notifications.info(\"已消耗 [剑醒]，虚招获优势\");\n    }\n}",
                             "active": true
                         },
                         {
                             "label": "击破-弃武",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"jiaoxie\");\n    ui.notifications.info(`${args.target.name} 被弃武(缴械)！`);\n}",
+                            "script": "if (args.isBroken) {\n    const jiaoxie = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jiaoxie\"));\n    jiaoxie.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, jiaoxie);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#8b0000; font-weight:bold; border-left:3px solid #8b0000; background:rgba(139,0,0,0.1);\"><i class=\"fas fa-exclamation-triangle\"></i> ${args.target.name} 被弃武(缴械)！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -4856,10 +4859,12 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，持剑引天，对周围敌人造成武器伤害值*2 点外功伤害，击中无架招敌人时，为自己的武器添加一层“天风”，最多五层，持续到战斗脱离。</p><p><strong>天风：</strong>每层使你装备的武器伤害+5，格挡值+5。</p><p>·命中前，你可以选择消耗“剑醒”状态，使此招的攻击范围变为 5。</p><p><strong>升级：</strong>武器伤害系数+1，内力消耗+4。</p>",
-                    "automationNote": "伤害计算自动。获天风自动。消耗剑醒改距离手动。",
+                    "automationNote": "伤害计算基于武器锐度。命中无架招敌人获天风自动。消耗剑醒改距离需手动判定目标。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
-                        "growth": 0
+                        "growth": 0,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -4870,15 +4875,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "武器伤害计算",
+                            "label": "纯武器伤害倍率计算",
                             "trigger": "calc",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst multiplier = 1 + (lvl - 1);\nconst weaponDmg = args.baseData.weapon || 0;\nargs.output.damage += weaponDmg * (1 + multiplier);\nargs.output.bonusDesc.push(`武器倍率修正 +${weaponDmg * (1 + multiplier)}`);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst multiplier = 2 + (lvl - 1);\n\nlet wDmg = args.baseData.weapon || 0;\nlet wRankBonus = 0;\n\nif (args.baseData.isWeaponMatch && move.weaponType && actor.system.combat.weaponRanks) {\n    const rank = actor.system.combat.weaponRanks[move.weaponType]?.total || 0;\n    if (rank <= 4) wRankBonus = rank * 1;\n    else if (rank <= 8) wRankBonus = rank * 2;\n    else wRankBonus = rank * 3;\n}\n\nlet wFlatBonus = actor.system.combat.damages.weapon?.total || 0;\nif (move.weaponType && actor.system.combat.damages.weaponTypes) {\n    wFlatBonus += actor.system.combat.damages.weaponTypes[move.weaponType]?.total || 0;\n}\n\nconst totalWeapon = wDmg + wRankBonus + wFlatBonus;\nconst finalDmg = totalWeapon * multiplier;\n\nargs.output.damage += finalDmg;\nargs.output.bonusDesc.push(`剑法锐度 (${totalWeapon} x ${multiplier}倍): +${finalDmg}`);",
                             "active": true
                         },
                         {
                             "label": "消耗剑醒",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianxing\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"剑啸天风起\" },\n        content: `<p>是否消耗 [剑醒] 以提升 <b>攻击范围</b> 至 5米？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await buff.delete();\n        ui.notifications.info(\"已消耗 [剑醒]，请手动判定 5米 范围。\");\n    }\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianxing\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"剑啸天风起\" },\n        content: `<p>是否消耗 [剑醒] 以提升 <b>攻击范围</b> 至 5米？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"jianxing\", 1);\n        ui.notifications.info(\"已消耗 [剑醒]，请手动将范围判定扩展至 5米。\");\n    }\n}",
                             "active": true
                         },
                         {
@@ -4893,7 +4898,7 @@
             "effects": [
                 {
                     "name": "剑醒",
-                    "icon": "icons/weapons/swords/sword-guard-blue.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "武器伤害+10，格挡值+5。",
                     "transfer": false,
                     "flags": {
@@ -4917,7 +4922,7 @@
                 },
                 {
                     "name": "天风",
-                    "icon": "icons/magic/air/wind-weather-snow-gusts-blue.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "每层武器伤害+5，格挡+5。",
                     "transfer": false,
                     "flags": {
