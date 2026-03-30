@@ -795,15 +795,15 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，足背紧绷，连环撩踢两脚，对目标造成 2 次伤害（只需投掷一次命中）。</p><p>·若目标无架招，则箭步而上，两脚猛踢目标下颚，将其击飞 3 米。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "伤害倍率自动计算(已包含在公式中)。无架招击飞自动提示。",
+                    "description": "<p>主要动作，足背紧绷，连环撩踢两脚，对目标造成 2 次伤害（只需投掷一次命中）。</p><p>·若目标无架招，则箭步而上，两脚猛踢目标下颚，将其击飞 3 米。</p><p><strong>升级：</strong>单次招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "面板伤害为单次伤害。命中后通过脚本自动发起第二次真实独立的伤害结算。无架招击飞发送卡片提醒。",
                     "calculation": {
                         "base": 0,
-                        "growth": 20,
+                        "growth": 10,
                         "scalings": [
                             {
                                 "prop": "liliang",
-                                "ratio": 0.8
+                                "ratio": 0.4
                             }
                         ]
                     },
@@ -817,13 +817,14 @@
                             7,
                             6,
                             5
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "无架招击飞",
+                            "label": "二连踢结算与击飞",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(`${args.target.name} 被击飞 3 米。`);\n}",
+                            "script": "if (args.isHit) {\n    actor.showFloatyText(\"连环踢！\", {fill: \"#ff9800\"});\n    \n    // 自动应用第二次完全相同的真实伤害\n    await args.target.applyDamage({\n        amount: args.baseDamage,\n        type: args.type,\n        attacker: actor,\n        isHit: true,\n        isCrit: args.isCrit,\n        applyCritDamage: args.config.applyCritDamage,\n        ignoreBlock: args.config.ignoreBlock,\n        ignoreDefense: args.config.ignoreDefense,\n        ignoreStance: args.config.ignoreStance,\n        isSkill: true,\n        element: args.element,\n        item: args.item,\n        move: args.move\n    });\n    \n    // 击飞判定\n    if (!args.target.system.martial.stanceActive) {\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c0392b; font-weight:bold; border-left:3px solid #c0392b; background:rgba(192,57,43,0.1);\"><i class=\"fas fa-wind\"></i> ${args.target.name} 被猛踢下颚，击飞 3 米！</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
