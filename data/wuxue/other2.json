@@ -2359,5 +2359,595 @@
                 }
             ]
         }
+    },
+    {
+        "name": "五阴剑法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>孽人谷八大孽客之一，为满足谷主要求，耗时三天所创。剑势阴损，专攻要害，且闪转诡异。一旦成势，身如鬼魅，孽人谷弟子多有修习。</p><p><strong>需求：</strong>剑</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "化阴成风",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "waigong",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>反手运剑，足底生阴，开启招架。格挡成功后，进入“阴风”状态，持续一回合。</p><p><strong>阴风：</strong>你的闪避值提高至等同于外功命中的数值。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。格挡后自动获得阴风状态，闪避值动态同步外功命中。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡获阴风",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"阴风\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "斩阴逐咽",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>回身一剑，横扫咽喉，对目标造成 0.3 内息点内功伤害。击破目标架招时，额外造成 10 气血流失，并使其声带受创无法说话，需休养 3 天。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。击破架招后自动造成10点流失伤害并发送声带受创提示。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破割喉",
+                            "trigger": "hit",
+                            "script": "if (args.isBroken) {\n    await args.target.applyDamage({ amount: 10, type: \"liushi\", attacker: actor });\n    const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding: 4px; padding-left: 8px; border-left: 4px solid #8b0000; background: rgba(139,0,0,0.05); margin-left: 2px;\"><b style=\"color:#8b0000;\"><i class=\"fas fa-cut\"></i> 咽喉割裂</b><br>目标声带受创无法说话，需休养 3 天！</div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "飞阴断脉",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>（可使用反应动作施展）俯身连刺，剑势袭杀，对目标造成 0.4 内息点内功伤害，并将其击退 1 米。</p><p>·当有目标处于半空中时，可消耗反应动作施展此招，飞身击敌于空，并将其击退 1 米。</p><p>·若你具有“阴风”，本招式的击退效果改为击飞。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "反应施展需手动扣除动作。击退与击飞效果将发送卡片提示，请玩家手动位移。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞/击退提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const hasYinfeng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinfeng\");\n    const actionName = hasYinfeng ? \"击飞\" : \"击退 1 米\";\n    const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding: 4px; padding-left: 8px; border-left: 4px solid #2980b9; background: rgba(41,128,185,0.05); margin-left: 2px;\"><b style=\"color:#2980b9;\"><i class=\"fas fa-wind\"></i> 强力冲击</b><br>目标被 ${actionName}！</div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "震阴破岳",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "1米",
+                    "targetInfo": "范围",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，快速连扫数剑，对周围所有敌人造成 0.5 内息点内功伤害，同时将他们击倒。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "请手动选中周围目标。命中后自动给目标施加倒地状态。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "范围击倒",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (prone) {\n        await game.xjzl.api.effects.addEffect(args.target, prone);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "五阴断魂",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>毫无征兆，一剑穿心，对目标造成 0.6 内息点内功伤害。若此招将目标打入濒死，目标陷入“禁疗”，持续三回合。</p><p>·若你具有“阴风”，将阴风的持续回合延长到战斗结束。</p><p><strong>升级：</strong>招式伤害+10，怒气-1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。濒死自动禁疗。自动延长阴风时间。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "濒死禁疗与延时",
+                            "trigger": "hit",
+                            "script": "if (args.isDying) {\n    const jl = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinliao\"));\n    if (jl) {\n        jl.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, jl);\n        ui.notifications.info(`${args.target.name} 被剑刺穿心脉，陷入禁疗！`);\n    }\n}\nif (args.isHit) {\n    const yf = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinfeng\");\n    if (yf) {\n        await yf.update({ \"duration.rounds\": null, \"duration.seconds\": null, \"duration.turns\": null });\n        actor.showFloatyText(\"阴风不息！\", { fill: \"#8e44ad\" });\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "阴风",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "闪避值提高至等同于外功命中的数值。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yinfeng",
+                            "stackable": false
+                        }
+                    },
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "scripts": [
+                        {
+                            "label": "闪避同步被动",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "const targetDodge = S.combat.hitWaigongTotal || 0;\nconst currentBaseDodge = Math.floor(10 + ((S.stats.shenfa?.total || 0) / 4) + (S.combat.dodge || 0));\nconst diff = targetDodge - currentBaseDodge;\nif (diff !== 0) S.combat.dodge += diff;"
+                        }
+                    ],
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "撩阴刺",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>专攻下三路的卑鄙武学，为武林人士不齿。</p><p><strong>需求：</strong>匕首-单刺</p><p><strong>属性：</strong>阴</p>",
+            "requirements": "匕首-单刺",
+            "moves": [
+                {
+                    "name": "偷梁换柱",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>刺其大腿，造成 0.3 内息点内功伤害。击中无架招目标使其下盘不稳，持续一回合。</p><p>若目标已经处于“下盘不稳”，则将其击倒。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。无架招自动施加下盘不稳，已有则自动转为倒地。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "下盘不稳转倒地",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const hasUnstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\n    if (hasUnstable) {\n        const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n        if (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n    } else {\n        const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n        if (unstable) {\n            unstable.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, unstable);\n        }\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "凝息聚意",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>缩刺待敌，开启架招。获得“阴损”状态，持续到战斗脱离或解除架招。</p><p><strong>阴损：</strong>你从背后攻击目标时，伤害增加 4 点。</p><p><strong>升级：</strong>格挡值+5，阴损伤害+3，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。开启时获得阴损。出招时阴损BUFF会弹窗询问是否为背后攻击并自动计算成长加伤。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启阴损",
+                            "trigger": "attack",
+                            "script": "const eff = thisItem.effects.getName(\"阴损\").toObject();\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 4 + (lvl - 1) * 3;\neff.flags[\"xjzl-system\"].yinsunBonus = bonus;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "钻裆越人",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作，压制对方虚招，钻过对手裤裆攻击目标身后，造成 0.5 内息点内功伤害，使目标下盘不稳，持续一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。命中自动施加下盘不稳。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "钻裆下盘不稳",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if (unstable) {\n        unstable.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, unstable);\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "断子绝孙",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>攻击目标命根，造成 0.6 内息点内功伤害。若此次攻击使目标陷入濒死，则其残疾检定前需要投掷一个[韧性]检定（难度 13），失败则残疾检定结果必然为 80。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "濒死时自动弹出韧性检定，检定提示中已说明失败后果。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "致残检定",
+                            "trigger": "hit",
+                            "script": "if (args.isDying) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"renxing\",\n        dc: 13,\n        label: \"抵抗断子绝孙\",\n        failureText: \"痛苦钻心，残疾检定结果必然为 80！\"\n    });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "阴损",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "从背后攻击目标时获得伤害增加。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yinsun",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "背后攻击判定",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "if (actor.uuid === args.attacker?.uuid) {\n    const bonus = thisEffect.getFlag(\"xjzl-system\", \"yinsunBonus\") || 4;\n    const targetName = args.target?.name || \"目标\";\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"阴损发作\" },\n        content: `<p>是否从背后攻击 <b>${targetName}</b>？</p>`,\n        yes: { label: `是 (伤害 +${bonus})`, icon: \"fas fa-check\" },\n        no: { label: \"否\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 背后攻击(阴损): ${bonus}`;\n    }\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
+    },
+    {
+        "name": "黄河拳法",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>黄河帮拳法，并非黄河帮所创，原名不详，招式平平无奇，好在势大力沉，施展之时颇有威风。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>刚</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "奔流到海",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>一拳平推，势大力沉，对目标造成 0.4 力量点外功伤害，招式暴击时，击退目标 3 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击退效果将发送卡片提示，请玩家手动位移。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "暴击击退",
+                            "trigger": "hit",
+                            "script": "if (args.isHit && args.isCrit) {\n    const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding: 4px; padding-left: 8px; border-left: 4px solid #2980b9; background: rgba(41,128,185,0.05); margin-left: 2px;\"><b style=\"color:#2980b9;\"><i class=\"fas fa-water\"></i> 奔流到海</b><br>目标被击退 3 米！</div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "后浪借力",
+                    "type": "stance",
+                    "element": "gang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>双拳护胸，扎稳马步，开启架招。格挡成功后获得一层“蓄劲”，至多三层，持续到脱战。</p><p><strong>蓄劲：</strong>每层使你暴击骰-1。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。格挡成功后自动给自身叠加系统通用状态[蓄劲] (该武学上限为3层)。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡获蓄劲",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst xujin = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"xujin\"));\nif (xujin) {\n    xujin.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(actor, xujin);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "惊涛拍岸",
+                    "type": "counter",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破目标虚招，可消耗反应动作释放此招，压制目标虚招，顺势一拳捣出，对其造成 0.5 力量点外功伤害，你每有 1 层“蓄劲”，击退对手 1 米。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击退效果将根据蓄劲层数发送卡片提示，请玩家手动位移。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "蓄劲击退",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const xujin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xujin\");\n    const stacks = xujin ? (xujin.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks > 0) {\n        const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding: 4px; padding-left: 8px; border-left: 4px solid #2980b9; background: rgba(41,128,185,0.05); margin-left: 2px;\"><b style=\"color:#2980b9;\"><i class=\"fas fa-water\"></i> 惊涛拍岸</b><br>爆发 ${stacks} 层蓄劲，目标被击退 ${stacks} 米！</div></div>`;\n        ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "咆哮黄河",
+                    "type": "qi",
+                    "isUltimate": true,
+                    "actionType": "buff",
+                    "element": "gang",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>大吼一声，双拳绷紧，进入“咆哮”状态，持续一回合。</p><p><strong>咆哮：</strong>当你击退任何目标时，额外使目标流失 10 点气血，并陷入“下盘不稳”状态一回合。</p><p><strong>升级：</strong>怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "施放本套路的击退招式时会自动触发咆哮效果。若使用其他武学击退目标，请根据状态描述手动应用流失和下盘不稳。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ],
+                        "rage": [
+                            4,
+                            3,
+                            2
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "进入咆哮",
+                            "trigger": "hit",
+                            "script": "const eff = thisItem.effects.getName(\"咆哮\").toObject();\neff.duration = { rounds: 1 };\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "active": true
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "咆哮",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "当你击退任何目标时，额外使目标流失 10 点气血，并陷入“下盘不稳”状态一回合。若使用其他武学击退目标，请手动应用气血流失和下盘不稳状态。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "paoxiao",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "咆哮追击",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "if (!args.isHit) return;\nlet isPushback = false;\n// 判定奔流到海暴击或惊涛拍岸具有蓄劲\nif (args.move.name === \"奔流到海\" && args.isCrit) {\n    isPushback = true;\n} else if (args.move.name === \"惊涛拍岸\") {\n    const xujin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xujin\");\n    if (xujin && (xujin.getFlag(\"xjzl-system\", \"stacks\") || 1) > 0) isPushback = true;\n}\n\nif (isPushback) {\n    await args.target.applyDamage({ amount: 10, type: \"liushi\", attacker: actor });\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if (unstable) {\n        unstable.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, unstable);\n    }\n    const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding: 4px; padding-left: 8px; border-left: 4px solid #8b0000; background: rgba(139,0,0,0.05); margin-left: 2px;\"><b style=\"color:#8b0000;\"><i class=\"fas fa-skull-crossbones\"></i> 咆哮触发</b><br>目标额外流失 10 点气血并陷入下盘不稳！</div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
     }
 ]
