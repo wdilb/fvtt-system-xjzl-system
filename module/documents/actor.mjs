@@ -1270,7 +1270,8 @@ export class XJZLActor extends Actor {
       isBroken = false,   // 是否被破防 (状态，不可逆)
       isSkill = true,     // false表示普通攻击
       move = null,
-      item = null
+      item = null,
+      source = "extra"    // 伤害来源标识 (move, basic, both, dot, extra)，默认是extra也就是额外伤害，用来处理哪些伤害应该触发濒死、易伤等问题
     } = data;
 
     // 构建可配置对象 (Mutable Config)
@@ -1441,7 +1442,9 @@ export class XJZLActor extends Actor {
 
     // --- 计算流失伤害 ---
     let liushiDamage = 0;
-    if (finalDamage > 0) {
+    // 仅招式、普攻、复合、Dot 触发易伤，额外伤害(extra)不触发
+    const validYishangSources = ["move", "basic", "both", "dot"];
+    if (finalDamage > 0 && validYishangSources.includes(source)) {
       liushiDamage += (this.xjzlStatuses.bleedOnHit || 0);
       if (["waigong", "neigong"].includes(type)) {
         liushiDamage += (this.xjzlStatuses.wuxueBleedOnHit || 0);
@@ -1489,7 +1492,7 @@ export class XJZLActor extends Actor {
           currentHP = 0;
           res.p += hpTake;
           remaining -= hpTake;
-          isDying = true;
+          if (hpTake > 0) isDying = true; // 只有确实扣了血导致归零，才算“刚刚濒死”
         }
       }
 
@@ -1544,7 +1547,11 @@ export class XJZLActor extends Actor {
     if (!wasDead) {
       // A. 濒死判定
       const isHitWhileDying = (originalHP <= 0 && finalDamage > 0);
-      if (isDying || isHitWhileDying) {
+      // 鞭尸有效性：只有来源是 招式、普攻 或 复合，鞭尸才发卡片/触发濒死
+      const validWhipCorpse = ["move", "basic", "both"].includes(source);
+      // 如果是“刚被打入濒死(isDying)” 必定触发
+      // 如果是“躺着被鞭尸(isHitWhileDying)”，则必须来源有效才触发
+      if (isDying || (isHitWhileDying && validWhipCorpse)) {
         await this.runScripts(SCRIPT_TRIGGERS.DYING, statusCtx);
         if (statusCtx.preventDying) {
           isDying = false;

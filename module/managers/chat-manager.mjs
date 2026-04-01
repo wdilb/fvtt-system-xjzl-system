@@ -1281,6 +1281,11 @@ export class ChatCardManager {
             }
             // 判断是否是招式
             const isSkillDamage = move.type !== "basic";
+            // 判定伤害来源 (source)
+            let damageSource = "move";
+            if (flags.actionType === "basic-attack") {
+                damageSource = flags.moveId === "opportunity" ? "both" : "basic";
+            }
             // C. 调用 Actor 伤害处理
             const damageResult = await targetActor.applyDamage({
                 amount: damageConfig.amount,     // 面板伤害
@@ -1297,7 +1302,8 @@ export class ChatCardManager {
                 isSkill: isSkillDamage,
                 element: damageConfig.element,
                 move: move,
-                item: item
+                item: item,
+                source: damageSource       // 注入来源标识
             });
 
             // 统计数据更新为该目标发送独立伤害卡片 (仅命中时)
@@ -1651,7 +1657,7 @@ export class ChatCardManager {
             if (isHit && config.isBroken && targetActor.system.martial?.stanceActive) {
                 // A. 移除架招状态
                 await ChatCardManager._safeUpdateDocument(targetActor, { "system.martial.stanceActive": false });
-                
+
                 // B. 应用 "破防" 状态
                 const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
                 if (statusConfig) {
@@ -1661,9 +1667,9 @@ export class ChatCardManager {
                         description: game.i18n.localize(statusConfig.description),
                         origin: attacker ? attacker.uuid : message.uuid
                     };
-                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect",[breakEffectData]);
+                    await ChatCardManager._safeCreateEmbedded(targetActor, "ActiveEffect", [breakEffectData]);
                 }
-                
+
                 // C. 视觉反馈
                 if (targetActor.showFloatyText) {
                     targetActor.showFloatyText("被击破架招！", { fill: "#ff0000" });
@@ -1693,6 +1699,13 @@ export class ChatCardManager {
             // 判断是否为招式
             const isSkillDamage = move.type !== "basic";
 
+            // 判定伤害来源 (source)
+            let damageSource = "move";
+            if (flags.actionType === "basic-attack") {
+                // 如果是趁虚而入，既算普攻也算招式
+                damageSource = flags.moveId === "opportunity" ? "both" : "basic";
+            }
+
             // 调用 Actor 伤害接口
             const damageResult = await targetActor.applyDamage({
                 amount: damageConfig.amount,
@@ -1709,7 +1722,8 @@ export class ChatCardManager {
                 isSkill: isSkillDamage,
                 element: damageConfig.element,
                 move: move,
-                item: item
+                item: item,
+                source: damageSource       // 注入来源标识
             });
 
             if (isHit) {
