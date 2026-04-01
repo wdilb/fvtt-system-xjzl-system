@@ -747,20 +747,6 @@
         "name": "梅花刀",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-        "effects": [
-            {
-                "name": "衔刀",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                "description": "视作装备嘴中之刀，仅在用嘴刀进行普通攻击时，方生效嘴中之刀的伤害、格挡、特效。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_xiandao_buff",
-                        "stackable": false
-                    }
-                },
-                "changes": []
-            }
-        ],
         "system": {
             "category": "wuxue",
             "sect": "sihaibiaomeng",
@@ -787,6 +773,16 @@
                         ],
                         "rage": [],
                         "hp": []
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
                     }
                 },
                 {
@@ -839,7 +835,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>将手中刀叼在嘴里，刀随身走，进入“衔刀”状态，持续到战斗脱离。</p><p><strong>衔刀：</strong>你可以用嘴中之刀施展普通攻击且伤害+5。</p><p>·你视作装备嘴中之刀，但仅在用嘴刀进行普通攻击时，方生效嘴中之刀的伤害、格挡、特效。</p><p><strong>升级：</strong>衔刀伤害+5，内力消耗+1。</p>",
-                    "automationNote": "提供描述性BUFF。脚本会自动将当前招式等级对应的增伤数值写入BUFF描述中。请在普攻时手动填写此加成。",
+                    "automationNote": "完全自动化。普通攻击自动增伤，如果存在不是用嘴里的刀攻击的情况请手动减伤。",
                     "costs": {
                         "mp": [
                             1,
@@ -858,7 +854,7 @@
                             "label": "衔刀BUFF",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effectData = thisItem.effects.getName(\"衔刀\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl * 5;\neffectData.description += `<br><strong style=\"color:#d35400;\">(当前普攻额外伤害加成: +${bonus})</strong>`;\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                            "script": "const effectData = thisItem.effects.getName(\"衔刀\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl * 5;\n\n// 动态设置 Changes，对普攻增加伤害\neffectData.changes =[{\n    key: \"system.combat.damages.normal.mod\",\n    mode: 2,\n    value: String(bonus)\n}];\n\neffectData.description += `<br><strong style=\"color:#d35400;\">(当前普攻额外伤害加成: +${bonus})</strong>`;\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ]
                 },
@@ -873,7 +869,7 @@
                     "targetInfo": "路径敌人",
                     "actionCost": "蓄力动作",
                     "description": "<p>左步缠头，右步劈刀，快步奔行，对周围目标造成 0.5 力量点外功伤害。</p><p>·此招可移动释放，对移动路径上周围 1 米范围内的敌人造成伤害。（不会重复造成伤害）</p><p>·若你处于“衔刀”，本招式伤害提升嘴中之刀的伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "移动攻击路径选定需手动处理（框选路径上所有敌人应用）。若处于[衔刀]状态，请根据你当前的武器面板，手动在弹窗中增加修正伤害。",
+                    "automationNote": "完全自动化。",
                     "costs": {
                         "mp": [
                             4,
@@ -896,10 +892,33 @@
                                 "ratio": 0.5
                             }
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "衔刀额外加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.name === \"衔刀\")) {\n    const weaponDmg = args.baseData.weapon || 0;\n    args.output.damage += weaponDmg;\n    args.output.bonusDesc.push(`衔刀加成: +${weaponDmg} (武器基础伤害)`);\n}"
+                        }
+                    ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "衔刀",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                "description": "视作装备嘴中之刀，进行普通攻击时额外增加伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_xiandao_buff",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "地术拳",
