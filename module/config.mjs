@@ -1188,9 +1188,10 @@ XJZL.statusEffects = [
     description: "XJZL.Status.DyingDesc",
     img: "icons/svg/down.svg", // 向下的箭头或倒地人影
     flags: { "xjzl-system": { slug: "dying", stackable: false } },
-    // changes: [
-    //   { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
-    // ]
+    changes: [
+      // { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.regenMpTurnStart", mode: 2, value: "-5" }
+    ]
   },
   {
     id: "dead",
