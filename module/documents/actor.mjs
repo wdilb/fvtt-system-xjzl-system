@@ -1966,7 +1966,8 @@ export class XJZLActor extends Actor {
           isHit: true,        // 状态伤害必定命中
           ignoreBlock: true,  // 无法被格挡
           ignoreStance: true, // 无视架招反击
-          ignoreDefense: true // 无视常规内外功护甲，仅拼抗性
+          ignoreDefense: true, // 无视常规内外功护甲，仅拼抗性
+          source: "dot" //这是一种dot伤害
         });
 
         // 构造专属的流血战报发送给聊天栏
