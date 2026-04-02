@@ -636,8 +636,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>狰狞露骨，幽神魔怵，不耗速度突进至目标周围空格，探爪敲击，造成伤害。击破架招时，为其添加“错骨”持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击破施加错骨自动。突进手动。",
+                    "description": "<p>狰狞露骨，幽神魔怵，不耗速度突进至目标周围空格，探爪敲击，造成 0.6 力量点外功伤害。击破架招时，为其添加“错骨”持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击破施加错骨自动。突进需手动移动Token。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -654,14 +654,16 @@
                             8,
                             12,
                             16
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "击破错骨",
+                            "label": "击破施加错骨",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        // 持续到脱战，不设 duration\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被错骨！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const eff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n    if(eff) {\n        eff.duration = { rounds: 99 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        actor.showFloatyText(\"击破错骨！\", { fill: \"#8b0000\" });\n    }\n}"
                         }
                     ]
                 },
@@ -674,8 +676,8 @@
                     "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>阴气牵引，抓伤目标造成伤害，将其朝自己的方向拉扯 3 米并陷入倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害和倒地自动。拉扯效果发送卡片提醒。",
+                    "description": "<p>阴气牵引，抓伤目标造成 0.7 力量点外功伤害，将其朝自己的方向拉扯 3 米并陷入倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "倒地自动。拉扯效果会发送卡片提示，需手动移动Token。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -692,14 +694,16 @@
                             8,
                             12,
                             16
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "拉扯与倒地",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    if (prone) {\n        await game.xjzl.api.effects.addEffect(args.target, prone);\n    }\n\n    const content = `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left:8px; border-left:4px solid #673ab7; background:rgba(103,58,183,0.1); margin-left:2px;\">\n            <div style=\"font-weight:bold; color:#512da8; font-size:1.1em;\"><i class=\"fas fa-hand-rock\"></i> 阴气牵引</div>\n            <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                将目标 <b>${args.target.name}</b> 朝自己方向拉扯 <span style=\"font-weight:bold; color:#311b92;\">3</span> 米！\n            </div>\n        </div>\n    </div>`;\n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: content\n    });\n}"
+                            "script": "if (args.isHit) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    if (prone) {\n        await game.xjzl.api.effects.addEffect(args.target, prone);\n    }\n    const content = `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left:8px; border-left:4px solid #673ab7; background:rgba(103,58,183,0.1); margin-left:2px;\">\n            <div style=\"font-weight:bold; color:#512da8; font-size:1.1em;\"><i class=\"fas fa-hand-rock\"></i> 阴气牵引</div>\n            <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                将目标 <b>${args.target.name}</b> 朝自己方向拉扯 <span style=\"font-weight:bold; color:#311b92;\">3</span> 米！\n            </div>\n        </div>\n    </div>`;\n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: content\n    });\n}"
                         }
                     ]
                 },
@@ -712,8 +716,8 @@
                     "range": "20米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你受到远程攻击（包括暗器、箭矢、凝空的剑气、掌力等）并受到伤害后，可消耗反应动作，气满冲贯，十指凝爪，真气射向目标造成伤害。若目标无架招，气机穿其眉心，使其阴气入体，陷入“封招”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "无架招施加封招自动。",
+                    "description": "<p>当你受到远程攻击（包括暗器、箭矢、凝空的剑气、掌力等）并受到伤害后，可消耗反应动作，气满冲贯，十指凝爪，真气射向目标造成 0.6 力量点外功伤害。若目标无架招，气机穿其眉心，使其阴气入体，陷入“封招”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -730,14 +734,16 @@
                             8,
                             12,
                             16
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "无架招封招",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被封招！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fengzhao\"));\n    if(eff) {\n        eff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        actor.showFloatyText(\"穿心封招！\", { fill: \"#8b0000\" });\n    }\n}"
                         }
                     ]
                 },
@@ -752,7 +758,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>阴珠手中擒，抓骨吸精鬼，阴气覆盖手指，获得“白骨”，持续到战斗脱离。</p><p><strong>白骨：</strong>下一次徒手招式伤害+10，命中敌人后与其进行[角力]对抗，若你获胜，则按顺序将其肢体捏碎，视作断裂。</p><p>捏碎顺序：右腿，左手，左腿，右手，头骨。</p><p>若对方没有此部位，则按顺序捏碎下一个部位，头骨破裂时目标直接死亡（无需进行死亡检定）。</p><p><strong>升级：</strong>招式伤害+5，角力检定+2，内力消耗+4。</p>",
-                    "automationNote": "应用白骨自动。白骨加伤逻辑较为特殊，建议手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -763,14 +769,16 @@
                             8,
                             12,
                             16
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "应用白骨",
+                            "label": "动态施加白骨",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"白骨\").toObject();\n// 升级逻辑：修改描述或提示\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 5;\n\n// 动态更新描述以提示玩家\neff.description += ` (当前伤害加成: ${dmgBonus})`;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"白骨\").toObject();\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 5;\nconst jiaoliBonus = (lvl - 1) * 2;\n\n// 存入 flags 供读取\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.dmgBonus\", dmgBonus);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.jiaoliBonus\", jiaoliBonus);\n\nif (jiaoliBonus > 0) {\n    eff.changes.push({\n        key: \"system.skills.jiaoli.mod\",\n        mode: 2,\n        value: String(jiaoliBonus)\n    });\n}\n\neff.description += ` <br>(当前加成：伤害 +${dmgBonus}，角力检定 +${jiaoliBonus})`;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -784,8 +792,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>摧敌首脑，如穿腐土，十爪对周围目标造成伤害，若目标已经陷入“错骨”，则使其进行一次伤残检定，且具有劣势。</p><p>·若此招攻击的目标已经存在残疾（包括不可磨灭的伤痕），招式伤害提高 30 点，且你获得“白骨”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "对错骨目标提示检定自动。残疾目标加伤和获白骨手动。",
+                    "description": "<p>摧敌首脑，如穿腐土，十爪对周围目标造成 0.8 力量点外功伤害，若目标已经陷入“错骨”，则使其进行一次伤残检定，且具有劣势。</p><p>·若此招攻击的目标已经存在残疾（包括不可磨灭的伤痕），招式伤害提高 30 点，且你获得“白骨”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "完全自动化。伤害结算前弹窗询问目标是否残疾。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -808,34 +816,68 @@
                             7,
                             6,
                             5
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "错骨提示",
+                            "label": "前置残疾确认",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"弱点洞察 - 剖心刻骨\" },\n    content: `<p>目标 <b>${args.target.name}</b> 是否已经存在残疾（或不可磨灭的伤痕）？</p>`,\n    yes: { label: \"是 (伤害+30)\", icon: \"fas fa-check\" },\n    no: { label: \"否\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    args.config.amount += 30;\n    // 用 attacker 对象临时做个标记，留给 hit_once 使用\n    args.attacker.pouxin_baigu = true;\n}"
+                        },
+                        {
+                            "label": "错骨伤残提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasCuogu = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"cuogu\");\n    if (hasCuogu) {\n        ChatMessage.create({\n            content: `<b>剖心刻骨提示：</b>目标 ${args.target.name} 处于 [错骨] 状态，请进行伤残检定 (劣势)。`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const hasCuogu = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"cuogu\");\n    if (hasCuogu) {\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\">\n                <div style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1);\">\n                    <div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-bone-break\"></i> 骨骼碎裂！</div>\n                    <div style=\"font-size:0.9em; margin-top:3px;\">目标 <b>${args.target.name}</b> 处于[错骨]，必须进行一次 <b>伤残检定 (劣势)</b>。</div>\n                </div>\n            </div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
+                        },
+                        {
+                            "label": "后置结算白骨",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (args.attacker.pouxin_baigu) {\n    const hasBaigu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"baigu\");\n    if (hasBaigu) {\n        args.preventBaiguConsume = true;\n    } else {\n        const eff = thisItem.effects.getName(\"白骨\").toObject();\n        eff.origin = thisItem.uuid;\n        const yinsi = thisItem.system.moves.find(m => m.name === \"阴丝灌手\");\n        const lvl = yinsi ? Math.max(1, yinsi.computedLevel || 1) : 1;\n        const dmgBonus = 10 + (lvl - 1) * 5;\n        const jiaoliBonus = (lvl - 1) * 2;\n        \n        foundry.utils.setProperty(eff, \"flags.xjzl-system.dmgBonus\", dmgBonus);\n        foundry.utils.setProperty(eff, \"flags.xjzl-system.jiaoliBonus\", jiaoliBonus);\n        \n        if (jiaoliBonus > 0) {\n            eff.changes.push({ key: \"system.skills.jiaoli.mod\", mode: 2, value: String(jiaoliBonus) });\n        }\n        eff.description += ` <br>(当前加成：伤害 +${dmgBonus}，角力检定 +${jiaoliBonus})`;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n    delete args.attacker.pouxin_baigu;\n}"
                         }
                     ]
                 }
             ],
-            "effects": [
-                {
-                    "name": "白骨",
-                    "icon": "icons/skills/melee/unarmed-claw-purple.webp",
-                    "description": "下次徒手招式伤害增加。命中后角力捏碎肢体。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "baigu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
-            ]
-        }
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "白骨",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "下一次徒手招式伤害增加。命中后发起角力对抗捏碎肢体，出招后消失。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "baigu",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "徒手加伤",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "if (args.move.weaponType === 'unarmed' && args.move.name !== '阴丝灌手') {\n    const bonus = thisEffect.getFlag('xjzl-system', 'dmgBonus') || 10;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`白骨加伤 +${bonus}`);\n}"
+                            },
+                            {
+                                "label": "发起捏骨对抗",
+                                "trigger": "hit",
+                                "active": true,
+                                "script": "if (args.move.weaponType === 'unarmed' && args.move.name !== '阴丝灌手' && args.isHit) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'jiaoli',\n        defType: 'jiaoli',\n        label: '白骨 - 捏碎肢体',\n        outcome: {\n            win: {\n                text: '角力获胜！按顺序将其肢体捏碎：右腿 -> 左手 -> 左腿 -> 右手 -> 头骨。若捏碎头骨，目标直接死亡（无死检）！'\n            },\n            lose: {\n                text: '目标拼死抵抗，未能捏碎其肢体。'\n            }\n        }\n    });\n}"
+                            },
+                            {
+                                "label": "消耗白骨",
+                                "trigger": "hit_once",
+                                "active": true,
+                                "script": "if (args.move.weaponType === 'unarmed' && args.move.name !== '阴丝灌手') {\n    if (!args.preventBaiguConsume) {\n        const jiaoliBonus = thisEffect.getFlag('xjzl-system', 'jiaoliBonus') || 0;\n        if (jiaoliBonus > 0 && args.hitCount > 0) {\n            const msg = `<div class=\"xjzl-chat-card\">\n                <div style=\"padding:5px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.1);\">\n                    <div style=\"font-weight:bold; color:#8e44ad;\"><i class=\"fas fa-info-circle\"></i> 角力检定提示</div>\n                    <div style=\"font-size:0.9em; margin-top:3px; color:#555;\">\n                        [白骨] 状态已消耗。请在随后的【捏碎肢体】角力对抗检定中，<b>手动增加 +${jiaoliBonus}</b> 的加值！\n                    </div>\n                </div>\n            </div>`;\n            ChatMessage.create({\n                content: msg,\n                speaker: ChatMessage.getSpeaker({actor: actor})\n            });\n        }\n        await game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 1);\n    }\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "九宫八卦剑",
