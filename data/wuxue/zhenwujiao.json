@@ -1608,7 +1608,7 @@
             "category": "wuxue",
             "sect": "zhenwujiao",
             "tier": 2,
-            "description": "<p>真武教弟子进阶剑法，志在守朴，养素全真，招式古朴拙重，但气象不凡。</p><p><strong>需求：</strong>剑-单剑，全真道</p><p><strong>属性：</strong>太极</p>",
+            "description": "<p>真武教弟子进阶剑法，志在守朴，养素全真，招式古朴拙重，但气象不凡。</p><p><strong>需求：</strong>剑-单剑，全真道 <strong>属性：</strong>太极</p>",
             "requirements": "剑-单剑；全真道",
             "moves": [
                 {
@@ -1620,8 +1620,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>飞射剑气对目标造成伤害，若目标无架招，将其击倒。</p><p>若有敌人处于半空中，可消耗反应动作原地释放，剑气射敌于空，造成伤害并将其击倒。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "命中无架招自动击倒。半空判定手动。",
+                    "description": "<p>（可消耗反应动作释放）飞射剑气对目标造成 0.5 内息点内功伤害，若目标无架招，将其击倒。</p><p>若有敌人处于半空中，可消耗反应动作原地释放，剑气射敌于空，造成伤害并将其击倒。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中无架招自动击倒。半空判定为环境判断，请手动处理额外击倒情况。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1636,14 +1636,15 @@
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
                             "label": "无架招击倒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    ChatMessage.create({content: `${args.target.name} 被剑气击倒！`});\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n}",
                             "active": true
                         }
                     ]
@@ -1657,8 +1658,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>剑势连摆，造成伤害。击破架招时，为自身添加“西风残照”三回合。</p><p><strong>西风残照：</strong>《全真剑法》的招式造成伤害时，可击倒敌人。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破获得BUFF自动。击倒效果需手动。",
+                    "description": "<p>剑势连摆，造成 0.4 内息点内功伤害。击破架招时，为自身添加“西风残照”三回合。</p><p><strong>西风残照：</strong>《全真剑法》的招式造成伤害时，可击倒敌人。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。击破架招后自动获得BUFF，BUFF自动监测全真剑法伤害并击倒目标。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1673,14 +1674,15 @@
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
                             "label": "获得西风残照",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"西风残照\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"西风残照\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ]
@@ -1694,8 +1696,8 @@
                     "range": "2米",
                     "targetInfo": "范围",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破虚招后，可消耗反应动作释放此招，压制对方虚招，然后跃起（半空中）剑舞，对周围目标造成伤害，并将他们全部击飞。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击飞手动。",
+                    "description": "<p>当你看破虚招后，可消耗反应动作释放此招，压制对方虚招，然后跃起（半空中）剑舞，对周围目标造成 0.6 内息点内功伤害，并将他们全部击飞。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中时发送击飞聊天提示，实际位移请结合地图手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1710,21 +1712,30 @@
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞提示",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    actor.showFloatyText(\"击飞!\", { fill: \"#FFFFFF\" });\n    ChatMessage.create({content: `${args.target.name} 被击飞！`, speaker: ChatMessage.getSpeaker({actor: actor})});\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "薄雾浓云",
                     "type": "stance",
                     "element": "taiji",
-                    "damageType": "waigong",
+                    "damageType": "none",
                     "weaponType": "sword",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>轻挽剑花，开启架招，获得 10 点护体真气，持续到战斗脱离。在你下个回合开始时，如果有护体真气，则护体真气消散，然后你回复护体真气数值的气血。</p><p><strong>升级：</strong>格挡值+10，护体真气增加 10 点，消耗+2。</p>",
-                    "automationNote": "开启获得护体自动。回合开始转化气血自动。",
+                    "automationNote": "完全自动化。开启时自动获得护体和监测状态。下回合开始时自动转化护体为气血。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1733,14 +1744,15 @@
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "获得护体&挂载监测",
+                            "label": "获得护体",
                             "trigger": "attack",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst hutiVal = 10 + (lvl - 1) * 10;\n// 1. 获得护体 (使用 applyHealing 会有飘字反馈)\nawait actor.applyHealing({amount: hutiVal, type: \"huti\"});\n\n// 2. 挂载转化监测\nconst eff = thisItem.effects.getName(\"薄雾浓云-转化\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst hutiVal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({amount: hutiVal, type: \"huti\", showScrolling: true});\n\nconst eff = thisItem.effects.getName(\"薄雾浓云\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -1755,8 +1767,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>剑分节击目标造成伤害，并使目标陷入“禁足”三回合，然后无消耗施展一次【薄雾浓云】。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "命中禁足自动。施展架招需手动。",
+                    "description": "<p>剑分节击目标造成 0.7 内息点内功伤害，并使目标陷入“禁足”三回合，然后无消耗施展一次【薄雾浓云】。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。命中自动施加禁足，并自动无消耗开启【薄雾浓云】并获得相关效果。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1771,19 +1783,21 @@
                         "mp": [
                             4,
                             8,
-                            12
+                            12,
+                            16
                         ],
                         "rage": [
                             7,
                             6,
-                            5
+                            5,
+                            4
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "禁足&架招提示",
+                            "label": "禁足与自动架招",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    ChatMessage.create({content: `${args.target.name} 被禁足！`});\n    ui.notifications.info(\"请手动免费开启【薄雾浓云】架招。\");\n}",
+                            "script": "if (args.isHit) {\n    const root = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (root) {\n        root.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, root);\n    }\n    \n    const stanceMove = thisItem.system.moves.find(m => m.name === \"薄雾浓云\");\n    if (stanceMove) {\n        const lvl = Math.max(1, stanceMove.computedLevel || 1);\n        const hutiVal = 10 + (lvl - 1) * 10;\n        await actor.applyHealing({amount: hutiVal, type: \"huti\", showScrolling: true});\n        \n        const eff = thisItem.effects.getName(\"薄雾浓云\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n        \n        await actor.update({\n            \"system.martial.stanceActive\": true,\n            \"system.martial.stance\": stanceMove.id,\n            \"system.martial.stanceItemId\": thisItem.id\n        });\n        \n        ui.notifications.info(\"已自动无消耗开启【薄雾浓云】\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1792,21 +1806,29 @@
             "effects": [
                 {
                     "name": "西风残照",
-                    "icon": "icons/magic/air/wind-weather-autumn-leaves-brown.webp",
-                    "description": "全真剑法招式造成伤害可击倒敌人。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/真武.png",
+                    "description": "《全真剑法》的招式造成伤害时，可击倒敌人。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "xifengcanzhao",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "击倒",
+                                    "trigger": "hit",
+                                    "script": "if (args.isHit && args.hpLost > 0 && args.item?.name === \"全真剑法\") {\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (prone) {\n        await game.xjzl.api.effects.addEffect(args.target, prone);\n        actor.showFloatyText(\"残照击倒!\", { fill: \"#FFA500\" });\n    }\n}",
+                                    "active": true
+                                }
+                            ]
                         }
                     },
                     "changes": []
                 },
                 {
-                    "name": "薄雾浓云-转化",
-                    "icon": "icons/magic/water/fog-cloud-white.webp",
-                    "description": "下回合开始时护体转化为气血。",
+                    "name": "薄雾浓云",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/真武.png",
+                    "description": "下回合开始时，护体真气消散，回复同等数值气血。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1816,7 +1838,7 @@
                                 {
                                     "label": "转化护体",
                                     "trigger": "turnStart",
-                                    "script": "const huti = actor.system.resources.huti || 0;\nif (huti > 0) {\n    // 转化回血\n    await actor.applyHealing({amount: huti, type: 'hp'});\n    // 清空护体\n    await actor.update({'system.resources.huti': 0});\n    // 视觉提示\n    if (actor.token?.object) {\n        actor.showFloatyText(\"护体转化\", { fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4 });\n    }\n}\n// 无论是否触发转化，回合开始后监测即结束\nawait thisEffect.delete();",
+                                    "script": "const huti = actor.system.resources.huti || 0;\nif (huti > 0) {\n    await actor.applyHealing({amount: -huti, type: 'huti'});\n    await actor.applyHealing({amount: huti, type: 'hp', showScrolling: true});\n    if (actor.token?.object) {\n        actor.showFloatyText(\"护体转化\", { fill: \"#00FFFF\", strokeThickness: 4 });\n    }\n}\nawait thisEffect.delete();",
                                     "active": true
                                 }
                             ]
