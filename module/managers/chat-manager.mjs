@@ -2144,8 +2144,12 @@ export class ChatCardManager {
         // 3. 执行属性检定
         const config = flags.config || {};
         const attrKey = role === "attacker" ? config.attAttr : config.defAttr;
+        // === 提取对应的临时修正值 ===
+        const specificBonus = role === "attacker" ? (config.attBonus || 0) : (config.defBonus || 0);
         const roll = await actor.rollAttributeTest(attrKey, {
-            chatMessage: false
+            chatMessage: false,
+            // === 传入 bonus，actor.mjs 中的 options.bonus 会自动将其设为弹窗的默认值 ===
+            bonus: specificBonus 
         });
 
         if (!roll) return;

@@ -86,6 +86,8 @@ export class XJZLMacros {
      * @param {Object} options
      * @param {Actor} options.attacker   发起者 Actor (通常是 current actor)
      * @param {Actor} options.defender   对抗者 Actor (目标)
+     * @param {Number} [options.attBonus=0] 发起者在本次对抗中的临时加值/减值
+     * @param {Number} [options.defBonus=0] 对抗者在本次对抗中的临时加值/减值
      * @param {String} options.type      发起者的属性 Key (如 "neili")
      * @param {String} [options.defType] 对抗者的属性 Key (如果不填，默认和发起者一致)
      * @param {String} [options.label]   对抗标题 (如 "内力比拼", "吸星大法")
@@ -93,7 +95,7 @@ export class XJZLMacros {
      * @param {String} [options.loseText] 发起者失败时的描述文本
      * @param {Object} [options.outcome] 自动化配置
      */
-    static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome }) {
+    static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome, attBonus = 0, defBonus = 0 }) {
         if (!attacker || !defender) return ui.notifications.error("对抗请求缺少参与双方。");
         if (!type) return ui.notifications.error("对抗请求缺少属性类型。");
 
@@ -140,7 +142,9 @@ export class XJZLMacros {
                 attLabel: attLabel,
                 defLabel: defLabel,
                 label: label || "属性对抗",
-                outcome: finalOutcome // 存入清洗后的自动化配置
+                outcome: finalOutcome, // 存入清洗后的自动化配置
+                attBonus: attBonus, 
+                defBonus: defBonus
             },
             // 状态记录
             state: {
