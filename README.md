@@ -508,6 +508,8 @@ await Macros.requestSave({
 | :--- | :--- | :--- |
 | `attacker` | Actor | 发起者角色 (必须)。 |
 | `defender` | Actor | 对抗者角色 (必须)。 |
+| `attBonus` | Number | 发起者在本次对抗中的临时加值/减值（默认0）。 |
+| `defBonus` | Number | 对抗者在本次对抗中的临时加值/减值（默认0）。 |
 | `type` | String | 发起者的属性 Key (如 `"neili"`)。 |
 | `defType` | String | **(可选)** 对抗者的属性 Key。不填则默认与发起者相同。 |
 | `label` | String | **(可选)** 卡片标题 (如 "吸星大法")。 |
