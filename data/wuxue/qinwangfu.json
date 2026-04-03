@@ -769,16 +769,14 @@
                             8,
                             12,
                             16
-                        ],
-                        "rage": [],
-                        "hp": []
+                        ]
                     },
                     "scripts": [
                         {
                             "label": "动态施加白骨",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"白骨\").toObject();\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 5;\nconst jiaoliBonus = (lvl - 1) * 2;\n\n// 存入 flags 供读取\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.dmgBonus\", dmgBonus);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.jiaoliBonus\", jiaoliBonus);\n\nif (jiaoliBonus > 0) {\n    eff.changes.push({\n        key: \"system.skills.jiaoli.mod\",\n        mode: 2,\n        value: String(jiaoliBonus)\n    });\n}\n\neff.description += ` <br>(当前加成：伤害 +${dmgBonus}，角力检定 +${jiaoliBonus})`;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                            "script": "const eff = thisItem.effects.getName(\"白骨\").toObject();\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 5;\nconst jiaoliBonus = (lvl - 1) * 2;\n\n// 存入 flags 供读取，绝不污染 changes\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.dmgBonus\", dmgBonus);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.jiaoliBonus\", jiaoliBonus);\n\neff.description += ` <br>(当前加成：伤害 +${dmgBonus}，角力检定 +${jiaoliBonus})`;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -864,13 +862,13 @@
                                 "label": "发起捏骨对抗",
                                 "trigger": "hit",
                                 "active": true,
-                                "script": "if (args.move.weaponType === 'unarmed' && args.move.name !== '阴丝灌手' && args.isHit) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'jiaoli',\n        defType: 'jiaoli',\n        label: '白骨 - 捏碎肢体',\n        outcome: {\n            win: {\n                text: '角力获胜！按顺序将其肢体捏碎：右腿 -> 左手 -> 左腿 -> 右手 -> 头骨。若捏碎头骨，目标直接死亡（无死检）！'\n            },\n            lose: {\n                text: '目标拼死抵抗，未能捏碎其肢体。'\n            }\n        }\n    });\n}"
+                                "script": "if (args.move.weaponType === 'unarmed' && args.move.name !== '阴丝灌手' && args.isHit) {\n    const jiaoliBonus = thisEffect.getFlag('xjzl-system', 'jiaoliBonus') || 0;\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'jiaoli',\n        defType: 'jiaoli',\n        label: '白骨 - 捏碎肢体',\n        attBonus: jiaoliBonus, // <--- 直接应用对抗加值！\n        outcome: {\n            win: {\n                text: '角力获胜！按顺序将其肢体捏碎：右腿 -> 左手 -> 左腿 -> 右手 -> 头骨。若捏碎头骨，目标直接死亡（无死检）！'\n            },\n            lose: {\n                text: '目标拼死抵抗，未能捏碎其肢体。'\n            }\n        }\n    });\n}"
                             },
                             {
                                 "label": "消耗白骨",
                                 "trigger": "hit_once",
                                 "active": true,
-                                "script": "if (args.move.weaponType === 'unarmed' && args.move.name !== '阴丝灌手') {\n    if (!args.preventBaiguConsume) {\n        const jiaoliBonus = thisEffect.getFlag('xjzl-system', 'jiaoliBonus') || 0;\n        if (jiaoliBonus > 0 && args.hitCount > 0) {\n            const msg = `<div class=\"xjzl-chat-card\">\n                <div style=\"padding:5px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.1);\">\n                    <div style=\"font-weight:bold; color:#8e44ad;\"><i class=\"fas fa-info-circle\"></i> 角力检定提示</div>\n                    <div style=\"font-size:0.9em; margin-top:3px; color:#555;\">\n                        [白骨] 状态已消耗。请在随后的【捏碎肢体】角力对抗检定中，<b>手动增加 +${jiaoliBonus}</b> 的加值！\n                    </div>\n                </div>\n            </div>`;\n            ChatMessage.create({\n                content: msg,\n                speaker: ChatMessage.getSpeaker({actor: actor})\n            });\n        }\n        await game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 1);\n    }\n}"
+                                "script": "if (args.move.weaponType === 'unarmed' && args.move.name !== '阴丝灌手') {\n    // 只要有命中目标且没有被剖心刻骨截断，就移除白骨（去掉了之前冗余的聊天卡片提示）\n    if (!args.preventBaiguConsume && args.hitCount > 0) {\n        await game.xjzl.api.effects.removeEffect(actor, thisEffect.id, 1);\n    }\n}"
                             }
                         ]
                     }
