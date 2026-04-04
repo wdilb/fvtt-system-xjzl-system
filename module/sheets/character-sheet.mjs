@@ -11,6 +11,7 @@ import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 import { XJZLManageXPDialog } from "../applications/manage-xp.mjs";
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { XJZLCharacterPreviewApp } from "../applications/character-preview.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -1344,6 +1345,33 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             await this.document.update({ "system.social.relations": relations });
             return;
         }
+    }
+
+    /* -------------------------------------------- */
+    /*  窗口顶部按钮 (Header Controls)               */
+    /* -------------------------------------------- */
+    _getHeaderControls() {
+        const controls = super._getHeaderControls();
+
+        // 往菜单里塞入“预览角色卡”按钮
+        controls.push({
+            action: "previewCharacter",
+            label: "预览角色卡",
+            icon: "fas fa-id-card",
+            onClick: this._onPreviewCharacter.bind(this)
+        });
+
+        return controls;
+    }
+
+    /**
+     * 点击“预览角色卡”时的处理逻辑
+     */
+    async _onPreviewCharacter(event) {
+        event.preventDefault();
+        // 实例化新 App
+        // 传入当前的角色 document
+        new XJZLCharacterPreviewApp({ actor: this.document }).render(true);
     }
 
     /* -------------------------------------------- */
