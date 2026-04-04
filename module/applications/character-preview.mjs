@@ -40,17 +40,19 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
     }
 
     /**
-     * 永久剥离截图法（100%解决报错与错位）
+     * 导出角色长图
+     * 采用离屏克隆与 Canvas 图标转换技术，避免与FVTT底层机制冲突
      */
     async _onExportImage(event) {
         event.preventDefault();
 
-        if (typeof html2canvas === "undefined") {
-            ui.notifications.info("正在初次加载图像引擎，请稍候...");
+        // 1. 动态加载 html-to-image 截图引擎
+        if (typeof htmlToImage === "undefined") {
+            ui.notifications.info("正在加载高精度图像引擎，请稍候...");
             try {
                 await new Promise((resolve, reject) => {
                     const script = document.createElement('script');
-                    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+                    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
                     script.onload = resolve;
                     script.onerror = reject;
                     document.head.appendChild(script);
@@ -60,52 +62,147 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             }
         }
 
-        ui.notifications.info("正在生成图片，请保持窗口打开...");
+        ui.notifications.info("正在生成高清档案图，这可能需要几秒钟...");
 
-        const targetElement = this.element.querySelector(".xjzl-preview-content");
+        const sourceElement = this.element.querySelector(".xjzl-preview-content");
 
-        // 1. 【终极必杀】在活体 DOM 上永久剥离所有可编辑属性！
-        const editables = targetElement.querySelectorAll('[contenteditable]');
+        // 2. 创建 DOM 克隆，剥离可编辑属性以防止 Foundry 编辑器报错
+        const cloneElement = sourceElement.cloneNode(true);
+        const editables = cloneElement.querySelectorAll('[contenteditable]');
         editables.forEach(el => {
             el.removeAttribute('contenteditable');
             el.removeAttribute('spellcheck');
-            el.blur(); // 失去焦点，消除发光边框
         });
 
-        // 2. 强制休眠 100ms，让浏览器完全重新计算失去 contenteditable 后的稳固排版
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // 3. 构建离屏渲染容器，继承应用原有样式，避免干扰当前视口
+        const offScreenContainer = document.createElement('div');
+        offScreenContainer.className = "xjzl-character-preview-app theme-dark";
+        Object.assign(offScreenContainer.style, {
+            position: 'absolute',
+            left: '-9999px',
+            top: '-9999px',
+            zIndex: '-999',
+            width: `${this.element.offsetWidth}px`
+        });
 
-        // 3. 执行截图
+        // 还原窗口的渐变背景与内边距
+        const windowContent = document.createElement('div');
+        windowContent.className = "window-content";
+        Object.assign(windowContent.style, {
+            padding: '20px',
+            background: 'radial-gradient(circle at 50% 0%, #2a2a2a 0%, #111111 80%)',
+            height: 'auto'
+        });
+
+        windowContent.appendChild(cloneElement);
+        offScreenContainer.appendChild(windowContent);
+
+        // 必须挂载至 body 下，才能使 getComputedStyle 正常解析伪元素
+        document.body.appendChild(offScreenContainer);
+
+        // 4. 等待字体加载完成并执行图标替换处理
+        await document.fonts.ready;
+        await this._replaceIconsWithImages(offScreenContainer);
+
+        // 预留短暂时延，确保 DOM 布局及图片替换完全稳定
+        await new Promise(resolve => setTimeout(resolve, 150));
+
         try {
-            const canvas = await html2canvas(targetElement, {
-                backgroundColor: "#111111",
-                scale: 2,
-                useCORS: true,
-                logging: false
+            // 5. 执行截图渲染
+            const dataUrl = await htmlToImage.toPng(windowContent, {
+                quality: 1.0,
+                pixelRatio: 2,
+                skipFonts: true, // 忽略字体跨域报错（已通过图标替换解决）
+                filter: (node) => {
+                    if (node.tagName === 'SCRIPT') return false;
+                    return true;
+                }
             });
 
-            // 下载图片
+            // 6. 触发图片下载
             const link = document.createElement("a");
             link.download = `${this.actor.name}-角色档案.png`;
-            link.href = canvas.toDataURL("image/png");
+            link.href = dataUrl;
             link.click();
-            ui.notifications.info("图片导出成功！(预览已锁定，如需修改请重新打开本窗口)");
+            ui.notifications.info("图片导出成功！");
 
         } catch (err) {
-            console.error(err);
-            ui.notifications.error("图片生成失败！");
+            console.error("生成图片失败:", err);
+            ui.notifications.error("图片生成失败！请按 F12 查看控制台。");
+        } finally {
+            // 7. 销毁离屏容器，释放内存
+            offScreenContainer.remove();
         }
-        // 注意：这里不再把 contenteditable 加回去了，直接锁定。
     }
 
-    // 强力清洗器：挫骨扬灰掉 V13 自动生成的 prose-mirror 标签和空段落
+    /**
+     * 将容器内的 FontAwesome 字体图标转换为真实 <img> 标签
+     * 解决由于跨域或 CSS 路径解析失败导致的截图图标丢失问题
+     */
+    async _replaceIconsWithImages(container) {
+        const icons = container.querySelectorAll('i.fas, i.far, i.fab, i.fal, i.fad, i.fa');
+
+        for (let icon of icons) {
+            const compStyle = window.getComputedStyle(icon, '::before');
+            const content = compStyle.content;
+
+            if (!content || content === 'none' || content === 'normal') continue;
+
+            let charCode;
+            try {
+                // 解析 CSS content 返回的 unicode 字符串 (例如 '"\\f02d"')
+                charCode = JSON.parse(content);
+            } catch (e) {
+                charCode = content.replace(/['"]/g, '');
+            }
+
+            const fontSize = parseFloat(compStyle.fontSize) || 16;
+            const color = compStyle.color;
+            const fontFamily = compStyle.fontFamily;
+            const fontWeight = compStyle.fontWeight;
+
+            // 创建临时画布绘制图标
+            const canvas = document.createElement('canvas');
+            const size = fontSize * 1.25; // 预留安全区防止裁切边界
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(charCode, size / 2, size / 2);
+
+            // 将画布转化为图片节点
+            const img = document.createElement('img');
+            img.src = canvas.toDataURL('image/png');
+            img.style.width = `${size}px`;
+            img.style.height = `${size}px`;
+            img.style.display = 'inline-block';
+            img.style.verticalAlign = 'middle';
+
+            const parentStyle = window.getComputedStyle(icon);
+            const offset = (size - fontSize) / 2;
+
+            // 使用负边界抵消画布留白，确保文字排版流不受影响
+            img.style.margin = `0 -${offset}px`;
+            img.style.marginLeft = `calc(${parentStyle.marginLeft} - ${offset}px)`;
+            img.style.marginRight = `calc(${parentStyle.marginRight} - ${offset}px)`;
+
+            // 节点替换
+            icon.replaceWith(img);
+        }
+    }
+
+    /**
+     * 清洗富文本数据，移除 FVTT 的隐藏标签和首尾空行
+     */
     _cleanRichText(htmlStr) {
         if (!htmlStr) return "";
         let res = htmlStr;
-        // 抹除 prose-mirror 标签 (保留内部文本)
         res = res.replace(/<prose-mirror[^>]*>/gi, '');
         res = res.replace(/<\/prose-mirror>/gi, '');
-        // 抹除开头和结尾的空段落
         res = res.replace(/^(<p>\s*(<br\s*\/?>|&nbsp;|\s)*<\/p>\s*)+/gi, "");
         res = res.replace(/(<p>\s*(<br\s*\/?>|&nbsp;|\s)*<\/p>\s*)+$/gi, "");
         return res.trim();
@@ -121,6 +218,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         const actor = this.actor;
         const system = actor.system;
 
+        // 基础信息
         let sectKey = system.info.sect || "无门派";
         let sectDisplay = sectKey;
         if (CONFIG.XJZL?.sects?.[sectKey]) {
@@ -146,12 +244,14 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             mpMax: system.resources.mp.max
         };
 
+        // 核心属性
         const statKeys = ["liliang", "shenfa", "tipo", "wuxing", "neixi", "qigan", "shencai"];
         context.stats = statKeys.map(key => ({
             label: game.i18n.localize(`XJZL.Stats.${this._capitalize(key)}`),
             value: system.stats[key].total
         }));
 
+        // 战斗属性
         context.combat = [
             { label: "移动速度", value: system.combat.speedTotal },
             { label: "先攻", value: system.combat.initiativeTotal },
@@ -166,15 +266,17 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             { label: "内功暴击", value: system.combat.critNeigongTotal }
         ];
 
+        // 生活技能
         const allSkillGroups = [
             { key: "wuxing", label: "悟", skills: ["wuxue", "jianding", "bagua", "shili"] },
             { key: "liliang", label: "力", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
             { key: "shenfa", label: "身", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
             { key: "tipo", label: "体", skills: ["renxing", "biqi", "rennai", "ningxue"] },
-            { key: "neixi", label: "息", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
-            { key: "qigan", label: "感", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
+            { key: "neixi", label: "内", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
+            { key: "qigan", label: "气", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
             { key: "shencai", label: "神", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
         ];
+
         context.skillGroups = allSkillGroups.map(group => ({
             label: group.label,
             skills: group.skills.map(sk => ({
@@ -183,6 +285,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             }))
         }));
 
+        // 技艺
         const artsList = [];
         for (const [key, artData] of Object.entries(system.arts || {})) {
             if (artData.total > 0) {
@@ -192,6 +295,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         }
         context.arts = artsList;
 
+        // 运行内功
         context.activeNeigong = null;
         if (system.martial.active_neigong) {
             const ng = actor.items.get(system.martial.active_neigong);
@@ -205,12 +309,14 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             }
         }
 
+        // 常用招式梳理
         const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
         const pinnedSet = new Set(pinnedList);
         const wuxueGroups = [];
 
         for (const wuxue of (actor.itemTypes.wuxue || [])) {
             const pinnedMoves = (wuxue.system.moves || []).filter(m => pinnedSet.has(`${wuxue.id}.${m.id}`));
+
             if (pinnedMoves.length > 0) {
                 const catKey = wuxue.system.category || 'wuxue';
                 let catDisplay = CONFIG.XJZL?.wuxueCategories?.[catKey]
@@ -223,6 +329,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                     moves: pinnedMoves.map(m => {
                         const derived = wuxue.calculateMoveDamage(m.id) || { damage: 0 };
                         let blockValue = 0;
+
                         if (m.type === "stance") {
                             const lvl = Math.max(1, m.computedLevel || 1);
                             const base = m.calculation?.base || 0;
@@ -246,7 +353,6 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                             isFeint: m.type === "feint",
                             feintValue: m.baseFeint || 0,
                             damage: derived.damage,
-                            // 调用强力清空行正则
                             description: this._cleanRichText(m.description) || "暂无描述"
                         };
                     })
