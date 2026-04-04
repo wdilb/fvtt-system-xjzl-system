@@ -228,9 +228,18 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             sectDisplay = !locTry.startsWith("XJZL") ? locTry : game.i18n.localize(sectKey);
         }
 
-        const realmMap = { 0: "未入门", 1: "人级领悟", 2: "人级小成", 3: "人级圆满", 4: "地级小成", 5: "地级圆满", 6: "天级小成", 7: "天级圆满" };
+        const realmMap = { 0: "未入门", 1: "不堪一击", 2: "初窥门径", 3: "略有小成", 4: "融会贯通", 5: "炉火纯青", 6: "登峰造极", 7: "撼天动地" };
         const rLevel = system.cultivation.realmLevel || 0;
 
+        const getAttitude = (val) => {
+            if (!val || val === "none") return "无视";
+            const fallback = { "zhonshi": "重视", "wushi": "无视" };
+            let locKey = CONFIG.XJZL?.attitudes?.[val] || `XJZL.Attitudes.${this._capitalize(val)}`;
+            let translated = game.i18n.localize(locKey);
+            return (!translated.startsWith("XJZL")) ? translated : (fallback[val] || val);
+        };
+
+        // 1. 基础信息
         context.basic = {
             name: actor.name,
             img: actor.img,
@@ -240,6 +249,13 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             personality: actor.itemTypes.personality?.[0]?.name || "无",
             xiayi: system.social.xiayi || 0,
             exing: system.social.exing || 0,
+            shalu: system.resources.shalu?.value || 0,
+            shanie: system.resources.shanie || 0,
+            repWulin: system.social.rep_wulin || 0,
+            repChaoting: system.social.rep_chaoting || 0,
+            attWulin: getAttitude(system.social.attitude_wulin),
+            attChaoting: getAttitude(system.social.attitude_chaoting),
+            attShisu: getAttitude(system.social.attitude_shisu),
             hpMax: system.resources.hp.max,
             mpMax: system.resources.mp.max
         };
@@ -251,30 +267,48 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             value: system.stats[key].total
         }));
 
-        // 战斗属性
+        // 通过借用 Actor 的方法直接测算普攻伤害
+        let basicAttackDamage = 0;
+        try {
+            const weapon = actor.itemTypes.weapon.find(i => i.system.equipped);
+            const weaponType = weapon ? weapon.system.type : "unarmed";
+            const baseDamage = weapon ? (weapon.system.damage || 0) : 0;
+            // 构建虚拟招式对象喂给测算函数
+            const mockMove = { name: "普通攻击", type: "basic", damageType: "waigong", weaponType: weaponType };
+            const mockItem = { id: "basic", name: "普通攻击", type: "basic", getFlag: () => null, flags: {} };
+            const calcRes = actor._calculateBasicAttackDamage(mockMove, baseDamage, { bonusDamage: 0 }, "basic", 0, mockItem);
+            basicAttackDamage = calcRes ? calcRes.damage : 0;
+        } catch (e) {
+            console.warn("预览计算普攻伤害失败:", e);
+        }
+
+        // 2. 战斗属性 (修改为3行4列排版顺序，并加入普攻伤害)
         context.combat = [
             { label: "移动速度", value: system.combat.speedTotal },
             { label: "先攻", value: system.combat.initiativeTotal },
             { label: "闪避", value: system.combat.dodgeTotal },
             { label: "格挡", value: system.combat.blockTotal },
-            { label: "看破", value: system.combat.kanpoTotal },
+
             { label: "外功命中", value: system.combat.hitWaigongTotal },
-            { label: "内功命中", value: system.combat.hitNeigongTotal },
             { label: "外功防御", value: system.combat.defWaigongTotal },
-            { label: "内功防御", value: system.combat.defNeigongTotal },
             { label: "外功暴击", value: system.combat.critWaigongTotal },
-            { label: "内功暴击", value: system.combat.critNeigongTotal }
+            { label: "看破", value: system.combat.kanpoTotal },
+
+            { label: "内功命中", value: system.combat.hitNeigongTotal },
+            { label: "内功防御", value: system.combat.defNeigongTotal },
+            { label: "内功暴击", value: system.combat.critNeigongTotal },
+            { label: "普攻伤害", value: basicAttackDamage }
         ];
 
         // 生活技能
         const allSkillGroups = [
-            { key: "wuxing", label: "悟", skills: ["wuxue", "jianding", "bagua", "shili"] },
-            { key: "liliang", label: "力", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
-            { key: "shenfa", label: "身", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
-            { key: "tipo", label: "体", skills: ["renxing", "biqi", "rennai", "ningxue"] },
-            { key: "neixi", label: "内", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
-            { key: "qigan", label: "气", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
-            { key: "shencai", label: "神", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
+            { key: "wuxing", label: "悟性", skills: ["wuxue", "jianding", "bagua", "shili"] },
+            { key: "liliang", label: "力量", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
+            { key: "shenfa", label: "身法", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
+            { key: "tipo", label: "体魄", skills: ["renxing", "biqi", "rennai", "ningxue"] },
+            { key: "neixi", label: "内息", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
+            { key: "qigan", label: "气感", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
+            { key: "shencai", label: "神采", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
         ];
 
         context.skillGroups = allSkillGroups.map(group => ({
@@ -313,6 +347,8 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
         const pinnedSet = new Set(pinnedList);
         const wuxueGroups = [];
+        // 招式等级映射表
+        const levelNames = ["未入门", "领悟", "掌握", "精通", "合一"];
 
         for (const wuxue of (actor.itemTypes.wuxue || [])) {
             const pinnedMoves = (wuxue.system.moves || []).filter(m => pinnedSet.has(`${wuxue.id}.${m.id}`));
@@ -337,12 +373,17 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                             blockValue = base + growth * (lvl - 1);
                         }
 
+                        // 安全获取招式等级对应名称 (防止越界)
+                        const stageIndex = Math.min(4, Math.max(0, m.computedLevel || 0));
+
                         return {
                             name: m.name,
+                            levelName: levelNames[stageIndex], // 【新增】加入等级中文名称
                             type: m.type,
                             typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
                             isUltimate: m.isUltimate,
                             range: m.range,
+                            // ... 保持原有的 cost, blockValue 等等不变 ...
                             cost: {
                                 hp: m.costs.hp?.[Math.max(0, m.computedLevel - 1)] || 0,
                                 mp: m.costs.mp?.[Math.max(0, m.computedLevel - 1)] || 0,
