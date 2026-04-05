@@ -537,57 +537,53 @@
             "category": "wuxue",
             "sect": "jiangjunying",
             "tier": 1,
-            "description": "<p>开弓时以“风”“大风”为号而得名，箭借风势，威力陡增，连绵不绝，由军中弓兵、游骑所习。</p>",
+            "description": "<p>开弓时以“风”“大风”为号而得名，箭借风势，威力陡增，连绵不绝，由军中弓兵、游骑所习。</p><p><strong>需求：</strong>奇门-弓 <strong>属性：</strong>阳</p>",
             "requirements": "奇门-弓",
             "moves": [
                 {
                     "name": "弓马娴熟",
                     "type": "stance",
                     "element": "yang",
+                    "damageType": "none",
                     "weaponType": "special",
                     "weaponSubtype": "弓",
-                    "damageType": "none",
-                    "description": "<p>次要动作，握弓勾弦，开启架招，同时进入“游击”状态，持续到战斗脱离或被击破架招。<br>游击：你的移动速度+1；若在本场战斗中你未曾对一个目标造成过伤害，且该目标也未曾攻击过你，你对其攻击时伤害+10。<br>·若在骑马时，你的骑乘马匹也被添加“游击”。</p>",
-                    "actionCost": "次要动作",
                     "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>握弓勾弦，开启架招，同时进入“游击”状态，持续到战斗脱离或被击破架招。</p><p><strong>游击：</strong>你的移动速度+1；若在本场战斗中你未曾对一个目标造成过伤害，且该目标也未曾攻击过你，你对其攻击时伤害+10。</p><p>·若在骑马时，你的骑乘马匹也被添加“游击”。</p><p><strong>升级：</strong>格挡值+5，游击提供的速度+1，消耗+1。</p>",
+                    "automationNote": "开启游击自动赋予动态速度。对未交互目标的伤害加成 (+10) 需玩家手动判断并添加修正。马匹Buff需手动添加。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5
+                    },
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
                         ]
-                    },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 5
                     },
                     "scripts": [
                         {
                             "label": "应用游击",
                             "trigger": "attack",
-                            "script": "await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"游击\"));\nui.notifications.info(\"进入游击状态\");",
+                            "script": "const eff = thisItem.effects.getName(\"游击\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst speedBonus = 1 + (lvl - 1);\neff.changes.push({ key: \"system.combat.speed\", mode: 2, value: String(speedBonus) });\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`进入游击状态 (速度+${speedBonus})`);",
                             "active": true
                         }
-                    ],
-                    "automationNote": "对未交互目标的伤害加成 (+10) 需玩家手动判断并添加修正。马匹Buff需手动添加。"
+                    ]
                 },
                 {
                     "name": "风劲弓鸣",
                     "type": "real",
                     "element": "yang",
+                    "damageType": "waigong",
                     "weaponType": "special",
                     "weaponSubtype": "弓",
-                    "damageType": "waigong",
-                    "description": "<p>主要动作，策风搭箭，对目标造成 0.4 力量点外功伤害后获得一层“乘风”，至多三层持续到脱战。<br>乘风：每层使你速度+1。<br>·若在骑马时施展，招式提升马匹速度的伤害。</p>",
-                    "actionCost": "主要动作",
                     "range": "10米",
-                    "costs": {
-                        "mp": [
-                            1,
-                            2,
-                            3
-                        ]
-                    },
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>策风搭箭，对目标造成 0.4 力量点外功伤害后获得一层“乘风”，至多三层持续到脱战。</p><p><strong>乘风：</strong>每层使你速度+1。</p><p>·若在骑马时施展，招式提升马匹速度的伤害。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "命中获乘风自动。骑马速度加伤需手动在弹窗中添加数值修正。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -598,26 +594,6 @@
                             }
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "命中获乘风",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(actor, \"chengfeng\");\n}",
-                            "active": true
-                        }
-                    ],
-                    "automationNote": "骑马速度加伤需手动在弹窗中添加数值修正。"
-                },
-                {
-                    "name": "暗箭难防",
-                    "type": "counter",
-                    "element": "yang",
-                    "weaponType": "special",
-                    "weaponSubtype": "弓",
-                    "damageType": "waigong",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制对方虚招，冷箭瞬发，给对方造成 0.5 力量点外功伤害。<br>若你处于“游击”状态，你每有 1 点移动速度，招式伤害+1。</p>",
-                    "actionCost": "反应动作",
-                    "range": "10米",
                     "costs": {
                         "mp": [
                             1,
@@ -625,6 +601,27 @@
                             3
                         ]
                     },
+                    "scripts": [
+                        {
+                            "label": "命中获乘风",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"乘风\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "暗箭难防",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "waigong",
+                    "weaponType": "special",
+                    "weaponSubtype": "弓",
+                    "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制对方虚招，冷箭瞬发，给对方造成 0.5 力量点外功伤害。</p><p>若你处于“游击”状态，你每有 1 点移动速度，招式伤害+1。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "游击状态下自动计算速度加伤。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -635,11 +632,18 @@
                             }
                         ]
                     },
+                    "costs": {
+                        "mp": [
+                            1,
+                            2,
+                            3
+                        ]
+                    },
                     "scripts": [
                         {
                             "label": "游击速度加伤",
                             "trigger": "calc",
-                            "script": "if (actor.effects.some(e => e.name === \"游击\")) {\n    const speed = S.combat.speedTotal || 0;\n    args.output.damage += speed;\n    args.output.bonusDesc.push(`游击速度加成: +${speed}`);\n}",
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"youji\")) {\n    const speed = S.combat.speedTotal || 0;\n    args.output.damage += speed;\n    args.output.bonusDesc.push(`游击速度加成: +${speed}`);\n}",
                             "active": true
                         }
                     ]
@@ -649,12 +653,24 @@
                     "type": "real",
                     "isUltimate": true,
                     "element": "yang",
+                    "damageType": "waigong",
                     "weaponType": "special",
                     "weaponSubtype": "弓",
-                    "damageType": "waigong",
-                    "description": "<p>主要动作，大喊风！风！风！射出爆鸣，对目标造成 0.6 力量点外功伤害，同时将其击倒。<br>·若在骑马时施展，且你处于“游击”状态，你可以移除游击，不消耗动作施展一次【风劲弓鸣】。</p>",
-                    "actionCost": "主要动作",
                     "range": "10米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>大喊风！风！风！射出爆鸣，对目标造成 0.6 力量点外功伤害，同时将其击倒。</p><p>·若在骑马时施展，且你处于“游击”状态，你可以移除游击，不消耗动作施展一次【风劲弓鸣】。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "命中击倒自动。触发骑马连招时，请手动移除游击状态并施展【风劲弓鸣】（勾选免费施展）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
                     "costs": {
                         "mp": [
                             2,
@@ -667,44 +683,49 @@
                             5
                         ]
                     },
-                    "calculation": {
-                        "base": 0,
-                        "growth": 10,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.6
-                            }
-                        ]
-                    },
                     "scripts": [
                         {
                             "label": "击倒目标",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n}",
+                            "script": "if (args.isHit) {\n    const prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n}",
                             "active": true
                         }
-                    ],
-                    "automationNote": "触发骑马连招时，请手动移除游击状态并施展【风劲弓鸣】（勾选免费施展）。"
+                    ]
                 }
             ],
             "effects": [
                 {
                     "name": "游击",
-                    "icon": "icons/svg/wing.svg",
-                    "description": "移动速度+1。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                    "description": "移动速度增加；对未交互目标造成伤害增加。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "youji",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "乘风",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
+                    "description": "每层使你速度+1。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "chengfeng",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    },
                     "changes": [
                         {
                             "key": "system.combat.speed",
                             "mode": 2,
-                            "value": 1
+                            "value": "1"
                         }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "stackable": false
-                        }
-                    }
+                    ]
                 }
             ]
         }
