@@ -2129,11 +2129,11 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>摔鞭抽击，直卷脖颈，对目标造成 0.5 内息点内功伤害，若目标身上存在“恶鬼缠身”状态，可消耗恶鬼缠身，使对方流失 5 点内力，你回复 5 内力。</p><p><strong>升级：</strong>招式伤害+10，流失回复内力+5，消耗+2。</p>",
-                    "automationNote": "吞噬恶鬼状态吸内自动。",
+                    "automationNote": "命中且目标有恶鬼缠身时自动吞噬吸内。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2155,8 +2155,8 @@
                         {
                             "label": "吞噬恶鬼",
                             "trigger": "hit",
-                            "script": "const egui = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"egui_chanshen\");\nif (egui) {\n    await egui.delete();\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = 5 + (lvl - 1) * 5;\n    \n    await args.target.applyHealing({ amount: -drain, type: \"mp\", showScrolling: true });\n    await actor.applyHealing({ amount: drain, type: \"mp\", showScrolling: true });\n    \n    ui.notifications.info(`消耗恶鬼缠身，吸取 ${drain} 点内力！`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const egui = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"egui_chanshen\");\nif (egui) {\n    await egui.delete();\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = 5 + (lvl - 1) * 5;\n    \n    await args.target.applyHealing({ amount: -drain, type: \"mp\", showScrolling: true });\n    await actor.applyHealing({ amount: drain, type: \"mp\", showScrolling: true });\n    \n    ui.notifications.info(`消耗恶鬼缠身，吸取 ${drain} 点内力！`);\n}"
                         }
                     ]
                 },
@@ -2170,7 +2170,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>长鞭一甩，阴风怒号，黑气缭绕，开启架招。格挡成功时，使对手获得“恶鬼缠身”，持续 3 回合。</p><p><strong>恶鬼缠身：</strong>暴击骰+3（最高 20）。</p><p><strong>升级：</strong>格挡值+10，暴击骰再+1，消耗+2。</p>",
-                    "automationNote": "格挡施加状态自动。暴击骰增加（阈值变高）自动。",
+                    "automationNote": "完全自动化。格挡后自动向对方施加恶鬼缠身。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2186,8 +2186,8 @@
                         {
                             "label": "施加恶鬼",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"恶鬼缠身\").toObject();\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\n// 动态计算暴击骰增加 (3 + Lv-1)\nconst mod = 3 + (lvl - 1);\neff.changes.push({ key: \"system.combat.crit_waigong\", mode: 2, value: String(mod) });\neff.changes.push({ key: \"system.combat.crit_neigong\", mode: 2, value: String(mod) });\n\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"恶鬼缠身\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst mod = 3 + (lvl - 1);\neff.changes.push({ key: \"system.combat.crit_waigong\", mode: 2, value: String(mod) });\neff.changes.push({ key: \"system.combat.crit_neigong\", mode: 2, value: String(mod) });\n\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);"
                         }
                     ]
                 },
@@ -2197,11 +2197,11 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>长鞭卷起沙尘，劈头而至，直抽胸膛，对目标造成 0.4 内息点内功伤害，击破架招时，若目标身上存在“恶鬼缠身”状态，则可以选择消耗恶鬼缠身状态，使目标陷入“厉鬼缠身”状态，持续 3 回合。</p><p><strong>厉鬼缠身：</strong>你招式消耗的内力翻倍，并且消耗内力时流失等量的气血。</p><p><strong>升级：</strong>招式伤害+10，“厉鬼缠身”持续回合+1，消耗+2。</p>",
-                    "automationNote": "击破转化厉鬼自动。厉鬼效果（消耗翻倍/扣血）需受害者手动处理。",
+                    "automationNote": "击破架招自动转化为厉鬼缠身。厉鬼缠身的内力翻倍及扣血效果需受害者出招时手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2223,8 +2223,8 @@
                         {
                             "label": "转化厉鬼",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const egui = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"egui_chanshen\");\n    if (egui) {\n        // 自动转化，不弹窗询问\n        await egui.delete();\n        const ligui = thisItem.effects.getName(\"厉鬼缠身\").toObject();\n        const lvl = Math.max(1, move.computedLevel || 1);\n        ligui.duration = { rounds: 3 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.target, ligui);\n        ui.notifications.info(`${args.target.name} 的 [恶鬼缠身] 转化为 [厉鬼缠身]！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const egui = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"egui_chanshen\");\n    if (egui) {\n        await egui.delete();\n        const ligui = thisItem.effects.getName(\"厉鬼缠身\").toObject();\n        delete ligui._id;\n        ligui.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        ligui.duration = { rounds: 3 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.target, ligui);\n        ui.notifications.info(`${args.target.name} 的 [恶鬼缠身] 转化为 [厉鬼缠身]！`);\n    }\n}"
                         }
                     ]
                 },
@@ -2235,11 +2235,11 @@
                     "element": "yin",
                     "damageType": "none",
                     "weaponType": "special",
-                    "range": "2",
+                    "range": "2米",
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>卷起阵阵鬼气，使范围内所有敌人陷入“恶鬼缠身”状态，使自身进入“鬼王”状态，持续到战斗结束。</p><p><strong>鬼王：</strong>带有“鬼”字的招式伤害+10 点；</p><p>·对“恶鬼缠身”和“厉鬼缠身”状态的敌人进行的虚招对抗具有优势。</p><p><strong>升级：</strong>招式伤害+10，招式距离+3，怒气-1，消耗+4。</p>",
-                    "automationNote": "自身获得鬼王自动。对敌人施加恶鬼缠身需玩家手动（请从物品效果中拖拽）。",
+                    "automationNote": "自己获得鬼王，给目标添加恶鬼缠身。虚招优势自动，看破优势需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2260,8 +2260,8 @@
                         {
                             "label": "自身获得鬼王",
                             "trigger": "hit_once",
-                            "script": "const gui = thisItem.effects.getName(\"鬼王\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, gui);\nui.notifications.info(\"已进入 [鬼王] 状态。请手动给范围内的敌人施加 [恶鬼缠身]。\");",
-                            "active": true
+                            "active": true,
+                            "script": "const gui = thisItem.effects.getName(\"鬼王\").toObject();\ndelete gui._id;\ngui.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, gui);\nui.notifications.info(\"已进入 [鬼王] 状态。请手动给范围内的敌人施加 [恶鬼缠身]。\");"
                         }
                     ]
                 }
@@ -2269,37 +2269,53 @@
             "effects": [
                 {
                     "name": "恶鬼缠身",
-                    "icon": "icons/magic/death/skull-horned-worn-fire-blue.webp",
-                    "description": "暴击骰增加（阈值变高，更难暴击）。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "暴击骰阈值增加（更难暴击）。",
                     "transfer": false,
+                    "duration": {
+                        "rounds": 3
+                    },
                     "flags": {
                         "xjzl-system": {
                             "slug": "egui_chanshen",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "鬼王看破提示",
+                                    "trigger": "check",
+                                    "active": true,
+                                    "script": "if (args.move.type === \"feint\" && args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"guiwang\")) {\n    const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding-left: 8px; border-left: 4px solid #8b0000; background: rgba(139,0,0,0.1);\"><p style=\"margin:0; font-weight:bold; color:#8b0000;\"><i class=\"fas fa-eye\"></i> 鬼王看破</p><p style=\"margin:2px 0 0 0; font-size:0.9em; color:#555;\">目标处于 <b>[鬼王]</b> 状态，其看破对抗具有<b>优势</b>，请目标手动添加。</p></div></div>`;\n    ChatMessage.create({\n        content: msg,\n        speaker: ChatMessage.getSpeaker({actor: args.target})\n    });\n}"
+                                }
+                            ]
                         }
-                    },
-                    "duration": {
-                        "rounds": 3
                     },
                     "changes": []
                 },
                 {
                     "name": "厉鬼缠身",
-                    "icon": "icons/magic/death/skull-energy-light-purple.webp",
-                    "description": "招式内力消耗翻倍，且流失等量气血（手动结算）。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "招式内力消耗翻倍，且流失等量气血（需手动处理）。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "ligui_chanshen",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "鬼王看破提示",
+                                    "trigger": "check",
+                                    "active": true,
+                                    "script": "if (args.move.type === \"feint\" && args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"guiwang\")) {\n    const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding-left: 8px; border-left: 4px solid #8b0000; background: rgba(139,0,0,0.1);\"><p style=\"margin:0; font-weight:bold; color:#8b0000;\"><i class=\"fas fa-eye\"></i> 鬼王看破</p><p style=\"margin:2px 0 0 0; font-size:0.9em; color:#555;\">目标处于 <b>[鬼王]</b> 状态，其看破对抗具有<b>优势</b>，请目标手动添加。</p></div></div>`;\n    ChatMessage.create({\n        content: msg,\n        speaker: ChatMessage.getSpeaker({actor: args.target})\n    });\n}"
+                                }
+                            ]
                         }
                     },
                     "changes": []
                 },
                 {
                     "name": "鬼王",
-                    "icon": "icons/magic/death/undead-ghost-scream-teal.webp",
-                    "description": "鬼字招式加伤，虚招对抗优势。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "鬼字招式加伤，对恶鬼/厉鬼目标虚招对抗具有优势。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -2310,13 +2326,13 @@
                                     "label": "鬼招加伤",
                                     "trigger": "calc",
                                     "active": true,
-                                    "script": "if (args.move.name.includes(\"鬼\")) {\n    const lvl = Math.max(1, thisItem.system.moves.find(m => m.name === \"鬼哭神嚎\")?.computedLevel || 1);\n    args.output.damage += (10 + (lvl-1)*10);\n    args.output.bonusDesc.push(\"鬼王加持\");\n}"
+                                    "script": "if (args.move.name.includes(\"鬼\")) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"鬼王加伤: +10\");\n}"
                                 },
                                 {
-                                    "label": "虚招优势",
+                                    "label": "虚招对抗优势",
                                     "trigger": "check",
                                     "active": true,
-                                    "script": "if (args.move.type === \"feint\") {\n    const hasDebuff = args.target.effects.some(e => \n        [\"egui_chanshen\", \"ligui_chanshen\"].includes(e.getFlag(\"xjzl-system\", \"slug\"))\n    );\n    if (hasDebuff) {\n        args.flags.feintLevel += 1;\n    }\n}"
+                                    "script": "if (args.move.type === \"feint\") {\n    const hasDebuff = args.target.effects.some(e => \n        [\"egui_chanshen\", \"ligui_chanshen\"].includes(e.getFlag(\"xjzl-system\", \"slug\"))\n    );\n    if (hasDebuff) {\n        // 给予攻击者（也就是自身）面对此目标时的虚招优势\n        args.flags.grantFeintLevel += 1;\n    }\n}"
                                 }
                             ]
                         }
