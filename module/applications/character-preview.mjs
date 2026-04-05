@@ -373,17 +373,29 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                             blockValue = base + growth * (lvl - 1);
                         }
 
+                        let feintValue = m.baseFeint || 0;
+
+                        if (m.type === "feint") {
+                            // 武器等级加成 (同上逻辑)
+                            let wRankVal = 0;
+                            if (m.weaponType && actor.system.combat?.weaponRanks) {
+                                wRankVal = actor.system.combat.weaponRanks[m.weaponType]?.total || 0;
+                            }
+
+                            const actorBonus = actor.system.combat.xuzhaoTotal || 0;
+                            feintValue = feintValue + wRankVal + actorBonus;
+                        }
+
                         // 安全获取招式等级对应名称 (防止越界)
                         const stageIndex = Math.min(4, Math.max(0, m.computedLevel || 0));
 
                         return {
                             name: m.name,
-                            levelName: levelNames[stageIndex], // 【新增】加入等级中文名称
+                            levelName: levelNames[stageIndex],
                             type: m.type,
                             typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
                             isUltimate: m.isUltimate,
                             range: m.range,
-                            // ... 保持原有的 cost, blockValue 等等不变 ...
                             cost: {
                                 hp: m.costs.hp?.[Math.max(0, m.computedLevel - 1)] || 0,
                                 mp: m.costs.mp?.[Math.max(0, m.computedLevel - 1)] || 0,
@@ -392,7 +404,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                             isStance: m.type === "stance",
                             blockValue: blockValue,
                             isFeint: m.type === "feint",
-                            feintValue: m.baseFeint || 0,
+                            feintValue: feintValue,
                             damage: derived.damage,
                             description: this._cleanRichText(m.description) || "暂无描述"
                         };
