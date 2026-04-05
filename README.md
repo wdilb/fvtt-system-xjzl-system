@@ -244,6 +244,7 @@ await Macros.requestSave({
         *   `grantFeintLevel` (Int): **虚招优劣势修正**。
         *   `grantHit` (Int): **命中数值修正** (如 +5)。直接加在最终命中结果上。
         *   `forceHit` (Bool): **单体必中**。设为 `true` 强制对该目标命中（跳过投掷，这也代表着不会暴击，如果需要能暴击的必中请给grantHit一个很大的加值来实现）。
+        *   `alwaysHit` (Bool): **单体必定命中**。设为 `true` 强行判定为命中（无视闪避和骰子掷出1），但**依然会正常投掷骰子**以判定是否触发暴击。
         *   `grantFeint` (Int): **虚招数值修正**。
         *   `critThresholdMod` (Int): **暴击阈值修正**。正数表示更容易暴击 (如 +2 表示 18 即可暴击)。仅对当前目标生效。
         *   `ignoreBlock` (Bool): **无视格挡**。
@@ -273,7 +274,8 @@ await Macros.requestSave({
         *   `level` (Int): 自身命中优劣势（+1优势/-1劣势）。
         *   `feintLevel` (Int): 自身虚招优劣势。
         *   `bonusHit` (Int): 自身全局命中数值修正。
-        *   `forceHit` (Bool): **单体必中**。设为 `true` 强制命中（跳过投掷，不暴击）。
+        *   `forceHit` (Bool): **全局必中**。设为 `true` 强制命中（跳过投掷，不暴击）。
+        *   `alwaysHit` (Bool): **全局必定命中**。设为 `true` 强行判定为命中，但**依然会正常投掷骰子**判定暴击（与弹窗勾选“必定命中”等效）。
         *   `bonusFeint` (Int): **自身全局虚招数值修正**。此值会在脚本结束后加到 `calcResult.feint` 上。
         *   `critThresholdMod` (Int): 全局暴击阈值修正。
         *   `abort` (Bool): 设为 `true` 阻断出招。
