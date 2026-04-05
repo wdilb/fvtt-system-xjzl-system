@@ -178,6 +178,8 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
         label: "XJZL.Wuxue.Category"
       }),
       sect: new fields.StringField({ label: "XJZL.Wuxue.Sect" }),
+      // === 二级势力 ===
+      subSect: new fields.StringField({ initial: "none", label: "XJZL.Wuxue.SubSect" }),
       // 把 Tier 加回顶层，作为整本书的默认值
       tier: new fields.NumberField({
         initial: 1,

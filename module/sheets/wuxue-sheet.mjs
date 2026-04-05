@@ -68,6 +68,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.choices = {
             tiers: localizeConfig(XJZL.tiers),
             sects: localizeConfig(XJZL.sects),
+            subSects: localizeConfig(XJZL.subSects || {}), //二级势力
             moveTiers: {
                 "": "继承 (默认)",
                 1: game.i18n.localize("XJZL.Tiers.1"),
@@ -100,6 +101,8 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 5: game.i18n.localize("XJZL.Wuxue.Progression.StageList.5")
             }
         };
+
+        context.isJianghuShiLi = this.document.system.sect === "jianghushili";
 
         // 触发器下拉选项
         context.scriptTriggerChoices = {};
@@ -136,7 +139,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 // 为下拉菜单准备一个专门的值：如果 tier 是 null，就转为空字符串 ""
                 // 这样 selectOptions 就能匹配到 choices 中的 "" 选项了
                 move.uiTierSelected = move.tier ?? "";
-                
+
                 let levels = [];
                 let labels = [];
                 // 注入 CSS 类名

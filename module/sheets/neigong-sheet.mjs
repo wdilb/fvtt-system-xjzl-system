@@ -84,6 +84,10 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
         context.sects = localizeConfig(CONFIG.XJZL.sects);
 
+        // 增加二级势力下拉数据与条件判断
+        context.subSects = localizeConfig(CONFIG.XJZL.subSects || {});
+        context.isJianghuShiLi = this.document.system.sect === "jianghushili";
+
         // 2. 内功阶段配置
         if (this.document.type === "neigong") {
             context.stages = [

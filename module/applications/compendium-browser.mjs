@@ -75,7 +75,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     static INDEX_FIELDS = [
         "img", "system.quantity", "system.price", "system.quality",
         "system.type", "system.subtype", "system.tier",
-        "system.sect", "system.element", "system.category",
+        "system.sect", "system.subSect", "system.element", "system.category",
         "system.moves", "system.artType", "system.damageType", "system.weaponType",
         "system.isOfficial"
     ];
@@ -105,6 +105,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             qizhen: [{ key: "quality", label: "品质", type: "checkbox", options: C.qualities }],
             wuxue: [
                 { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
+                { key: "subSect", label: "江湖势力分支", type: "checkbox", options: C.subSects },
                 { key: "category", label: "武学类别", type: "checkbox", options: C.wuxueCategories },
                 { key: "tier", label: "武学品阶", type: "checkbox", options: C.tiers },
                 { key: "element", label: "武学属性", type: "checkbox", options: elemOpts },
@@ -113,6 +114,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             ],
             neigong: [
                 { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
+                { key: "subSect", label: "江湖势力分支", type: "checkbox", options: C.subSects },
                 { key: "tier", label: "内功品阶", type: "checkbox", options: C.tiers },
                 { key: "element", label: "内功属性", type: "checkbox", options: neigongOpts }
             ],
@@ -313,9 +315,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const currentFilters = this.browserState.filters;
         const filterConfigs = this.filterConfig[activeTab] || [];
 
-        // 优化：使用 reduce 或 map 构建 UI 数据
+        // 使用 reduce 或 map 构建 UI 数据
         const filterList = filterConfigs.map(config => ({
             ...config,
+            isOpen: config.key !== "subSect", // 只要不是 subSect，就默认展开
             options: Object.entries(config.options).map(([val, labelKey]) => ({
                 val: val,
                 label: game.i18n.localize(labelKey),

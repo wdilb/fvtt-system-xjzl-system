@@ -421,6 +421,38 @@ XJZL.sects = {
   "jianghushili": "XJZL.Sect.JiangHuShiLi"
 };
 
+// 20.5 江湖势力二级分类 (Sub-Sects)
+XJZL.subSects = {
+  "none": "XJZL.SubSect.None",
+  "qinwangfu": "XJZL.SubSect.QinWangFu",         // 秦王府
+  "shenjia": "XJZL.SubSect.ShenJia",             // 沈家
+  "xujia": "XJZL.SubSect.XuJia",                 // 徐家
+  "dongfang": "XJZL.SubSect.DongFang",           // 东方世家
+  "tianyanmen": "XJZL.SubSect.TianYanMen",       // 天阉门
+  "huashendian": "XJZL.SubSect.HuaShenDian",     // 花神殿
+  "gumu": "XJZL.SubSect.GuMu",                   // 活死人墓
+  "bixiaodao": "XJZL.SubSect.BiXiaoDao",         // 碧箫岛
+  "shishenfu": "XJZL.SubSect.ShiShenFu",         // 食神府
+  "canglanpai": "XJZL.SubSect.CangLanPai",       // 沧澜派
+  "caobang": "XJZL.SubSect.CaoBang",             // 漕帮
+  "yanwanglou": "XJZL.SubSect.YanWangLou",       // 阎王楼
+  "miaomiao": "XJZL.SubSect.MiaoMiao",           // 圣火喵喵教
+  "dabeisi": "XJZL.SubSect.DaBeiSi",             // 大悲寺
+  "wudujiao": "XJZL.SubSect.WuDuJiao",           // 五毒教
+  "mingguizong": "XJZL.SubSect.MingGuiZong",     // 明鬼宗
+  "qianmen": "XJZL.SubSect.QianMen",             // 千门
+  "luoshenjiao": "XJZL.SubSect.LuoShenJiao",     // 洛神教
+  "gongjia": "XJZL.SubSect.GongJia",             // 宫家
+  "wuyuemeng": "XJZL.SubSect.WuYueMeng",         // 五岳盟
+  "qingcheng": "XJZL.SubSect.QingCheng",         // 青城派
+  "beiyuan": "XJZL.SubSect.BeiYuan",             // 北元
+  "dongying": "XJZL.SubSect.DongYing",           // 足利幕府(东瀛)
+  "xiyang": "XJZL.SubSect.XiYang",               // 天主教会(西洋)
+  "murong": "XJZL.SubSect.MuRong",               // 燕国(慕容氏)
+  "duanshi": "XJZL.SubSect.DuanShi",             // 大理(段氏)
+  "wuzu": "XJZL.SubSect.WuZu"                    // 巫族
+};
+
 // 21. 态度
 XJZL.attitudes = {
   "respect": "XJZL.Social.Attitude.Respect", // 敬重

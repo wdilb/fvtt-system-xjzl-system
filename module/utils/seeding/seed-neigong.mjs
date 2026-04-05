@@ -170,6 +170,7 @@ export async function seedNeigong() {
                 tier: d.system.tier ?? 1,      // 1=人, 2=地, 3=天
                 element: d.system.element || "taiji", // yin, yang, taiji
                 sect: d.system.sect || "none",
+                subSect: d.system.subSect || "none", // 二级势力，默认为 none
 
                 description: d.system.description || "",
                 requirement: d.system.requirement || "",

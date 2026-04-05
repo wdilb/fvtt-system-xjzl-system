@@ -365,6 +365,7 @@ export async function seedWuxue() {
                 // 总纲配置
                 category: d.system.category || "wuxue", // wuxue, sanshou, qinggong, zhenfa
                 sect: d.system.sect || "none",
+                subSect: d.system.subSect || "none", // 二级势力，默认为 none
                 // 使用自动计算出的 Tier
                 tier: finalTier,
 
