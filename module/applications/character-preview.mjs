@@ -36,7 +36,191 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             icon: "fas fa-camera",
             onClick: this._onExportImage.bind(this)
         });
+
+        controls.unshift({
+            action: "exportA4Image",
+            label: "导出A4图",
+            icon: "fas fa-file-invoice",
+            onClick: this._onExportA4Image.bind(this)
+        });
         return controls;
+    }
+
+    /**
+     * 导出竖向 A4 双列的分页截图
+     */
+    async _onExportA4Image(event) {
+        event.preventDefault();
+        if (typeof htmlToImage === "undefined") {
+            if (!document.querySelector('script[src*="html-to-image.min.js"]')) {
+                ui.notifications.info("正在加载截图引擎，请稍候...");
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                } catch (err) {
+                    return ui.notifications.error("加载截图插件失败。");
+                }
+            } else {
+                // 脚本标签已存在但还没执行完，让程序等一下并阻止后续并发
+                await new Promise(resolve => setTimeout(resolve, 500));
+                if (typeof htmlToImage === "undefined") return ui.notifications.warn("插件正在努力下载中，请稍后再试。");
+            }
+        }
+        if (typeof JSZip === "undefined") {
+            if (!document.querySelector('script[src*="jszip.min.js"]')) {
+                ui.notifications.info("正在加载压缩打包引擎，请稍候...");
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                } catch (err) {
+                    return ui.notifications.error("加载ZIP插件失败。");
+                }
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                if (typeof JSZip === "undefined") return ui.notifications.warn("插件正在努力下载中，请稍后再试。");
+            }
+        }
+        ui.notifications.info("正在生成 A4比例的 图片，请耐心等待...");
+        // 克隆源数据并去除可编辑属性
+        const sourceElement = this.element.querySelector(".xjzl-preview-content");
+        const cloneElement = sourceElement.cloneNode(true);
+        cloneElement.querySelectorAll('[contenteditable]').forEach(el => {
+            el.removeAttribute('contenteditable');
+            el.removeAttribute('spellcheck');
+        });
+        // ==========================================
+        // 物理比例双列截断运算
+        // ==========================================
+        const COL_WIDTH = 900;       // 单列完全保持原长图的 900px
+        const COL_GAP = 60;          // 两列中间留 60px 缝隙 (缩放后相当于30px)
+        const PADDING = 40;          // A4 纸边缘留 40px 白边 (缩放后相当于20px)
+
+        const A4_ASPECT = 1.4142;    // A4 标准长宽比
+        // A4 画布总宽度 = 2个900px的列 + 中间大缝隙 + 左右边距
+        const CANVAS_WIDTH = COL_WIDTH * 2 + COL_GAP + PADDING * 2;   // 1940px
+        // A4 画布总高度 = 宽度 * 1.4142
+        const CANVAS_HEIGHT = Math.round(CANVAS_WIDTH * A4_ASPECT);   // 2744px
+
+        // 内容实际可以延展高度 = 大画布高度 - 上下边距
+        const INNER_HEIGHT = CANVAS_HEIGHT - PADDING * 2;             // 2664px
+
+        // 每次翻页，镜头往右平移"两列+两缝"的距离
+        const SHIFT_STEP = (COL_WIDTH + COL_GAP) * 2;                 // 1920px
+        const offScreenContainer = document.createElement('div');
+        offScreenContainer.className = "xjzl-character-preview-app theme-dark";
+        Object.assign(offScreenContainer.style, {
+            position: 'absolute',
+            left: '-9999px',
+            top: '-9999px',
+            zIndex: '-999',
+            width: `${CANVAS_WIDTH}px`
+        });
+        const windowContent = document.createElement('div');
+        windowContent.className = "window-content";
+        Object.assign(windowContent.style, {
+            width: `${CANVAS_WIDTH}px`,
+            height: `${CANVAS_HEIGHT}px`,
+            padding: `${PADDING}px`,
+            background: 'radial-gradient(circle at 50% 0%, #2a2a2a 0%, #111111 80%)',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+            position: 'relative'
+        });
+        // 为推拉平移提供图层
+        const shiftWrapper = document.createElement('div');
+        Object.assign(shiftWrapper.style, {
+            width: '100%',
+            height: '100%',
+            position: 'relative'
+        });
+        // 核心截断发生器：这会让长图在 2664 高度的地方硬折断到旁边生成第二列
+        const layoutContainer = document.createElement('div');
+        Object.assign(layoutContainer.style, {
+            height: `${INNER_HEIGHT}px`,
+            columnWidth: `${COL_WIDTH}px`,  // 不允许挤压，强制按900px排版
+            columnGap: `${COL_GAP}px`,
+            columnFill: 'auto',
+            position: 'absolute',
+            top: '0',
+            left: '0',
+            transition: 'none'
+        });
+        layoutContainer.appendChild(cloneElement);
+        shiftWrapper.appendChild(layoutContainer);
+        windowContent.appendChild(shiftWrapper);
+        offScreenContainer.appendChild(windowContent);
+        document.body.appendChild(offScreenContainer);
+        await document.fonts.ready;
+        await this._replaceIconsWithImages(offScreenContainer);
+        await new Promise(resolve => setTimeout(resolve, 400));
+        try {
+            // 测量排版后总共蔓延出了多宽
+            const scrollW = layoutContainer.scrollWidth;
+            const totalPages = Math.max(1, Math.ceil(scrollW / SHIFT_STEP));
+            const zip = new JSZip();
+            for (let i = 0; i < totalPages; i++) {
+                // 向左抽拉图层进行分页截图
+                layoutContainer.style.left = `-${i * SHIFT_STEP}px`;
+                layoutContainer.getBoundingClientRect(); // 强制重绘
+                await new Promise(resolve => setTimeout(resolve, 350));
+                // 因为底宽就是1940px，已经是超巨幅了，不需要 pixelRatio: 2 (以免爆内存导致空图)
+                const dataUrl = await htmlToImage.toPng(windowContent, {
+                    quality: 1.0,
+                    pixelRatio: 1.0,
+                    skipFonts: true,
+                    filter: (node) => node.tagName !== 'SCRIPT'
+                });
+                const base64Data = dataUrl.split(',')[1];
+                const fileName = totalPages > 1 ? `${this.actor.name}-A4图册-第${i + 1}幅.png` : `${this.actor.name}-A4图册.png`;
+                zip.file(fileName, base64Data, { base64: true });
+            }
+            // 等待截图生成并压缩完毕
+            const zipBlob = await zip.generateAsync({ type: "blob" });
+            const objectUrl = URL.createObjectURL(zipBlob);
+            // 友好弹窗 - 解除浏览器保护限制
+            new Dialog({
+                title: "✅ 档案打包完成",
+                content: `
+            <div style="padding: 10px; text-align: center;">
+                <p style="font-size: 1.1em; margin-bottom: 5px;">角色 <strong>${this.actor.name}</strong> 的A4比例图片已装订打包！</p>
+                <p>本次合成了 <strong>${totalPages}</strong> 幅 A4 图片。</p>
+            </div>
+        `,
+                buttons: {
+                    download: {
+                        label: "保存 ZIP 压缩包",
+                        icon: '<i class="fas fa-file-download"></i>',
+                        callback: () => {
+                            const link = document.createElement("a");
+                            link.download = `${this.actor.name}-A4角色档案图册.zip`;
+                            link.href = objectUrl;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+
+                            setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
+                            ui.notifications.info("A4图册下载已开始！");
+                        }
+                    }
+                },
+                default: "download"
+            }).render(true);
+        } catch (err) {
+            console.error("A4 图片打包生成失败:", err);
+            ui.notifications.error("A4 图片打包失败！请查阅控制台。");
+        } finally {
+            offScreenContainer.remove();
+        }
     }
 
     /**
@@ -48,17 +232,22 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
 
         // 1. 动态加载 html-to-image 截图引擎
         if (typeof htmlToImage === "undefined") {
-            ui.notifications.info("正在加载高精度图像引擎，请稍候...");
-            try {
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
-            } catch (err) {
-                return ui.notifications.error("加载截图插件失败，请检查网络环境。");
+            if (!document.querySelector('script[src*="html-to-image.min.js"]')) {
+                ui.notifications.info("正在加载高精度图像引擎，请稍候...");
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = "https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js";
+                        script.onload = resolve;
+                        script.onerror = reject;
+                        document.head.appendChild(script);
+                    });
+                } catch (err) {
+                    return ui.notifications.error("加载截图插件失败，请检查网络环境。");
+                }
+            } else {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                if (typeof htmlToImage === "undefined") return ui.notifications.warn("插件正在努力下载中，请稍后再试。");
             }
         }
 
