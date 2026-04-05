@@ -450,7 +450,13 @@ XJZL.subSects = {
   "xiyang": "XJZL.SubSect.XiYang",               // 天主教会(西洋)
   "murong": "XJZL.SubSect.MuRong",               // 燕国(慕容氏)
   "duanshi": "XJZL.SubSect.DuanShi",             // 大理(段氏)
-  "wuzu": "XJZL.SubSect.WuZu"                    // 巫族
+  "wuzu": "XJZL.SubSect.WuZu",                   // 巫族
+  "nangong": "XJZL.SubSect.NanGong",             // 南宫
+  "baihong": "XJZL.SubSect.BaiHong",             // 白虹剑派
+  "tianchipai": "XJZL.SubSect.TianChiPai",       // 天池派
+  "badaotang": "XJZL.SubSect.BaDaoTang",         // 霸刀堂
+  "modaomen": "XJZL.SubSect.MoDaoMen",           // 魔刀门
+  "hehuanpai": "XJZL.SubSect.HeHuanPai"          // 合欢派
 };
 
 // 21. 态度
