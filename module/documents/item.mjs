@@ -1422,7 +1422,8 @@ export class XJZLItem extends Item {
             manualAttackLevel: parseInt(getVal("manualAttackLevel")) || 0,
             manualFeintLevel: parseInt(getVal("manualFeintLevel")) || 0,
             isFree: getVal("isFree") === true,
-            isDesperate: getVal("isDesperate") === true
+            isDesperate: getVal("isDesperate") === true,
+            alwaysHit: getVal("alwaysHit") === true
           };
         }
       }],
@@ -1477,7 +1478,7 @@ export class XJZLItem extends Item {
       // 保留 targets 仅用于记录 Chat Message 的 flags，不传给脚本
       const targets = options.targets || Array.from(game.user.targets);
       // === 玩家配置弹窗 (Dialog) ===
-      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0, isFree: false, isDesperate: false };
+      let config = { bonusAttack: 0, bonusFeint: 0, bonusDamage: 0, canCrit: true, manualAttackLevel: 0, manualFeintLevel: 0, isFree: false, isDesperate: false, alwaysHit: false };
       // 架招不需要弹窗，Buff类气招如果没选目标也不弹窗
       // 但如果是 heal/attack 类气招，即使没选目标也可能需要弹窗调数值
       const needsDialog = initialEffectiveMode !== "buff";
@@ -1701,6 +1702,7 @@ export class XJZLItem extends Item {
           bonusHit: 0,    // 自身命中加值
           bonusFeint: 0,   // 自身虚招数值加值
           forceHit: false, // 全局必中标记
+          alwaysHit: config.alwaysHit || false, //必定命中，和上个参数的区别是这个不会跳过投掷，可以暴击
           damageResult: calcResult //提供伤害给脚本修改
         }
       };
@@ -1817,7 +1819,8 @@ export class XJZLItem extends Item {
               critThresholdMod: 0, // 添加这个字段，让 CHECK 脚本可以修改
               grantHit: 0,    // 针对该目标的命中加值
               grantFeint: 0,   // 针对该目标的虚招数值加值
-              forceHit: false
+              forceHit: false,
+              alwaysHit: false
             }
           };
 
@@ -1863,7 +1866,8 @@ export class XJZLItem extends Item {
             critThresholdMod: checkContext.flags.critThresholdMod || 0,
             grantHit: checkContext.flags.grantHit || 0,
             grantFeint: checkContext.flags.grantFeint || 0,
-            forceHit: checkContext.flags.forceHit || false
+            forceHit: checkContext.flags.forceHit || false,
+            alwaysHit: checkContext.flags.alwaysHit || false
           });
         }
       }
@@ -1974,10 +1978,19 @@ export class XJZLItem extends Item {
             // 获取目标闪避
             // 这里只是预览命中，不做逻辑判定
             dodge = t.actor.system.combat.dodgeTotal ?? 10;
+            // alwaysHit 干预
+            const isGlobalAlwaysHit = attackContext.flags.alwaysHit || false;
             // 规则：20必中，1必失
-            if (finalDie === 20) isHit = true;
-            else if (finalDie === 1) isHit = false;
-            else isHit = total >= dodge;
+            if (finalDie === 20) {
+              isHit = true;
+            } else if (isGlobalAlwaysHit || ctx.alwaysHit) {
+              isHit = true;
+              if (!outcomeLabel.includes("必中")) outcomeLabel += "(必中)";
+            } else if (finalDie === 1) {
+              isHit = false;
+            } else {
+              isHit = total >= dodge;
+            }
           }
           // 情况2: 无需检定 (全局必中) OR 该目标被脚本强制必中
           else {
@@ -2110,6 +2123,7 @@ export class XJZLItem extends Item {
             moveType: move.type,       // 招式类型
             costConsumed: costConsumed,// 记录消耗
             forceHit: isGlobalForceHit, // 存入全局必中状态
+            alwaysHit: attackContext.flags.alwaysHit || false,
             // 2. 数值结果
             damage: calcResult.damage, // 最终伤害值 (整数)
             feint: calcResult.feint,   // 最终虚招值 (整数)

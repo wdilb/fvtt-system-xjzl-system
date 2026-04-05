@@ -257,6 +257,7 @@ export class ChatCardManager {
         const isValidDamage = ["waigong", "neigong"].includes(damageType);
         // 读取全局必中标记
         const isGlobalForceHit = flags.forceHit || false;
+        const isGlobalAlwaysHit = flags.alwaysHit || false;
         // 反击(Counter) 或 非内外功招式 不需要投骰子比对闪避
         const needsCheck = isValidDamage && !isCounter && !isGlobalForceHit;
 
@@ -346,7 +347,8 @@ export class ChatCardManager {
                     critThresholdMod: 0, // 允许 CHECK 脚本针对特定目标修改暴击阈值
                     grantHit: 0,      // 针对此人的命中修正
                     grantFeint: 0,    // 针对此人的虚招修正
-                    forceHit: false   //必中标记
+                    forceHit: false,   //必中标记
+                    alwaysHit: false   //必定命中，和上个参数的区别是这个不会跳过投掷，可以暴击
                 }
             }; //换成优劣势计数
 
@@ -398,7 +400,8 @@ export class ChatCardManager {
                 critThresholdMod: checkContext.flags.critThresholdMod || 0,
                 grantHit: checkContext.flags.grantHit || 0,
                 grantFeint: checkContext.flags.grantFeint || 0,
-                forceHit: checkContext.flags.forceHit || false // 存储单目标必中
+                forceHit: checkContext.flags.forceHit || false, // 存储单目标必中
+                alwaysHit: checkContext.flags.alwaysHit || false
             });
             // 如果该目标是必中(forceHit)，那么即使 needsCheck=true (全局非必中)，也不需要对他进行补骰
             const isTargetForceHit = checkContext.flags.forceHit || false;
@@ -479,9 +482,15 @@ export class ChatCardManager {
                     displayTotal = total
 
                     // 判定命中 (含20必中/1必失)
-                    if (finalDie === 20) isHit = true;
-                    else if (finalDie === 1) isHit = false;
-                    else isHit = total >= dodge;
+                    if (finalDie === 20) {
+                        isHit = true;
+                    } else if (isGlobalAlwaysHit || states.alwaysHit) {
+                        isHit = true;
+                    } else if (finalDie === 1) {
+                        isHit = false;
+                    } else {
+                        isHit = total >= dodge;
+                    }
 
                     color = isHit ? "green" : "red";
                     label = isHit ? "命中" : "未中";
@@ -2149,7 +2158,7 @@ export class ChatCardManager {
         const roll = await actor.rollAttributeTest(attrKey, {
             chatMessage: false,
             // === 传入 bonus，actor.mjs 中的 options.bonus 会自动将其设为弹窗的默认值 ===
-            bonus: specificBonus 
+            bonus: specificBonus
         });
 
         if (!roll) return;

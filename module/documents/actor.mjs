@@ -2038,7 +2038,8 @@ export class XJZLActor extends Actor {
       bonusAttack: 0,
       bonusDamage: 0,
       canCrit: true, // 普攻默认可暴击
-      manualAttackLevel: 0
+      manualAttackLevel: 0,
+      alwaysHit: false //必定命中，默认否
     };
 
     if (!options.skipDialog) {
@@ -2138,6 +2139,7 @@ export class XJZLActor extends Actor {
         bonusHit: 0,           // 脚本给予的命中加值
         bonusFeint: 0,         // 脚本给予的虚招加值(虽然普攻一般不用，但为了兼容性加上)
         forceHit: false, // 全局必中参数
+        alwaysHit: config.alwaysHit || false, //必定命中，和上个参数的区别是这个不会跳过投掷，可以暴击
         damageResult: calcResult
       }
     };
@@ -2191,7 +2193,8 @@ export class XJZLActor extends Actor {
           critThresholdMod: 0, // 针对该目标的暴击阈值修正
           grantHit: 0,         // 针对该目标的命中加值
           grantFeint: 0,        // 针对该目标的虚招加值
-          forceHit: false // 添加单目标必中参数
+          forceHit: false, // 添加单目标必中参数
+          alwaysHit: false //必定命中，和上个参数的区别是这个不会跳过投掷，可以暴击
         }
       };
 
@@ -2215,7 +2218,8 @@ export class XJZLActor extends Actor {
         critThresholdMod: checkContext.flags.critThresholdMod || 0,
         grantHit: checkContext.flags.grantHit || 0,
         grantFeint: checkContext.flags.grantFeint || 0,
-        forceHit: checkContext.flags.forceHit || false
+        forceHit: checkContext.flags.forceHit || false,
+        alwaysHit: checkContext.flags.alwaysHit || false
       });
     }
 
@@ -2314,10 +2318,19 @@ export class XJZLActor extends Actor {
 
         total = finalDie + hitMod + (ctx.grantHit || 0);
         dodge = t.actor?.system.combat.dodgeTotal ?? 10;
+        // alwaysHit 干预
+        const isGlobalAlwaysHit = attackContext.flags.alwaysHit || false;
 
-        if (finalDie === 20) isHit = true;
-        else if (finalDie === 1) isHit = false;
-        else isHit = total >= dodge;
+        if (finalDie === 20) {
+          isHit = true;
+        } else if (isGlobalAlwaysHit || ctx.alwaysHit) {
+          isHit = true; // 强制命中
+          if (!outcomeLabel.includes("必中")) outcomeLabel += "(必中)"; // 界面提示
+        } else if (finalDie === 1) {
+          isHit = false;
+        } else {
+          isHit = total >= dodge;
+        }
       } else {
         // 必中逻辑
         isHit = true;
@@ -2383,6 +2396,7 @@ export class XJZLActor extends Actor {
           scriptBonusHit: scriptBonusHit,
           critThresholdMod: attackContext.flags.critThresholdMod || 0,
           forceHit: isGlobalForceHit,
+          alwaysHit: attackContext.flags.alwaysHit || false,
 
           costConsumed: costConsumed, // 记录消耗
           damage: calcResult.damage,
@@ -2405,6 +2419,7 @@ export class XJZLActor extends Actor {
               stateLabel: res.stateLabel,
               isHit: res.isHit,
               forceHit: res.forceHit,
+              alwaysHit: res.alwaysHit || false,
               critThresholdMod: res.critThresholdMod || 0,
               total: res.total,
               dieUsed: res.dieUsed,
@@ -2597,9 +2612,10 @@ export class XJZLActor extends Actor {
             canCrit: getVal("canCrit") !== false,
             manualCritMod: parseInt(getVal("manualCritMod")) || 0, //手动暴击阈值
 
-            // 如果你希望普攻也能临时变更为虚招，可以在这里获取 overrideMoveType
-            // 但目前的 rollBasicAttack 逻辑似乎只处理 basic，这里仅作兼容
-            isFeint: getVal("overrideMoveType") === "feint"
+            // 如果普攻也能临时变更为虚招，可以在这里获取 overrideMoveType
+            // 但目前的 rollBasicAttack 逻辑只处理 basic，这里仅作兼容
+            isFeint: getVal("overrideMoveType") === "feint",
+            alwaysHit: getVal("alwaysHit") === true // 必定命中
           };
         }
       }],
