@@ -1818,7 +1818,7 @@
             "category": "sanshou",
             "sect": "jiangnange",
             "tier": 2,
-            "description": "<p>众人皆醉我独醒，举世皆俗我独清。身处红尘不沾世俗，凡夫俗子难为知音，曲高和寡，遗世独立。</p><p><strong>需求：</strong>《风雅颂》修炼圆满</p><p><strong>【清雅】</strong></p><p>清新文雅，风格脱俗。</p><p>你的[演奏]、[棋术]、[书写]、[作画]每有一种达到 5 级，你的神采+5。</p><p><strong>【高雅】</strong></p><p>高尚典雅，名士之风。</p><p>你施展笔/乐器/棋类武学时，命中和招式伤害提升【神采/10】的数值。</p><p><strong>升级：</strong>清雅中需求的四艺等级-1；高雅中，命中伤害额外+5。</p>",
+            "description": "<p>众人皆醉我独醒，举世皆俗我独清。身处红尘不沾世俗，凡夫俗子难为知音，曲高和寡，遗世独立。</p><p><strong>需求：</strong>《风雅颂》修炼圆满</p><p><strong>【清雅】</strong></p><p>清新文雅，风格脱俗。</p><p>你的[演奏]、[棋术]、[书写]、[作画]每有一种达到 5 级，你的神采+5。</p><p><strong>【高雅】</strong></p><p>高尚典雅，名士之风。</p><p>你施展笔/乐器/棋类武学时，命中和招式伤害提升【神采/10】的数值。</p><p><strong>升级：</strong>清雅中需求的四艺等级-1；高雅中，命中伤害额外+5。</p><p style=\"color:#8b0000;\"><em>注：受限于系统武器判定的局限性，【高雅】的加成已设置为全局生效。当你不使用笔、乐器或棋类武学时，请手动进入武学详情关闭【高雅】脚本。</em></p>",
             "requirements": "《风雅颂》修炼圆满",
             "moves": [
                 {
@@ -1830,7 +1830,7 @@
                     "range": "自身",
                     "actionCost": "无",
                     "description": "<p>众人皆醉我独醒，举世皆俗我独清。身处红尘不沾世俗，凡夫俗子难为知音，曲高和寡，遗世独立。</p><p><strong>【清雅】</strong>你的[演奏]、[棋术]、[书写]、[作画]每有一种达到 5 级，你的神采+5。</p><p><strong>【高雅】</strong>你施展笔/乐器/棋类武学时，命中和招式伤害提升【神采/10】的数值。</p><p><strong>升级：</strong>清雅中需求的四艺等级-1；高雅中，命中伤害额外+5。</p>",
-                    "automationNote": "完全自动化",
+                    "automationNote": "【清雅】全局自动生效；【高雅】自动为所有招式加成。若非指定武器，请手动打开武学然后停用高雅脚本。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1843,19 +1843,13 @@
                             "label": "清雅：神采加成",
                             "trigger": "passive",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst threshold = Math.max(1, 5 - (lvl - 1));\nconst arts = ['yanzou', 'qishu', 'shuxie', 'zuohua'];\nlet count = 0;\narts.forEach(k => {\n    if ((actor.system.arts[k]?.total || 0) >= threshold) count++;\n});\nS.stats.shencai.mod += count * 5;"
+                            "script": "const dyzt = thisItem.system.moves.find(m => m.name === \"大雅之堂\");\nconst lvl = Math.max(1, dyzt?.computedLevel || 1);\nconst threshold = Math.max(1, 5 - (lvl - 1));\nconst arts =['yanzou', 'qishu', 'shuxie', 'zuohua'];\nlet count = 0;\narts.forEach(k => {\n    if ((actor.system.arts[k]?.total || 0) >= threshold) count++;\n});\nS.stats.shencai.mod += count * 5;"
                         },
                         {
-                            "label": "高雅：伤害修正",
-                            "trigger": "calc",
-                            "active": true,
-                            "script": "if (['dagger', 'instrument', 'hidden'].includes(args.move.weaponType)) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const baseBonus = Math.floor(actor.system.stats.shencai.total / 10);\n    const extra = (lvl - 1) * 5;\n    const total = baseBonus + extra;\n    args.output.damage += total;\n    args.output.bonusDesc.push(`高雅增加 +${total}伤`);\n}"
-                        },
-                        {
-                            "label": "高雅：命中修正",
+                            "label": "高雅：命中与伤害加成",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if (['dagger', 'instrument', 'hidden'].includes(args.move.weaponType)) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const baseBonus = Math.floor(actor.system.stats.shencai.total / 10);\n    const extra = (lvl - 1) * 5;\n    const total = baseBonus + extra;\n    args.flags.bonusHit += total;\n}"
+                            "script": "if (args.move.type === \"basic\" || args.move.type === \"stance\") return;\n\nconst dyzt = thisItem.system.moves.find(m => m.name === \"大雅之堂\");\nconst lvl = Math.max(1, dyzt?.computedLevel || 1);\nconst currentShencai = S.stats.shencai.total || 0;\n\nconst baseBonus = Math.floor(currentShencai / 10);\nconst extraBonus = (lvl - 1) * 5;\nconst totalBonus = baseBonus + extraBonus;\n\nargs.flags.bonusHit += totalBonus;\nargs.flags.damageResult.damage += totalBonus;\nargs.flags.damageResult.breakdown += `\\n+ 高雅加成: ${totalBonus}`;"
                         }
                     ]
                 }
