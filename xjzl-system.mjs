@@ -792,6 +792,33 @@ Hooks.on("renderItemDirectory", (app, html, data) => {
 });
 
 /**
+ * 渲染合集包目录侧边栏钩子
+ * 用于注入 "江湖万卷阁" 按钮
+ */
+Hooks.on("renderCompendiumDirectory", (app, html, data) => {
+  const element = html instanceof HTMLElement ? html : html[0];
+  const headerActions = element.querySelector(".header-actions");
+  if (!headerActions) return;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "xjzl-browser-btn";
+  button.style.cssText = "min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;";
+  button.innerHTML = '<i class="fas fa-book-open"></i> 江湖万卷阁';
+
+  button.addEventListener("click", (ev) => {
+    ev.preventDefault();
+    if (game.xjzl?.compendiumBrowser) {
+      game.xjzl.compendiumBrowser.render(true);
+    } else {
+      ui.notifications.warn("江湖万卷阁尚未初始化，请稍候...");
+    }
+  });
+
+  headerActions.after(button);
+});
+
+/**
  * 渲染角色目录时的钩子
  * 作用：对玩家隐藏 "container" 类型的 Actor，避免侧边栏剧透
  */
