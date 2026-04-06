@@ -261,6 +261,9 @@ await Macros.requestSave({
     *   `move` (Object): 当前招式数据。
     *   `item` (Item): 来源物品。
     *   `attacker` (Actor): 攻击者实例。
+    *   `actionType` (String): **动作类型** (`"attack"`, `"heal"`, 或 `"buff"`)。
+    *   `type` / `damageType` (String): **伤害类型** (如 `"waigong"`, `"neigong"`, `"none"` 等)。两者等价。
+    *   `element` (String): 招式的**五行属性** (如 `"yin"`, `"taiji"`, `"none"` 等)。
     *   `costConsumed` (Object): **本次出招的真实资源消耗** (包含减耗、免费施法、濒死额外耗蓝)。
         *   `.mp` (Number): 实际消耗的内力。
         *   `.hp` (Number): 实际消耗的气血。
@@ -295,7 +298,7 @@ await Macros.requestSave({
     *   `item` (Item): 攻击者的武学数据。
     *   `attacker` (Actor): 攻击者。
     *   `target` (Actor): 防御者 (自己)。
-    *   `type` (String): 伤害类型。
+    *   `type` / `damageType` (String): 伤害类型 (两者等价，推荐使用 `damageType` 避免歧义)。
     *   `baseDamage` (Number): 原始面板伤害。
     *   `isCrit` (Bool): 攻击者是否触发了暴击判定。
     *   `outcome` (Object, **只读**): `{ isHit: false, isBroken: Bool }`。明确告知未命中。
@@ -308,7 +311,7 @@ await Macros.requestSave({
     *   `item` (Item): 攻击者的武学数据。
     *   `attacker` (Actor): 攻击者。
     *   `target` (Actor): 防御者。
-    *   `type` (String): 伤害类型。
+    *   `type` / `damageType` (String): 伤害类型 (两者等价，推荐使用 `damageType` 避免歧义)。
     *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
     *   `baseDamage` (Number): 原始面板伤害。
     *   `config` (Object, **可修改**):
@@ -374,7 +377,7 @@ await Macros.requestSave({
     *   `outcome` (Object, **只读**): `{ isHit(是否命中), isCrit(是否暴击), isBroken(是否击破架招) }`。
     *   `config` (Object, **可修改**):
         *   `amount` (Number): 伤害数值。
-        *   `type` (String): 伤害类型。
+        *   `type` / `damageType` (String): 伤害类型 (两者等价，推荐使用 `damageType` 避免歧义)。
         *   `element` (String): 招式的五行属性 (`yin`, `yang`, `gang`, `rou`, `taiji`, `none`)。
         *   `ignoreBlock`, `ignoreDefense`, `ignoreStance`, `ignoreMinDamage`(是否允许伤害归零。设为 true 可防止系统强制保底造成 1 点伤害), `applyCritDamage` (Bool)。
 
@@ -386,21 +389,23 @@ await Macros.requestSave({
     *   `attacker` (Actor): 攻击者。
     *   `item` (Item): 来源物品。
     *   `move` (Object): 招式数据。
-    *   `type` (String): `"attack"`, `"heal"`, 或 `"buff"`。
+    *   `actionType` (String): **动作类型** (`"attack"`, `"heal"`, 或 `"buff"`)。判断招式行为请用此字段。
+    *   `type` / `damageType` (String): **伤害类型** (`"waigong"`, `"poison"`, `"none"` 等)。两者等价。
+    *   `element` (String): 招式的**五行属性**。
     *   `isManual` (Bool): 是否手动应用。
     *   `isHit`, `isCrit`, `isBroken` (Bool)。
     *   `isAttack`, `isHeal`, `isBuff` (Bool): 快捷类型标记。
-*   **参数 (`args`) - 攻击特有 (非气招，或气招但是`type="attack"`)**:
+*   **参数 (`args`) - 攻击特有 (非气招，或气招但是`actionType="attack"`)**:
     *   `baseDamage` (Number): 面板伤害。
     *   `finalDamage` (Number): 结算伤害。
     *   `hpLost`, `mpLost`, `hutiLost` (Number): **实际**造成的损失。
     *   `isDying`, `isDead` (Bool): 目标状态。
     *   `damageResult` (Object): 完整的结算数据包 (包含上述所有字段)。
-*   **参数 (`args`) - 治疗/Buff特有 (`type="heal"/"buff"`)**:
+*   **参数 (`args`) - 治疗/Buff特有 (`actionType="heal"/"buff"`)**:
     *   `baseAmount` (Number): 面板数值 (治疗量或强度)。
     *   `finalAmount` (Number):
-        *   若 `type === 'heal'`: 实际应用到 HP 上的回复量。
-        *   若 `type === 'buff'`: 等于 `baseAmount` (视为强度 Potency)。
+        *   若 `actionType === 'heal'`: 实际应用到 HP 上的回复量。
+        *   若 `actionType === 'buff'`: 等于 `baseAmount` (视为强度 Potency)。
     *   `healAmount` (Number): 同 `finalAmount`。
     *   `isBuffOnly` (Bool): 标识是否仅为Buff (无治疗数值)。
 
@@ -412,6 +417,10 @@ await Macros.requestSave({
     *   `hitCount` (Int): 命中的目标总数。
     *   `baseDamage` (Number): 面板伤害 (攻击模式下)。
     *   `totalHealAmount` (Number): (治疗模式下) 总治疗量。
+    *   `actionType` (String): 动作类型 (`"attack"`, `"heal"`, 或 `"buff"`)。
+    *   `type` / `damageType` (String): 伤害类型 (`"waigong"`, `"neigong"`, `"none"` 等)。
+    *   `element` (String): 招式的五行属性。
+    *   `hasCrit` (Bool): **本次群体结算中，是否对任意一个目标产生了暴击**。
     *   `costConsumed` (Object): **本次出招的真实资源消耗** (包含减耗、免费施法、濒死一击额外耗蓝)。
         *   `.mp` (Number): 实际消耗的内力总和。
         *   `.hp` (Number): 实际消耗的气血。
