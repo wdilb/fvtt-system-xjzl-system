@@ -1323,6 +1323,7 @@ export class XJZLActor extends Actor {
       attacker: attacker,
       target: this,
       type: type,
+      damageType: type, // 与 type 完全等价，确保脚本无论用 args.type 还是 args.damageType 都能取到
       baseDamage: amount, // 原始面板伤害
       element: config.element,
       move: move,
@@ -1406,6 +1407,7 @@ export class XJZLActor extends Actor {
       attacker: attacker,
       target: this,
       type: type,
+      damageType: type, // 与 type 完全等价，确保脚本无论用 args.type 还是 args.damageType 都能取到
       element: config.element,
       baseDamage: amount,        // 原始面板
       calcDamage: reducedDamage, // 减伤后理论值
@@ -1603,6 +1605,7 @@ export class XJZLActor extends Actor {
       attacker: attacker,
       target: this,
       type: type,
+      damageType: type, // 与 type 完全等价，确保脚本无论用 args.type 还是 args.damageType 都能取到
       element: config.element,
 
       finalDamage: finalDamage, // 理论应扣

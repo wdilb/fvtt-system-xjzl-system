@@ -1398,8 +1398,11 @@ export class ChatCardManager {
                 attacker: attacker,
                 item: item,
                 move: move,
+                actionType: "attack",         //  动作类型，不再使用type，容易和其他的脚本阶段的type混淆
+                damageType: flags.damageType, //  伤害类型 (waigong, neigong 等)
+                type: flags.damageType,       //  伤害类型，与防御端保持统一
+                element: moveElement,         //  招式的属性 (taiji, yin, yang 等)
                 // 添加一些参数和_applyHeal保持一致
-                type: "attack",       // 明确类型
                 isAttack: true,       // 明确标记
                 isHeal: false,
                 isBuff: false,
@@ -1484,6 +1487,12 @@ export class ChatCardManager {
             attacker: attacker,
             item: item,
             move: move,
+            // --- 补充一些参数 ---
+            actionType: "attack",//  动作类型，不再使用type，容易和其他的脚本阶段的type混淆
+            damageType: flags.damageType,//  伤害类型 (waigong, neigong 等)
+            type: flags.damageType,//  伤害类型，与防御端保持统一
+            element: moveElement,//  招式的属性 (taiji, yin, yang 等)
+            hasCrit: hasCrit, // 标记本次AOE中是否对任意目标产生了暴击
             costConsumed: flags.costConsumed
         };
 
@@ -1801,6 +1810,10 @@ export class ChatCardManager {
                 attacker: attacker,
                 item: item,
                 move: move,
+                actionType: "attack", //  动作类型，不再使用type，容易和其他的脚本阶段的type混淆
+                damageType: flags.damageType,//  伤害类型 (waigong, neigong 等)
+                type: flags.damageType,//  伤害类型，与防御端保持统一
+                element: moveElement,//  招式的属性 (taiji, yin, yang 等)
                 isManual: true // 给脚本一个标记，万一脚本需要区分
             };
             await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
@@ -1825,6 +1838,11 @@ export class ChatCardManager {
             attacker: attacker,
             item: item,
             move: move,
+            // --- 补充一些参数 ---
+            actionType: "attack",//  动作类型，不再使用type，容易和其他的脚本阶段的type混淆
+            damageType: flags.damageType,//  伤害类型 (waigong, neigong 等)
+            type: flags.damageType,//  伤害类型，与防御端保持统一
+            element: moveElement,//  招式的属性 (taiji, yin, yang 等)
             isManual: true
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
@@ -2477,7 +2495,10 @@ export class ChatCardManager {
                 move: move,
 
                 // 2. 行为标识
-                type: isBuffType ? "buff" : "heal", // 更精准的类型
+                actionType: isBuffType ? "buff" : "heal", // 用 actionType 表达动作
+                damageType: "none",                       // 明确没有伤害类型
+                type: "none",                             // 维持 type 语义统一
+                element: move.element || "none",          // 传递五行
                 isHeal: !isBuffType,
                 isAttack: false,      // 明确不是攻击
                 isBuff: isBuffType, // 方便脚本判断
@@ -2521,7 +2542,10 @@ export class ChatCardManager {
             item: item,
             move: move,
 
-            type: isBuffType ? "buff" : "heal",
+            actionType: isBuffType ? "buff" : "heal", // 用 actionType 表达动作
+            damageType: "none",                       // 明确没有伤害类型
+            type: "none",                             // 维持 type 语义统一
+            element: move.element || "none",          // 传递五行
             isHeal: !isBuffType,
             totalHealAmount: summaryData.reduce((acc, cur) => acc + cur.amount, 0), // 方便统计总奶量
             costConsumed: flags.costConsumed

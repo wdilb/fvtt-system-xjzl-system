@@ -1689,6 +1689,11 @@ export class XJZLItem extends Item {
         move: move,
         item: this,
         attacker: actor, // 明确语义，方便 copy 脚本到其他地方
+        // --- 新增参数 ---
+        actionType: effectiveMode, //  动作类型，不再使用type，容易和其他的脚本阶段的type混淆
+        damageType: damageType,    //  伤害类型 (waigong, neigong 等)
+        type: damageType,          //  伤害类型，与防御端保持统一
+        element: move.element || "none", //  招式的属性 (taiji, yin, yang 等)
         // 使用数值计数器，不再使用布尔值的flags
         // 核心 Flags (供脚本修改)
         costConsumed: costConsumed,
