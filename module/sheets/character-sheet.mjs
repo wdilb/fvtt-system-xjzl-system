@@ -565,6 +565,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     const bdHtml = move.derived.breakdown.replace(/\n/g, "<br>");
                     move.derived.breakdownTooltip = `<div style='text-align:left; font-family:Consolas; font-size:11px;'>${bdHtml}</div>`;
                 }
+
+                if (move.derived.feint) {
+                    // 防空处理，确保有数据
+                    const rawFeintBd = move.derived.feintBreakdown || "基础虚招值";
+                    const feintBdHtml = rawFeintBd.replace(/\n/g, "<br>");
+                    move.derived.feintBreakdownTooltip = `<div style='text-align:left; font-family:Consolas; font-size:11px;'>${feintBdHtml}</div>`;
+                }
             });
 
             // --- 5. 构建武学书本 Tooltip ---
