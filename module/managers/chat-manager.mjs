@@ -2614,8 +2614,9 @@ export class ChatCardManager {
 
     /**
      * 死检 (Death Save)
-     * d20 > 10: 活 (回1血1内，去状态)
-     * d20 <= 10: 死 (播报)
+     * d20 == 20: 堪破生死 (回1血1内，提示打通玄关)
+     * 10 <= d20 < 20: 活 (回1内，昏迷，提示投昏迷时辰)
+     * d20 < 10: 死 (播报)
      */
     static async _rollDeathSave(actor) {
         // 1. 投掷
@@ -2623,14 +2624,37 @@ export class ChatCardManager {
 
         // 2. 展示骰子
         const total = roll.total;
-        const isSuccess = total >= 10;
+        const isCritSuccess = total === 20;
+        const isSuccess = total >= 10 && total < 20;
+        const isFail = total < 10;
 
         // 3. 构建结果内容
-        let flavor = isSuccess ? "回光返照！" : "回天乏术...";
-        let color = isSuccess ? "green" : "black";
-        let desc = isSuccess
-            ? "心脉护住了一口气，脱离死亡状态。"
-            : "彻底气绝身亡。";
+        let flavor = "";
+        let color = "";
+        let desc = "";
+        let extraHtml = "";
+
+        if (isCritSuccess) {
+            flavor = "堪破生死！";
+            color = "#ff4500"; // 橙红
+            desc = "心脉护住了最后一口气，不仅脱离死亡，更有机缘由死入生！";
+            extraHtml = `
+            <div style="margin-top:5px; padding:5px; background:rgba(255, 69, 0, 0.1); border-left:3px solid #ff4500; font-size:0.85em; text-align:left; color:#8b0000;">
+                <b>生死玄关机缘：</b><br>如果你的丹田存储有 1000 修为，且已经打通至少一条第二关经脉，你可以手动消耗 1000 通用修为，直接打通【生死玄关】！
+            </div>`;
+        } else if (isSuccess) {
+            flavor = "回光返照！";
+            color = "green";
+            desc = "心脉护住了一口气，保住了性命，但陷入了深度的昏迷。";
+            extraHtml = `
+            <div style="margin-top:5px; padding:5px; background:rgba(0, 128, 0, 0.1); border-left:3px solid green; font-size:0.85em; text-align:left; color:#006400;">
+                <b>陷入昏迷：</b><br>你未恢复气血，仅恢复了 1 点内力。请手动投掷 <b>1d20</b>，结果为你在醒来前需要昏迷的时辰数。
+            </div>`;
+        } else {
+            flavor = "回天乏术...";
+            color = "black";
+            desc = "彻底气绝身亡。";
+        }
 
         // 4. 发送结果消息
         // roll.toMessage 会自动处理 rolls 数组和 3D 骰子
@@ -2643,21 +2667,28 @@ export class ChatCardManager {
                 <div style="font-size:1.5em; text-align:center; font-weight:bold; color:${color}; margin-bottom:5px;">
                     ${total}
                 </div>
-                <div style="text-align:center; color:#555;">${desc}</div>
+                <div style="text-align:center; color:#555; margin-bottom: 5px;">${desc}</div>
+                ${extraHtml}
             </div>`
         });
 
         // 5. 自动化处理 (仅成功时)
-        if (isSuccess) {
-            // A. 回复资源 (调用 Actor 接口，不仅改数据还飘字)
+        if (isCritSuccess) {
+            // A. 大成功: 回1血1内，移除死亡状态
             await actor.applyHealing({ amount: 1, type: "hp" });
-            await actor.applyHealing({ amount: 1, type: "mp" }); // 假设 mp 也是 1
-
-            // B. 移除死亡状态
-            // 注意：toggleStatusEffect 切换状态，如果当前有，toggle 会移除
+            await actor.applyHealing({ amount: 1, type: "mp" });
             await actor.toggleStatusEffect("dead", { active: false });
+            await actor.toggleStatusEffect("dying", { active: false });
+        } else if (isSuccess) {
+            // B. 普通成功: 仅回1内，移除死亡，挂上昏迷
+            await actor.applyHealing({ amount: 1, type: "mp" });
+            await actor.toggleStatusEffect("dead", { active: false });//不脱离濒死，只脱离死亡
 
-            // 这里暂不移除 dying，只移除 dead，让玩家处于濒死(HP=1)状态比较合理
+            const unconscious = CONFIG.statusEffects.find(e => e.id === "unconscious");
+            if (unconscious) {
+                // 调用系统统一的特效管理器发放“昏迷”状态
+                await game.xjzl.api.effects.addEffect(actor, unconscious);
+            }
         }
     }
 
