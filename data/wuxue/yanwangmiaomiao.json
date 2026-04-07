@@ -415,7 +415,7 @@
                     "targetInfo": "自身",
                     "actionCost": "反应动作",
                     "description": "<p>当你即将受到暴击伤害时，你可以消耗反应动作释放此招，引动阴死审判之气，抵挡此次攻击。你的每点恶行值为你提供 1 点减伤（至多 200 点）。</p><p>若你将此次伤害抵消至仅剩 1 点，历经大叫唤地狱，满日转解闹恼地狱，你可以立即不消耗动作施展一次【泰山锥肉】。</p><p><strong>升级：</strong>恶行值提供的减伤上限提高 100 点。</p>",
-                    "automationNote": "反应技。使用后自动获得护盾BUFF，BUFF会自动计算减伤并在受击时提示是否满足追击条件。包含计数。",
+                    "automationNote": "反应技。使用后自动获得护盾BUFF，受击时自动减伤、提示并随之销毁。包含计数。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -516,7 +516,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>自身陷入重伤时（气血不足 50%）方能施展，次要动作，血液流转，鲜血蒸发，短棍引动形成周身血雾，开启架招。你每损失 100 点气血，获得额外 1 点格挡值。格挡成功后，你可以用自身气感与目标的身法进行一次对抗：</p><p>若你对抗成功，鲜血缠绕目标，粘于皮肤之上，使其状如血人，形态可怖，陷入“行刑”状态，持续到战斗脱离。</p><p>若你对抗失败，你的气血逸散，转送阎罗，解除架招，获得 1 点怒气，如果你愿意，你可以消耗反应动作施展一次【阿鼻降难】。</p><p><strong>升级：</strong>格挡值+10，每损失 100 气血获得的额外格挡值+1，内力消耗+4。</p>",
-                    "automationNote": "开启条件自动检查。格挡值根据血量动态增加。格挡后自动请求对抗。对抗后续需手动处理。",
+                    "automationNote": "开启条件自动检查。格挡值动态增加。格挡后自动请求对抗，对抗获胜后自动施加[行刑]。对抗失败解除架招需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -551,7 +551,7 @@
                         {
                             "label": "血雾对抗",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.attacker,\n    type: \"qigan\",\n    defType: \"shenfa\",\n    label: \"五宫血池 - 血雾缠绕\",\n    outcome: {\n        win: {\n            text: \"鲜血缠绕！请手动施加 [行刑]。\"\n        },\n        lose: {\n            text: \"对抗失败。请手动解除架招。\",\n            selfRecovery: { \"value\": 1, \"type\": \"rage\" }\n        }\n    }\n});",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst effData = thisItem.effects.getName(\"行刑\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.attacker,\n    type: \"qigan\",\n    defType: \"shenfa\",\n    label: \"五宫血池 - 血雾缠绕\",\n    outcome: {\n        win: {\n            text: \"鲜血缠绕！目标陷入 [行刑]。\",\n            targetEffect: effData\n        },\n        lose: {\n            text: \"对抗失败。请手动解除架招。\",\n            selfRecovery: { \"value\": 1, \"type\": \"rage\" }\n        }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -751,7 +751,7 @@
                 {
                     "name": "阿鼻降难-破",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "description": "下一次出招无视闪避，距离+20米。",
+                    "description": "下一次出招无视敌方闪避，距离+20米。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -761,7 +761,7 @@
                                 {
                                     "label": "无视闪避",
                                     "trigger": "attack",
-                                    "script": "args.flags.forceHit = true;\nui.notifications.info(\"阿鼻降难效果：本次必中，距离+20米！\");",
+                                    "script": "args.flags.alwaysHit = true;\nui.notifications.info(\"阿鼻降难效果：本次必定命中，距离+20米！\");",
                                     "active": true
                                 },
                                 {
@@ -778,7 +778,7 @@
                 {
                     "name": "卞城枉死",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "description": "护盾：恶行值减伤。",
+                    "description": "护盾：恶行值减伤。生效一次后销毁。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -788,7 +788,7 @@
                                 {
                                     "label": "恶行护盾",
                                     "trigger": "preTake",
-                                    "script": "// 1. 读取 Flag 中的护盾强度\nconst shieldValue = thisEffect.getFlag(\"xjzl-system\", \"shieldValue\") || 0;\n\n// 2. 计算减伤\nconst original = args.output.damage;\n// 确保至少扣1点血 (除非完全免疫，但此招描述为抵挡)\nlet reduced = Math.max(1, original - shieldValue);\nconst blocked = original - reduced;\n\n// 3. 应用结果\nargs.output.damage = reduced;\n// 已修复：移除 args.output.bonusDesc.push 避免报错\n\n// 4. 发送卡片通知\nlet msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\">\n    <b>卞城枉死</b> 触发！<br>\n    原始伤害: ${original}<br>\n    抵消伤害: ${blocked}<br>\n    <span style=\"font-size:1.2em; font-weight:bold;\">最终伤害: ${reduced}</span>\n`;\n\n// 追击判定：伤害<=1点\nif (reduced <= 1) {\n    msg += `<hr><b style=\"color:red;\">条件满足！</b><br>伤害已压制至1点以下。<br>获得【泰山锥肉】追击机会！`;\n}\n\nmsg += `<hr><i style=\"color:#666; font-size:0.8em;\">请手动删除此状态</i></div></div>`;\n\nChatMessage.create({\n    content: msg,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                                    "script": "// 1. 读取 Flag 中的护盾强度\nconst shieldValue = thisEffect.getFlag(\"xjzl-system\", \"shieldValue\") || 0;\n\n// 2. 计算减伤\nconst original = args.output.damage;\n// 确保至少扣1点血 (除非完全免疫，但此招描述为抵挡)\nlet reduced = Math.max(1, original - shieldValue);\nconst blocked = original - reduced;\n\n// 3. 应用结果\nargs.output.damage = reduced;\n\n// 4. 发送卡片通知\nlet msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\">\n    <b>卞城枉死</b> 触发！<br>\n    原始伤害: ${original}<br>\n    抵消伤害: ${blocked}<br>\n    <span style=\"font-size:1.2em; font-weight:bold;\">最终伤害: ${reduced}</span>\n`;\n\n// 追击判定：伤害<=1点\nif (reduced <= 1) {\n    msg += `<hr><b style=\"color:red;\">条件满足！</b><br>伤害已压制至1点以下。<br>获得【泰山锥肉】追击机会！`;\n}\n\nmsg += `</div></div>`;\n\nChatMessage.create({\n    content: msg,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 5. 自动销毁此护盾\nawait thisEffect.delete();",
                                     "active": true
                                 }
                             ]
