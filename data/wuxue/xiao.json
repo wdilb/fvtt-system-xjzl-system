@@ -1178,7 +1178,7 @@
           "range": "自身",
           "targetInfo": "自身",
           "actionCost": "主要动作",
-          "description": "<p>每次濒死时，将自身毁灭重生，可以消除自身一个不想要的buff，每消除一个buff对周围目标造成50点火焰伤害。（包括除了濒死以外的特殊状态，但不可消除天极状态）</p><p><strong>升级：</strong>额外清除一个buff，内力消耗+10。</p>",
+          "description": "<p>每次濒死时，将自身毁灭重生，可以消除自身一个不想要的buff，每消除一个buff对周围目标造成50点火焰伤害。（包括除了濒死、丹田破碎、破防以外的特殊状态，但不可消除天级状态）</p><p><strong>升级：</strong>额外清除一个buff，内力消耗+10。</p>",
           "automationNote": "请对自己释放气招获取状态，之后濒死时会自动发卡片提醒您手动消除不利Buff。",
           "calculation": {
             "base": 0,
@@ -3814,5 +3814,779 @@
       "scripts": []
     },
     "effects": []
+  },
+  {
+    "name": "灵脉九针",
+    "type": "wuxue",
+    "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+    "system": {
+      "category": "wuxue",
+      "sect": "jianghushili",
+      "isOfficial": false,
+      "tier": 3,
+      "description": "<p>沟通天地灵气，激发人体潜能。</p><p><strong>需求：</strong>暗器-玄金针</p><p><strong>属性：</strong>太极</p>",
+      "requirements": "暗器-玄金针",
+      "moves": [
+        {
+          "name": "一气通脉",
+          "type": "qi",
+          "actionType": "heal",
+          "element": "taiji",
+          "damageType": "none",
+          "weaponType": "hidden",
+          "range": "5米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>用内力驱动针尖，刺激目标经脉关键节点，驱散目标一个负面状态，同时恢复 20 点气血。</p><p><strong>升级：</strong>回复气血+10，消耗+5，额外去除一个状态。</p>",
+          "automationNote": "恢复气血自动。驱散状态需根据卡片提示手动执行。",
+          "calculation": {
+            "base": 20,
+            "growth": 10
+          },
+          "costs": {
+            "mp": [
+              5,
+              10,
+              15,
+              20
+            ]
+          },
+          "scripts": [
+            {
+              "label": "提示驱散",
+              "trigger": "hit",
+              "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst count = 1 + (lvl > 1 ? 1 : 0);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #27ae60; background: rgba(39, 174, 96, 0.1); margin-left: 2px;\"><b>一气通脉：</b>请手动驱散目标 <b>${count}</b> 个负面状态。</div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "二龙戏珠",
+          "type": "qi",
+          "actionType": "buff",
+          "element": "taiji",
+          "damageType": "none",
+          "weaponType": "hidden",
+          "range": "5米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>以两根细针刺激目标经脉交汇处穴位，同目标进行一次武学对抗，胜利则对面自动解除架招。</p><p><strong>升级：</strong>消耗内力+5，武学对抗结果+1。</p>",
+          "automationNote": "对抗全自动。胜利后需根据提示手动解除目标架招。",
+          "calculation": {
+            "base": 0,
+            "growth": 0
+          },
+          "costs": {
+            "mp": [
+              5,
+              10,
+              15,
+              20
+            ]
+          },
+          "scripts": [
+            {
+              "label": "发起对抗",
+              "trigger": "hit",
+              "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    label: \"二龙戏珠 - 武学对抗\",\n    attBonus: bonus,\n    outcome: {\n        win: { text: \"对抗胜利！请手动解除目标的架招状态。\" },\n        lose: { text: \"对抗失败，对方内力深厚。\" }\n    }\n});",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "三才定穴",
+          "type": "stance",
+          "element": "taiji",
+          "damageType": "waigong",
+          "weaponType": "hidden",
+          "range": "自身",
+          "targetInfo": "自身",
+          "actionCost": "次要动作",
+          "description": "<p>依天、地、人三才之位寻穴位，开启架招。架招期间，每次成功格挡可以不消耗动作对目标进行一次点穴。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+          "automationNote": "开启自动。格挡成功后发卡片提示手动点穴。",
+          "calculation": {
+            "base": 0,
+            "growth": 10
+          },
+          "costs": {
+            "mp": [
+              4,
+              8,
+              12,
+              16
+            ]
+          },
+          "scripts": [
+            {
+              "label": "格挡提示点穴",
+              "trigger": "damaged",
+              "script": "if (!Macros.checkStance(actor, args)) return;\nconst msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1); margin-left: 2px;\"><b>三才定穴触发：</b>格挡成功！你可以不消耗动作对目标进行一次点穴，请手动施展。</div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "四象聚元",
+          "type": "qi",
+          "actionType": "buff",
+          "element": "taiji",
+          "damageType": "none",
+          "weaponType": "hidden",
+          "range": "5米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>用四根短针刺激目标四肢关键经脉穴位汇聚元气，为目标添加 “四象元身” 状态，持续 1 回合，目标施展绝招时怒气消耗降低 2 点，绝招伤害提高自身 0.1 气感点。</p><p><strong>升级：</strong>消耗内力+10，四象元身持续回合+1。</p>",
+          "automationNote": "完全自动化。",
+          "calculation": {
+            "base": 0,
+            "growth": 0
+          },
+          "costs": {
+            "mp": [
+              10,
+              20,
+              30,
+              40
+            ],
+            "rage": [
+              2,
+              2,
+              2,
+              2
+            ]
+          },
+          "scripts": [
+            {
+              "label": "施加四象元身",
+              "trigger": "hit",
+              "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"四象元身\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "五龙归海",
+          "type": "real",
+          "isUltimate": true,
+          "element": "taiji",
+          "damageType": "liushi",
+          "weaponType": "hidden",
+          "range": "10米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>汇聚全身内力化五龙之势，五根长针呈扇形飞出击中目标，造成 100 点气血流失，使目标陷入 “经脉紊乱” 状态，持续 1 回合。</p><p><strong>经脉紊乱：</strong>随机一条经脉（手三阴经、足三阴经、手三阳经、足三阳经）效果不生效。</p><p><strong>升级：</strong>消耗内力+20，气血流失+20。</p>",
+          "automationNote": "流失伤害自动。经脉紊乱将通过卡片随机抽取失效经脉，需玩家手动执行经脉失效。",
+          "calculation": {
+            "base": 100,
+            "growth": 20
+          },
+          "costs": {
+            "mp": [
+              20,
+              40,
+              60,
+              80
+            ],
+            "rage": [
+              8,
+              8,
+              8,
+              8
+            ]
+          },
+          "scripts": [
+            {
+              "label": "经脉紊乱判定",
+              "trigger": "hit",
+              "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"经脉紊乱\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nconst msgs = [\"手三阴经\", \"足三阴经\", \"手三阳经\", \"足三阳经\"];\nconst rand = msgs[Math.floor(Math.random() * msgs.length)];\nconst msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #c0392b; background: rgba(192, 57, 43, 0.1); margin-left: 2px;\"><b>五龙归海：</b>目标陷入经脉紊乱！<br>随机失效经脉：<b style=\"color:red;\">${rand}</b><br><span style=\"font-size:0.85em; color:#666;\">（请根据此结果，手动使对应的经脉加成失效）</span></div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "六道轮回",
+          "type": "qi",
+          "actionType": "buff",
+          "element": "taiji",
+          "damageType": "none",
+          "weaponType": "hidden",
+          "range": "5米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>以六根短针依次刺激目标经脉上的六个重要穴位，形成一个循环的内力流转。为目标添加 “轮回” 状态，持续 1 回合。</p><p><strong>轮回：</strong>每回合末回复 5 点内力，受到伤害时可用内力 1:1 抵消伤害。</p><p><strong>升级：</strong>消耗内力+5，轮回持续回合+1。</p>",
+          "automationNote": "回合末回蓝全自动。内力抵消伤害由于主观性强，需玩家根据自身意愿手动扣蓝回血。",
+          "calculation": {
+            "base": 0,
+            "growth": 0
+          },
+          "costs": {
+            "mp": [
+              5,
+              10,
+              15,
+              20
+            ]
+          },
+          "scripts": [
+            {
+              "label": "施加轮回",
+              "trigger": "hit",
+              "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"轮回\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "七宿连星",
+          "type": "counter",
+          "element": "taiji",
+          "damageType": "liushi",
+          "weaponType": "hidden",
+          "range": "5米",
+          "targetInfo": "单体",
+          "actionCost": "反应动作",
+          "description": "<p>看破敌方虚招时，可消耗反应动作压制虚招，以针刺特定穴位，对敌方造成 70 点气血流失。若目标身上存在 2 个以上的负面状态，则使敌人陷入 “眩晕” 状态，持续 1 回合。</p><p><strong>升级：</strong>消耗内力+5，气血流失+10。</p>",
+          "automationNote": "流失伤害自动。眩晕效果将发送卡片提示，需玩家手动评估并施加。",
+          "calculation": {
+            "base": 70,
+            "growth": 10
+          },
+          "costs": {
+            "mp": [
+              5,
+              10,
+              15,
+              20
+            ]
+          },
+          "scripts": [
+            {
+              "label": "眩晕提示",
+              "trigger": "hit",
+              "script": "if (!args.isHit) return;\nconst msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #2980b9; background: rgba(41, 128, 185, 0.1); margin-left: 2px;\"><b>七宿连星：</b>若目标 <b>${args.target.name}</b> 身上存在 <b>2 个以上</b>的负面状态，请手动为其添加 <b>[眩晕]</b> 状态 1 回合。</div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "八荒凝聚",
+          "type": "qi",
+          "actionType": "buff",
+          "element": "taiji",
+          "damageType": "none",
+          "weaponType": "hidden",
+          "range": "10米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>以自身内力转化为八荒之气，八枚长针刺入目标脉穴，为目标输入八荒之气。目标下次出招提高本招式消耗内力点数的招式伤害。</p><p><strong>升级：</strong>消耗内力+30。</p>",
+          "automationNote": "完全自动化。本招式消耗的内力将以AE形式暂存于目标身上，目标下次出招时自动读取并增加伤害，随后移除。",
+          "calculation": {
+            "base": 0,
+            "growth": 0
+          },
+          "costs": {
+            "mp": [
+              30,
+              60,
+              90,
+              120
+            ]
+          },
+          "scripts": [
+            {
+              "label": "存储内力",
+              "trigger": "hit",
+              "script": "const costMp = args.costConsumed.mp || 0;\nif (costMp <= 0) return;\nconst eff = thisItem.effects.getName(\"八荒之气\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\n// 使用 mode 2 写入 flag\neff.changes.push({ key: \"flags.xjzl-system.bahuang_bonus\", mode: 2, value: String(costMp) });\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "九宫归元",
+          "type": "qi",
+          "isUltimate": true,
+          "actionType": "buff",
+          "element": "taiji",
+          "damageType": "none",
+          "weaponType": "hidden",
+          "range": "1米",
+          "targetInfo": "单体",
+          "actionCost": "全回合动作",
+          "description": "<p>汇聚九宫之力，以九根玄金针呈奇门遁甲之阵飞出，精准命中目标全身多处要穴经脉。当目标死亡后（战斗结束后，时间不超过一个时辰也可），可刺激目标生机，保护心火，使目标起死回生，获得 1 点气血，1 点内力。目标本回合不受其他效果影响。</p><p><strong>升级：</strong>每提升一级减少 1 点怒气消耗。</p>",
+          "automationNote": "内力动态扣除全自动。濒死复活及恢复1点血蓝全自动。脱战死亡后的复活需玩家手动操作。",
+          "calculation": {
+            "base": 0,
+            "growth": 0
+          },
+          "costs": {
+            "mp": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "rage": [
+              8,
+              7,
+              6,
+              5
+            ]
+          },
+          "scripts": [
+            {
+              "label": "动态扣蓝",
+              "trigger": "attack",
+              "script": "const currentMp = actor.system.resources.mp.value;\nconst cost = Math.max(200, Math.floor(currentMp / 2));\nif (currentMp < cost) {\n    args.flags.abort = true;\n    args.flags.abortReason = `内力不足（需至少 ${cost}），无法施展九宫归元！`;\n    return;\n}\nawait actor.update({\"system.resources.mp.value\": currentMp - cost});\nargs.costConsumed.mp = cost;",
+              "active": true
+            },
+            {
+              "label": "施加庇护",
+              "trigger": "hit",
+              "script": "const eff = thisItem.effects.getName(\"九宫庇护\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+              "active": true
+            }
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "name": "四象元身",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+          "description": "绝招怒气消耗降低2点，绝招伤害提高0.1气感。",
+          "transfer": false,
+          "flags": {
+            "xjzl-system": {
+              "slug": "sixiangyuanshen",
+              "stackable": false,
+              "scripts": [
+                {
+                  "label": "绝招加成",
+                  "trigger": "calc",
+                  "active": true,
+                  "script": "if (args.move.isUltimate) {\n    const bonus = Math.floor(actor.system.stats.qigan.total * 0.1);\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`四象元身加成: +${bonus}`);\n}"
+                }
+              ]
+            }
+          },
+          "changes": [
+            {
+              "key": "system.combat.costs.ultimateRageDiscount.mod",
+              "mode": 2,
+              "value": "2"
+            }
+          ]
+        },
+        {
+          "name": "经脉紊乱",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+          "description": "随机一条经脉失效。",
+          "transfer": false,
+          "duration": {
+            "rounds": 1
+          },
+          "flags": {
+            "xjzl-system": {
+              "slug": "jingmaiwenluan",
+              "stackable": false
+            }
+          },
+          "changes": []
+        },
+        {
+          "name": "轮回",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+          "description": "回合末回蓝。受击可手动以蓝抵血。",
+          "transfer": false,
+          "flags": {
+            "xjzl-system": {
+              "slug": "lunhui",
+              "stackable": false
+            }
+          },
+          "changes": [
+            {
+              "key": "flags.xjzl-system.regenMpTurnEnd",
+              "mode": 2,
+              "value": "5"
+            }
+          ]
+        },
+        {
+          "name": "八荒之气",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+          "description": "下次出招伤害提高。",
+          "transfer": false,
+          "flags": {
+            "xjzl-system": {
+              "slug": "bahuangzhiqi",
+              "stackable": false,
+              "scripts": [
+                {
+                  "label": "爆发增伤",
+                  "trigger": "calc",
+                  "active": true,
+                  "script": "const bonus = Number(thisEffect.getFlag(\"xjzl-system\", \"bahuang_bonus\")) || 0;\nif (bonus > 0 && args.move.type !== \"basic\" && args.move.type !== \"qi\" && args.move.type !== \"stance\") {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`八荒之气加成: +${bonus}`);\n    thisEffect.delete();\n}"
+                }
+              ]
+            }
+          },
+          "changes": []
+        },
+        {
+          "name": "九宫庇护",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+          "description": "抵御致死伤害，起死回生。",
+          "transfer": false,
+          "flags": {
+            "xjzl-system": {
+              "slug": "jiugongbihu",
+              "stackable": false,
+              "scripts": [
+                {
+                  "label": "免死复活",
+                  "trigger": "dying",
+                  "active": true,
+                  "script": "args.preventDying = true;\nawait actor.update({\n    \"system.resources.hp.value\": 1,\n    \"system.resources.mp.value\": 1\n});\nactor.showFloatyText(\"起死回生！\", { fill: \"#f1c40f\", fontSize: 40 });\nthisEffect.delete();"
+                }
+              ]
+            }
+          },
+          "changes": []
+        }
+      ]
+    }
+  },
+  {
+    "name": "七秀七绝",
+    "type": "wuxue",
+    "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+    "system": {
+      "category": "wuxue",
+      "sect": "jianghushili",
+      "isOfficial": false,
+      "tier": 3,
+      "description": "<p>“七秀七绝，剑舞风华，翩若惊鸿，婉若游龙。”</p><p>七秀七绝乃七秀坊传承的绝世剑舞，融合了七秀坊历代弟子的智慧与灵感，每一招每一式都如同精心编排的舞蹈，刚柔并济，变幻莫测，在战斗中既能造成强大伤害，又能翩翩起舞，美不胜收，是七秀坊武学的巅峰之作。</p><p><strong>需求：</strong>剑-双剑 【表演】到达 7</p><p><strong>属性：</strong>阴</p>",
+      "requirements": "剑-双剑；【表演】到达 7",
+      "moves": [
+        {
+          "name": "惊鸿照影",
+          "type": "real",
+          "element": "yin",
+          "damageType": "neigong",
+          "weaponType": "sword",
+          "range": "4米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>翩若惊鸿，婉若游龙，荣耀秋菊，华茂春松舞者轻盈跃起，手中剑化作流光溢彩的惊鸿，快速向目标刺去，剑尖闪烁着寒光，对目标造成 0.7 神采点内功伤害。命中无架招目标后，目标陷入‘下盘不稳’且自身获得“剑影”，持续到战斗结束。</p><p><strong>剑影：</strong>命中目标时，可同目标进行‘定力’对抗，获胜则目标剑影缠绕，行动迟缓，如同陷入幻境，封招一回合，同时移除剑影。你的定力对抗结果+1</p><p><strong>升级：</strong>招式伤害+10，剑影的对抗结果+1，内力消耗+4。</p>",
+          "automationNote": "施加下盘不稳与剑影全自动。剑影触发时自动发起对抗，胜利后封招自动，但【移除剑影】需玩家根据卡片提示手动执行。",
+          "calculation": {
+            "base": 0,
+            "growth": 10,
+            "scalings": [
+              {
+                "prop": "shencai",
+                "ratio": 0.7
+              }
+            ]
+          },
+          "costs": {
+            "mp": [
+              4,
+              8,
+              12,
+              16
+            ]
+          },
+          "scripts": [
+            {
+              "label": "施加状态与剑影",
+              "trigger": "hit",
+              "script": "if (!args.isHit) return;\nif (!args.target.system.martial?.stanceActive) {\n    const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (unstable) await game.xjzl.api.effects.addEffect(args.target, unstable);\n    const eff = thisItem.effects.getName(\"剑影\").toObject();\n    delete eff._id; eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "梨花飘雪",
+          "type": "feint",
+          "element": "yin",
+          "damageType": "neigong",
+          "weaponType": "sword",
+          "range": "3米",
+          "targetInfo": "单体",
+          "actionCost": "主要动作",
+          "description": "<p>梨花一枝春带雨，泪光点点，娇喘微微。舞者轻盈旋转，手中剑如同飘落的梨花，剑光闪烁间，对目标造成 0.6 神采点内功伤害。</p><p>若自身存在“剑影”，可消耗反应动作，使剑气化作片片梨花，对目标周围 3 米范围内的其他敌人造成 0.4 神采点内功伤害，并使他们的虚招对抗结果-1，随后移除‘剑影’。</p><p><strong>升级：</strong>招式伤害+10，虚招对抗结果再-1，内力消耗+4。</p>",
+          "automationNote": "作为主要动作施展全自动。若作为【反应动作】追击，请在弹窗手动减去提示的伤害数值，并手动扣除敌方虚招点数及移除自身剑影。",
+          "calculation": {
+            "base": 0,
+            "growth": 10,
+            "scalings": [
+              {
+                "prop": "shencai",
+                "ratio": 0.6
+              }
+            ]
+          },
+          "costs": {
+            "mp": [
+              4,
+              8,
+              12,
+              16
+            ]
+          },
+          "scripts": [
+            {
+              "label": "反应施展提示",
+              "trigger": "attack",
+              "script": "const hasJianying = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianying\");\nif (hasJianying) {\n    const diff = Math.floor(actor.system.stats.shencai.total * 0.2);\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const debuff = 1 + (lvl > 1 ? lvl - 1 : 0);\n    ui.notifications.info(`【梨花飘雪】若作为反应动作施展，请在伤害调整中输入 -${diff}，并手动对目标应用虚招劣势 -${debuff}，最后移除剑影。`);\n}",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "玉容映月",
+          "type": "stance",
+          "element": "yin",
+          "damageType": "waigong",
+          "weaponType": "sword",
+          "range": "自身",
+          "targetInfo": "自身",
+          "actionCost": "次要动作",
+          "description": "<p>端正严静，乃生神灵。舞者剑尖轻点地面，身体微侧，以优美的姿态开启架招，剑身泛起柔和的月光，格挡成功时，为目标添加一层“剑意”，持续到战斗脱离。</p><p><strong>剑意：</strong>满五层后，移除所有剑意，目标下一次攻击必定会被闪避，随后陷入“失神”状态，持续一回合。失神持续期间，不会添加剑意。</p><p><strong>失神：</strong>仿佛被剑意所惑，犹犹豫豫。出招命中检定劣势。</p><p><strong>升级：</strong>格挡值+10，失神回合+1，内力消耗+5。</p>",
+          "automationNote": "格挡添加剑意全自动。剑意满5层后自动清空并施加失神，同时发送卡片提示“下一次必定闪避”，该闪避效果需防守方手动处理。",
+          "calculation": {
+            "base": 0,
+            "growth": 10
+          },
+          "costs": {
+            "mp": [
+              5,
+              10,
+              15,
+              20
+            ]
+          },
+          "scripts": [
+            {
+              "label": "格挡剑意",
+              "trigger": "damaged",
+              "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst hasShishen = args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shishen\");\nif (hasShishen) return;\nconst eff = thisItem.effects.getName(\"剑意\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);\n\n// 检查层数爆发\nconst stacks = args.attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianyi\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nif (stacks >= 5) {\n    await game.xjzl.api.effects.removeEffect(args.attacker, \"jianyi\", 5);\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const ss = thisItem.effects.getName(\"失神\").toObject();\n    delete ss._id; ss.origin = thisItem.uuid;\n    ss.duration = { rounds: 1 + (lvl > 1 ? lvl - 1 : 0) };\n    await game.xjzl.api.effects.addEffect(args.attacker, ss);\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #9b59b6; background: rgba(155, 89, 182, 0.1); margin-left: 2px;\"><b>剑意爆发！</b><br>目标 <b>${args.attacker.name}</b> 的<b style=\"color:red;\">下一次攻击必定会被闪避</b>！请防守方注意手动处理！<br>目标已陷入[失神]状态。</div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "剑舞旋风",
+          "type": "counter",
+          "element": "yin",
+          "damageType": "neigong",
+          "weaponType": "sword",
+          "range": "4米",
+          "targetInfo": "单体",
+          "actionCost": "反应动作",
+          "description": "<p>剑舞翩跹，风生水起。当看破对方虚招后，可消耗反应动作释放此招，双剑快速挥舞，剑气如旋风般飞出，压制对面虚招，对目标造成 0.8 神采点内功伤害。目标每有一层“剑意”，本次伤害提高 10 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+5。</p>",
+          "automationNote": "根据目标剑意层数增伤完全自动化。",
+          "calculation": {
+            "base": 0,
+            "growth": 10,
+            "scalings": [
+              {
+                "prop": "shencai",
+                "ratio": 0.8
+              }
+            ]
+          },
+          "costs": {
+            "mp": [
+              5,
+              10,
+              15,
+              20
+            ]
+          },
+          "scripts": [
+            {
+              "label": "剑意引爆",
+              "trigger": "preDamage",
+              "script": "const stacks = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianyi\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nif (stacks > 0) {\n    const bonus = stacks * 10;\n    args.config.amount += bonus;\n    ui.notifications.info(`剑舞旋风：引爆 ${stacks} 层剑意，伤害 +${bonus}`);\n}",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "清影随风",
+          "type": "qi",
+          "actionType": "buff",
+          "element": "yin",
+          "damageType": "none",
+          "weaponType": "sword",
+          "range": "5米",
+          "targetInfo": "单体",
+          "actionCost": "次要动作",
+          "description": "<p>独立小桥风满袖，平林新月人归后。舞者轻盈跃起，剑随身转，剑尖划出一道优雅弧线，剑气如同清风拂过，为目标添加一层“剑意”状态。</p><p><strong>升级：</strong>合一后额外添加一层‘剑意’，释放距离+5，内力消耗+6。</p>",
+          "automationNote": "施加剑意及合一升级双倍叠加完全自动化。",
+          "calculation": {
+            "base": 0,
+            "growth": 0
+          },
+          "costs": {
+            "mp": [
+              6,
+              12,
+              18,
+              24
+            ]
+          },
+          "scripts": [
+            {
+              "label": "施加剑意",
+              "trigger": "hit",
+              "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst loops = lvl >= 4 ? 2 : 1;\nconst eff = thisItem.effects.getName(\"剑意\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nfor (let i = 0; i < loops; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "繁花似锦",
+          "type": "real",
+          "element": "yin",
+          "damageType": "neigong",
+          "weaponType": "sword",
+          "range": "5米",
+          "targetInfo": "范围",
+          "actionCost": "蓄力动作",
+          "description": "<p>锦城丝管日纷纷，半入江风半入云。舞者轻盈跃起，手中剑如同繁花盛开，剑光闪烁间，对周围 5 米范围内的所有敌人造成 0.5 神采点内功伤害，剑气形成的花瓣纷飞，干扰敌人，若自身存在‘剑影’，同周围敌人进行‘定力’对抗，获胜则敌方陷入‘迟滞’，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，迟滞持续回合+1，内力消耗+4。</p>",
+          "automationNote": "命中后自动拉起对抗面板，获胜后自动施加迟滞。",
+          "calculation": {
+            "base": 0,
+            "growth": 10,
+            "scalings": [
+              {
+                "prop": "shencai",
+                "ratio": 0.5
+              }
+            ]
+          },
+          "costs": {
+            "mp": [
+              4,
+              8,
+              12,
+              16
+            ]
+          },
+          "scripts": [
+            {
+              "label": "花瓣干扰",
+              "trigger": "hit",
+              "script": "const hasJianying = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianying\");\nif (args.isHit && hasJianying) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const cz = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n    const czData = foundry.utils.deepClone(cz);\n    czData.duration = { rounds: 1 + (lvl > 1 ? lvl - 1 : 0) };\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"dingli\",\n        label: \"繁花似锦 - 花瓣干扰\",\n        outcome: {\n            win: { text: \"花瓣干扰成功！\", targetEffect: czData },\n            lose: { text: \"干扰失败。\" }\n        }\n    });\n}",
+              "active": true
+            }
+          ]
+        },
+        {
+          "name": "七秀绝唱",
+          "type": "real",
+          "isUltimate": true,
+          "element": "yin",
+          "damageType": "neigong",
+          "weaponType": "sword",
+          "range": "8米",
+          "targetInfo": "范围",
+          "actionCost": "蓄力动作",
+          "description": "<p>七秀绝唱，剑舞九天，惊鸿照影，名动世间。蓄力动作，舞者身体轻盈跃起，双剑在空中划出一道道优美的弧线，如同天女散花般，剑气如虹，震撼天地。对周围所有敌人造成 0.9 神采点内功伤害。</p><p>若自身存在‘剑影’，可以改为只攻击一名敌人，敌人受到伤害后，同敌人进行‘定力’对抗，获胜则敌人陷入自闭，持续一回合。</p><p><strong>升级：</strong>招式伤害+20，攻击距离+2 米，定力对抗结果+1，怒气消耗-1，内力消耗+20。</p>",
+          "automationNote": "单体集火转换交由玩家自行控制(只选一个目标即视为发动)。附带提示卡片，需玩家通过卡片提示手动开启对抗。",
+          "calculation": {
+            "base": 0,
+            "growth": 20,
+            "scalings": [
+              {
+                "prop": "shencai",
+                "ratio": 0.9
+              }
+            ]
+          },
+          "costs": {
+            "mp": [
+              20,
+              40,
+              60,
+              80
+            ],
+            "rage": [
+              8,
+              7,
+              6,
+              5
+            ]
+          },
+          "scripts": [
+            {
+              "label": "绝唱锁定提示",
+              "trigger": "hit",
+              "script": "const hasJianying = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianying\");\nif (args.isHit && hasJianying) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = lvl > 1 ? (lvl - 1) : 0;\n    const msg = `<div class=\"xjzl-chat-card\" style=\"padding: 5px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1); margin-left: 2px;\"><b>七秀绝唱：</b>你拥有[剑影]。若本次你<b>仅攻击了一名敌人</b>，可手动在角色栏发起与其的定力对抗（你的结果 <b>+${bonus}</b>），胜则对方陷入[自闭] 1 回合。</div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}",
+              "active": true
+            }
+          ]
+        }
+      ],
+      "effects": [
+        {
+          "name": "剑影",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+          "description": "命中即可自动发起对抗，胜后封印对方招式。",
+          "transfer": false,
+          "flags": {
+            "xjzl-system": {
+              "slug": "jianying",
+              "stackable": false,
+              "scripts": [
+                {
+                  "label": "惊鸿照影-定力对抗",
+                  "trigger": "hit",
+                  "active": true,
+                  "script": "if (!args.isHit) return;\nconst move = thisItem.system.moves.find(m => m.name === \"惊鸿照影\");\nconst lvl = Math.max(1, move?.computedLevel || 1);\nconst bonus = 1 + (lvl > 1 ? (lvl - 1) : 0);\n\nawait Macros.requestContest({\n    attacker: actor, defender: args.target, type: \"dingli\",\n    attBonus: bonus,\n    label: \"惊鸿照影 - 剑影缠绕\",\n    outcome: { \n        win: { \n            text: \"目标陷入幻境！<br><span style='color:red;font-weight:bold;'>对抗成功！请手动移除自身的 [剑影] 状态。</span>\", \n            targetEffect: \"fengzhao\" \n        }, \n        lose: { \n            text: \"对抗失败。\" \n        } \n    }\n});"
+                }
+              ]
+            }
+          },
+          "changes": []
+        },
+        {
+          "name": "剑意",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+          "description": "剑意潜伏，满 5 层爆发。",
+          "transfer": false,
+          "flags": {
+            "xjzl-system": {
+              "slug": "jianyi",
+              "stackable": true,
+              "maxStacks": 5
+            }
+          },
+          "changes": []
+        },
+        {
+          "name": "失神",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+          "description": "出招命中检定劣势。",
+          "transfer": false,
+          "flags": {
+            "xjzl-system": {
+              "slug": "shishen",
+              "stackable": false
+            }
+          },
+          "changes": [
+            {
+              "key": "flags.xjzl-system.attackLevel",
+              "mode": 2,
+              "value": "-1"
+            }
+          ]
+        }
+      ]
+    }
   }
 ]
