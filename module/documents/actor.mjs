@@ -1906,6 +1906,10 @@ export class XJZLActor extends Actor {
     const resKeys = ["hp", "mp", "rage"];
     const labels = { hp: "气血", mp: "内力", rage: "怒气" };
 
+    // 检查当前是否处于濒死状态
+    const isDying = this.effects.some(e => e.statuses.has("dying"));
+    let deathTriggered = false; // 防止单次结算触发多次死亡卡片
+
     for (const res of resKeys) {
       // 拼接 Flag Key，例如: regenHpTurnStart
       // 注意大小写：配置里是 regenHp... 所以这里要把 res 首字母大写
@@ -1929,6 +1933,46 @@ export class XJZLActor extends Actor {
           // 记录日志文本
           const sign = delta > 0 ? "+" : "";
           messages.push(`${labels[res]} ${sign}${delta}`);
+
+          // =====================================================
+          // 濒死状态下的内力流失专项处理
+          // =====================================================
+          if (res === "mp" && delta < 0 && isDying && timing === "TurnStart") {
+
+            // 1. 播报濒死内力流失卡片
+            const mpLossContent = `
+                  <div class="xjzl-chat-card" style="padding:4px 8px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);">
+                      <div style="color:#8b0000; font-weight:bold; font-size:0.9em; margin-bottom: 2px;">
+                          <i class="fas fa-skull"></i> 濒死真气涣散
+                      </div>
+                      <div style="font-size:0.85em; color:#555;">
+                          由于处于濒死状态，流失了 <b style="color:red;">${Math.abs(delta)}</b> 点内力。
+                      </div>
+                  </div>`;
+            ChatMessage.create({
+              speaker: ChatMessage.getSpeaker({ actor: this }),
+              content: mpLossContent
+            });
+
+            // 2. 如果这波流失直接让内力归零，触发死亡！
+            if (newVal === 0 && !deathTriggered) {
+              deathTriggered = true; // 标记已触发，防止重复
+
+              // 强制挂上死亡状态 (系统默认的 overlay 行为)
+              await this.toggleStatusEffect("dead", { overlay: true, active: true });
+
+              // 渲染并发送死检卡片
+              renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: true })
+                .then(content => {
+                  ChatMessage.create({
+                    user: game.user.id,
+                    speaker: ChatMessage.getSpeaker({ actor: this }),
+                    content: content,
+                    flags: { "xjzl-system": { type: "death-card" } }
+                  });
+                });
+            }
+          }
         }
       }
     }
