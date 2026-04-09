@@ -243,7 +243,7 @@ await Macros.requestSave({
         *   `grantLevel` (Int): **命中优劣势修正**。+1=给予攻方优势(2d20kh)，-1=劣势(2d20kl)。
         *   `grantFeintLevel` (Int): **虚招优劣势修正**。
         *   `grantHit` (Int): **命中数值修正** (如 +5)。直接加在最终命中结果上。
-        *   `forceHit` (Bool): **单体必中**。设为 `true` 强制对该目标命中（跳过投掷，这也代表着不会暴击，如果需要能暴击的必中请给grantHit一个很大的加值来实现）。
+        *   `forceHit` (Bool): **单体必中**。设为 `true` 强制对该目标命中（跳过投掷，这也代表着不会暴击）。
         *   `alwaysHit` (Bool): **单体必定命中**。设为 `true` 强行判定为命中（无视闪避和骰子掷出1），但**依然会正常投掷骰子**以判定是否触发暴击。
         *   `grantFeint` (Int): **虚招数值修正**。
         *   `critThresholdMod` (Int): **暴击阈值修正**。正数表示更容易暴击 (如 +2 表示 18 即可暴击)。仅对当前目标生效。
