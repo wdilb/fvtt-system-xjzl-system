@@ -991,6 +991,51 @@ export class XJZLItem extends Item {
       };
     }
 
+    // =====================================================
+    // 提前武器匹配判定 (虚招计算和后续伤害计算都需要)
+    // =====================================================
+    let isWeaponMatch = false; // 标记：是否满足武器条件
+    if (actor.itemTypes.weapon && move.weaponType && move.weaponType !== 'none') {
+      const weapon = actor.itemTypes.weapon.find(w =>
+        w.system.equipped === true &&
+        w.system.type === move.weaponType
+      );
+      if (weapon) {
+        isWeaponMatch = true;
+      }
+    }
+
+    // =====================================================
+    // 提前虚招值计算
+    // =====================================================
+    let feintVal = 0;
+    let feintBreakdown = "";
+
+    if (effectiveType === 'feint') {
+      let base = move.baseFeint || 0; // DataModel 算好的基础值
+
+      // 如果变成了虚招，但原数据里没有基础值 (说明是半路改的)，现场补算
+      if (base === 0 && move.type !== 'feint') {
+        const tier = move.tier ?? this.system.tier ?? 1;
+        // 系数公式：人级2，地级3，天级4
+        const feintCoef = (tier === 3) ? 4 : (tier === 2 ? 3 : 2);
+        const lvlFeint = Math.max(1, move.computedLevel || 1);
+        base = lvlFeint * feintCoef;
+      }
+
+      // 武器等级加成 (虚招吃武器等级加成)
+      let wRankVal = 0;
+      if (isWeaponMatch && move.weaponType && actor.system.combat?.weaponRanks) {
+        wRankVal = actor.system.combat.weaponRanks[move.weaponType]?.total || 0;
+      }
+
+      const actorBonus = actor.system.combat.xuzhaoTotal || 0;
+      feintVal = base + wRankVal + actorBonus;
+
+      // 生成提示文本
+      feintBreakdown = `${game.i18n.localize("XJZL.Wuxue.Moves.BaseFeint")} ${base} + ${game.i18n.localize("XJZL.Combat.WeaponRanks")} ${wRankVal} + ${game.i18n.localize("XJZL.Combat.XuZhao")} ${actorBonus}`;
+    }
+
     // 2. 无系数气招 (纯脚本)：直接归零，不跑计算流程
     // 判定条件：是气招 且 没有配置属性加成 (Scalings)
     // 先去掉气招的条件，无系数的应该都不吃加成
@@ -1000,7 +1045,7 @@ export class XJZLItem extends Item {
       if (move.calculation.isFixed) {
         const calcOutput = {
           damage: Math.floor(moveBaseDmg),
-          feint: 0,
+          feint: feintVal,
           bonusDesc: []
         };
 
@@ -1042,7 +1087,7 @@ export class XJZLItem extends Item {
           damage: Math.floor(calcOutput.damage),
           feint: Math.floor(calcOutput.feint),
           breakdown: breakdownText,
-          feintBreakdown: "固定值",
+          feintBreakdown: feintBreakdown || "固定值",
           neigongBonus: "",
           cost: move.currentCost || { mp: 0, rage: 0, hp: 0 },
           isWeaponMatch: true
@@ -1052,7 +1097,7 @@ export class XJZLItem extends Item {
       // 2.2 纯固定值 (isFixed = false/undefined) -> 维持老逻辑，直接返回
       return {
         damage: Math.floor(moveBaseDmg),
-        feint: 0,
+        feint: feintVal,
         breakdown: "造成固定值或者不造成伤害，不享受一切通用加成", // 清晰的提示
         feintBreakdown: "",
         neigongBonus: "",
@@ -1063,16 +1108,14 @@ export class XJZLItem extends Item {
 
     // --- B. 武器基础伤害 (Weapon Item) & 装备判定 ---
     let weaponDmg = 0;
-    let isWeaponMatch = false; // 标记：是否满足武器条件
-
-    if (actor.itemTypes.weapon && move.weaponType && move.weaponType !== 'none') {
+    // isWeaponMatch 已经在上方算过了，这里直接用
+    if (isWeaponMatch && actor.itemTypes.weapon) {
       const weapon = actor.itemTypes.weapon.find(w =>
         w.system.equipped === true &&
         w.system.type === move.weaponType
       );
       if (weapon) {
         weaponDmg = weapon.system.damage || 0;
-        isWeaponMatch = true;
       }
     }
 
@@ -1158,35 +1201,6 @@ export class XJZLItem extends Item {
     let preScriptDmg = Math.floor(moveBaseDmg + weaponDmg + attrBonus + flatBonus + weaponDmgBonus);
     let scriptDmgBonus = 0;
     let scriptFeintBonus = 0;
-
-    // --- 虚招值计算 (Pre-Script) ---
-    let feintVal = 0;
-    let feintBreakdown = "";
-
-    if (effectiveType === 'feint') {
-      let base = move.baseFeint || 0; // DataModel 算好的基础值
-
-      // 如果变成了虚招，但原数据里没有基础值 (说明是半路改的)，现场补算
-      if (base === 0 && move.type !== 'feint') {
-        const tier = move.tier ?? this.system.tier ?? 1;
-        // 系数公式：人级2，地级3，天级4
-        const feintCoef = (tier === 3) ? 4 : (tier === 2 ? 3 : 2);
-        const lvl = Math.max(1, move.computedLevel || 1);
-        base = lvl * feintCoef;
-      }
-
-      // 武器等级加成 (同上逻辑)
-      let wRankVal = 0;
-      if (isWeaponMatch && move.weaponType && actor.system.combat?.weaponRanks) {
-        wRankVal = actor.system.combat.weaponRanks[move.weaponType]?.total || 0;
-      }
-
-      const actorBonus = actor.system.combat.xuzhaoTotal || 0;
-      feintVal = base + wRankVal + actorBonus;
-
-      // 生成提示文本
-      feintBreakdown = `${game.i18n.localize("XJZL.Wuxue.Moves.BaseFeint")} ${base} + ${game.i18n.localize("XJZL.Combat.WeaponRanks")} ${wRankVal} + ${game.i18n.localize("XJZL.Combat.XuZhao")} ${actorBonus}`;
-    }
 
     // ==========================================================
     // G. 执行 CALC 阶段脚本 (Script Execution)
