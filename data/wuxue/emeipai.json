@@ -1224,13 +1224,14 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>撤剑玉立，一顾倾城，剑气对目标造成0.5内息点内功伤害；</p><p>可消耗蓄力动作释放，则释放距离+2，伤害+5。</p>",
-                    "automationNote": "蓄力释放需手动增加伤害修正。",
+                    "description": "<p>主要动作，撤剑玉立，一顾倾城，剑气对目标造成 0.5 内息点内功伤害；</p><p>可消耗蓄力动作释放，则释放距离+2，伤害+5。</p><p><strong>升级：</strong>招式伤害+10，蓄力伤害+5，内力消耗+2。</p>",
+                    "automationNote": "出招时弹窗询问是否蓄力释放，自动计算加成（含等级成长）并计入最终伤害。",
                     "costs": {
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ],
                         "rage": [],
                         "hp": []
@@ -1244,7 +1245,15 @@
                                 "ratio": 0.5
                             }
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "蓄力释放加成",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonusDmg = 5 + (lvl - 1) * 5;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"蓄力释放确认\" },\n    content: `<p>是否消耗 <b>蓄力动作</b> 释放此招？</p><p>释放距离 +2，伤害 <b>+${bonusDmg}</b></p>`,\n    yes: { label: `蓄力释放 (+${bonusDmg})`, icon: \"fas fa-fist-raised\" },\n    no: { label: \"主要动作\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    args.flags.damageResult.damage += bonusDmg;\n    args.flags.damageResult.breakdown += `\\n+ 蓄力释放: ${bonusDmg}`;\n    ui.notifications.info(`已消耗蓄力动作，招式伤害增强！`);\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "分花扬柳",
@@ -1255,13 +1264,14 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>剑挑流光，澄澈碧空，造成0.4内息点内功伤害，若击破对方架招，将目标击飞1米。</p>",
-                    "automationNote": "击飞提示需GM操作。",
+                    "description": "<p>主要动作，剑挑流光，澄澈碧空，造成 0.4 内息点内功伤害，若击破对方架招，将目标击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "伤害与击破自动化。击飞通过聊天卡片广播提醒。",
                     "costs": {
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ],
                         "rage": [],
                         "hp": []
@@ -1278,10 +1288,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破击飞",
+                            "label": "击破击飞提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米！`);\n}"
+                            "script": "if (args.isBroken) {\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><div style=\"border-left: 4px solid #d35400; background: rgba(211, 84, 0, 0.05); padding: 5px;\"><div style=\"font-weight:bold; color:#d35400; font-size:1.1em;\"><i class=\"fas fa-wind\"></i> 击飞！</div><div style=\"font-size:0.9em; margin-top:3px; color:#555;\"><b>${args.target.name}</b> 的架招被分花扬柳击破，被击飞 <b>1 米</b>！</div></div></div>`;\n    ChatMessage.create({ content: content, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1294,13 +1304,14 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>风姿绰约，盈态似雪，开启架招，成功格挡后，进入“皓腕”，持续一回合。</p><p><strong>皓腕</strong>：你无法被击落、击飞、击倒。</p>升级：格挡值+10，皓腕额外持续一回合，内力消耗+2。",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>次要动作，风姿绰约，盈态似雪，开启架招，成功格挡后，进入“皓腕”，持续一回合。</p><p><strong>皓腕：</strong>你无法被击落、击飞、击倒。</p><p><strong>升级：</strong>格挡值+10，皓腕额外持续一回合，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。格挡后自动获得跟随等级成长的[皓腕]状态。",
                     "costs": {
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ],
                         "rage": [],
                         "hp": []
@@ -1327,13 +1338,14 @@
                     "range": "3米",
                     "targetInfo": "范围敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>剑风回旋，对范围内敌人造成0.4内息点内功伤害，并击飞无架招目标1米。</p><p>·若有人处于半空中，可消耗反应动作释放此招，飞至半空，擎剑直刺目标对其造成伤害，并将其再向上击飞至高空。</p>",
-                    "automationNote": "击飞与半空需手动。",
+                    "description": "<p>蓄力动作，剑风回旋，对范围内敌人造成 0.4 内息点内功伤害，并击飞无架招目标 1 米。</p><p>·若有人处于半空中，可消耗反应动作释放此招，飞至半空，擎剑直刺目标对其造成伤害，并将其再向上击飞至高空。</p><p>被持续击飞目标在他的下个回合初方能落地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "伤害判定自动。对无架招目标的击飞通过战报卡片广播提醒。半空连击逻辑需手动扣除资源处理。",
                     "costs": {
                         "mp": [
                             4,
                             8,
-                            12
+                            12,
+                            16
                         ],
                         "rage": [],
                         "hp": []
@@ -1353,7 +1365,7 @@
                             "label": "无架招击飞",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target.system.martial.stanceActive) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米！`);\n}"
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><div style=\"border-left: 4px solid #d35400; background: rgba(211, 84, 0, 0.05); padding: 5px;\"><div style=\"font-weight:bold; color:#d35400; font-size:1.1em;\"><i class=\"fas fa-wind\"></i> 击飞！</div><div style=\"font-size:0.9em; margin-top:3px; color:#555;\"><b>${args.target.name}</b> 因无架招保护，被剑风击飞 <b>1 米</b>！</div></div></div>`;\n    ChatMessage.create({ content: content, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -1367,18 +1379,20 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>纤纤碎步，长剑若离，对目标造成0.8内息点伤害。</p><p>若目标无架招，则被暗劲入侵经脉，为其添加“禁足”“缚身”，持续一回合。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>主要动作，纤纤碎步，长剑若离，对目标造成 0.8 内息点伤害。</p><p>若目标无架招，则被暗劲入侵经脉，为其添加“禁足”“缚身”，持续一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。无架招目标会自动受到持续一回合的系统【禁足】和【缚身】状态。",
                     "costs": {
                         "mp": [
                             4,
                             8,
-                            12
+                            12,
+                            16
                         ],
                         "rage": [
                             7,
                             6,
-                            5
+                            5,
+                            4
                         ],
                         "hp": []
                     },
@@ -1397,7 +1411,7 @@
                             "label": "无架招控制",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n}"
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    const rootStatus = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (rootStatus) {\n        const rootData = foundry.utils.deepClone(rootStatus);\n        rootData.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n    }\n    const fushenStatus = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n    if (fushenStatus) {\n        const fushenData = foundry.utils.deepClone(fushenStatus);\n        fushenData.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, fushenData);\n    }\n}"
                         }
                     ]
                 }
