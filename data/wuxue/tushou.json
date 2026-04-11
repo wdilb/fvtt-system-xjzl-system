@@ -473,17 +473,12 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，足趾抓地，拼掌合十，提肛调息，进入“铁头”状态，持续到战斗脱离。</p><p><strong>铁头：</strong>你受到的内外功伤害减少 10 点。受伤后，可消耗反应动作朝 5 米内一目标扬头奔撞而去，对其造成伤害，之后解除“铁头”，并停留在目标周围空格。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "本招式为施加状态。反应攻击需手动再次施展本招式（或另做宏），本招式不直接造成伤害。铁头状态自动添加。",
+                    "description": "<p>主要动作，足趾抓地，拼掌合十，提肛调息，进入“铁头”状态，持续到战斗脱离。</p><p><strong>铁头：</strong>你受到的内外功伤害减少 10 点。受伤后，可消耗反应动作朝 5 米内一目标扬头奔撞而去，对其造成 0.4 力量点外功伤害，之后解除“铁头”，并停留在目标周围空格。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "本招式为施加状态。点击出招自动施加铁头。反应攻击请使用[童子拜佛-撞击]。",
                     "calculation": {
                         "base": 0,
-                        "growth": 5,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.4
-                            }
-                        ]
+                        "growth": 0,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -495,8 +490,54 @@
                     "scripts": [
                         {
                             "label": "添加铁头",
-                            "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"铁头\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"已开启铁头状态。若触发反应攻击，请移除此状态并手动造成伤害。\");",
+                            "trigger": "attack",
+                            "script": "const eff = thisItem.effects.getName(\"铁头\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"铁头开启\", {fill: \"#ffffff\"});\nargs.flags.autoApplied = true; // 隐藏卡片上的应用按钮",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "童子拜佛-撞击",
+                    "type": "real",
+                    "element": "gang",
+                    "damageType": "waigong",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>处于“铁头”状态受伤后，可消耗反应动作朝 5 米内一目标扬头奔撞而去，对其造成 0.4 力量点外功伤害，之后解除“铁头”，并停留在目标周围空格。</p>",
+                    "automationNote": "自动检测铁头状态，出招自动解除铁头，伤害自动继承主招式的等级加成。位移需手动。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [],
+                        "mappedStage": 5
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "读取主招式等级加成",
+                            "trigger": "calc",
+                            "script": "const mainMove = item.system.moves.find(m => m.name === \"童子拜佛\");\nconst lvl = Math.max(1, mainMove?.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`等级加成 +${bonus}`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "检测并消耗铁头",
+                            "trigger": "attack",
+                            "script": "const hasTietou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tietou\");\nif (!hasTietou) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"必须处于【铁头】状态才能释放撞击！\";\n    return;\n}\n// 解除铁头\nawait game.xjzl.api.effects.removeEffect(actor, \"tietou\", 1);",
                             "active": true
                         }
                     ]
@@ -512,10 +553,11 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，双手拍打头顶，呼气喊出“嘿”声。自身添加“金头”状态，持续到下次受伤后结束。</p><p><strong>金头：</strong>你受到的伤害必定暴击，但攻击者需要投掷一个 D20，结果为奇数时，攻击者打中你坚硬的头部，你减免 50 点内外功伤害。</p><p><strong>升级：</strong>打中头部再减免 50 点伤害，内力消耗+1。</p>",
-                    "automationNote": "受击时自动判暴击，自动投D20判定减伤。",
+                    "automationNote": "受击时自动判暴击，自动投D20判定减伤，受伤后自动移除金头。",
                     "calculation": {
                         "base": 0,
-                        "growth": 0
+                        "growth": 0,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -528,7 +570,7 @@
                         {
                             "label": "添加金头",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"金头\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态写入升级后的减伤值 (50 + (Lv-1)*50)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduce = 50 + (lvl - 1) * 50;\neff.flags[\"xjzl-system\"].reduceAmount = reduce;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"金头\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态写入升级后的减伤值 (50 + (Lv-1)*50)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduce = 50 + (lvl - 1) * 50;\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.reduceAmount\", reduce);\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -543,7 +585,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，双掌拍打，笼罩目标全身，对其造成伤害。</p><p>·若自身处于“铁头”，击破架招后，以头顶肺，击退目标三米，使目标浑身麻木，怒气清空。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "击退手动。清空怒气自动。",
+                    "automationNote": "清空怒气自动，击退及麻木扮演请手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -565,7 +607,7 @@
                         {
                             "label": "击破特效",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const hasTietou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tietou\");\n    if (hasTietou) {\n        // 清空怒气\n        await args.target.update({\"system.resources.rage.value\": 0});\n        ui.notifications.info(`${args.target.name} 怒气被清空！请手动击退 3 米。`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const hasTietou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tietou\");\n    if (hasTietou) {\n        // 清空怒气\n        await args.target.update({\"system.resources.rage.value\": 0});\n        const cardContent = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #f39c12; background:rgba(243,156,18,0.1);\"><b><i class=\"fas fa-bolt\"></i> 罗汉抱肚</b><br>以头顶肺！目标浑身麻木，怒气清空！<br><span style=\"color:#888; font-size:0.8em;\">(请手动将目标击退三米)</span></div></div>`;\n        ChatMessage.create({\n            content: cardContent,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -620,7 +662,7 @@
                         {
                             "label": "铁头消耗决策",
                             "trigger": "attack",
-                            "script": "const tietou = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tietou\");\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 10 + (lvl - 1) * 10;\n\nif (tietou) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"金刚撞钟\" },\n        content: `<p>是否消耗 [铁头] 以增加 <b>${bonus}</b> 点伤害？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await tietou.delete();\n        ui.notifications.info(\"铁头已消耗，伤害提升！\");\n    } else {\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗铁头：移除加成 (-${bonus})`;\n    }\n}",
+                            "script": "const tietou = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tietou\");\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 10 + (lvl - 1) * 10;\n\nif (tietou) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"金刚撞钟\" },\n        content: `<p>是否消耗 [铁头] 以增加 <b>${bonus}</b> 点伤害？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"tietou\", 1);\n        actor.showFloatyText(\"铁头消耗\", {fill: \"#ff4500\"});\n    } else {\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗铁头：移除加成 (-${bonus})`;\n    }\n}",
                             "active": true
                         }
                     ]
@@ -640,7 +682,12 @@
                     },
                     "changes": [
                         {
-                            "key": "system.combat.resistances.global.mod",
+                            "key": "system.combat.resistances.waigong.mod",
+                            "mode": 2,
+                            "value": "10"
+                        },
+                        {
+                            "key": "system.combat.resistances.neigong.mod",
                             "mode": 2,
                             "value": "10"
                         }
@@ -648,7 +695,7 @@
                 },
                 {
                     "name": "金头",
-                    "icon": "icons/svg/skull.svg",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "必定暴击。受击判定减伤。",
                     "transfer": false,
                     "flags": {
@@ -666,7 +713,7 @@
                                     "label": "头部判定",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "// 投掷 D20\nconst r = await new Roll(\"1d20\").evaluate();\nif (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\nconst result = r.total;\n\nif (result % 2 !== 0) {\n    // 奇数，打中头部\n    const reduce = thisEffect.getFlag(\"xjzl-system\", \"reduceAmount\") || 50;\n    args.output.damage = Math.max(0, args.output.damage - reduce);\n    ui.notifications.info(`金头护体！(骰值 ${result}) 伤害减免 ${reduce} 点。`);\n} else {\n    ui.notifications.warn(`金头失效！(骰值 ${result}) 未击中坚硬部位。`);\n}\n\n// 移除特效 (一次性)\nawait thisEffect.delete();"
+                                    "script": "const r = await new Roll(\"1d20\").evaluate();\nif (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\nconst result = r.total;\n\nif (result % 2 !== 0) {\n    const reduce = thisEffect.getFlag(\"xjzl-system\", \"reduceAmount\") || 50;\n    args.output.damage = Math.max(0, args.output.damage - reduce);\n    actor.showFloatyText(`金头减伤 ${reduce}`, {fill: \"#00FF00\"});\n} else {\n    actor.showFloatyText(\"金头未命中\", {fill: \"#cccccc\"});\n}\n\n// 持续到下次受伤后结束，一律移除\nawait game.xjzl.api.effects.removeEffect(actor, \"jintou\", 1);"
                                 }
                             ]
                         }
