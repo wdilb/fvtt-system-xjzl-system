@@ -108,7 +108,7 @@
                     "label": "混世斧-连击蓄劲",
                     "trigger": "attack",
                     "active": true,
-                    "script": "if (args.move.type === 'basic') return;\n// 1. 读取当前回合计数\nlet count = actor.getFlag('xjzl-system', 'weapon_hunshifu_count') || 0;\ncount += 1;\nawait actor.setFlag('xjzl-system', 'weapon_hunshifu_count', count);\n\n// 2. 判断是否第三次\nif (count === 3) {\n    await game.xjzl.api.effects.addEffect(actor, 'xujin');\n    ui.notifications.info('混世斧：已出招三次，获得蓄劲！');\n}"
+                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\n// 1. 读取当前回合计数\nlet count = actor.getFlag('xjzl-system', 'weapon_hunshifu_count') || 0;\ncount += 1;\nawait actor.setFlag('xjzl-system', 'weapon_hunshifu_count', count);\n\n// 2. 判断是否第三次\nif (count === 3) {\n    await game.xjzl.api.effects.addEffect(actor, 'xujin');\n    ui.notifications.info('混世斧：已出招三次，获得蓄劲！');\n}"
                 },
                 {
                     "label": "混世斧-计数重置",
@@ -391,7 +391,7 @@
                     "label": "鸣沙-听声辨位",
                     "trigger": "preDamage",
                     "active": true,
-                    "script": "if (!args.outcome.isHit) return;\nif (args.move && args.move.type === 'basic') return; // 不对普通攻击生效\n\n// 检查目标是否具有 目盲(blind) 状态\nif (args.target.statuses.has('blind')) {\n    args.config.amount += 10;\n    // 发送卡片提示\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; color:#8b0000; font-weight:bold;\">\n                <i class=\"fas fa-eye-slash\"></i> 鸣沙刀：听声辨位！(伤害+10)\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                    "script": "if (!args.outcome.isHit) return;\nif (args.move && (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return; // 不对普通攻击生效\n\n// 检查目标是否具有 目盲(blind) 状态\nif (args.target.statuses.has('blind')) {\n    args.config.amount += 10;\n    // 发送卡片提示\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; color:#8b0000; font-weight:bold;\">\n                <i class=\"fas fa-eye-slash\"></i> 鸣沙刀：听声辨位！(伤害+10)\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                 }
             ]
         },
@@ -534,7 +534,7 @@
                     "label": "三尖-撕裂",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.move && args.move.type === 'basic') return; // 不对普通攻击生效 \n if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'bleed_stack');\n}"
+                    "script": "if (args.move && (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return; // 不对普通攻击生效 \n if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, 'bleed_stack');\n}"
                 }
             ]
         }
@@ -1121,7 +1121,7 @@
                     "label": "古锭-欺弱",
                     "trigger": "preDamage",
                     "active": true,
-                    "script": "if (!args.outcome.isHit) return;\nif (args.move && args.move.type === 'basic') return; // 不对普通攻击生效\n\n// 检查敌人是否装备了武器\nconst hasWeapon = args.target.itemTypes.weapon.some(w => w.system.equipped);\nif (!hasWeapon) {\n    args.config.amount += 20;\n    // 发送卡片提示\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; color:#8b0000; font-weight:bold;\">\n                <i class=\"fas fa-skull\"></i> 古锭刀：手无寸铁者斩！(伤害+20)\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                    "script": "if (!args.outcome.isHit) return;\nif (args.move && (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return; // 不对普通攻击生效\n\n// 检查敌人是否装备了武器\nconst hasWeapon = args.target.itemTypes.weapon.some(w => w.system.equipped);\nif (!hasWeapon) {\n    args.config.amount += 20;\n    // 发送卡片提示\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; color:#8b0000; font-weight:bold;\">\n                <i class=\"fas fa-skull\"></i> 古锭刀：手无寸铁者斩！(伤害+20)\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                 }
             ]
         }
@@ -1623,7 +1623,7 @@
                     "label": "清韵回气",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.move.type === 'basic') return;\nif (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
+                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
                 }
             ]
         },
@@ -2346,7 +2346,7 @@
                     "label": "清韵回气",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.move.type === 'basic') return;\nif (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
+                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
                 }
             ]
         },
@@ -3069,7 +3069,7 @@
                     "label": "清韵回气",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.move.type === 'basic') return;\nif (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
+                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.isHit) {\n    await actor.applyHealing({ amount: 5, type: \"mp\" });\n}"
                 }
             ]
         },
@@ -3831,7 +3831,7 @@
                     "label": "清韵回气",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.move.type === 'basic') return;\nif (args.actionType === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
+                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.actionType === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
                 }
             ]
         },
@@ -4595,7 +4595,7 @@
                     "label": "清韵回气",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.move.type === 'basic') return;\nif (args.actionType === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
+                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.actionType === 'attack' && args.isHit) {\n    await actor.applyHealing({ amount: 5, type: 'mp', showScrolling: true });\n}"
                 }
             ]
         },
