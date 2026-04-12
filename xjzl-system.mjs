@@ -39,6 +39,7 @@ import { XJZLArtBookSheet } from "./module/sheets/art-book-sheet.mjs";
 import { XJZLPersonalitySheet } from "./module/sheets/personality-sheet.mjs";
 import { XJZLBackgroundSheet } from "./module/sheets/background-sheet.mjs";
 import { XJZLActiveEffectConfig } from "./module/sheets/active-effect-config.mjs";
+import { XJZLTraitSheet } from "./module/sheets/trait-sheet.mjs";
 
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
@@ -388,8 +389,12 @@ Hooks.once("init", async function () {
   });
 
   //注册特性/特效
-  //TODO
-  
+  Items.registerSheet("xjzl-system", XJZLTraitSheet, {
+    types: ["trait"],
+    makeDefault: true,
+    label: "XJZL.Sheet.Trait"
+  });
+
   // ==========================================
   //  5.注册 常用Handlebars 辅助函数
   // ==========================================
@@ -1408,6 +1413,11 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/item/equipment/tabs.hbs",
     "systems/xjzl-system/templates/item/equipment/tab-details.hbs",
     "systems/xjzl-system/templates/item/equipment/tab-effects.hbs",
+    //特效/特性
+    "systems/xjzl-system/templates/item/trait/header.hbs",
+    "systems/xjzl-system/templates/item/trait/tabs.hbs",
+    "systems/xjzl-system/templates/item/trait/tab-details.hbs",
+    "systems/xjzl-system/templates/item/trait/tab-effects.hbs",
     //物品
     "systems/xjzl-system/templates/item/general/header.hbs",
     "systems/xjzl-system/templates/item/general/tabs.hbs",
