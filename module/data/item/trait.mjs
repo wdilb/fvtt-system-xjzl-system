@@ -4,7 +4,6 @@ export class XJZLTraitData extends foundry.abstract.TypeDataModel {
     static defineSchema() {
         const fields = foundry.data.fields;
         return {
-            isOfficial: new fields.BooleanField({ initial: true, label: "XJZL.Item.IsOfficial" }),
             description: new fields.HTMLField({ label: "XJZL.Info.Description" }),
             automationNote: new fields.StringField({ initial: "", label: "XJZL.AutomationNote" }),
 
