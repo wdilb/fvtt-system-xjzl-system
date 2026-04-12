@@ -25,6 +25,7 @@ import { XJZLMiscData } from "./module/data/item/misc.mjs";
 import { XJZLArtBookData } from "./module/data/item/art-book.mjs";
 import { XJZLPersonalityData } from "./module/data/item/personality.mjs";
 import { XJZLBackgroundData } from "./module/data/item/background.mjs";
+import { XJZLTraitData } from "./module/data/item/trait.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
@@ -300,7 +301,8 @@ Hooks.once("init", async function () {
     misc: XJZLMiscData,
     art_book: XJZLArtBookData,
     personality: XJZLPersonalityData,
-    background: XJZLBackgroundData
+    background: XJZLBackgroundData,
+    trait: XJZLTraitData
   };
 
   // 4. 注册 Sheets (表现层)
@@ -385,6 +387,9 @@ Hooks.once("init", async function () {
     label: "XJZL.Sheet.Background"
   });
 
+  //注册特性/特效
+  //TODO
+  
   // ==========================================
   //  5.注册 常用Handlebars 辅助函数
   // ==========================================

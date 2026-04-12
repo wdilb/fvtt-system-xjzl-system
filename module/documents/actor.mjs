@@ -506,6 +506,25 @@ export class XJZLActor extends Actor {
     }
 
     // =====================================================
+    // 2.5 特效/特性 (Trait) - 全局生效，无条件收集
+    // =====================================================
+    const traits = this.itemTypes.trait || [];
+    for (const item of traits) {
+      if (item.system.scripts) {
+        item.system.scripts.forEach(s => {
+          // 同样的，检查触发时机和开关
+          if (s.trigger === trigger && s.active) {
+            scripts.push({
+              script: s.script,
+              label: s.label || item.name,
+              source: item
+            });
+          }
+        });
+      }
+    }
+
+    // =====================================================
     // 3. 当前激活的架招 (Active Stance)
     // =====================================================
     // 架招开启后，应当视为常驻被动效果，直到关闭
