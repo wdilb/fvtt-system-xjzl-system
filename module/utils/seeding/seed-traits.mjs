@@ -43,17 +43,20 @@ export async function seedTraits() {
             type: "trait",
             img: t.img || "icons/magic/light/explosion-star-glow-green.webp",
             system: {
-                type: t.type || "general",
-                description: t.description || "",
-                automationNote: t.automationNote || "",
-                scripts: Array.isArray(t.scripts) ? t.scripts.map(s => ({
+                // 如果没有则兜底为 "general"
+                type: t.system?.type || "general",
+
+                description: t.system?.description || t.description || "",
+                automationNote: t.system?.automationNote || t.automationNote || "",
+
+                // 脚本同理
+                scripts: Array.isArray(t.system?.scripts) ? t.system.scripts.map(s => ({
                     label: s.label || "特效",
                     trigger: s.trigger || "passive",
                     script: s.script || "",
                     active: s.active ?? true
                 })) : []
             },
-            // 如果 JSON 里配置了附带的 AE (例如某些特效其实是一个光环，附带 AE 模板)
             effects: Array.isArray(t.effects) ? t.effects : []
         };
     });
