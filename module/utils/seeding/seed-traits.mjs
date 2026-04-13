@@ -1,7 +1,7 @@
 const PACK_NAME = "xjzl-system.traits";
 
 export async function seedTraits() {
-    ui.notifications.info("XJZL | 正在读取武道特质数据...");
+    ui.notifications.info("XJZL | 正在读取特效数据...");
 
     const filePath = "systems/xjzl-system/data/traits/traits.json";
     let traitsData = [];
@@ -9,7 +9,7 @@ export async function seedTraits() {
     try {
         const response = await fetch(filePath);
         if (!response.ok) {
-            return ui.notifications.error(`XJZL Seeder | 无法加载特质数据文件: ${filePath}`);
+            return ui.notifications.error(`XJZL Seeder | 无法加载特效数据文件: ${filePath}`);
         }
 
         const data = await response.json();
@@ -17,7 +17,7 @@ export async function seedTraits() {
         traitsData = Array.isArray(data) ? data : [data];
 
     } catch (err) {
-        console.error("XJZL Seeder | 读取特质 JSON 出错:", err);
+        console.error("XJZL Seeder | 读取特效 JSON 出错:", err);
         return ui.notifications.error("读取 traits.json 失败，请检查控制台。");
     }
 
@@ -39,7 +39,7 @@ export async function seedTraits() {
     // 构建 Item 数组
     const items = traitsData.map(t => {
         return {
-            name: t.name || "未命名特质",
+            name: t.name || "未命名特效",
             type: "trait",
             img: t.img || "icons/magic/light/explosion-star-glow-green.webp",
             system: {
@@ -52,13 +52,13 @@ export async function seedTraits() {
                     active: s.active ?? true
                 })) : []
             },
-            // 如果 JSON 里配置了附带的 AE (例如某些特质其实是一个光环，附带 AE 模板)
+            // 如果 JSON 里配置了附带的 AE (例如某些特效其实是一个光环，附带 AE 模板)
             effects: Array.isArray(t.effects) ? t.effects : []
         };
     });
 
-    console.log(`XJZL Seeder | 正在写入 ${items.length} 个特质...`);
+    console.log(`XJZL Seeder | 正在写入 ${items.length} 个特效...`);
     await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
 
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个武道特质！`);
+    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个武道特效！`);
 }
