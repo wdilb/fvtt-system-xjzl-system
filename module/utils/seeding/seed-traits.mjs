@@ -61,5 +61,5 @@ export async function seedTraits() {
     console.log(`XJZL Seeder | 正在写入 ${items.length} 个特效...`);
     await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
 
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个武道特效！`);
+    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个特效！`);
 }
