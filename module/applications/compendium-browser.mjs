@@ -70,6 +70,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         { id: "wuxue", label: "武学", icon: "fas fa-fist-raised" },
         { id: "neigong", label: "内功", icon: "fas fa-yin-yang" },
         { id: "art_book", label: "技艺", icon: "fas fa-book" },
+        { id: "trait", label: "特效", icon: "fas fa-seedling" },
     ];
 
     static INDEX_FIELDS = [
@@ -118,7 +119,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 { key: "tier", label: "内功品阶", type: "checkbox", options: C.tiers },
                 { key: "element", label: "内功属性", type: "checkbox", options: neigongOpts }
             ],
-            art_book: [{ key: "artType", label: "技艺类型", type: "checkbox", options: C.arts }]
+            art_book: [{ key: "artType", label: "技艺类型", type: "checkbox", options: C.arts }],
+            trait: [
+                { key: "type", label: "特效分类", type: "checkbox", options: C.traitTypes }
+            ]
         };
 
         for (const tab in config) {
@@ -550,13 +554,32 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             items: items.map(i => {
                 const sys = i.system;
                 const isWuxue = i.type === "wuxue" || i.type === "neigong";
-                const val = isWuxue ? (sys.tier ?? 1) : (sys.quality ?? 0);
-                const labels = isWuxue ? { 1: "人", 2: "地", 3: "天" } : { 0: "凡", 1: "铜", 2: "银", 3: "金", 4: "玉" };
+                const isTrait = i.type === "trait";
+                let colorClass = "quality-0";
+                let label = "?";
+
+                if (isWuxue) {
+                    const val = sys.tier ?? 1;
+                    const labels = { 1: "人", 2: "地", 3: "天" };
+                    colorClass = `tier-${val}`;
+                    label = labels[val] || "?";
+                } else if (isTrait) {
+                    // 特效没有品阶，统一给高级金色样式
+                    colorClass = "rank-jin";
+                    // 显示具体的特效类型，如果没选则显示通用“特质”
+                    const typeKey = CONFIG.XJZL.traitTypes?.[sys.type];
+                    label = typeKey ? game.i18n.localize(typeKey).substring(0, 2) : "特质";
+                } else {
+                    const val = sys.quality ?? 0;
+                    const labels = { 0: "凡", 1: "铜", 2: "银", 3: "金", 4: "玉" };
+                    colorClass = `quality-${val}`;
+                    label = labels[val] || "?";
+                }
 
                 return {
                     uuid: i.uuid, name: i.name, img: i.img, type: i.type,
-                    colorClass: isWuxue ? `tier-${val}` : `quality-${val}`,
-                    label: labels[val] || "?"
+                    colorClass: colorClass,
+                    label: label
                 };
             })
         };
