@@ -225,6 +225,7 @@ await Macros.requestSave({
         *   `damage` (Number): 最终计算出的伤害/治疗量。**脚本主要修改此值**。
         *   `feint` (Number): 最终计算出的虚招值。
         *   `bonusDesc` (Array): 描述文本数组，可使用 `.push("说明")` 添加到伤害详情中。
+        *   `feintBonusDesc` (Array): 描述文本数组，可使用 `.push("说明")` 添加到虚招详情中。
 
 ---
 
