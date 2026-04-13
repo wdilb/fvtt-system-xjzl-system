@@ -1046,7 +1046,8 @@ export class XJZLItem extends Item {
         const calcOutput = {
           damage: Math.floor(moveBaseDmg),
           feint: feintVal,
-          bonusDesc: []
+          bonusDesc: [],
+          feintBonusDesc: []
         };
 
         // 仅提取该招式自带的 CALC 脚本，隔绝外界(内功/装备)的所有脚本
@@ -1083,11 +1084,31 @@ export class XJZLItem extends Item {
           breakdownText += `\n` + calcOutput.bonusDesc.map(d => `   └ ${d}`).join(`\n`);
         }
 
+        if (!feintBreakdown) {
+          feintBreakdown = `基础虚招: ${feintVal}`;
+        }
+        const scriptFeintBonus = calcOutput.feint - feintVal;
+        const hasFeintScriptChange = scriptFeintBonus !== 0;
+        const hasFeintScriptDesc = calcOutput.feintBonusDesc && calcOutput.feintBonusDesc.length > 0;
+
+        if (hasFeintScriptChange || hasFeintScriptDesc) {
+          const sign = scriptFeintBonus > 0 ? "+" : "";
+          feintBreakdown += `\n${sign} 特效修正: ${scriptFeintBonus}`;
+
+          if (hasFeintScriptDesc) {
+            calcOutput.feintBonusDesc.forEach(desc => {
+              feintBreakdown += `\n   └ ${desc}`;
+            });
+          } else {
+            feintBreakdown += ` (计算/被动特效)`;
+          }
+        }
+
         return {
           damage: Math.floor(calcOutput.damage),
           feint: Math.floor(calcOutput.feint),
           breakdown: breakdownText,
-          feintBreakdown: feintBreakdown || "固定值",
+          feintBreakdown: feintBreakdown,
           neigongBonus: "",
           cost: move.currentCost || { mp: 0, rage: 0, hp: 0 },
           isWeaponMatch: true
@@ -1099,7 +1120,7 @@ export class XJZLItem extends Item {
         damage: Math.floor(moveBaseDmg),
         feint: feintVal,
         breakdown: "造成固定值或者不造成伤害，不享受一切通用加成", // 清晰的提示
-        feintBreakdown: "",
+        feintBreakdown: feintBreakdown,
         neigongBonus: "",
         cost: move.currentCost || { mp: 0, rage: 0, hp: 0 },
         isWeaponMatch: true
@@ -1211,7 +1232,8 @@ export class XJZLItem extends Item {
     const calcOutput = {
       damage: preScriptDmg, // 初始伤害
       feint: feintVal,      // 初始虚招
-      bonusDesc: []         // 允许脚本添加额外的描述文本
+      bonusDesc: [],         // 允许脚本添加额外的描述文本
+      feintBonusDesc: [],    // 虚招的额外的描述文本
     };
 
     // 2. 准备上下文 (Context)
@@ -1273,10 +1295,23 @@ export class XJZLItem extends Item {
       }
     }
 
-    if (scriptFeintBonus !== 0) {
+    if (!feintBreakdown) {
+      feintBreakdown = `基础虚招: ${feintVal}`;
+    }
+    const hasFeintScriptChange = scriptFeintBonus !== 0;
+    const hasFeintScriptDesc = calcOutput.feintBonusDesc && calcOutput.feintBonusDesc.length > 0;
+
+    if (hasFeintScriptChange || hasFeintScriptDesc) {
       const sign = scriptFeintBonus > 0 ? "+" : "";
-      if (!feintBreakdown) feintBreakdown = "基础 0";
-      feintBreakdown += ` ${sign} 特效加值 ${scriptFeintBonus}(仅生效计算阶段特效与被动特效，不代表最终结果)`;
+      feintBreakdown += `\n${sign} 特效修正: ${scriptFeintBonus}`;
+
+      if (hasFeintScriptDesc) {
+        calcOutput.feintBonusDesc.forEach(desc => {
+          feintBreakdown += `\n   └ ${desc}`;
+        });
+      } else {
+        feintBreakdown += ` (计算/被动特效)`;
+      }
     }
 
     if (!isWeaponMatch && move.weaponType && move.weaponType !== 'none') {
