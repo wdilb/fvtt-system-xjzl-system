@@ -1287,7 +1287,7 @@ export class XJZLItem extends Item {
     // 返回结果包
     return {
       damage: finalDamage,
-      feint: feintVal,
+      feint: finalFeint,
       breakdown: breakdownText,
       feintBreakdown: feintBreakdown,
       neigongBonus: neigongBonusRatio > 0 ? `+${(neigongBonusRatio).toFixed(1)}系数` : "",
