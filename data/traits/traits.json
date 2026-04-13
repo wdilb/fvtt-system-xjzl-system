@@ -1,0 +1,452 @@
+[
+    {
+        "name": "普攻双倍武器伤害",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击时，武器伤害翻倍。</p><p><em>适用于所有普通攻击造成双倍武器伤害的武器类型（如双刀、双剑、双刺等）。</em></p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "双倍武器伤害",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic') {\n    // 将武器原本的伤害再次叠加到总伤害中，实现翻倍\n    const weaponDmg = args.baseData.weapon || 0;\n    args.output.damage += weaponDmg;\n    args.output.bonusDesc.push(`武器伤害翻倍 (+${weaponDmg})`);\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普通攻击击退",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击目标无架招时，将其击退 1 米。</p><p><em>适用于所有普通攻击可以击退的武器类型（如重剑等）。</em></p>",
+            "automationNote": "完全自动化。命中且目标无架招时，自动发送卡片。",
+            "scripts": [
+                {
+                    "label": "普攻击退",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic' && args.isHit) {\n    const targetStance = args.target.system.martial?.stanceActive;\n    if (!targetStance) {\n        const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #f39c12; background:rgba(243,156,18,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#d68910; font-size:1.1em;\"><i class=\"fas fa-angle-double-right\"></i> 强力击退！</div><div style=\"font-size:0.9em; margin-top:3px; color:#555;\"><b>${args.target.name}</b> 失去平衡，被击退 <b>1 米</b>！</div></div></div>`;\n        ChatMessage.create({\n            content: msg,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普攻气血流失",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击时，额外造成 5 气血流失。</p><p><em>适用于所有普通攻击可以触发流失伤害的武器类型（如斧钺、飞镖等）。</em></p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "追加流失",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic' && args.isHit) {\n    // 如果需要修改流失伤害数值，请修改下方 amount 的值\n    await args.target.applyDamage({ amount: 5, type: 'liushi', attacker: actor });\n    actor.showFloatyText('致伤流血', { fill: '#8b0000' });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普攻速度加伤",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击时提升自身当前速度的伤害。</p><p><em>适用于所有普通攻击可以享受速度加伤的武器类型（如弯刀等）。</em></p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "速度加伤",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic') {\n    const spd = actor.system.combat.speedTotal || 0;\n    if (spd > 0) {\n        args.output.damage += spd;\n        args.output.bonusDesc.push(`速度转化伤害 (+${spd})`);\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普攻必定暴击",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击时，若目标无架招，必定暴击。</p><p><em>适用于所有普通攻击命中无架招目标必定暴击的武器类型（如单刺等）。</em></p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "无架招必暴",
+                    "trigger": "check",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic') {\n    const targetStance = args.target.system.martial?.stanceActive;\n    if (!targetStance) {\n        // 将暴击阈值大幅降低(通过正数修改)，保证只要命中必定触发暴击\n        args.flags.critThresholdMod += 20;\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "被普通攻击减伤",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>装备后，受到普通攻击时，减免 5 点伤害。</p><p><em>适用于所有受到普通攻击减伤的武器类型（如尺等）。</em></p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "普攻减伤",
+                    "trigger": "preTake",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic') {\n    // 如需修改减免数值，请修改下方的 5\n    const reduceAmount = 5;\n    args.output.damage = Math.max(0, args.output.damage - reduceAmount);\n    actor.showFloatyText(`武器格挡 -${reduceAmount}`, { fill: '#cccccc' });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普攻提升伤害",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>普通攻击提升自己[书写][作画]之和的伤害。</p><p><em>适用于笔。</em></p>",
+            "automationNote": "完全自动化。自动读取技艺等级并附加到普攻伤害中。",
+            "scripts": [
+                {
+                    "label": "技艺加伤",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic') {\n    const shuxie = actor.system.arts.shuxie?.total || 0;\n    const zuohua = actor.system.arts.zuohua?.total || 0;\n    const totalBonus = shuxie + zuohua;\n    if (totalBonus > 0) {\n        args.output.damage += totalBonus;\n        args.output.bonusDesc.push(`文墨化武 (+${totalBonus})`);\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普攻减暴击",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击时，暴击骰-1。</p><p><em>适用于长枪、针等容易击中要害的兵器。</em></p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "暴击骰-1",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic') {\n    // 暴击阈值修正，正数表示更容易暴击(阈值下降)\n    args.flags.critThresholdMod += 1;\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普通攻击击飞",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击目标无架招时，将其击飞 1 米。</p><p><em>适用于所有普通攻击可以击飞的武器类型（如锤等）。</em></p>",
+            "automationNote": "完全自动化。命中且目标无架招时，自动发送击飞卡片",
+            "scripts": [
+                {
+                    "label": "普攻击飞",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic' && args.isHit) {\n    const targetStance = args.target.system.martial?.stanceActive;\n    if (!targetStance) {\n        const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #e74c3c; background:rgba(231,76,60,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#c0392b; font-size:1.1em;\"><i class=\"fas fa-space-shuttle\" style=\"transform:rotate(-45deg);\"></i> 腾空击飞！</div><div style=\"font-size:0.9em; margin-top:3px; color:#555;\"><b>${args.target.name}</b> 遭到重击，被击飞 <b>1 米</b>！</div></div></div>`;\n        ChatMessage.create({\n            content: msg,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "普攻增加命中",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>施展普通攻击时，命中+5。</p><p><em>适用于飞刀等轻巧易中的武器。</em></p>",
+            "automationNote": "完全自动化。出招时自动附加全局命中修正。",
+            "scripts": [
+                {
+                    "label": "普攻命中+5",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "if (args.move.type === 'basic') {\n    // 如需修改命中数值，请修改下方的 5\n    args.flags.bonusHit += 5;\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "出招增加命中",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/武器.png",
+        "system": {
+            "type": "weapon",
+            "description": "<p>乐器武学出招时，增加[演奏]等级数值的命中。</p><p><em>适用于所有乐器。</em></p>",
+            "automationNote": "完全自动化。施展招式时自动读取演奏技艺提供加成，不适用于纯普通攻击（趁虚而入除外）。",
+            "scripts": [
+                {
+                    "label": "音律制敌",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// 如果是纯普通攻击（不包括趁虚而入），则不生效\nif (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\n\nconst yanzou = actor.system.arts.yanzou?.total || 0;\nif (yanzou > 0) {\n    args.flags.bonusHit += yanzou;\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "攻击触发额外伤害",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/伤害.png",
+        "system": {
+            "type": "damage",
+            "description": "<p>攻击命中时，触发一次10点的火焰伤害。</p><p><em>可以自由配置伤害数值和伤害属性。</em></p>",
+            "automationNote": "完全自动化。可在脚本中手动调整期望的伤害值和类型。",
+            "scripts": [
+                {
+                    "label": "附加伤害",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "// 配置区：请在此处修改数值和类型\n// 类型支持: waigong, neigong, poison, fire, bleed, mental, liushi\nconst extraAmount = 10;\nconst extraType = 'fire'; \n\nif (args.isHit) {\n    await args.target.applyDamage({ amount: extraAmount, type: extraType, attacker: actor });\n    actor.showFloatyText(`附加 ${game.i18n.localize(CONFIG.XJZL.damageTypes[extraType])}`, { fill: '#ff4500' });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "攻击造成双倍伤害",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/伤害.png",
+        "system": {
+            "type": "damage",
+            "description": "<p>施展任何攻击时，造成的总面板伤害翻倍。</p><p><em>适用于极度致命的特殊绝学或状态。</em></p>",
+            "automationNote": "完全自动化。可在脚本中手动修改倍率。",
+            "scripts": [
+                {
+                    "label": "面板伤害翻倍",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "// 修改乘数请更改下方的 2\nconst multiplier = 2;\nconst original = args.output.damage;\nargs.output.damage *= multiplier;\nargs.output.bonusDesc.push(`致命打击 (面板伤害 x${multiplier})`);"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "攻击伤害增加",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/伤害.png",
+        "system": {
+            "type": "damage",
+            "description": "<p>施展攻击时，额外增加10的伤害数值。</p><p><em>该伤害直接加在面板上，享受暴击带来的收益。</em></p>",
+            "automationNote": "完全自动化。可在脚本内手动修改希望增加的固定数值。",
+            "scripts": [
+                {
+                    "label": "固定增伤",
+                    "trigger": "calc",
+                    "active": true,
+                    "script": "// 请在这里修改固定增加的伤害数值\nconst bonus = 10;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`额外固定增伤 (+${bonus})`);"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "只受到一半伤害",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/防御.png",
+        "system": {
+            "type": "defend",
+            "description": "<p>受击时，最终承受的伤害强制减半。</p><p><em>在扣除了防御力、格挡、抗性之后，将即将扣血的数值斩半。</em></p>",
+            "automationNote": "完全自动化。可在脚本中手动修改倍率。",
+            "scripts": [
+                {
+                    "label": "伤害减半",
+                    "trigger": "preTake",
+                    "active": true,
+                    "script": "// 将最终计算出来的理论伤害减半\nargs.output.damage = Math.floor(args.output.damage / 2);\nactor.showFloatyText('伤害减半', { fill: '#3498db' });"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "免疫暴击伤害",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/防御.png",
+        "system": {
+            "type": "defend",
+            "description": "<p>被敌人攻击时，强制使敌方的暴击失效。</p><p><em>敌人依然正常造成伤害，但永远无法触发双倍的暴击效果。</em></p>",
+            "automationNote": "完全自动化。在防御计算前强制拦截敌人的暴击判定。",
+            "scripts": [
+                {
+                    "label": "免疫暴击",
+                    "trigger": "preDefense",
+                    "active": true,
+                    "script": "// 强制将暴击状态设为 false，使其按照普通命中计算\nif (args.config.isCrit) {\n    args.config.isCrit = false;\n    actor.showFloatyText('免疫暴击', { fill: '#9b59b6' });\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "无架招格挡生效",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/防御.png",
+        "system": {
+            "type": "defend",
+            "description": "<p>获得“被动格挡”特性：即使没有开启架招姿态，自身累积的基础格挡值依然在受击时提供伤害减免。</p>",
+            "automationNote": "完全自动化。",
+            "scripts": [
+                {
+                    "label": "被动格挡开启",
+                    "trigger": "passive",
+                    "active": true,
+                    "script": "// 开启系统底层的被动格挡标记，无需手动开启架招\nS.xjzlStatuses.passiveBlock = true;"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "必定命中（需投掷）",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/通用.png",
+        "system": {
+            "type": "general",
+            "description": "<p>攻击永远不会被闪避，但依然会投掷骰子以判定是否触发暴击。</p><p><em>无视敌人的闪避值，且掷出 1 点也不会大失败。</em></p>",
+            "automationNote": "完全自动化。赋予出招全局 alwaysHit 标记。",
+            "scripts": [
+                {
+                    "label": "强制命中",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// alwaysHit 会强制判定为命中，但依然投掷骰子以判定20点暴击和属性暴击\nargs.flags.alwaysHit = true;"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "必定命中（无投掷）",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/通用.png",
+        "system": {
+            "type": "general",
+            "description": "<p>攻击直接命中目标，跳过投掷阶段，也不会触发暴击。</p><p><em>适用于规则强制要求直接造成直击伤害的绝对必中情况。</em></p>",
+            "automationNote": "完全自动化。赋予出招全局 forceHit 标记，系统会跳过命中骰子。",
+            "scripts": [
+                {
+                    "label": "跳过投掷",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// forceHit 会跳过整个命中检定和暴击判定，直接应用伤害\nargs.flags.forceHit = true;"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "暴击阈值降低",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/通用.png",
+        "system": {
+            "type": "general",
+            "description": "<p>出招时，暴击门槛降低。</p><p><em>例如：原本需要掷出 20 才能暴击，降低 10 点后，只需掷出 10 以上即可暴击。</em></p>",
+            "automationNote": "完全自动化。可手动在脚本内修改降低的数值。",
+            "scripts": [
+                {
+                    "label": "暴击骰加成",
+                    "trigger": "attack",
+                    "active": true,
+                    "script": "// 请在这里修改希望降低的暴击阈值（正数表示门槛下降，更容易暴击）\nconst mod = 10;\nargs.flags.critThresholdMod += mod;"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "命中添加倒地状态",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/通用.png",
+        "system": {
+            "type": "general",
+            "description": "<p>攻击只要命中目标，就会强制使其陷入“倒地”状态。</p>",
+            "automationNote": "完全自动化。可手动修改需要添加的状态。",
+            "scripts": [
+                {
+                    "label": "施加倒地",
+                    "trigger": "hit",
+                    "active": true,
+                    "script": "if (args.isHit) {\n    const status = CONFIG.statusEffects.find(e => e.id === 'prone');\n    if (status) {\n        // 克隆系统状态以安全应用\n        const effectData = foundry.utils.deepClone(status);\n        effectData.origin = thisItem?.uuid || actor.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        actor.showFloatyText('击倒！', { fill: '#f1c40f' });\n    }\n}"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "每回合流血伤害",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/持续.png",
+        "system": {
+            "type": "dot",
+            "description": "<p>每回合开始时，受到 30 点毒素伤害。</p>",
+            "automationNote": "完全自动化。可手动调整伤害类型与数值。",
+            "scripts": [
+                {
+                    "label": "持续毒素",
+                    "trigger": "turnStart",
+                    "active": true,
+                    "script": "// 请在此处修改每回合受到的伤害数值\nconst damageAmount = 10;\n\n// 极简调用：系统底层会自动处理防御豁免规则，并发送伤害卡片\nawait actor.applyDamage({\n    amount: damageAmount,\n    type: 'poison',       // 伤害类型\n    attacker: actor,     // 伤害来源指向自己\n    isHit: true,         // 状态伤害必定命中\n    source: 'dot'        // 明确标识伤害来源为 DOT\n});"
+                }
+            ]
+        },
+        "effects": []
+    },
+    {
+        "name": "每回合气血回复",
+        "type": "trait",
+        "img": "systems/xjzl-system/assets/icons/trait/持续.png",
+        "system": {
+            "type": "dot",
+            "description": "<p>每回合开始时，自动回复 10 点气血。</p><p><em>受禁疗状态影响。</em></p>",
+            "automationNote": "完全自动化。可手动调整数值。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "每回合气血回复",
+                "icon": "systems/xjzl-system/assets/icons/trait/持续.png",
+                "transfer": true,
+                "disabled": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "trait_regen_hp",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnStart",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            }
+        ]
+    }
+]
