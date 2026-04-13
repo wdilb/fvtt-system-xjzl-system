@@ -945,6 +945,33 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             items.forEach(item => { item.derivedTooltip = buildGeneralTooltip(item); });
         });
 
+        // =====================================================
+        // ✦ 12. 特效/特性 (Traits)   
+        // -----------------------------------------------------
+        const rawTraits = actor.itemTypes.trait || [];
+        context.traits = rawTraits.map(trait => {
+            let tooltip = `<div style='text-align:left; max-width:250px; font-family:var(--font-serif);'>`;
+            tooltip += `<div style='font-weight:bold; margin-bottom:5px; color:#fff; border-bottom:1px solid rgba(255,255,255,0.2);'>${trait.name}</div>`;
+
+            // 类型标签
+            const typeLabelKey = XJZL.traitTypes?.[trait.system.type] || "XJZL.Trait.Type.General";
+            const typeLabel = game.i18n.localize(typeLabelKey);
+            tooltip += `<div style='font-size:10px; color:#1abc9c; margin-bottom:6px;'>[${typeLabel}]</div>`;
+
+            if (trait.system.automationNote) tooltip += buildAutomationHTML(trait.system.automationNote);
+
+            if (trait.system.description) {
+                tooltip += buildDescriptionHTML(trait.system.description, 200);
+            } else {
+                tooltip += `<div style='font-size:12px; color:#999; font-style:italic;'>暂无描述</div>`;
+            }
+            tooltip += `</div>`;
+
+            trait.derived = { tooltip: tooltip };
+            return trait;
+        });
+
+
         // [特效计算]
         this._prepareEffects(context);
         context.isSorting = this._isSorting || false;
@@ -1178,12 +1205,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 手动绑定拖拽事件 (Drag & Drop fix)
         // =====================================================
         // 1. 选取所有需要拖拽的元素类名
-        //    注意：不要包含 .wuxue-group，因为你在 HTML 里写了 ondragstart 内联代码处理排序，我们避开它以免冲突
+        //    不包含 .wuxue-group，因为在 HTML 里写了 ondragstart 内联代码处理排序，我们避开它以免冲突
         const dragSelectors = [
             ".move-card",         // 招式
             ".item-grid-card",    // 物品/消耗品
             ".neigong-card",      // 内功
-            ".art-book-card"      // 技艺书
+            ".art-book-card",     // 技艺书
+            ".trait-card"         // 特效
         ];
 
         // 2. 遍历并绑定
@@ -2329,6 +2357,16 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             } else {
                 book.style.display = "none";
             }
+        });
+
+        // -----------------------------------------------------
+        // 4. 搜索特效 (Traits)
+        // -----------------------------------------------------
+        const traits = html.querySelectorAll(".trait-card");
+        traits.forEach(trait => {
+            const titleEl = trait.querySelector(".trait-title");
+            const traitName = titleEl ? titleEl.innerText.toLowerCase() : "";
+            trait.style.display = traitName.includes(query) ? "flex" : "none";
         });
     }
 
