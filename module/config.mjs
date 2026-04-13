@@ -484,8 +484,11 @@ XJZL.hobbies = {
 
 // 23. 特效/特性类型 (Trait Types)
 XJZL.traitTypes = {
-  general: "XJZL.Trait.Type.General",     // 通用特质
-  weapon: "XJZL.Trait.Type.Weapon"        // 武器子类型
+  general: "XJZL.Trait.Type.General",     // 通用特效
+  weapon: "XJZL.Trait.Type.Weapon",       // 武器子类型
+  damage: "XJZL.Trait.Type.Damage",       // 伤害特效
+  defend: "XJZL.Trait.Type.Defend",       // 防御特效
+  dot: "XJZL.Trait.Type.Dot"              // DOT特效
 };
 
 
