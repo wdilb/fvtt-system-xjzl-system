@@ -6,6 +6,7 @@ export class XJZLTraitData extends foundry.abstract.TypeDataModel {
         return {
             description: new fields.HTMLField({ label: "XJZL.Info.Description" }),
             automationNote: new fields.StringField({ initial: "", label: "XJZL.AutomationNote" }),
+            type: new fields.StringField({ initial: "general", label: "XJZL.Trait.TypeLabel" }),
 
             // 核心：存放脚本的容器
             scripts: new fields.ArrayField(makeScriptEffectSchema(), {

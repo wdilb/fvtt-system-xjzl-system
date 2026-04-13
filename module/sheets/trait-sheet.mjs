@@ -1,3 +1,5 @@
+import { XJZL } from "../config.mjs";
+import { localizeConfig } from "../utils/utils.mjs";
 import { TRIGGER_CHOICES } from "../data/common.mjs";
 
 const { ItemSheetV2 } = foundry.applications.sheets;
@@ -43,6 +45,11 @@ export class XJZLTraitSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         for (const [key, labelKey] of Object.entries(TRIGGER_CHOICES)) {
             context.scriptTriggerChoices[key] = game.i18n.localize(labelKey);
         }
+
+        // 准备特效类型的下拉菜单
+        context.choices = {
+            traitTypes: localizeConfig(XJZL.traitTypes)
+        };
 
         // 准备特效列表
         context.effects = this.document.effects.map(e => ({

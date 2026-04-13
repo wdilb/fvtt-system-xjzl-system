@@ -43,6 +43,7 @@ export async function seedTraits() {
             type: "trait",
             img: t.img || "icons/magic/light/explosion-star-glow-green.webp",
             system: {
+                type: t.type || "general",
                 description: t.description || "",
                 automationNote: t.automationNote || "",
                 scripts: Array.isArray(t.scripts) ? t.scripts.map(s => ({

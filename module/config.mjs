@@ -482,8 +482,14 @@ XJZL.hobbies = {
   "antique": "XJZL.Hobbies.Antique"  // 喜好古玩
 };
 
+// 23. 特效/特性类型 (Trait Types)
+XJZL.traitTypes = {
+  general: "XJZL.Trait.Type.General",     // 通用特质
+  weapon: "XJZL.Trait.Type.Weapon"        // 武器子类型
+};
 
-// 23. 系统状态标志 (逻辑开关)
+
+// 24. 系统状态标志 (逻辑开关)
 // 用于处理那些buff/debuff上无法通过AE修改数值来实现的效果
 // 用于 Actor.prepareDerivedData 中读取，以及 AE 效果配置
 XJZL.statusFlags = {
@@ -585,7 +591,7 @@ XJZL.statusFlags = {
   regenRageAttack: "XJZL.Status.RegenRageAttack"
 };
 
-// 24. 检定优劣势计数器 (Check Flags)
+// 25. 检定优劣势计数器 (Check Flags)
 // 专门用于存储 rollAttributeTest 的修正 (key + "CheckLevel")
 // 结构: { "liliangCheckLevel": "XJZL.Stats.Liliang", ... }
 XJZL.checkFlags = {
