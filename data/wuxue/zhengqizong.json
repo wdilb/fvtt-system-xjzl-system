@@ -3584,16 +3584,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "选择法典",
+                            "label": "主张法典",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const options = `\n    <option value=\"盗法\">《盗法》</option>\n    <option value=\"贼法\">《贼法》</option>\n    <option value=\"囚法\">《囚法》</option>\n    <option value=\"捕法\">《捕法》</option>\n    <option value=\"杂法\">《杂法》</option>\n    <option value=\"具法\">《具法》</option>\n`;\nconst html = `<p>请选择你要主张的法典：</p><select id=\"fa-select\" style=\"width:100%; height:30px;\">${options}</select>`;\n\nconst selected = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"主张策论\" },\n    content: html,\n    ok: { \n        label: \"主张\",\n        callback: (event, button) => button.form.elements[\"fa-select\"].value\n    }\n});\n\nif (selected) {\n    args.flags.selectedFa = selected;\n    ui.notifications.info(`你主张了 ${selected}`);\n} else {\n    args.flags.abort = true;\n}"
-                        },
-                        {
-                            "label": "切换法典状态",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "if (args.flags.selectedFa && args.target.uuid === actor.uuid) {\n    const faNames = [\"盗法\", \"贼法\", \"囚法\", \"捕法\", \"杂法\", \"具法\"];\n    for (const name of faNames) {\n        if (name !== args.flags.selectedFa) {\n            const existing = actor.effects.find(e => e.name === name);\n            if (existing) await existing.delete();\n        }\n    }\n    \n    const eff = thisItem.effects.getName(args.flags.selectedFa);\n    if (eff) {\n        const effData = eff.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n        actor.showFloatyText(`主张：${args.flags.selectedFa}`, {fill: \"#ffdf00\", fontSize: 26});\n    }\n}"
+                            "script": "const options = `\n    <option value=\"盗法\">《盗法》</option>\n    <option value=\"贼法\">《贼法》</option>\n    <option value=\"囚法\">《囚法》</option>\n    <option value=\"捕法\">《捕法》</option>\n    <option value=\"杂法\">《杂法》</option>\n    <option value=\"具法\">《具法》</option>\n`;\nconst html = `<p>请选择你要主张的法典：</p><select id=\"fa-select\" style=\"width:100%; height:30px;\">${options}</select>`;\n\nconst selected = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"主张策论\" },\n    content: html,\n    ok: { \n        label: \"主张\",\n        callback: (event, button) => button.form.elements[\"fa-select\"].value\n    }\n});\n\nif (selected) {\n    // 1. 删除旧法典\n    const faNames = [\"盗法\", \"贼法\", \"囚法\", \"捕法\", \"杂法\", \"具法\"];\n    for (const name of faNames) {\n        if (name !== selected) {\n            const existing = actor.effects.getName(name);\n            if (existing) await existing.delete(); // 或者使用 game.xjzl.api.effects.removeEffect\n        }\n    }\n    \n    // 2. 挂载新法典\n    const eff = thisItem.effects.getName(selected);\n    if (eff) {\n        const effData = eff.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n        actor.showFloatyText(`主张：${selected}`, {fill: \"#ffdf00\", fontSize: 26});\n    }\n    \n    // 3. 标记为自动应用，隐藏聊天卡片按钮\n    args.flags.autoApplied = true;\n} else {\n    // 玩家取消选择，阻断出招\n    args.flags.abort = true;\n    args.flags.abortReason = \"取消选择法典\";\n}"
                         }
                     ]
                 }
