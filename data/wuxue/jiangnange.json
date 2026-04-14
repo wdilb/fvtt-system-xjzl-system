@@ -1715,59 +1715,76 @@
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
                     "range": "5米",
+                    "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，一缕书墨香回忆，获得“江南”状态，持续到战斗脱离。</p><p><strong>江南：</strong>你与周围 5 米内友方招式伤害+5。</p><p>·你每个回合初必须再次消耗 1 点内力维持“江南”，否则移除江南。</p><p><strong>升级：</strong>江南提升的伤害+5，施展和维持的消耗+1。</p>",
-                    "automationNote": "自身完全自动化，光环效果请队友手动增加伤害。",
+                    "automationNote": "完全自动化。会给自己和选中的目标上BUFF。",
                     "calculation": {
-                        "base": 0
+                        "base": 0,
+                        "growth": 0
                     },
                     "costs": {
                         "mp": [
                             1,
                             2,
                             3
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "添加江南",
+                            "label": "分发光环",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst maintainCost = 1 + (lvl - 1);\n\nconst effectData = thisItem.effects.getName(\"江南\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\n// 动态写入伤害加成\neffectData.changes[0].value = String(dmgBonus);\n// 动态存入维持消耗\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.maintainCost\", maintainCost);\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 5 + (lvl - 1) * 5;\nconst maintainCost = 1 + (lvl - 1);\n\n// 1. 给所有人 (包括自己) 添加增伤加护\nconst buffTpl = thisItem.effects.getName(\"江南-加护\");\nif (buffTpl) {\n    const buffData = buffTpl.toObject();\n    delete buffData._id;\n    buffData.origin = thisItem.uuid;\n    buffData.changes[0].value = String(dmgBonus);\n    await game.xjzl.api.effects.addEffect(args.target, buffData);\n}\n\n// 2. 只对自己添加维持核心\nif (args.target.uuid === actor.uuid) {\n    const mainTpl = thisItem.effects.getName(\"江南-维持\");\n    if (mainTpl) {\n        const maintainData = mainTpl.toObject();\n        delete maintainData._id;\n        maintainData.origin = thisItem.uuid;\n        foundry.utils.setProperty(maintainData, \"flags.xjzl-system.maintainCost\", maintainCost);\n        await game.xjzl.api.effects.addEffect(actor, maintainData);\n    }\n}"
                         }
                     ]
                 }
-            ]
-        },
-        "effects": [
-            {
-                "name": "江南",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
-                "description": "招式伤害得到提升。回合初需消耗内力维持。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "jiangnan",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "回合初维持消耗",
-                                "trigger": "turnStart",
-                                "active": true,
-                                "script": "const cost = thisEffect.getFlag(\"xjzl-system\", \"maintainCost\") || 1;\nif (actor.system.resources.mp.value >= cost) {\n    await actor.applyHealing({ amount: -cost, type: \"mp\", showScrolling: true });\n    actor.showFloatyText(`维持江南 (-${cost}内力)`, { fill: \"#00FFFF\", fontSize: 24 });\n} else {\n    await thisEffect.delete();\n    ui.notifications.warn(`${actor.name} 内力不足，[江南] 状态已移除。`);\n}"
-                            }
-                        ]
-                    }
+            ],
+            "effects": [
+                {
+                    "name": "江南-加护",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                    "description": "置身书香江南，招式伤害提升。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_jiangnan_buff",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.damages.skill.mod",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
                 },
-                "changes": [
-                    {
-                        "key": "system.combat.damages.skill.mod",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
-            }
-        ]
+                {
+                    "name": "江南-维持",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
+                    "description": "光环核心。回合初自动扣除内力维持，中断则全队失效。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_jiangnan_core",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "维持扣费",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "const cost = thisEffect.getFlag(\"xjzl-system\", \"maintainCost\") || 1;\nif (actor.system.resources.mp.value >= cost) {\n    await actor.applyHealing({ amount: -cost, type: \"mp\", showScrolling: false });\n    actor.showFloatyText(`维持江南 (-${cost}内力)`, { fill: \"#00FFFF\", fontSize: 24 });\n} else {\n    await thisEffect.delete();\n    const msgHtml = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1);\">\n    <p style=\"color:#8b0000; font-weight:bold; margin-bottom:2px;\"><i class=\"fas fa-exclamation-triangle\"></i> 光环崩溃</p>\n    <p style=\"font-size:0.9em; color:#555;\">内力不足，【江南】维持中断！<br><b>请通知范围内的盟友手动移除身上的【江南-加护】状态。</b></p></div></div>`;\n    ChatMessage.create({ content: msgHtml, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
     },
     {
         "name": "妙趣横生",
