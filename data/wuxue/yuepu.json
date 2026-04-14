@@ -3011,11 +3011,11 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "instrument",
-                    "range": "4米",
+                    "range": "15米",
                     "targetInfo": "直线",
                     "actionCost": "全回合动作",
                     "description": "<p>全回合动作，声声入耳，如破魂之刺，对直线上敌人造成 0.4 内息点内功伤害，给命中的敌人按顺序依次添加“粘”“杀”“夺”“摄”“牵”“拉”“旋”“锤”中的一种八音状态。<br>目标每有一种八音状态，招式伤害提升 20 点。<br>音阶排序：角、徵、羽<br>天籁之音：招式伤害+20，为目标添加所有八音。</p>",
-                    "automationNote": "伤害自动根据目标身上的八音状态加成。施加八音状态手动。",
+                    "automationNote": "[天籁之音]的增伤与全八音施加需完全手动处理。其他自动化。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -3040,10 +3040,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "八音加伤",
+                            "label": "八音共鸣加伤",
                             "trigger": "preDamage",
-                            "script": "const bayinNames = [\"粘\", \"杀\", \"夺\", \"摄\", \"牵\", \"拉\", \"旋\", \"锤\"];\nlet count = 0;\nif (args.target.effects) {\n    count = args.target.effects.filter(e => bayinNames.includes(e.name)).length;\n}\nif (count > 0) {\n    const bonus = count * 20;\n    args.config.amount += bonus;\n    ui.notifications.info(`天龙八音：检测到 ${count} 个八音状态，伤害 +${bonus}`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const bayinNames = [\"粘\", \"杀\", \"夺\", \"摄\", \"牵\", \"拉\", \"旋\", \"锤\"];\nlet count = 0;\nif (args.target.effects) {\n    count = args.target.effects.filter(e => bayinNames.includes(e.name)).length;\n}\nif (count > 0) {\n    const bonus = count * 20;\n    args.config.amount += bonus;\n    \n    const cardHtml = `\n    <div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.05);\">\n        <div style=\"font-weight: bold; color: #8e44ad; margin-bottom: 2px;\">\n            <i class=\"fas fa-music\"></i> 天龙八音共鸣\n        </div>\n        <div style=\"font-size: 0.85em; color: #555;\">\n            检测到 <b>${args.target.name}</b> 身上有 ${count} 种八音状态。<br>\n            引发共振，额外造成 <span style=\"color:red; font-weight:bold;\">${bonus}</span> 点伤害！\n        </div>\n    </div>`;\n    \n    ChatMessage.create({\n        content: cardHtml,\n        speaker: ChatMessage.getSpeaker({actor: args.attacker})\n    });\n}"
+                        },
+                        {
+                            "label": "施加单种八音状态",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst bayinNames = [\"粘\", \"杀\", \"夺\", \"摄\", \"牵\", \"拉\", \"旋\", \"锤\"];\nlet toAdd = null;\nfor (const name of bayinNames) {\n    if (!args.target.effects.some(e => e.name === name)) {\n        toAdd = name;\n        break;\n    }\n}\nif (!toAdd) toAdd = \"粘\"; // 全满则覆盖第一个\n\nconst effTpl = thisItem.effects.getName(toAdd);\nif (effTpl) {\n    const effData = effTpl.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n    actor.showFloatyText(`附加: ${toAdd}`, {fill: \"#cccccc\"});\n}"
                         }
                     ]
                 }
@@ -3053,49 +3059,97 @@
                     "name": "粘",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：粘",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_zhan",
+                            "stackable": false
+                        }
+                    }
                 },
                 {
                     "name": "杀",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：杀",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_sha",
+                            "stackable": false
+                        }
+                    }
                 },
                 {
                     "name": "夺",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：夺",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_duo",
+                            "stackable": false
+                        }
+                    }
                 },
                 {
                     "name": "摄",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：摄",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_she",
+                            "stackable": false
+                        }
+                    }
                 },
                 {
                     "name": "牵",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：牵",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_qian",
+                            "stackable": false
+                        }
+                    }
                 },
                 {
                     "name": "拉",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：拉",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_la",
+                            "stackable": false
+                        }
+                    }
                 },
                 {
                     "name": "旋",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：旋",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_xuan",
+                            "stackable": false
+                        }
+                    }
                 },
                 {
                     "name": "锤",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "八音状态：锤",
-                    "transfer": false
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bayin_chui",
+                            "stackable": false
+                        }
+                    }
                 }
             ]
         }
