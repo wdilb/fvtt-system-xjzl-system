@@ -1065,36 +1065,35 @@
             "requirements": "匕首",
             "effects": [
                 {
-                    "name": "水中环境",
-                    "icon": "icons/magic/water/wave-water-blue.webp",
-                    "description": "标记：处于水中。",
+                    "name": "处于水中 (破船)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "标记：处于水中。触发破船锥法部分招式加成。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "environment_water"
+                            "slug": "pochuan_water"
                         }
                     },
                     "changes": []
                 },
                 {
-                    "name": "水鬼潜游-水中",
-                    "icon": "icons/magic/water/water-bubble-blue.webp",
-                    "description": "水中架招加成。",
+                    "name": "溺水",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "目标陷入“缚身”且移动速度-5。（移动速度减免已自动生效；“缚身”效果及相关判定需手动处理）",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "shuigui_water_bonus",
-                            "scripts": [
-                                {
-                                    "label": "水中加成",
-                                    "trigger": "passive",
-                                    "active": true,
-                                    "script": "const stanceMove = thisItem.system.moves.find(m => m.name === \"水鬼潜游\");\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nS.combat.block += (5 + (lvl - 1) * 5);\nS.combat.kanpo += (1 + (lvl - 1) * 1);"
-                                }
-                            ]
+                            "slug": "nishui",
+                            "stackable": false
                         }
                     },
-                    "changes": []
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "-5"
+                        }
+                    ]
                 }
             ],
             "moves": [
@@ -1108,7 +1107,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，利凿狠刺，对目标则造成 0.5 力量点外功伤害。</p><p>·若范围内有敌人处于水中，可以使用反应动作释放此招攻击该敌人，且无视其格挡值。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "反应动作手动。水中无视格挡手动(弹窗调节)。",
+                    "automationNote": "反应动作及水中无视格挡需完全手动处理（弹窗勾选无视格挡）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1138,7 +1137,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，钉其面门，造成 0.4 力量点外功伤害，击破敌人架招时，使其陷入“溺水”，持续一回合。</p><p><strong>溺水：</strong>你陷入“缚身”且移动速度-5。</p><p>·若在水中施展此招，虚招值+2。</p><p><strong>升级：</strong>招式伤害+10，溺水持续回合+1，消耗+2。</p>",
-                    "automationNote": "击破施加溺水自动。水中虚招加成手动(弹窗调节)。",
+                    "automationNote": "若自身具有[处于水中 (破船)]状态，虚招加成自动计算。击破敌方架招后，自动施加[溺水]状态 (减速自动，缚身手动)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1158,10 +1157,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "水中虚招加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pochuan_water\")) {\n    args.output.feint += 2;\n    args.output.feintBonusDesc.push(\"水中作战: 虚招值 +2\");\n}"
+                        },
+                        {
                             "label": "击破溺水",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    // 溺水 AE\n    const nishui = {\n        name: \"溺水\",\n        icon: \"icons/svg/net.svg\",\n        duration: { rounds: rounds },\n        changes: [\n            { key: \"system.combat.speed\", mode: 2, value: \"-5\" }\n        ],\n        flags: { \"xjzl-system\": { slug: \"nishui\" } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n    await game.xjzl.api.effects.addEffect(args.target, nishui);\n    ui.notifications.info(\"目标陷入溺水！\");\n}"
+                            "script": "if (args.isBroken) {\n    const nishuiAE = thisItem.effects.getName(\"溺水\");\n    if (nishuiAE) {\n        const eff = nishuiAE.toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        \n        const lvl = Math.max(1, move.computedLevel || 1);\n        eff.duration = { rounds: 1 + (lvl - 1) };\n        \n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        \n        const msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; font-weight:bold; color:#2c3e50;\"><i class=\"fas fa-water\"></i> 目标陷入溺水！(移动速度-5，缚身效果请手动处理)</div></div>`;\n        ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({ actor: actor }) });\n    }\n}"
                         }
                     ]
                 },
@@ -1175,7 +1180,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，掷出匕首缠绕目标脖颈（外功命中），然后将其朝自己的方向拉扯 3 米，并为目标添加一层“笨拙”，至多三层，持续到脱战。</p><p><strong>笨拙：</strong>每层使你闪避-5。</p><p>·当范围内有敌人处于半空中时，你可以消耗反应动作对其释放此招，并额外为其添加禁足一回合。</p><p><strong>升级：</strong>释放距离+3，额外添加一层笨拙，消耗+2。</p>",
-                    "automationNote": "拉扯/反应动作手动。添加笨拙自动。禁足手动。",
+                    "automationNote": "拉扯/对空禁足需手动。命中后自动给目标添加对应层数的[笨拙]状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1192,7 +1197,7 @@
                             "label": "施加笨拙",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    // 笨拙 (benzhuo)\n    const eff = CONFIG.statusEffects.find(e => e.id === \"benzhuo\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const stacksToAdd = 1 + (lvl - 1);\n        for(let i=0; i<stacksToAdd; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n        ui.notifications.info(`已施加 ${stacksToAdd} 层笨拙`);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const stacksToAdd = 1 + (lvl - 1);\n    await game.xjzl.api.effects.addEffect(args.target, \"benzhuo\", stacksToAdd);\n    ui.notifications.info(`已施加 ${stacksToAdd} 层笨拙！拉扯及禁足请手动处理。`);\n}"
                         }
                     ]
                 },
@@ -1206,7 +1211,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，作潜水状，开启架招。若你在水中，架招持续期间，额外格挡值+5，且看破值+1。</p><p><strong>升级：</strong>格挡值+10，看破值+1，内力消耗+2。</p>",
-                    "automationNote": "水中加成手动(请手动挂上武学自带的AE)。",
+                    "automationNote": "若自身具有[处于水中 (破船)]状态，开启架招时自动计算额外加值。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1218,7 +1223,14 @@
                             6
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "水中架招加成",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pochuan_water\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    S.combat.block += 5 + (lvl - 1) * 5;\n    S.combat.kanpo += 1 + (lvl - 1) * 1;\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "凿龙断骨",
@@ -1231,7 +1243,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，乾锥做锤，坤锥做凿，凿穿一切，对敌人造成 0.7 力量点外功伤害。</p><p>·若范围内有敌人处于水中，可以使用反应动作释放此招攻击该敌人，且无视其格挡值。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+4。</p>",
-                    "automationNote": "反应动作手动。水中无视格挡手动(弹窗调节)。",
+                    "automationNote": "反应动作及水中无视格挡需完全手动处理（弹窗勾选无视格挡）。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1328,9 +1340,23 @@
             "sect": "jianghushili",
             "subSect": "caobang",
             "tier": 2,
-            "description": "<p>船家时常下水作业，多会习得一些水下憋气的法门，而漕帮的这套口诀，却是他们横行大明水域的独门绝技，一旦学会，如鱼得水。</p><p><strong>效果：</strong>你的[闭气]等级+2。</p><p>·你在水中战斗时，不会受到下盘不稳的影响。</p><p>·你在水中战斗时，虚招对抗+1。</p><p><strong>升级：</strong>闭气等级再+2，水中战斗时虚招对抗再+1。</p>",
+            "description": "<p>船家时常下水作业，多会习得一些水下憋气的法门，而漕帮的这套口诀，却是他们横行大明水域的独门绝技，一旦学会，如鱼得水。</p>",
             "requirements": "",
-            "automationNote": "水中效果请在战斗时手动从物品中开启[水中作战]状态。其余已全自动。",
+            "effects": [
+                {
+                    "name": "处于水中 (水栖)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "标记：处于水中。触发水栖诀加成。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shuiqi_water",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
+            ],
             "moves": [
                 {
                     "name": "水栖诀",
@@ -1341,8 +1367,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>被动生效。</p>",
-                    "automationNote": "被动常驻。",
+                    "description": "<p><strong>效果：</strong>被动生效。你的[闭气]等级+2。</p><p>·你在水中战斗时，不会受到下盘不稳的影响。</p><p>·你在水中战斗时，虚招对抗+1。</p><p><strong>升级：</strong>闭气等级再+2，水中战斗时虚招对抗再+1。</p>",
+                    "automationNote": "被动常驻。闭气成长及水中虚招对抗已自动；免疫下盘不稳请手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1350,29 +1376,14 @@
                     "costs": {},
                     "scripts": [
                         {
-                            "label": "水栖诀被动成长与水下判断",
+                            "label": "被动成长与虚招强化",
                             "trigger": "passive",
                             "active": true,
-                            "script": "// 1. 闭气成长计算\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst biqiBonus = 2 + (lvl - 1) * 2;\nS.skills.biqi.mod += biqiBonus;\n\n// 2. 检测水中作战状态\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'water_combat')) {\n    // 免疫下盘不稳 (清除 flag)\n    actor.xjzlStatuses.unstable = false;\n    \n    // 虚招对抗成长\n    const feintBonus = 1 + (lvl - 1) * 1;\n    S.combat.xuzhao += feintBonus;\n    S.combat.kanpo += feintBonus;\n}"
+                            "script": "// 1. 闭气成长计算 (常驻)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.biqi.mod += 2 + (lvl - 1) * 2;\n\n// 2. 检测水中作战状态 (水栖专属)\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'shuiqi_water')) {\n    // 虚招对抗成长\n    const feintBonus = 1 + (lvl - 1) * 1;\n    S.combat.xuzhao += feintBonus;\n    S.combat.kanpo += feintBonus;\n}"
                         }
                     ]
                 }
             ]
-        },
-        "effects": [
-            {
-                "name": "水中作战",
-                "icon": "icons/magic/water/water-bubble-blue.webp",
-                "description": "水栖诀：在水中战斗时，不会受到下盘不稳的影响，虚招对抗提升。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "water_combat",
-                        "stackable": false
-                    }
-                },
-                "changes": []
-            }
-        ]
+        }
     }
 ]
