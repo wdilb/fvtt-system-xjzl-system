@@ -3552,162 +3552,160 @@
             "category": "sanshou",
             "sect": "zhengqizong",
             "tier": 2,
-            "description": "<p>李悝所作法典，共分为六篇，为法家弟子研修之重典，其法治思想对商鞅、韩非影响极大。</p>",
+            "description": "<p>李悝所作法典，共分为六篇，为法家弟子研修之重典，其法治思想对商鞅、韩非影响极大。</p><p><strong>需求：</strong>《世法论》修炼圆满</p><p><strong>效果：</strong>你获得盗、贼、囚、捕、杂、具六篇法典，它们都属于策论名篇，你无需书写策论，可直接主张以下观点，但需遵循更换策论效果的规则。</p>",
             "requirements": "《世法论》修炼圆满",
             "moves": [
                 {
-                    "name": "盗法",
-                    "type": "stance",
+                    "name": "主张策论",
+                    "type": "qi",
+                    "actionType": "buff",
                     "damageType": "none",
+                    "weaponType": "none",
                     "range": "自身",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
-                    "description": "<p>主张观点：“官私财产，不可侵犯”<br>策论效果：他人对你进行盗窃的检定必定失败。</p>",
-                    "automationNote": "效果需手动裁定。",
+                    "targetInfo": "自身",
+                    "actionCost": "主要动作",
+                    "description": "<p>你主张法经中的某个观点，使自身获得对应的策论效果。每次施展都会替换当前的法经策论。</p>",
+                    "automationNote": "出招时弹窗选择法典，自动清理旧法典并应用新法典状态。除盗、具外，大部分法典特效已自动挂载在状态脚本中。",
+                    "progression": {
+                        "mode": "standard"
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "costs": {
                         "mp": [
+                            0,
+                            0,
                             0
                         ],
-                        "rage": [
-                            0
-                        ],
-                        "hp": [
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
-                    "actionCost": "无"
+                    "scripts": [
+                        {
+                            "label": "选择法典",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const options = `\n    <option value=\"盗法\">《盗法》</option>\n    <option value=\"贼法\">《贼法》</option>\n    <option value=\"囚法\">《囚法》</option>\n    <option value=\"捕法\">《捕法》</option>\n    <option value=\"杂法\">《杂法》</option>\n    <option value=\"具法\">《具法》</option>\n`;\nconst html = `<p>请选择你要主张的法典：</p><select id=\"fa-select\" style=\"width:100%; height:30px;\">${options}</select>`;\n\nconst selected = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"主张策论\" },\n    content: html,\n    ok: { \n        label: \"主张\",\n        callback: (event, button) => button.form.elements[\"fa-select\"].value\n    }\n});\n\nif (selected) {\n    args.flags.selectedFa = selected;\n    ui.notifications.info(`你主张了 ${selected}`);\n} else {\n    args.flags.abort = true;\n}"
+                        },
+                        {
+                            "label": "切换法典状态",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.flags.selectedFa && args.target.uuid === actor.uuid) {\n    const faNames = [\"盗法\", \"贼法\", \"囚法\", \"捕法\", \"杂法\", \"具法\"];\n    for (const name of faNames) {\n        if (name !== args.flags.selectedFa) {\n            const existing = actor.effects.find(e => e.name === name);\n            if (existing) await existing.delete();\n        }\n    }\n    \n    const eff = thisItem.effects.getName(args.flags.selectedFa);\n    if (eff) {\n        const effData = eff.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n        actor.showFloatyText(`主张：${args.flags.selectedFa}`, {fill: \"#ffdf00\", fontSize: 26});\n    }\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "盗法",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "官私财产，不可侵犯。他人对你进行盗窃的检定必定失败。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fajing_daofa",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
                 },
                 {
                     "name": "贼法",
-                    "type": "stance",
-                    "damageType": "none",
-                    "range": "自身",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
-                    "description": "<p>主张观点：“保护百姓，禁止犯上作乱”<br>策论效果：若目标具有杀戮值或杀孽，你对他出招时招式伤害+10 点。</p>",
-                    "costs": {
-                        "mp": [
-                            0
-                        ],
-                        "rage": [
-                            0
-                        ],
-                        "hp": [
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "贼法加成",
-                            "trigger": "preDamage",
-                            "script": "if (args.target) {\n    const res = args.target.system.resources;\n    if ((res.shalu?.value > 0) || (res.shanie > 0)) {\n        args.config.amount += 10;\n    }\n}",
-                            "active": true
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "保护百姓，禁止犯上作乱。若目标具有杀戮值或杀孽，招式伤害+10。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fajing_zeifa",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "贼法加成",
+                                    "trigger": "preDamage",
+                                    "active": true,
+                                    "script": "if (args.target) {\n    const res = args.target.system.resources;\n    if ((res.shalu?.value > 0) || (res.shanie > 0)) {\n        args.config.amount += 10;\n    }\n}"
+                                }
+                            ]
                         }
-                    ],
-                    "actionCost": "无"
+                    },
+                    "changes": []
                 },
                 {
                     "name": "囚法",
-                    "type": "stance",
-                    "damageType": "none",
-                    "range": "自身",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
-                    "description": "<p>主张观点：“公审判，断罪狱”<br>策论效果：一场战斗一次，你的招式命中标签为【恶】的目标后，为其添加“禁足”持续一回合。</p>",
-                    "costs": {
-                        "mp": [
-                            0
-                        ],
-                        "rage": [
-                            0
-                        ],
-                        "hp": [
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "囚法禁足",
-                            "trigger": "hit",
-                            "script": "if (args.isHit && args.target) {\n    // 检查计数器\n    if (actor.getFlag(\"xjzl-system\", \"wuxue_qiufa_used\")) return;\n\n    const soc = args.target.system.social || {};\n    // 恶标签: 恶行>=100 且 侠义<=50\n    const isEvil = (soc.exing >= 100) && (soc.xiayi <= 50);\n    if (isEvil) {\n        // 调用系统通用AE: 禁足(root)\n        const result = await game.xjzl.api.effects.addEffect(args.target, \"root\");\n        // 设置Flag\n        if (result) {\n             await actor.setFlag(\"xjzl-system\", \"wuxue_qiufa_used\", true);\n             // 如果返回的是Effect对象，手动更新时长为1回合\n             await result.update({ duration: { rounds: 1 } });\n             ui.notifications.info(`${actor.name} 触发囚法，禁足目标！`);\n        }\n    }\n}",
-                            "active": true
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "公审判，断罪狱。一场战斗一次，招式命中【恶】的目标后为其添加禁足1回合。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fajing_qiufa",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "囚法禁足",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "if (args.isHit && args.target) {\n    const soc = args.target.system.social || {};\n    const isEvil = (soc.exing >= 100) && (soc.xiayi <= 50);\n    if (isEvil) {\n        const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if(root) {\n            const data = foundry.utils.deepClone(root);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            \n            ChatMessage.create({\n                content: `<div class=\"xjzl-chat-card\"><p style=\"color:#8b0000; font-weight:bold;\">《囚法》生效！</p><p>判定目标 ${args.target.name} 为【恶】，已被禁足 1 回合。</p><hr><p style=\"color:#888; font-size:0.8em;\">※ 注意：此策论效果一场战斗仅限触发一次，请自觉遵守。</p></div>`,\n                speaker: ChatMessage.getSpeaker({actor: actor})\n            });\n        }\n    }\n}"
+                                }
+                            ]
                         }
-                    ],
-                    "actionCost": "无"
+                    },
+                    "changes": []
                 },
                 {
                     "name": "捕法",
-                    "type": "stance",
-                    "damageType": "none",
-                    "range": "自身",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
-                    "description": "<p>主张观点：“逃兵、贼、丁、役需刻捕”<br>策论效果：你的速度+3。</p>",
-                    "costs": {
-                        "mp": [
-                            0
-                        ],
-                        "rage": [
-                            0
-                        ],
-                        "hp": [
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "速度加成",
-                            "trigger": "passive",
-                            "script": "S.combat.speed += 3;",
-                            "active": true
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "逃兵、贼、丁、役需刻捕。速度+3。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fajing_bufa",
+                            "stackable": false
                         }
-                    ],
-                    "actionCost": "无"
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "3"
+                        }
+                    ]
                 },
                 {
                     "name": "杂法",
-                    "type": "stance",
-                    "damageType": "none",
-                    "range": "自身",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
-                    "description": "<p>主张观点：“不得狡、赌、贪、淫”<br>策论效果：目标每有 100 点恶行值，你对目标施展的招式伤害提升 5 点。</p>",
-                    "costs": {
-                        "mp": [
-                            0
-                        ],
-                        "rage": [
-                            0
-                        ],
-                        "hp": [
-                            0
-                        ]
-                    },
-                    "scripts": [
-                        {
-                            "label": "杂法加成",
-                            "trigger": "preDamage",
-                            "script": "if (args.target) {\n    const evil = args.target.system.social?.exing || 0;\n    const bonus = Math.floor(evil / 100) * 5;\n    if (bonus > 0) {\n        args.config.amount += bonus;\n    }\n}",
-                            "active": true
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "不得狡、赌、贪、淫。目标每有100点恶行，伤害+5。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fajing_zafa",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "杂法加伤",
+                                    "trigger": "preDamage",
+                                    "active": true,
+                                    "script": "if (args.target) {\n    const evil = args.target.system.social?.exing || 0;\n    const bonus = Math.floor(evil / 100) * 5;\n    if (bonus > 0) {\n        args.config.amount += bonus;\n    }\n}"
+                                }
+                            ]
                         }
-                    ],
-                    "actionCost": "无"
+                    },
+                    "changes": []
                 },
                 {
                     "name": "具法",
-                    "type": "stance",
-                    "damageType": "none",
-                    "range": "自身",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
-                    "description": "<p>主张观点：“定罪量刑、具其加减”<br>策论效果：你将目标的某件行为定罪为小恶，目标增加对应恶行值。一个月内，你只能对一个目标使用一次该策论效果。</p>",
-                    "automationNote": "纯描述性效果。",
-                    "costs": {
-                        "mp": [
-                            0
-                        ],
-                        "rage": [
-                            0
-                        ],
-                        "hp": [
-                            0
-                        ]
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "description": "定罪量刑、具其加减。将目标行为定罪为小恶，增加其恶行值。需手动处理。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fajing_jufa",
+                            "stackable": false
+                        }
                     },
-                    "actionCost": "无"
+                    "changes": []
                 }
             ]
         }
