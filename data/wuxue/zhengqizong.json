@@ -2576,7 +2576,7 @@
                     "range": "1米",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，音朗清越，安详高洁，为范围内一个友方目标移除“下盘不稳”和“目盲”。</p><p>你可以消耗一层“弄梅”，同时为友方目标再移除一个人级状态。</p><p>升级：施展距离+5，选择目标+1，内力消耗+2。</p>",
-                    "automationNote": "自动移除下盘不稳和目盲。消耗弄梅移除额外状态需手动。",
+                    "automationNote": "自动移除下盘不稳和目盲。消耗弄梅移除额外状态需手动在目标面板删除。",
                     "requirements": "乐器",
                     "costs": {
                         "mp": [
@@ -2584,16 +2584,8 @@
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -2611,13 +2603,13 @@
                 {
                     "name": "溪山夜月",
                     "type": "stance",
-                    "damageType": "none",
+                    "damageType": "waigong",
                     "weaponType": "instrument",
                     "element": "yin",
                     "range": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，起奏低音，肃穆深沉，开启架招。格挡成功时获得一层“弄梅”，至多三层，持续到脱战。</p><p>弄梅：每层使《梅花三弄》释放距离+1，伤害+5。</p><p>升级：格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "架招开启自动化。格挡获得弄梅需手动或在damaged脚本（较复杂，建议手动）。弄梅效果自动化。",
+                    "automationNote": "完全自动化。",
                     "requirements": "乐器",
                     "costs": {
                         "mp": [
@@ -2625,16 +2617,8 @@
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -2645,7 +2629,7 @@
                             "label": "格挡获得弄梅",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"弄梅\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effectData = thisItem.effects.getName(\"弄梅\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nactor.showFloatyText(\"+ 弄梅\", {fill: \"#cccccc\"});"
                         }
                     ]
                 },
@@ -2658,7 +2642,7 @@
                     "range": "5米",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，旋律跌宕，大起大落，对目标造成 0.5 内息点内功伤害。若目标无架招，陷入“耳鸣”，持续一回合。</p><p>你可以消耗一层“弄梅”，使有架招的目标也陷入“耳鸣”，持续一回合。</p><p>升级：招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "伤害自动化。耳鸣判定自动化。弄梅增幅伤害自动化。消耗弄梅强制耳鸣需手动。",
+                    "automationNote": "完全自动化。",
                     "requirements": "乐器",
                     "costs": {
                         "mp": [
@@ -2666,16 +2650,8 @@
                             4,
                             6
                         ],
-                        "rage": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "rage": [],
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -2692,13 +2668,19 @@
                             "label": "弄梅加成",
                             "trigger": "calc",
                             "active": true,
-                            "script": "const nongmei = actor.effects.find(e => e.name === \"弄梅\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nargs.output.damage += stacks * 5;\nif (stacks > 0) args.output.bonusDesc.push(`弄梅加成 +${stacks*5}`);"
+                            "script": "const nongmei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_nongmei\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks > 0) {\n    args.output.damage += stacks * 5;\n    args.output.bonusDesc.push(`弄梅加成 +${stacks*5}`);\n}"
+                        },
+                        {
+                            "label": "询问消耗弄梅",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const nongmei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_nongmei\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks > 0) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"凌云戛玉 - 消耗弄梅\" },\n        content: \"<p>是否消耗 1 层【弄梅】？<br>使拥有架招的目标也会陷入【耳鸣】。</p>\",\n        yes: { label: \"消耗 (-1层)\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhengqi_nongmei\", 1);\n        args.flags.consumeNongmei = true;\n        ui.notifications.info(\"已消耗1层弄梅，准备强加耳鸣！\");\n    }\n}"
                         },
                         {
                             "label": "施加耳鸣",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"deaf\", true);\n}"
+                            "script": "if (args.isHit) {\n    const hasStance = args.target.system.martial?.stanceActive;\n    if (!hasStance || args.flags.consumeNongmei) {\n        const effectData = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n        if(effectData) {\n            const data = foundry.utils.deepClone(effectData);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            actor.showFloatyText(\"耳鸣！\", {fill: \"#cccccc\"});\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -2712,7 +2694,7 @@
                     "range": "5米",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，情绪激越，奏寒梅竞相怒放之势，对目标造成 0.7 内息点内功伤害，自身进入“傲梅”状态，持续到战斗脱离。</p><p>傲梅：你在自身每个回合初获得一层“弄梅”，你的[演奏]检定结果+5。</p><p>每消耗一层“弄梅”，施展本招式需求怒气-1。</p><p>升级：伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "伤害自动化。获得傲梅状态自动化。傲梅自动回弄梅自动化。怒气减免需手动调整消耗。",
+                    "automationNote": "完全自动化。",
                     "requirements": "乐器",
                     "costs": {
                         "mp": [
@@ -2725,11 +2707,7 @@
                             6,
                             5
                         ],
-                        "hp": [
-                            0,
-                            0,
-                            0
-                        ]
+                        "hp": []
                     },
                     "calculation": {
                         "base": 0,
@@ -2746,13 +2724,19 @@
                             "label": "弄梅加成",
                             "trigger": "calc",
                             "active": true,
-                            "script": "const nongmei = actor.effects.find(e => e.name === \"弄梅\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nargs.output.damage += stacks * 5;\nif (stacks > 0) args.output.bonusDesc.push(`弄梅加成 +${stacks*5}`);"
+                            "script": "const nongmei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_nongmei\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks > 0) {\n    args.output.damage += stacks * 5;\n    args.output.bonusDesc.push(`弄梅加成 +${stacks*5}`);\n}"
+                        },
+                        {
+                            "label": "怒气减免",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const nongmei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_nongmei\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst rageCost = args.costConsumed.rage || 0;\n\nif (stacks > 0 && rageCost > 0) {\n    const maxToConsume = Math.min(stacks, rageCost);\n    const html = `<p>当前拥有 <b>${stacks}</b> 层【弄梅】。</p><p>本招式消耗了 <b>${rageCost}</b> 点怒气。你想消耗几层弄梅来返还等额怒气？</p><div style=\"text-align:center;\"><input type=\"number\" id=\"nongmei-cost\" value=\"${maxToConsume}\" min=\"0\" max=\"${maxToConsume}\" style=\"width:60px; text-align:center;\"/> 层</div>`;\n    \n    const consumed = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"傲梅迎雪 - 怒气减免\" },\n        content: html,\n        ok: {\n            label: \"确定\",\n            callback: (ev, btn) => parseInt(btn.form.elements[\"nongmei-cost\"].value) || 0\n        }\n    });\n    \n    if (consumed > 0) {\n        // 扣除弄梅\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhengqi_nongmei\", consumed);\n        // 返还怒气\n        await actor.applyHealing({ amount: consumed, type: \"rage\", showScrolling: false });\n        actor.showFloatyText(`怒气返还 +${consumed}`, {fill: \"#ff4500\"});\n        ui.notifications.info(`消耗了 ${consumed} 层弄梅，减免了 ${consumed} 点怒气消耗。`);\n    }\n}"
                         },
                         {
                             "label": "获得傲梅",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "if (args.hitCount > 0) {\n    const effectData = thisItem.effects.getName(\"傲梅\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (args.hitCount > 0) {\n    const effectData = thisItem.effects.getName(\"傲梅\").toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 }
@@ -2773,7 +2757,7 @@
                 },
                 {
                     "name": "傲梅",
-                    "icon": "isystems/xjzl-system/assets/icons/wuxue/正气.png",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/正气.png",
                     "description": "每回合初获得一层弄梅，演奏检定+5",
                     "transfer": false,
                     "changes": [
@@ -2790,7 +2774,8 @@
                                 {
                                     "trigger": "turnStart",
                                     "label": "回合回弄梅",
-                                    "script": "const effectData = { name: '弄梅', flags: { 'xjzl-system': { slug: 'wuxue_zhengqi_nongmei', stackable: true, maxStacks: 3 } } }; await game.xjzl.api.effects.addEffect(actor, effectData); ui.notifications.info('傲梅迎雪：获得一层弄梅');"
+                                    "active": true,
+                                    "script": "if (!thisItem) return;\nconst nongmeiTpl = thisItem.effects.getName(\"弄梅\");\nif (nongmeiTpl) {\n    const effectData = nongmeiTpl.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"+ 弄梅\", {fill: \"#cccccc\", fontSize: 24});\n}"
                                 }
                             ]
                         }
