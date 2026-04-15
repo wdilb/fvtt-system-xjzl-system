@@ -456,13 +456,13 @@
             "damage": 35,
             "block": 20,
             "description": "<p>龙蟠棍上，棒头有一龙头，头顶两支犄角，分为两把，双龙盘踞，刚猛无比，名扬四海。</p><p><strong>效果：</strong>当你造成暴击时，可以选择一项效果：<br>阴:忽视对方外功防御；<br>阳:击飞目标1米。</p>",
-            "automationNote": "部分暴击时弹出对话框选择效果。选择“阴”自动无视防御；选择“阳”需手动处理击飞，但会飘字提示。",
+            "automationNote": "部分暴击时弹出对话框选择效果。选择“阴”且为外功伤害时自动无视防御；选择“阳”需手动处理击飞，但会飘字提示。",
             "scripts": [
                 {
                     "label": "双龙之择",
                     "trigger": "preDamage",
                     "active": true,
-                    "script": "/**\n * 水火囚龙棒暴击特效\n * Trigger: preDamage (伤害计算前)\n */\n// 检查是否暴击 (preDamage 阶段暴击状态已确定，在 args.outcome 中)\nif (args.outcome.isCrit) {\n    const choice = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"水火囚龙棒：暴击特效\" },\n        content: \"<p>双龙盘踞，刚猛无比！请选择暴击效果：</p>\",\n        buttons: [\n            { label: \"阴：无视外防\", action: \"yin\", icon: \"fas fa-ghost\" },\n            { label: \"阳：击飞1米\", action: \"yang\", icon: \"fas fa-sun\" }\n        ]\n    });\n    \n    if (choice === \"yin\") {\n        // 修改配置：无视防御\n        args.config.ignoreDefense = true;\n        ui.notifications.info(\"囚龙棒·阴：无视防御！\");\n    } else {\n        // 阳：提示手动击飞\n        ui.notifications.warn(`囚龙棒·阳：请将 ${args.target?.name || \"目标\"} 击飞 1 米！`);\n    }\n}"
+                    "script": "if (args.outcome.isCrit) {\n    const choice = await foundry.applications.api.DialogV2.wait({\n        window: { title: \"水火囚龙棒：暴击特效\" },\n        content: \"<p>双龙盘踞，刚猛无比！请选择暴击效果：</p>\",\n        buttons: [\n            { label: \"阴：无视外防\", action: \"yin\", icon: \"fas fa-ghost\" },\n            { label: \"阳：击飞1米\", action: \"yang\", icon: \"fas fa-sun\" }\n        ]\n    });\n    \n    if (choice === \"yin\") {\n        if (args.config.type === \"waigong\") {\n            args.config.ignoreDefense = true;\n            ui.notifications.info(\"囚龙棒·阴：外功防御已无视！\");\n        } else {\n            ui.notifications.warn(\"囚龙棒·阴：当前非外功伤害，无法无视防御。\");\n        }\n    } else if (choice === \"yang\") {\n        ui.notifications.warn(`囚龙棒·阳：请将 ${args.target?.name || \"目标\"} 击飞 1 米！`);\n        if (args.target?.showFloatyText) args.target.showFloatyText(\"被击飞！\", {fill: \"#ffaa00\"});\n    }\n}"
                 }
             ]
         }
