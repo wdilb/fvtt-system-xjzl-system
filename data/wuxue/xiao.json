@@ -310,8 +310,8 @@
                     "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>虚拉弓弦，箭尖轻点地面溅起瘴气与落叶，制造射箭假象诱敌暴露身形，随后真箭悄无声息射出，对目标造成0.4力量点外功伤害。击破架招时，瘴毒遮蔽目标视线，使其陷入“目盲”，持续2回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破架招自动施加目盲2回合。",
+                    "description": "<p>主要动作，虚拉弓弦，箭尖轻点地面溅起瘴气与落叶，制造射箭假象诱敌暴露身形，随后真箭悄无声息射出，对目标造成0.4力量点外功伤害。击破架招时，瘴毒遮蔽目标视线，使其陷入“目盲”，持续2回合。</p><p>·若目标架招是徒手、暗器类武器，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
+                    "automationNote": "系统自动读取目标架招武学判定是否为徒手/暗器以提升虚招值。击破架招自动施加目盲2回合。消耗的箭矢请手动扣除。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -331,6 +331,12 @@
                         ]
                     },
                     "scripts": [
+                        {
+                            "label": "兵器克制检测",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "if (args.target.system.martial.stanceActive) {\n    const stanceItemId = args.target.system.martial.stanceItemId;\n    const wuxue = args.target.items.get(stanceItemId);\n    if (wuxue) {\n        const m = wuxue.system.moves.find(x => x.id === args.target.system.martial.stance);\n        // 检查是否为徒手或暗器\n        if (m && [\"unarmed\", \"hidden\"].includes(m.weaponType)) {\n            const lvl = Math.max(1, move.computedLevel || 1);\n            args.flags.grantFeint += lvl;\n            actor.showFloatyText(\"远程克制!\", { fill: \"#00FFFF\" });\n        }\n    }\n}"
+                        },
                         {
                             "label": "击破目盲",
                             "trigger": "hit",
@@ -507,7 +513,7 @@
                     "range": "4米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>（可使用反应动作释放）双脚蹬踏船板借力，身形随船身颠簸微晃，枪尖如浪涛骤起，直刺目标要害，对目标造成 0.5 内息点内功伤害。</p><p>·当目标进入攻击范围时，可消耗反应动作释放此招，招式必中，使其陷入“下盘不稳”，持续1回合。</p><p><strong>升级：</strong>招式伤害+10，下盘不稳持续回合+1，内力消耗+2。</p>",
+                    "description": "<p>（可使用反应动作释放）双脚蹬踏船板借力，身形随船身颠簸微晃，枪尖如浪涛骤起，直刺目标要害，对目标造成 0.5 内息点内功伤害。</p><p>·当目标处于水中（水面）且在你的攻击范围内时，可消耗反应动作释放此招，招式必中，使其陷入“下盘不稳”，持续1回合。</p><p><strong>升级：</strong>招式伤害+10，下盘不稳持续回合+1，内力消耗+2。</p>",
                     "automationNote": "作为被动反应触发时，需手动在弹窗中配置必中等选项，并手动为目标应用下盘不稳。",
                     "calculation": {
                         "base": 0,
@@ -537,8 +543,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>枪势虚浮如潮影不定，对目标造成 0.4 内息点内功伤害。击破架招时，使目标【倒地】。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破架招自动施加倒地。",
+                    "description": "<p>主要动作，枪势虚浮如潮影不定，对目标造成 0.4 内息点内功伤害。击破架招时，使目标陷入“窒息”状态并倒地。</p><p>·若目标处在水中，虚招值+1</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
+                    "automationNote": "出招前弹窗询问目标是否在水中以自动增强虚招。击破架招自动施加倒地，并发送窒息状态卡片提醒（窒息需手动处理）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -559,10 +565,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破倒地",
+                            "label": "环境克制检测",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"环境优势判定\" },\n    content: `<p>目标 <b>${args.target.name}</b> 是否处在<b>水中</b>？</p>`,\n    yes: { label: \"是 (+虚招值)\", icon: \"fas fa-water\" },\n    no: { label: \"否\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    args.flags.grantFeint += lvl;\n    actor.showFloatyText(\"水形虚势!\", { fill: \"#3498db\" });\n}"
+                        },
+                        {
+                            "label": "击破倒地与窒息提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
+                            "script": "if (args.isBroken) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n    \n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #34495e;\"><p><b style=\"color:#2c3e50;\"><i class=\"fas fa-dizzy\"></i> 陷入窒息</b><br>目标必须在<b>三个回合内</b>呼吸到空气，否则在第三个回合末陷入濒死，且回复气血不会使其脱离濒死。<br><span style=\"font-size:0.85em; color:#888;\">(如果在水上会被击倒到水底，请主持人自行判断是否呼吸到空气)</span></p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: args.target}) });\n}"
                         }
                     ]
                 },
@@ -776,8 +788,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>挥刺虚攻目标腿部，看似轻浮，实则暗藏杀招，对目标造成 0.4 力量点外功伤害。击破架招时，借藤蔓缠绕目标脚踝，使其陷入“下盘不稳”，持续2回合。</p><p>·若目标的架招是短兵器类招式，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
-                    "automationNote": "出招自动检测目标架招是否为短兵器以提升虚招值。击破架招自动施加下盘不稳2回合。",
+                    "description": "<p>主要动作，挥刺虚攻目标腿部，看似轻浮，实则暗藏杀招，对目标造成 0.4 力量点外功伤害。击破架招时，借藤蔓缠绕目标脚踝，使其陷入“禁足”，持续2回合。</p><p>·若目标的架招是单手类招式，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
+                    "automationNote": "出招弹窗询问对方是否为单手类招式以提升虚招值。击破架招自动施加禁足2回合。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -798,16 +810,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "短兵克制检测",
+                            "label": "单手克制检测",
                             "trigger": "check",
                             "active": true,
-                            "script": "if (args.target.system.martial.stanceActive) {\n    const stanceItemId = args.target.system.martial.stanceItemId;\n    const wuxue = args.target.items.get(stanceItemId);\n    if (wuxue) {\n        const m = wuxue.system.moves.find(x => x.id === args.target.system.martial.stance);\n        if (m && [\"sword\", \"blade\", \"dagger\"].includes(m.weaponType)) {\n            const lvl = Math.max(1, move.computedLevel || 1);\n            args.flags.grantFeint += lvl;\n            actor.showFloatyText(\"短兵克制!\", { fill: \"#00FFFF\" });\n        }\n    }\n}"
+                            "script": "if (args.target.system.martial.stanceActive) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"兵器克制判定\" },\n        content: `<p>目标 <b>${args.target.name}</b> 已开启架招。</p><p>其架招是否属于<b>单手类招式</b>？</p>`,\n        yes: { label: \"是 (+虚招值)\", icon: \"fas fa-check\" },\n        no: { label: \"否\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        args.flags.grantFeint += lvl;\n        actor.showFloatyText(\"招式克制!\", { fill: \"#00FFFF\" });\n    }\n}"
                         },
                         {
-                            "label": "击破下盘不稳",
+                            "label": "击破禁足",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if (unstable) {\n        unstable.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, unstable);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootData) {\n        rootData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, rootData);\n    }\n}"
                         }
                     ]
                 },
@@ -987,8 +999,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>挥刀虚劈身前山石，溅起碎石扬尘诱敌，随后刀出如龙，对目标造成 0.4 力量点外功伤害。击破架招时，碎石迷扰目标视线，使其陷入“下盘不稳”，持续两回合。</p><p>·若目标的架招是刀、斧类重型兵器，虚招值 + 1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
-                    "automationNote": "检测目标架招是否为刀类武器以自动提升虚招值。击破架招自动施加下盘不稳2回合。",
+                    "description": "<p>主要动作，挥刀虚劈身前山石，溅起碎石扬尘诱敌，随后刀出如龙，对目标造成 0.4 力量点外功伤害。击破架招时，使其陷入“错骨”，持续两回合。</p><p>·若目标的架招是双手类兵器，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
+                    "automationNote": "出招弹窗询问对方是否为双手兵器以提升虚招值。击破架招自动施加错骨2回合。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1009,16 +1021,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "重兵克制检测",
+                            "label": "双手克制检测",
                             "trigger": "check",
                             "active": true,
-                            "script": "if (args.target.system.martial.stanceActive) {\n    const stanceItemId = args.target.system.martial.stanceItemId;\n    const wuxue = args.target.items.get(stanceItemId);\n    if (wuxue) {\n        const m = wuxue.system.moves.find(x => x.id === args.target.system.martial.stance);\n        if (m && m.weaponType === \"blade\") {\n            const lvl = Math.max(1, move.computedLevel || 1);\n            args.flags.grantFeint += lvl;\n            actor.showFloatyText(\"重兵克制!\", { fill: \"#00FFFF\" });\n        }\n    }\n}"
+                            "script": "if (args.target.system.martial.stanceActive) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"兵器克制判定\" },\n        content: `<p>目标 <b>${args.target.name}</b> 已开启架招。</p><p>其架招是否属于<b>双手类兵器</b>？</p>`,\n        yes: { label: \"是 (+虚招值)\", icon: \"fas fa-check\" },\n        no: { label: \"否\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        args.flags.grantFeint += lvl;\n        actor.showFloatyText(\"重兵克制!\", { fill: \"#00FFFF\" });\n    }\n}"
                         },
                         {
-                            "label": "击破下盘不稳",
+                            "label": "击破错骨",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if (unstable) {\n        unstable.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, unstable);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const cuoguData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n    if (cuoguData) {\n        cuoguData.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, cuoguData);\n    }\n}"
                         }
                     ]
                 },
@@ -1524,7 +1536,7 @@
             "category": "sanshou",
             "sect": "jianghushili",
             "tier": 3,
-            "description": "<p>黎澄结合自在神功和长生绝所创之内力使用法门，可以增强武学招式，抵抗伤害，容颜常驻。</p><p>每次出招使友方单位获得一层长生气，至多一层，持续到战斗结束。</p><p><strong>·长生气：</strong>招式伤害增加 10 点，受到的招式伤害减少 10 点。</p><p><strong>升级：</strong>消耗内力+5，长生气的上限+1。</p>",
+            "description": "<p>黎澄结合自在神功和长生绝所创之内力使用法门，可以增强武学招式，抵抗伤害，容颜常驻。</p><p><strong>类型：</strong>气招</p><p><strong>距离：</strong>15</p><p><strong>消耗：</strong>10</p><p><strong>效果：</strong>每次出招使至多一名友方单位获得一层长生气，至多一层，持续到战斗结束。</p><p><strong>·长生气：</strong>招式伤害增加10点，受到的招式伤害减少10点。</p><p><strong>升级：</strong>消耗内力+10，友方单位+1，长生气的上限+1。</p>",
             "requirements": "",
             "moves": [
                 {
@@ -1537,26 +1549,32 @@
                     "range": "15米",
                     "targetInfo": "单体",
                     "actionCost": "无",
-                    "description": "<p>每次出招使友方单位获得一层长生气，至多一层，持续到战斗结束。</p><p><strong>·长生气：</strong>招式伤害增加 10 点，受到的招式伤害减少 10 点。</p><p><strong>升级：</strong>消耗内力+5，长生气的上限+1。</p>",
-                    "automationNote": "请选中友方目标（或不选默认给自己）后点击出招。自动施加长生气，叠加上限随等级自动提升。",
+                    "description": "<p>每次出招使至多一名友方单位获得一层长生气，至多一层，持续到战斗结束。</p><p><strong>·长生气：</strong>招式伤害增加10点，受到的招式伤害减少10点。</p><p><strong>升级：</strong>消耗内力+10，友方单位+1，长生气的上限+1。</p>",
+                    "automationNote": "请选中友方目标（或不选默认给自己）后点击出招。出招时会提示可作用的人数上限。自动施加长生气，叠加上限随等级自动提升。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
                     },
                     "costs": {
                         "mp": [
-                            5,
                             10,
-                            15,
-                            20
+                            20,
+                            30,
+                            40
                         ]
                     },
                     "scripts": [
                         {
+                            "label": "目标数量提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxTargets = lvl;\nconst msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #2ecc71;\"><p><b>系统提示：</b><br>当前等级最多可选择 <b>${maxTargets}</b> 名友方单位施加长生气。<br><span style=\"color:#888; font-size:0.85em;\"></span></p></div></div>`;\nChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });"
+                        },
+                        {
                             "label": "施加长生气",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxStacks = lvl;\n\nconst eff = thisItem.effects.getName(\"长生气\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nif (!eff.flags) eff.flags = {};\nif (!eff.flags[\"xjzl-system\"]) eff.flags[\"xjzl-system\"] = {};\neff.flags[\"xjzl-system\"].maxStacks = maxStacks;\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nactor.showFloatyText(\"长生气！\", { fill: \"#27ae60\" });",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxStacks = lvl;\n\nconst eff = thisItem.effects.getName(\"长生气\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nif (!eff.flags) eff.flags = {};\nif (!eff.flags[\"xjzl-system\"]) eff.flags[\"xjzl-system\"] = {};\neff.flags[\"xjzl-system\"].maxStacks = maxStacks;\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nactor.showFloatyText(\"长生气！\", { fill: \"#27ae60\" });"
                         }
                     ]
                 }
@@ -2079,7 +2097,7 @@
             "isOfficial": false,
             "sect": "jianghushili",
             "tier": 3,
-            "description": "<p>白良玉所创之剑法，勇往无前之剑，使用者要心中有着天下无物不可斩的信念，斩天命，破岁月。</p><p><strong>需求：</strong>剑-单剑 <strong>属性：</strong>太极</p>",
+            "description": "<p>白良玉所创之剑法，勇往直前之剑，使用者要心中有着天下无物不可斩的信念，斩天命，破岁月。</p><p><strong>需求：</strong>剑-单剑 <strong>属性：</strong>太极</p>",
             "requirements": "剑-单剑",
             "moves": [
                 {
@@ -2092,8 +2110,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>内力灌注武器。获得“断”状态，持续一回合。在此状态下，招式伤害无视内功防御，攻击距离+4，且最多可以选中三个目标。</p><p><strong>升级：</strong>攻击距离+1，内力消耗+10，合一‘断’状态持续回合+1。</p>",
-                    "automationNote": "点击获得“断”状态（自动计算回合数并赋予无视内功防御效果）。距离增加和多目标选择需手动处理。",
+                    "description": "<p>内力灌注武器。获得两层“断天命”状态。每次出招必须移除一层“断天命”。“断天命”状态时，无法获得“天命”。</p><p><strong>·断天命：</strong>使用《断天命》招式时上升动作等级，招式伤害无视格挡，攻击距离+2，且最多可以选中三个目标。最多叠加三层。</p><p><strong>升级：</strong>攻击距离+1，内力消耗+10，合一后可以移除三层“天命”，获得三层“断天命”。</p>",
+                    "automationNote": "动作等级提升、距离增加、多目标选择交由玩家手动操作。无视格挡已通过脚本自动判定生效。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2115,10 +2133,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得断状态",
+                            "label": "消耗天命校验",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const tianming = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'tianming');\nconst stacks = tianming ? (tianming.getFlag('xjzl-system', 'stacks') || 1) : 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\n\nif (stacks < 2) {\n    args.flags.abort = true;\n    args.flags.abortReason = `施展此招需要至少2层[天命]，当前仅有 ${stacks} 层。`;\n    return;\n}\n\nlet costStacks = 2;\nif (lvl >= 4 && stacks >= 3) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '斩万物 (合一)' },\n        content: `<p>当前拥有 <b>${stacks}</b> 层[天命]。</p><p>要消耗 <b>3层</b> 获得三层[断天命]，还是正常消耗 <b>2层</b>？</p>`,\n        yes: { label: '消耗 3 层', icon: 'fas fa-arrow-up' },\n        no: { label: '消耗 2 层', icon: 'fas fa-check' }\n    });\n    costStacks = confirm ? 3 : 2;\n}\n\n// 记录打算消耗的层数传递给 Hit\nargs.flags.tianmingCost = costStacks;\nawait game.xjzl.api.effects.removeEffect(actor, 'tianming', costStacks);\nactor.showFloatyText(`消耗 ${costStacks} 层天命`, { fill: '#e67e22' });"
+                        },
+                        {
+                            "label": "获得断天命",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 基础1回合，只有达到合一(4级)时才+1回合\nconst rounds = lvl >= 4 ? 2 : 1;\nconst eff = thisItem.effects.getName(\"断\").toObject();\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                            "script": "const costStacks = args.flags.tianmingCost || 2;\nconst eff = thisItem.effects.getName('断天命').toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nawait game.xjzl.api.effects.addEffect(actor, eff, costStacks);"
                         }
                     ]
                 },
@@ -2128,11 +2152,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "range": "4米",
+                    "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>挥舞刺出，剑尖绽放出剑气。对目标造成 0.6 内息点内功伤害。击破架招，目标陷入“禁疗”状态，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4，合一后“禁疗”额外持续一回合。</p>",
-                    "automationNote": "击破架招后自动给目标施加禁疗，合一等级自动延长回合。",
+                    "description": "<p>挥舞刺出，剑尖绽放出剑气。对目标造成 0.6 内息点内功伤害。击破架招，目标陷入“禁疗”状态，持续一回合，并获得一层“天命”。</p><p><strong>·天命：</strong>移除一层“天命”，对抗结果+1（每次至多移除一层），至多获得三层。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击破自动施加禁疗并自身获得一层天命（若无断天命状态）。[天命]的消耗与对抗加值需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2155,10 +2179,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破禁疗",
+                            "label": "击破禁疗与天命",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl >= 4 ? 1 : 0);\n    const jinliao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinliao\"));\n    if (jinliao) {\n        jinliao.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, jinliao);\n        ui.notifications.info(`${args.target.name} 被击破架招，陷入禁疗！`);\n    }\n}"
+                            "script": "if (args.isBroken) {\n    const jinliao = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'jinliao'));\n    if (jinliao) {\n        jinliao.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, jinliao);\n        ui.notifications.info(`${args.target.name} 被击破架招，陷入禁疗！`);\n    }\n    \n    // 检查是否有断天命状态，有则不获得天命\n    const hasDuan = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'duantianming_state');\n    if (!hasDuan) {\n        const eff = thisItem.effects.getName('天命').toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    } else {\n        ui.notifications.warn('处于[断天命]状态中，无法获得[天命]。');\n    }\n}"
                         }
                     ]
                 },
@@ -2171,7 +2195,7 @@
                     "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>看破敌人的虚招时，可消耗反应动作施展此招，剑气穿刺，压制虚招，对目标造成 0.8 内息点内功伤害，并可以消除目标身上一个状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "description": "<p>看破敌人的虚招时，可消耗反应动作施展此招，剑气穿刺，压制虚招，对目标造成 0.7 内息点内功伤害，并可以消除目标身上一个状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
                     "automationNote": "命中后发送卡片提示手动消除目标状态。",
                     "calculation": {
                         "base": 0,
@@ -2179,16 +2203,16 @@
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 0.8
+                                "ratio": 0.7
                             }
                         ]
                     },
                     "costs": {
                         "mp": [
-                            4,
                             8,
                             12,
-                            16
+                            16,
+                            20
                         ],
                         "rage": [],
                         "hp": []
@@ -2208,18 +2232,18 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "range": "5米",
+                    "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>汇聚内力，斩出一道气芒。对目标造成 0.7 内息点内功伤害。命中无架招目标后自身处于‘断’状态，自身进入“幸”状态，持续一回合。</p><p><strong>幸：</strong>任意对抗具有优势。</p><p>当有人在半空中，可消耗反应动作原地释放气浪攻击并击落敌人。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4，合一后“幸”额外持续一回合。</p>",
-                    "automationNote": "命中且目标无架招且自身有[断]时自动获得[幸]状态（回合自动计算）。[幸]的对抗优势需手动。反应动作击落会发送聊天卡片提示手动处理。",
+                    "description": "<p>主要动作，汇聚内力，斩出一道气芒。对目标造成 0.6 内息点内功伤害。命中无架招目标时，获得一层“天命”。</p><p>·当有目标处于半空中，可原地释放剑气，造成伤害并击倒敌人。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "命中且目标无架招自动获取天命（断天命状态下无法获取）。击落半空敌人需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 0.7
+                                "ratio": 0.6
                             }
                         ]
                     },
@@ -2235,10 +2259,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "状态获取与提示",
+                            "label": "天命获取与提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    if (!args.target.system.martial.stanceActive) {\n        const hasDuan = actor.effects.some(e => e.name === \"断\");\n        if (hasDuan) {\n            const lvl = Math.max(1, move.computedLevel || 1);\n            const rounds = 1 + (lvl >= 4 ? 1 : 0);\n            const eff = thisItem.effects.getName(\"幸\").toObject();\n            eff.duration = { rounds: rounds };\n            game.xjzl.api.effects.addEffect(actor, eff);\n        }\n    }\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #e67e22;\"><p><b>除厄运·气浪击落</b><br>若目标在半空中，可消耗反应动作释放气浪将其击落（请手动扣除反应动作及施加倒地状态）。</p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
+                            "script": "if (args.isHit) {\n    if (!args.target.system.martial.stanceActive) {\n        const hasDuan = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'duantianming_state');\n        if (!hasDuan) {\n            const eff = thisItem.effects.getName('天命').toObject();\n            delete eff._id;\n            eff.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(actor, eff);\n        } else {\n            ui.notifications.warn('处于[断天命]状态中，无法获得[天命]。');\n        }\n    }\n    const msg = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 5px; border-left: 3px solid #e67e22;\"><p><b>除厄运·剑气击落</b><br>若目标在半空中，可释放剑气造成伤害将其击倒（请手动施加倒地状态）。</p></div></div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -2249,11 +2273,11 @@
                     "element": "taiji",
                     "damageType": "neigong",
                     "weaponType": "sword",
-                    "range": "10米",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>将‘气’与‘意’完美融合，发出最为强大的一击。对目标造成 0.9 内息点内功伤害。造成伤害后同敌人进行武学内功对抗，成功则对该敌人招式必中，且暴击伤害提高 20%，持续到战斗结束。</p><p><strong>升级：</strong>招式伤害+20，武学内功对抗结果+1，暴击伤害提高 10%，内力消耗+10，怒气-1。</p>",
-                    "automationNote": "造成伤害后自动请求武学内功对抗，成功后自动给目标施加包含暴伤加深的AE（受击暴击时自动增伤）。[必中]效果请在之后攻击该目标时手动勾选。",
+                    "description": "<p>跳到半空中，将‘气’与‘意’完美融合，向下发出最为强大的一击。对目标造成 0.9 内息点内功伤害，并获得两层“断天命”状态。造成伤害后同敌人进行武学内功对抗，成功则对该敌人招式必中，持续到战斗结束。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+10，怒气-1。</p>",
+                    "automationNote": "造成伤害后自动请求对抗并获得两层断天命。对抗成功仅提示，【必中】效果需在后续攻击手动勾选。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -2281,10 +2305,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "对抗与锁定",
+                            "label": "对抗与断天命",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const critBonus = 0.2 + (lvl - 1) * 0.1;\n    \n    const eff = thisItem.effects.getName(\"断天命锁定\").toObject();\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.critBonus\", critBonus);\n    eff.description += ` (受到原施加者暴击时承受额外 ${Math.round(critBonus * 100)}% 基础伤害)`;\n    \n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"wuxue\",\n        label: \"断天命 - 武学对抗\",\n        outcome: {\n            win: {\n                text: `对抗胜利！对 ${args.target.name} 的招式必中(请手动勾选)，且暴击伤害提升。`,\n                targetEffect: eff\n            },\n            lose: {\n                text: \"对抗失败。\"\n            }\n        }\n    });\n}"
+                            "script": "const eff = thisItem.effects.getName('断天命').toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff, 2);\n\nif (args.hpLost > 0 || args.hutiLost > 0) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'wuxue',\n        label: '断天命 - 武学对抗',\n        outcome: {\n            win: {\n                text: `对抗胜利！对 ${args.target.name} 的招式必中，持续到战斗脱离 (请在后续攻击时手动勾选必中)。`\n            },\n            lose: {\n                text: '对抗失败。'\n            }\n        }\n    });\n}"
                         }
                     ]
                 }
@@ -2292,52 +2316,35 @@
         },
         "effects": [
             {
-                "name": "断",
+                "name": "天命",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                "description": "招式伤害无视内功防御，攻击距离+4，最多可选三个目标(距离与多目标需手动)。",
+                "description": "移除一层“天命”，对抗结果+1（每次至多移除一层）。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "duan",
-                        "stackable": false
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.ignoreDefense",
-                        "mode": 5,
-                        "value": "true"
-                    }
-                ]
-            },
-            {
-                "name": "幸",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                "description": "任意对抗具有优势 (请手动应用)。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "xing",
-                        "stackable": false
+                        "slug": "tianming",
+                        "stackable": true,
+                        "maxStacks": 3
                     }
                 },
                 "changes": []
             },
             {
-                "name": "断天命锁定",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                "description": "原施加者对你招式必中 (攻击者需手动勾选)。",
+                "name": "断天命",
+                "icon": "icons/magic/death/skull-energy-light-purple.webp",
+                "description": "使用《断天命》招式时上升动作等级，招式伤害无视格挡，攻击距离+2，且最多可以选中三个目标。每次出招必须移除一层。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "duantianming_lock",
-                        "stackable": false,
+                        "slug": "duantianming_state",
+                        "stackable": true,
+                        "maxStacks": 3,
                         "scripts": [
                             {
-                                "label": "暴伤加深",
-                                "trigger": "preTake",
+                                "label": "出招扣层及招式特化",
+                                "trigger": "attack",
                                 "active": true,
-                                "script": "const originActorUuid = thisEffect.origin.split('.Item.')[0];\nif (args.attacker && args.attacker.uuid === originActorUuid) {\n    if (args.isCrit) {\n        const critBonus = thisEffect.getFlag('xjzl-system', 'critBonus') || 0.2;\n        const extra = Math.floor(args.baseDamage * critBonus);\n        args.output.damage += extra;\n        actor.showFloatyText('天命暴杀', { fill: '#ff0000', fontSize: 24 });\n    }\n}"
+                                "script": "// 1. 判断是否为普通攻击(非趁虚而入)，如果是，直接跳过不扣层\nif (args.move && args.move.id === 'basic-attack') return;\n\n// 2. 排除开启招式自身\nif (args.move && args.move.name === '斩万物') return;\n\n// 3. 扣除层数 (趁虚而入和其他所有武学招式都会扣)\nawait game.xjzl.api.effects.removeEffect(actor, 'duantianming_state', 1);\nactor.showFloatyText('- 断天命', { fill: '#9b59b6' });\n\n// 4. 判断是否是《断天命》的招式，赋予无视格挡特性\nif (args.item && args.item.name === '断天命') {\n    args.flags.ignoreBlock = true;\n    if (args.flags.damageResult) {\n        args.flags.damageResult.breakdown += '\\n【断天命】生效：无视格挡，动作上升，距离+2';\n    }\n}"
                             }
                         ]
                     }
