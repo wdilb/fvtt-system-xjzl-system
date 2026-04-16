@@ -2776,7 +2776,7 @@ export class XJZLActor extends Actor {
     const calcContext = {
       move: virtualMove,
       item: virtualItem,
-      baseData: { base: weaponDmg, rank: rankBonus },
+      baseData: { base: weaponDmg, rank: rankBonus, weapon: weaponDmg, isWeaponMatch: true },
       output: calcOutput
     };
 
