@@ -219,7 +219,7 @@ await Macros.requestSave({
     *   `baseData` (Object, **只读**): 基础数值参考。
         *   `base` (Number): 招式自带的基础伤害 (基础 + 成长 * 等级)。
         *   `weapon` (Number): 武器提供的伤害值 (如未装备匹配武器则为0)。
-        *   `level` (Number): 招式的当前计算等级。
+        *   `level` (Number): 招式的当前计算等级（如果是普通攻击这个参数代表武器等级的加伤）。
         *   `isWeaponMatch` (Bool): 是否装备了符合招式要求的武器。
     *   `output` (Object, **可修改**):
         *   `damage` (Number): 最终计算出的伤害/治疗量。**脚本主要修改此值**。
