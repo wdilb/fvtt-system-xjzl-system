@@ -250,8 +250,8 @@
           "range": "1米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
-          "description": "<p>吐棍伐敌，劲扫目标造成伤害，击破架招时可击倒目标。</p><p>若有敌人在你周身 3 米范围半空中，可消耗反应动作释放此招，飞身（半空中）击敌造成伤害，若击破架招，将其击打坠地。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-          "automationNote": "击破击倒/坠地手动(提示)。",
+          "description": "<p>主要动作，吐棍伐敌，劲扫目标造成伤害，击破架招时可击倒目标。</p><p>若有敌人在你周身 3 米范围半空中，可消耗反应动作释放此招，飞身（半空中）击敌造成伤害，若击破架招，将其击打坠地。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+          "automationNote": "正常流程自动，半空中反应动作施展手动。",
           "calculation": {
             "base": 0,
             "growth": 5,
@@ -271,10 +271,10 @@
           },
           "scripts": [
             {
-              "label": "击倒提示",
+              "label": "击破击倒",
               "trigger": "hit",
-              "script": "if (args.isBroken) {\n    ui.notifications.info(`击破架招！请手动将 ${args.target.name} [击倒/坠地]`);\n}",
-              "active": true
+              "active": true,
+              "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(`击破架招！${args.target.name} 被击倒。`);\n}"
             }
           ]
         },
@@ -2411,7 +2411,7 @@
           "targetInfo": "单体",
           "actionCost": "主要动作",
           "description": "<p>主要动作，呼喝跳打，棍风挥洒，对敌人造成伤害。</p><p>若有敌人在 5 米范围的半空中，可消耗反应动作施展此招，飞身（半空中）冲至目标上方，劈棍下踹，造成伤害并将敌人击倒。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-          "automationNote": "半空反应判定及击倒手动。",
+          "automationNote": "半空反应判定及击倒需手动。",
           "calculation": {
             "base": 0,
             "growth": 10,
@@ -2440,7 +2440,7 @@
           "targetInfo": "单体",
           "actionCost": "主要动作",
           "description": "<p>主要动作，力大无穷，舞棍对敌人造成伤害，击破架招时，使目标下盘不稳两回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-          "automationNote": "击破施加状态自动。",
+          "automationNote": "完全自动化。",
           "calculation": {
             "base": 0,
             "growth": 10,
@@ -2462,8 +2462,8 @@
             {
               "label": "下盘不稳",
               "trigger": "hit",
-              "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
-              "active": true
+              "active": true,
+              "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 下盘不稳！`);\n    }\n}"
             }
           ]
         },
@@ -2477,7 +2477,7 @@
           "targetInfo": "自身",
           "actionCost": "次要动作",
           "description": "<p>次要动作，无法冷静，陷入疯狂，开启架招。格挡成功后，给自身添加一层“疯意”，可叠加三层，持续到战斗脱离。</p><p><strong>疯意：</strong>出招时可消耗一层，使招式伤害+10。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-          "automationNote": "格挡获层自动。",
+          "automationNote": "完全自动化。",
           "calculation": {
             "base": 0,
             "growth": 10
@@ -2493,14 +2493,15 @@
             {
               "label": "格挡获疯意",
               "trigger": "damaged",
-              "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"疯意\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-              "active": true
+              "active": true,
+              "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"疯意\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
             }
           ]
         },
         {
           "name": "疯魔入体",
           "type": "qi",
+          "actionType": "buff",
           "element": "yang",
           "damageType": "none",
           "weaponType": "staff",
@@ -2508,7 +2509,7 @@
           "targetInfo": "自身",
           "actionCost": "主要动作",
           "description": "<p>若气血不足则无法释放，主要动作，心癫目赤，获得 3 怒气，然后将自身气血内力恢复到满值，坠入“疯魔”状态，持续五回合。</p><p><strong>疯魔：</strong>《疯魔杖法》招式伤害+10。持续期间，你受到的伤害和消耗的内力变为原来的三倍，且无法开启架招，即格挡值归零。</p><p>·疯魔结束时，你的怒气归零。</p><p>·疯魔期间陷入濒死，直接进行死亡检定。</p><p>·疯魔持续期间，你无法重复释放【疯魔入体】。</p><p><strong>升级：</strong>疯魔期间受到的伤害和内力消耗减少 50%。</p>",
-          "automationNote": "消耗判断、状态恢复、施加BUFF自动。易伤/内力消耗倍率自动。",
+          "automationNote": "完全自动化。疯魔结束后的怒气归零和陷入濒死时的死亡检定需手动处理。",
           "calculation": {
             "base": 0,
             "growth": 0
@@ -2522,19 +2523,18 @@
           },
           "scripts": [
             {
-              "label": "疯魔判定与消耗",
+              "label": "释放检测与扣血",
               "trigger": "attack",
-              "script": "const hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nif (hp < maxHp * 0.3) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"气血不足 30%\";\n    return;\n}\nconst hasFengmo = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengmo\");\nif (hasFengmo) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已疯魔\";\n    return;\n}\n// 扣除30%血量\nconst cost = Math.floor(maxHp * 0.3);\nawait actor.applyHealing({amount: -cost, type: \"hp\", showScrolling: true});",
-              "active": true
+              "active": true,
+              "script": "const maxHp = actor.system.resources.hp.max;\nconst cost = Math.floor(maxHp * 0.3);\nif (actor.system.resources.hp.value < cost) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"气血不足最大值的 30%，无法施展！\";\n    return;\n}\nconst hasFengmo = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengmo\");\nif (hasFengmo) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已处于疯魔状态，无法重复释放！\";\n    return;\n}\nawait actor.applyHealing({ amount: -cost, type: \"hp\", showScrolling: true });"
             },
             {
-              "label": "状态恢复与应用",
+              "label": "状态恢复与疯魔",
               "trigger": "hit",
-              "script": "// 恢复满状态\nconst maxHp = actor.system.resources.hp.max;\nconst maxMp = actor.system.resources.mp.max;\nawait actor.update({\n    \"system.resources.hp.value\": maxHp,\n    \"system.resources.mp.value\": maxMp,\n    \"system.resources.rage.value\": actor.system.resources.rage.value + 3\n});\n\n// 应用疯魔AE\nconst eff = thisItem.effects.getName(\"疯魔\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 升级逻辑\nconst lvl = Math.max(1, move.computedLevel || 1);\nif (lvl >= 2) {\n    eff.flags[\"xjzl-system\"].level = lvl;\n    eff.description += \" (升级: 惩罚减半)\";\n}\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-              "active": true
+              "active": true,
+              "script": "const maxHp = actor.system.resources.hp.max;\nconst maxMp = actor.system.resources.mp.max;\nconst newRage = Math.min(10, actor.system.resources.rage.value + 3);\nawait actor.update({\n    \"system.resources.hp.value\": maxHp,\n    \"system.resources.mp.value\": maxMp,\n    \"system.resources.rage.value\": newRage\n});\nconst eff = thisItem.effects.getName(\"疯魔\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nif (!eff.flags[\"xjzl-system\"]) eff.flags[\"xjzl-system\"] = {};\nconst lvl = Math.max(1, move.computedLevel || 1);\nif (lvl >= 2) {\n    eff.flags[\"xjzl-system\"].level = lvl;\n    eff.description += \" (升级: 易伤及蓝耗倍率降至1.5倍)\";\n    eff.changes.push({ key: \"flags.xjzl-system.mpCostMultiplier\", mode: 2, value: \"0.5\" });\n} else {\n    eff.changes.push({ key: \"flags.xjzl-system.mpCostMultiplier\", mode: 2, value: \"2\" });\n}\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`${actor.name} 坠入疯魔！`);"
             }
-          ],
-          "actionType": "buff"
+          ]
         },
         {
           "name": "群魔疯舞",
@@ -2547,7 +2547,7 @@
           "targetInfo": "范围",
           "actionCost": "蓄力动作",
           "description": "<p>蓄力动作，心随魔舞，癫狂乱打，对自身周围 3 米敌人造成伤害。</p><p>·自身具有“疯意”时，击飞所有敌人。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，消耗内力+8。</p>",
-          "automationNote": "消耗疯意自动。击飞手动。",
+          "automationNote": "完全自动化。满足条件时自动发送击飞战报。",
           "calculation": {
             "base": 0,
             "growth": 20,
@@ -2572,10 +2572,10 @@
           },
           "scripts": [
             {
-              "label": "消耗疯意",
-              "trigger": "attack",
-              "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyi\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"疯意\" },\n        content: `<p>消耗 [疯意] 击飞敌人？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"否\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"fengyi\", 1);\n        ui.notifications.info(\"疯意爆发，请手动击飞敌人。\")\n    }\n}",
-              "active": true
+              "label": "疯意击飞",
+              "trigger": "hit_once",
+              "active": true,
+              "script": "const hasFengyi = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyi\");\nif (args.flags.usedFengyi || hasFengyi) {\n    if (args.hitCount > 0) {\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c0392b; font-weight:bold; background:rgba(192,57,43,0.1); border-left:4px solid #c0392b;\"><i class=\"fas fa-meteor\"></i> 疯意爆发，力量磅礴倾泻，将所有命中的敌人击飞！</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
             }
           ]
         }
@@ -2583,22 +2583,36 @@
       "effects": [
         {
           "name": "疯意",
-          "icon": "icons/magic/control/fear-fright-white.webp",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
           "description": "出招时可消耗一层，使招式伤害+10。",
           "transfer": false,
           "flags": {
             "xjzl-system": {
               "slug": "fengyi",
               "stackable": true,
-              "maxStacks": 3
+              "maxStacks": 3,
+              "scripts": [
+                {
+                  "label": "疯意加伤预览",
+                  "trigger": "calc",
+                  "active": true,
+                  "script": "args.output.damage += 10; args.output.bonusDesc.push('疯意加伤 +10 (需消耗Buff)');"
+                },
+                {
+                  "label": "询问消耗疯意",
+                  "trigger": "attack",
+                  "active": true,
+                  "script": "const confirm = await foundry.applications.api.DialogV2.confirm({ window: { title: '疯意爆发' }, content: '<p>预计算伤害已包含 <b>+10</b> 疯意加成。</p><p>是否消耗一层 [疯意] 以生效此加成？</p>', yes: { label: '消耗', icon: 'fas fa-check' }, no: { label: '保留', icon: 'fas fa-times' } });\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, 'fengyi', 1);\n    args.flags.usedFengyi = true;\n} else {\n    args.flags.damageResult.damage -= 10;\n    args.flags.damageResult.breakdown += '\\n- 未消耗疯意：移除加成 (-10)';\n}"
+                }
+              ]
             }
           },
           "changes": []
         },
         {
           "name": "疯魔",
-          "icon": "icons/magic/death/skull-energy-light-purple.webp",
-          "description": "伤害+10，易伤/内力消耗增加，禁架。",
+          "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+          "description": "招式伤害+10，受到的伤害和内力消耗倍增，且无法开启架招。",
           "transfer": false,
           "duration": {
             "rounds": 5
@@ -2609,10 +2623,10 @@
               "stackable": false,
               "scripts": [
                 {
-                  "label": "易伤倍率",
+                  "label": "受伤倍率",
                   "trigger": "preTake",
                   "active": true,
-                  "script": "const lvl = thisEffect.getFlag(\"xjzl-system\", \"level\") || 1;\nlet multiplier = 3;\nif (lvl >= 2) multiplier = 1.5;\nargs.output.damage = Math.floor(args.output.damage * multiplier);"
+                  "script": "const lvl = thisEffect.getFlag(\"xjzl-system\", \"level\") || 1;\nconst multiplier = lvl >= 2 ? 1.5 : 3;\nargs.output.damage = Math.floor(args.output.damage * multiplier);"
                 }
               ]
             }
@@ -2629,7 +2643,7 @@
               "value": "0"
             },
             {
-              "key": "system.combat.damages.global.mod",
+              "key": "system.combat.damages.skill.mod",
               "mode": 2,
               "value": "10"
             }
