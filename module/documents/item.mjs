@@ -1629,6 +1629,21 @@ export class XJZLItem extends Item {
         finalCost = { mp: 0, rage: 0, hp: 0 };
       }
 
+      // =====================================================
+      // 资源消耗前置干预 (Trigger: PRE_ATTACK)
+      // 允许脚本在正式扣除资源前，修改 finalCost 对象
+      // =====================================================
+      const preAttackContext = {
+        move: move,
+        item: this,
+        attacker: actor,
+        costConfig: finalCost // 传入引用，脚本内修改 args.costConfig 即可生效
+      };
+
+      // 异步执行
+      await actor.runScripts(SCRIPT_TRIGGERS.PRE_ATTACK, preAttackContext, move);
+      // =====================================================
+
       // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
       if (actor.system.resources.mp.value < finalCost.mp) {
         ui.notifications.warn("内力不足！");
