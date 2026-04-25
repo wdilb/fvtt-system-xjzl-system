@@ -232,6 +232,18 @@ await Macros.requestSave({
 ### B. 战斗决策与交互 (异步阶段)
 > ✅ **提示**: 此阶段及后续阶段**可以使用** `await`。
 
+#### ⏳ `preAttack` (出招前置/减耗)
+*   **时机**: 点击招式按钮并计算出基础消耗后 -> **检查余额与实际扣除资源之前**。
+*   **用途**: 动态修改出招消耗（如“消耗状态层数使怒气消耗-1”）、基于特殊资源的自定义拦截。
+*   **参数 (`args`)**:
+    *   `move` (Object): 当前招式数据。
+    *   `item` (Item): 来源物品。
+    *   `attacker` (Actor): 攻击者实例。
+    *   `costConfig` (Object, **可修改**): 本次出招的预计资源消耗。**脚本直接修改此对象内的数值，即可改变最终扣除量**。
+        *   `mp` (Number): 预计消耗的内力（不能小于0）。
+        *   `hp` (Number): 预计消耗的气血（不能小于0）。
+        *   `rage` (Number): 预计消耗的怒气（不能小于0）。
+
 #### 🎯 `check` (检定修正/比对)
 *   **时机**: 掷骰前，针对**每一个目标**分别运行。
 *   **用途**: 判断“我对这个**特定目标**的命中率/优劣势/穿透”。
@@ -1016,6 +1028,67 @@ if (debuff && args.attacker) {
         fill: "#FFA500", // 橙色
         fontSize: 36
     });
+}
+```
+
+### J. 动态减耗与玩家交互 (新机制)
+> **场景**: 出招前检查自身是否有“剑意”层数。如果有，弹出输入框让玩家自由决定消耗几层。每消耗 1 层“剑意”，招式的内力消耗减少 2 点。
+> **时机**: `preAttack` (专用于正式扣除资源前的拦截)
+
+```javascript
+// 1. 查找目标状态 (如 "剑意")
+const jianyi = actor.effects.find(e => e.getFlag("xjzl-system", "slug") === "jianyi");
+const currentStacks = jianyi ? (jianyi.getFlag("xjzl-system", "stacks") || 1) : 0;
+
+// 当前原本需要消耗的内力
+const currentMpCost = args.costConfig.mp;
+
+// 2. 如果有层数且确实需要耗蓝，进入交互逻辑
+if (currentStacks > 0 && currentMpCost > 0) {
+    // 计算最多能消耗几层 (每层减2蓝，防止玩家多填浪费层数)
+    const maxUsefulSpend = Math.ceil(currentMpCost / 2);
+    const maxSpend = Math.min(currentStacks, maxUsefulSpend);
+    
+    // 3. 构建并呼出原生 Prompt 弹窗
+    const htmlContent = `
+        <div style="margin-bottom: 10px; color: #555;">
+            <p>当前拥有 <b>${currentStacks}</b> 层 [剑意]。</p>
+            <p>本次招式需消耗 <b>${currentMpCost}</b> 点内力。</p>
+            <p style="color:#e67e22;">每消耗 1 层剑意，内力消耗 -2。</p>
+        </div>
+        <div class="form-group">
+            <label style="font-weight:bold;">选择消耗层数 (0-${maxSpend}):</label>
+            <input type="number" name="spendCount" value="${maxSpend}" min="0" max="${maxSpend}" style="text-align:center;">
+        </div>
+    `;
+    
+    const spendResult = await foundry.applications.api.DialogV2.prompt({
+        window: { title: "剑意勃发 - 减耗选择", icon: "fas fa-fire" },
+        content: htmlContent,
+        ok: {
+            label: "确认",
+            icon: "fas fa-check",
+            callback: (event, button) => {
+                // 提取玩家输入的值
+                const fd = new FormData(button.form);
+                return parseInt(fd.get("spendCount")) || 0;
+            }
+        },
+        rejectClose: false // 允许点X关闭 (返回null)
+    });
+    
+    // 4. 根据玩家选择执行减耗
+    if (spendResult && spendResult > 0) {
+        const finalSpend = Math.min(spendResult, maxSpend); // 二次防呆
+        
+        // 移除对应层数的 Buff
+        await game.xjzl.api.effects.removeEffect(actor, "jianyi", finalSpend);
+        
+        // ✨核心：直接修改上下文中的预计消耗值
+        args.costConfig.mp = Math.max(0, currentMpCost - (finalSpend * 2));
+        
+        ui.notifications.info(`已消耗 ${finalSpend} 层剑意，内力消耗减少 ${finalSpend * 2} 点！`);
+    }
 }
 ```
 
