@@ -1073,6 +1073,38 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
 });
 
 /**
+ * 监听战斗结束 (脱战)
+ * 作用：自动清空所有参战角色的怒气
+ */
+Hooks.on("deleteCombat", async (combat, options, userId) => {
+    // 这里确保只让“触发删除操作的用户（通常是GM）”来执行数据库写操作，防止并发冲突。
+    if (game.user.id !== userId) return;
+
+    let hasUpdated = false;
+
+    // 遍历战斗追踪器中的所有参战者
+    for (const combatant of combat.combatants) {
+        // combatant.actor 是一个智能指针，可以处理关联和非关联的问题
+        const actor = combatant.actor;
+
+        // 安全检查：角色存在，且有资源结构，且怒气大于 0
+        if (actor && actor.system.resources?.rage?.value > 0) {
+            
+            // 执行更新
+            await actor.update({
+                "system.resources.rage.value": 0
+            });
+            hasUpdated = true;
+        }
+    }
+
+    // 给予 GM 视觉反馈
+    if (hasUpdated) {
+        ui.notifications.info("脱离战斗：所有参战角色的怒气已自动清零。");
+    }
+});
+
+/**
  * 处理 Token 删除
  */
 Hooks.on("deleteToken", (tokenDoc, options, userId) => {
