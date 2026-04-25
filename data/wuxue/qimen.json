@@ -2884,11 +2884,11 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招时，可消耗反应动作使用此招，压制对方虚招，拨动弓弦，射出内息滚滚，对周围敌人造成 0.7 力量点内功伤害，并将他们击飞 5 米。</p><p><strong>升级：</strong>招式伤害+10，击飞距离+2，消耗+8。</p>",
-                    "automationNote": "击飞手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2906,19 +2906,27 @@
                             24,
                             32
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "击飞通报",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dist = 5 + (lvl - 1) * 2;\nconst cardContent = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 8px;\">\n    <div style=\"border-left: 4px solid #e67e22; background: rgba(230, 126, 34, 0.1); padding: 5px; margin-left: 2px;\">\n        <div style=\"font-weight:bold; color:#d35400; font-size:1.1em;\">\n            <i class=\"fas fa-wind\"></i> 狂风过境，击飞！\n        </div>\n        <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n            强大的内息滚滚而出，将 <b>${args.target.name}</b> 击飞 <span style=\"font-weight:bold; color:#d35400;\">${dist}</span> 米！\n        </div>\n    </div>\n</div>`;\nChatMessage.create({\n    content: cardContent,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                        }
+                    ]
                 },
                 {
                     "name": "持节镇堂",
                     "type": "stance",
                     "element": "yin",
-                    "damageType": "none",
+                    "damageType": "waigong",
                     "weaponType": "special",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>提弓于臂，开启架招。每次格挡成功后获得一层“持节”，最多叠加五层，持续到战斗脱离或解除架招。</p><p><strong>持节：</strong>每层增加《天狼箭》招式释放距离 2 米。</p><p><strong>升级：</strong>格挡值+10，每层“持节”再加 1 米释放距离，消耗+4。</p>",
-                    "automationNote": "格挡叠层自动。距离增加需玩家手动参考。",
+                    "description": "<p>次要动作，提弓于臂，开启架招。每次格挡成功后获得一层“持节”，最多叠加五层，持续到战斗脱离或解除架招。</p><p><strong>持节：</strong>每层增加《天狼箭》招式释放距离 2 米。</p><p><strong>升级：</strong>格挡值+10，每层“持节”再加 1 米释放距离，消耗+4。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2935,8 +2943,8 @@
                         {
                             "label": "格挡叠层",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"持节\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effObj = thisItem.effects.getName(\"持节\");\nif (effObj) {\n    const eff = effObj.toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    // 【正确读取自身架招等级】\n    const stanceId = actor.system.martial.stance;\n    const myStance = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = myStance ? Math.max(1, myStance.computedLevel || 1) : 1;\n    \n    const bonusDist = 2 + (lvl - 1);\n    eff.description += ` (当前效果: 每层增加射程 ${bonusDist} 米)`;\n    \n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
                         }
                     ]
                 },
@@ -2946,11 +2954,11 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>雄健豪放，对敌人造成 0.6 力量点内功伤害，并获得一层“持节”，若目标无架招，额外获得一层。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "获层自动。",
+                    "description": "<p>主要动作，雄健豪放，对敌人造成 0.6 力量点内功伤害，并获得一层“持节”，若目标无架招，额外获得一层。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2971,10 +2979,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得持节",
+                            "label": "命中获层",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"持节\").toObject();\nlet stacks = 1;\nif (!args.target.system.martial.stanceActive) stacks++;\n\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nlet stacks = 1;\nif (!args.target.system.martial?.stanceActive) stacks++;\n\nconst effObj = thisItem.effects.getName(\"持节\");\nif (effObj) {\n    const eff = effObj.toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    let bonusDist = 2;\n    const stanceMove = thisItem.system.moves.find(m => m.name === \"持节镇堂\");\n    if (stanceMove) {\n        const lvl = Math.max(1, stanceMove.computedLevel || 1);\n        bonusDist = 2 + (lvl - 1);\n    }\n    eff.description += ` (当前效果: 每层增加射程 ${bonusDist} 米)`;\n    \n    await game.xjzl.api.effects.addEffect(actor, eff, stacks);\n    if (stacks > 1) actor.showFloatyText(\"破绽！额外获持节\", {fill: \"#3498db\"});\n}"
                         }
                     ]
                 },
@@ -2985,11 +2993,11 @@
                     "element": "yin",
                     "damageType": "none",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "范围友方",
                     "actionCost": "次要动作",
-                    "description": "<p>凝弓运气，消耗 5 层“持节”，为范围内友方增加 1 点怒气，并为其添加一层“劲气”。</p><p><strong>劲气：</strong>每层提高招式伤害 10 点。</p><p><strong>升级：</strong>减少一层“持节”消耗，消耗+4。</p>",
-                    "automationNote": "消耗持节自动。回复怒气/添加劲气自动（对选中目标）。",
+                    "description": "<p>次要动作，凝弓运气，消耗 5 层“持节”，为范围内友方增加 1 点怒气，并为其添加一层“劲气”。</p><p><strong>劲气：</strong>每层提高招式伤害 10 点。</p><p><strong>升级：</strong>减少一层“持节”消耗，消耗+4。</p>",
+                    "automationNote": "完全自动化。出招前自动检查/扣除持节，并发送全局提示卡片。若提前选中了队友，将自动发放怒气与劲气；若忘记选中，队友可根据卡片提示手动添加。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -3004,10 +3012,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗与增益",
+                            "label": "消耗与全局广播",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 1. 检查并消耗持节\nconst chijie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chijie\");\nconst currentStacks = chijie ? (chijie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst cost = Math.max(0, 5 - (lvl - 1));\n\nif (currentStacks < cost) {\n    args.flags.abort = true;\n    args.flags.abortReason = `持节层数不足！(需要 ${cost} 层，当前 ${currentStacks} 层)`;\n    return;\n}\nif (cost > 0) {\n    await game.xjzl.api.effects.removeEffect(actor, \"chijie\", cost);\n    actor.showFloatyText(`消耗 ${cost} 层持节`, { fill: \"#3498db\" });\n}\n\n// 2. 发送全局提示卡片 (防止玩家忘记选中目标)\nconst cardContent = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 8px;\">\n    <div style=\"border-left: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.1); padding: 5px; margin-left: 2px;\">\n        <div style=\"font-weight:bold; color:#27ae60; font-size:1.1em;\">\n            <i class=\"fas fa-arrow-up\"></i> 劲气勃发！\n        </div>\n        <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n            <b>${actor.name}</b> 施展了西北望，范围内的友方受到鼓舞！<br>\n            <span style=\"color:#d35400; font-weight:bold;\">效果：恢复 1 点怒气，获得 1 层 [劲气]。</span><br>\n            <hr style=\"border:0; border-top:1px dashed #ccc; margin:5px 0;\">\n            <span style=\"color:#888; font-size:0.85em;\">注：请选择需要生效的目标然后点击应用效果。</span>\n        </div>\n    </div>\n</div>`;\nChatMessage.create({\n    content: cardContent,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                        },
+                        {
+                            "label": "自动增益发放",
                             "trigger": "hit",
-                            "script": "// 消耗持节\nconst chijie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chijie\");\nconst currentStacks = chijie ? (chijie.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst cost = 5 - (lvl - 1);\n\nif (currentStacks < cost) return ui.notifications.warn(`持节层数不足 (需 ${cost})`);\n\nawait game.xjzl.api.effects.removeEffect(actor, \"chijie\", cost);\n\n// 增益目标\nawait game.xjzl.api.effects.addEffect(args.target, \"jinqi_stack\");\nawait args.target.applyHealing({ amount: 1, type: \"rage\", showScrolling: true });",
-                            "active": true
+                            "active": true,
+                            "script": "// 为乖乖被选中的目标自动发放增益\nawait args.target.applyHealing({ amount: 1, type: \"rage\", showScrolling: true });\nconst jinqi = CONFIG.statusEffects.find(e => e.id === \"jinqi_stack\");\nif (jinqi) await game.xjzl.api.effects.addEffect(args.target, jinqi);"
                         }
                     ]
                 },
@@ -3018,11 +3032,11 @@
                     "element": "yin",
                     "damageType": "neigong",
                     "weaponType": "special",
-                    "range": "25",
+                    "range": "25米",
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
-                    "description": "<p>弯弓满月，对一条线上所有敌人造成 0.8 力量点内功伤害。</p><p>·若有敌人处于半空中，可消耗反应动作释放此招，对目标直线上所有敌人造成伤害，击落半空敌人并击破其架招。</p><p>·可以消耗一层“持节”，使怒气消耗减少 1 点。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+16。</p>",
-                    "automationNote": "击落破架手动。持节减怒手动（请玩家自行调整怒气）。",
+                    "description": "<p>蓄力动作，弯弓满月，对一条线上所有敌人造成 0.8 力量点内功伤害。</p><p>·若有敌人处于半空中，可消耗反应动作释放此招，对目标直线上所有敌人造成伤害，击落半空敌人并击破其架招。</p><p>·可以消耗一层或多层“持节”，每层使怒气消耗减少 1 点。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+16。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -3046,13 +3060,39 @@
                             6,
                             5
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "战前自由减怒",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "const chijie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chijie\");\nconst currentStacks = chijie ? (chijie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst currentRageCost = args.costConfig.rage;\n\nif (currentStacks > 0 && currentRageCost > 0) {\n    const maxSpend = Math.min(currentStacks, currentRageCost);\n    const htmlContent = `\n        <div style=\"margin-bottom: 10px; font-size: 0.9em; color: #555;\">\n            <p>当前拥有 <b>${currentStacks}</b> 层 [持节]。</p>\n            <p>本次绝招需消耗 <b>${currentRageCost}</b> 点怒气。</p>\n            <p style=\"color:#e67e22;\">每消耗 1 层持节，怒气消耗 -1。</p>\n        </div>\n        <div class=\"form-group\">\n            <label style=\"font-weight:bold;\">选择消耗层数 (0-${maxSpend}):</label>\n            <input type=\"number\" name=\"spendCount\" value=\"${maxSpend}\" min=\"0\" max=\"${maxSpend}\" style=\"text-align:center; background:rgba(0,0,0,0.05);\">\n        </div>\n    `;\n    \n    const spendResult = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"射天狼 - 减耗选择\", icon: \"fas fa-bow-arrow\" },\n        content: htmlContent,\n        ok: {\n            label: \"确认\",\n            icon: \"fas fa-check\",\n            callback: (event, button) => {\n                const fd = new FormData(button.form);\n                return parseInt(fd.get(\"spendCount\")) || 0;\n            }\n        },\n        rejectClose: false\n    });\n    \n    if (spendResult && spendResult > 0) {\n        const finalSpend = Math.min(spendResult, maxSpend);\n        await game.xjzl.api.effects.removeEffect(actor, \"chijie\", finalSpend);\n        args.costConfig.rage -= finalSpend;\n        ui.notifications.info(`已消耗 ${finalSpend} 层持节，怒气消耗减少 ${finalSpend} 点！`);\n    }\n}"
+                        },
+                        {
+                            "label": "半空追击判定",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"射天狼 - 对空打击\" },\n    content: `<p>是否消耗<b>反应动作</b>对半空中的敌人施展此招？</p>`,\n    yes: { label: \"是 (将击落并破架)\", icon: \"fas fa-plane-slash\" },\n    no: { label: \"否 (常规蓄力)\", icon: \"fas fa-bow-arrow\" }\n});\nif (confirm) {\n    actor._tianlangMidAir = true; // 挂载在 actor 的瞬时内存中\n    ui.notifications.info(\"已消耗反应动作，本次攻击附带击落与破甲效果。\");\n}"
+                        },
+                        {
+                            "label": "对空破架结算",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !actor._tianlangMidAir) return; // 读取瞬时内存\n\nif (args.target.system.martial?.stanceActive) {\n    await args.target.update({ \"system.martial.stanceActive\": false });\n    const pofang = CONFIG.statusEffects.find(e => e.id === \"pofang\");\n    if (pofang) await game.xjzl.api.effects.addEffect(args.target, pofang);\n}\n\nconst prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\nif (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n\nconst cardContent = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 8px;\">\n    <div style=\"border-left: 4px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px; margin-left: 2px;\">\n        <div style=\"font-weight:bold; color:#c0392b; font-size:1.1em;\">\n            <i class=\"fas fa-fighter-jet\"></i> 击落！\n        </div>\n        <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n            箭如流星，将半空中的 <b>${args.target.name}</b> 狠狠击落并贯穿其架势！\n        </div>\n    </div>\n</div>`;\nChatMessage.create({\n    content: cardContent,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                        },
+                        {
+                            "label": "标记清理",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "delete actor._tianlangMidAir;"
+                        }
+                    ]
                 }
             ],
             "effects": [
                 {
                     "name": "持节",
-                    "icon": "icons/weapons/bows/bow-composite-engraved-gold.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                     "description": "增加天狼箭距离。",
                     "transfer": false,
                     "flags": {
