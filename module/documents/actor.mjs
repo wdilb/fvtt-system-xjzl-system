@@ -2769,7 +2769,8 @@ export class XJZLActor extends Actor {
     const calcOutput = {
       damage: preScriptDmg,
       feint: 0,
-      bonusDesc: []
+      bonusDesc: [],
+      feintBonusDesc: [] // 让参数与招式保持一致
     };
 
     // 注入 item 到上下文
