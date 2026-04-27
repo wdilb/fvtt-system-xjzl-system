@@ -1253,7 +1253,7 @@
             "sect": "jianghushili",
             "description": "<p>脱胎于《玉清无上灵宝自然北斗本真经》，传承斗姆星君，掌北斗星力，功法以参悟星辰运转为引，运功之时可引星辰之力，加持己身。</p>",
             "requirement": "悟性15",
-            "automationNote": "1. 北斗七星：回合开始自动获得层数。\n2. 额外伤害：出招命中后自动结算流失伤害。",
+            "automationNote": "完全自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1264,20 +1264,20 @@
                         "qigan": 30,
                         "shencai": 15
                     },
-                    "description": "<p>领悟特效：回合开始时，获得1层“北斗七星”状态，至多七层，持续到战斗脱离。北斗七星：造成伤害后，你每有1层北斗七星，星辰之力侵袭，使目标流失10点气血。</p>",
+                    "description": "<p>领悟特效：回合开始时，获得1层“北斗七星”状态，至多七层，持续到战斗脱离。<br>北斗七星：造成伤害后，你每有1层北斗七星，星辰之力侵袭，使目标流失10点气血。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "北斗星力",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const effect = thisItem.effects.getName('北斗七星');\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject());"
+                            "script": "const effect = thisItem.effects.getName('北斗七星');\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject(), 1);"
                         },
                         {
                             "label": "星力侵袭",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'beidou');\nif (effect && effect.stacks > 0) {\n    const dmg = effect.stacks * 10;\n    await args.target.applyDamage({ amount: dmg, type: 'liushi', isHit: true });\n}"
+                            "script": "if (!args.isHit || !args.finalDamage || args.finalDamage <= 0) return;\n\nconst effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'beidou');\nif (effect) {\n    const stacks = effect.getFlag('xjzl-system', 'stacks') || 1;\n    const dmg = stacks * 10;\n    \n    await args.target.applyDamage({ \n        amount: dmg, \n        type: 'liushi', \n        attacker: actor,\n        isHit: true, \n        ignoreDefense: true \n    });\n\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1); padding: 5px 8px; border-radius: 2px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-star\"></i> 北斗七星 · 星力侵袭</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">星辰之力随招式爆发，目标额外流失 <span style=\"color:#c0392b; font-weight:bold;\">${dmg}</span> 点气血！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -1290,20 +1290,20 @@
                         "qigan": 60,
                         "shencai": 30
                     },
-                    "description": "<p>小成特效：回合开始时，获得2层“北斗七星”状态，至多七层，持续到战斗脱离。北斗七星：造成伤害后，你每有1层北斗七星，星辰之力侵袭，使目标流失10点气血。</p>",
+                    "description": "<p>小成特效：回合开始时，获得2层“北斗七星”状态，至多七层，持续到战斗脱离。<br>北斗七星：造成伤害后，你每有1层北斗七星，星辰之力侵袭，使目标流失10点气血。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "北斗星力II",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const effect = thisItem.effects.getName('北斗七星');\nif (effect) {\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n}"
+                            "script": "const effect = thisItem.effects.getName('北斗七星');\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject(), 2);"
                         },
                         {
                             "label": "星力侵袭II",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'beidou');\nif (effect && effect.stacks > 0) {\n    const dmg = effect.stacks * 10;\n    await args.target.applyDamage({ amount: dmg, type: 'liushi', isHit: true });\n}"
+                            "script": "if (!args.isHit || !args.finalDamage || args.finalDamage <= 0) return;\n\nconst effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'beidou');\nif (effect) {\n    const stacks = effect.getFlag('xjzl-system', 'stacks') || 1;\n    const dmg = stacks * 10;\n    \n    await args.target.applyDamage({ \n        amount: dmg, \n        type: 'liushi', \n        attacker: actor,\n        isHit: true, \n        ignoreDefense: true \n    });\n\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1); padding: 5px 8px; border-radius: 2px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-star\"></i> 北斗七星 · 星力侵袭</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">星辰之力随招式爆发，目标额外流失 <span style=\"color:#c0392b; font-weight:bold;\">${dmg}</span> 点气血！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -1316,20 +1316,20 @@
                         "qigan": 90,
                         "shencai": 45
                     },
-                    "description": "<p>圆满特效：回合开始时，获得3层“北斗七星”状态，至多七层，持续到战斗脱离。<br>北斗七星：造成伤害后，你每有1层北斗七星，星辰之力侵袭，使目标流失10点气血。</p><p>修满特效：修满[永久]：气血+60，内力+60，气感+10。</p>",
+                    "description": "<p>圆满特效：回合开始时，获得3层“北斗七星”状态，至多七层，持续到战斗脱离。<br>北斗七星：造成伤害后，你每有1层北斗七星，星辰之力侵袭，使目标流失10点气血。</p><p>修满[永久]：气血+60，内力+60，气感+10。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "北斗星力III",
                             "trigger": "turnStart",
                             "active": true,
-                            "script": "const effect = thisItem.effects.getName('北斗七星');\nif (effect) {\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n}"
+                            "script": "const effect = thisItem.effects.getName('北斗七星');\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject(), 3);"
                         },
                         {
                             "label": "星力侵袭III",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'beidou');\nif (effect && effect.stacks > 0) {\n    const dmg = effect.stacks * 10;\n    await args.target.applyDamage({ amount: dmg, type: 'liushi', isHit: true });\n}"
+                            "script": "if (!args.isHit || !args.finalDamage || args.finalDamage <= 0) return;\n\nconst effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'beidou');\nif (effect) {\n    const stacks = effect.getFlag('xjzl-system', 'stacks') || 1;\n    const dmg = stacks * 10;\n    \n    await args.target.applyDamage({ \n        amount: dmg, \n        type: 'liushi', \n        attacker: actor,\n        isHit: true, \n        ignoreDefense: true \n    });\n\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1); padding: 5px 8px; border-radius: 2px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-star\"></i> 北斗七星 · 星力侵袭</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">星辰之力随招式爆发，目标额外流失 <span style=\"color:#c0392b; font-weight:bold;\">${dmg}</span> 点气血！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 }
