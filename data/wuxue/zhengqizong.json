@@ -245,58 +245,12 @@
         "name": "寒门笔法",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/正气.png",
-        "effects": [
-            {
-                "name": "苦读",
-                "icon": "icons/svg/book.svg",
-                "description": "受到内外功伤害时，减免 5 点。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "kudu",
-                        "stackable": false
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "system.combat.resistances.waigong.mod",
-                        "mode": 2,
-                        "value": "5"
-                    },
-                    {
-                        "key": "system.combat.resistances.neigong.mod",
-                        "mode": 2,
-                        "value": "5"
-                    }
-                ]
-            },
-            {
-                "name": "及第",
-                "icon": "icons/svg/sun.svg",
-                "description": "书写等级低于你的目标，对你造成的内外功伤害降低 20 点。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "jidi",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "及第减伤",
-                                "trigger": "preTake",
-                                "active": true,
-                                "script": "const attackerShuxie = args.attacker.system.skills?.shuxie?.total || 0;\nconst myShuxie = actor.system.skills?.shuxie?.total || 0;\nif (attackerShuxie < myShuxie) {\n    args.output.damage = Math.max(0, args.output.damage - 20);\n    ui.notifications.info(\"及第生效：伤害减免 20\");\n}"
-                            }
-                        ]
-                    }
-                }
-            }
-        ],
         "system": {
             "sect": "zhengqizong",
             "category": "wuxue",
             "tier": 1,
-            "description": "<p>书生意气，自强不息，只待金榜题名，天下皆闻。<br>需求：匕首-笔 属性：太极</p>",
-            "requirements": "<p>需求：匕首-笔</p>",
+            "description": "<p>书生意气，自强不息，只待金榜题名，天下皆闻。</p><p><strong>需求：</strong>匕首-笔</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "匕首-笔",
             "moves": [
                 {
                     "name": "十年寒窗",
@@ -307,8 +261,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>执笔定心，开启架招，进入“苦读”，持续到战斗脱离或解除架招。<br>苦读：你受到内外功伤害时，减免 5 点。</p>",
-                    "requirements": "匕首-笔",
+                    "description": "<p>执笔定心，开启架招，进入“苦读”，持续到战斗脱离或解除架招。</p><p><strong>苦读：</strong>你受到内外功伤害时，减免 5 点。</p><p><strong>升级:</strong>格挡值+5，内力消耗+1。</p>",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -328,10 +281,10 @@
                             "label": "开启苦读",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const source = thisItem.effects.getName(\"苦读\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n\n    // 动态注入：被破防时移除特效的逻辑\n    const breakScript = {\n        label: \"架招击破移除\",\n        trigger: \"damaged\",\n        active: true,\n        script: \"if (args.isBroken) await thisEffect.delete();\"\n    };\n\n    // 合并脚本\n    let scripts = effectData.flags?.[\"xjzl-system\"]?.scripts || [];\n    if (typeof scripts === 'object' && !Array.isArray(scripts)) scripts = Object.values(scripts);\n    scripts.push(breakScript);\n    foundry.utils.setProperty(effectData, \"flags.xjzl-system.scripts\", scripts);\n\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"开启架招：进入苦读状态\");\n}"
+                            "script": "const eff = thisItem.effects.getName(\"苦读\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"苦读\", { fill: \"#1565c0\" });"
                         }
                     ],
-                    "automationNote": "完全自动化。被击破架招会自动解除。手动解除架招请手动删除BUFF。"
+                    "automationNote": "完全自动化。被击破架招会自动解除并移除苦读。"
                 },
                 {
                     "name": "好学不倦",
@@ -342,8 +295,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>挥笔敲打，对目标造成 0.4 力量点外功伤害。<br>·若自身存在“苦读”，向对方念诵一句诗，对方进行[书写]检定（难度 13），成功或对方知道这句诗则无事，失败或没听过则招式伤害+5。</p>",
-                    "requirements": "<p>需求：匕首-笔</p>",
+                    "description": "<p>挥笔敲打，对目标造成 0.4 力量点外功伤害。</p><p>·若自身存在“苦读”，向对方念诵一句诗，对方进行[书写]检定（难度 13），成功或对方知道这句诗则无事，失败或没听过则招式伤害+5。</p><p><strong>升级：</strong>招式伤害+5，念诗伤害再+5，内力消耗+1。</p>",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -365,13 +317,13 @@
                     },
                     "scripts": [
                         {
-                            "label": "念诗判定",
+                            "label": "念诗判定与自动伤害",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasKudu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kudu\");\nif (hasKudu) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"shuxie\",\n        dc: 13,\n        label: \"对诗检定 (失败请手动应用额外伤害)\"\n    });\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const extraDmg = 5 + (lvl - 1) * 5;\n    ui.notifications.info(`若对方对诗失败，请手动对其造成额外 ${extraDmg} 点伤害。`);\n}"
+                            "script": "if (!args.isHit) return;\nconst hasKudu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kudu\");\nif (hasKudu) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const extraDmg = 5 + (lvl - 1) * 5;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"shuxie\",\n        dc: 13,\n        label: \"好学不倦 - 对诗检定\",\n        damageOnFail: { value: extraDmg, type: \"waigong\" },\n        failureText: `对方未听过此诗，心神失守，受到额外的 ${extraDmg} 点外功伤害！`,\n        successText: \"对方从容接上诗句，化解了攻势。\"\n    });\n}"
                         }
                     ],
-                    "automationNote": "部分自动化：自动发起检定请求。额外伤害需手动应用。"
+                    "automationNote": "完全自动化：自动发起检定，若失败自动应用额外外功伤害。"
                 },
                 {
                     "name": "悬梁刺股",
@@ -382,8 +334,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>笔戳其股，对目标造成 0.3 力量点外功伤害。击破架招时，使目标倒地并陷入“下盘不稳”，持续一回合。</p>",
-                    "requirements": "<p>需求：匕首-笔</p>",
+                    "description": "<p>笔戳其股，对目标造成 0.3 力量点外功伤害。击破架招时，使目标倒地并陷入“下盘不稳”，持续一回合。</p><p><strong>升级:</strong>招式伤害+5，内力消耗+1。</p>",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -405,13 +356,13 @@
                     },
                     "scripts": [
                         {
-                            "label": "刺股特效",
+                            "label": "击破倒地与下盘不稳",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n    ui.notifications.info(`${args.target.name} 悬梁刺股！`);\n}"
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: 1 } });\n    actor.showFloatyText(\"悬梁刺股！\", { fill: \"#FFA500\" });\n}"
                         }
                     ],
-                    "automationNote": "完全自动化：击破架招自动添加倒地和下盘不稳状态。"
+                    "automationNote": "完全自动化：击破架招自动添加倒地，和持续 1 回合的下盘不稳。"
                 },
                 {
                     "name": "凿壁借光",
@@ -422,8 +373,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，笔锋连点，对其造成 0.5 力量点外功伤害，并添加一层“流血”，持续到战斗脱离。</p>",
-                    "requirements": "<p>需求：匕首-笔</p>",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，笔锋连点，对其造成 0.5 力量点外功伤害，并添加一层“流血”，持续到战斗脱离。</p><p><strong>升级:</strong>招式伤害+5，内力消耗+1。</p>",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -448,7 +398,7 @@
                             "label": "添加流血",
                             "trigger": "hit",
                             "active": true,
-                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");"
+                            "script": "if (args.isHit) await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");"
                         }
                     ],
                     "automationNote": "完全自动化。"
@@ -463,8 +413,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>提笔挥毫，一鸣惊人，对目标造成 0.6 力量点外功伤害。<br>·若自身存在“苦读”，移除“苦读”，获得“及第”，持续到战斗脱离。<br>及第：[书写]等级低于你的目标，对你造成的内外功伤害降低 20 点。</p>",
-                    "requirements": "<p>需求：匕首-笔</p>",
+                    "description": "<p>提笔挥毫，一鸣惊人，对目标造成 0.6 力量点外功伤害。</p><p>·若自身存在“苦读”，移除“苦读”，获得“及第”，持续到战斗脱离。</p><p><strong>及第：</strong>[书写]等级低于你的目标，对你造成的内外功伤害降低 20 点。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -493,13 +442,67 @@
                             "label": "及第转换",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const kuduEffect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kudu\");\nif (kuduEffect) {\n    await kuduEffect.delete();\n    const source = thisItem.effects.getName(\"及第\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"金榜题名！苦读转化为及第！\");\n    }\n}"
+                            "script": "if (!args.isHit) return;\nconst kuduEffect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kudu\");\nif (kuduEffect) {\n    await kuduEffect.delete();\n    const source = thisItem.effects.getName(\"及第\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        actor.showFloatyText(\"金榜题名!\", { fill: \"#FFD700\" });\n    }\n}"
                         }
                     ],
                     "automationNote": "完全自动化：移除苦读并添加及第状态，及第状态内置脚本自动处理伤害减免。"
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "苦读",
+                "icon": "icons/svg/book.svg",
+                "description": "受到内外功伤害时，减免 5 点。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kudu",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "架招击破移除",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "if (args.isBroken) await thisEffect.delete();"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.resistances.waigong.mod",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.resistances.neigong.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "及第",
+                "icon": "icons/svg/sun.svg",
+                "description": "[书写]等级低于你的目标，对你造成的内外功伤害降低 20 点。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "jidi",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "及第减伤",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "if ([\"waigong\", \"neigong\"].includes(args.type)) {\n    const attackerShuxie = args.attacker?.system?.skills?.shuxie?.total || 0;\n    const myShuxie = actor.system.skills?.shuxie?.total || 0;\n    if (attackerShuxie < myShuxie) {\n        args.output.damage = Math.max(0, args.output.damage - 20);\n        actor.showFloatyText(\"及第减伤\", { fill: \"#1565c0\", fontSize: 24 });\n    }\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     },
     {
         "name": "知行剑法",
