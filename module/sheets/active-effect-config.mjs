@@ -43,6 +43,7 @@ export class XJZLActiveEffectConfig extends ActiveEffectConfig {
                 autoSlug: effect.name ? (typeof effect.name.slugify === 'function' ? effect.name.slugify() : effect.name) : "auto-slug",
                 isStackable: !!flags.stackable,
                 maxStacks: maxStacks,
+                isTiedToStance: !!flags.tiedToStance, //是否随架招解除
                 scripts: scripts,
                 triggerChoices: TRIGGER_CHOICES
             }

@@ -1224,7 +1224,8 @@ export class ChatCardManager {
             if (isHit && isBroken && targetActor.system.martial.stanceActive) {
 
                 // A. 判定失败：移除架招状态
-                await ChatCardManager._safeUpdateDocument(targetActor, { "system.martial.stanceActive": false });
+                // 改为调用stopStance，可以自动化处理持续到架招结束的ae
+                await targetActor.stopStance();
                 // B. 应用 "破防" 状态
                 // 从配置中获取标准数据
                 const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
@@ -1674,7 +1675,8 @@ export class ChatCardManager {
             // =====================================================
             if (isHit && config.isBroken && targetActor.system.martial?.stanceActive) {
                 // A. 移除架招状态
-                await ChatCardManager._safeUpdateDocument(targetActor, { "system.martial.stanceActive": false });
+                // 改为调用stopStance，可以自动化处理持续到架招结束的ae
+                await targetActor.stopStance();
 
                 // B. 应用 "破防" 状态
                 const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");

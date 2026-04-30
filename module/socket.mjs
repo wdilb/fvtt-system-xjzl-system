@@ -11,6 +11,7 @@ export function setupSocket() {
     xjzlSocket.register("updateDocument", _socketUpdateDocument);
     xjzlSocket.register("createEmbedded", _socketCreateEmbedded);
     xjzlSocket.register("deleteEmbedded", _socketDeleteEmbedded);
+    xjzlSocket.register("stopStance", _socketStopStance);
 
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
@@ -41,7 +42,7 @@ async function _socketApplyHealing(targetUuid, data) {
     return await target.applyHealing(data);
 }
 
-async function _socketAddEffect(targetUuid, effectData, count) { 
+async function _socketAddEffect(targetUuid, effectData, count) {
     // 在此拦截：如果有多个GM 在线，只有 1 个会通过这个判断
     if (isNotActiveGM()) return null;
     const target = await fromUuid(targetUuid);
@@ -112,4 +113,25 @@ async function _socketShowScrollingText(tokenUuid, text, settings) {
     // 4. 执行渲染
     // 使用 interface.createScrollingText 确保是 UI 层面的绘制
     canvas.interface.createScrollingText(tokenObject.center, text, settings);
+}
+
+/**
+ * 执行解除架招
+ * @param {string} targetUuid
+ */
+async function _socketStopStance(targetUuid) {
+    if (isNotActiveGM()) return null;
+
+    // 1. 获取文档
+    const targetDoc = await fromUuid(targetUuid);
+    if (!targetDoc) return null;
+
+    // 2. 兼容关联Actor与不关联Token
+    // 如果 targetDoc 是 TokenDocument，取它的 .actor；否则它本身就是 Actor
+    const actor = targetDoc.actor || targetDoc;
+
+    if (!actor || typeof actor.stopStance !== "function") return null;
+
+    // 3. 执行
+    return await actor.stopStance();
 }

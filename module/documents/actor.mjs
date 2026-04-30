@@ -2853,6 +2853,14 @@ export class XJZLActor extends Actor {
    */
   async stopStance() {
     if (this.type === "container") return; //容器直接返回
+
+    // ==========================================
+    // 如果没权限，打包发给 GM 执行
+    // ==========================================
+    if (!this.isOwner) {
+      return await xjzlSocket.executeAsGM("stopStance", this.uuid);
+    }
+
     // 1. 检查当前是否有架招
     const martial = this.system.martial;
     if (!martial.stanceActive) return;
@@ -2864,22 +2872,11 @@ export class XJZLActor extends Actor {
       "system.martial.stanceItemId": ""  // 清空物品ID
     };
 
-    // 3. 查找并移除相关的临时特效 (Cleanup)
-    // 逻辑：如果某个临时特效的 origin 指向了当前架招物品，则一并移除
-    // 这对于“开启架招获得3回合反伤Buff”之类的设计很有用
+    // 3. 查找需要清理的特效 (只清理标记了 tiedToStance 标签的AE)
     const effectsToDelete = [];
-    if (martial.stanceItemId) {
-      // 获取架招物品的 UUID
-      const stanceItem = this.items.get(martial.stanceItemId);
-      if (stanceItem) {
-        const originUuid = stanceItem.uuid;
-        // 遍历 Actor 身上的特效
-        for (const effect of this.effects) {
-          // 只删除临时的、且来源匹配的
-          if (effect.isTemporary && effect.origin === originUuid) {
-            effectsToDelete.push(effect.id);
-          }
-        }
+    for (const effect of this.effects) {
+      if (effect.getFlag("xjzl-system", "tiedToStance")) {
+        effectsToDelete.push(effect.id);
       }
     }
 

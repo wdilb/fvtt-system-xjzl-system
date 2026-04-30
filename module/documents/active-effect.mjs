@@ -44,6 +44,14 @@ export class XJZLActiveEffect extends ActiveEffect {
     return this.getFlag("xjzl-system", "stackable") || false;
   }
 
+  /**
+   * 是否与架招绑定
+   * @returns {boolean}
+   */
+  get isTiedToStance() {
+    return this.getFlag("xjzl-system", "tiedToStance") || false;
+  }
+
   /* -------------------------------------------- */
   /*  脚本数据封装 (Script Helpers)         */
   /* -------------------------------------------- */
