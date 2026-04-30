@@ -252,7 +252,7 @@ export class XJZLActiveEffect extends ActiveEffect {
     if (xjzlFlags && "scripts" in xjzlFlags) {
 
       const incomingScripts = xjzlFlags.scripts;
-      console.log("XJZL DEBUG | _preUpdate Check Scripts:", incomingScripts);
+      // console.log("XJZL DEBUG | _preUpdate Check Scripts:", incomingScripts);
 
       // 3. 检测伪数组对象 (例如 {"0": {...}, "1": {...}})
       if (typeof incomingScripts === "object" && !Array.isArray(incomingScripts)) {

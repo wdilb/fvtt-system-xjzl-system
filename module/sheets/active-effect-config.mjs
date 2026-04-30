@@ -51,6 +51,23 @@ export class XJZLActiveEffectConfig extends ActiveEffectConfig {
     }
 
     /**
+     * 拦截系统默认的保存事件
+     * 解决非关联 Token 的 flags 被 expandObject 深度覆写覆盖的 Bug
+     */
+    async _updateObject(event, formData) {
+        // 1. 提取安全的扁平更新数据
+        const flatUpdates = this._extractSafeFlatUpdates(formData);
+
+        // 2. 让 Foundry 核心去处理基础字段 (name, icon, duration 等)
+        await super._updateObject(event, formData);
+
+        // 3. 使用扁平键 (Flat Keys) 独立精准更新我们的配置
+        if (!foundry.utils.isEmpty(flatUpdates)) {
+            await this.document.update(flatUpdates);
+        }
+    }
+
+    /**
      * 自定义按钮保存逻辑 (点击添加/删除脚本时触发)
      * 这里必须手动抓取表单数据，否则会丢失用户在其他 Tab 修改但未保存的内容
      */
@@ -64,9 +81,14 @@ export class XJZLActiveEffectConfig extends ActiveEffectConfig {
         const formData = new FormDataClass(form).object;
 
         const action = btn.dataset.action;
-        const currentScripts = this._getCleanScripts(this.document.getFlag("xjzl-system", "scripts"));
 
-        // 处理数组逻辑
+        // 1. 提取安全的扁平更新数据 (此时界面输入已同步到内存数组)
+        const flatUpdates = this._extractSafeFlatUpdates(formData);
+
+        // 2. 提取刚才处理好的脚本数组
+        const currentScripts = flatUpdates["flags.xjzl-system.scripts"];
+
+        // 3. 执行数组增删操作
         if (action === "add-script") {
             currentScripts.push({ label: "新特效", trigger: "passive", active: true, script: "" });
         } else if (action === "delete-script") {
@@ -74,30 +96,47 @@ export class XJZLActiveEffectConfig extends ActiveEffectConfig {
             currentScripts.splice(index, 1);
         }
 
-        // 清理 FormData 中的干扰项 
-        // 删除自动生成的 flags.xjzl-system.scripts.0.xx 等键，防止污染数组
+        // 4. 提交扁平化更新
+        await this.document.update(flatUpdates);
+    }
+
+    /**
+     * 【辅助方法】将 formData 中的嵌套标志提取为 Flat Keys
+     */
+    _extractSafeFlatUpdates(formData) {
+        const flatUpdates = {};
+
+        // 深度拷贝当前的脚本数组
+        let currentScripts = foundry.utils.deepClone(this.document.getFlag("xjzl-system", "scripts") || []);
+        if (typeof currentScripts === 'object' && !Array.isArray(currentScripts)) {
+            currentScripts = Object.values(currentScripts);
+        }
+
+        // 遍历提取我们自己的配置
         for (const key of Object.keys(formData)) {
-            if (key.startsWith("flags.xjzl-system.scripts.")) {
+            if (key.startsWith("flags.xjzl-system.")) {
+
+                if (key.startsWith("flags.xjzl-system.scripts.")) {
+                    // 同步界面上的数组元素输入到内存数组
+                    const parts = key.split(".");
+                    const index = parseInt(parts[3]);
+                    const field = parts[4]; // 'label', 'trigger', 'script', 'active'
+                    if (currentScripts[index]) {
+                        currentScripts[index][field] = formData[key];
+                    }
+                } else {
+                    // 其他基础开关属性 (如 tiedToStance, slug)，直接装入 flatUpdates
+                    flatUpdates[key] = formData[key];
+                }
+
+                // 【绝杀】从 formData 中彻底剥离它，阻止 Foundry 核心对其执行灾难性的 expandObject
                 delete formData[key];
             }
         }
 
-        // 赋值纯净的数组
-        formData["flags.xjzl-system.scripts"] = currentScripts;
-
-        // 提交更新 (这会自动触发 Hook 重绘界面)
-        await this.document.update(formData);
-    }
-
-    /**
-     * 辅助方法：确保获取到的是数组
-     */
-    _getCleanScripts(scripts) {
-        let clean = scripts || [];
-        if (typeof clean === 'object' && !Array.isArray(clean)) {
-            clean = Object.values(clean);
-        }
-        return clean;
+        // 将组装好的数组也挂载上去
+        flatUpdates["flags.xjzl-system.scripts"] = currentScripts;
+        return flatUpdates;
     }
 }
 
