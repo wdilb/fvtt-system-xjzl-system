@@ -489,6 +489,28 @@ Hooks.once("init", async function () {
     default: true,
     requiresReload: true
   });
+
+  // 是否解除目盲视野遮挡
+  game.settings.register("xjzl-system", "disableBlindVision", {
+    name: "解除目盲视野遮挡",
+    hint: "默认开启。开启后，赋予角色“目盲”状态时，不会触发 Foundry VTT 底层默认的 Token 视野完全变黑机制。关闭则保留系统原生行为。",
+    scope: "world",      // 世界级设置，保持全场统一
+    config: true,        // 显示在设置菜单中
+    type: Boolean,
+    default: true,       // 默认阻止 FVTT 的自带效果
+    requiresReload: true // 因为涉及核心 CONFIG 变量的修改，需要刷新页面生效
+  });
+});
+
+Hooks.once("setup", () => {
+  // 读取系统设置，判断是否需要移除默认的盲目视野关联
+  const disableBlind = game.settings.get("xjzl-system", "disableBlindVision");
+
+  if (disableBlind) {
+    if (CONFIG.specialStatusEffects.BLIND === "blind") {
+      CONFIG.specialStatusEffects.BLIND = null;
+    }
+  }
 });
 
 // 在 Hooks.once("init") 之后的合适位置，添加这个钩子
@@ -1077,31 +1099,31 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
  * 作用：自动清空所有参战角色的怒气
  */
 Hooks.on("deleteCombat", async (combat, options, userId) => {
-    // 这里确保只让“触发删除操作的用户（通常是GM）”来执行数据库写操作，防止并发冲突。
-    if (game.user.id !== userId) return;
+  // 这里确保只让“触发删除操作的用户（通常是GM）”来执行数据库写操作，防止并发冲突。
+  if (game.user.id !== userId) return;
 
-    let hasUpdated = false;
+  let hasUpdated = false;
 
-    // 遍历战斗追踪器中的所有参战者
-    for (const combatant of combat.combatants) {
-        // combatant.actor 是一个智能指针，可以处理关联和非关联的问题
-        const actor = combatant.actor;
+  // 遍历战斗追踪器中的所有参战者
+  for (const combatant of combat.combatants) {
+    // combatant.actor 是一个智能指针，可以处理关联和非关联的问题
+    const actor = combatant.actor;
 
-        // 安全检查：角色存在，且有资源结构，且怒气大于 0
-        if (actor && actor.system.resources?.rage?.value > 0) {
-            
-            // 执行更新
-            await actor.update({
-                "system.resources.rage.value": 0
-            });
-            hasUpdated = true;
-        }
+    // 安全检查：角色存在，且有资源结构，且怒气大于 0
+    if (actor && actor.system.resources?.rage?.value > 0) {
+
+      // 执行更新
+      await actor.update({
+        "system.resources.rage.value": 0
+      });
+      hasUpdated = true;
     }
+  }
 
-    // 给予 GM 视觉反馈
-    if (hasUpdated) {
-        ui.notifications.info("脱离战斗：所有参战角色的怒气已自动清零。");
-    }
+  // 给予 GM 视觉反馈
+  if (hasUpdated) {
+    ui.notifications.info("脱离战斗：所有参战角色的怒气已自动清零。");
+  }
 });
 
 /**
