@@ -37,7 +37,7 @@ export class XJZLTurnMarkerManager {
             {
                 key: "turnMarkerScale",
                 name: "战斗标记缩放比例",
-                hint: "标记相对于 Token 尺寸的大小 (默认 1.5 倍)",
+                hint: "标记相对于 Token 尺寸的大小 (默认 1.3 倍)",
                 type: Number,
                 default: 1.3,
                 range: { min: 0.5, max: 3.0, step: 0.1 },
@@ -105,8 +105,7 @@ export class XJZLTurnMarkerManager {
 
     /**
      * 处理设置变更
-     * 更新策略：不销毁 Token，只销毁标记 Sprite 并重置状态。
-     * 解决了使用 token.draw() 导致重绘瞬间系统图标回退的问题。
+     * 更新策略：摧毁我们独立的容器，强制重绘
      */
     static _onSettingChange() {
         // 1. 同步最新设置到缓存
@@ -114,26 +113,19 @@ export class XJZLTurnMarkerManager {
 
         // 2. 遍历当前场景所有 Token
         canvas.tokens.placeables.forEach(token => {
-            // 获取 Token 内部的 TurnMarker 容器 (V13 API)
-            const turnMarker = token.children.find(c => c.constructor.name === "TokenTurnMarker");
-
-            if (turnMarker) {
-                // A. 清理旧资源：防止内存泄漏
-                if (turnMarker._xjzlSprites) {
-                    if (turnMarker._xjzlSprites.bottom) turnMarker._xjzlSprites.bottom.destroy();
-                    if (turnMarker._xjzlSprites.top) turnMarker._xjzlSprites.top.destroy();
-                    turnMarker._xjzlSprites = null;
-                }
-
-                // B. 重置状态：强制触发 _initCustomSprites 重新加载
-                turnMarker._xjzlInitDone = false;
-
-                // C. 临时恢复可见性：确保系统 refresh 逻辑能正常运行
-                // (随后我们的 handleTurnMarker 会再次接管并隐藏它们)
-                turnMarker.children.forEach(c => c.visible = true);
+            // 如果存在我们自定义的独立容器，彻底销毁它以便重新生成
+            if (token._xjzlTurnMarker && !token._xjzlTurnMarker.destroyed) {
+                token._xjzlTurnMarker.destroy({ children: true });
+                token._xjzlTurnMarker = null;
             }
 
-            // 3. 轻量级刷新：触发 _refreshTurnMarker 钩子
+            // 如果关闭了总开关，释放系统的标记，让难看的圈回来
+            if (!this._cache.enabled && token.turnMarker) {
+                token.turnMarker.renderable = true;
+                token.turnMarker.alpha = 1;
+            }
+
+            // 3. 轻量级刷新
             token.refresh();
         });
     }
@@ -148,34 +140,56 @@ export class XJZLTurnMarkerManager {
         this._cache.imgTop = game.settings.get(this.ID, "turnMarkerImgTop");
         this._cache.alphaBottom = game.settings.get(this.ID, "turnMarkerAlphaBottom");
         this._cache.alphaTop = game.settings.get(this.ID, "turnMarkerAlphaTop");
-        // console.log("XJZL | 战斗标记缓存已更新", this._cache);
     }
 
     /**
-     * 注册钩子与补丁
+     * 注册钩子与补丁 (核心解耦逻辑)
      */
     static _registerHooks() {
         const TokenClass = CONFIG.Token.objectClass;
-        // 保存原始方法引用
         this._originalRefresh = TokenClass.prototype._refreshTurnMarker;
         const self = this;
 
-        // 覆写 _refreshTurnMarker
-        // 注意：必须使用 function() 而非箭头函数，以保持 `this` 指向 Token 实例
+        // 接管刷新逻辑
         TokenClass.prototype._refreshTurnMarker = function (...args) {
-            // 1. 快速检查开关 (读取缓存，极快)
-            if (!self._cache.enabled) {
-                return self._originalRefresh.apply(this, args);
-            }
-
-            // 2. 执行系统原始逻辑 (确保容器被创建)
+            // 1. 让 FVTT 跑完它自己的重绘 (无论它怎么挣扎画黄圈，都在这一步完成)
             self._originalRefresh.apply(this, args);
 
-            // 3. 接管控制权，应用自定义效果
+            // 2. 检查开关
+            if (!self._cache.enabled) return;
+
+            // 3. 降维打击：直接在 PIXI 底层阻断系统标记的渲染
+            // 无论系统刚才怎么重绘了几何图形，renderable = false 让它立刻在这个宇宙消失
+            if (this.turnMarker) {
+                this.turnMarker.renderable = false;
+                this.turnMarker.visible = false;
+                this.turnMarker.alpha = 0;
+            }
+
+            // 4. 操作我们自己脱钩的独立容器
             self.handleTurnMarker(this);
         };
 
-        console.log("XJZL | 战斗标记管理器已挂载 (V13 优化版)");
+        // 接管旋转动画 (可选，但加上会让顶底图有极佳的交错旋转效果)
+        if (TokenClass.prototype._animateTurnMarker) {
+            this._originalAnimate = TokenClass.prototype._animateTurnMarker;
+            TokenClass.prototype._animateTurnMarker = function (...args) {
+                self._originalAnimate.apply(this, args); // 让系统去算旋转角度
+
+                if (self._cache.enabled && this._xjzlTurnMarker && this.isTurn) {
+                    if (this._xjzlTurnMarker._xjzlSprites) {
+                        const { bottom, top } = this._xjzlTurnMarker._xjzlSprites;
+                        const angle = this.turnMarker ? this.turnMarker.rotation : 0;
+                        
+                        // 底图顺时针，顶图逆时针旋转
+                        if (bottom) bottom.rotation = angle;
+                        if (top) top.rotation = -angle; 
+                    }
+                }
+            };
+        }
+
+        console.log("XJZL | 战斗标记管理器已挂载 (独立容器抗干扰版)");
     }
 
     /**
@@ -183,75 +197,65 @@ export class XJZLTurnMarkerManager {
      * @param {Token} token - 当前正在刷新的 Token 对象
      */
     static handleTurnMarker(token) {
-        // === A. 基础状态判断 ===
         const combatant = game.combat?.combatant;
         // 判定条件：当前有战斗 & 轮到该 Combatant & Token ID 匹配
         const isActive = combatant && (token.id === combatant.token?.id);
 
-        // 查找系统生成的 TurnMarker 容器
-        const turnMarker = token.children.find(c => c.constructor.name === "TokenTurnMarker");
+        // 如果不是当前行动者，隐藏我们的独立容器
+        if (!isActive) {
+            if (token._xjzlTurnMarker && !token._xjzlTurnMarker.destroyed) {
+                token._xjzlTurnMarker.visible = false;
+            }
+            return;
+        }
 
-        // 容器不存在或不是当前行动者，直接退出
-        if (!turnMarker) return;
-        if (!isActive) return;
+        // 如果独立容器不存在，创建一个全新的脱钩容器
+        if (!token._xjzlTurnMarker || token._xjzlTurnMarker.destroyed) {
+            token._xjzlTurnMarker = token.addChild(new PIXI.Container());
+            token._xjzlTurnMarker.zIndex = -1; // -1 确保它在 Token 角色贴图的下方
+            
+            // 关键：将容器的坐标轴固定在 Token 的正中心
+            token._xjzlTurnMarker.position.set(token.w / 2, token.h / 2);
+            
+            this._initCustomSprites(token);
+        } else {
+            // 时刻修正坐标（以防 Token 的宽高在游戏过程中动态改变）
+            token._xjzlTurnMarker.position.set(token.w / 2, token.h / 2);
 
-        // === B. 视觉控制 ===
-        // 1. 强力隐藏系统自带圆环 (防止系统在 refresh 中重置 visible 属性)
-        this._hideSystemRing(turnMarker);
-
-        // 2. 分支逻辑
-        if (!turnMarker._xjzlInitDone) {
-            // 情况一：尚未初始化 -> 执行异步加载
-            this._initCustomSprites(turnMarker, token);
-        } else if (turnMarker._xjzlSprites) {
-            // 情况二：已初始化 -> 检查路径一致性 (防止缓存意外变更)
-            const { imgBottom, imgTop } = this._cache;
-            if (turnMarker._xjzlSprites.pathBottom !== imgBottom || turnMarker._xjzlSprites.pathTop !== imgTop) {
-                // 路径不匹配，强制重置并刷新
-                turnMarker._xjzlInitDone = false;
-                token.refresh();
+            // 检查路径一致性，如果不一致，炸掉里面的子元素重新加载
+            const currentPaths = this._cache.imgBottom + "|" + this._cache.imgTop;
+            if (token._xjzlTurnMarker._xjzlPaths !== currentPaths) {
+                token._xjzlTurnMarker.removeChildren().forEach(c => c.destroy());
+                token._xjzlTurnMarker._xjzlSprites = null;
+                this._initCustomSprites(token);
                 return;
             }
 
-            // 路径一致 -> 仅更新属性 (大小/透明度)
-            this._updateAttributes(turnMarker, token);
-        }
-    }
-
-    /**
-     * 隐藏系统自带的子元素 (虚线圆环)
-     * 使用 for...of 循环以获得最佳性能
-     */
-    static _hideSystemRing(turnMarker) {
-        for (const child of turnMarker.children) {
-            // 逻辑：只要它是可见的，且没有打上我们的自定义标记 (_isXJZLSprite)，就视为系统元素并隐藏
-            if (child.visible && !child._isXJZLSprite) {
-                child.visible = false;
-            }
+            token._xjzlTurnMarker.visible = true;
+            this._updateAttributes(token);
         }
     }
 
     /**
      * 异步加载纹理并创建 Sprite
      */
-    static async _initCustomSprites(turnMarker, token) {
-        // 抢占标记，防止在异步等待期间被重复调用
-        turnMarker._xjzlInitDone = true;
+    static async _initCustomSprites(token) {
+        const container = token._xjzlTurnMarker;
+        if (!container) return;
+
+        const { imgBottom, imgTop } = this._cache;
+        // 记录当前的路径签名
+        container._xjzlPaths = imgBottom + "|" + imgTop;
 
         try {
-            const { imgBottom, imgTop } = this._cache;
-
-            // 再次确保系统圆环被隐藏 (因为 await 之前的一帧可能发生过渲染)
-            this._hideSystemRing(turnMarker);
-
             // 并行加载纹理
             const [texBottom, texTop] = await Promise.all([
                 foundry.canvas.loadTexture(imgBottom),
                 foundry.canvas.loadTexture(imgTop)
             ]);
 
-            // 【关键安全检查】异步回来后，Token 可能已被销毁或重绘
-            if (!turnMarker || turnMarker.destroyed) return;
+            // 异步回来后，Token 可能已被删除，容器可能已销毁
+            if (container.destroyed) return;
 
             // 创建 PIXI Sprite
             const spriteBottom = new PIXI.Sprite(texBottom);
@@ -259,59 +263,50 @@ export class XJZLTurnMarkerManager {
 
             // 设置锚点居中
             spriteBottom.anchor.set(0.5);
-            spriteBottom._isXJZLSprite = true; // 打上自定义标记，防止被误伤
-
             spriteTop.anchor.set(0.5);
-            spriteTop._isXJZLSprite = true;
 
-            // 添加到容器
-            turnMarker.addChild(spriteBottom);
-            turnMarker.addChild(spriteTop);
+            // 添加到我们自己的独立容器
+            container.addChild(spriteBottom);
+            container.addChild(spriteTop);
 
-            // 保存引用 (用于 updateAttributes) 和路径 (用于变更检测)
-            turnMarker._xjzlSprites = {
+            container._xjzlSprites = {
                 bottom: spriteBottom,
-                top: spriteTop,
-                pathBottom: imgBottom,
-                pathTop: imgTop
+                top: spriteTop
             };
 
             // 创建完毕后立即应用一次属性
-            this._updateAttributes(turnMarker, token);
+            this._updateAttributes(token);
 
         } catch (err) {
             console.error("XJZL | 战斗标记图片加载失败:", err);
-            // 加载失败，重置标记允许重试
-            turnMarker._xjzlInitDone = false;
+            container._xjzlPaths = null; // 允许重试
         }
     }
 
     /**
      * 实时更新属性 (大小、透明度、颜色)
-     * 此方法开销极低，可在每一帧调用
+     * 此方法开销低，可在每一帧调用
      */
-    static _updateAttributes(turnMarker, token) {
-        const { bottom, top } = turnMarker._xjzlSprites;
+    static _updateAttributes(token) {
+        const container = token._xjzlTurnMarker;
+        if (!container || container.destroyed || !container._xjzlSprites) return;
+
+        const { bottom, top } = container._xjzlSprites;
         const { scale, alphaBottom, alphaTop } = this._cache;
 
-        // 计算目标尺寸
+        // 计算目标尺寸 (FVTT V13 中，Token的真实宽度是 token.w)
         const targetSize = token.w * scale;
-
-        // 再次隐藏系统圆环 (多重保险)
-        this._hideSystemRing(turnMarker);
 
         // 应用到底图
         if (bottom && !bottom.destroyed) {
-            bottom.visible = true;
             bottom.width = targetSize;
             bottom.height = targetSize;
             bottom.alpha = alphaBottom;
-            bottom.tint = 0xFFFFFF; // 清除系统可能染上的颜色 (Team Color)
+            bottom.tint = 0xFFFFFF; // 清除系统可能染上的颜色
         }
 
         // 应用到顶图
         if (top && !top.destroyed) {
-            top.visible = true;
             top.width = targetSize;
             top.height = targetSize;
             top.alpha = alphaTop;

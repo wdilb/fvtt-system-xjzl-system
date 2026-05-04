@@ -1084,7 +1084,7 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
     const updateData = { _id: t.id, x: targetCenterX, y: targetCenterY };
 
     // ==========================================
-    // 🌟 终极修复：原生权限判定 + Socket 委托
+    // 🌟 如果玩家权限不足，则交给Socket 委托
     // ==========================================
     // t.canUserModify 是 Foundry 底层 API，判断当前玩家能否直接改它
     if (t.canUserModify(game.user, "update")) {
