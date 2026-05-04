@@ -100,6 +100,9 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
         let sourceTokenId = null;
         let isSticky = false;
 
+        // 默认模板作者为当前点击按钮的用户
+        let templateOwnerId = game.user.id;
+
         if (mode === "follow") {
             // --- 模式 A: 跟随 ---
             // 从场景中查找 ID 对应的 Token
@@ -114,6 +117,15 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
             y = center.y;
             sourceTokenId = targetToken.id;
             isSticky = true;
+
+            // 如果 GM 给玩家的角色创建跟随 AOE，把模板的所有权移交给该玩家
+            if (targetToken.actor) {
+                // 查找对该角色具有所有权 (OWNER) 的第一个非 GM 玩家
+                const playerOwner = game.users.find(u => !u.isGM && targetToken.actor.testUserPermission(u, "OWNER"));
+                if (playerOwner) {
+                    templateOwnerId = playerOwner.id;
+                }
+            }
 
         } else {
             // --- 模式 B: 静态 (视野中心) ---
@@ -131,7 +143,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
 
         const templateData = {
             t: "circle",
-            user: game.user.id,
+            user: templateOwnerId, // 使用智能分配的用户ID
             distance: finalDistance,
             direction: 0,
             x: x,

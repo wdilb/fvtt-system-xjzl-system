@@ -1069,7 +1069,7 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
   const targetCenterY = newY + (tokenDoc.height * gridSize) / 2;
 
   // 4. 单次遍历查找并构建更新数据
-  const updates = [];
+  const directUpdates = [];
 
   // V13 推荐直接遍历 Collection
   for (const t of scene.templates) {
@@ -1081,16 +1081,26 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
     // 如果位置差异小于 1 像素，视为未移动，跳过数据库更新
     if (Math.abs(t.x - targetCenterX) < 1 && Math.abs(t.y - targetCenterY) < 1) continue;
 
-    updates.push({
-      _id: t.id,
-      x: targetCenterX,
-      y: targetCenterY
-    });
+    const updateData = { _id: t.id, x: targetCenterX, y: targetCenterY };
+
+    // ==========================================
+    // 🌟 终极修复：原生权限判定 + Socket 委托
+    // ==========================================
+    // t.canUserModify 是 Foundry 底层 API，判断当前玩家能否直接改它
+    if (t.canUserModify(game.user, "update")) {
+      // 自己建的，或者 GM 操作：直接改，零延迟！
+      directUpdates.push(updateData);
+    } else {
+      // 没权限（比如 GM 给玩家建的）：委托 Socket 让 GM 帮忙改，不报错！
+      if (xjzlSocket) {
+        xjzlSocket.executeAsGM("updateDocument", t.uuid, updateData);
+      }
+    }
   }
 
   // 5. 批量提交
-  if (updates.length > 0) {
-    scene.updateEmbeddedDocuments("MeasuredTemplate", updates);
+  if (directUpdates.length > 0) {
+    scene.updateEmbeddedDocuments("MeasuredTemplate", directUpdates);
   }
 });
 
