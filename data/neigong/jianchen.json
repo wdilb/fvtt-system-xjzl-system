@@ -431,10 +431,16 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "格挡数值反弹",
+                            "label": "格挡反弹(预计算)",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (![\"waigong\", \"neigong\"].includes(args.type)) return;\n\n// 1. 获取准确的原始伤害(已包含暴击)\nconst rawDmg = (args.isCrit && args.config.applyCritDamage) ? args.baseDamage * 2 : args.baseDamage;\n\n// 2. 准确获取当前生效的格挡值\nlet blockVal = 0;\nif (!args.config.ignoreBlock) {\n    let total = S.combat.blockTotal || 0;\n    if (args.config.ignoreStance) total = Math.max(0, total - (S.combat.stanceBlockValue || 0));\n    blockVal = total;\n}\n\n// 3. 计算并暂存反伤值 (Min(格挡, 原始伤害-1))\nif (blockVal > 0) {\n    args.config._xuejingReflect = Math.max(0, Math.min(blockVal, rawDmg - 1));\n    args.config._xuejingType = args.type;\n}"
+                        },
+                        {
+                            "label": "格挡反弹(执行)",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (actor.isReceivingReflection) return;\nif (![\"waigong\", \"neigong\"].includes(args.type)) return;\n\nconst rawDmg = args.isCrit ? args.baseDamage * 2 : args.baseDamage;\nconst blockVal = S.combat.blockTotal || 0;\n\n// 核心逻辑：反伤量 = Min(格挡值, 原始伤害 - 1) 保证不超额反弹\nconst reflectDmg = Math.max(0, Math.min(blockVal, rawDmg - 1));\n\nif (reflectDmg > 0) {\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({ amount: reflectDmg, type: args.type, attacker: actor, isHit: true, ignoreDefense: true });\n        const typeStr = args.type === 'waigong' ? '外功' : '内功';\n        const cardHtml = `<div class=\"xjzl-chat-card\"><div style=\"padding:4px 8px; border-left:4px solid #8b0000; background:rgba(139, 0, 0, 0.1); margin-left:2px;\"><i class=\"fas fa-burn\"></i> <b>藏边血经：</b>格挡反震！对攻击者造成 <span style=\"color:red; font-weight:bold;\">${reflectDmg}</span> 点${typeStr}真实伤害！</div></div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml});\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}"
+                            "script": "const reflectDmg = args.config._xuejingReflect || 0;\nif (reflectDmg <= 0) return;\nif (actor.isReceivingReflection) return;\n\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({ amount: reflectDmg, type: args.config._xuejingType, attacker: actor, isHit: true });\n    const typeStr = args.config._xuejingType === 'waigong' ? '外功' : '内功';\n    const cardHtml = `<div class=\"xjzl-chat-card\"><div style=\"padding:4px 8px; border-left:4px solid #8b0000; background:rgba(139, 0, 0, 0.1); margin-left:2px;\"><i class=\"fas fa-burn\"></i> <b>藏边血经：</b>格挡反震！对攻击者反弹 <span style=\"color:red; font-weight:bold;\">${reflectDmg}</span> 点${typeStr}伤害！</div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml});\n} finally {\n    args.attacker.isReceivingReflection = false;\n}"
                         }
                     ]
                 },
@@ -451,10 +457,16 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "防御与格挡反弹",
+                            "label": "护甲格挡反弹(预计算)",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (![\"waigong\", \"neigong\"].includes(args.type)) return;\n\n// 1. 获取准确的原始伤害\nconst rawDmg = (args.isCrit && args.config.applyCritDamage) ? args.baseDamage * 2 : args.baseDamage;\n\n// 2. 准确获取当前生效的格挡值与防御值\nlet blockVal = 0;\nif (!args.config.ignoreBlock) {\n    let total = S.combat.blockTotal || 0;\n    if (args.config.ignoreStance) total = Math.max(0, total - (S.combat.stanceBlockValue || 0));\n    blockVal = total;\n}\n\nlet defVal = 0;\nif (!args.config.ignoreDefense) {\n    defVal = (args.type === \"waigong\") ? (S.combat.defWaigongTotal || 0) : (S.combat.defNeigongTotal || 0);\n}\n\nconst maxReflect = blockVal + defVal;\n\n// 3. 计算并暂存反伤值\nif (maxReflect > 0) {\n    args.config._xuejingReflect = Math.max(0, Math.min(maxReflect, rawDmg - 1));\n    args.config._xuejingType = args.type;\n}"
+                        },
+                        {
+                            "label": "护甲格挡反弹(执行)",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (actor.isReceivingReflection) return;\nif (![\"waigong\", \"neigong\"].includes(args.type)) return;\n\nconst rawDmg = args.isCrit ? args.baseDamage * 2 : args.baseDamage;\nconst blockVal = S.combat.blockTotal || 0;\nconst defVal = (args.type === \"waigong\") ? (S.combat.defWaigongTotal || 0) : (S.combat.defNeigongTotal || 0);\n\n// 核心逻辑：反伤量 = Min(格挡+防御, 原始伤害 - 1) 保证不超额反弹\nconst reflectDmg = Math.max(0, Math.min(blockVal + defVal, rawDmg - 1));\n\nif (reflectDmg > 0) {\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({ amount: reflectDmg, type: args.type, attacker: actor, isHit: true, ignoreDefense: true });\n        const typeStr = args.type === 'waigong' ? '外功' : '内功';\n        const cardHtml = `<div class=\"xjzl-chat-card\"><div style=\"padding:4px 8px; border-left:4px solid #8b0000; background:rgba(139, 0, 0, 0.1); margin-left:2px;\"><i class=\"fas fa-burn\"></i> <b>藏边血经：</b>防御与格挡反震！对攻击者造成 <span style=\"color:red; font-weight:bold;\">${reflectDmg}</span> 点${typeStr}真实伤害！</div></div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml});\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}"
+                            "script": "const reflectDmg = args.config._xuejingReflect || 0;\nif (reflectDmg <= 0) return;\nif (actor.isReceivingReflection) return;\n\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({ amount: reflectDmg, type: args.config._xuejingType, attacker: actor, isHit: true });\n    const typeStr = args.config._xuejingType === 'waigong' ? '外功' : '内功';\n    const cardHtml = `<div class=\"xjzl-chat-card\"><div style=\"padding:4px 8px; border-left:4px solid #8b0000; background:rgba(139, 0, 0, 0.1); margin-left:2px;\"><i class=\"fas fa-burn\"></i> <b>藏边血经：</b>护体反震！对攻击者反弹 <span style=\"color:red; font-weight:bold;\">${reflectDmg}</span> 点${typeStr}伤害！</div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: cardHtml});\n} finally {\n    args.attacker.isReceivingReflection = false;\n}"
                         }
                     ]
                 }
