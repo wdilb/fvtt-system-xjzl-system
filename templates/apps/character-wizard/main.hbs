@@ -177,107 +177,119 @@
         </div>
         <div class="wizard-form-container relative-z social-step-container">
 
-            <div class="social-grid">
-                {{!-- 基础生理与嗜好 --}}
-                <div class="social-panel">
-                    <div class="panel-header">形貌与嗜好</div>
-                    <div class="form-group split-group">
-                        <div class="sub-group">
-                            <label>年龄</label>
-                            <div class="form-fields"><input type="number" name="info.age" value="{{data.info.age}}">
+            <div class="dossier-wrapper">
+                <div class="dossier-header">
+                    <h3 class="dossier-title">江湖卷宗</h3>
+                    <div class="dossier-subtitle">形貌 / 传记 / 羁绊</div>
+                </div>
+
+                <div class="dossier-body">
+                    {{!-- 顶部三栏：形貌 / 嗜好 / 声望 --}}
+                    <div class="dossier-grid-3">
+                        <div class="dossier-section">
+                            <div class="sec-label">基础形貌</div>
+                            <div class="ink-input-row">
+                                <span>芳龄</span>
+                                <input type="number" name="info.age" value="{{data.info.age}}">
+                            </div>
+                            <div class="ink-input-row">
+                                <span>身高</span>
+                                <input type="text" name="info.height" value="{{data.info.height}}">
+                            </div>
+                            <div class="ink-input-row">
+                                <span>体重</span>
+                                <input type="text" name="info.weight" value="{{data.info.weight}}">
                             </div>
                         </div>
-                        <div class="sub-group">
-                            <label>身高</label>
-                            <div class="form-fields"><input type="text" name="info.height" value="{{data.info.height}}"
-                                    placeholder="如: 八尺"></div>
+
+                        <div class="dossier-section">
+                            <div class="sec-label">平生嗜好</div>
+                            <div class="hobby-stack">
+                                {{#each hobbySlots as |slot|}}
+                                <select name="social.shihao.{{slot.index}}" class="ink-select">
+                                    {{selectOptions @root.choices.hobbies selected=slot.value blank="无" localize=true}}
+                                </select>
+                                {{/each}}
+                            </div>
                         </div>
-                        <div class="sub-group">
-                            <label>体重</label>
-                            <div class="form-fields"><input type="text" name="info.weight" value="{{data.info.weight}}"
-                                    placeholder="如: 匀称"></div>
+
+                        <div class="dossier-section">
+                            <div class="sec-label">势力声望</div>
+                            <div class="rep-stack">
+                                <div class="rep-mini-row">
+                                    <span class="rep-name">朝廷</span>
+                                    <input type="number" name="social.rep_chaoting"
+                                        value="{{data.social.rep_chaoting}}">
+                                    <select name="social.attitude_chaoting" class="ink-select">
+                                        {{selectOptions choices.attitudes selected=data.social.attitude_chaoting
+                                        localize=true}}
+                                    </select>
+                                </div>
+                                <div class="rep-mini-row">
+                                    <span class="rep-name">武林</span>
+                                    <input type="number" name="social.rep_wulin" value="{{data.social.rep_wulin}}">
+                                    <select name="social.attitude_wulin" class="ink-select">
+                                        {{selectOptions choices.attitudes selected=data.social.attitude_wulin
+                                        localize=true}}
+                                    </select>
+                                </div>
+                                <div class="rep-mini-row">
+                                    <span class="rep-name" style="color:#aaa;">世俗</span>
+                                    <!-- 隐形占位符，替代原本的 span flex:1 -->
+                                    <div class="rep-placeholder"></div>
+                                    <select name="social.attitude_shisu" class="ink-select">
+                                        {{selectOptions choices.attitudes selected=data.social.attitude_shisu
+                                        localize=true}}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label>个人嗜好 (选填3项)</label>
-                        <div class="hobbies-row">
-                            {{#each hobbySlots as |slot|}}
-                            <select name="social.shihao.{{slot.index}}">
-                                {{selectOptions @root.choices.hobbies selected=slot.value blank="-" localize=true}}
-                            </select>
+
+                    <div class="dossier-divider"></div>
+
+                    {{!-- 中部：生平传记 (原生 Textarea 替换富文本) --}}
+                    <div class="dossier-section">
+                        <div class="sec-label">生平传记</div>
+                        <textarea name="info.bio" class="ink-textarea" rows="4"
+                            placeholder="请简述你的过往身世、江湖经历...">{{{data.info.bio}}}</textarea>
+                    </div>
+
+                    <div class="dossier-divider"></div>
+
+                    {{!-- 底部：关系网 --}}
+                    <div class="dossier-section">
+                        <div class="flex-between">
+                            <div class="sec-label">江湖羁绊</div>
+                            <button type="button" class="btn-ink-add" data-action="addRelation"><i
+                                    class="fas fa-pen-fancy"></i> 结识新缘</button>
+                        </div>
+
+                        <div class="relations-list-container">
+                            {{#if data.social.relations.length}}
+                            {{#each data.social.relations as |rel i|}}
+                            <div class="relation-row">
+                                <input type="text" name="social.relations.{{i}}.name" value="{{rel.name}}"
+                                    placeholder="输入NPC姓名">
+                                <input type="text" name="social.relations.{{i}}.type" value="{{rel.type}}"
+                                    placeholder="如: 挚友/宿敌/恩师">
+                                <input type="number" name="social.relations.{{i}}.value" value="{{rel.value}}"
+                                    title="好感度">
+                                <button type="button" data-action="deleteRelation" class="btn-delete-rel" title="删除"><i
+                                        class="fas fa-trash"></i></button>
+                            </div>
                             {{/each}}
+                            {{else}}
+                            <div class="empty-hint">孤身一人，暂无牵绊</div>
+                            {{/if}}
                         </div>
                     </div>
-                </div>
 
-                {{!-- 声望与业障 --}}
-                <div class="social-panel">
-                    <div class="panel-header">声望与业障</div>
-                    <div class="reputation-grid">
-                        <div class="rep-item">
-                            <label>朝廷声望</label>
-                            <input type="number" name="social.rep_chaoting" value="{{data.social.rep_chaoting}}">
-                            <select name="social.attitude_chaoting">
-                                {{selectOptions choices.attitudes selected=data.social.attitude_chaoting localize=true}}
-                            </select>
-                        </div>
-                        <div class="rep-item">
-                            <label>武林声望</label>
-                            <input type="number" name="social.rep_wulin" value="{{data.social.rep_wulin}}">
-                            <select name="social.attitude_wulin">
-                                {{selectOptions choices.attitudes selected=data.social.attitude_wulin localize=true}}
-                            </select>
-                        </div>
-                        <div class="rep-item">
-                            <label>世俗态度</label>
-                            <select name="social.attitude_shisu" style="margin-top:auto;">
-                                {{selectOptions choices.attitudes selected=data.social.attitude_shisu localize=true}}
-                            </select>
-                        </div>
-                    </div>
                 </div>
             </div>
-
-            {{!-- 人物传记 --}}
-            <div class="social-panel" style="margin-top: 20px;">
-                <div class="panel-header">生平传记</div>
-                <div class="bio-prosemirror-wrapper">
-                    <prose-mirror name="info.bio" value="{{data.info.bio}}" toggled="true">
-                        {{{data.info.bio}}}
-                    </prose-mirror>
-                </div>
-            </div>
-
-            {{!-- 初始关系网 --}}
-            <div class="social-panel" style="margin-top: 20px;">
-                <div class="panel-header flex-between">
-                    <span>初始关系网</span>
-                    <button type="button" class="btn-small-add" data-action="addRelation"><i class="fas fa-plus"></i>
-                        新增结识</button>
-                </div>
-
-                <div class="relations-container">
-                    {{#if data.social.relations.length}}
-                    {{#each data.social.relations as |rel i|}}
-                    <div class="relation-row">
-                        <input type="text" name="social.relations.{{i}}.name" value="{{rel.name}}" placeholder="NPC姓名">
-                        <input type="text" name="social.relations.{{i}}.type" value="{{rel.type}}"
-                            placeholder="关系(恩人/仇家等)">
-                        <input type="number" name="social.relations.{{i}}.value" value="{{rel.value}}"
-                            placeholder="好感度">
-                        <button type="button" data-action="deleteRelation" data-index="{{i}}" class="btn-delete-rel"><i
-                                class="fas fa-trash"></i></button>
-                    </div>
-                    {{/each}}
-                    {{else}}
-                    <div class="empty-hint">孤身一人，暂无牵绊</div>
-                    {{/if}}
-                </div>
-            </div>
-
         </div>
         {{/if}}
-        {{#if (eq data.currentStep 4)}}<div class="placeholder-text">资源配置：运算引擎加载中...</div>{{/if}}
+        {{#if (eq data.currentStep 4)}}<div class="placeholder-text">武学内功：运算引擎加载中...</div>{{/if}}
         {{#if (eq data.currentStep 5)}}<div class="placeholder-text">技艺精通：面板组装中...</div>{{/if}}
 
         {{#if (eq data.currentStep 6)}}

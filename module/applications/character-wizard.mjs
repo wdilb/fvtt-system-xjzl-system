@@ -137,6 +137,16 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         const rawData = Object.fromEntries(fd.entries());
         // 3. 利用 Foundry 工具，将其展开为嵌套对象 { info: { name: "xxx", silver: 10 } }
         const expandedData = foundry.utils.expandObject(rawData);
+
+        // 解决 FVTT 表单将数组解析为对象的 Bug
+        if (expandedData.social && expandedData.social.relations) {
+            // 将 { "0": {...}, "1": {...} } 强制转回真正的数组
+            expandedData.social.relations = Object.values(expandedData.social.relations);
+        } else if (expandedData.social) {
+            // 如果清空了所有关系，确保它重置为空数组，而不是 undefined
+            expandedData.social.relations = [];
+        }
+
         // 4. 深度合并到我们的内存状态中
         foundry.utils.mergeObject(this.wizardData, expandedData);
     }
@@ -288,24 +298,46 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
     // ==========================================
     async _onAddRelation(event, target) {
         event.preventDefault();
-        this._saveCurrentStepData(); // 先保存已填写的数据
 
-        this.wizardData.social.relations.push({
-            id: foundry.utils.randomID(),
-            name: "",
-            type: "",
-            value: 0
-        });
-        this.render();
+        // 1. 找到容器
+        const container = this.element.querySelector('.relations-list-container');
+        if (!container) return;
+
+        // 2. 移除空提示（如果有）
+        const emptyHint = container.querySelector('.empty-hint');
+        if (emptyHint) emptyHint.remove();
+
+        // 3. 计算当前索引（用于表单 name 绑定）
+        // 使用 Date.now() 作为唯一索引，防止中间删除某行后索引重复
+        const uniqueIndex = Date.now();
+
+        // 4. 构建 HTML 并动态插入，绝不调用 this.render()
+        const html = `
+            <div class="relation-row fade-in">
+                <input type="text" name="social.relations.${uniqueIndex}.name" value="" placeholder="输入NPC姓名">
+                <input type="text" name="social.relations.${uniqueIndex}.type" value="" placeholder="如: 挚友/宿敌/恩师">
+                <input type="number" name="social.relations.${uniqueIndex}.value" value="0" title="好感度">
+                <button type="button" data-action="deleteRelation" class="btn-delete-rel" title="删除"><i class="fas fa-trash"></i></button>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', html);
     }
 
     async _onDeleteRelation(event, target) {
         event.preventDefault();
-        this._saveCurrentStepData();
 
-        const index = Number(target.dataset.index);
-        this.wizardData.social.relations.splice(index, 1);
-        this.render();
+        // 1. 找到被点击的那一行
+        const row = target.closest('.relation-row');
+        if (row) {
+            row.remove(); // 直接从 DOM 中移除
+        }
+
+        // 2. 如果全删光了，补回空提示
+        const container = this.element.querySelector('.relations-list-container');
+        if (container && container.querySelectorAll('.relation-row').length === 0) {
+            container.innerHTML = `<div class="empty-hint">孤身一人，暂无牵绊</div>`;
+        }
     }
 
     // ==========================================
@@ -338,6 +370,10 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             "system.info": {
                 gender: this.wizardData.info.gender,
                 title: this.wizardData.info.title,
+                zi: this.wizardData.info.zi,
+                age: this.wizardData.info.age,
+                height: this.wizardData.info.height,
+                weight: this.wizardData.info.weight,
                 sect: this.wizardData.info.sect,
                 appearance: this.wizardData.info.appearance,
                 bio: this.wizardData.info.bio
