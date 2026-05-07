@@ -420,7 +420,29 @@ XJZL.sects = {
   "baicaoge": "XJZL.Sect.BaiCaoGe",
   "jianghushili": "XJZL.Sect.JiangHuShiLi"
 };
-
+// 20.1 门派介绍
+XJZL.sectDescription = {
+  "none": "XJZL.Sect.Desc.None",
+  "zhengqizong": "XJZL.Sect.Desc.ZhengQiZong",
+  "zhenwujiao": "XJZL.Sect.Desc.ZhenWuJiao",
+  "wanfosi": "XJZL.Sect.Desc.WanFoSi",
+  "xiaoyaopai": "XJZL.Sect.Desc.XiaoYaoPai",
+  "qingtianmen": "XJZL.Sect.Desc.QingTianMen",
+  "emeipai": "XJZL.Sect.Desc.EMeiPai",
+  "huashanpai": "XJZL.Sect.Desc.HuaShanPai",
+  "tangmen": "XJZL.Sect.Desc.TangMen",
+  "mingjiao": "XJZL.Sect.Desc.MingJiao",
+  "gaibang": "XJZL.Sect.Desc.GaiBang",
+  "fenghuayuan": "XJZL.Sect.Desc.FengHuaYuan",
+  "liushanmen": "XJZL.Sect.Desc.LiuShanMen",
+  "jiangnange": "XJZL.Sect.Desc.JiangNanGe",
+  "shenfengbang": "XJZL.Sect.Desc.ShenFengBang",
+  "sihaibiaomeng": "XJZL.Sect.Desc.SiHaiBiaoMeng",
+  "jiangjunying": "XJZL.Sect.Desc.JiangJunYing",
+  "wanshoushanzhuang": "XJZL.Sect.Desc.WanShouShanZhuang",
+  "baicaoge": "XJZL.Sect.Desc.BaiCaoGe",
+  "jianghushili": "XJZL.Sect.Desc.JiangHuShiLi"
+};
 // 20.5 江湖势力二级分类 (Sub-Sects)
 XJZL.subSects = {
   "none": "XJZL.SubSect.None",

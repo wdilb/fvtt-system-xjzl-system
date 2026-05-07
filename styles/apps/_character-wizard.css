@@ -1,0 +1,715 @@
+/* ==========================================================================
+   侠界之旅 - 角色建卡向导 (Character Wizard)
+   ========================================================================== */
+
+/* 1. 全局遮罩与窗口魔法 */
+.character-wizard-app.application {
+    box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.9), 0 20px 60px rgba(0, 0, 0, 0.8) !important;
+    border: 1px solid rgba(212, 175, 55, 0.4) !important;
+    border-radius: 12px;
+    overflow: hidden;
+    animation: wizard-app-enter 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes wizard-app-enter {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+/* 2. 网格布局结构 */
+.character-wizard-app .window-content {
+    display: grid !important;
+    grid-template-columns: 320px 1fr;
+    grid-template-rows: 1fr auto;
+    padding: 0 !important;
+    background: #0f0f0f;
+    color: #eee;
+    height: 100% !important;
+    /* 强制填满窗口高度 */
+}
+
+.character-wizard-app .wizard-sidebar-wrapper {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    position: relative;
+    border-right: 1px solid rgba(212, 175, 55, 0.2);
+    background: #000;
+    overflow: hidden;
+    height: 100%;
+}
+
+.character-wizard-app .wizard-main-wrapper {
+    grid-column: 2;
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    /* 为子元素的绝对定位提供锚点 */
+    background: #0a0a0a;
+    height: 100%;
+    /* 确保主区域填满网格行 */
+}
+
+.character-wizard-app .footer-actions {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+/* ==========================================================================
+   侧边栏动效与图层 (Sidebar)
+   ========================================================================== */
+.character-wizard-app .wizard-sidebar-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+}
+
+.character-wizard-app .wizard-sidebar-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
+    opacity: 0.85;
+    filter: contrast(1.1) brightness(0.85);
+}
+
+.character-wizard-app .sidebar-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.1) 0%, rgba(0, 0, 0, 0.95) 100%),
+        linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, transparent 50%);
+}
+
+.character-wizard-app .wizard-steps-container {
+    position: relative;
+    z-index: 1;
+    padding: 40px 30px;
+}
+
+.character-wizard-app .wizard-title {
+    color: var(--c-highlight, #d4af37);
+    font-family: var(--font-serif, serif);
+    font-size: 2rem;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+    padding-bottom: 15px;
+    margin-bottom: 40px;
+    text-shadow: 0 4px 6px rgba(0, 0, 0, 1);
+    letter-spacing: 2px;
+}
+
+.character-wizard-app .step-list {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.character-wizard-app .step-list li {
+    font-size: 1.25rem;
+    color: rgba(255, 255, 255, 0.4);
+    transition: all 0.4s ease;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 12px 15px;
+    border-radius: 6px;
+    font-family: var(--font-serif, serif);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+    opacity: 0;
+    animation: slide-in-left 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 阶梯延迟：拉开层次感 */
+.character-wizard-app .step-list li:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.character-wizard-app .step-list li:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.character-wizard-app .step-list li:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+.character-wizard-app .step-list li:nth-child(4) {
+    animation-delay: 0.4s;
+}
+
+.character-wizard-app .step-list li:nth-child(5) {
+    animation-delay: 0.5s;
+}
+
+.character-wizard-app .step-list li:nth-child(6) {
+    animation-delay: 0.6s;
+}
+
+@keyframes slide-in-left {
+    from {
+        opacity: 0;
+        transform: translateX(-40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.character-wizard-app .step-list li.active {
+    color: #fff;
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.3) 0%, transparent 100%);
+    border-left: 4px solid var(--c-highlight, #d4af37);
+    transform: translateX(10px);
+}
+
+.character-wizard-app .step-list li.active.finish-step {
+    color: #2ecc71;
+    border-left-color: #2ecc71;
+    background: linear-gradient(90deg, rgba(46, 204, 113, 0.3) 0%, transparent 100%);
+}
+
+/* ==========================================================================
+   主内容区样式 (Main Content)
+   ========================================================================== */
+.character-wizard-app .wizard-header {
+    padding: 20px 40px;
+    background: rgba(0, 0, 0, 0.4);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    flex-shrink: 0;
+}
+
+.character-wizard-app .header-deco-line {
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    height: 1px;
+    width: 60%;
+    background: linear-gradient(90deg, var(--c-highlight, #d4af37), transparent);
+}
+
+.character-wizard-app .wizard-header h3 {
+    margin: 0;
+    font-size: 1.8rem;
+    color: #fff;
+    font-family: var(--font-serif, serif);
+    letter-spacing: 2px;
+}
+
+.character-wizard-app .step-indicator {
+    color: var(--c-highlight, #d4af37);
+    font-size: 1.2rem;
+    opacity: 0.9;
+    margin-left: 10px;
+}
+
+.character-wizard-app .wizard-step-body {
+    position: relative;
+    flex: 1 1 auto;
+    padding: 50px 60px;
+    overflow-y: auto;
+    animation: fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* ==========================================================================
+   Wizard Step 1 补充样式
+   ========================================================================== */
+.character-wizard-app .step-bg {
+    position: absolute;
+    inset: 0;
+    /* 优化：替代上下左右0，绝对铺满 */
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    opacity: 0.15;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.character-wizard-app .relative-z {
+    position: relative;
+    z-index: 1;
+}
+
+/* 表单重构 */
+.character-wizard-app .wizard-form-container {
+    max-width: 650px;
+    margin: 0 auto;
+}
+
+.character-wizard-app .form-group {
+    margin-bottom: 30px;
+}
+
+.character-wizard-app .form-group label {
+    display: block;
+    color: #bdc3c7;
+    font-size: 1rem;
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+    font-family: var(--font-serif, serif);
+}
+
+.character-wizard-app .form-fields input,
+.character-wizard-app .form-fields select {
+    width: 100%;
+    height: 42px;
+    line-height: normal;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #444;
+    color: #fff;
+    padding: 0 15px;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    font-family: var(--font-primary, sans-serif);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.character-wizard-app .form-fields select option {
+    background: #111;
+    color: #fff;
+}
+
+.character-wizard-app .form-fields input:focus,
+.character-wizard-app .form-fields select:focus {
+    outline: none;
+    border-color: var(--c-highlight, #d4af37);
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.4);
+    background: rgba(0, 0, 0, 0.8);
+    transform: translateY(-1px);
+}
+
+.character-wizard-app .split-group {
+    display: flex;
+    gap: 30px;
+}
+
+.character-wizard-app .split-group .sub-group {
+    flex: 1;
+}
+
+.character-wizard-app .silver-input-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.character-wizard-app .silver-input-wrap i {
+    position: absolute;
+    left: 15px;
+    color: #f1c40f;
+    font-size: 1.2rem;
+}
+
+.character-wizard-app .silver-input-wrap input {
+    padding-left: 42px;
+}
+
+/* 伪装的下拉按钮 (门派选择器) */
+.character-wizard-app .sect-selector-btn {
+    width: 100%;
+    height: 42px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #444;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 15px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.character-wizard-app .sect-selector-btn:hover {
+    border-color: var(--c-highlight, #d4af37);
+    background: rgba(212, 175, 55, 0.1);
+}
+
+.character-wizard-app .sect-name {
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+.character-wizard-app .sect-hint {
+    color: var(--c-highlight, #d4af37);
+    font-size: 0.9rem;
+}
+
+/* ==========================================================================
+   Step 6 降生界面的居中美化
+   ========================================================================== */
+.character-wizard-app .wizard-final-view {
+    position: relative;
+    height: 100%;
+    min-height: 450px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid #333;
+    box-shadow: inset 0 0 80px rgba(0, 0, 0, 0.9);
+}
+
+.character-wizard-app .final-bg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.4;
+    z-index: 0;
+    mix-blend-mode: screen;
+}
+
+.character-wizard-app .final-content {
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 60px;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9);
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    backdrop-filter: blur(8px);
+}
+
+.character-wizard-app .final-content h2 {
+    color: #fff;
+    font-size: 2.5rem;
+    font-family: var(--font-serif, serif);
+    margin: 25px 0;
+    text-shadow: 0 0 15px rgba(212, 175, 55, 0.6);
+    letter-spacing: 3px;
+}
+
+.character-wizard-app .yin-yang-spin {
+    animation: spinSlow 15s linear infinite;
+    filter: drop-shadow(0 0 15px var(--c-highlight));
+}
+
+.character-wizard-app .warning-text {
+    margin-top: 30px;
+    color: #e74c3c;
+    font-size: 1.1rem;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+@keyframes spinSlow {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.character-wizard-app .placeholder-text {
+    color: #666;
+    text-align: center;
+    margin-top: 200px;
+    font-style: italic;
+    font-size: 1.4rem;
+}
+
+/* ==========================================================================
+   底部操作栏 (Footer)
+   ========================================================================== */
+.character-wizard-app .footer-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 40px;
+    background: rgba(0, 0, 0, 0.95);
+    border-top: 1px solid #333;
+    position: relative;
+    z-index: 10;
+}
+
+.character-wizard-app .footer-actions button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 30px;
+    font-size: 1.1rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    border: 1px solid #555;
+    background: #1a1a1a;
+    color: #ddd;
+    font-family: var(--font-primary, sans-serif);
+    letter-spacing: 1px;
+}
+
+.character-wizard-app .footer-actions button:hover:not(:disabled) {
+    background: #333;
+    color: #fff;
+    border-color: #888;
+}
+
+.character-wizard-app .footer-actions button:disabled {
+    opacity: 0.2;
+    cursor: not-allowed;
+}
+
+.character-wizard-app .footer-actions .btn-next {
+    background: var(--c-highlight, #d4af37);
+    color: #000;
+    border-color: transparent;
+    font-weight: bold;
+}
+
+.character-wizard-app .footer-actions .btn-next:hover {
+    background: #f1c40f;
+    color: #000;
+    box-shadow: 0 0 20px rgba(212, 175, 55, 0.5);
+    transform: translateY(-2px);
+}
+
+.character-wizard-app .footer-actions .btn-finish {
+    background: linear-gradient(135deg, #27ae60 0%, #2ecc71 100%);
+    color: #fff;
+    border-color: transparent;
+    font-weight: bold;
+    padding: 12px 40px;
+}
+
+.character-wizard-app .footer-actions .btn-finish:hover {
+    box-shadow: 0 0 20px rgba(46, 204, 113, 0.6);
+    transform: translateY(-2px);
+}
+
+/* ==========================================================================
+   门派选择器独立样式 (MMO 手风琴式 - 严格作用域版)
+   ========================================================================== */
+
+.sect-selector-app.application {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.sect-selector-app .window-content {
+    flex: 1 1 auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 0 !important;
+    background: #000 !important;
+    overflow: hidden !important;
+    height: 100% !important;
+}
+
+.sect-selector-app .mmo-accordion-container {
+    flex: 1 1 auto;
+    display: flex;
+    width: 100%;
+    height: 100%;
+    padding: 20px;
+    gap: 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+}
+
+.sect-selector-app .mmo-accordion-container::-webkit-scrollbar {
+    display: none;
+}
+
+.sect-selector-app .mmo-sect-panel {
+    position: relative;
+    height: 100%;
+    width: 80px;
+    flex-shrink: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    transition: width 0.6s cubic-bezier(0.25, 1, 0.3, 1), border-color 0.4s ease;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.8);
+}
+
+.sect-selector-app .mmo-sect-panel:hover {
+    border-color: rgba(212, 175, 55, 0.5);
+}
+
+.sect-selector-app .mmo-sect-panel.expanded {
+    width: 520px;
+    cursor: default;
+    border-color: var(--c-highlight, #d4af37);
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.5);
+}
+
+.sect-selector-app .panel-bg {
+    position: absolute;
+    inset: -10px;
+    background-size: cover;
+    background-position: center top;
+    filter: grayscale(80%) brightness(0.5);
+    transform: scale(1);
+    transition: filter 0.8s ease, transform 6s cubic-bezier(0.1, 1, 0.1, 1);
+}
+
+.sect-selector-app .mmo-sect-panel:hover .panel-bg {
+    filter: grayscale(40%) brightness(0.7);
+    transform: scale(1.02);
+}
+
+.sect-selector-app .mmo-sect-panel.expanded .panel-bg {
+    filter: grayscale(0%) brightness(1);
+    transform: scale(1.05);
+}
+
+.sect-selector-app .panel-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 40%);
+    transition: background 0.6s ease;
+}
+
+.sect-selector-app .mmo-sect-panel.expanded .panel-overlay {
+    background: linear-gradient(to right, transparent 0%, rgba(0, 0, 0, 0.8) 45%, rgba(0, 0, 0, 0.95) 100%);
+}
+
+.sect-selector-app .vertical-title {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #aaa;
+    font-family: var(--font-serif, serif);
+    transition: opacity 0.3s ease, color 0.3s ease;
+}
+
+.sect-selector-app .mmo-sect-panel:hover .vertical-title {
+    color: #fff;
+}
+
+.sect-selector-app .vertical-title .icon-deco {
+    margin-bottom: 20px;
+    font-size: 1.2rem;
+    color: var(--c-highlight, #d4af37);
+}
+
+.sect-selector-app .vertical-title .text {
+    writing-mode: vertical-rl;
+    text-orientation: upright;
+    font-size: 1.5rem;
+    letter-spacing: 8px;
+    text-shadow: 0 2px 4px #000;
+}
+
+.sect-selector-app .mmo-sect-panel.expanded .vertical-title {
+    opacity: 0;
+    pointer-events: none;
+    transition-duration: 0.1s;
+}
+
+.sect-selector-app .expanded-content {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 320px;
+    height: 100%;
+    padding: 50px 30px;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    transform: translateX(40px);
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.sect-selector-app .mmo-sect-panel.expanded .expanded-content {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+    transition: opacity 0.5s ease 0.3s, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+}
+
+.sect-selector-app .content-header h2 {
+    color: var(--c-highlight, #d4af37);
+    font-family: var(--font-serif, serif);
+    font-size: 2.2rem;
+    margin: 0 0 15px 0;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+    padding-bottom: 10px;
+    text-shadow: 0 2px 4px #000;
+}
+
+.sect-selector-app .content-body {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+}
+
+.sect-selector-app .content-body::-webkit-scrollbar {
+    display: none;
+}
+
+.sect-selector-app .content-body p {
+    color: #ddd;
+    font-size: 1.05rem;
+    line-height: 1.8;
+    text-align: justify;
+    text-shadow: 0 1px 2px #000;
+    margin-bottom: 15px;
+}
+
+.sect-selector-app .content-footer {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.sect-selector-app .btn-confirm-sect {
+    width: 100%;
+    background: transparent;
+    color: var(--c-highlight, #d4af37);
+    border: 1px solid var(--c-highlight, #d4af37);
+    padding: 12px;
+    font-size: 1.2rem;
+    font-family: var(--font-serif, serif);
+    cursor: pointer;
+    transition: all 0.3s;
+    border-radius: 4px;
+}
+
+.sect-selector-app .btn-confirm-sect:hover {
+    background: var(--c-highlight, #d4af37);
+    color: #000;
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.5);
+}

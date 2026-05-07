@@ -1,15 +1,18 @@
+import { XJZLSectSelectorApp } from "./sect-selector.mjs";
+
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
 export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(ApplicationV2) {
     constructor(options) {
         super(options);
-        
+
         this.actor = options.actor;
 
+        // 核心：内存状态机 (State)
         this.wizardData = {
             currentStep: 1,
             maxStep: 6,
-            
+
             // Step 1: 基础与背景
             info: {
                 name: this.actor.name,
@@ -21,54 +24,47 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 silver: 0
             },
 
-            // Step 2: 性格和背景
             origins: { background: null, personality: null },
-
-            // Step 3: 社交网
             social: {
                 rep_chaoting: 0, rep_wulin: 0,
                 attitude_chaoting: "none", attitude_wulin: "none", attitude_shisu: "none",
                 shihao: ["", "", ""], relations: []
             },
-
-            // Step 4: 预算与武学装配
             budget: { general: 0, neigong: 0, wuxue: 0, arts: 0 },
             assembly: { items: [] },
-
-            // Step 5: 技艺与天赋
-            artsBonus: {} 
+            artsBonus: {}
         };
     }
 
     static DEFAULT_OPTIONS = {
         id: "xjzl-character-wizard",
         tag: "form",
-        classes: ["xjzl-window", "theme-dark", "character-wizard-app"], // 复用你的黑暗主题
-        position: { width: 950, height: 700 },
+        classes: ["xjzl-window", "theme-dark", "character-wizard-app"],
+        // 尺寸放大：占据屏幕视觉中心，更有RPG游戏建卡感
+        position: { width: 1200, height: 750 },
         window: {
             title: "侠界之旅 - 角色建卡向导",
             icon: "fas fa-hat-wizard",
             resizable: false
         },
-        // 开启表单变化自动提交，方便我们实时抓取输入框数据
+        // 关键：关闭自动提交，由我们手动接管数据
         form: {
-            submitOnChange: true,
+            submitOnChange: false,
             closeOnSubmit: false
         },
         actions: {
             nextStep: XJZLCharacterWizardApp.prototype._onNextStep,
             prevStep: XJZLCharacterWizardApp.prototype._onPrevStep,
-            finishWizard: XJZLCharacterWizardApp.prototype._onFinishWizard
+            finishWizard: XJZLCharacterWizardApp.prototype._onFinishWizard,
+            openSectSelector: XJZLCharacterWizardApp.prototype._onOpenSectSelector // 门派选择器
         }
     };
 
-    // 🔥 利用 PARTS 机制拆分模板
     static PARTS = {
         sidebar: {
             template: "systems/xjzl-system/templates/apps/character-wizard/sidebar.hbs",
             classes: ["wizard-sidebar"]
         },
-        // 主内容区 (所有步骤都在这一个 Part 里，通过 hbs 的 if 判断显示)
         main: {
             template: "systems/xjzl-system/templates/apps/character-wizard/main.hbs",
             classes: ["wizard-main-content"],
@@ -80,13 +76,10 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         }
     };
 
-    /**
-     * 将状态传递给模板
-     */
     async _prepareContext(options) {
         return {
             actor: this.actor,
-            data: this.wizardData, // 传给模板的数据
+            data: this.wizardData,
             isFirstStep: this.wizardData.currentStep === 1,
             isLastStep: this.wizardData.currentStep === this.wizardData.maxStep,
             choices: {
@@ -104,39 +97,70 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
     /* -------------------------------------------- */
 
     /**
-     * 捕获表单输入，实时同步到内存中
-     * 因为我们配置了 submitOnChange: true，输入框变化会触发此方法
+     * 手动提取并展开表单数据
      */
-    async _processFormData(event, form, formData) {
-        // V13 标准获取 object 的方法
-        const dataObj = formData.object;
-        
-        // 我们利用 foundry 的深度合并功能，将表单数据直接合并到 wizardData.info 或 social 中
-        // 只要 hbs 中的 name 属性写成 info.name, info.gender 即可
-        foundry.utils.mergeObject(this.wizardData, dataObj);
+    _saveCurrentStepData() {
+        if (!this.element) return;
+        // 1. 获取原生 FormData
+        const fd = new FormData(this.element);
+        // 2. 将 FormData 转换为普通对象 { "info.name": "xxx", "info.silver": 10 }
+        const rawData = Object.fromEntries(fd.entries());
+        // 3. 利用 Foundry 工具，将其展开为嵌套对象 { info: { name: "xxx", silver: 10 } }
+        const expandedData = foundry.utils.expandObject(rawData);
+        // 4. 深度合并到我们的内存状态中
+        foundry.utils.mergeObject(this.wizardData, expandedData);
     }
 
     async _onNextStep(event, target) {
         event.preventDefault();
+        this._saveCurrentStepData();
+
         if (this.wizardData.currentStep < this.wizardData.maxStep) {
             this.wizardData.currentStep++;
-            this.render(); // 刷新界面
+            this.render();
         }
     }
 
     async _onPrevStep(event, target) {
         event.preventDefault();
+        this._saveCurrentStepData();
+
         if (this.wizardData.currentStep > 1) {
             this.wizardData.currentStep--;
-            this.render(); // 刷新界面
+            this.render();
         }
     }
 
     // ==========================================
-    // 🔥 Step 6: 降生结算 (核心写入逻辑)
+    // Step 1: 基础身世
+    // ==========================================
+
+    /**
+     * 呼出门派选择器
+     */
+    async _onOpenSectSelector(event, target) {
+        event.preventDefault();
+
+        // 关键：在打开弹窗前，必须先保存玩家目前在文本框里输入的名字等信息，防止重绘时丢失
+        this._saveCurrentStepData();
+
+        // 实例化门派选择器，传入当前选中的门派和回调函数
+        new XJZLSectSelectorApp({
+            currentSect: this.wizardData.info.sect,
+            onSelect: (selectedSectKey) => {
+                this.wizardData.info.sect = selectedSectKey;
+                this.render(); // 重新渲染 Step 1，更新门派显示
+            }
+        }).render(true);
+    }
+
+    // ==========================================
+    // Step 6: 降生结算 (核心写入逻辑)
     // ==========================================
     async _onFinishWizard(event, target) {
         event.preventDefault();
+        this._saveCurrentStepData();
+
         const actor = this.actor;
         if (!actor) return;
 
@@ -150,13 +174,11 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
         ui.notifications.info("正在重塑角色躯体...");
 
-        // 1. 清理旧躯壳
         const oldItemIds = actor.items.map(i => i.id);
         if (oldItemIds.length > 0) {
             await actor.deleteEmbeddedDocuments("Item", oldItemIds);
         }
 
-        // 2. 构建 Actor 核心数据更新
         const actorUpdates = {
             "name": this.wizardData.info.name || "无名氏",
             "system.info": {
@@ -176,14 +198,10 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             }
         };
 
-        // 3. 构建技艺初始赠送 (自定义修改组)
         const artsChanges = [];
         for (const [artKey, level] of Object.entries(this.wizardData.artsBonus)) {
             if (level > 0) {
-                artsChanges.push({
-                    key: `system.arts.${artKey}.value`, 
-                    value: level
-                });
+                artsChanges.push({ key: `system.arts.${artKey}.value`, value: level });
             }
         }
         if (artsChanges.length > 0) {
@@ -195,23 +213,16 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             }];
         }
 
-        // 4. 生成创角历史日志
         const historyLog = {
-            id: foundry.utils.randomID(),
-            realTime: Date.now(),
-            type: "text",
-            importance: 2,
-            title: "踏入江湖",
-            reason: "通过向导完成建卡",
+            id: foundry.utils.randomID(), realTime: Date.now(), type: "text",
+            importance: 2, title: "踏入江湖", reason: "通过向导完成建卡",
             delta: "", balance: ""
         };
         const currentHistory = actor.system.history || [];
         actorUpdates["system.history"] = [historyLog, ...currentHistory];
 
-        // 5. 执行属性更新
         await actor.update(actorUpdates);
 
-        // 6. 批量创建物品
         const itemsToCreate = [];
         if (this.wizardData.origins.background) itemsToCreate.push(this.wizardData.origins.background);
         if (this.wizardData.origins.personality) itemsToCreate.push(this.wizardData.origins.personality);
@@ -221,7 +232,6 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             await actor.createEmbeddedDocuments("Item", itemsToCreate);
         }
 
-        // 7. 收尾工作
         ui.notifications.success(`${actor.name} 降生成功！`);
         this.close();
         actor.sheet.render(true);
