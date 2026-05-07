@@ -360,6 +360,351 @@
 }
 
 /* ==========================================================================
+   Step 2: 命理性格 (Origin Selection)
+   ========================================================================== */
+.character-wizard-app .origin-step-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.character-wizard-app .origin-split-layout {
+    display: flex;
+    gap: 30px;
+    width: 100%;
+    /* 确保填满容器 */
+}
+
+.character-wizard-app .origin-column {
+    flex: 1 1 50%;
+    /* 强制基础宽度为 50% */
+    min-width: 0;
+    /* 禁止内容撑破 Flex 容器边界，拯救左侧面板 */
+    display: flex;
+    flex-direction: column;
+}
+
+.character-wizard-app .column-title {
+    color: var(--c-highlight, #d4af37);
+    font-family: var(--font-serif, serif);
+    font-size: 1.3rem;
+    border-bottom: 2px solid rgba(212, 175, 55, 0.3);
+    padding-bottom: 8px;
+    margin-bottom: 15px;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* 核心视窗：锁死高度，内部滚动 */
+.character-wizard-app .origin-inner-split {
+    display: flex;
+    height: 420px;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    margin-bottom: 15px;
+    min-width: 0;
+    /* 同理，防止内部内容暴走 */
+}
+
+/* 左侧：菜单列表 */
+.character-wizard-app .origin-list-sidebar {
+    width: 130px;
+    flex-shrink: 0;
+    /* 列表坚决不准被压缩 */
+    background: rgba(0, 0, 0, 0.4);
+    border-right: 1px solid #222;
+    overflow-y: auto;
+}
+
+.character-wizard-app .origin-list-item {
+    padding: 12px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+    color: #bbb;
+    font-size: 0.95rem;
+}
+
+.character-wizard-app .origin-list-item img {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    border: 1px solid #444;
+}
+
+.character-wizard-app .origin-list-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+.character-wizard-app .origin-list-item.selected {
+    background: linear-gradient(90deg, rgba(212, 175, 55, 0.2) 0%, transparent 100%);
+    color: var(--c-highlight, #d4af37);
+    border-left: 3px solid var(--c-highlight, #d4af37);
+    font-weight: bold;
+}
+
+.character-wizard-app .origin-list-item.selected img {
+    border-color: var(--c-highlight, #d4af37);
+}
+
+/* 右侧：详情面板 */
+.character-wizard-app .origin-detail-view {
+    flex: 1;
+    min-width: 0;
+    /* 允许内部长文本自动换行，而不是去顶宽容器 */
+    padding: 20px;
+    overflow-y: auto;
+    position: relative;
+}
+
+.character-wizard-app .detail-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px dashed #444;
+}
+
+.character-wizard-app .detail-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 6px;
+    border: 1px solid var(--c-highlight, #d4af37);
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.character-wizard-app .detail-name {
+    font-size: 1.5rem;
+    color: #fff;
+    margin: 0;
+    font-family: var(--font-serif, serif);
+}
+
+.character-wizard-app .detail-desc {
+    font-size: 0.95rem;
+    color: #ccc;
+    line-height: 1.6;
+    margin-bottom: 20px;
+}
+
+.character-wizard-app .detail-assets {
+    padding: 12px;
+    background: rgba(46, 204, 113, 0.1);
+    border: 1px solid rgba(46, 204, 113, 0.3);
+    border-radius: 6px;
+    color: #ddd;
+    font-size: 0.95rem;
+}
+
+.character-wizard-app .detail-assets i {
+    color: #2ecc71;
+}
+
+/* 提示与空视图 */
+.character-wizard-app .system-warning-note {
+    font-size: 0.85rem;
+    color: #e67e22;
+    background: rgba(230, 126, 34, 0.1);
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(230, 126, 34, 0.3);
+}
+
+.character-wizard-app .origin-empty-box {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #666;
+    font-style: italic;
+    font-size: 1.1rem;
+}
+
+/* 性格专长复选框 */
+.character-wizard-app .personality-skills {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px dashed #444;
+}
+
+.character-wizard-app .skill-prompt {
+    display: block;
+    color: var(--c-highlight, #d4af37);
+    margin-bottom: 12px;
+    font-weight: bold;
+}
+
+.character-wizard-app .skill-checkbox-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.character-wizard-app .skill-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: #ddd;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 4px;
+    border: 1px solid #333;
+    transition: all 0.2s;
+}
+
+.character-wizard-app .skill-checkbox:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: #555;
+}
+
+.character-wizard-app .skill-checkbox input[type="checkbox"] {
+    accent-color: var(--c-highlight, #d4af37);
+    width: 16px;
+    height: 16px;
+}
+
+/* ==========================================================================
+   Step 3: 处世结交 (Social & Biography)
+   ========================================================================== */
+.character-wizard-app .social-step-container {
+    max-width: 900px;
+}
+
+.character-wizard-app .social-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.character-wizard-app .social-panel {
+    background: rgba(0, 0, 0, 0.7);
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 20px;
+    backdrop-filter: blur(4px);
+}
+
+.character-wizard-app .panel-header {
+    font-size: 1.2rem;
+    color: var(--c-highlight, #d4af37);
+    border-bottom: 1px solid rgba(212, 175, 55, 0.3);
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+    font-family: var(--font-serif, serif);
+}
+
+.character-wizard-app .panel-header.flex-between {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.character-wizard-app .hobbies-row {
+    display: flex;
+    gap: 10px;
+}
+
+.character-wizard-app .hobbies-row select {
+    flex: 1;
+}
+
+.character-wizard-app .reputation-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.character-wizard-app .rep-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.character-wizard-app .rep-item label {
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+.character-wizard-app .rep-item input,
+.character-wizard-app .rep-item select {
+    height: 36px;
+}
+
+/* 富文本编辑器包裹器 */
+.character-wizard-app .bio-prosemirror-wrapper {
+    background: #111;
+    border: 1px solid #444;
+    border-radius: 6px;
+    min-height: 150px;
+    padding: 10px;
+}
+
+/* 关系网 */
+.character-wizard-app .btn-small-add {
+    background: rgba(46, 204, 113, 0.2);
+    color: #2ecc71;
+    border: 1px solid #2ecc71;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.character-wizard-app .btn-small-add:hover {
+    background: #2ecc71;
+    color: #000;
+}
+
+.character-wizard-app .relations-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.character-wizard-app .relation-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.character-wizard-app .relation-row input {
+    height: 36px;
+}
+
+.character-wizard-app .relation-row input[type="number"] {
+    width: 80px;
+    text-align: center;
+}
+
+.character-wizard-app .btn-delete-rel {
+    background: transparent;
+    border: none;
+    color: #e74c3c;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 5px;
+}
+
+.character-wizard-app .btn-delete-rel:hover {
+    color: #c0392b;
+}
+
+.character-wizard-app .empty-hint {
+    color: #666;
+    font-style: italic;
+    text-align: center;
+    padding: 10px 0;
+}
+
+/* ==========================================================================
    Step 6 降生界面的居中美化
    ========================================================================== */
 .character-wizard-app .wizard-final-view {
