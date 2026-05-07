@@ -1519,6 +1519,10 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/compendiumbrowser/sidebar.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览
+    // 向导界面
+    "systems/xjzl-system/templates/apps/character-wizard/sidebar.hbs",
+    "systems/xjzl-system/templates/apps/character-wizard/main.hbs",
+    "systems/xjzl-system/templates/apps/character-wizard/footer.hbs",
     //暂停按钮的界面
     "systems/xjzl-system/templates/system/pause.hbs",
   ];

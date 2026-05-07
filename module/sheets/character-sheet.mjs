@@ -12,6 +12,7 @@ import { XJZLManageXPDialog } from "../applications/manage-xp.mjs";
 import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { XJZLCharacterPreviewApp } from "../applications/character-preview.mjs";
+import { XJZLCharacterWizardApp } from "../applications/character-wizard.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -1396,6 +1397,19 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             onClick: this._onPreviewCharacter.bind(this)
         });
 
+        // 建卡向导按钮
+        // 只有 Owner 才能看到这个按钮
+        if (this.document.isOwner) {
+            controls.unshift({ // 用 unshift 放在最前面，更显眼
+                action: "openWizard",
+                label: "建卡向导",
+                icon: "fas fa-hat-wizard",
+                // 添加高亮样式使其引人注目
+                class: "xjzl-wizard-btn", 
+                onClick: this._onOpenWizard.bind(this)
+            });
+        }
+
         return controls;
     }
 
@@ -1407,6 +1421,31 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 实例化新 App
         // 传入当前的角色 document
         new XJZLCharacterPreviewApp({ actor: this.document }).render(true);
+    }
+
+    /**
+     * 点击“向导建卡”时的处理逻辑
+     */
+    async _onOpenWizard(event) {
+        event.preventDefault();
+        
+        // 弹出免责警告：向导建卡会清空当前数据
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: "进入建卡向导", icon: "fas fa-exclamation-triangle" },
+            content: `
+                <p style="color:#ff6b6b; font-weight:bold;">警告：进入建卡向导并完成结算后，将清空当前角色卡上的所有物品和数据！</p>
+                <p>建议仅对新建立的【空白角色】使用此功能。</p>
+                <p>是否继续？</p>
+            `,
+            rejectClose: false
+        });
+
+        if (confirmed) {
+            // 实例化并渲染向导，将当前 Actor 传进去
+            new XJZLCharacterWizardApp({ actor: this.document }).render(true);
+            // 可选：把现在的角色卡先最小化或关掉，避免挡视野
+            this.close();
+        }
     }
 
     /* -------------------------------------------- */
