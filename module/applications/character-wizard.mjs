@@ -18,7 +18,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         // ==========================================
         this.wizardData = {
             currentStep: 1,
-            maxStep: 6,
+            maxStep: 7,
 
             // Step 1: 基础与背景
             info: {
@@ -27,8 +27,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 title: "",
                 sect: "none",
                 appearance: "",
-                bio: "",
-                silver: 0
+                bio: ""
             },
             // Step 2: 命理性格 (存放完整 Item 对象快照)
             origins: { background: null, personality: null },
@@ -48,8 +47,15 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             // assembly: 从万卷阁拖入的武学/内功列表
             assembly: { items: [] },
 
-            // Step 5: 技艺 (预留给后续开发)
-            artsBonus: {}
+            // Step 5: 技艺
+            artsBonus: {},
+
+            // Step 6: 行囊采买
+            shopping: {
+                silver: 0,
+                runtimeSilver: 0,
+                items: []
+            }
         };
     }
 
@@ -84,7 +90,9 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             // Step 4 动作
             openBrowser: XJZLCharacterWizardApp.prototype._onOpenBrowser,
             removeAssemblyItem: XJZLCharacterWizardApp.prototype._onRemoveAssemblyItem,
-            refreshBudget: XJZLCharacterWizardApp.prototype._onRefreshBudget
+            refreshBudget: XJZLCharacterWizardApp.prototype._onRefreshBudget,
+            // Step 6 动作
+            removeShoppingItem: XJZLCharacterWizardApp.prototype._onRemoveShoppingItem
         }
     };
 
@@ -166,6 +174,10 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             if (e.target.closest(".budget-input-group") || e.target.closest(".assembly-list-container")) {
                 this._onRefreshBudget();
             }
+            // 监听购物区的输入变化
+            if (e.target.closest(".shopping-budget-group") || e.target.closest(".shopping-list-container")) {
+                this._onRefreshShoppingBudget();
+            }
         };
         this.element.addEventListener("input", refreshTrigger);
         this.element.addEventListener("change", refreshTrigger);
@@ -211,6 +223,14 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
             if (rb.general < 0 || rb.neigong < 0 || rb.wuxue < 0) {
                 return ui.notifications.error("修为已透支！请减少武学配置，或增加左侧的初始资源后再继续。");
+            }
+        }
+
+        // 校验：离开第 6 步前，检查银两是否透支
+        if (this.wizardData.currentStep === 6) {
+            this._onRefreshShoppingBudget();
+            if (this.wizardData.shopping.runtimeSilver < 0) {
+                return ui.notifications.error("银两已透支！请减少购买的物品，或增加初始银两后再继续。");
             }
         }
 
@@ -375,7 +395,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
     }
 
     // ==========================================
-    // Step 4: 武学内功 (装配与预算引擎)
+    // Step 4: 武学内功 (装配与预算引擎) 与部分 Step6：行囊采买
     // ==========================================
 
     /**
@@ -405,7 +425,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
      * 响应万卷阁的拖拽放置
      */
     async _onDropItem(event) {
-        if (this.wizardData.currentStep !== 4) return;
+        if (this.wizardData.currentStep !== 4 && this.wizardData.currentStep !== 6) return;
 
         let data;
         try { data = JSON.parse(event.dataTransfer.getData("text/plain")); }
@@ -413,41 +433,85 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
         if (data.type !== "Item" || !data.uuid) return;
 
-        const item = await fromUuid(data.uuid);
-        if (!item || !["neigong", "wuxue"].includes(item.type)) {
-            return ui.notifications.warn("只能将【内功】或【武学】拖入此处！");
+        // ==========================================
+        // 分支 A: 第 4 步 (武学内功)
+        // ==========================================
+        if (this.wizardData.currentStep === 4) {
+            const item = await fromUuid(data.uuid);
+            if (!item || !["neigong", "wuxue"].includes(item.type)) {
+                return ui.notifications.warn("只能将【内功】或【武学】拖入此处！");
+            }
+
+            if (this.wizardData.assembly.items.some(i => i.uuid === item.uuid)) {
+                return ui.notifications.warn("该心法/武学已在参悟列表中。");
+            }
+
+            const itemDataObj = item.toObject();
+
+            // [业务判定]：为模板准备 hasHeyi 字段，如果是天级武学才有第4层(合一)
+            if (item.type === "wuxue") {
+                const defaultTier = itemDataObj.system.tier ?? 1;
+                itemDataObj.system.moves.forEach(m => {
+                    const t = m.tier ?? defaultTier;
+                    m.hasHeyi = t >= 3;
+                });
+            }
+
+            const assemblyItem = {
+                id: item.id,
+                uuid: item.uuid,
+                type: item.type,
+                name: item.name,
+                img: item.img,
+                itemData: itemDataObj,
+                // 运行时的计算结果缓存，供最终结算时写入系统
+                runtime: { requiredXP: 0, costGeneral: 0, costSpecific: 0, moves: {} }
+            };
+
+            this.wizardData.assembly.items.push(assemblyItem);
+            this._onRefreshBudget();
+            this.render();
         }
+        // ==========================================
+        // 分支 B: 第 6 步 (行囊采买)
+        // ==========================================
+        else if (this.wizardData.currentStep === 6) {
+            const item = await fromUuid(data.uuid);
+            const validTypes = ["weapon", "armor", "consumable", "misc", "qizhen"];
 
-        if (this.wizardData.assembly.items.some(i => i.uuid === item.uuid)) {
-            return ui.notifications.warn("该心法/武学已在参悟列表中。");
+            if (!item || !validTypes.includes(item.type)) {
+                return ui.notifications.warn("只能将装备、杂物或消耗品拖入此处！");
+            }
+
+            // 获取被拖入的目标区域 (free/half/full)
+            const dropZone = event.target.closest("[data-zone]");
+            if (!dropZone) return ui.notifications.warn("请将物品明确拖入【免费区】、【半价区】或【全价区】内！");
+
+            const zone = dropZone.dataset.zone;
+            const price = item.system.price || 0;
+
+            // 查找同一个区域里是否已经有这个物品了 (实现堆叠)
+            const existing = this.wizardData.shopping.items.find(i => i.uuid === item.uuid && i.zone === zone);
+
+            if (existing) {
+                existing.quantity += 1;
+            } else {
+                this.wizardData.shopping.items.push({
+                    id: foundry.utils.randomID(), // 独立ID，防止多个同UUID物品在不同区域冲突
+                    uuid: item.uuid,
+                    type: item.type,
+                    name: item.name,
+                    img: item.img,
+                    price: price,
+                    quantity: 1,
+                    zone: zone,
+                    itemData: item.toObject()
+                });
+            }
+
+            this._onRefreshShoppingBudget();
+            this.render();
         }
-
-        const itemDataObj = item.toObject();
-
-        // [业务判定]：为模板准备 hasHeyi 字段，如果是天级武学才有第4层(合一)
-        if (item.type === "wuxue") {
-            const defaultTier = itemDataObj.system.tier ?? 1;
-            itemDataObj.system.moves.forEach(m => {
-                const t = m.tier ?? defaultTier;
-                m.hasHeyi = t >= 3;
-            });
-        }
-
-        const assemblyItem = {
-            id: item.id,
-            uuid: item.uuid,
-            type: item.type,
-            name: item.name,
-            img: item.img,
-            itemData: itemDataObj,
-            // 运行时的计算结果缓存，供最终结算时写入系统
-            runtime: { requiredXP: 0, costGeneral: 0, costSpecific: 0, moves: {} }
-        };
-
-        // 先写入数组 -> 更新预算内存 -> 重绘界面
-        this.wizardData.assembly.items.push(assemblyItem);
-        this._onRefreshBudget();
-        this.render();
     }
 
     /**
@@ -603,7 +667,55 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
     // ==========================================
 
     // ==========================================
-    // Step 6: 降生结算
+    // Step 6: 行囊采购
+    // ==========================================
+
+    /**
+     * 移除购物车物品
+     */
+    async _onRemoveShoppingItem(event, target) {
+        event.preventDefault();
+        const id = target.dataset.id;
+        this.wizardData.shopping.items = this.wizardData.shopping.items.filter(i => i.id !== id);
+        this._onRefreshShoppingBudget();
+        this.render();
+    }
+
+    /**
+     * 逆向计算购物车花费
+     */
+    _onRefreshShoppingBudget() {
+        this._saveCurrentStepData();
+        const state = this.wizardData;
+        let totalCost = 0;
+
+        for (const item of state.shopping.items) {
+            // 获取表单中可能被玩家手动修改的数量
+            const qtyInputName = `shopping_qty_${item.id}`;
+            if (state[qtyInputName] !== undefined) {
+                item.quantity = Math.max(1, parseInt(state[qtyInputName]) || 1);
+            }
+
+            let multiplier = 1;
+            if (item.zone === "free") multiplier = 0;
+            else if (item.zone === "half") multiplier = 0.5;
+
+            // 公式：向下取整 (单价 * 数量 * 折扣)
+            totalCost += Math.floor(item.price * item.quantity * multiplier);
+        }
+
+        state.shopping.runtimeSilver = state.shopping.silver - totalCost;
+
+        // 极速更新 DOM 数值和颜色
+        const remainEl = this.element.querySelector("#remain-silver");
+        if (remainEl) {
+            remainEl.innerText = state.shopping.runtimeSilver;
+            remainEl.style.color = state.shopping.runtimeSilver < 0 ? "#e74c3c" : (state.shopping.runtimeSilver === 0 ? "#95a5a6" : "#2ecc71");
+        }
+    }
+
+    // ==========================================
+    // Step 7: 降生结算
     // ==========================================
     async _onFinishWizard(event, target) {
         event.preventDefault();
@@ -780,6 +892,14 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
         if (itemsToCreate.length > 0) {
             await actor.createEmbeddedDocuments("Item", itemsToCreate);
+        }
+
+        // 合并行囊采买的物品
+        for (const shopItem of this.wizardData.shopping.items) {
+            const newItemData = foundry.utils.deepClone(shopItem.itemData);
+            // 覆写购买的数量
+            newItemData.system.quantity = shopItem.quantity;
+            itemsToCreate.push(newItemData);
         }
 
         ui.notifications.success(`${actor.name} 降生成功！`);

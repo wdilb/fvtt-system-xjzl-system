@@ -60,16 +60,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="form-group">
-                <label>初始银两</label>
-                <div class="form-fields">
-                    <div class="silver-input-wrap">
-                        <i class="fas fa-coins"></i>
-                        <input type="number" name="info.silver" value="{{data.info.silver}}" min="0">
-                    </div>
-                </div>
-            </div>
         </div>
         {{/if}}
 
@@ -504,8 +494,127 @@
 
         </div>
         {{/if}}
-
+        {{!-- ================= Step 6: 行囊采买 ================= --}}
         {{#if (eq data.currentStep 6)}}
+        <div class="step-bg" style="background-image: url('systems/xjzl-system/assets/picture/wizard-step6-bg.png');">
+        </div>
+        <div class="wizard-form-container relative-z shopping-step-container">
+            <div class="shopping-layout">
+                {{!-- 左侧：资金看板与入口 --}}
+                <div class="budget-board">
+                    <h3 class="board-title"><i class="fas fa-coins"></i> 银两盘缠</h3>
+
+                    <div class="budget-input-group shopping-budget-group">
+                        <div class="b-row specific-row" style="border-left-color: #f1c40f;">
+                            <label>初始银两 (文/两)</label>
+                            <input type="number" name="shopping.silver" value="{{data.shopping.silver}}" min="0">
+                            <div class="b-remain">余: <span id="remain-silver">{{#if
+                                    data.shopping.runtimeSilver}}{{data.shopping.runtimeSilver}}{{else}}{{data.shopping.silver}}{{/if}}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="compendium-shortcuts" style="flex-direction: column; gap: 10px;">
+                        <button type="button" class="btn-shortcut" data-action="openBrowser" data-type="weapon">
+                            <i class="fas fa-sword"></i> 挑选兵器
+                        </button>
+                        <button type="button" class="btn-shortcut" data-action="openBrowser" data-type="armor">
+                            <i class="fas fa-tshirt"></i> 挑选防具
+                        </button>
+                        <button type="button" class="btn-shortcut" data-action="openBrowser" data-type="consumable">
+                            <i class="fas fa-flask"></i> 挑选消耗品/杂物
+                        </button>
+                    </div>
+
+                    <div class="sect-rules-note scrollable" style="border-left-color: #f1c40f;">
+                        <h4 class="rule-title"><i class="fas fa-info-circle"></i> 采购须知</h4>
+                        <ul class="rule-list">
+                            <li><span class="highlight">免费区：</span>拖入背景/模组无偿赠送之物。</li>
+                            <li><span class="highlight">半价区：</span>拖入门派物资或特殊折扣物资。</li>
+                            <li><span class="highlight">全价区：</span>拖入正常购买的物资。</li>
+                            <li class="warning"><i class="fas fa-exclamation-triangle"></i> 不符合以上购买规则的物品请建卡完成后手动购买。</li>
+                        </ul>
+                    </div>
+                </div>
+
+                {{!-- 右侧：三个打折区 --}}
+                <div class="shopping-board shopping-list-container scrollable">
+
+                    {{!-- 免费区 --}}
+                    <div class="shopping-zone free-zone" data-zone="free">
+                        <h4 class="zone-title"><i class="fas fa-gift"></i> 免费获取 (不扣钱)</h4>
+                        <div class="zone-items">
+                            {{#each data.shopping.items as |shopItem|}}
+                            {{#if (eq shopItem.zone "free")}}
+                            <div class="shop-item-card">
+                                <img src="{{shopItem.img}}">
+                                <div class="si-name">{{shopItem.name}} <span class="si-price">单价:
+                                        {{shopItem.price}}</span></div>
+                                <div class="si-controls">
+                                    <span>数量:</span>
+                                    <input type="number" name="shopping_qty_{{shopItem.id}}"
+                                        value="{{shopItem.quantity}}" min="1">
+                                    <a data-action="removeShoppingItem" data-id="{{shopItem.id}}" title="放回原处"><i
+                                            class="fas fa-trash"></i></a>
+                                </div>
+                            </div>
+                            {{/if}}
+                            {{/each}}
+                        </div>
+                    </div>
+
+                    {{!-- 半价区 --}}
+                    <div class="shopping-zone half-zone" data-zone="half">
+                        <h4 class="zone-title"><i class="fas fa-tags"></i> 门派物资 (半价)</h4>
+                        <div class="zone-items">
+                            {{#each data.shopping.items as |shopItem|}}
+                            {{#if (eq shopItem.zone "half")}}
+                            <div class="shop-item-card">
+                                <img src="{{shopItem.img}}">
+                                <div class="si-name">{{shopItem.name}} <span class="si-price">单价:
+                                        {{shopItem.price}}</span></div>
+                                <div class="si-controls">
+                                    <span>数量:</span>
+                                    <input type="number" name="shopping_qty_{{shopItem.id}}"
+                                        value="{{shopItem.quantity}}" min="1">
+                                    <a data-action="removeShoppingItem" data-id="{{shopItem.id}}"><i
+                                            class="fas fa-trash"></i></a>
+                                </div>
+                            </div>
+                            {{/if}}
+                            {{/each}}
+                        </div>
+                    </div>
+
+                    {{!-- 全价区 --}}
+                    <div class="shopping-zone full-zone" data-zone="full">
+                        <h4 class="zone-title"><i class="fas fa-shopping-cart"></i> 正常采买 (全额)</h4>
+                        <div class="zone-items">
+                            {{#each data.shopping.items as |shopItem|}}
+                            {{#if (eq shopItem.zone "full")}}
+                            <div class="shop-item-card">
+                                <img src="{{shopItem.img}}">
+                                <div class="si-name">{{shopItem.name}} <span class="si-price">单价:
+                                        {{shopItem.price}}</span></div>
+                                <div class="si-controls">
+                                    <span>数量:</span>
+                                    <input type="number" name="shopping_qty_{{shopItem.id}}"
+                                        value="{{shopItem.quantity}}" min="1">
+                                    <a data-action="removeShoppingItem" data-id="{{shopItem.id}}"><i
+                                            class="fas fa-trash"></i></a>
+                                </div>
+                            </div>
+                            {{/if}}
+                            {{/each}}
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+        {{/if}}
+
+        {{#if (eq data.currentStep 7)}}
         <div class="wizard-final-view">
             <img class="final-bg" src="systems/xjzl-system/assets/picture/wizard-birth-bg.png">
             <div class="final-content">
