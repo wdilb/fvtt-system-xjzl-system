@@ -56,6 +56,25 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
         const sectConfig = CONFIG.XJZL.sects;
         const descConfig = CONFIG.XJZL.sectDescription;
 
+        // 自定义未展开时的图片坐标字典
+        // 在这里自由调整那些显示偏了的门派
+        // 格式可以是 "left center", "right 20%", "60% 40%" 等
+        // 没写在里面的门派，HBS 将不会生成数据，CSS 会使用默认值
+        const customPositions = {
+            "zhengqizong": "center 45px",
+            "xiaoyaopai": "61% 30px",   
+            "qingtianmen": "58% 30px",  
+            "emeipai": "center -5px",   
+            "huashanpai": "68% top", 
+            "tangmen": "30% -40px", 
+            "mingjiao": "center 10px",
+            "gaibang": "center -15px",
+            "fenghuayuan": "45% top",
+            "liushanmen": "center 10px",
+            "sihaibiaomeng":"center -60px",
+            "wanshoushanzhuang":"center -30px",
+        };
+
         for (const [key, labelKey] of Object.entries(sectConfig)) {
             sectData.push({
                 key: key,
@@ -63,7 +82,9 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
                 desc: game.i18n.localize(descConfig[key] || "XJZL.Sect.Desc.None"),
                 // 如果找不到对应的图片，使用默认黑影占位图
                 img: `systems/xjzl-system/assets/picture/sects/${key}.png`,
-                isActive: this.currentSect === key
+                isActive: this.currentSect === key,
+                // 将字典里的坐标赋给数据
+                bgPos: customPositions[key] || null 
             });
         }
 
