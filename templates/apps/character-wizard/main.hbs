@@ -289,7 +289,166 @@
             </div>
         </div>
         {{/if}}
-        {{#if (eq data.currentStep 4)}}<div class="placeholder-text">武学内功：运算引擎加载中...</div>{{/if}}
+        {{!-- ================= Step 4: 武学内功 (预算与装配) ================= --}}
+        {{#if (eq data.currentStep 4)}}
+        <div class="step-bg" style="background-image: url('systems/xjzl-system/assets/picture/wizard-step4-bg.png');">
+        </div>
+        <div class="wizard-form-container relative-z assembly-step-container">
+
+            <div class="assembly-layout">
+                {{!-- 左侧：预算看板 --}}
+                <div class="budget-board">
+                    <h3 class="board-title"><i class="fas fa-coins"></i> 初始资源</h3>
+
+                    <div class="budget-input-group">
+                        <div class="b-row general-row">
+                            <label>通用修为</label>
+                            <input type="number" name="budget.general" value="{{data.budget.general}}" min="0">
+                            <div class="b-remain">余: <span id="remain-gen">{{#if
+                                    data.runtimeBudget}}{{data.runtimeBudget.general}}{{else}}{{data.budget.general}}{{/if}}</span>
+                            </div>
+                        </div>
+                        <div class="b-row specific-row">
+                            <label>内功专属</label>
+                            <input type="number" name="budget.neigong" value="{{data.budget.neigong}}" min="0">
+                            <div class="b-remain">余: <span id="remain-ng">{{#if
+                                    data.runtimeBudget}}{{data.runtimeBudget.neigong}}{{else}}{{data.budget.neigong}}{{/if}}</span>
+                            </div>
+                        </div>
+                        <div class="b-row specific-row">
+                            <label>武学专属</label>
+                            <input type="number" name="budget.wuxue" value="{{data.budget.wuxue}}" min="0">
+                            <div class="b-remain">余: <span id="remain-wx">{{#if
+                                    data.runtimeBudget}}{{data.runtimeBudget.wuxue}}{{else}}{{data.budget.wuxue}}{{/if}}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="compendium-shortcuts">
+                        <button type="button" class="btn-shortcut neigong" data-action="openBrowser"
+                            data-type="neigong">
+                            <i class="fas fa-yin-yang"></i> 挑选内功
+                        </button>
+                        <button type="button" class="btn-shortcut wuxue" data-action="openBrowser" data-type="wuxue">
+                            <i class="fas fa-fist-raised"></i> 挑选武学
+                        </button>
+                    </div>
+
+                    {{!-- 门派规制引导 --}}
+                    <div class="sect-rules-note scrollable">
+                        <h4 class="rule-title"><i class="fas fa-book"></i> 门规制参考</h4>
+                        <ul class="rule-list">
+                            <li><span class="highlight">外门：</span>任意人级武学/内功，选修一套地级（外门弟子不能学习散手、轻功、阵法）。</li>
+                            <li><span class="highlight">嫡传：</span>(地级内功圆满晋升) 任意地级武学/内功，选修一套天级。</li>
+                            <li><span class="highlight">长老：</span>(天级内功圆满晋升) 修习门派所有心法。</li>
+                            <li class="warning"><i class="fas fa-exclamation-circle"></i> 门派特殊规则大于通用规则</li>
+                        </ul>
+                    </div>
+                </div>
+
+                {{!-- 右侧：装配列表 --}}
+                <div class="assembly-board">
+                    <h3 class="board-title"><i class="fas fa-scroll"></i> 武学参悟录</h3>
+                    <div class="budget-desc">从左侧开启万卷阁拖入心法招式，设定初始境界。</div>
+
+                    <div class="assembly-list-container scrollable">
+                        {{#if data.assembly.items.length}}
+                        {{#each data.assembly.items as |asm|}}
+
+                        {{!-- 内功卡片 (注意 name 属性已改为 asm.id) --}}
+                        {{#if (eq asm.type "neigong")}}
+                        <div class="asm-card neigong-card">
+                            <a class="asm-remove" data-action="removeAssemblyItem" data-uuid="{{asm.uuid}}"
+                                title="移除"><i class="fas fa-times"></i></a>
+                            <div class="asm-header">
+                                <img src="{{asm.img}}">
+                                <div class="asm-name">{{asm.name}} <span class="tier-badge">内功</span></div>
+                            </div>
+                            <div class="asm-config-row">
+                                <div class="cfg-item">
+                                    <label>目标境界</label>
+                                    <select name="config_neigong.{{asm.id}}.targetStage">
+                                        <option value="0">未入门</option>
+                                        <option value="1" {{#if (eq (lookup (lookup ../data.config_neigong
+                                            asm.id) 'targetStage' ) "1" )}}selected{{/if}}>一层 (领悟)</option>
+                                        <option value="2" {{#if (eq (lookup (lookup ../data.config_neigong
+                                            asm.id) 'targetStage' ) "2" )}}selected{{/if}}>二层 (小成)</option>
+                                        <option value="3" {{#if (eq (lookup (lookup ../data.config_neigong
+                                            asm.id) 'targetStage' ) "3" )}}selected{{/if}}>三层 (圆满)</option>
+                                    </select>
+                                </div>
+                                <div class="cfg-item">
+                                    <label>获取方式</label>
+                                    <select name="config_neigong.{{asm.id}}.payment">
+                                        <option value="xp" {{#if (eq (lookup (lookup ../data.config_neigong
+                                            asm.id) 'payment' ) "xp" )}}selected{{/if}}>消耗修为</option>
+                                        <option value="free" {{#if (eq (lookup (lookup ../data.config_neigong
+                                            asm.id) 'payment' ) "free" )}}selected{{/if}}>开卡赠送</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        {{/if}}
+
+                        {{!-- 武学卡片 (注意 name 属性已改为 asm.id) --}}
+                        {{#if (eq asm.type "wuxue")}}
+                        <div class="asm-card wuxue-card">
+                            <a class="asm-remove" data-action="removeAssemblyItem" data-uuid="{{asm.uuid}}"
+                                title="移除"><i class="fas fa-times"></i></a>
+                            <div class="asm-header">
+                                <img src="{{asm.img}}">
+                                <div class="asm-name">{{asm.name}} <span class="tier-badge">武学</span></div>
+                            </div>
+                            <div class="asm-moves-list">
+                                {{#each asm.itemData.system.moves as |move|}}
+                                <div class="asm-move-row">
+                                    <span class="move-name"><i class="fas fa-caret-right"></i> {{move.name}}</span>
+                                    <div class="move-select-group">
+                                        <select name="config_wuxue.{{asm.id}}.{{move.id}}.targetLevel"
+                                            class="mini-select">
+                                            <option value="0">未入门</option>
+                                            <option value="1" {{#if (eq (lookup (lookup (lookup ../../data.config_wuxue
+                                                asm.id) move.id) 'targetLevel' ) "1" )}}selected{{/if}}>1层 (领悟)</option>
+                                            <option value="2" {{#if (eq (lookup (lookup (lookup ../../data.config_wuxue
+                                                asm.id) move.id) 'targetLevel' ) "2" )}}selected{{/if}}>2层 (掌握)</option>
+                                            <option value="3" {{#if (eq (lookup (lookup (lookup ../../data.config_wuxue
+                                                asm.id) move.id) 'targetLevel' ) "3" )}}selected{{/if}}>3层 (精通)</option>
+
+                                            {{!-- 根据后台注入的 hasHeyi 属性决定是否显示第4层 --}}
+                                            {{#if move.hasHeyi}}
+                                            <option value="4" {{#if (eq (lookup (lookup (lookup ../../data.config_wuxue
+                                                asm.id) move.id) 'targetLevel' ) "4" )}}selected{{/if}}>4层 (合一)</option>
+                                            {{/if}}
+                                        </select>
+
+                                        <select name="config_wuxue.{{asm.id}}.{{move.id}}.payment"
+                                            class="mini-select pay">
+                                            <option value="xp" {{#if (eq (lookup (lookup (lookup ../../data.config_wuxue
+                                                asm.id) move.id) 'payment' ) "xp" )}}selected{{/if}}>消耗修为</option>
+                                            <option value="free" {{#if (eq (lookup (lookup (lookup
+                                                ../../data.config_wuxue asm.id) move.id) 'payment' ) "free"
+                                                )}}selected{{/if}}>开卡赠送</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                {{/each}}
+                            </div>
+                        </div>
+                        {{/if}}
+
+                        {{/each}}
+                        {{else}}
+                        <div class="empty-drop-zone">
+                            <i class="fas fa-box-open fa-3x"></i>
+                            <p>请点击左侧按钮开启万卷阁<br>并将心法或武学拖拽至此</p>
+                        </div>
+                        {{/if}}
+                    </div>
+                </div>
+
+            </div>
+        </div>
+        {{/if}}
         {{#if (eq data.currentStep 5)}}<div class="placeholder-text">技艺精通：面板组装中...</div>{{/if}}
 
         {{#if (eq data.currentStep 6)}}
