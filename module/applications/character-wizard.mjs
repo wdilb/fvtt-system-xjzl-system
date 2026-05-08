@@ -185,6 +185,27 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         this.element.setAttribute("data-drag-bound", "true");
     }
 
+    /**
+     * 拦截窗口关闭事件，防止按 ESC 或误点右上角导致建卡进度丢失
+     */
+    async close(options = {}) {
+        // 如果是系统强制关闭（比如降生结算完毕），直接放行
+        if (options.force) return super.close(options);
+
+        // 弹出确认框
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: "放弃建卡？", icon: "fas fa-exclamation-triangle" },
+            content: "<p>你确定要关闭向导吗？<strong style='color:#e74c3c;'>所有未保存的建卡进度将会丢失！</strong></p>",
+            rejectClose: false
+        });
+
+        // 只有玩家点击确认，才执行真实的关闭
+        if (confirmed) {
+            return super.close(options);
+        }
+        return false;
+    }
+
     /* -------------------------------------------- */
     /*  交互与流程控制                              */
     /* -------------------------------------------- */
@@ -408,13 +429,16 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         const cb = game.xjzl?.compendiumBrowser;
         if (!cb) return ui.notifications.warn("江湖万卷阁尚未初始化！");
 
-        // 注入默认配置：锁定官方、锁定门派
+        // 注入默认配置：锁定官方
         cb.browserState.activeTab = type;
         cb.browserState.filters = { isOfficial: new Set(["true"]) };
 
-        const currentSect = this.wizardData.info.sect;
-        if (currentSect && currentSect !== "none") {
-            cb.browserState.filters.sect = new Set([currentSect]);
+        // 只有在挑选内功和武学时，才追加“门派”过滤条件
+        if (["neigong", "wuxue"].includes(type)) {
+            const currentSect = this.wizardData.info.sect;
+            if (currentSect && currentSect !== "none") {
+                cb.browserState.filters.sect = new Set([currentSect]);
+            }
         }
 
         cb.browserState.searchQuery = "";
@@ -441,20 +465,59 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             if (!item || !["neigong", "wuxue"].includes(item.type)) {
                 return ui.notifications.warn("只能将【内功】或【武学】拖入此处！");
             }
-
             if (this.wizardData.assembly.items.some(i => i.uuid === item.uuid)) {
                 return ui.notifications.warn("该心法/武学已在参悟列表中。");
             }
 
             const itemDataObj = item.toObject();
 
-            // [业务判定]：为模板准备 hasHeyi 字段，如果是天级武学才有第4层(合一)
+            // 纯文本清洗辅助函数
+            const cleanText = (htmlStr) => {
+                if (!htmlStr) return "暂无描述";
+                let txt = htmlStr.replace(/<[^>]*>?/gm, '').substring(0, 120);
+                return txt.length >= 120 ? txt + "..." : txt;
+            };
+
+            let tooltipHtml = "";
+            const tierLabels = { 1: "人级", 2: "地级", 3: "天级" };
+
             if (item.type === "wuxue") {
                 const defaultTier = itemDataObj.system.tier ?? 1;
+
+                // 武学书本：蓝色主题 + 显眼品阶徽章
+                tooltipHtml = `
+                    <div style='text-align:left; max-width:260px; border-left: 3px solid #3498db; padding-left: 8px;'>
+                        <strong style='color:#3498db; font-size:1.1em;'>${item.name}</strong>
+                        <span style='background:#3498db; color:#fff; padding:2px 6px; border-radius:3px; font-size:0.8em; margin-left:6px; box-shadow:0 0 5px rgba(52,152,219,0.5);'>${tierLabels[defaultTier]}武学</span>
+                        <div style='font-size:12px; color:#ccc; margin-top:8px; line-height:1.5;'>${cleanText(itemDataObj.system.description)}</div>
+                    </div>
+                `;
+
                 itemDataObj.system.moves.forEach(m => {
                     const t = m.tier ?? defaultTier;
                     m.hasHeyi = t >= 3;
+                    const typeLabel = game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`);
+
+                    // 招式效果：绿色主题 + 招式类型徽章
+                    m.tooltip = `
+                        <div style='text-align:left; max-width:260px; border-left: 3px solid #2ecc71; padding-left: 8px;'>
+                            <strong style='color:#2ecc71; font-size:1.1em;'>${m.name}</strong>
+                            <span style='background:#2ecc71; color:#000; padding:2px 6px; border-radius:3px; font-size:0.8em; margin-left:6px; box-shadow:0 0 5px rgba(46,204,113,0.5);'>${typeLabel}</span>
+                            <div style='font-size:12px; color:#ccc; margin-top:8px; line-height:1.5;'>${cleanText(m.description)}</div>
+                        </div>
+                    `;
                 });
+            } else if (item.type === "neigong") {
+                const tier = itemDataObj.system.tier ?? 1;
+
+                // 内功心法：红色主题 + 显眼品阶徽章
+                tooltipHtml = `
+                    <div style='text-align:left; max-width:260px; border-left: 3px solid #e74c3c; padding-left: 8px;'>
+                        <strong style='color:#e74c3c; font-size:1.1em;'>${item.name}</strong>
+                        <span style='background:#e74c3c; color:#fff; padding:2px 6px; border-radius:3px; font-size:0.8em; margin-left:6px; box-shadow:0 0 5px rgba(231,76,60,0.5);'>${tierLabels[tier]}内功</span>
+                        <div style='font-size:12px; color:#ccc; margin-top:8px; line-height:1.5;'>${cleanText(itemDataObj.system.description)}</div>
+                    </div>
+                `;
             }
 
             const assemblyItem = {
@@ -463,8 +526,8 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 type: item.type,
                 name: item.name,
                 img: item.img,
+                tooltip: tooltipHtml, // 将生成的提示存入内存
                 itemData: itemDataObj,
-                // 运行时的计算结果缓存，供最终结算时写入系统
                 runtime: { requiredXP: 0, costGeneral: 0, costSpecific: 0, moves: {} }
             };
 
@@ -476,6 +539,11 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         // 分支 B: 第 6 步 (行囊采买)
         // ==========================================
         else if (this.wizardData.currentStep === 6) {
+            // 拖拽发生瞬间，先保存当前界面的输入状态
+            this._saveCurrentStepData();
+            // 刷新一次内存状态，使其与DOM完全同步
+            this._onRefreshShoppingBudget(true);
+
             const item = await fromUuid(data.uuid);
             const validTypes = ["weapon", "armor", "consumable", "misc", "qizhen"];
 
@@ -483,21 +551,38 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 return ui.notifications.warn("只能将装备、杂物或消耗品拖入此处！");
             }
 
-            // 获取被拖入的目标区域 (free/half/full)
             const dropZone = event.target.closest("[data-zone]");
             if (!dropZone) return ui.notifications.warn("请将物品明确拖入【免费区】、【半价区】或【全价区】内！");
 
             const zone = dropZone.dataset.zone;
             const price = item.system.price || 0;
 
-            // 查找同一个区域里是否已经有这个物品了 (实现堆叠)
-            const existing = this.wizardData.shopping.items.find(i => i.uuid === item.uuid && i.zone === zone);
+            let rawDesc = item.system.description || "暂无描述";
+            let cleanDesc = rawDesc.replace(/<[^>]*>?/gm, '').substring(0, 100);
+            if (rawDesc.length > 100) cleanDesc += "...";
+            const tooltipHtml = `
+                <div style='text-align:left; max-width:250px;'>
+                    <strong style='color:var(--c-highlight);'>${item.name}</strong><hr style='border-color:#555; margin:4px 0;'>
+                    <div style='font-size:12px; color:#ccc; line-height:1.4;'>${cleanDesc}</div>
+                </div>
+            `;
+
+            // 仅限消耗品、杂物、秘籍可以堆叠
+            const stackableTypes = ["consumable", "misc", "manual"];
+            const isStackable = stackableTypes.includes(item.type);
+
+            let existing = null;
+            if (isStackable) {
+                existing = this.wizardData.shopping.items.find(i => i.uuid === item.uuid && i.zone === zone);
+            }
 
             if (existing) {
                 existing.quantity += 1;
+                // 强制修改表单缓存，防止被旧数据覆盖
+                this.wizardData[`shopping_qty_${existing.id}`] = existing.quantity;
             } else {
                 this.wizardData.shopping.items.push({
-                    id: foundry.utils.randomID(), // 独立ID，防止多个同UUID物品在不同区域冲突
+                    id: foundry.utils.randomID(),
                     uuid: item.uuid,
                     type: item.type,
                     name: item.name,
@@ -505,11 +590,13 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                     price: price,
                     quantity: 1,
                     zone: zone,
+                    tooltip: tooltipHtml,
                     itemData: item.toObject()
                 });
             }
 
-            this._onRefreshShoppingBudget();
+            // 再次计算总价，跳过 DOM 读取
+            this._onRefreshShoppingBudget(true);
             this.render();
         }
     }
@@ -675,23 +762,28 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
      */
     async _onRemoveShoppingItem(event, target) {
         event.preventDefault();
+        this._saveCurrentStepData(); // 先保存其他可能正在输入的内容
         const id = target.dataset.id;
         this.wizardData.shopping.items = this.wizardData.shopping.items.filter(i => i.id !== id);
-        this._onRefreshShoppingBudget();
+        this._onRefreshShoppingBudget(true); // 跳过读取旧DOM
         this.render();
     }
 
     /**
      * 逆向计算购物车花费
+     * @param {boolean} skipSave 是否跳过从表单抓取数据（防止拖拽增加数量时被旧DOM覆盖）
      */
-    _onRefreshShoppingBudget() {
-        this._saveCurrentStepData();
+    _onRefreshShoppingBudget(skipSave = false) {
+        if (!skipSave) {
+            this._saveCurrentStepData();
+        }
+
         const state = this.wizardData;
         let totalCost = 0;
 
         for (const item of state.shopping.items) {
-            // 获取表单中可能被玩家手动修改的数量
             const qtyInputName = `shopping_qty_${item.id}`;
+            // 只有在表单中真实存在该字段时，才去覆盖内存
             if (state[qtyInputName] !== undefined) {
                 item.quantity = Math.max(1, parseInt(state[qtyInputName]) || 1);
             }
@@ -700,13 +792,11 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             if (item.zone === "free") multiplier = 0;
             else if (item.zone === "half") multiplier = 0.5;
 
-            // 公式：向下取整 (单价 * 数量 * 折扣)
             totalCost += Math.floor(item.price * item.quantity * multiplier);
         }
 
         state.shopping.runtimeSilver = state.shopping.silver - totalCost;
 
-        // 极速更新 DOM 数值和颜色
         const remainEl = this.element.querySelector("#remain-silver");
         if (remainEl) {
             remainEl.innerText = state.shopping.runtimeSilver;
@@ -722,6 +812,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
         // 确保数值是最新鲜的
         this._onRefreshBudget();
+        this._onRefreshShoppingBudget(); // 确保购物结算也是最新的
 
         const actor = this.actor;
         if (!actor) return;
@@ -743,6 +834,8 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
         // 提取最终预算
         const rb = this.wizardData.runtimeBudget || { general: 0, neigong: 0, wuxue: 0 };
+        // 提取最终银两
+        const finalSilver = this.wizardData.shopping.runtimeSilver || 0;
 
         const actorUpdates = {
             "name": this.wizardData.info.name || "无名氏",
@@ -758,12 +851,12 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 bio: this.wizardData.info.bio
             },
             "system.social": this.wizardData.social,
-            "system.resources.silver": this.wizardData.info.silver,
+            "system.resources.silver": finalSilver,
             "system.cultivation": {
                 general: rb.general,
                 neigong: rb.neigong,
                 wuxue: rb.wuxue,
-                arts: this.wizardData.budget.arts // 技艺原样传入，等待Step 5逻辑
+                arts: this.wizardData.budget.arts
             }
         };
 
@@ -806,21 +899,18 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             }
         }
 
-        if (artsChanges.length > 0) {
-            // 获取角色原本可能带有的修正组（虽然新建空白卡一般没有，但防卫性编程）
-            const existingModifiers = actor.system.customModifiers || [];
+        // 清理旧的向导赠送数据，防止重复建卡时无限累加
+        let existingModifiers = (actor.system.customModifiers || []).filter(m => m.name !== "开卡赠送技艺等级");
 
-            // 组装新的修正模块，标题定为“开卡赠送技艺等级”
+        if (artsChanges.length > 0) {
             existingModifiers.push({
                 id: foundry.utils.randomID(),
                 name: "开卡赠送技艺等级",
                 enabled: true,
                 changes: artsChanges
             });
-
-            // 写入更新列表
-            actorUpdates["system.customModifiers"] = existingModifiers;
         }
+        actorUpdates["system.customModifiers"] = existingModifiers;
 
         // --- 物品装配与经验注入 ---
         const itemsToCreate = [];
@@ -879,6 +969,15 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             itemsToCreate.push(newItemData);
         }
 
+        // 遍历并写入购物车的所有物品
+        for (const shopItem of this.wizardData.shopping.items) {
+            const newItemData = foundry.utils.deepClone(shopItem.itemData);
+            // 将购物车里决定的数量覆盖原物品的数量
+            newItemData.system.quantity = shopItem.quantity;
+            itemsToCreate.push(newItemData);
+        }
+
+
         // 把最终的降生文本日志加上（排在第一条显示）
         historyLogs.unshift({
             id: foundry.utils.randomID(), realTime: Date.now(), type: "text",
@@ -894,16 +993,9 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             await actor.createEmbeddedDocuments("Item", itemsToCreate);
         }
 
-        // 合并行囊采买的物品
-        for (const shopItem of this.wizardData.shopping.items) {
-            const newItemData = foundry.utils.deepClone(shopItem.itemData);
-            // 覆写购买的数量
-            newItemData.system.quantity = shopItem.quantity;
-            itemsToCreate.push(newItemData);
-        }
-
         ui.notifications.success(`${actor.name} 降生成功！`);
-        this.close();
+        // 强制关闭，跳过确认弹窗
+        this.close({ force: true });
         actor.sheet.render(true);
     }
 }
