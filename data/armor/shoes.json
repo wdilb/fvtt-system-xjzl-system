@@ -431,10 +431,10 @@
             "automationNote": "完全自动化：自动检测距离并反伤。",
             "scripts": [
                 {
-                    "label": "软猬鞋反伤",
+                    "label": "软猬套装反伤",
                     "trigger": "damaged",
                     "active": true,
-                    "script": "/**\n * 软猬鞋反伤脚本 (防死循环)\n */\n\n// 1. 基础校验 & 防自伤\n// 如果没有攻击者，或者攻击者是自己，直接退出\nif (!args.attacker || args.attacker.uuid === actor.uuid) return;\n\n// 2. 防乒乓机制 (Ping-Pong Protection)\n// 检查自身是否被标记为“正在承受反伤”，如果是，则不再触发反击\nif (actor.isReceivingReflection) return;\n\n// 3. 距离检测逻辑 (V13 API 修正)\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nlet inRange = false;\n\nif (t1 && t2) {\n    // 使用 measurePath 替代 measureDistance\n    const measure = canvas.grid.measurePath([t1.center, t2.center]);\n    // measure.distance 返回的是基于 gridSpaces: true 的结果\n    const dist = measure.distance;\n    \n    // 放宽到 1.1 米以兼容斜向移动的浮点误差\n    if (dist <= 1.1) inRange = true;\n} else {\n    // 找不到 Token 时提示 GM，但默认不执行以防误判\n    ui.notifications.warn(`${actor.name} 的软猬鞋无法检测距离 (无 Token)，请手动处理。`);\n}\n\n// 4. 执行反伤\nif (inRange) {\n    // [关键] 在造成伤害前，给目标挂上“反伤豁免”标记\n    // 这是一个内存属性，不会存入数据库，仅在当前运算栈有效\n    args.attacker.isReceivingReflection = true;\n\n    try {\n        // A. 执行伤害\n        await args.attacker.applyDamage({ \n            amount: 15, \n            type: \"poison\", \n            attacker: actor, \n            isHit: true, \n            ignoreDefense: true \n        });\n\n        // B. 发送卡片\n        const content = `\n            <div class=\"xjzl-chat-card item-card\">\n                <header class=\"card-header\" style=\"border-left: 4px solid #8e44ad;\">\n                    <img src=\"${thisItem.img}\" style=\"border:none;\" />\n                    <h3 style=\"color: #8e44ad;\">${thisItem.name}</h3>\n                </header>\n                <div class=\"card-content-wrapper\">\n                    <div style=\"font-weight:bold; color:#8b0000; margin-bottom:5px;\"><i class=\"fas fa-skull-crossbones\"></i> 反伤触发！</div>\n                    <div style=\"font-size:0.9em;\">距离检测: <b>近身</b></div>\n                    <div style=\"font-size:0.9em;\">反伤目标: <b>${args.attacker.name}</b></div>\n                    <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;\">\n                        已反弹 <span style=\"color:red; font-weight:bold;\">15</span> 点毒素伤害。\n                    </div>\n                </div>\n            </div>\n        `;\n\n        ChatMessage.create({\n            user: game.user.id,\n            speaker: ChatMessage.getSpeaker({ actor: actor }),\n            content: content\n        });\n\n    } finally {\n        // [关键] 无论成功失败，必须清除标记，以免目标后续无法触发反伤\n        args.attacker.isReceivingReflection = false;\n    }\n}"
+                    "script": "// 1. 【终极防并发】利用事件上下文(args)的共享引用特性\n// 第一次受击事件中，第一件装备执行后立刻在 args 上打个动态标记\n// 后续装备看到标记直接跳过，绝对不会触发两次\nif (args.ruanweiProcessed) return;\nargs.ruanweiProcessed = true;\n\n// 2. 读取全身软猬反伤总和 (通过 AE 静态累加，身上穿几件就自动叠几件的数值)\nconst totalReflectDmg = actor.getFlag(\"xjzl-system\", \"ruanweiDamage\") || 0;\nif (totalReflectDmg <= 0) return;\n\n// 3. 基础校验与防死循环机制\nif (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (actor.isReceivingReflection) return;\n\n// 4. 距离检测\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nlet inRange = false;\n\nif (t1 && t2) {\n    const measure = canvas.grid.measurePath([t1.center, t2.center]);\n    if (measure.distance <= 1.1) inRange = true;\n} else {\n    ui.notifications.warn(`${actor.name} 的 软猬套装 无法检测距离，请手动处理。`);\n}\n\n// 5. 执行统一反伤\nif (inRange) {\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({ \n            amount: totalReflectDmg, // 无论穿几件，只发送这一次伤害，对方毒抗也只减免一次！\n            type: \"poison\", \n            attacker: actor, \n            isHit: true, \n            ignoreDefense: true \n        });\n\n        const content = `\n            <div class=\"xjzl-chat-card item-card\">\n                <header class=\"card-header\" style=\"border-left: 4px solid #8e44ad;\">\n                    <img src=\"${thisItem.img}\" style=\"border:none;\" />\n                    <h3 style=\"color: #8e44ad;\">软猬套装</h3>\n                </header>\n                <div class=\"card-content-wrapper\">\n                    <div style=\"font-weight:bold; color:#8b0000; margin-bottom:5px;\"><i class=\"fas fa-skull-crossbones\"></i> 反伤触发！</div>\n                    <div style=\"font-size:0.9em;\">距离检测: <b>近身</b></div>\n                    <div style=\"font-size:0.9em;\">反伤目标: <b>${args.attacker.name}</b></div>\n                    <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;\">\n                        已反弹 <span style=\"color:red; font-weight:bold;\">${totalReflectDmg}</span> 点毒素伤害。\n                    </div>\n                </div>\n            </div>\n        `;\n\n        ChatMessage.create({\n            user: game.user.id,\n            speaker: ChatMessage.getSpeaker({ actor: actor }),\n            content: content\n        });\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}"
                 }
             ]
         },
@@ -449,6 +449,11 @@
                         "key": "system.combat.def_waigong",
                         "mode": 2,
                         "value": "3"
+                    },
+                    {
+                        "key": "flags.xjzl-system.ruanweiDamage",
+                        "mode": 2,
+                        "value": "15"
                     }
                 ]
             }
@@ -1378,13 +1383,13 @@
             "automationNote": "半自动化：防御与速度自动应用。水面相关判定需手动。",
             "scripts": []
         },
-        "effects":[
+        "effects": [
             {
                 "name": "碧桃踏浪履",
                 "icon": "systems/xjzl-system/assets/icons/armor/绣花鞋1.png",
                 "transfer": true,
                 "disabled": false,
-                "changes":[
+                "changes": [
                     {
                         "key": "system.combat.def_waigong",
                         "mode": 2,
