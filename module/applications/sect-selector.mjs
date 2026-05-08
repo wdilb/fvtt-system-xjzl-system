@@ -61,6 +61,7 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
         // 格式可以是 "left center", "right 20%", "60% 40%" 等
         // 没写在里面的门派，HBS 将不会生成数据，CSS 会使用默认值
         const customPositions = {
+            "none": "40% top",
             "zhengqizong": "center 45px",
             "xiaoyaopai": "61% 30px",   
             "qingtianmen": "58% 30px",  
@@ -73,6 +74,7 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
             "liushanmen": "center 10px",
             "sihaibiaomeng":"center -60px",
             "wanshoushanzhuang":"center -30px",
+            "jianghushili":"center 10px"
         };
 
         for (const [key, labelKey] of Object.entries(sectConfig)) {
