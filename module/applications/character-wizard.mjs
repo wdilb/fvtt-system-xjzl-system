@@ -599,6 +599,10 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
     }
 
     // ==========================================
+    // Step 5: 技艺精通 (无需额外代码)
+    // ==========================================
+
+    // ==========================================
     // Step 6: 降生结算
     // ==========================================
     async _onFinishWizard(event, target) {
@@ -674,6 +678,37 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         addLog("初始内功专属", this.wizardData.budget.neigong, "开局资源");
         addLog("初始武学专属", this.wizardData.budget.wuxue, "开局资源");
         addLog("初始技艺专属", this.wizardData.budget.arts, "开局资源");
+
+        // 技艺部分
+        const artsChanges = [];
+
+        // 遍历所有技艺输入值
+        for (const [artKey, lvlStr] of Object.entries(this.wizardData.artsBonus || {})) {
+            const lvl = parseInt(lvlStr) || 0;
+            if (lvl > 0) {
+                // 推入修改配置：路径指向 arts.xxx.mod
+                artsChanges.push({
+                    key: `arts.${artKey}.mod`,
+                    value: lvl
+                });
+            }
+        }
+
+        if (artsChanges.length > 0) {
+            // 获取角色原本可能带有的修正组（虽然新建空白卡一般没有，但防卫性编程）
+            const existingModifiers = actor.system.customModifiers || [];
+
+            // 组装新的修正模块，标题定为“开卡赠送技艺等级”
+            existingModifiers.push({
+                id: foundry.utils.randomID(),
+                name: "开卡赠送技艺等级",
+                enabled: true,
+                changes: artsChanges
+            });
+
+            // 写入更新列表
+            actorUpdates["system.customModifiers"] = existingModifiers;
+        }
 
         // --- 物品装配与经验注入 ---
         const itemsToCreate = [];
