@@ -864,8 +864,12 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         const historyLogs = [];
         let logTimeCursor = Date.now();
 
-        const addLog = (title, deltaVal, reason) => {
+        const addLog = (title, deltaVal, reason, poolKey = null) => {
             if (deltaVal <= 0) return; // 不产生 0 或 负数 日志
+
+            // 构造符合系统解析格式的字符串，例如 "general: 5000"
+            const balanceStr = poolKey ? `${poolKey}: ${deltaVal}` : "";
+
             historyLogs.push({
                 id: foundry.utils.randomID(),
                 realTime: logTimeCursor -= 10,
@@ -874,15 +878,15 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 title: title,
                 reason: reason,
                 delta: `+${deltaVal}`,
-                balance: ""
+                balance: balanceStr
             });
         };
 
         // 独立分块记录初始资源
-        addLog("初始通用修为", this.wizardData.budget.general, "开局资源");
-        addLog("初始内功专属", this.wizardData.budget.neigong, "开局资源");
-        addLog("初始武学专属", this.wizardData.budget.wuxue, "开局资源");
-        addLog("初始技艺专属", this.wizardData.budget.arts, "开局资源");
+        addLog("初始通用修为", this.wizardData.budget.general, "开局资源", "general");
+        addLog("初始内功专属", this.wizardData.budget.neigong, "开局资源", "neigong");
+        addLog("初始武学专属", this.wizardData.budget.wuxue, "开局资源", "wuxue");
+        addLog("初始技艺专属", this.wizardData.budget.arts, "开局资源", "arts");
 
         // 技艺部分
         const artsChanges = [];
@@ -935,7 +939,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 // 赠送折算日志
                 const config = this.wizardData.config_neigong?.[asm.id];
                 if (config && config.payment === "free" && reqXP > 0) {
-                    addLog(`开局赠送: ${asm.name}`, reqXP, "内功境界折算");
+                    addLog(`开卡赠送: ${asm.name}`, reqXP, "内功折算", "neigong");
                 }
             }
             else if (asm.type === "wuxue") {
@@ -963,7 +967,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 }
 
                 if (freeMoveXpTotal > 0) {
-                    addLog(`开局赠送: ${asm.name}`, freeMoveXpTotal, "武学境界折算");
+                    addLog(`开卡赠送: ${asm.name}`, freeMoveXpTotal, "武学折算", "wuxue");
                 }
             }
             itemsToCreate.push(newItemData);
