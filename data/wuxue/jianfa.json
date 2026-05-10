@@ -2546,7 +2546,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>一剑甩出、气劲伤敌，造成伤害，招式伤害提升【自身最大气血 10%】的数值。（至多提升 30）</p><p><strong>升级:</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "气血加成自动计算。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2568,7 +2568,7 @@
                         {
                             "label": "气血加成",
                             "trigger": "calc",
-                            "script": "const maxHP = actor.system.resources.hp.max || 0;\nconst bonus = Math.min(Math.floor(maxHP * 0.1), 30);\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`气血加成 +${bonus}`);",
+                            "script": "const maxHP = S.resources.hp.max || 0;\nconst bonus = Math.min(Math.floor(maxHP * 0.1), 30);\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`气血加成 +${bonus}`);",
                             "active": true
                         }
                     ]
@@ -2577,13 +2577,13 @@
                     "name": "重若泰山",
                     "type": "stance",
                     "element": "taiji",
-                    "damageType": "waigong",
+                    "damageType": "none",
                     "weaponType": "sword",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>马步架打，两臂交叉，开启架招，同时进入“重若泰山”一回合。</p><p><strong>重若泰山：</strong>【日薄西山】可以消耗反应动作当做反击招式释放。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "开启架招获得BUFF自动。反击用法手动。",
+                    "automationNote": "开启架招获得状态自动。反击请在打出日薄西山时于弹窗中手动修改招式类型为反击。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2597,7 +2597,7 @@
                     },
                     "scripts": [
                         {
-                            "label": "开启获得泰山",
+                            "label": "获得重若泰山",
                             "trigger": "attack",
                             "script": "const eff = thisItem.effects.getName(\"重若泰山\").toObject();\neff.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
@@ -2615,7 +2615,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>身体舒展，进入“轻如鸿毛”一回合。</p><p><strong>轻如鸿毛：</strong>【日薄西山】可以当作虚招来使用，且虚招对抗检定+1。</p><p><strong>升级：</strong>对抗检定再+1，内力消耗+4。</p>",
-                    "automationNote": "获得BUFF自动。虚招用法/检定加值手动。",
+                    "automationNote": "获取BUFF自动。虚招对抗加值自动。虚招请打出日薄西山时于弹窗中手动修改招式类型。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2634,16 +2634,17 @@
                     },
                     "scripts": [
                         {
-                            "label": "开启获得鸿毛",
+                            "label": "获得轻如鸿毛",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"轻如鸿毛\").toObject();\neff.duration = { rounds: 1 };\n// 写入描述提示玩家\neff.description += ` (虚招检定+${bonus})`;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 1 + (lvl - 1);\nconst effData = thisItem.effects.getName(\"轻如鸿毛\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { rounds: 1 };\neffData.flags[\"xjzl-system\"].qhmBonus = bonus;\neffData.description += ` (当前虚招/看破加成: +${bonus})`;\nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
                 },
                 {
                     "name": "英雄迟暮",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "taiji",
                     "damageType": "waigong",
@@ -2652,7 +2653,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>豪气微叹，获得一层“迟暮”，此后每个回合末或受伤或施展【日薄西山】时，你再获得一层“迟暮”，最多十层，战斗脱离后消失。</p><p>每层“迟暮”增加【日薄西山】释放距离 1 米。</p><p>五层“迟暮”后【日薄西山】伤害再提高 10 点。</p><p>十层“迟暮”后自身的虚招对抗检定结果+5。</p><p><strong>升级：</strong>五层时【日薄西山】的招式伤害再提高 5 点，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "获层自动。日薄西山加成自动。虚招对抗手动。",
+                    "automationNote": "距离增加需手动。其他完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2671,9 +2672,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得迟暮",
+                            "label": "初次获得迟暮",
                             "trigger": "hit",
-                            "script": "const effData = thisItem.effects.getName(\"迟暮\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 注入日薄西山升级带来的额外伤害变量 (lv)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst extraDmg = 10 + (lvl - 1) * 5;\neffData.flags[\"xjzl-system\"].chimuExtraDmg = extraDmg;\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "script": "const effData = thisItem.effects.getName(\"迟暮\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\neffData.flags[\"xjzl-system\"].chimuLvl = lvl;\nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
@@ -2682,12 +2683,12 @@
             "effects": [
                 {
                     "name": "重若泰山",
-                    "icon": "icons/magic/earth/barrier-stone-blue.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "【日薄西山】可作反击。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "zhongruotaishan",
+                            "slug": "wuming_zhongruotaishan",
                             "stackable": false
                         }
                     },
@@ -2695,50 +2696,70 @@
                 },
                 {
                     "name": "轻如鸿毛",
-                    "icon": "icons/magic/air/wind-stream-white.webp",
-                    "description": "【日薄西山】可作虚招，检定加值。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "【日薄西山】可作虚招。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "qingruhongmao",
-                            "stackable": false
+                            "slug": "wuming_qingruhongmao",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "看破加成",
+                                    "trigger": "passive",
+                                    "script": "const bonus = thisEffect.getFlag('xjzl-system', 'qhmBonus') || 1;\nS.combat.kanpo += bonus;",
+                                    "active": true
+                                },
+                                {
+                                    "label": "虚招值加成",
+                                    "trigger": "calc",
+                                    "script": "if (args.move.name === '日薄西山') {\n    const bonus = thisEffect.getFlag('xjzl-system', 'qhmBonus') || 1;\n    args.output.feint += bonus;\n    args.output.feintBonusDesc.push(`轻如鸿毛 +${bonus}`);\n}",
+                                    "active": true
+                                }
+                            ]
                         }
                     },
                     "changes": []
                 },
                 {
                     "name": "迟暮",
-                    "icon": "icons/magic/time/hourglass-tilted-gray.webp",
-                    "description": "每层增加日薄西山距离。5层加伤。10层加虚招对抗。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "英雄迟暮，越战越勇。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "chimu",
+                            "slug": "wuming_chimu",
                             "stackable": true,
                             "maxStacks": 10,
                             "scripts": [
                                 {
-                                    "label": "回合末/受伤获层",
+                                    "label": "回合末获取",
                                     "trigger": "turnEnd",
-                                    "script": "const effData = thisEffect.toObject();\nawait game.xjzl.api.effects.addEffect(actor, effData);\nui.notifications.info(\"英雄迟暮：岁月催人老 (层数+1)\");",
+                                    "script": "const effData = thisEffect.toObject();\nawait game.xjzl.api.effects.addEffect(actor, effData);\nactor.showFloatyText(\"迟暮加深\", { fill: \"#a8a8a8\" });",
                                     "active": true
                                 },
                                 {
-                                    "label": "受伤获层",
+                                    "label": "受伤获取",
                                     "trigger": "damaged",
-                                    "script": "if (args.finalDamage > 0) {\n    const effData = thisEffect.toObject();\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                                    "script": "if (args.hpLost > 0 || args.hutiLost > 0) {\n    const effData = thisEffect.toObject();\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
                                     "active": true
                                 },
                                 {
-                                    "label": "施展日薄西山获层",
+                                    "label": "出招获取",
                                     "trigger": "attack",
-                                    "script": "if (args.move.name === \"日薄西山\") {\n    const effData = thisEffect.toObject();\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                                    "script": "if (args.move.name === '日薄西山') {\n    const effData = thisEffect.toObject();\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
                                     "active": true
                                 },
                                 {
-                                    "label": "增强日薄西山",
+                                    "label": "十层对抗加成",
+                                    "trigger": "passive",
+                                    "script": "if (thisEffect.stacks >= 10) {\n    S.combat.kanpo += 5;\n    S.combat.xuzhao += 5;\n}",
+                                    "active": true
+                                },
+                                {
+                                    "label": "距离及五层加伤",
                                     "trigger": "calc",
-                                    "script": "if (args.move.name === \"日薄西山\") {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const extraDmg = thisEffect.getFlag(\"xjzl-system\", \"chimuExtraDmg\") || 10;\n    \n    // 距离增加提示 (无法直接改range属性，只改描述)\n    args.output.bonusDesc.push(`迟暮：距离 +${stacks} 米`);\n    \n    if (stacks >= 5) {\n        args.output.damage += extraDmg;\n        args.output.bonusDesc.push(`迟暮(5层)：伤害 +${extraDmg}`);\n    }\n}",
+                                    "script": "if (args.move.name === '日薄西山') {\n    const stacks = thisEffect.stacks;\n    args.output.bonusDesc.push(`迟暮: 距离 +${stacks} 米`);\n    if (stacks >= 5) {\n        const lvl = thisEffect.getFlag('xjzl-system', 'chimuLvl') || 1;\n        const bonus = 10 + (lvl - 1) * 5;\n        args.output.damage += bonus;\n        args.output.bonusDesc.push(`迟暮(>=5层) +${bonus}`);\n    }\n}",
                                     "active": true
                                 }
                             ]
