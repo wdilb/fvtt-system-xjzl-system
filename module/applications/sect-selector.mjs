@@ -63,21 +63,48 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
         const customPositions = {
             "none": "40% top",
             "zhengqizong": "center 45px",
-            "xiaoyaopai": "61% 30px",   
-            "qingtianmen": "58% 30px",  
-            "emeipai": "center -5px",   
-            "huashanpai": "68% top", 
-            "tangmen": "30% -40px", 
+            "xiaoyaopai": "61% 30px",
+            "qingtianmen": "58% 30px",
+            "emeipai": "center -5px",
+            "huashanpai": "68% top",
+            "tangmen": "30% -40px",
             "mingjiao": "center 10px",
             "gaibang": "center -15px",
             "fenghuayuan": "45% top",
             "liushanmen": "center 10px",
-            "sihaibiaomeng":"center -60px",
-            "wanshoushanzhuang":"center -30px",
-            "jianghushili":"center 10px"
+            "sihaibiaomeng": "center -60px",
+            "wanshoushanzhuang": "center -30px",
+            "jianghushili": "center 10px"
         };
 
+        // 大图（展开时）的专属坐标与比例字典
+        const customExpanded = {
+            "none": { pos: "-30px center", size: "90% auto" },
+            "zhengqizong": { pos: "-20px 45px", size: "100% auto" },
+            "zhenwujiao": { pos: "-20px center", size: "80% auto" },
+            "wanfosi": { pos: "-30px center", size: "100% auto" },
+            "xiaoyaopai": {pos: "-70px 30px", size: "100% auto"},
+            "qingtianmen": {pos: "-110px 30px", size: "100% auto"},
+            "emeipai": {pos: "-10px center", size: "100% auto"},
+            "huashanpai": {pos: "-70px center", size: "90% auto"},
+            "tangmen": {pos: "-40px -40px", size: "100% auto"},
+            "mingjiao": {pos: "-70px top", size: "90% auto"},
+            "gaibang": {pos: "-80px center", size: "90% auto"},
+            "fenghuayuan": {pos: "center top", size: "100% auto"},
+            "liushanmen": {pos: "-80px top", size: "90% auto"},
+            "jiangnange": {pos: "-20px center", size: "90% auto"},
+            "shenfengbang": {pos: "-80px center", size: "90% auto"},
+            "sihaibiaomeng": {pos: "-30px -60px", size: "100% auto"},
+            "jiangjunying": {pos: "-40px center", size: "90% auto"},
+            "wanshoushanzhuang": {pos: "-20px center", size: "90% auto"},
+            "baicaoge": {pos: "-40px center", size: "90% auto"},
+            "jianghushili": {pos: "-90px -20px", size: "100% auto"}
+        };
+
+
         for (const [key, labelKey] of Object.entries(sectConfig)) {
+            // 获取专属配置
+            const expConfig = customExpanded[key] || { pos: "15% center", size: "100% auto" };
             sectData.push({
                 key: key,
                 label: game.i18n.localize(labelKey),
@@ -86,7 +113,9 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
                 img: `systems/xjzl-system/assets/picture/sects/${key}.png`,
                 isActive: this.currentSect === key,
                 // 将字典里的坐标赋给数据
-                bgPos: customPositions[key] || null 
+                bgPos: customPositions[key] || null,
+                bgPosExpanded: expConfig.pos,
+                bgSizeExpanded: expConfig.size
             });
         }
 
