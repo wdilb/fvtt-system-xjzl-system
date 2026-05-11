@@ -304,8 +304,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>运手厥阴心包经，右手中指戳出，指劲爆射对敌人造成 0.5 内息点内功伤害。</p><p>若招式暴击，可吐气纳新，流失 50 点内力，不消耗动作再次施展此招。（一回合仅可额外出招一次）</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "暴击再动需手动处理（手动扣除50内力）。",
+                    "description": "<p>运手厥阴心包经，右手中指戳出，指劲爆射对敌人造成伤害。</p><p>若招式暴击，可吐气纳新，流失 50 点内力，不消耗动作再次施展此招。（一回合仅可额外出招一次）</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "暴击后发送卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -322,8 +322,18 @@
                             8,
                             12,
                             16
-                        ]
-                    }
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "暴击连击提示",
+                            "trigger": "hit_once",
+                            "script": "if (args.hasCrit) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #f39c12; padding:5px 8px; background:rgba(243,156,18,0.1);\"><div style=\"font-weight:bold; color:#e67e22;\"><i class=\"fas fa-bolt\"></i> 吐气纳新</div><div style=\"font-size:0.9em; color:#555;\">招式暴击！你可选择手动流失 50 点内力，不消耗动作再次施展【中冲指】。</div></div></div>`\n    });\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "商阳指",
@@ -334,8 +344,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>运手阳明大肠经，暗劲悄发，对敌人造成 0.5 内息点内功伤害。击破架招时可立即消耗 X 点内力使对方陷入点穴（冲穴难度=X/10），持续三回合或敌方陷入濒死。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击破后自动弹窗询问消耗内力，自动发起点穴判定。施加状态需手动。",
+                    "description": "<p>运手阳明大肠经，暗劲悄发，对敌人造成伤害。击破架招时可立即消耗 X 点内力使对方陷入点穴（冲穴难度=X/10），持续三回合或敌方陷入濒死。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击破后自动发送卡片提示。消耗内力与点穴效果需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -352,13 +362,15 @@
                             8,
                             12,
                             16
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "点穴判定",
+                            "label": "点穴提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const confirm = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"商阳指 - 点穴\" },\n        content: `<p>击破架招！请输入消耗的内力值 (X)。</p><p>难度 = X / 10。</p><input type=\"number\" name=\"mpCost\" value=\"100\" autofocus>`,\n        ok: { label: \"确定\", callback: (event, button) => button.form.elements.mpCost.value }\n    });\n    \n    const cost = parseInt(confirm) || 0;\n    if (cost > 0) {\n        // 扣除内力\n        const currentMp = actor.system.resources.mp.value;\n        if (currentMp >= cost) {\n            await actor.update({\"system.resources.mp.value\": currentMp - cost});\n            const dc = Math.floor(cost / 10);\n            ui.notifications.info(`消耗 ${cost} 内力，点穴 DC ${dc}`);\n            \n            // 发起请求\n            await Macros.requestSave({\n                target: args.target,\n                attacker: actor,\n                type: \"neixi\",\n                dc: dc,\n                label: \"抵抗商阳指点穴\",\n                onFail: \"dianxue\"\n            });\n        } else {\n            ui.notifications.warn(\"内力不足！\");\n        }\n    }\n}",
+                            "script": "if (args.isBroken) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #8e44ad; padding:5px 8px; background:rgba(142,68,173,0.1);\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-crosshairs\"></i> 击破破绽</div><div style=\"font-size:0.9em; color:#555;\">成功击破架招！你可以手动消耗 <b>X</b> 点内力，并在目标身上手动发起一个难度为 <b>X/10</b> 的内息对抗点穴（持续三回合或敌方陷入濒死）。</div></div></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -373,7 +385,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>运手少阳三焦经，侧立右手无名指，开启架招。格挡成功时，进入“气脉”一回合。</p><p><strong>气脉：</strong>刺激经脉，下一次《六脉神指》招式额外消耗内力 5 点，并降低内功命中 5 点，然后提升该招式伤害 10 点。</p><p><strong>升级:</strong>格挡值+10，内力消耗+4，气脉额外消耗内力 5 点，降低命中 5 点，提高伤害 10 点。</p>",
-                    "automationNote": "格挡自动获得气脉。气脉消耗、命中降低、伤害提升自动生效。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -384,13 +396,15 @@
                             8,
                             12,
                             16
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "格挡获气脉",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取模板\nconst effData = thisItem.effects.getName(\"气脉\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 动态计算数值 (基础 + Lv成长)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\n// 基础5/5/10, 每级+5/+5/+10\nconst costMod = 5 + (lvl - 1) * 5;\nconst hitMod = 5 + (lvl - 1) * 5;\nconst dmgMod = 10 + (lvl - 1) * 10;\n\n// 写入 Flags 供脚本读取\neffData.flags[\"xjzl-system\"].qimai = {\n    cost: costMod,\n    hit: hitMod,\n    dmg: dmgMod\n};\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effData = thisItem.effects.getName(\"气脉\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst costMod = 5 + (lvl - 1) * 5;\nconst hitMod = 5 + (lvl - 1) * 5;\nconst dmgMod = 10 + (lvl - 1) * 10;\n\neffData.flags[\"xjzl-system\"].qimai = { cost: costMod, hit: hitMod, dmg: dmgMod };\neffData.description += ` (消耗+${costMod}, 命中-${hitMod}, 伤害+${dmgMod})`;\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
                             "active": true
                         }
                     ]
@@ -404,8 +418,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破对方虚招时，可以消耗反应动作施展此招，压制对方虚招，运手太阳小肠经，抬左手小指反击，对敌人造成 0.7 内息点内功伤害。疏通经络，进入“凝气”状态，持续到你的下个回合末。</p><p><strong>凝气：</strong>你施展《六脉神指》，不消耗内力。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "自动获得凝气。凝气自动返还内力。",
+                    "description": "<p>当你看破对方虚招时，可以消耗反应动作施展此招，压制对方虚招，运手太阳小肠经，抬左手小指反击，对敌人造成伤害。疏通经络，进入“凝气”状态，持续到你的下个回合末。</p><p><strong>凝气：</strong>你施展《六脉神指》，不消耗内力。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -422,13 +436,15 @@
                             8,
                             12,
                             16
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "获凝气",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"凝气\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"凝气\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -444,7 +460,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>运手少阴心经，气凝右手小指，不消耗速度朝一个方向侧滑 5 米，同时使自身进入“六脉贯通”状态，持续一回合。</p><p><strong>六脉贯通：</strong>施展《六脉神指》时，射程提升 5 米；施展《六脉神指》时，主要动作和反应动作可以相互替换；被《六脉神指》选中的目标失去反应动作。</p><p><strong>升级：</strong>持续回合数+1，射程+5 米，内力消耗+20。</p>",
-                    "automationNote": "自动获得六脉贯通。位移和动作替换需手动。",
+                    "automationNote": "自动获得六脉贯通。提升射程、动作替换、封锁敌方反应需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -461,13 +477,14 @@
                             1,
                             1,
                             1
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "获六脉贯通",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst rangeBonus = 5 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"六脉贯通\").toObject();\neff.duration = { rounds: rounds };\neff.description += ` (射程+${rangeBonus}米)`;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst rangeBonus = 5 + (lvl - 1) * 5;\nconst eff = thisItem.effects.getName(\"六脉贯通\").toObject();\neff.duration = { rounds: rounds };\neff.description += ` (射程+${rangeBonus}米)`;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -482,8 +499,8 @@
                     "range": "5米",
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
-                    "description": "<p>运手太阴肺经，抬右手大拇指，剑势雄浑，气劲勃发，对直线上所有敌人造成 0.9 内息点内功伤害。</p><p>·可消耗自身剩余的所有内力，使招式伤害提高 100 点。</p><p><strong>升级:</strong>招式伤害+20，怒气-1，消耗所有内力提升的伤害+50，内力消耗+16。</p>",
-                    "automationNote": "自动检测并消耗剩余内力增加伤害。",
+                    "description": "<p>运手太阴肺经，抬右手大拇指，剑势雄浑，气劲勃发，对直线上所有敌人造成伤害。</p><p>·可消耗自身剩余的所有内力，使招式伤害提高 100 点。</p><p><strong>升级:</strong>招式伤害+20，怒气-1，消耗所有内力提升的伤害+50，内力消耗+16。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -506,13 +523,14 @@
                             7,
                             6,
                             5
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "耗空内力增伤",
                             "trigger": "attack",
-                            "script": "const currentMp = actor.system.resources.mp.value;\nif (currentMp > 0) {\n    // 计算增伤: 基础100 + Lv成长50\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = 100 + (lvl - 1) * 50;\n    \n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 耗空内力: ${bonus}`;\n    \n    // 扣除\n    await actor.update({\"system.resources.mp.value\": 0});\n    ui.notifications.info(`少商剑: 消耗剩余 ${currentMp} 内力，伤害提升 ${bonus}`);\n}",
+                            "script": "const currentMp = actor.system.resources.mp.value;\nif (currentMp > 0) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"少商剑 - 破釜沉舟\" },\n        content: `<p>当前剩余内力：<b>${currentMp}</b>，是否全部消耗以巨幅提升伤害？</p>`,\n        yes: { label: \"消耗全部内力\", icon: \"fas fa-fire\" },\n        no: { label: \"保留内力\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const bonus = 100 + (lvl - 1) * 50;\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 耗空内力: ${bonus}`;\n        await actor.update({\"system.resources.mp.value\": 0});\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor}),\n            content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #c0392b; padding:5px 8px; background:rgba(192,57,43,0.1);\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-fire\"></i> 破釜沉舟</div><div style=\"font-size:0.9em; color:#555;\">消耗全部内力，少商剑伤害飙升 ${bonus} 点！</div></div></div>`\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -524,25 +542,34 @@
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "六脉神指消耗增加，命中降低，伤害提升。",
                     "transfer": false,
-                    "duration": {
-                        "rounds": 1
-                    },
                     "flags": {
                         "xjzl-system": {
                             "slug": "qimai",
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "气脉影响",
-                                    "trigger": "attack",
-                                    "active": true,
-                                    "script": "if (args.move.item.name === \"六脉神指\") {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    \n    // 降低命中\n    args.flags.bonusHit -= data.hit;\n    \n    // 额外扣除内力 (attack阶段扣除，注意检查余额)\n    const mp = actor.system.resources.mp.value;\n    if (mp >= data.cost) {\n        await actor.update({\"system.resources.mp.value\": mp - data.cost});\n        ui.notifications.info(`气脉: 额外消耗 ${data.cost} 内力`);\n    } else {\n        ui.notifications.warn(\"气脉: 内力不足支付额外消耗 (可能导致负数)\");\n    }\n}"
-                                },
-                                {
                                     "label": "气脉增伤",
                                     "trigger": "calc",
                                     "active": true,
-                                    "script": "if (args.move.item.name === \"六脉神指\") {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    args.output.damage += data.dmg;\n    args.output.bonusDesc.push(`气脉增伤 +${data.dmg}`);\n}"
+                                    "script": "if (args.item?.name === '六脉神指') {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    args.output.damage += data.dmg;\n    args.output.bonusDesc.push(`气脉增伤 +${data.dmg}`);\n}"
+                                },
+                                {
+                                    "label": "气脉耗蓝",
+                                    "trigger": "preAttack",
+                                    "active": true,
+                                    "script": "if (args.item?.name === '六脉神指') {\n    if (!actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'ningqi')) {\n        const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n        args.costConfig.mp += data.cost;\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor}),\n            content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #c0392b; padding:5px 8px; background:rgba(192,57,43,0.1);\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-fire\"></i> 气脉激荡</div><div style=\"font-size:0.9em; color:#555;\">额外消耗 ${data.cost} 点内力。</div></div></div>`\n        });\n    }\n}"
+                                },
+                                {
+                                    "label": "气脉减命中",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "if (args.item?.name === '六脉神指') {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    args.flags.bonusHit -= data.hit;\n}"
+                                },
+                                {
+                                    "label": "气脉移除",
+                                    "trigger": "hit_once",
+                                    "active": true,
+                                    "script": "if (args.item?.name === '六脉神指') {\n    await thisEffect.delete();\n}"
                                 }
                             ]
                         }
@@ -554,16 +581,19 @@
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "六脉神指不消耗内力。",
                     "transfer": false,
+                    "duration": {
+                        "rounds": 1
+                    },
                     "flags": {
                         "xjzl-system": {
                             "slug": "ningqi",
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "凝气返还",
-                                    "trigger": "attack",
+                                    "label": "凝气免耗",
+                                    "trigger": "preAttack",
                                     "active": true,
-                                    "script": "if (args.move.item.name === \"六脉神指\") {\n    const cost = args.move.currentCost.mp || 0;\n    const mp = actor.system.resources.mp.value;\n    await actor.update({\"system.resources.mp.value\": mp + cost});\n    ui.notifications.info(`凝气: 返还 ${cost} 内力`);\n}"
+                                    "script": "if (args.item?.name === '六脉神指') {\n    args.costConfig.mp = 0;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #2980b9; padding:5px 8px; background:rgba(41,128,185,0.1);\"><div style=\"font-weight:bold; color:#154360;\"><i class=\"fas fa-wind\"></i> 凝气成剑</div><div style=\"font-size:0.9em; color:#555;\">招式内力消耗归零。</div></div></div>`\n    });\n}"
                                 }
                             ]
                         }
@@ -573,7 +603,7 @@
                 {
                     "name": "六脉贯通",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "射程增加，动作灵活。",
+                    "description": "射程增加，主要与反应动作互换，选中目标失去反应。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
