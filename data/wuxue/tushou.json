@@ -8610,7 +8610,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双掌翻转，对敌人造成伤害，若目标处于下盘不稳，则击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击飞手动。",
+                    "automationNote": "击飞发送卡片提醒。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -8626,13 +8626,15 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "击飞提示",
                             "trigger": "hit",
-                            "script": "// 优化：直接读取系统计算好的状态Flags\nif (args.isHit && args.target.xjzlStatuses.unstable) {\n    ui.notifications.info(`${args.target.name} 下盘不稳，被击飞 1 米！`);\n}",
+                            "script": "if (args.isHit && args.target.xjzlStatuses.unstable) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}), \n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #8e44ad; padding:5px 8px; background:rgba(142,68,173,0.1);\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-wind\"></i> 掌风击退</div><div style=\"font-size:0.9em; color:#555;\">目标处于下盘不稳，请手动将其击飞 1 米！</div></div></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -8647,7 +8649,7 @@
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
                     "description": "<p>单掌击地，内力随地面传至周围，对所有敌人造成伤害，使目标“下盘不稳”三回合。击破架招时，击飞目标 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "施加下盘不稳自动。击破击飞手动。",
+                    "automationNote": "击飞发送卡片提醒，其他自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -8663,13 +8665,15 @@
                             4,
                             8,
                             12
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "下盘不稳",
+                            "label": "下盘不稳与击破提示",
                             "trigger": "hit",
-                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}\nif (args.isBroken) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米`);\n}",
+                            "script": "if (!args.isHit) return;\nconst eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}\nif (args.isBroken) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}), \n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #8e44ad; padding:5px 8px; background:rgba(142,68,173,0.1);\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-wind\"></i> 破势击退</div><div style=\"font-size:0.9em; color:#555;\">目标被击破架招，请手动将其击飞 1 米！</div></div></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -8684,7 +8688,7 @@
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
                     "description": "<p>双掌回环，内力奔涌，对周围敌人造成伤害。若范围内有敌人处于空中，则可以消耗反应动作或次要动作施展，飞身击敌，不造成伤害，但使其最大气血上限永久-5。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "空中释放效果需手动调整（手动归零伤害并扣除上限）。",
+                    "automationNote": "若目标在空中，请手动调整伤害为0并扣除气血上限。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -8700,13 +8704,15 @@
                             4,
                             8,
                             12
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "空中释放提示",
                             "trigger": "attack",
-                            "script": "ui.notifications.info(\"若作为对空反击，请手动将伤害调整为 0，并手动扣除目标 HP 上限。 (使用手动修正组)\");",
+                            "script": "ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #e67e22; padding:5px 8px; background:rgba(230,126,34,0.1);\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-exclamation-triangle\"></i> 对空反击提示</div><div style=\"font-size:0.9em; color:#555;\">若作为对空反击，请在弹窗手动将伤害降为 0，并手动扣除目标 5 点 HP 上限。</div></div></div>`\n});",
                             "active": true
                         }
                     ]
@@ -8722,7 +8728,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双掌成爪化为乌黑，进入“暗掌”状态，持续到战斗脱离。</p><p><strong>暗掌：</strong>下次攻击命中后内力流入其头颅，额外造成 5 点精神伤害并使目标陷入“目盲”三回合。</p><p><strong>升级：</strong>造成精神伤害+5，内力消耗+2。</p>",
-                    "automationNote": "获暗掌自动。暗掌效果触发自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -8732,7 +8738,9 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
@@ -8753,7 +8761,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制对方虚招，内力顺着对方肢体打入奇经八脉，汇聚脑部，对目标造成伤害，若目标处于目盲，则使目标陷入永久的“黑暗”状态。</p><p><strong>黑暗：</strong>失去所有视力，所有需要视力的能力均失效。此效果无法被任何效果驱散，只有受到《天阳指》治疗七次后，此效果结束。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "目盲转黑暗自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -8769,13 +8777,15 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "黑暗",
+                            "label": "施加黑暗",
                             "trigger": "hit",
-                            "script": "// 优化：直接读取系统计算好的状态Flags\nif (args.target.xjzlStatuses.blind) {\n    const eff = thisItem.effects.getName(\"黑暗\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 陷入永久黑暗！`);\n}",
+                            "script": "if (!args.isHit) return;\nconst blindEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"blind\" || e.statuses.has(\"blind\"));\nif (blindEff) {\n    await blindEff.delete();\n    \n    const eff = thisItem.effects.getName(\"黑暗\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    \n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}), \n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #000; padding:5px 8px; background:rgba(0,0,0,0.1);\"><div style=\"font-weight:bold; color:#000;\"><i class=\"fas fa-eye-slash\"></i> 大日黑天</div><div style=\"font-size:0.9em; color:#333;\">内力侵入脑部，${args.target.name} 陷入永久黑暗！</div></div></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -8784,8 +8794,8 @@
             "effects": [
                 {
                     "name": "暗掌",
-                    "icon": "icons/magic/death/hand-undead-skeleton-fire-purple.webp",
-                    "description": "下次攻击造成精神伤害并致盲。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "下次攻击命中附加额外精神伤害，并使目标陷入目盲三回合。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -8793,10 +8803,16 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "暗掌触发",
+                                    "label": "暗掌附加伤害与致盲",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "// 修正：直接使用 thisItem，无需遍历查找\nif (args.actionType === \"attack\" && args.isHit) {\n    // 消耗暗掌\n    await thisEffect.delete();\n    \n    // 计算额外伤害\n    // 从 thisItem (武学书) 中查找 \"暗无天日\" 招式的数据来计算等级\n    const moveData = thisItem.system.moves.find(m => m.name === \"暗无天日\");\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const extra = 5 + (lvl - 1) * 5;\n    \n    await args.target.applyDamage({amount: extra, type: \"mental\", attacker: actor, isHit: true});\n    \n    // 施加目盲\n    const blind = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if (blind) {\n        const data = foundry.utils.deepClone(blind);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    ui.notifications.info(`暗掌触发：${extra} 精神伤害 + 目盲`);\n}"
+                                    "script": "if (args.actionType === 'attack' && args.isHit) {\n    const wuxue = actor.items.find(i => i.name === '灭神掌' && i.type === 'wuxue');\n    const lvl = Math.max(1, wuxue?.system.moves.find(m => m.name === '暗无天日')?.computedLevel || 1);\n    const extra = 5 + (lvl - 1) * 5;\n    \n    await args.target.applyDamage({amount: extra, type: 'mental', attacker: actor, isHit: true});\n    \n    const blind = CONFIG.statusEffects.find(e => e.id === 'blind');\n    if (blind) {\n        const data = foundry.utils.deepClone(blind);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    \n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #8e44ad; padding:5px 8px; background:rgba(142,68,173,0.1);\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-ghost\"></i> 暗掌触发</div><div style=\"font-size:0.9em; color:#555;\">对 ${args.target.name} 造成 ${extra} 点额外精神伤害并致盲！</div></div></div>`});\n}"
+                                },
+                                {
+                                    "label": "暗掌安全移除",
+                                    "trigger": "hit_once",
+                                    "active": true,
+                                    "script": "if (args.actionType === 'attack' && args.hitCount > 0) {\n    await thisEffect.delete();\n}"
                                 }
                             ]
                         }
@@ -8805,8 +8821,8 @@
                 },
                 {
                     "name": "黑暗",
-                    "icon": "icons/svg/blind.svg",
-                    "description": "永久失明。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "永久失明。无法被通常手段驱散。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
