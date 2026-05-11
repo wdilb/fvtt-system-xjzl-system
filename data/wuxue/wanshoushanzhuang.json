@@ -554,7 +554,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，龙腾虎啸，开启架招，格挡成功后获得一层“捕食”，至多三层，持续到脱战。</p><p><strong>捕食：</strong>每层提高《兽王拳》招式伤害 5 点，叠满三层后获得“化龙”，持续到战斗脱离。</p><p><strong>化龙：</strong>【苍龙震天】提供的格挡值翻倍。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。格挡获捕食、满层获化龙自动。化龙状态下格挡值自动翻倍。",
+                    "automationNote": "完全自动化。",
                     "costs": {
                         "mp": [
                             2,
@@ -572,13 +572,13 @@
                             "label": "化龙翻倍",
                             "trigger": "passive",
                             "active": true,
-                            "script": "// 在被动阶段读取自身招式基础格挡，如果有化龙，再加一次等额的数值来实现翻倍 (防止污染 base)\nif (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const baseBlock = (args.move.calculation.base || 0) + (args.move.calculation.growth || 0) * (lvl - 1);\n    actor.system.combat.block += baseBlock;\n}"
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const baseBlock = (args.move.calculation.base || 0) + (args.move.calculation.growth || 0) * (lvl - 1);\n    actor.system.combat.block += baseBlock;\n}"
                         },
                         {
                             "label": "捕食与化龙",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst bushiTpl = thisItem.effects.getName(\"捕食\");\nconst hualongTpl = thisItem.effects.getName(\"化龙\");\n\nif (bushiTpl) {\n    const effect = await game.xjzl.api.effects.addEffect(actor, bushiTpl.toObject());\n    // 检查是否满3层且还没获得化龙\n    if (effect && (effect.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 3 && hualongTpl) {\n        if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n            await game.xjzl.api.effects.addEffect(actor, hualongTpl.toObject());\n            actor.showFloatyText(\"化龙！\", { fill: \"#FFD700\", fontSize: 40 });\n        }\n    }\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst bushiTpl = thisItem.effects.getName(\"捕食\");\nconst hualongTpl = thisItem.effects.getName(\"化龙\");\nif (bushiTpl) {\n    const effect = await game.xjzl.api.effects.addEffect(actor, bushiTpl.toObject());\n    if (effect && (effect.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 3 && hualongTpl) {\n        if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n            await game.xjzl.api.effects.addEffect(actor, hualongTpl.toObject());\n            actor.showFloatyText(\"化龙！\", { fill: \"#FFD700\", fontSize: 40 });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -592,7 +592,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，伏身袭击，奔袭目标周围空格，对其造成 0.4 力量点外功伤害，并获得一层“捕食”，至多三层，持续到脱战。</p><p>·具有“化龙”时，招式伤害提高 10 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。捕食与化龙加伤自动计算。出招自动获得捕食。",
+                    "automationNote": "完全自动化。",
                     "costs": {
                         "mp": [
                             2,
@@ -619,10 +619,10 @@
                             "script": "const bushi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_bushi\");\nconst stacks = bushi ? (bushi.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (stacks > 0) {\n    args.output.damage += stacks * 5;\n    args.output.bonusDesc.push(`捕食加成 +${stacks * 5}`);\n}\nif (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"化龙加成 +10\");\n}"
                         },
                         {
-                            "label": "获得捕食",
+                            "label": "命中获得捕食与化龙",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const effect = thisItem.effects.getName(\"捕食\");\nif (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject());"
+                            "script": "if (!args.isHit) return;\nconst bushiTpl = thisItem.effects.getName(\"捕食\");\nconst hualongTpl = thisItem.effects.getName(\"化龙\");\nif (bushiTpl) {\n    const effect = await game.xjzl.api.effects.addEffect(actor, bushiTpl.toObject());\n    // 检查是否叠满3层且尚未获得化龙\n    if (effect && (effect.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 3 && hualongTpl) {\n        if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n            await game.xjzl.api.effects.addEffect(actor, hualongTpl.toObject());\n            actor.showFloatyText(\"化龙！\", { fill: \"#FFD700\", fontSize: 40 });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -680,7 +680,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对手虚招时，可消耗反应动作释放此招，压制目标虚招，奔袭至目标身旁空格，轰拳对其造成 0.6 力量点外功伤害。</p><p>·具有“化龙”时，可将目标击倒。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "看破需手动触发。捕食加伤自动。若有化龙自动击倒。",
+                    "automationNote": "完全自动化。",
                     "costs": {
                         "mp": [
                             2,
@@ -710,7 +710,7 @@
                             "label": "化龙击倒",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n    const prone = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n    await game.xjzl.api.effects.addEffect(args.target, prone);\n}"
+                            "script": "if (args.isHit && actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
                         }
                     ]
                 },
@@ -724,8 +724,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，力拔山兮气盖世，破釜沉舟决雌雄，轰击目标造成 0.8 力量点外功伤害。</p><p>·具有“化龙”时，出招后进入“兽王降世”，持续到脱离战斗。</p><p><strong>兽王降世：</strong>你免疫击飞、击退、击倒、下盘不稳、禁足和任意降低移动速度的效果。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "免疫效果通过清除相关异常标记实现，但若遇特殊模组减速请手动忽略。",
+                    "description": "<p>力拔山兮气盖世，破釜沉舟决雌雄，轰击目标造成 0.8 力量点外功伤害。</p><p>·具有“化龙”时，出招后进入“兽王降世”，持续到脱离战斗。</p><p><strong>兽王降世：</strong>你免疫击飞、击退、击倒、下盘不稳、禁足和任意降低移动速度的效果。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "兽王降世免疫需手动。",
                     "costs": {
                         "mp": [
                             4,
@@ -759,7 +759,7 @@
                         },
                         {
                             "label": "获得兽王降世",
-                            "trigger": "hit",
+                            "trigger": "attack",
                             "active": true,
                             "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_wanshou_hualong\")) {\n    const effect = thisItem.effects.getName(\"兽王降世\");\n    if (effect) await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n}"
                         }
@@ -770,7 +770,7 @@
         "effects": [
             {
                 "name": "捕食",
-                "icon": "icons/svg/pawprint.svg",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
                 "description": "每层提高《兽王拳》招式伤害 5 点。",
                 "transfer": false,
                 "flags": {
@@ -784,7 +784,7 @@
             },
             {
                 "name": "化龙",
-                "icon": "icons/svg/dragon.svg",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
                 "description": "【苍龙震天】提供的格挡值翻倍。",
                 "transfer": false,
                 "flags": {
@@ -797,9 +797,9 @@
             },
             {
                 "name": "阻脉",
-                "icon": "icons/svg/net.svg",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
                 "description": "每层使出招内力消耗提升一倍。",
-                "transfer": true,
+                "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "wuxue_wanshou_zumai",
@@ -817,8 +817,8 @@
             },
             {
                 "name": "兽王降世",
-                "icon": "icons/svg/king.svg",
-                "description": "免疫击飞、击退、击倒、下盘不稳、禁足和任意降低移动速度的效果。",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/万兽.png",
+                "description": "免疫击飞、击退、击倒、下盘不稳、禁足和任意降低移动速度的效果。(需手动免疫)",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
