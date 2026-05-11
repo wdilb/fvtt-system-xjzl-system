@@ -2359,11 +2359,11 @@
                     "element": "yang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "6",
+                    "range": "6米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>鞭首昂起，迅势劈砸，对目标造成 0.5 力量点外功伤害，若目标在本场战斗中曾受到过毒素伤害，还会再次诱发毒素，此招使其额外受到 10 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，额外毒素伤害+5，消耗+2。</p>",
-                    "automationNote": "诱发毒素伤害需手动（请使用手动伤害应用功能）。",
+                    "description": "<p>鞭首昂起，迅势劈砸，对目标造成伤害，若目标在本场战斗中曾受到过毒素伤害，还会再次诱发毒素，此招使其额外受到 10 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，额外毒素伤害+5，消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2379,8 +2379,18 @@
                             2,
                             4,
                             6
-                        ]
-                    }
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "诱发额外毒伤",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"血口赤牙 - 诱发毒素\" },\n    content: \"<p>若目标在本场战斗中曾受到过毒素伤害，可再次诱发毒素。是否诱发？</p>\",\n    yes: { label: \"诱发\", icon: \"fas fa-biohazard\" },\n    no: { label: \"取消\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extraDmg = 10 + (lvl - 1) * 5;\n    await args.target.applyDamage({\n        amount: extraDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true\n    });\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #27ae60; padding:5px 8px; background:rgba(39,174,96,0.1);\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-biohazard\"></i> 诱发毒伤</div><div style=\"font-size:0.9em; color:#555;\">对 ${args.target.name} 额外造成 ${extraDmg} 点毒素伤害！</div></div></div>`\n    });\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "恶蛟缠身",
@@ -2388,11 +2398,11 @@
                     "element": "yang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "6",
+                    "range": "6米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，挥鞭抖击，压制虚招，对目标造成 0.6 力量点外功伤害。同时和目标进行一个[角力]对抗，若你胜出，则施鞭缠绕，为其添加“下盘不稳”一回合。</p><p><strong>升级：</strong>伤害+10，下盘不稳回合数+1，消耗+2。</p>",
-                    "automationNote": "角力对抗自动。下盘不稳效果自动(System ID)。",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，挥鞭抖击，压制虚招，对目标造成伤害。同时和目标进行一个[角力]对抗，若你胜出，则施鞭缠绕，为其添加“下盘不稳”一回合。</p><p><strong>升级：</strong>伤害+10，下盘不稳回合数+1，消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2408,13 +2418,15 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "角力对抗",
                             "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"恶蛟缠身 - 角力对抗\",\n    outcome: {\n        win: {\n            text: \"缠绕成功！\",\n            targetEffect: \"unstable\"\n        },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
+                            "script": "if (!args.isHit) return;\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"恶蛟缠身 - 角力对抗\",\n    outcome: {\n        win: { text: \"缠绕成功！\", targetEffect: \"unstable\" },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -2429,7 +2441,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>折鞭缠手，开启架招，并进入“荼毒”状态，持续到战斗脱离或被击破架招。</p><p><strong>荼毒：</strong>你受伤后，攻击者受到 10 点毒素伤害。</p><p><strong>升级：</strong>格挡值+10，荼毒毒素伤害+5，消耗+2。</p>",
-                    "automationNote": "开启获得荼毒自动。反伤效果自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2439,7 +2451,9 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
@@ -2457,11 +2471,11 @@
                     "element": "yang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "6",
+                    "range": "6米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>鞭影翻飞，毒蛟漫天，对范围内敌人造成 0.7 力量点外功伤害，然后为自身添加“毒蛟”状态，持续到战斗脱离。</p><p><strong>毒蛟：</strong>命中处于下盘不稳、倒地的敌人时，必定暴击，且招式对他们所造成的毒素伤害翻倍。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+8。</p>",
-                    "automationNote": "自身获得毒蛟自动。毒蛟效果(必暴)自动。翻倍伤害需玩家手动。",
+                    "description": "<p>鞭影翻飞，毒蛟漫天，对范围内敌人造成伤害，然后为自身添加“毒蛟”状态，持续到战斗脱离。</p><p><strong>毒蛟：</strong>命中处于下盘不稳、倒地的敌人时，必定暴击，且招式对他们所造成的毒素伤害翻倍。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+8。</p>",
+                    "automationNote": "攻击下盘不稳/倒地敌人自动必定暴击，且招式本身造成毒素伤害自动翻倍（若为额外附加的毒伤需手动翻倍）。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -2482,7 +2496,8 @@
                             7,
                             6,
                             5
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
@@ -2497,19 +2512,20 @@
             "effects": [
                 {
                     "name": "荼毒",
-                    "icon": "icons/magic/nature/poison-glob-green.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "受伤后反弹毒素伤害。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "tudu",
                             "stackable": false,
+                            "tiedToStance": true,
                             "scripts": [
                                 {
                                     "label": "反伤",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "if (args.attacker && args.attacker.uuid !== actor.uuid && !args.attacker.isReceivingReflection) {\n    const lvl = Math.max(1, thisItem.system.moves.find(m => m.name === \"不毒不发\")?.computedLevel || 1);\n    const dmg = 10 + (lvl - 1) * 5;\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({\n            amount: dmg,\n            type: \"poison\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`荼毒反噬！对 ${args.attacker.name} 造成 ${dmg} 点毒素伤害。`);\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}"
+                                    "script": "if (!args.attacker || args.attacker.uuid === actor.uuid || args.attacker.isReceivingReflection) return;\nconst wuxue = actor.items.find(i => i.name === '毒蛟鞭' && i.type === 'wuxue');\nconst lvl = Math.max(1, wuxue?.system.moves.find(m => m.name === '不毒不发')?.computedLevel || 1);\nconst dmg = 10 + (lvl - 1) * 5;\n\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({\n        amount: dmg,\n        type: 'poison',\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #8e44ad; padding:5px 8px; background:rgba(142,68,173,0.1);\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-skull-crossbones\"></i> 荼毒反伤</div><div style=\"font-size:0.9em; color:#555;\">对 ${args.attacker.name} 造成 ${dmg} 点毒素伤害！</div></div></div>`\n    });\n} finally {\n    args.attacker.isReceivingReflection = false;\n}"
                                 }
                             ]
                         }
@@ -2518,8 +2534,8 @@
                 },
                 {
                     "name": "毒蛟",
-                    "icon": "icons/creatures/reptiles/serpent-horned-green.webp",
-                    "description": "对下盘不稳/倒地敌人必定暴击，毒素伤害翻倍(手动)。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "对下盘不稳/倒地敌人必定暴击，招式毒素伤害翻倍。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -2527,10 +2543,10 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "强击",
+                                    "label": "强击翻倍",
                                     "trigger": "preDamage",
                                     "active": true,
-                                    "script": "const s = args.target.xjzlStatuses;\nif (s.unstable || s.prone) {\n    // 必定暴击\n    args.config.isCrit = true;\n    // 翻倍提示\n    if (args.config.type === \"poison\") {\n        ui.notifications.info(\"毒蛟：请手动翻倍毒素伤害\");\n    }\n}"
+                                    "script": "const s = args.target.xjzlStatuses;\nif (s.unstable || s.prone) {\n    args.config.isCrit = true;\n    if (args.config.type === 'poison') {\n        args.config.amount *= 2;\n        ui.notifications.info('毒蛟：该招式毒素伤害已自动翻倍');\n    } else {\n        ui.notifications.info('毒蛟：已必定暴击。若有附带的额外毒素伤害，请手动翻倍');\n    }\n}"
                                 }
                             ]
                         }
