@@ -83,14 +83,14 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
             "zhengqizong": { pos: "-20px 45px", size: "100% auto" },
             "zhenwujiao": { pos: "-20px center", size: "80% auto" },
             "wanfosi": { pos: "-30px center", size: "100% auto" },
-            "xiaoyaopai": {pos: "-70px 30px", size: "100% auto"},
+            "xiaoyaopai": {pos: "-90px 10px", size: "100% auto"},
             "qingtianmen": {pos: "-110px 30px", size: "100% auto"},
-            "emeipai": {pos: "-10px center", size: "100% auto"},
+            "emeipai": {pos: "-20px center", size: "100% auto"},
             "huashanpai": {pos: "-70px center", size: "90% auto"},
             "tangmen": {pos: "-40px -40px", size: "100% auto"},
             "mingjiao": {pos: "-70px top", size: "90% auto"},
             "gaibang": {pos: "-80px center", size: "90% auto"},
-            "fenghuayuan": {pos: "center top", size: "100% auto"},
+            "fenghuayuan": {pos: "center center", size: "100% auto"},
             "liushanmen": {pos: "-80px top", size: "90% auto"},
             "jiangnange": {pos: "-20px center", size: "90% auto"},
             "shenfengbang": {pos: "-80px center", size: "90% auto"},
@@ -98,7 +98,7 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
             "jiangjunying": {pos: "-40px center", size: "90% auto"},
             "wanshoushanzhuang": {pos: "-20px center", size: "90% auto"},
             "baicaoge": {pos: "-40px center", size: "90% auto"},
-            "jianghushili": {pos: "-90px -20px", size: "100% auto"}
+            "jianghushili": {pos: "-110px -50px", size: "100% auto"}
         };
 
 
