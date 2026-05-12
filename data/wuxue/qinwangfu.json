@@ -21,7 +21,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>刀气如火，开启架招。获得一层“金乌”，至多三层，持续到脱战或解除架招。</p><p><strong>金乌：</strong>受到伤害时，每层对目标造成 5 火焰伤害。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "开启自动获层。格挡/受伤反伤自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -38,12 +38,6 @@
                             "label": "开启获金乌",
                             "trigger": "attack",
                             "script": "const eff = thisItem.effects.getName(\"金乌\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
-                        },
-                        {
-                            "label": "金乌反伤",
-                            "trigger": "damaged",
-                            "script": "if (!actor.system.martial.stanceActive) return;\nif (args.config?.ignoreStance) return;\n\nconst jinwu = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinwu\");\nif (jinwu && args.attacker) {\n    const stacks = jinwu.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = stacks * 5;\n    \n    if (args.attacker.isReceivingReflection) return;\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({\n            amount: dmg,\n            type: \"fire\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`金乌反噬！造成 ${dmg} 火焰伤害`);\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n}",
                             "active": true
                         }
                     ]
@@ -80,7 +74,7 @@
                         {
                             "label": "无架招目盲",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"blind\", true);\n    ui.notifications.info(`${args.target.name} 被强光致盲！`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"blind\", duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被强光致盲！`);\n}",
                             "active": true
                         }
                     ]
@@ -117,19 +111,22 @@
                 },
                 {
                     "name": "骄阳似火",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "attack",
                     "isUltimate": true,
                     "element": "yang",
-                    "damageType": "neigong",
+                    "damageType": "none",
                     "weaponType": "blade",
                     "range": "10米",
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
                     "description": "<p>持刀倚天，灼灼曜日，自身每有一层“金乌”，对范围内敌人造成 10 点火焰伤害。然后在自身周围 10m 范围内创造‘灼日’，持续到战斗脱离或你解除架招【烈日炎炎】。</p><p><strong>灼日：</strong>区域内敌人在自己的每个回合初，受到 10 点火焰伤害，若处于无架招状态，持续陷入“目盲”。</p><p>·灼日区域以你为中心跟随你移动，你只能拥有一 个灼日，如果你创造新的灼日，之前的消失。</p><p><strong>升级：</strong>每层金乌和灼日区域造成的火焰伤害+10，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "金乌额外伤害自动计算并显示。灼日区域效果需手动。",
+                    "automationNote": "金乌额外伤害自动计算并显示。施展完毕发送卡片提示灼日生成，区域效果需手动结算。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
-                        "growth": 0
+                        "growth": 0,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -147,7 +144,13 @@
                         {
                             "label": "金乌爆发伤害",
                             "trigger": "calc",
-                            "script": "const jinwu = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinwu\");\nif (jinwu) {\n    const stacks = jinwu.getFlag(\"xjzl-system\", \"stacks\") || 0;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dmgPerStack = 10 + (lvl - 1) * 10;\n    const totalAdd = stacks * dmgPerStack;\n    \n    args.output.damage += totalAdd;\n    args.output.bonusDesc.push(`金乌爆发 (${stacks}层): +${totalAdd} 火焰伤害`);\n}",
+                            "script": "const jinwu = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinwu\");\nconst stacks = jinwu ? (jinwu.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dmgPerStack = 10 + (lvl - 1) * 10;\nconst totalAdd = stacks * dmgPerStack;\nargs.output.damage += totalAdd;\nif (totalAdd > 0) args.output.bonusDesc.push(`金乌爆发 (${stacks}层): +${totalAdd} 火焰伤害`);",
+                            "active": true
+                        },
+                        {
+                            "label": "生成灼日提示",
+                            "trigger": "hit_once",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst dotDmg = 10 + (lvl - 1) * 10;\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230,126,34,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-sun\"></i> 灼日领域 生成</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">区域内敌人在回合初，受到 <b style=\"color:#c0392b;\">${dotDmg}</b> 点火焰伤害。<br>若处于无架招状态，持续陷入“目盲”。<br><span style=\"color:#888;\">(以自身为中心 10m 移动，需玩家手动结算伤害与状态)</span></div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
@@ -156,7 +159,7 @@
             "effects": [
                 {
                     "name": "金乌",
-                    "icon": "icons/magic/fire/projectile-fireball-orange.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "受到伤害时反弹火焰伤害。",
                     "transfer": false,
                     "flags": {
@@ -164,10 +167,17 @@
                             "slug": "jinwu",
                             "stackable": true,
                             "maxStacks": 3,
-                            "tiedToStance": true
+                            "tiedToStance": true,
+                            "scripts": [
+                                {
+                                    "label": "金乌反伤",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nconst stacks = thisEffect.stacks || 1;\nconst dmg = stacks * 5;\n\nif (args.attacker.isReceivingReflection) return;\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({\n        amount: dmg,\n        type: \"fire\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n\n    const content = `<div class=\"xjzl-chat-card item-card\" style=\"margin-left: 6px;\">\n        <header class=\"card-header\" style=\"border-left: 4px solid #e74c3c;\">\n            <img src=\"${thisEffect.icon}\" style=\"border:none;\" />\n            <h3 style=\"color: #e74c3c;\">${thisEffect.name}</h3>\n        </header>\n        <div class=\"card-content-wrapper\">\n            <div style=\"font-weight:bold; color:#c0392b; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 金乌反噬触发！</div>\n            <div style=\"font-size:0.9em;\">反噬目标: <b>${args.attacker.name}</b></div>\n            <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;\">\n                已反弹 <span style=\"color:red; font-weight:bold;\">${dmg}</span> 点火焰伤害。\n            </div>\n        </div>\n    </div>`;\n\n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n} finally {\n    args.attacker.isReceivingReflection = false;\n}"
+                                }
+                            ]
                         }
-                    },
-                    "changes": []
+                    }
                 }
             ]
         }
@@ -403,7 +413,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>选择你的妻子或丈夫，双方一同添加“鸳鸯”，持续三回合。</p><p><strong>鸳鸯：</strong>你施展“夫妻刀法”时，招式伤害+10；只要你的妻子或丈夫未陷入濒死，每个回合末你回复 10 点气血内力。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "应用BUFF自动。鸳鸯加伤自动。回血效果手动。",
+                    "automationNote": "将会给目标与自己添加BUFF，伤害增加自动，回血卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -419,7 +429,7 @@
                         {
                             "label": "添加鸳鸯",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"鸳鸯\").toObject();\n// 默认给目标\nawait game.xjzl.api.effects.addEffect(args.target, eff);\n// 同时给攻击者\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"双方已添加 [鸳鸯] 状态\");",
+                            "script": "const eff = thisItem.effects.getName(\"鸳鸯\").toObject();\neff.duration = { rounds: 3 };\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"双方已添加 [鸳鸯] 状态\");",
                             "active": true
                         }
                     ]
@@ -434,7 +444,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双刀如双人，环挡身前，开启架招。格挡成功后，可消耗反应动作，施展【喜结连理】。</p><p>消耗“仁者”：格挡成功后，改为不消耗动作施展【喜结连理】。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "纯架招。反击逻辑手动。",
+                    "automationNote": "格挡后发送反击卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -446,7 +456,14 @@
                             6
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "风流反震",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst hasRen = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"renzhe\");\nconst subText = hasRen ? \"<span style='color:#c0392b; font-weight:bold;'><br>可消耗一层[仁者]，不消耗动作施展。</span>\" : \"\";\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2980b9; background: rgba(41,128,185,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1a5276;\"><i class=\"fas fa-shield-alt\"></i> 英雄风流触发</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">格挡成功！你可消耗反应动作施展【喜结连理】。${subText}</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "喜结连理",
@@ -457,8 +474,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>刀光旖旎，挥刀乱舞对周围敌人造成伤害。</p><p>消耗“仁者”：将敌人拉扯至身边未被占据的任意空格，若目标无架招，将其“禁足”一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害自动。消耗仁者拉人禁足手动。",
+                    "description": "<p>刀光旖旎，挥刀乱舞对周围敌人造成外功伤害。</p><p>消耗“仁者”：将敌人拉扯至身边未被占据的任意空格，若目标无架招，将其“禁足”一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -476,7 +493,20 @@
                             12
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "仁者拉扯判定",
+                            "trigger": "attack",
+                            "script": "const renzhe = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"renzhe\");\nif (renzhe) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"消耗仁者\" },\n        content: \"<p>是否消耗一层 [仁者]，将敌人拉扯至身边，若无架招则禁足一回合？</p>\",\n        yes: { label: \"消耗\" }, no: { label: \"保留\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"renzhe\", 1);\n        args.flags.wuxue_yuanyang_xijie = true;\n        ui.notifications.info(\"已消耗仁者！\");\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "拉人与禁足",
+                            "trigger": "hit",
+                            "script": "if (args.flags.wuxue_yuanyang_xijie && args.isHit) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-people-arrows\"></i> 喜结连理</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">将 ${args.target.name} 拉扯至身边未占据的空格！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    if (!args.target.system.martial.stanceActive) {\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n    }\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "春宵一刻",
@@ -488,7 +518,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>水乳交融，欢愉难忘，对目标造成伤害，击破架招时，使其“错乱”，持续三回合。</p><p><strong>错乱：</strong>自己的每个回合末，朝 D4 随机方向不消耗速度走出一步，然后倒地。</p><p>消耗“仁者”：虚招值+3，且招式变为攻击直线范围的所有敌方。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破施加错乱自动。仁者加成手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -508,9 +538,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "仁者虚招强化",
+                            "trigger": "attack",
+                            "script": "const renzhe = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"renzhe\");\nif (renzhe) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"消耗仁者\" },\n        content: \"<p>是否消耗一层 [仁者]，虚招值+3，并变为直线范围攻击？</p>\",\n        yes: { label: \"消耗\" }, no: { label: \"保留\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"renzhe\", 1);\n        args.flags.bonusFeint += 3;\n        ui.notifications.info(\"虚招值+3，请手动选择直线所有敌方。\");\n    }\n}",
+                            "active": true
+                        },
+                        {
                             "label": "击破错乱",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"cuoluan\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入错乱！`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuoluan\", duration: { rounds: 3 } });\n    ui.notifications.info(`${args.target.name} 陷入错乱！`);\n}",
                             "active": true
                         }
                     ]
@@ -525,7 +561,7 @@
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
                     "description": "<p>龙凤双飞，鸳鸯转刀，对周围敌人造成伤害。</p><p>·此招可移动释放，对移动路径上周围 2 米范围内的敌人造成伤害。（不会重复造成伤害）</p><p>消耗“仁者”：动作降低为蓄力动作，且招式伤害提升 20 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害自动。移动攻击手动。仁者加成手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -543,7 +579,14 @@
                             12
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "仁者加伤",
+                            "trigger": "attack",
+                            "script": "const renzhe = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"renzhe\");\nif (renzhe) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"消耗仁者\" },\n        content: \"<p>是否消耗一层 [仁者]，招式降为蓄力动作并伤害+20？</p>\",\n        yes: { label: \"消耗\" }, no: { label: \"保留\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"renzhe\", 1);\n        args.flags.damageResult.damage += 20;\n        args.flags.damageResult.breakdown += \"\\n+ 消耗仁者: 20\";\n        ui.notifications.info(\"招式伤害+20，降为蓄力动作。\");\n    }\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "齐天之乐",
@@ -557,7 +600,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>鸳扑朔，鸯迷离，心心相印，获得一层“仁者”，持续到战斗脱离或切换套路</p><p><strong>仁者：</strong>施展《鸳鸯双刀》时，可选择消耗一层仁者，使招式发生变化。</p><p><strong>升级：</strong>额外获得一层“仁者”，内力消耗+4。</p>",
-                    "automationNote": "获得仁者自动。绝招本身无伤害。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -578,7 +621,7 @@
                         {
                             "label": "获得仁者",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"仁者\").toObject();\n\n// 升级增加层数\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 1 + (lvl - 1);\n\n// 循环添加\nfor(let i=0; i<amount; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nui.notifications.info(`获得 ${amount} 层 [仁者]`);",
+                            "script": "const eff = thisItem.effects.getName(\"仁者\").toObject();\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst amount = 1 + (lvl - 1);\nfor(let i=0; i<amount; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nui.notifications.info(`获得 ${amount} 层 [仁者]`);",
                             "active": true
                         }
                     ]
@@ -587,13 +630,21 @@
             "effects": [
                 {
                     "name": "鸳鸯",
-                    "icon": "icons/magic/life/heart-glow-red.webp",
-                    "description": "夫妻刀法伤害+10。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "夫妻刀法伤害+10。回合末未濒死时可提示回血。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "yuanyang",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "回合末回血提示",
+                                    "trigger": "turnEnd",
+                                    "active": true,
+                                    "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-heart\"></i> 鸳鸯共鸣</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">只要你的妻子或丈夫未陷入濒死，请手动为自己回复 <b>10 点气血和内力</b>。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
+                                }
+                            ]
                         }
                     },
                     "changes": [
@@ -606,16 +657,16 @@
                 },
                 {
                     "name": "仁者",
-                    "icon": "icons/magic/holy/prayer-hands-glowing-yellow.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "消耗以强化鸳鸯双刀招式。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "renzhe",
-                            "stackable": true
+                            "stackable": true,
+                            "tiedToStance": true
                         }
-                    },
-                    "changes": []
+                    }
                 }
             ]
         }
@@ -904,7 +955,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>聚气下肢，双剑刺地，在自身周围创造‘地宫’，持续三回合，并对周围敌人造成伤害，若目标无架招，为其添加“禁足”，持续一回合。</p><p><strong>地宫：</strong>区域内友方速度+1；敌方处于困难地形。</p><p><strong>升级：</strong>招式伤害+10，地宫持续回合+1，消耗+8。</p>",
-                    "automationNote": "地宫领域手动。无架招禁足自动。",
+                    "automationNote": "无架招禁足自动。施展完毕卡片提示地宫效果，可手动把武学自带AE赋予队友。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -931,7 +982,13 @@
                         {
                             "label": "无架招禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！`);\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "地宫播报",
+                            "trigger": "hit_once",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-chess-board\"></i> 地宫生成 (${rounds}回合)</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">区域内友方速度+1；敌方处于困难地形。<br>请从武学把对应【地宫】AE 赋予队友。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
@@ -946,7 +1003,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>凝气双手，双剑擎天，在自身周围创造‘天宫’，持续三回合，并对周围敌人造成伤害，然后将他们击倒。</p><p><strong>天宫：</strong>区域内友方暴击骰-1；敌方闪避-5。</p><p><strong>升级：</strong>招式伤害+10，天宫持续回合+1，消耗+8。</p>",
-                    "automationNote": "天宫领域手动。击倒手动。",
+                    "automationNote": "命中击倒自动。施展完毕卡片提示天宫效果，可手动把武学自带AE赋予队友和敌人。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -969,7 +1026,20 @@
                             32
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "天宫播报与击倒",
+                            "trigger": "hit_once",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52,152,219,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-cloud-moon\"></i> 天宫生成 (${rounds}回合)</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">区域内友方暴击骰-1；敌方闪避-5。<br>请从武学中把对应【天宫】AE 给双方。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
+                            "active": true
+                        },
+                        {
+                            "label": "击倒",
+                            "trigger": "hit",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"prone\" });\n}",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "戴九履一",
@@ -980,8 +1050,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>一剑指天，一剑履地，开启架招。格挡成功获得一层“剑光”，至多三层，持续到脱战。</p><p><strong>剑光：</strong>每层使《九宫八卦剑》招式伤害+10。</p><p>若自身处于‘天宫’或‘地宫’区域，选择以下对应区域效果中的效果生效：</p><p><strong>天宫：</strong>你受到的内外功伤害减少 10 点。</p><p><strong>地宫：</strong>攻击者你的敌人流失 10 点气血。</p><p><strong>升级：</strong>格挡值+10，天宫再减少 10 伤害，地宫使攻击者多流失 10 气血流失，内力消耗+4。</p>",
-                    "automationNote": "格挡获剑光自动。天宫减伤、地宫流失手动（需判断是否在领域内）。",
+                    "description": "<p>一剑指天，一剑履地，开启架招。格挡成功获得一层“剑光”，至多三层，持续到脱战。</p><p><strong>剑光：</strong>每层使《九宫八卦剑》招式伤害+10。</p><p>若自身处于‘天宫’或‘地宫’区域，选择以下对应区域效果中的效果生效：</p><p><strong>天宫：</strong>你受到的内外功伤害减少 10 点。</p><p><strong>地宫：</strong>攻击你的敌人流失 10 点气血。</p><p><strong>升级：</strong>格挡值+10，天宫再减少 10 伤害，地宫使攻击者多流失 10 气血，内力消耗+4。</p>",
+                    "automationNote": "格挡获剑光自动。开启架招时发送卡片提醒玩家，天宫减伤/地宫流失可手动挂载武学内置的AE实现自动扣血与减免。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1000,6 +1070,12 @@
                             "trigger": "damaged",
                             "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"剑光\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
+                        },
+                        {
+                            "label": "开启阵法提示",
+                            "trigger": "attack",
+                            "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2ecc71; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-yin-yang\"></i> 戴九履一 开启</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">如果你处于天宫或地宫，请手动挂载武学中的【戴九履一-天宫】或【戴九履一-地宫】AE以获取自动减伤/流失反伤效果。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
+                            "active": true
                         }
                     ]
                 },
@@ -1013,7 +1089,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>骤然抖锋，合剑崩之，对目标造成伤害，击破架招后，为目标添加“定身”，持续一回合。</p><p>若你同时处于‘天宫’‘地宫’区域，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值+1，内力消耗+4。</p>",
-                    "automationNote": "击破定身自动。区域加成手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1038,9 +1114,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "阵法叠加判断",
+                            "trigger": "attack",
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"阵法判定\" },\n    content: \"<p>是否同时处于 [天宫] 和 [地宫] 区域内？</p>\",\n    yes: { label: \"是\" }, no: { label: \"否\" }\n});\nif(confirm) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const extraFeint = 1 + (lvl - 1);\n    args.flags.bonusFeint += extraFeint;\n    ui.notifications.info(`处于天地交汇，虚招值 +${extraFeint}`);\n}",
+                            "active": true
+                        },
+                        {
                             "label": "击破定身",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"stun\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被定身！`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"stun\", duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被定身！`);\n}",
                             "active": true
                         }
                     ]
@@ -1056,7 +1138,7 @@
                     "targetInfo": "周围",
                     "actionCost": "全回合动作",
                     "description": "<p>双剑平聚于前胸，以奇门遁甲九宫图方位，周围对应位置的目标，获得相应效果：</p><p>一九若有敌人占据：自身获得 3 层“剑光”。</p><p>二四若有敌人占据：将他们击飞 3 米。</p><p>六八若有敌人占据：将他们添加“禁足”一回合。</p><p>三七若有敌人占据：为他们添加“错骨”一回合。</p><p><strong>升级：</strong>动作下降一级（全回合-蓄力-主要-次要）怒气消耗-1。</p>",
-                    "automationNote": "纯手动。请根据战术地图判断方位应用效果。",
+                    "automationNote": "纯手动。请根据战术地图判断方位应用效果，出招附带九宫格说明卡片。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1075,7 +1157,14 @@
                             1
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "方位说明图",
+                            "trigger": "attack",
+                            "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #d35400; background: rgba(211,84,0,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#a04000;\"><i class=\"fas fa-th\"></i> 九宫方位判图</div><div style=\"font-family:monospace; font-size:1.1em; color:#555; margin-top:3px; text-align:center;\">4 9 2<br>3 5 7<br>8 1 6</div><div style=\"font-size:0.85em; color:#666; margin-top:5px;\">请根据图示手动结算：1/9 获剑光，2/4 击飞，6/8 禁足，3/7 错骨。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "九九归一",
@@ -1088,7 +1177,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>掌中排九宫，落步踏剑斩，随机选择范围内三个目标（投掷 3 次 X 面骰子，X 是招式范围内的敌人数量，按投结果决定三次斩击的目标），分别对他们斩出一剑（投掷一次命中），每剑造成伤害。</p><p>·若自身处于‘天宫’或‘地宫’区域，选择以下两个效果中的一个生效：</p><p><strong>天宫：</strong>招式伤害无视目标的格挡和内功防御。</p><p><strong>地宫：</strong>若目标无架招，眩晕目标一回合。</p><p>·你可以重复斩击一个目标三次，但第二、第三次斩击无法造成暴击。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "完全手动。请手动进行多次攻击检定和目标选择。",
+                    "automationNote": "随机目标请自动选择，如果是对同一个目标多次伤害，请手动发起多次（可在出招面板选择不消耗和无法造成暴击伤害）。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1117,13 +1206,26 @@
                             5
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "阵域穿透判定",
+                            "trigger": "attack",
+                            "script": "const result = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"阵域判定\" },\n    content: `<div class=\"form-group\"><label>当前所处区域：</label><select name=\"zone\"><option value=\"none\">无/其他</option><option value=\"tian\">天宫</option><option value=\"di\">地宫</option></select></div>`,\n    ok: { callback: (ev, btn) => new FormData(btn.form).get(\"zone\") }\n});\nif(result === \"tian\") {\n    args.flags.ignoreBlock = true;\n    args.flags.ignoreDefense = true;\n    ui.notifications.info(\"处于天宫：本次攻击无视格挡和内防！\");\n} else if(result === \"di\") {\n    args.flags.wuxue_jiugong_di = true;\n    ui.notifications.info(\"处于地宫：无架招目标将眩晕！\");\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "地宫眩晕",
+                            "trigger": "hit",
+                            "script": "if (args.flags.wuxue_jiugong_di && args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"xuanyun\", duration: { rounds: 1 } });\n}",
+                            "active": true
+                        }
+                    ]
                 }
             ],
             "effects": [
                 {
                     "name": "剑光",
-                    "icon": "icons/magic/light/sword-beam-strike-yellow.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "提高九宫八卦剑伤害。",
                     "transfer": false,
                     "flags": {
@@ -1140,6 +1242,108 @@
                             "value": "10"
                         }
                     ]
+                },
+                {
+                    "name": "地宫-友方",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "速度+1",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "digong_ally",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                },
+                {
+                    "name": "天宫-友方",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "暴击骰-1",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tiangong_ally",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.crit_waigong",
+                            "mode": 2,
+                            "value": "-1"
+                        },
+                        {
+                            "key": "system.combat.crit_neigong",
+                            "mode": 2,
+                            "value": "-1"
+                        }
+                    ]
+                },
+                {
+                    "name": "天宫-敌方",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "闪避-5",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tiangong_enemy",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.dodge",
+                            "mode": 2,
+                            "value": "-5"
+                        }
+                    ]
+                },
+                {
+                    "name": "戴九履一-天宫",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "天宫庇护，受到的内外伤大幅度减免。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "tiangong_jianshang",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "天宫减伤",
+                                    "trigger": "passive",
+                                    "script": "// 需要知道招式的当前等级，如果不知道，就默认最高等级或固定值。由于被动没法读 move.computedLevel，改读 Item 等级。\nlet lvl = 1;\nconst wuxue = actor.items.find(i => i.name === '九宫八卦剑' && i.type === 'wuxue');\nif (wuxue) {\n   const stanceMove = wuxue.system.moves.find(m => m.name === '戴九履一');\n   if (stanceMove) lvl = Math.max(1, stanceMove.computedLevel || 1);\n}\nconst resAmount = 10 + (lvl - 1) * 10;\nargs.output = resAmount;\nactor.system.combat.resistances.waigong.mod += resAmount;\nactor.system.combat.resistances.neigong.mod += resAmount;",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "戴九履一-地宫",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "地宫森严，攻击者将持续流失气血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "digong_liushi",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "地宫反噬",
+                                    "trigger": "damaged",
+                                    "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nlet lvl = 1;\nconst wuxue = actor.items.find(i => i.name === '九宫八卦剑' && i.type === 'wuxue');\nif (wuxue) {\n   const stanceMove = wuxue.system.moves.find(m => m.name === '戴九履一');\n   if (stanceMove) lvl = Math.max(1, stanceMove.computedLevel || 1);\n}\nconst dmg = 10 + (lvl - 1) * 10;\nawait args.attacker.applyHealing({ amount: -dmg, type: 'hp', showScrolling: true });\nargs.attacker.showFloatyText(`地宫反噬 -${dmg}`, { fill: \"#e74c3c\" });",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    }
                 }
             ]
         }
