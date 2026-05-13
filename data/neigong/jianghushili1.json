@@ -388,7 +388,7 @@
             "subSect": "xujia",
             "description": "此功修炼时毫无余地，置身于生死之境历练，以成就功名。抱持必死决心，勇往直前而获胜。练至大成后，技力互补，气势内敛而决绝。\n小成运功特效：处于无架招时，你的招式伤害+10。\n圆满运功特效：处于无架招时，你的招式伤害+20。你施展濒死一击时招式必定暴击，但那次死亡检定结果具有劣势。\n修满特效：修满[永久]：气血+30，内力+30，暴击骰-1。",
             "requirement": "悟性4",
-            "automationNote": "完全自动化",
+            "automationNote": "完全自动化，死亡检定劣势需玩家投掷时手动。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -416,10 +416,10 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "背水诀-无架增伤",
+                            "label": "无架增伤",
                             "trigger": "calc",
-                            "script": "if (!actor.system.martial.stanceActive) { args.output.damage += 10; }",
-                            "active": true
+                            "active": true,
+                            "script": "if (!actor.system.martial.stanceActive) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push('背水诀 (无架招): +10');\n}"
                         }
                     ]
                 },
@@ -436,16 +436,16 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "背水诀-无架增伤",
+                            "label": "无架增伤",
                             "trigger": "calc",
-                            "script": "if (!actor.system.martial.stanceActive) { args.output.damage += 20; }",
-                            "active": true
+                            "active": true,
+                            "script": "if (!actor.system.martial.stanceActive) {\n    args.output.damage += 20;\n    args.output.bonusDesc.push('背水诀 (无架招): +20');\n}"
                         },
                         {
-                            "label": "背水诀-濒死暴击",
+                            "label": "濒死必暴",
                             "trigger": "attack",
-                            "script": "if (args.flags.isDesperate) { args.flags.critThresholdMod += 20; ui.notifications.info('【背水诀】濒死一击触发：必定暴击，下次死亡检定劣势(需手动处理)'); }",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.costConsumed && args.costConsumed.desperateBonus > 0) {\n    args.flags.critThresholdMod += 20; // 降低20点暴击门槛，实现必暴\n    actor.showFloatyText('背水一战·必暴！', { fill: '#ff0000', fontSize: 40 });\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\"><b style=\"color:red;\">【背水诀】濒死一击触发：</b>招式必定暴击！<br><span style=\"color:#666; font-size:0.9em;\">⚠️ 注意：你下一次死亡检定结果具有劣势 (请在检定弹窗中手动设定劣势)。</span></div>`\n    });\n}"
                         }
                     ]
                 }
