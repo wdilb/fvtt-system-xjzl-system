@@ -505,66 +505,67 @@
             "requirements": "《聚宝功》修炼圆满",
             "moves": [
                 {
-                    "name": "重义轻财",
+                    "name": "物华天宝",
                     "type": "qi",
                     "actionType": "buff",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>你视金钱如粪土，你可以赠予他人一千两白银，然后获得“豪绅”，持续一个月。</p><p><strong>豪绅：</strong>他人对你出招时伤害-10，暴击骰+1。</p><p><strong>升级：</strong>重义轻财他人对你的伤害额外-5。</p>",
-                    "automationNote": "纯手动。请自行扣除银两，并手动给角色添加[豪绅]状态（在特效栏中）。",
+                    "description": "<p>包含【穷奢极欲】【荣华富贵】【重义轻财】三式。</p>",
+                    "automationNote": "穷奢极欲神采提升自动。荣华富贵与重义轻财扣款需手动，[豪绅]状态需手动从物品特效中添加。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
                     },
                     "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0,
-                            0
-                        ]
+                        "mp": []
                     },
                     "scripts": [
                         {
-                            "label": "提示",
+                            "label": "穷奢极欲",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "let goldItemsCount = 0;\nfor (const i of actor.items) {\n    if (i.system.quality >= 3) goldItemsCount++;\n}\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst maxShencai = 10 + (lvl - 1) * 5;\nconst shencaiBonus = Math.min(goldItemsCount, maxShencai);\nS.stats.shencai.mod += shencaiBonus;"
+                        },
+                        {
+                            "label": "重义轻财提示",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"请手动扣除1000两白银，并手动将 [豪绅] 状态拖拽给角色。\");",
-                            "active": true
+                            "active": true,
+                            "script": "ui.notifications.info(\"请手动扣除 1000 两白银，并手动将物品内 [豪绅] 状态施加给角色。荣华富贵的声望亦需手动增加。\");"
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "豪绅",
-                    "icon": "icons/commodities/currency/coins-assorted-mix-copper-silver-gold.webp",
-                    "description": "视金钱如粪土，他人伤害降低，更难暴击。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "haoshen",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "伤害减免",
-                                    "trigger": "preTake",
-                                    "script": "// 尝试动态查找角色身上的物华天宝招式等级\n// 如果找不到，默认为1级\nlet lvl = 1;\nconst item = actor.items.find(i => i.name === \"物华天宝\" && i.type === \"wuxue\");\nif (item) {\n    const move = item.system.moves.find(m => m.name === \"重义轻财\");\n    if (move) lvl = Math.max(1, move.computedLevel || 1);\n}\n\nconst reduct = 10 + (lvl - 1) * 5;\nargs.output.damage -= reduct;\nif (args.output.damage < 0) args.output.damage = 0;\n\n// 提示减伤\n// actor.showFloatyText(`豪绅减伤 -${reduct}`, {fill: \"#FFD700\"});",
-                                    "active": true
-                                },
-                                {
-                                    "label": "暴击抵抗",
-                                    "trigger": "check",
-                                    "script": "// 暴击骰+1 (意味着阈值更难达成，需要减去修正值)\nargs.flags.critThresholdMod -= 1;",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "豪绅",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "视金钱如粪土，他人伤害降低，更难暴击。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "haoshen",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "伤害减免",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "let lvl = 1;\nconst item = actor.items.find(i => i.name === '物华天宝' && i.type === 'wuxue');\nif (item) {\n    const move = item.system.moves.find(m => m.name === '物华天宝');\n    if (move) lvl = Math.max(1, move.computedLevel || 1);\n}\nconst reduct = 10 + (lvl - 1) * 5;\nargs.output.damage = Math.max(0, args.output.damage - reduct);"
+                            },
+                            {
+                                "label": "暴击抵抗",
+                                "trigger": "check",
+                                "active": true,
+                                "script": "args.flags.critThresholdMod -= 1;"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "铁花枪",
@@ -575,7 +576,7 @@
             "sect": "jianghushili",
             "subSect": "xujia",
             "tier": 1,
-            "description": "<p>刚劲有力，节奏分明，枪法变化多端，连贯通达。</p><p><strong>需求：</strong>棍-长枪</p><p><strong>属性：</strong>刚</p>",
+            "description": "<p>刚劲有力，节奏分明，枪法变化多端，连贯通达。</p><p><strong>需求：</strong>棍-长枪 <strong>属性：</strong>刚</p>",
             "requirements": "棍-长枪",
             "moves": [
                 {
@@ -588,7 +589,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>高提平枪，开启架招。格挡成功时，获得一层“刚劲”，至多三层，持续到战斗脱离。</p><p><strong>刚劲：</strong>每层使你的刚属性武学招式伤害+5。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "格挡获刚劲自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -604,8 +605,8 @@
                         {
                             "label": "格挡-刚劲",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"刚劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName('刚劲').toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -618,8 +619,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>枪扫下盘，对目标造成伤害，并为其添加“下盘不稳”，持续一回合。</p><p>·若在骑马时施展，改为为其添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "默认施加下盘不稳。骑马检测需手动。",
+                    "description": "<p>枪扫下盘，对目标造成 0.4 力量点外功伤害，并为其添加“下盘不稳”，持续一回合。</p><p>·若在骑马时施展，改为为其添加“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "默认施加下盘不稳。骑马改禁足需手动操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -641,8 +642,8 @@
                         {
                             "label": "状态施加",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 默认下盘不稳\n    let statusId = \"unstable\";\n    // 简单询问是否骑马 (或者让玩家自己选禁足)\n    // 为简化流程，这里只应用默认，特殊情况手动\n    const eff = CONFIG.statusEffects.find(e => e.id === statusId);\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst eff = CONFIG.statusEffects.find(e => e.id === 'unstable');\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
                         }
                     ]
                 },
@@ -656,8 +657,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
-                    "description": "<p>缠枪摔把，回复气血，并为自身添加一层“棍势”，至多三层，持续到脱战或更换其他武器的武学套路。</p><p><strong>棍势：</strong>每层使棍法命中+10。</p><p><strong>升级：</strong>回复气血+5，内力消耗+1。</p>",
-                    "automationNote": "应用治疗时自动获得棍势。",
+                    "description": "<p>缠枪摔把，回复 10 气血，并为自身添加一层“棍势”，至多三层，持续到脱战或更换其他武器的武学套路。</p><p><strong>棍势：</strong>每层使棍法命中+10。</p><p><strong>升级：</strong>回复气血+5，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 10,
                         "growth": 5
@@ -678,8 +679,8 @@
                         {
                             "label": "获得棍势",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"棍势\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName('棍势').toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -693,8 +694,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>速势出枪，上下翻飞，对敌人造成伤害。</p><p>·若在骑马时施展，改为对直线路径上所有敌人造成伤害。</p><p>·你可以移除一层“棍势”，使招式释放距离+3。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "骑马直线手动。消耗棍势手动(或在Attack脚本中提示)。",
+                    "description": "<p>速势出枪，上下翻飞，对敌人造成 0.5 力量点外功伤害。</p><p>·若在骑马时施展，改为对直线路径上所有敌人造成伤害。</p><p>·你可以移除一层“棍势”，使招式释放距离+3。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "骑马变直线需手动划定范围。消耗棍势加距离需手动确认距离。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -721,8 +722,8 @@
                         {
                             "label": "消耗棍势提示",
                             "trigger": "attack",
-                            "script": "const gunshi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"gunshi\");\nif (gunshi) {\n    ui.notifications.info(\"提示：可手动移除 1 层 [棍势] 以增加距离。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const gunshi = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'gunshi');\nif (gunshi) {\n    ui.notifications.info('提示：可手动移除 1 层 [棍势] 使本次招式释放距离+3。');\n}"
                         }
                     ]
                 }
@@ -731,7 +732,7 @@
                 {
                     "name": "刚劲",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "刚属性招式伤害增加。",
+                    "description": "每层使你的刚属性武学招式伤害+5。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -751,7 +752,7 @@
                 {
                     "name": "棍势",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "棍法命中增加。",
+                    "description": "每层使棍法命中+10。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1065,52 +1066,52 @@
                         {
                             "label": "获得侠胆",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst block = 10 + (lvl - 1) * 5;\nconst crit = -1 + (lvl - 1) * -1;\n\nconst eff = thisItem.effects.getName(\"侠胆\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 默认持续3回合\neff.duration = { rounds: 3 };\n// 写入动态数值\neff.changes[0].value = String(block);\neff.changes[1].value = String(crit);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
-                        }
-                    ]
-                }
-            ],
-            "effects": [
-                {
-                    "name": "侠胆",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "description": "格挡提升，暴击门槛降低。回合末需消耗侠义值。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xiadan",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "维持侠胆",
-                                    "trigger": "turnEnd",
-                                    "script": "const xiayi = actor.system.social.xiayi || 0;\nif (xiayi >= 5) {\n    await actor.update({\"system.social.xiayi\": xiayi - 5});\n    actor.showFloatyText(\"-5 侠义 (维持)\", {fill: \"#0000FF\", fontSize: 24});\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><b>侠胆</b>: 消耗 5 点侠义值维持状态 (剩余 ${xiayi - 5})。</div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    ui.notifications.warn(`${actor.name} 侠义值不足，侠胆消散！`);\n    await thisEffect.delete();\n}",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.block",
-                            "mode": 2,
-                            "value": "0"
-                        },
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "0"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "0"
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst block = 10 + (lvl - 1) * 5;\nconst crit = -1 + (lvl - 1) * -1;\n\nconst eff = thisItem.effects.getName('侠胆').toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: 3 };\n\n// 正确的动态设值：遍历 changes\neff.changes.forEach(c => {\n    if (c.key === 'system.combat.block') c.value = String(block);\n    if (c.key === 'system.combat.crit_waigong' || c.key === 'system.combat.crit_neigong') c.value = String(crit);\n});\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "侠胆",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "格挡提升，暴击门槛降低。回合末需消耗侠义值。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xiadan",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "维持侠胆",
+                                "trigger": "turnEnd",
+                                "active": true,
+                                "script": "const xiayi = actor.system.social.xiayi || 0;\nif (xiayi >= 5) {\n    await actor.update({'system.social.xiayi': xiayi - 5});\n    actor.showFloatyText('-5 侠义 (维持)', {fill: '#0000FF', fontSize: 24});\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><b>侠胆</b>: 消耗 5 点侠义值维持状态 (剩余 ${xiayi - 5})。</div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    ui.notifications.warn(`${actor.name} 侠义值不足，侠胆消散！`);\n    await thisEffect.delete();\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.block",
+                        "mode": 2,
+                        "value": "0"
+                    },
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "0"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "0"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "撒手锏",
