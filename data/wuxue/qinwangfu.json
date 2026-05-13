@@ -1357,26 +1357,62 @@
             "sect": "jianghushili",
             "subSect": "qinwangfu",
             "tier": 2,
-            "description": "<p>秦王府收藏天下武学，含各路绝学、江湖把式、民间武艺，即便魔门武学也收录不少。秦王命人归纳各派精要，汇总成一道运气法门，供人参详领悟。</p><p><strong>武艺详解</strong></p><p>你将一套武学的全部招式修炼至精通后，你施展该武学的招式时，招式伤害提升 5 点。</p><p><strong>触类旁通</strong></p><p>你每有一种武器技能达到 8 级时，你的看破值+1。（至多一种武器技能）</p><p><strong>升级：</strong>武艺详解提供的伤害+5，触类旁通的武器数量上限增加一种。</p>",
+            "description": "<p>秦王府收藏天下武学，含各路绝学、江湖把式、民间武艺，即便魔门武学也收录不少。秦王命人归纳各派精要，汇总成一道运气法门，供人参详领悟。</p>",
+            "requirements": "",
             "moves": [
                 {
                     "name": "武道百炼",
                     "type": "qi",
                     "actionType": "buff",
-                    "description": "被动生效",
-                    "automationNote": "触类旁通自动。武艺详解手动。",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p><strong>武艺详解</strong></p><p>你将一套武学的全部招式修炼至精通后，你施展该武学的招式时，招式伤害提升 5 点。</p><p><strong>触类旁通</strong></p><p>你每有一种武器技能达到 8 级时，你的看破值+1。（至多一种武器技能）</p><p><strong>升级：</strong>武艺详解提供的伤害+5，触类旁通的武器数量上限增加一种。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": []
+                    },
                     "scripts": [
                         {
                             "label": "触类旁通",
                             "trigger": "passive",
-                            "script": "let count = 0;\nconst ranks = system.combat.weaponRanks;\nfor(const key in ranks) {\n    if(ranks[key].value >= 8) {\n        count++;\n        // 根据升级描述：上限增加一种\n        // 这里简化实现，因为 level 获取需要 move context\n        // 假设基础上限1，每次升级+1\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const maxCount = 1 + (lvl - 1);\n        if(count >= maxCount) break;\n    }\n}\nsystem.combat.kanpo += count;",
-                            "active": true
+                            "active": true,
+                            "script": "// 1. 拦截未入门\nconst lvl = move.computedLevel || 0;\nif (lvl < 1) return;\n\n// 2. 统计武器精通数量\nlet count = 0;\nconst ranks = S.combat.weaponRanks;\nfor (const key in ranks) {\n    if (ranks[key].total >= 8) count++;\n}\n\n// 3. 计算加成并应用\nconst maxCount = 1 + (lvl - 1); // 初始上限1，每升1级+1\nconst finalBonus = Math.min(count, maxCount);\nS.combat.kanpo += finalBonus;"
                         }
-                    ],
-                    "actionCost": "无"
+                    ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "武艺详解",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "你将一套武学的全部招式修炼至精通后，施展该武学的招式时伤害提升。",
+                "transfer": true,
+                "disabled": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuyixiangjie",
+                        "scripts": [
+                            {
+                                "label": "武艺详解-自动加伤",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "// 1. 拦截非武学招式的调用\nconst wuxueItem = args.item;\nif (!wuxueItem || wuxueItem.type !== 'wuxue') return;\nconst moves = wuxueItem.system.moves || [];\nif (moves.length === 0) return;\n\n// 2. 检查当前施展的这套武学是否全部达到精通 (>= 3级)\nconst isAllMastered = moves.every(m => (m.computedLevel || 0) >= 3);\nif (!isAllMastered) return;\n\n// 3. 放弃 origin 取巧，使用绝对可靠的 find 寻找本武学等级\nconst myItem = actor.items.find(i => i.name === '武道百炼' && i.type === 'wuxue');\nif (!myItem) return;\nconst myMove = myItem.system.moves.find(m => m.name === '武道百炼');\nconst lvl = myMove?.computedLevel || 0;\n\n// 4. 未入门拦截\nif (lvl < 1) return;\n\n// 5. 计算加成并应用\nconst bonus = 5 + (lvl - 1) * 5;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`武艺详解 (精通套路): +${bonus}`);"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "琴音剑魄",
@@ -1443,7 +1479,7 @@
             "sect": "jianghushili",
             "subSect": "qinwangfu",
             "tier": 3,
-            "description": "<p>暗器手法，“戌亥”天罗，“辰巳”地网，由 199 枚毒针编网组成，中之命势阻滞，劫煞缠身。</p><p><strong>需求：</strong>暗器-天罗地网针</p><p><strong>属性：</strong>太极</p>",
+            "description": "<p>暗器手法，“戌亥”天罗，“辰巳”地网，由 199 枚毒针编网组成，中之命势阻滞，劫煞缠身。</p><p><strong>需求：</strong>暗器-天罗地网针 <strong>属性：</strong>太极</p>",
             "requirements": "暗器-天罗地网针",
             "moves": [
                 {
@@ -1456,7 +1492,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>双手挥洒金暗双网，选中空格及其周围 5 米内所有敌人和其他友方，为他们中的男性添加“天罗”，女性添加“地网”，持续三回合。</p><p><strong>天罗：</strong>你的速度和闪避归零，在进行属性、技能、对抗检定时具有劣势，且每次检定都会受到 60 点毒素伤害。</p><p><strong>地网：</strong>你的速度和闪避归零，在进行属性、技能、对抗检定时-5，且每次检定都会流失 30 点内力。</p><p>·目标可以花费主要动作进行一次[挣脱]检定（难度 19），成功则移除“天罗”“地网”。</p><p><strong>升级：</strong>挣脱难度+3，天罗地网持续回合+1，内力消耗+8。</p>",
-                    "automationNote": "根据性别施加天罗/地网自动。效果中属性检定减值需手动。挣脱检定手动。",
+                    "automationNote": "区分性别施加状态自动。AE内包含速度闪避归零与天罗的劣势。每次检定时的【毒素伤害/内力流失】以及【挣脱检定】需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1471,69 +1507,75 @@
                     },
                     "scripts": [
                         {
+                            "label": "阻断面板伤害",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;"
+                        },
+                        {
                             "label": "施加天罗地网",
                             "trigger": "hit",
-                            "script": "const gender = args.target.system.info?.gender;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst duration = 3 + (lvl - 1);\n\nif (gender === \"male\") {\n    // 男性：天罗\n    const tl = thisItem.effects.getName(\"天罗\").toObject();\n    tl.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, tl);\n    ui.notifications.info(`${args.target.name} (男) 陷入 [天罗]`);\n} else if (gender === \"female\") {\n    // 女性：地网\n    const dw = thisItem.effects.getName(\"地网\").toObject();\n    dw.duration = { rounds: duration };\n    await game.xjzl.api.effects.addEffect(args.target, dw);\n    ui.notifications.info(`${args.target.name} (女) 陷入 [地网]`);\n} else {\n    ui.notifications.warn(`${args.target.name} 性别未知，未施加效果。`);\n}",
-                            "active": true
-                        }
-                    ]
-                }
-            ],
-            "effects": [
-                {
-                    "name": "天罗",
-                    "icon": "icons/svg/net.svg",
-                    "description": "速度闪避归零，检定劣势且受毒伤。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "tianluo",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.forceSpeedZero",
-                            "mode": 5,
-                            "value": "true"
-                        },
-                        {
-                            "key": "flags.xjzl-system.forceDodgeZero",
-                            "mode": 5,
-                            "value": "true"
-                        },
-                        {
-                            "key": "flags.xjzl-system.globalCheckLevel",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
-                },
-                {
-                    "name": "地网",
-                    "icon": "icons/svg/net.svg",
-                    "description": "速度闪避归零，检定-5且流失内力。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "diwang",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.forceSpeedZero",
-                            "mode": 5,
-                            "value": "true"
-                        },
-                        {
-                            "key": "flags.xjzl-system.forceDodgeZero",
-                            "mode": 5,
-                            "value": "true"
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst gender = args.target.system.info?.gender;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst duration = 3 + (lvl - 1);\nconst escapeDC = 19 + (lvl - 1) * 3;\n\nif (gender === 'male') {\n    const tl = thisItem.effects.getName('天罗').toObject();\n    tl.duration = { rounds: duration };\n    tl.description += `\\n挣脱难度: DC ${escapeDC}`;\n    await game.xjzl.api.effects.addEffect(args.target, tl);\n    actor.showFloatyText(`${args.target.name} 陷入 [天罗]!`, { fill: \"#8e44ad\" });\n} else if (gender === 'female') {\n    const dw = thisItem.effects.getName('地网').toObject();\n    dw.duration = { rounds: duration };\n    dw.description += `\\n挣脱难度: DC ${escapeDC}`;\n    await game.xjzl.api.effects.addEffect(args.target, dw);\n    actor.showFloatyText(`${args.target.name} 陷入 [地网]!`, { fill: \"#8e44ad\" });\n} else {\n    ui.notifications.warn(`${args.target.name} 性别未知，无法判断金暗双网。`);\n}"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "天罗",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "速度闪避归零，检定劣势。每次检定受到 60 毒素伤害 (需手动扣除)。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "tianluo",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.forceSpeedZero",
+                        "mode": 5,
+                        "value": "true"
+                    },
+                    {
+                        "key": "flags.xjzl-system.forceDodgeZero",
+                        "mode": 5,
+                        "value": "true"
+                    },
+                    {
+                        "key": "flags.xjzl-system.globalCheckLevel",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            },
+            {
+                "name": "地网",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "速度闪避归零，检定时-5 (请在弹窗手动输入-5)。每次检定流失 30 内力 (需手动扣除)。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "diwang",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.forceSpeedZero",
+                        "mode": 5,
+                        "value": "true"
+                    },
+                    {
+                        "key": "flags.xjzl-system.forceDodgeZero",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
     }
 ]
