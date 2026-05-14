@@ -21,7 +21,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，挥舞丝带，翩翩起舞，开启架招。同时获得一层“粉蝶”，至多三层，持续到战斗脱离。</p><p><strong>粉蝶：</strong>出招前你可以消耗若干层粉蝶，每消耗一层粉蝶，使你此次施展《蝶舞飘》时招式伤害+10。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "开启架招自动获得粉蝶。消耗粉蝶增伤需在其他招式中手动触发（暂未强制自动化消耗逻辑）。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -37,8 +37,8 @@
                         {
                             "label": "获得粉蝶",
                             "trigger": "attack",
-                            "script": "const effData = thisItem.effects.getName(\"粉蝶\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effData);",
-                            "active": true
+                            "active": true,
+                            "script": "const effTemplate = thisItem.effects.getName(\"粉蝶\");\nif (effTemplate) {\n    const effData = effTemplate.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}"
                         }
                     ]
                 },
@@ -52,7 +52,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，翩翩起舞，转起手中丝带，跳跃（半空中）至 3 米范围内的空格，对周围敌人造成 0.4 内息点内功伤害，每击中一个目标，获得一层“粉蝶”，至多三层，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "命中获得粉蝶自动。跳跃/移动手动。",
+                    "automationNote": "跳跃位移需手动。其他自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -72,10 +72,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "粉蝶增伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const fendie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_fendie\");\nconst currentStacks = fendie ? (fendie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (currentStacks > 0) {\n    const htmlContent = `\n        <div style=\"margin-bottom: 10px; color: #555;\">\n            <p>当前拥有 <b>${currentStacks}</b> 层 [粉蝶]。</p>\n            <p style=\"color:#e67e22;\">每消耗 1 层粉蝶，本次招式伤害 +10。</p>\n        </div>\n        <div class=\"form-group\">\n            <label style=\"font-weight:bold;\">选择消耗层数 (0-${currentStacks}):</label>\n            <input type=\"number\" name=\"spendCount\" value=\"0\" min=\"0\" max=\"${currentStacks}\" style=\"text-align:center;\">\n        </div>\n    `;\n    const spendResult = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"蝶舞飘 - 粉蝶增伤\", icon: \"fas fa-fire\" },\n        content: htmlContent,\n        ok: {\n            label: \"确认\",\n            icon: \"fas fa-check\",\n            callback: (event, button) => { return parseInt(new FormData(button.form).get(\"spendCount\")) || 0; }\n        },\n        rejectClose: false\n    });\n    if (spendResult && spendResult > 0) {\n        const finalSpend = Math.min(spendResult, currentStacks);\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_fendie\", finalSpend);\n        const bonus = finalSpend * 10;\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 消耗 ${finalSpend} 层粉蝶: ${bonus}`;\n        ui.notifications.info(`已消耗 ${finalSpend} 层粉蝶，招式伤害 +${bonus}！`);\n    }\n}"
+                        },
+                        {
                             "label": "命中获蝶",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const effData = thisItem.effects.getName(\"粉蝶\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(attacker, effData);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const effTemplate = thisItem.effects.getName(\"粉蝶\");\n    if (effTemplate) {\n        const effData = effTemplate.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(attacker, effData);\n    }\n}"
                         }
                     ]
                 },
@@ -89,7 +95,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，巧舞步轻点，意凝丝带出，对目标造成 0.4 内息点内功伤害，击破对方架招时，使目标陷入“禁足”，持续两回合。之后自身获得两层“粉蝶”，至多三层，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破施加禁足自动。自身获得粉蝶自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -109,10 +115,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破效果",
+                            "label": "粉蝶增伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const fendie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_fendie\");\nconst currentStacks = fendie ? (fendie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (currentStacks > 0) {\n    const htmlContent = `\n        <div style=\"margin-bottom: 10px; color: #555;\">\n            <p>当前拥有 <b>${currentStacks}</b> 层 [粉蝶]。</p>\n            <p style=\"color:#e67e22;\">每消耗 1 层粉蝶，本次招式伤害 +10。</p>\n        </div>\n        <div class=\"form-group\">\n            <label style=\"font-weight:bold;\">选择消耗层数 (0-${currentStacks}):</label>\n            <input type=\"number\" name=\"spendCount\" value=\"0\" min=\"0\" max=\"${currentStacks}\" style=\"text-align:center;\">\n        </div>\n    `;\n    const spendResult = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"蝶舞飘 - 粉蝶增伤\", icon: \"fas fa-fire\" },\n        content: htmlContent,\n        ok: {\n            label: \"确认\",\n            icon: \"fas fa-check\",\n            callback: (event, button) => { return parseInt(new FormData(button.form).get(\"spendCount\")) || 0; }\n        },\n        rejectClose: false\n    });\n    if (spendResult && spendResult > 0) {\n        const finalSpend = Math.min(spendResult, currentStacks);\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_fendie\", finalSpend);\n        const bonus = finalSpend * 10;\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 消耗 ${finalSpend} 层粉蝶: ${bonus}`;\n        ui.notifications.info(`已消耗 ${finalSpend} 层粉蝶，招式伤害 +${bonus}！`);\n    }\n}"
+                        },
+                        {
+                            "label": "击破禁足及获蝶",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const rootEff = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (rootEff) {\n        const data = foundry.utils.deepClone(rootEff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被禁足！`);\n    }\n}\n// 获得2层粉蝶\nconst effData = thisItem.effects.getName(\"粉蝶\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(attacker, effData);\nawait game.xjzl.api.effects.addEffect(attacker, effData);",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 2 } });\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}\nconst effTemplate = thisItem.effects.getName(\"粉蝶\");\nif (effTemplate) {\n    const effData = effTemplate.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(attacker, effData, 2);\n}"
                         }
                     ]
                 },
@@ -127,7 +139,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，微微躬身，随风起舞，对周围敌人造成 0.7 内息点内功伤害。</p><p>·若击中无架招的目标，可以消耗三层“粉蝶”，让该目标花费反应动作，随你一起舞蹈，若对方没有反应动作，流失 30 点内力、3 点怒气。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "命中无架招检测自动。消耗粉蝶询问弹窗。流失效果自动。反应动作判定手动。",
+                    "automationNote": "出招弹窗消耗粉蝶增伤。群体结算时自动检测无架招目标，询问是否起舞。系统会读取目标反应动作状态，若无可用的反应动作，将自动扣除其内力与怒气，并发送卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -152,31 +164,37 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗粉蝶追击",
-                            "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const fendie = attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_fendie\");\n    const stacks = fendie ? (fendie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\n    if (stacks >= 3) {\n        const confirm = await foundry.applications.api.DialogV2.confirm({\n            window: { title: \"落花随舞\" },\n            content: `<p>命中无架招目标 <b>${args.target.name}</b>。</p><p>是否消耗 3 层 [粉蝶] 触发特效？</p>`,\n            yes: { label: \"消耗\" },\n            no: { label: \"跳过\" }\n        });\n\n        if (confirm) {\n            await game.xjzl.api.effects.removeEffect(attacker, \"wuxue_fendie\", 3);\n            // 发送提示信息\n            ChatMessage.create({\n                content: `<div class=\"xjzl-chat-card\">\n                    <div style=\"font-weight:bold; color:#e91e63;\">粉蝶起舞</div>\n                    <div>目标 <b>${args.target.name}</b> 需消耗反应动作跟随舞蹈。</div>\n                    <div style=\"font-size:0.9em; color:#666;\">若无反应动作，请GM手动扣除目标 30内力 和 3怒气。</div>\n                </div>`,\n                speaker: ChatMessage.getSpeaker({actor: attacker})\n            });\n            // 尝试自动扣除 (如果目标是 Token/Actor)\n            // 这里简化处理：直接扣，假设对方没有反应动作 (通常系统不追踪反应动作状态)\n            await args.target.applyHealing({ amount: -30, type: \"mp\" });\n            const rage = args.target.system.resources.rage.value;\n            await args.target.update({ \"system.resources.rage.value\": Math.max(0, rage - 3) });\n        }\n    }\n}",
-                            "active": true
+                            "label": "粉蝶增伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const fendie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_fendie\");\nconst currentStacks = fendie ? (fendie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (currentStacks > 0) {\n    const htmlContent = `\n        <div style=\"margin-bottom: 10px; color: #555;\">\n            <p>当前拥有 <b>${currentStacks}</b> 层 [粉蝶]。</p>\n            <p style=\"color:#e67e22;\">每消耗 1 层粉蝶，本次招式伤害 +10。</p>\n        </div>\n        <div class=\"form-group\">\n            <label style=\"font-weight:bold;\">选择消耗层数 (0-${currentStacks}):</label>\n            <input type=\"number\" name=\"spendCount\" value=\"0\" min=\"0\" max=\"${currentStacks}\" style=\"text-align:center;\">\n        </div>\n    `;\n    const spendResult = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"蝶舞飘 - 粉蝶增伤\", icon: \"fas fa-fire\" },\n        content: htmlContent,\n        ok: {\n            label: \"确认\",\n            icon: \"fas fa-check\",\n            callback: (event, button) => { return parseInt(new FormData(button.form).get(\"spendCount\")) || 0; }\n        },\n        rejectClose: false\n    });\n    if (spendResult && spendResult > 0) {\n        const finalSpend = Math.min(spendResult, currentStacks);\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_fendie\", finalSpend);\n        const bonus = finalSpend * 10;\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 消耗 ${finalSpend} 层粉蝶: ${bonus}`;\n        ui.notifications.info(`已消耗 ${finalSpend} 层粉蝶，招式伤害 +${bonus}！`);\n    }\n}"
+                        },
+                        {
+                            "label": "强迫起舞(自动扣除)",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const noStanceTargets = args.targets.filter(t => t.isHit && !t.target.system.martial.stanceActive);\nif (noStanceTargets.length === 0) return;\n\nconst fendie = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_fendie\");\nconst stacks = fendie ? (fendie.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3) {\n    const targetNames = noStanceTargets.map(t => t.target.name).join(\"、\");\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"落花随舞\" },\n        content: `<p>命中无架招目标：<b>${targetNames}</b>。</p><p>是否消耗 3 层 [粉蝶] 迫使他们随你起舞？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"跳过\" }\n    });\n\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_fendie\", 3);\n        \n        for (const t of noStanceTargets) {\n            const tActor = t.target;\n            const actionFlags = tActor.getFlag(\"xjzl-system\", \"actions\") || {};\n            const hasReaction = actionFlags.reaction ?? true;\n            \n            if (hasReaction) {\n                ChatMessage.create({\n                    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\">\n                        <div style=\"border-left: 3px solid #e91e63; padding: 4px; background: rgba(233, 30, 99, 0.05);\">\n                            <div style=\"font-weight:bold; color:#e91e63;\"><i class=\"fas fa-fan\"></i> 粉蝶起舞</div>\n                            <div>目标 <b>${tActor.name}</b> 动作可用。</div>\n                            <div style=\"font-size:0.85em; color:#666; margin-top:3px;\">请对方消耗反应动作随你起舞。</div>\n                        </div>\n                    </div>`,\n                    speaker: ChatMessage.getSpeaker({actor: actor})\n                });\n            } else {\n                ChatMessage.create({\n                    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\">\n                        <div style=\"border-left: 3px solid #e91e63; padding: 4px; background: rgba(233, 30, 99, 0.05);\">\n                            <div style=\"font-weight:bold; color:#e91e63;\"><i class=\"fas fa-fan\"></i> 粉蝶起舞</div>\n                            <div>目标 <b>${tActor.name}</b> 没有反应动作。</div>\n                            <div style=\"font-size:0.85em; color:#c62828; margin-top:3px;\">已自动流失其 <b>30</b> 点内力与 <b>3</b> 点怒气。</div>\n                        </div>\n                    </div>`,\n                    speaker: ChatMessage.getSpeaker({actor: actor})\n                });\n                await tActor.applyHealing({ amount: -30, type: \"mp\", showScrolling: true });\n                const currentRage = tActor.system.resources.rage.value || 0;\n                await tActor.update({ \"system.resources.rage.value\": Math.max(0, currentRage - 3) });\n            }\n        }\n    }\n}"
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "粉蝶",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "description": "出招前消耗可增加伤害。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuxue_fendie",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "粉蝶",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "出招前消耗可增加《蝶舞飘》伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_fendie",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "移花掌法",
@@ -187,7 +205,7 @@
             "sect": "jianghushili",
             "subSect": "huashendian",
             "tier": 3,
-            "description": "<p>花神殿最为高深的掌法，神鬼莫敌，以柔克刚、后发制人，牵引挪移反弹敌方武学。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>柔</p>",
+            "description": "<p>花神殿最为高深的掌法，神鬼莫敌，以柔克刚、后发制人，牵引挪移反弹敌方武学。</p><p><strong>需求：</strong>徒手 <strong>属性：</strong>柔</p>",
             "requirements": "徒手",
             "moves": [
                 {
@@ -200,7 +218,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，手仰抚云，开启架招。成功格挡后，给对方添加一层“飞花”，持续到脱战。</p><p><strong>飞花：</strong>你因《移花掌法》招式效果受到伤害（包括流失）时，每层流失 5 点内力。</p><p><strong>升级：</strong>格挡值+10，额外叠加一层飞花，消耗+4。</p>",
-                    "automationNote": "格挡施加飞花自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -217,8 +235,8 @@
                         {
                             "label": "格挡-飞花",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"飞花\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 升级检测: 若等级>=2 (即升级过1次)，额外叠加\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    \n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    if (lvl >= 2) {\n        await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    }\n    ui.notifications.info(`${args.attacker.name} 沾染了 [飞花]`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effTemplate = thisItem.effects.getName(\"飞花\");\n    if (effTemplate) {\n        const effData = effTemplate.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        await game.xjzl.api.effects.addEffect(args.attacker, effData, lvl);\n        actor.showFloatyText(\"移花反震！\", { fill: \"#FFA500\" });\n    }\n}"
                         }
                     ]
                 },
@@ -232,7 +250,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，聚气幽兰，盈盈一击，对目标造成 0.7 内息点内功伤害，并对目标周围 2 米范围内其他敌人造成本次伤害（扣除防御前）一半的气血流失。</p><p>·流失气血的目标不受“飞花”的内力流失效果。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "溅射伤害手动提示。飞花扣蓝自动。",
+                    "automationNote": "溅射伤害卡片提示，请手动对目标周围的敌人扣除气血。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -255,8 +273,8 @@
                         {
                             "label": "溅射提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const splashDmg = Math.floor(args.damageResult.finalDamage / 2);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"font-weight:bold; color:#9c27b0;\">花须蝶芒 - 溅射</div>\n            <div>请对目标周围 2米 内其他敌人造成 <b>${splashDmg}</b> 点气血流失。</div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const rawDamage = args.isCrit ? args.baseDamage * 2 : args.baseDamage;\n    const splash = Math.floor(rawDamage / 2);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\">\n            <div style=\"border-left: 3px solid #9c27b0; padding: 4px; background: rgba(156, 39, 176, 0.05);\">\n                <div style=\"font-weight:bold; color:#9c27b0;\"><i class=\"fas fa-fan\"></i> 花须蝶芒 - 气劲溅射</div>\n                <div>请手动对目标周围 2米 内其他敌人造成 <b>${splash}</b> 点气血流失。</div>\n                <div style=\"font-size:0.85em; color:#666; margin-top:3px;\">（此流失伤害不触发飞花效果）</div>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 },
@@ -270,7 +288,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，飘引回身，流转气劲对目标造成 0.6 内息点内功伤害。击破对方架招时，“飞花”使目标流失双倍的内力，并使目标陷入“缚身”，持续两回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击破缚身自动。双倍扣蓝通过临时Flag传递给飞花脚本。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -291,10 +309,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破效果",
+                            "label": "击破缚身与双倍飞花",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    // 1. 施加缚身\n    const fushen = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n    if (fushen) {\n        const data = foundry.utils.deepClone(fushen);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    \n    // 2. 补扣飞花蓝量 (飞花自带脚本只扣了1倍，这里再扣1倍)\n    const feihua = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_feihua\");\n    if (feihua) {\n        const stacks = feihua.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const extraDrain = 5 * stacks;\n        await args.target.applyHealing({ amount: -extraDrain, type: \"mp\" });\n        ui.notifications.info(\"枯木生花击破：触发双倍飞花扣蓝\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 2 } });\n    \n    const feihua = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_feihua\");\n    if (feihua) {\n        const stacks = feihua.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const extraDrain = 5 * stacks;\n        await args.target.applyHealing({ amount: -extraDrain, type: \"mp\", showScrolling: true });\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\">\n                <div style=\"border-left: 3px solid #e91e63; padding: 4px; background: rgba(233, 30, 99, 0.05);\">\n                    <div style=\"font-weight:bold; color:#e91e63;\"><i class=\"fas fa-bolt\"></i> 枯木生花 - 双倍飞花</div>\n                    <div style=\"font-size:0.85em; margin-top:3px;\">击破架招，飞花反噬加剧，额外流失 <b>${extraDrain}</b> 点内力。</div>\n                </div>\n            </div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
                         }
                     ]
                 },
@@ -308,7 +326,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对手虚招时，可消耗反应动作释放此招，压制虚招，花开即逝，婉转一击对其造成 0.8 内息点内功伤害。并对目标周围 2 米范围内其他敌人造成本次伤害（扣除防御前）一半的气血流失。</p><p>·流失气血的目标不受“飞花”的内力流失效果。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "溅射提示手动。",
+                    "automationNote": "溅射伤害卡片提示，需手动扣除。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -331,8 +349,8 @@
                         {
                             "label": "溅射提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const splashDmg = Math.floor(args.damageResult.finalDamage / 2);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"font-weight:bold; color:#9c27b0;\">玉树琼芝 - 溅射</div>\n            <div>请对目标周围 2米 内其他敌人造成 <b>${splashDmg}</b> 点气血流失。</div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const rawDamage = args.isCrit ? args.baseDamage * 2 : args.baseDamage;\n    const splash = Math.floor(rawDamage / 2);\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\">\n            <div style=\"border-left: 3px solid #9c27b0; padding: 4px; background: rgba(156, 39, 176, 0.05);\">\n                <div style=\"font-weight:bold; color:#9c27b0;\"><i class=\"fas fa-fan\"></i> 玉树琼芝 - 气劲溅射</div>\n                <div>请手动对目标周围 2米 内其他敌人造成 <b>${splash}</b> 点气血流失。</div>\n                <div style=\"font-size:0.85em; color:#666; margin-top:3px;\">（此流失伤害不触发飞花效果）</div>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 },
@@ -348,7 +366,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>-花神鬼魅，他山之玉- 次要动作，为自身添加“移花”，持续两回合。</p><p><strong>移花：</strong>每当你受到内外功伤害时，减免其中一半的伤害（扣除防御之前），减免的伤害会以气血流失的形式由周围 20 米内的随机一名敌方承担。</p><p><strong>升级：</strong>移花持续回合数+1，怒气消耗-1，消耗+8。</p><p>·当修炼至【合一】时，“移花”承担伤害的目标可以变为由你指定的目标。</p>",
-                    "automationNote": "移花护盾自动减伤。反弹伤害提示手动。",
+                    "automationNote": "减伤自动。转移伤害需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -371,8 +389,8 @@
                         {
                             "label": "获得移花",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 2 + (lvl - 1);\nconst effData = thisItem.effects.getName(\"移花\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effData);",
-                            "active": true
+                            "active": true,
+                            "script": "const effTemplate = thisItem.effects.getName(\"移花\");\nif (effTemplate) {\n    const effData = effTemplate.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    effData.duration = { rounds: 2 + (lvl - 1) };\n    foundry.utils.setProperty(effData, \"flags.xjzl-system.yihuaLevel\", lvl);\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}"
                         }
                     ]
                 }
@@ -381,7 +399,7 @@
                 {
                     "name": "飞花",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "description": "受到移花掌法伤害时流失内力。",
+                    "description": "受到移花掌法伤害时，每层流失5点内力。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -391,8 +409,8 @@
                                 {
                                     "label": "受击扣蓝",
                                     "trigger": "damaged",
-                                    "script": "// 检查伤害来源\nif (args.item && args.item.name === \"移花掌法\") {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const drain = 5 * stacks;\n    await actor.applyHealing({ amount: -drain, type: \"mp\", showScrolling: true });\n}",
-                                    "active": true
+                                    "active": true,
+                                    "script": "if (args.item && args.item.name === \"移花掌法\") {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const drain = 5 * stacks;\n    await actor.applyHealing({ amount: -drain, type: \"mp\", showScrolling: true });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #e91e63; padding: 4px; background: rgba(233, 30, 99, 0.05);\"><div style=\"font-weight:bold; color:#e91e63;\"><i class=\"fas fa-leaf\"></i> 飞花反噬</div><div style=\"font-size:0.85em;\">因移花掌法招式影响，内力流失 <b>${drain}</b> 点。</div></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                                 }
                             ]
                         }
@@ -401,8 +419,8 @@
                 },
                 {
                     "name": "移花",
-                    "icon": "icons/magic/defensive/shield-barrier-pink.webp",
-                    "description": "减免一半伤害并转移。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "受到内外功伤害时，减免扣除防御前一半的伤害并转移给周围敌人。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -412,8 +430,8 @@
                                 {
                                     "label": "伤害转移",
                                     "trigger": "preTake",
-                                    "script": "if ([\"waigong\", \"neigong\"].includes(args.type)) {\n    const original = args.calcDamage;\n    const reduced = Math.ceil(original / 2);\n    const reflected = original - reduced;\n    \n    // 修改自身承受伤害\n    args.output.damage = reduced;\n    \n    // 提示转移\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"font-weight:bold; color:#e91e63;\">移花接木触发</div>\n            <div>自身减免 <b>${reflected}</b> 点伤害。</div>\n            <div>请指定 20米 内一名敌人承担 <b>${reflected}</b> 点气血流失。</div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
-                                    "active": true
+                                    "active": true,
+                                    "script": "if (['waigong', 'neigong'].includes(args.type)) {\n    const rawDamage = args.isCrit ? args.baseDamage * 2 : args.baseDamage;\n    const transferAmount = Math.floor(rawDamage / 2);\n    args.output.damage = Math.max(0, args.output.damage - transferAmount);\n    const lvl = thisEffect.getFlag('xjzl-system', 'yihuaLevel') || 1;\n    const isMastery = lvl >= 4;\n    const targetText = isMastery ? '<b>由你指定的</b> 一名敌方' : '<b>随机的</b> 一名敌方';\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #e91e63; padding: 4px; background: rgba(233, 30, 99, 0.05);\"><div style=\"font-weight:bold; color:#e91e63;\"><i class=\"fas fa-sync-alt\"></i> 移花接木</div><div>减免了 <b>${transferAmount}</b> 点伤害。</div><div style=\"font-size:0.85em; margin-top:3px;\">请让 20米 内 ${targetText} 承担 <b>${transferAmount}</b> 点气血流失！</div></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                                 }
                             ]
                         }
