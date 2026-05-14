@@ -583,7 +583,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，剑轮横空，清光铺地，对敌人造成 0.4 内息点内功伤害。击破对方架招时，自身可朝任意方向移动 5 米。</p><p>·若对方处于倒地，招式虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
-                    "automationNote": "倒地增加虚招值自动。移动手动。",
+                    "automationNote": "倒地动态增加虚招值自动。移动手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -603,16 +603,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "倒地加虚招值",
+                            "label": "倒地动态加虚招值",
                             "trigger": "attack",
-                            "script": "// 检查选中的目标\nconst targets = Array.from(game.user.targets);\nif (targets.length === 1) {\n    const t = targets[0].actor;\n    if (t.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n        args.flags.bonusFeint += 1;\n        ui.notifications.info(\"目标倒地，虚招值+1\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const targets = Array.from(game.user.targets);\nif (targets.length === 1) {\n    const t = targets[0].actor;\n    if (t && t.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\")) {\n        const lvl = Math.max(1, args.move.computedLevel || 1);\n        args.flags.bonusFeint += lvl;\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-arrow-up\"></i> 菊园忆晓</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">目标处于倒地状态，虚招值 <span style=\"color:#2980b9; font-weight:bold;\">+${lvl}</span> ！</div></div></div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}"
                         },
                         {
                             "label": "击破移动提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"击破架招！你可以移动 5 米。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230, 126, 34, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-shoe-prints\"></i> 击破破绽</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">成功击破架招！你可以朝任意方向移动 <span style=\"font-weight:bold;\">5 米</span>。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -910,7 +910,7 @@
             "sect": "jianghushili",
             "subSect": "gumu",
             "tier": 3,
-            "description": "<p>【默然失魂者，唯别而已矣】</p><p>此功必须要以特殊心境才能真正发挥威力。若能领悟其中“默然”精要，此掌威力普天之下只有降龙神掌可以匹敌。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>阴</p><p>注：若你曾经拥有，却又失去所有亲人后，便能领悟默然之意。</p><p><strong>默然之意：</strong>进入战斗后，获得“默然”，强化《默然失魂掌》所有招式，持续到战斗脱离。</p>",
+            "description": "<p>【默然失魂者，唯别而已矣】</p><p>此功必须要以特殊心境才能真正发挥威力。若能领悟其中“默然”精要，此掌威力普天之下只有降龙神掌可以匹敌。</p><p><strong>需求：</strong>徒手 <strong>属性：</strong>阴</p><p>注：若你曾经拥有，却又失去所有亲人后，便能领悟默然之意。</p><p><strong>默然之意：</strong>进入战斗后，获得“默然”（需手动把这个BUFF添加给自己的角色），强化《默然失魂掌》所有招式，持续到战斗脱离。</p>",
             "requirements": "徒手",
             "moves": [
                 {
@@ -923,7 +923,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，左掌右袖、双足腿部、胸背腰腹尽皆有招式发出，对目标造成 0.7 内息点内功伤害。</p><p>若有敌人处于半空状态，可以消耗反应动作释放此招，立于原地，隔空伤敌。</p><p><strong>默然：</strong>击中开启架招的目标时，增加 1 点怒气。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "默然回怒自动。半空判定手动。",
+                    "automationNote": "反应施展手动。其他完全自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -944,10 +944,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "悲增伤逻辑",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const bei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bei\");\nif (bei) {\n    const stacks = bei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    const perStack = moran ? 10 : 5;\n    const bonus = stacks * perStack;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`悲(${stacks}) 加成 +${bonus}`);\n}"
+                        },
+                        {
                             "label": "默然回怒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.target.system.martial.stanceActive) {\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    if (moran) {\n        const rage = actor.system.resources.rage.value;\n        await actor.update({ \"system.resources.rage.value\": rage + 1 });\n        ui.notifications.info(\"默然：击中架招回怒 +1\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && args.target.system.martial?.stanceActive) {\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    if (moran) {\n        const rage = actor.system.resources.rage.value;\n        if (rage < actor.system.resources.rage.max && !actor.xjzlStatuses?.noRecoverRage) {\n            await actor.update({ \"system.resources.rage.value\": rage + 1 });\n            const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-fire\"></i> 默然之意</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">击中开启架招的目标，怒气 <span style=\"color:#c0392b; font-weight:bold;\">+1</span> ！</div></div></div>`;\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -955,13 +961,13 @@
                     "name": "面无血色",
                     "type": "feint",
                     "element": "yin",
-                    "damageType": "mental",
+                    "damageType": "neigong",
                     "weaponType": "unarmed",
                     "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，变化百出，使敌心神难以自制，对其造成 0.7 神采点精神伤害（内功命中、内功暴击）。</p><p>若击破目标架招，使对方悲从心中起，伤心欲绝，不能自已，陷入“封招”状态，持续一回合。</p><p><strong>默然：</strong>若你虚招对抗失败，则本招式视作释放失败，敌方无法释放反击压制。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害基于神采自动。击破封招自动。默然效果需手动（GM判无效）。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -982,10 +988,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破封招",
+                            "label": "悲增伤逻辑",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const bei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bei\");\nif (bei) {\n    const stacks = bei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    const perStack = moran ? 10 : 5;\n    const bonus = stacks * perStack;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`悲(${stacks}) 加成 +${bonus}`);\n}"
+                        },
+                        {
+                            "label": "精神伤害转换",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "args.config.type = \"mental\";"
+                        },
+                        {
+                            "label": "击破封招与默然提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被封招！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fengzhao\", duration: { rounds: 1 } });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-sad-tear\"></i> 悲从心中起</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">目标陷入 <span style=\"color:#8e44ad; font-weight:bold;\">封招</span> ！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n} else if (!args.isHit && args.target.system.martial?.stanceActive) {\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    if (moran) {\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #34495e; background: rgba(52, 73, 94, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2c3e50;\"><i class=\"fas fa-shield-alt\"></i> 默然之意</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">虽然虚招对抗失败，但由于招式形同失败，目标 <span style=\"color:#c0392b; font-weight:bold;\">无法对你释放反击压制</span> ！</div></div></div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}"
                         }
                     ]
                 },
@@ -999,7 +1017,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，凝目远眺，脚下踱步，开启架招，并获得一层“悲”，至多十层，持续到战斗脱离或解除架招。</p><p>·成功格挡后获得一层“悲”，持续到战斗脱离。</p><p><strong>悲：</strong>每层提高《默然失魂掌》招式伤害 5 点。</p><p><strong>默然：</strong>每层“悲”额外提高招式伤害 5 点。</p><p><strong>升级:</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "开启/格挡获悲自动。悲增伤自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1016,20 +1034,14 @@
                         {
                             "label": "开启获悲",
                             "trigger": "attack",
-                            "script": "const effData = thisItem.effects.getName(\"悲\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effData);",
-                            "active": true
+                            "active": true,
+                            "script": "const effData = thisItem.effects.getName(\"悲\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effData);"
                         },
                         {
                             "label": "格挡获悲",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effData = thisItem.effects.getName(\"悲\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effData);",
-                            "active": true
-                        },
-                        {
-                            "label": "悲增伤",
-                            "trigger": "passive",
-                            "script": "// 此脚本无效，因为passive只在轻功/散手/开启的架招生效。\n// 我们需要把增伤逻辑写在每个招式的 calc 中。\n// 但为了不重复写，这里作为占位符提醒。\n",
-                            "active": false
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effData = thisItem.effects.getName(\"悲\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effData);"
                         }
                     ]
                 },
@@ -1043,7 +1055,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制虚招，飘若流水，却重滞之极，带千斤之力。对目标造成 0.8 内息点内功伤害。</p><p><strong>默然：</strong>顺势击倒目标，并使其陷入“缚身”“禁足”，持续一回合。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "默然效果自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1064,10 +1076,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "悲增伤逻辑",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const bei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bei\");\nif (bei) {\n    const stacks = bei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    const perStack = moran ? 10 : 5;\n    const bonus = stacks * perStack;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`悲(${stacks}) 加成 +${bonus}`);\n}"
+                        },
+                        {
                             "label": "默然特效",
                             "trigger": "hit",
-                            "script": "const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\nif (moran && args.isHit) {\n    // 击倒 (Prone)\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    // 缚身\n    const fushen = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n    if (fushen) {\n        const d1 = foundry.utils.deepClone(fushen);\n        d1.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, d1);\n    }\n    // 禁足\n    const root = CONFIG.statusEffects.find(e => e.id === \"root\");\n    if (root) {\n        const d2 = foundry.utils.deepClone(root);\n        d2.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, d2);\n    }\n    ui.notifications.info(\"默然触发：击倒、缚身、禁足！\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\nif (moran && args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"prone\" });\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 1 } });\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39, 174, 96, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2196f3;\"><i class=\"fas fa-anchor\"></i> 拖泥带水</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">默然触发！目标陷入 <span style=\"color:#d35400; font-weight:bold;\">倒地、缚身、禁足</span> ！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -1082,7 +1100,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，头下脚上，倒过身子，逆中有正，正反相冲，自相矛盾，进入“逆练”状态，持续到战斗脱离。</p><p><strong>逆练：</strong>你的内功属性视为阴柔、阳刚或太极。在你的每个回合末，你因逆练真气，经脉受损而受到 200 点气血流失。</p><p><strong>默然：</strong>逆练状态下出招无需遵循套路切换规则。</p><p><strong>升级：</strong>降低因逆练而受到的气血流失 50 点。</p>",
-                    "automationNote": "应用逆练自动。逆练流血自动。属性转换和切换规则需手动。",
+                    "automationNote": "属性切换需手动。其他自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1098,9 +1116,15 @@
                     "scripts": [
                         {
                             "label": "应用逆练",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-sync\"></i> 倒行逆施</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">请手动将使用的内功属性视为【阴柔】、【阳刚】或【太极】。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
+                        },
+                        {
+                            "label": "上BUFF",
                             "trigger": "hit",
-                            "script": "const effData = thisItem.effects.getName(\"逆练\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 升级减少流失\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduction = (lvl - 1) * 50;\nconst baseBleed = 200;\nconst finalBleed = Math.max(0, baseBleed - reduction);\n\n// 写入变量\neffData.flags[\"xjzl-system\"].nilianBleed = finalBleed;\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
-                            "active": true
+                            "active": true,
+                            "script": "const effData = thisItem.effects.getName(\"逆练\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduction = (lvl - 1) * 50;\nconst finalBleed = Math.max(0, 200 - reduction);\n// 动态重写逆练内的脚本，将结算量写死进去\neffData.flags[\"xjzl-system\"].scripts[0].script = `await actor.applyDamage({ amount: ${finalBleed}, type: 'liushi', isHit: true, ignoreDefense: true, ignoreBlock: true, ignoreStance: true });\\nconst msg = \\`<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8b0000; background: rgba(139,0,0,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-tint\"></i> 逆练反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">经脉受损，流失 <span style=\"color:#8b0000; font-weight:bold;\">${finalBleed}</span> 点气血！</div></div></div>\\`;\\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });`;\nawait game.xjzl.api.effects.addEffect(actor, effData);"
                         }
                     ]
                 },
@@ -1115,7 +1139,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，举头拍天，掌力化弧，四散落下。对范围内所有敌人造成 0.9 内息点内功伤害。</p><p>·可消耗自身所有的“悲”，使此招圆转广被，无可躲闪，必定命中。</p><p><strong>默然：</strong>目标需要进行一次[定力]检定（难度 20），失败则悲痛欲绝，失去所有怒气。</p><p>·每消耗一层“悲”，检定难度提高 1 点。</p><p><strong>升级:</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "消耗悲必中自动。默然定力检定请求自动。怒气清零手动。",
+                    "automationNote": "消耗悲必定命中自动。默然定力检定请求自动。怒气清零手动。悲加伤自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1142,22 +1166,28 @@
                     },
                     "scripts": [
                         {
-                            "label": "悲增伤逻辑(通用)",
+                            "label": "悲增伤逻辑",
                             "trigger": "calc",
-                            "script": "const bei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bei\");\nif (bei) {\n    const stacks = bei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    const perStack = moran ? 10 : 5;\n    const bonus = stacks * perStack;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`悲(${stacks}) 加成 +${bonus}`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const bei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bei\");\nif (bei) {\n    const stacks = bei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\n    const perStack = moran ? 10 : 5;\n    const bonus = stacks * perStack;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`悲(${stacks}) 加成 +${bonus}`);\n}"
                         },
                         {
                             "label": "消耗悲必中",
                             "trigger": "attack",
-                            "script": "const bei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bei\");\nif (bei) {\n    const stacks = bei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"杞人忧天\" },\n        content: `<p>当前有 ${stacks} 层 [悲]。</p><p>是否全部消耗以获得 <b>必中</b> 及提高定力检定难度？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"保留\" }\n    });\n    if (confirm) {\n        await bei.delete();\n        args.flags.forceHit = true;\n        // 传递消耗的层数给 hit 脚本\n        args.flags.beiConsumed = stacks;\n        ui.notifications.info(`消耗 ${stacks} 层悲，攻击必中！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const bei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bei\");\nif (bei) {\n    const stacks = bei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"杞人忧天\" },\n        content: `<p>当前有 ${stacks} 层 [悲]。</p><p>是否全部消耗以获得 <b>必定命中</b> 及提高定力检定难度？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"保留\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_bei\", stacks);\n        args.flags.alwaysHit = true;\n        // 存入 Actor 的临时缓存中，供后续 hit 阶段使用\n        await actor.setFlag(\"xjzl-system\", \"qiren_bei_consumed\", stacks);\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2980b9; background: rgba(41, 128, 185, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1f618d;\"><i class=\"fas fa-crosshairs\"></i> 圆转广被</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">消耗 ${stacks} 层悲，本次攻击 <span style=\"color:#e74c3c; font-weight:bold;\">必定命中</span> ！</div></div></div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n        return;\n    }\n}\n// 如果没有悲或选择不消耗，将临时变量置 0\nawait actor.setFlag(\"xjzl-system\", \"qiren_bei_consumed\", 0);"
                         },
                         {
                             "label": "默然定力检定",
                             "trigger": "hit",
-                            "script": "const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\nif (moran) {\n    const consumed = args.flags.beiConsumed || 0;\n    const dc = 20 + consumed;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"抵抗悲痛\",\n        onFail: {\n            name: \"悲痛欲绝\",\n            description: \"怒气清零 (请手动操作)\",\n            icon: \"icons/svg/skull.svg\",\n            duration: { turns: 1 }\n        }\n    });\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const moran = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_moran\");\nif (moran && args.isHit) {\n    // 从 Actor 的临时缓存中读取消耗的层数\n    const consumed = actor.getFlag(\"xjzl-system\", \"qiren_bei_consumed\") || 0;\n    const dc = 20 + consumed;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"抵抗悲痛\",\n        onFail: {\n            name: \"悲痛欲绝\",\n            description: \"怒气清零 (请手动操作)\",\n            icon: \"icons/svg/skull.svg\",\n            duration: { turns: 1 }\n        }\n    });\n}"
+                        },
+                        {
+                            "label": "清理临时数据",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "await actor.unsetFlag(\"xjzl-system\", \"qiren_bei_consumed\");"
                         }
                     ]
                 }
@@ -1166,7 +1196,7 @@
                 {
                     "name": "默然",
                     "icon": "icons/svg/mystery-man.svg",
-                    "description": "默然之意，强化掌法。",
+                    "description": "默然之意，强化掌法。需手动赋予。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1205,7 +1235,7 @@
                                     "label": "回合末流失",
                                     "trigger": "turnEnd",
                                     "active": true,
-                                    "script": "const bleed = thisEffect.getFlag('xjzl-system', 'nilianBleed') || 200;\nawait actor.applyHealing({ amount: -bleed, type: 'hp', showScrolling: true });\nui.notifications.info(`${actor.name} 逆练真气反噬！`);"
+                                    "script": ""
                                 }
                             ]
                         }
@@ -1349,7 +1379,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，射出寒光银针，对目标造成 0.5 内息点内功伤害，命中无架招目标时使其陷入“寒魄”，持续十回合。</p><p><strong>寒魄：</strong>陷入“禁足”，且每回合初受到 20 点毒素伤害。</p><p><strong>升级：</strong>寒魄每回合的毒素招式伤害+10 点。</p>",
-                    "automationNote": "消耗银针检测自动。命中施加寒魄自动。",
+                    "automationNote": "消耗银针请自觉遵守。其他完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0,
@@ -1367,16 +1397,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗银针",
-                            "trigger": "attack",
-                            "script": "const ammo = actor.items.find(i => i.name === \"寒魄银针\");\nif (ammo && ammo.system.quantity > 0) {\n    await ammo.update({ \"system.quantity\": ammo.system.quantity - 1 });\n} else {\n    ui.notifications.warn(\"缺少 [寒魄银针]！(未阻止施放)\");\n}",
-                            "active": true
-                        },
-                        {
                             "label": "施加寒魄",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effData = thisItem.effects.getName(\"寒魄\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 升级加伤\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dmg = 20 + (lvl - 1) * 10;\n    effData.flags[\"xjzl-system\"].hanpoDmg = dmg;\n    \n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const effData = thisItem.effects.getName(\"寒魄\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dmg = 20 + (lvl - 1) * 10;\n    effData.flags[\"xjzl-system\"].hanpoDmg = dmg;\n    \n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
                         }
                     ]
                 }
@@ -1385,8 +1409,11 @@
                 {
                     "name": "寒魄",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "description": "禁足，每回合受到毒素伤害。",
+                    "description": "禁足，每回合初受到毒素伤害。",
                     "transfer": false,
+                    "duration": {
+                        "rounds": 10
+                    },
                     "flags": {
                         "xjzl-system": {
                             "slug": "wuxue_hanpo",
@@ -1396,7 +1423,7 @@
                                     "label": "回合初毒伤",
                                     "trigger": "turnStart",
                                     "active": true,
-                                    "script": "const dmg = thisEffect.getFlag('xjzl-system', 'hanpoDmg') || 20;\nawait actor.applyDamage({ source: 'dot', amount: dmg, type: 'poison', isHit: true, ignoreDefense: true });"
+                                    "script": "const dmg = thisEffect.getFlag('xjzl-system', 'hanpoDmg') || 20;\nawait actor.applyDamage({ source: 'dot', amount: dmg, type: 'poison', isHit: true, ignoreDefense: true });\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-skull-crossbones\"></i> 寒魄毒伤</div><div style=\"font-size:0.9em; color:#555; margin-top:2px;\">毒发攻心，受到 <span style=\"color:#8e44ad; font-weight:bold;\">${dmg}</span> 点毒素伤害！</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
                                 }
                             ]
                         }
@@ -1404,6 +1431,11 @@
                     "changes": [
                         {
                             "key": "flags.xjzl-system.forceSpeedZero",
+                            "mode": 5,
+                            "value": "true"
+                        },
+                        {
+                            "key": "flags.xjzl-system.forceDodgeZero",
                             "mode": 5,
                             "value": "true"
                         }
