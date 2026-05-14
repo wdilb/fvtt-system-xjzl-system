@@ -1390,20 +1390,6 @@
             "tier": 2,
             "description": "<p>醉汉握棍、翻滚、跌爬，其实心无一丝醉意，用时得心应手，寓技法于醉形，藏杀机于醉态。</p><p><strong>注：</strong>若侠士处于“醉倒”，《醉棍》招式可将对方击倒，且招式伤害+5。</p><p><strong>需求：</strong>棍，酒之道</p><p><strong>属性：</strong>阳</p>",
             "requirements": "棍；酒之道",
-            "scripts": [
-                {
-                    "label": "醉倒加成",
-                    "trigger": "calc",
-                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉倒加成 +5\");\n}",
-                    "active": true
-                },
-                {
-                    "label": "醉倒击倒提示",
-                    "trigger": "hit",
-                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao && args.isHit) {\n    ui.notifications.info(`${actor.name} 处于醉倒状态，可将 ${args.target.name} 击倒！（请手动执行倒地）`);\n}",
-                    "active": true
-                }
-            ],
             "moves": [
                 {
                     "name": "踏浪弄箫",
@@ -1415,7 +1401,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>棍置双腿间，双腿巧拨棍，开启架招。若处于“醉倒”时，你获得“醉态”，可叠加三层，持续到战斗脱离或解除架招。</p><p><strong>醉态：</strong>每层醉态使你虚招值+1，棍法伤害+5。</p><p><strong>升级：</strong>格挡值+10。内力消耗+2。</p>",
-                    "automationNote": "醉意消耗自动。开启时若醉倒获醉态自动。格挡获醉态自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1429,22 +1415,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗检查",
+                            "label": "强制扣除醉意",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 5 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});"
                         },
                         {
                             "label": "开启获态",
                             "trigger": "attack",
-                            "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
                         },
                         {
                             "label": "格挡获态",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}"
                         }
                     ]
                 },
@@ -1458,7 +1444,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>持棍上挑，棍击敌人造成 0.4 力量点外功伤害。若命中无架招目标，可将其击退 1 米，然后消耗次要动作饮用一壶美酒。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "醉意消耗自动。击退与饮酒手动。",
+                    "automationNote": "击中无架招目标发送卡片提醒，击退与饮酒需手动执行。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1478,16 +1464,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 5 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});"
                         },
                         {
-                            "label": "效果提示",
+                            "label": "醉棍通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
+                        },
+                        {
+                            "label": "击中提示与醉棍击倒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(`命中无架招目标！请手动击退 ${args.target.name} 1 米，并消耗次要动作饮酒。`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}\n\nif (!args.target.system.martial.stanceActive) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-arrows-alt-h\"></i> 急步挑灯</b><br>命中无架招目标！请手动击退 ${args.target.name} 1 米，并可消耗次要动作饮用一壶美酒。</div></div>` });\n}"
                         }
                     ]
                 },
@@ -1501,7 +1493,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>低头含胸，出棍佯攻，而后扫敌后脑，造成 0.4 力量点外功伤害。击破架招后，自身获得一层“醉态”，并击飞敌人 3 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "醉意消耗自动。击破获态自动。击飞手动。",
+                    "automationNote": "破架招自动获得醉态并发送击飞提醒。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1521,16 +1513,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 5 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});"
                         },
                         {
-                            "label": "击破效果",
+                            "label": "醉棍通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
+                        },
+                        {
+                            "label": "击破特效与醉棍击倒",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(`击破架招！获得 [醉态]。请手动击飞 ${args.target.name} 3 米。`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) { \n    await game.xjzl.api.effects.addEffect(args.target, \"prone\"); \n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}\n\nif (args.isBroken) {\n    const eff = thisItem.effects.getName(\"醉态\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1);\"><b><i class=\"fas fa-wind\"></i> 倒拍击飞</b><br>获得 1 层[醉态]！请手动击飞 ${args.target.name} 3 米。</div></div>` });\n}"
                         }
                     ]
                 },
@@ -1544,7 +1542,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招时，可以消耗反应动作释放此招，压制对方虚招，掌心推棍，直击对方咽喉，造成 0.5 力量点外功伤害，并使其陷入“醉倒”三回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "醉意消耗自动。施加醉倒自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1564,16 +1562,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 5 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});"
                         },
                         {
-                            "label": "施加醉倒",
+                            "label": "醉棍通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
+                        },
+                        {
+                            "label": "反击灌醉与醉棍特性",
                             "trigger": "hit",
-                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"zuidao\");\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}\n\nawait game.xjzl.api.effects.addEffect(args.target, {id: \"zuidao\", duration: {rounds: 3}});\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #27ae60; background: rgba(39, 174, 96, 0.1);\"><b><i class=\"fas fa-wine-bottle\"></i> 敬酒灌醉</b><br>${args.target.name} 陷入 [醉倒] 3回合！</div></div>` });"
                         }
                     ]
                 },
@@ -1588,7 +1592,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双手握棍，棍顶戮敌，造成 0.8 力量点外功伤害。可消耗醉态层数获得以下一个效果：</p><p>消耗 1 层“醉态”，招式命中+10。</p><p>消耗 2 层“醉态”，击飞敌人三米后使其倒地。</p><p>消耗 3 层“醉态”，招式伤害提升 20 点。</p><p>·若你的[酒艺]等级达到 10，返还消耗的醉态。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "醉意消耗自动。醉态消耗与效果自动。酒艺返还自动。击飞手动。",
+                    "automationNote": "击飞发卡片提醒。酒艺>=10自动返还层数。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1613,22 +1617,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意与醉态爆发",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 5点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 5 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 5});\n\nconst zuitai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuitai\");\nconst stacks = zuitai ? (zuitai.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst options = [];\nif (stacks >= 1) options.push({value: 1, label: \"消耗1层：命中+10\"});\nif (stacks >= 2) options.push({value: 2, label: \"消耗2层：击飞并倒地\"});\nif (stacks >= 3) options.push({value: 3, label: \"消耗3层：伤害+20\"});\n\nif (options.length > 0) {\n    const content = `<form><div class=\"form-group\"><label>选择醉态强化 (互斥)</label><select id=\"choice\"><option value=\"0\">不消耗</option>${options.map(o => `<option value=\"${o.value}\">${o.label}</option>`).join(\"\")}</select></div></form>`;\n    const choice = await foundry.applications.api.DialogV2.prompt({ window: { title: \"醉仙指路 - 醉态爆发\" }, content: content, ok: { callback: (e, b) => b.form.elements.choice.value } });\n    const cost = parseInt(choice) || 0;\n    if (cost > 0) {\n        args.flags.damageResult.zuitaiChoice = cost;\n        if (cost === 1) { \n            args.flags.bonusHit += 10; \n            args.flags.damageResult.breakdown += \"\\n+ 醉态(1层): 命中+10\"; \n        }\n        else if (cost === 3) { \n            args.flags.damageResult.damage += 20; \n            args.flags.damageResult.breakdown += \"\\n+ 醉态(3层): 伤害+20\"; \n        }\n        \n        const jiuyi = actor.system.arts.jiuyi.total || 0;\n        if (jiuyi < 10) await game.xjzl.api.effects.removeEffect(actor, \"zuitai\", cost);\n        else ui.notifications.info(\"酒艺高超(>=10)，消耗的醉态瞬间返还！\");\n    }\n}"
                         },
                         {
-                            "label": "消耗醉态",
-                            "trigger": "attack",
-                            "script": "// 检查层数\nconst zuitai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuitai\");\nconst stacks = zuitai ? (zuitai.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\n// 弹窗选择\nconst options = [];\nif (stacks >= 1) options.push({value: 1, label: \"消耗1层：命中+10\"});\nif (stacks >= 2) options.push({value: 2, label: \"消耗2层：击飞倒地\"});\nif (stacks >= 3) options.push({value: 3, label: \"消耗3层：伤害+20\"});\n\nif (options.length === 0) return;\n\nconst content = `<form><div class=\"form-group\"><label>选择消耗</label><select id=\"choice\">${options.map(o => `<option value=\"${o.value}\">${o.label}</option>`).join(\"\")}</select></div></form>`;\n\nconst choice = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"醉仙指路\" },\n    content: content,\n    ok: { callback: (event, button) => button.form.elements.choice.value }\n});\n\nif (!choice) return;\nconst cost = parseInt(choice);\n\n// 应用效果\nif (cost === 1) {\n    args.flags.bonusHit += 10;\n    args.flags.damageResult.breakdown += \"\\n+ 醉态：命中+10\";\n} else if (cost === 2) {\n    // 记录标记，在 hit 阶段应用倒地\n    // 使用规范的 wuxue_ 前缀\n    actor.flags[\"xjzl-system\"].wuxue_applyProne = true;\n    ui.notifications.info(\"醉态强化：请手动击飞 3 米！即将自动施加倒地。\");\n} else if (cost === 3) {\n    args.flags.damageResult.damage += 20;\n    args.flags.damageResult.breakdown += \"\\n+ 醉态：伤害+20\";\n}\n\n// 消耗处理 (酒艺>=10 则不消耗)\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nif (jiuyi < 10) {\n    await game.xjzl.api.effects.removeEffect(actor, \"zuitai\", cost);\n} else {\n    ui.notifications.info(\"酒艺高超，醉态已返还！\");\n}",
-                            "active": true
+                            "label": "醉棍通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
                         },
                         {
-                            "label": "应用倒地",
+                            "label": "击中效果与醉棍特性",
                             "trigger": "hit",
-                            "script": "if (actor.flags[\"xjzl-system\"]?.wuxue_applyProne && args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if (eff) await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(`${args.target.name} 被击倒！`);\n    // 清理标记\n    delete actor.flags[\"xjzl-system\"].wuxue_applyProne;\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}\n\nif (args.damageResult.zuitaiChoice === 2) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-meteor\"></i> 醉态爆发</b><br>${args.target.name} 已被击倒！请手动将其击飞 3 米。</div></div>` });\n}"
                         }
                     ]
                 }
@@ -1674,20 +1678,6 @@
             "tier": 2,
             "description": "<p>传说是李白所创，也有人言乃蜀山剑仙传下，抑或后人攀附，虽糊里糊涂，却是个罕见的高明剑法。</p><p><strong>注：</strong>若侠士处于“醉倒”，《醉仙剑法》招式可将对方击倒，且招式伤害+5。</p><p><strong>需求：</strong>剑，酒之道</p><p><strong>属性：</strong>太极</p>",
             "requirements": "剑；酒之道",
-            "scripts": [
-                {
-                    "label": "醉倒加成",
-                    "trigger": "calc",
-                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉倒加成 +5\");\n}",
-                    "active": true
-                },
-                {
-                    "label": "醉倒击倒提示",
-                    "trigger": "hit",
-                    "script": "const zuidao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (zuidao && args.isHit) {\n    ui.notifications.info(`${actor.name} 处于醉倒状态，可将 ${args.target.name} 击倒！（请手动执行倒地）`);\n}",
-                    "active": true
-                }
-            ],
             "moves": [
                 {
                     "name": "敬酒天阁",
@@ -1699,7 +1689,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>酒浮于剑，飞溅四方，对周围敌人造成 0.4 内息点内功伤害。命中无架招目标时，美酒迷眼，使目标陷入“目盲”状态，持续一回合。</p><p>·若自身具有“仙酿”，可移除一层“仙酿”，使本次招式伤害提升当前醉意值的数值，然后自身移除所有醉意。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "醉意消耗自动。命中无架招目盲自动。仙酿消耗与增伤全自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1719,22 +1709,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意与仙酿爆发",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 10 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst xianniang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nif (xianniang) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({window: {title: \"仙酿爆发\"}, content: \"<p>是否消耗 1 层 [仙酿] 提升当前醉意值的伤害？（随后将清空醉意）</p>\", yes: {label: \"爆发\"}, no: {label: \"否\"}});\n    if (confirm) {\n        const currentAlc = actor.system.resources.alcohol.value || 0;\n        args.flags.damageResult.damage += currentAlc;\n        args.flags.damageResult.breakdown += `\\n+ 仙酿爆发：+${currentAlc}`;\n        await game.xjzl.api.effects.removeEffect(actor, \"xianniang\", 1);\n        await actor.update({\"system.resources.alcohol.value\": 0});\n        ui.notifications.info(\"仙酿已尽，醉意全消！\");\n    }\n}"
                         },
                         {
-                            "label": "无架招目盲",
+                            "label": "醉仙通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
+                        },
+                        {
+                            "label": "击中效果与醉仙特性",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被美酒迷眼 (目盲)`);\n    }\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "消耗仙酿爆发",
-                            "trigger": "attack",
-                            "script": "const xianniang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nif (xianniang) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"敬酒天阁\" },\n        content: \"<p>是否消耗 1 层 [仙酿]？</p><p>效果：伤害增加当前醉意值，随后清空醉意。</p>\",\n        yes: { label: \"消耗爆发\" },\n        no: { label: \"普通施展\" }\n    });\n\n    if (confirm) {\n        // 1. 获取当前醉意 (注意：attack前已经扣了10点基础消耗)\n        const currentAlc = actor.system.resources.alcohol.value;\n        \n        // 2. 增加伤害\n        args.flags.damageResult.damage += currentAlc;\n        args.flags.damageResult.breakdown += `\\n+ 仙酿爆发：+${currentAlc}`;\n        \n        // 3. 移除效果\n        await game.xjzl.api.effects.removeEffect(actor, \"xianniang\", 1);\n        await actor.update({\"system.resources.alcohol.value\": 0});\n        ui.notifications.info(\"仙酿已尽，醉意全消！\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}\n\nif (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, {id: \"blind\", duration: {rounds: 1}});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1);\"><b><i class=\"fas fa-eye-slash\"></i> 美酒迷眼</b><br>${args.target.name} 陷入目盲 1 回合！</div></div>` });\n}"
                         }
                     ]
                 },
@@ -1748,7 +1738,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>剑撇三路，剑鸣不止，对目标造成 0.4 内息点内功伤害。命中无架招目标时，为自己和对方添加一层“仙酿”，至多三层，持续到脱战。</p><p><strong>仙酿：</strong>每层使你每回合末获得 5 点醉意。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "醉意消耗自动。命中无架招添加仙酿自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1768,16 +1758,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 10 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});"
                         },
                         {
-                            "label": "添加仙酿",
+                            "label": "醉仙通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
+                        },
+                        {
+                            "label": "击中效果与醉仙特性",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"仙酿\").toObject();\n    // 给自己\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    // 给目标\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(\"对饮成三人！双方获得 [仙酿]。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}\n\nif (!args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"仙酿\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #27ae60; background: rgba(39, 174, 96, 0.1);\"><b><i class=\"fas fa-glass-cheers\"></i> 对饮成三</b><br>双方各获得 1 层 [仙酿]！</div></div>` });\n}"
                         }
                     ]
                 },
@@ -1791,7 +1787,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>酒洒遍地，脚步虚浮，开启架招，格挡成功后，使敌我双方各获得一层“仙酿”。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "醉意消耗自动。格挡添加仙酿自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1805,16 +1801,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗检查",
+                            "label": "强制扣除醉意",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 10 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});"
                         },
                         {
-                            "label": "格挡-仙酿",
+                            "label": "格挡获仙酿",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst eff = thisItem.effects.getName(\"仙酿\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);\nif (args.attacker) {\n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"仙酿\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);\nif (args.attacker) {\n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #27ae60; background: rgba(39, 174, 96, 0.1);\"><b><i class=\"fas fa-glass-cheers\"></i> 步履生花</b><br>格挡成功，双方各获得 1 层 [仙酿]！</div></div>` });\n}"
                         }
                     ]
                 },
@@ -1828,7 +1824,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可以消耗反应动作施展此招，压制对方虚招。酒意顿失，恍惚一瞬寒光现，对目标造成 0.7 内息点内功伤害。</p><p>·若目标身上存在 3 层“仙酿”，可移除目标 3 层仙酿，不进行虚招对抗，直接施展此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "醉意消耗自动。跳过对抗逻辑需GM/玩家手动确认执行（提示信息已加）。",
+                    "automationNote": "3层仙酿可免对抗直接施展需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1848,16 +1844,28 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 10 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});"
                         },
                         {
-                            "label": "特殊施展提示",
+                            "label": "特攻免对抗提示",
                             "trigger": "check",
-                            "script": "const xianniang = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nconst stacks = xianniang ? (xianniang.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3) {\n    ui.notifications.info(`${args.target.name} 身上有 3 层仙酿，您可以手动移除它们并【直接施展】此反击（无需对抗）。`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const xianniang = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xianniang\");\nconst stacks = xianniang ? (xianniang.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (stacks >= 3) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-info-circle\"></i> 酒醒虚妄破绽</b><br>${args.target.name} 身上有 3 层仙酿，你可以手动移除它们并直接施展反击（无需对抗）！</div></div>` });\n}"
+                        },
+                        {
+                            "label": "醉仙通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
+                        },
+                        {
+                            "label": "击中效果与醉仙特性",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}"
                         }
                     ]
                 },
@@ -1872,7 +1880,7 @@
                     "targetInfo": "自身",
                     "actionCost": "全回合动作",
                     "description": "<p>向月共饮，扬臂饮尽壶中酒，消耗自身行囊任意一壶美酒获得效果，且额外增加 10 醉意。根据你的酒量，获得“护身”，至多三层：</p><p>酒量大于 30，获得一层，持续到脱战。</p><p>酒量大于 50，获得两层，持续到脱战。</p><p>酒量大于 100，获得三层，持续到脱战。</p><p><strong>护身：</strong>每层增加内外功防御 5 点。</p><p>·自身受到内外功伤害后，移除所有“护身”，每移除一层护身，获得一层“仙酿”状态。</p><p><strong>升级：</strong>再增加 10 点醉意，内力消耗+2。</p>",
-                    "automationNote": "消耗美酒手动。增加醉意、计算护身层数自动。受击移除护身并转仙酿手动提示。",
+                    "automationNote": "美酒需手动消耗。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1886,10 +1894,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "饮酒获益",
+                            "label": "饮酒护身",
                             "trigger": "hit",
-                            "script": "// 1. 增加醉意 (基础10 + 升级)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst alcBonus = 10 + (lvl - 1) * 10;\nconst currentAlc = actor.system.resources.alcohol.value;\nawait actor.update({\"system.resources.alcohol.value\": currentAlc + alcBonus});\n\n// 2. 计算护身层数\nconst maxAlc = actor.system.resources.alcohol.max;\nlet stacks = 0;\nif (maxAlc > 100) stacks = 3;\nelse if (maxAlc > 50) stacks = 2;\nelse if (maxAlc > 30) stacks = 1;\n\nif (stacks > 0) {\n    const eff = thisItem.effects.getName(\"护身\").toObject();\n    eff.flags[\"xjzl-system\"].maxStacks = 3;\n    // 循环叠加\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n    ui.notifications.info(`酒量 ${maxAlc}，获得 ${stacks} 层 [护身]`);\n} else {\n    ui.notifications.warn(\"酒量不足 30，未获得护身。 (记得手动消耗美酒物品)\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst alcBonus = 10 * lvl;\nconst currentAlc = actor.system.resources.alcohol.value || 0;\nawait actor.update({\"system.resources.alcohol.value\": currentAlc + alcBonus});\n\nconst maxAlc = actor.system.resources.alcohol.max || 0;\nlet stacks = 0;\nif (maxAlc > 100) stacks = 3;\nelse if (maxAlc > 50) stacks = 2;\nelse if (maxAlc > 30) stacks = 1;\n\nif (stacks > 0) {\n    const eff = thisItem.effects.getName(\"护身\").toObject();\n    eff.flags[\"xjzl-system\"].maxStacks = 3;\n    await game.xjzl.api.effects.addEffect(actor, eff, stacks);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-shield-alt\"></i> 举杯邀月</b><br>增加 <b>${alcBonus}</b> 点醉意！<br>凭借酒量获得 <b>${stacks}</b> 层 [护身]！<br><span style=\"color:#666; font-size:0.9em;\">(请手动扣除背包中的美酒)</span></div></div>` });\n} else {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #95a5a6; background: rgba(149, 165, 166, 0.1);\"><b><i class=\"fas fa-wine-bottle\"></i> 举杯邀月</b><br>增加 <b>${alcBonus}</b> 点醉意！<br><span style=\"color:#e74c3c; font-size:0.9em;\">酒量不足 30，未能凝聚护身。</span><br><span style=\"color:#666; font-size:0.9em;\">(请手动扣除背包中的美酒)</span></div></div>` });\n}"
                         }
                     ]
                 },
@@ -1904,7 +1912,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>颠颠倒倒，肆意挥剑，月光难泄，剑影难窥，不消耗速度突进至目标身前，对目标及其 1 米内所有敌人造成 0.7 内息点内功伤害。</p><p>·可以消耗自身与目标的“仙酿”状态，每合计消耗一层“仙酿”，招式伤害+5，若合计消耗层数大于等于 5 层，则此招必定命中。</p><p>·施展此招后，进入“酒仙”状态，持续到脱战。</p><p><strong>酒仙：</strong>你每回合初获得 10 点醉意，且不受“醉倒”的移动速度减半和命中劣势效果影响。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "醉意消耗自动。仙酿消耗采用手动弹窗输入总层数。酒仙状态自动。突进手动。",
+                    "automationNote": "因为涉及目标与目标周围计算层数复杂，所以采取手动输入层数，请手动扣减层数。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1929,16 +1937,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "醉意消耗",
+                            "label": "强制扣除醉意与仙酿爆发",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 20) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 20点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 20});",
-                            "active": true
+                            "active": true,
+                            "script": "const alc = actor.system.resources.alcohol.value || 0;\nif (alc < 20) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 20 点，无法施展！\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 20});\n\nconst confirm = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"何处人间 - 仙酿爆发\" },\n    content: `<p>请统计你想消耗的自身与目标的 [仙酿] 总层数：</p><input type='number' name='stacks' value='0' style='text-align:center;' autofocus/>`,\n    ok: { label: \"确定消耗\", callback: (event, button) => new FormData(button.form).get(\"stacks\") }\n});\nconst totalStacks = parseInt(confirm) || 0;\nif (totalStacks > 0) {\n    const dmgBonus = totalStacks * 5;\n    args.flags.damageResult.damage += dmgBonus;\n    args.flags.damageResult.breakdown += `\\n+ 仙酿消耗(${totalStacks}层): +${dmgBonus}`;\n    if (totalStacks >= 5) {\n        args.flags.alwaysHit = true;\n        ui.notifications.info(\"消耗达到 5 层，此招必定命中！(仍可暴击)\", {permanent: true});\n    } else {\n        ui.notifications.info(`已增加 ${dmgBonus} 点伤害。`);\n    }\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e67e22; background: rgba(230, 126, 34, 0.1);\"><b><i class=\"fas fa-fire\"></i> 仙酿爆发</b><br>消耗 ${totalStacks} 层仙酿，伤害增加 ${dmgBonus}！<br><span style=\"color:#666; font-size:0.9em;\">(请手动移除对应层数的仙酿状态)</span></div></div>` });\n}\nconst jiuxian = thisItem.effects.getName(\"酒仙\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, jiuxian);"
                         },
                         {
-                            "label": "仙酿爆发与酒仙",
-                            "trigger": "attack",
-                            "script": "// 1. 弹出输入框询问全场总层数 (避免遍历遍历全场Token)\nconst confirm = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"何处人间 - 仙酿爆发\" },\n    content: `<p>请统计场上所有单位(含自身)的 [仙酿] 总层数：</p><input type='number' name='stacks' value='0' style='text-align:center;' autofocus/>`,\n    ok: {\n        label: \"确定消耗\",\n        callback: (event, button) => new FormData(button.form).get(\"stacks\")\n    }\n});\n\nconst totalStacks = parseInt(confirm) || 0;\n\nif (totalStacks > 0) {\n    // 效果\n    const dmgBonus = totalStacks * 5;\n    args.flags.damageResult.damage += dmgBonus;\n    args.flags.damageResult.breakdown += `\\n+ 仙酿消耗(${totalStacks}): +${dmgBonus}`;\n    \n    if (totalStacks >= 5) {\n        args.flags.forceHit = true;\n        ui.notifications.info(\"酒意滔天，此剑必中！\");\n    }\n    // 提示手动移除\n    ui.notifications.info(\"伤害已加成。请手动移除场上相关单位的 [仙酿] 状态。\", {permanent: true});\n}\n\n// 获得酒仙\nconst jiuxian = thisItem.effects.getName(\"酒仙\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, jiuxian);",
-                            "active": true
+                            "label": "醉仙通用：加伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"醉汉发力: 伤害+5\");\n}"
+                        },
+                        {
+                            "label": "击中效果与醉仙特性",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst isZuidao = actor.system.resources.alcohol.value > (actor.system.resources.alcohol.max || 0) || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zuidao\");\nif (isZuidao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-beer\"></i> 醉汉发力</b><br>${args.target.name} 被猛烈击倒！</div></div>` });\n}"
                         }
                     ]
                 }
@@ -1953,21 +1967,23 @@
                         "xjzl-system": {
                             "slug": "xianniang",
                             "stackable": true,
-                            "maxStacks": 3
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "回合末回醉意",
+                                    "trigger": "turnEnd",
+                                    "active": true,
+                                    "script": "const alc = actor.system.resources.alcohol.value || 0;\nconst stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait actor.update({\"system.resources.alcohol.value\": alc + (5 * stacks)});\nactor.showFloatyText(`+${5 * stacks} 醉意`, {fill: \"#3498db\"});"
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenAlcoholTurnEnd",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
+                    "changes": []
                 },
                 {
                     "name": "护身",
-                    "icon": "icons/magic/defensive/shield-barrier-glowing-blue.webp",
-                    "description": "增加防御。受击后移除并提示转仙酿。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "增加防御。受击后移除并转为仙酿。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1976,10 +1992,10 @@
                             "maxStacks": 3,
                             "scripts": [
                                 {
-                                    "label": "转化提示",
+                                    "label": "受伤转化仙酿",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "if (['waigong', 'neigong'].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 移除护身\n    await thisEffect.delete();\n    // 提示手动添加，避免去源物品查找\n    ui.notifications.info(`护身破碎！请手动给自己添加 ${stacks} 层 [仙酿]。`, {permanent: false});\n}"
+                                    "script": "if ([\"waigong\", \"neigong\"].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await thisEffect.delete();\n    const xianniangEff = thisItem.effects.getName(\"仙酿\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, xianniangEff, stacks);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-wine-bottle\"></i> 护身破碎</b><br>护身真气消散，转化为 ${stacks} 层 [仙酿]！</div></div>` });\n}"
                                 }
                             ]
                         }
@@ -2005,15 +2021,18 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "jiuxian",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "回合初加醉意",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "const alc = actor.system.resources.alcohol.value || 0;\nawait actor.update({\"system.resources.alcohol.value\": alc + 10});\nactor.showFloatyText(\"+10 醉意\", {fill: \"#3498db\"});"
+                                }
+                            ]
                         }
                     },
                     "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenAlcoholTurnStart",
-                            "mode": 2,
-                            "value": "10"
-                        },
                         {
                             "key": "flags.xjzl-system.unstable",
                             "mode": 5,
