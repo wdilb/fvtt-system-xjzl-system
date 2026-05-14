@@ -541,7 +541,7 @@
             "requirements": "剑-重剑",
             "moves": [
                 {
-                    "name": "架海擎天",
+                    "name": "架海擎天（失传）",
                     "type": "qi",
                     "actionType": "buff",
                     "element": "taiji",
@@ -551,7 +551,7 @@
                     "targetInfo": "自身",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，心随意动，势随架转，将自身剑势在【穹苍式】、【重溟式】两者之间切换，持续到战斗脱离。</p><p>·穹苍式：本套路使用外功命中，造成外功伤害。</p><p>·重溟式：本套路使用内功命中，造成内功伤害。</p><p>·每次切换剑势后，下一次施展《穹溟剑法》获得相应的额外特效，持续到战斗脱离。</p><p>·进入战斗后，自动获得【穹苍式】，但并不视为切换剑势，不获得相应特效。</p><p><strong>升级：</strong>每提升一级使此招动作等级降低一级。（蓄力-主要-次要-简要）</p>",
-                    "automationNote": "姿态切换自动。额外特效逻辑自动。",
+                    "automationNote": "姿态切换自动完成并发送卡片。带有“待触发”机制。出招时需根据当前剑势手动在弹窗中选择[外功/内功]。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -569,12 +569,18 @@
                             "label": "切换剑势",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const currentMode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst newMode = currentMode === \"sky\" ? \"ocean\" : \"sky\";\nawait actor.setFlag(\"xjzl-system\", \"wuxue_qiongming_mode\", newMode);\n\nconst label = newMode === \"sky\" ? \"穹苍式 (外功)\" : \"重溟式 (内功)\";\nui.notifications.info(`穹溟剑法已切换至: ${label}`);\n\n// 标记“切换过” (用于触发下一次额外特效)\nawait actor.setFlag(\"xjzl-system\", \"wuxue_qiongming_switched\", true);"
+                            "script": "const hasSky = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nif (hasSky) {\n    await hasSky.delete();\n    const eff = thisItem.effects.getName(\"重溟式\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #1abc9c; background: rgba(39, 174, 156, 0.1);\"><b><i class=\"fas fa-water\"></i> 剑势切换</b><br>转为 <b>[重溟式]</b>。下一次招式将附带额外特效！<br><span style=\"color:#e74c3c; font-size:0.9em;\">【注意】出招时请在弹窗手动将伤害类型选为<b>内功</b>。</span></div></div>` });\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"穹溟_已切换\").toObject());\n} else {\n    const hasOcean = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\n    if (hasOcean) await hasOcean.delete();\n    const eff = thisItem.effects.getName(\"穹苍式\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-cloud\"></i> 剑势切换</b><br>转为 <b>[穹苍式]</b>。下一次招式将附带额外特效！<br><span style=\"color:#e74c3c; font-size:0.9em;\">【注意】出招时请在弹窗手动将伤害类型选为<b>外功</b>。</span></div></div>` });\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"穹溟_已切换\").toObject());\n}"
+                        },
+                        {
+                            "label": "初始获得穹苍式",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "const hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nconst hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nif (!hasSky && !hasOcean) {\n    const eff = thisItem.effects.getName(\"穹苍式\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"拔剑起势：穹苍\", { fill: \"#3498db\" });\n}"
                         }
                     ]
                 },
                 {
-                    "name": "云垂海立",
+                    "name": "云垂海立（失传）",
                     "type": "stance",
                     "element": "taiji",
                     "damageType": "waigong",
@@ -583,7 +589,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，气力无双，运剑驭敌，开启架招。</p><p>开启此架招期间，若回复气血时数值溢出，溢出的数值会变为等额的护体真气，持续到战斗脱离。</p><p>·穹苍式：每次格挡成功后，下一次《穹溟剑法》命中并造成伤害，还会对敌人造成 5 点气血流失。</p><p>·重溟式：每次格挡成功后，下一次《穹溟剑法》命中并造成伤害，还会为自身回复 5 点内力。</p><p><strong>升级：</strong>格挡值+10，流失和回复的数值+5，消耗+4。</p>",
-                    "automationNote": "治疗溢出转护体手动(暂无OnHeal触发器)。格挡特效逻辑复杂，暂设为提示。",
+                    "automationNote": "治疗溢出转护体需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -598,15 +604,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡触发提示",
+                            "label": "回血转护体提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #9b59b6; background: rgba(155, 89, 182, 0.1);\"><b><i class=\"fas fa-shield-alt\"></i> 云垂海立</b><br>架招开启期间，请玩家自行留意：气血回复溢出的部分，可手动转化为等额[护体真气]！</div></div>` });"
+                        },
+                        {
+                            "label": "格挡充能待发效果",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n\n    if (!Macros.checkStance(actor, args)) return;\nconst mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = 5 + (Math.max(1, lvl||1) - 1) * 5;\nif (mode === \"sky\") {\n    ui.notifications.info(`格挡成功(穹苍): 下一击需手动附加 ${val} 流失`);\n} else {\n    ui.notifications.info(`格挡成功(重溟): 下一击需手动回复 ${val} 内力`);\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (hasSky) {\n    const eff = thisItem.effects.getName(\"穹苍_待流失\").toObject();\n    eff.flags[\"xjzl-system\"].maxStacks = 10;\n    eff.flags[\"xjzl-system\"].stacks = lvl;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"格挡: 充能流失\", { fill: \"#e74c3c\" });\n} else {\n    const eff = thisItem.effects.getName(\"重溟_待回复\").toObject();\n    eff.flags[\"xjzl-system\"].maxStacks = 10;\n    eff.flags[\"xjzl-system\"].stacks = lvl;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"格挡: 充能回复\", { fill: \"#2ecc71\" });\n}"
                         }
                     ]
                 },
                 {
-                    "name": "扶摇万里",
+                    "name": "扶摇万里（失传）",
                     "type": "real",
                     "element": "taiji",
                     "damageType": "waigong",
@@ -615,7 +627,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，剑贯长龙，气吞山河，对敌人造成 0.7 力量点伤害，此招无视目标格挡值。</p><p>·穹苍式：击退敌人 5 米，若撞击其他敌方或障碍物则立即停下，使他们倒地，并对他们额外造成 50 点气血流失。</p><p>·重溟式：内力消耗+20，攻击距离+5，对敌人造成相距于你米数 x5 的内力流失。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "无视格挡自动。姿态切换属性/伤害类型/效果通过脚本实现。",
+                    "automationNote": "完全自动化。出招时需手动选内外功。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -636,21 +648,33 @@
                     },
                     "scripts": [
                         {
-                            "label": "姿态适配",
-                            "trigger": "preDamage",
+                            "label": "姿态适配与消耗",
+                            "trigger": "preAttack",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.ignoreBlock = true;\nif (mode === \"ocean\") {\n    args.config.type = \"neigong\";\n} else {\n    args.config.type = \"waigong\";\n}"
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nif (hasOcean) {\n    args.costConfig.mp += 20;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-tint\"></i> 重溟之渊</b><br>已额外扣除 20 点内力。本次攻击距离视作 <b>+5</b> 米！</div></div>` });\n}"
                         },
                         {
-                            "label": "额外效果",
+                            "label": "无视格挡与伤害类型",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "args.config.ignoreBlock = true;\nconst hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nargs.config.type = hasOcean ? \"neigong\" : \"waigong\";"
+                        },
+                        {
+                            "label": "命中额外效果与云垂连携",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nif (mode === \"sky\") {\n    ui.notifications.info(\"穹苍式：请手动处理 [击退5米] 及 [撞击流失50]\");\n} else {\n    // 重溟式：额外消耗\n    const currentMp = actor.system.resources.mp.value;\n    await actor.update({\"system.resources.mp.value\": Math.max(0, currentMp - 20)});\n    \n    // 距离计算流失\n    const dist = canvas.grid.measureDistance(actor.token.object.center, args.target.token.object.center);\n    const loss = Math.floor(dist * 5);\n    await args.target.applyHealing({amount: -loss, type: \"mp\", showScrolling: true});\n    ui.notifications.info(`重溟式：距离 ${dist}米，流失 ${loss} 内力 (已额外消耗20内力)`);\n}"
+                            "script": "if (!args.isHit) return;\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\n\n// --- 本招式自带特效 ---\nif (hasSky) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"扶摇万里 - 击退判定\" },\n        content: `<p>将 <b>${args.target.name}</b> 击退 5 米！</p><p>过程中是否撞击到其他敌方或障碍物？</p>`,\n        yes: { label: \"是 (流失与倒地)\", icon: \"fas fa-car-crash\" },\n        no: { label: \"否 (仅击退)\", icon: \"fas fa-arrow-right\" }\n    });\n    if (confirm) {\n        await args.target.applyHealing({amount: -50, type: \"hp\", showScrolling: true});\n        await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-car-crash\"></i> 猛烈撞击</b><br>${args.target.name} 撞上障碍，承受 50 流失并倒地！若撞到他人，请手动对其施加流失与倒地。</div></div>` });\n    }\n} else {\n    const t1 = actor.token?.object || actor.getActiveTokens()[0];\n    const t2 = args.target.token?.object || args.target.getActiveTokens()[0];\n    if (t1 && t2) {\n        const dist = Math.floor(canvas.grid.measurePath([t1.center, t2.center]).distance);\n        const loss = dist * 5;\n        await args.target.applyHealing({amount: -loss, type: \"mp\", showScrolling: true});\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-water\"></i> 重溟卷流</b><br>距离 ${dist} 米，造成 ${loss} 点内力流失！</div></div>` });\n    } else {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1);\"><b><i class=\"fas fa-exclamation-triangle\"></i> 距离计算失败</b><br>无法获取 Token 位置计算距离，请手动计算并流失内力。</div></div>` });\n    }\n}\n\n// --- 云垂海立 连携特效 ---\nconst waitBleed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_bleed\");\nif (waitBleed) {\n    const lvl = waitBleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = 5 + (lvl - 1) * 5;\n    await args.target.applyHealing({amount: -dmg, type: \"hp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1);\"><b><i class=\"fas fa-tint\"></i> 云垂追击(穹苍)</b><br>附加 ${dmg} 点气血流失！</div></div>` });\n}\nconst waitHeal = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_heal\");\nif (waitHeal) {\n    const lvl = waitHeal.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const heal = 5 + (lvl - 1) * 5;\n    await actor.applyHealing({amount: heal, type: \"mp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\"><b><i class=\"fas fa-plus\"></i> 云垂追击(重溟)</b><br>自身回复 ${heal} 点内力！</div></div>` });\n}"
+                        },
+                        {
+                            "label": "清理待发特效",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_bleed\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_heal\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_switched\", 1);"
                         }
                     ]
                 },
                 {
-                    "name": "凤翥鹏翔",
+                    "name": "凤翥鹏翔（失传）",
                     "type": "real",
                     "element": "taiji",
                     "damageType": "waigong",
@@ -659,7 +683,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，剑气纵横，翻江倒海，对范围内所有敌人造成 0.6 力量点伤害。</p><p>·穹苍式：若将敌人打入濒死状态，可立即不消耗动作施展一次【扶摇万里】。</p><p>·重溟式：使范围内所有敌人流失 20 点内力，自身回复敌人流失总和的内力，若自身内力溢出，溢出的数值会转化为气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "重溟吸内自动。穹苍追击提示。",
+                    "automationNote": "重溟吸内全局汇总自动（溢出转血手动）。穹苍追击发卡片提示。云垂海立附加特效联动自动。出招时需手动选内外功。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -680,21 +704,27 @@
                     },
                     "scripts": [
                         {
-                            "label": "姿态判定",
+                            "label": "姿态适配",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.type = (mode === \"ocean\") ? \"neigong\" : \"waigong\";"
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nargs.config.type = hasOcean ? \"neigong\" : \"waigong\";"
                         },
                         {
-                            "label": "特效",
+                            "label": "命中效果与云垂连携",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nif (mode === \"sky\") {\n    if (args.isDying || args.isDead) {\n        ui.notifications.info(\"击杀/濒死触发：请手动免费施展 [扶摇万里]\");\n    }\n} else {\n    // 重溟吸内\n    await args.target.applyHealing({amount: -20, type: \"mp\", showScrolling: true});\n    await actor.applyHealing({amount: 20, type: \"mp\", showScrolling: true});\n}"
+                            "script": "if (!args.isHit) return;\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\n\nif (hasSky) {\n    if (args.isDying) {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-skull\"></i> 穹苍狂舞</b><br>将 ${args.target.name} 打入濒死！你可以立即<b>不消耗动作</b>施展一次【扶摇万里】。</div></div>` });\n    }\n} else {\n    await args.target.applyHealing({amount: -20, type: \"mp\", showScrolling: true});\n}\n\n// --- 云垂海立 连携特效 ---\nconst waitBleed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_bleed\");\nif (waitBleed) {\n    const lvl = waitBleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = 5 + (lvl - 1) * 5;\n    await args.target.applyHealing({amount: -dmg, type: \"hp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1);\"><b><i class=\"fas fa-tint\"></i> 云垂追击(穹苍)</b><br>附加 ${dmg} 点气血流失！</div></div>` });\n}\nconst waitHeal = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_heal\");\nif (waitHeal) {\n    const lvl = waitHeal.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const heal = 5 + (lvl - 1) * 5;\n    await actor.applyHealing({amount: heal, type: \"mp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\"><b><i class=\"fas fa-plus\"></i> 云垂追击(重溟)</b><br>自身回复 ${heal} 点内力！</div></div>` });\n}"
+                        },
+                        {
+                            "label": "汇总与清理",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nif (hasOcean && args.hitCount > 0) {\n    const totalHeal = args.hitCount * 20;\n    await actor.applyHealing({amount: totalHeal, type: \"mp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-water\"></i> 重溟汲取</b><br>共命中 ${args.hitCount} 人，回复了 ${totalHeal} 点内力。若内力溢出，请手动等额转化为气血。</div></div>` });\n}\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_bleed\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_heal\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_switched\", 1);"
                         }
                     ]
                 },
                 {
-                    "name": "转海回天",
+                    "name": "转海回天（失传）",
                     "type": "counter",
                     "element": "taiji",
                     "damageType": "waigong",
@@ -703,7 +733,7 @@
                     "targetInfo": "范围",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，旋舞剑身，气镇八方，压制对方虚招，对范围内所有敌人造成 0.7 力量点伤害，并可移除自身一个状态。</p><p>·穹苍式：可额外移除自身一个状态，并对范围内所有敌人造成 20 点气血流失。</p><p>·重溟式：可额外移除自身一个状态，且每命中一名敌人，自身回复 10 点内力和气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "移除状态手动。流失/回复自动。",
+                    "automationNote": "移除状态手动。流失与回复自动。出招时需手动选内外功。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -724,21 +754,27 @@
                     },
                     "scripts": [
                         {
-                            "label": "姿态判定",
+                            "label": "姿态适配",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.type = (mode === \"ocean\") ? \"neigong\" : \"waigong\";"
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nargs.config.type = hasOcean ? \"neigong\" : \"waigong\";"
                         },
                         {
-                            "label": "特效",
+                            "label": "命中效果与云垂连携",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nif (mode === \"sky\") {\n    await args.target.applyHealing({amount: -20, type: \"hp\", showScrolling: true});\n    ui.notifications.info(\"穹苍式：造成20流失。请手动移除2个状态。\");\n} else {\n    await actor.applyHealing({amount: 10, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({amount: 10, type: \"mp\", showScrolling: true});\n    ui.notifications.info(\"重溟式：回复10血蓝。请手动移除2个状态。\");\n}"
+                            "script": "if (!args.isHit) return;\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\n\nif (hasSky) {\n    await args.target.applyHealing({amount: -20, type: \"hp\", showScrolling: true});\n} else {\n    await actor.applyHealing({amount: 10, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({amount: 10, type: \"mp\", showScrolling: true});\n}\n\n// --- 云垂海立 连携特效 ---\nconst waitBleed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_bleed\");\nif (waitBleed) {\n    const lvl = waitBleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = 5 + (lvl - 1) * 5;\n    await args.target.applyHealing({amount: -dmg, type: \"hp\", showScrolling: true});\n}\nconst waitHeal = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_heal\");\nif (waitHeal) {\n    const lvl = waitHeal.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const heal = 5 + (lvl - 1) * 5;\n    await actor.applyHealing({amount: heal, type: \"mp\", showScrolling: true});\n}"
+                        },
+                        {
+                            "label": "汇总发卡",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nlet msg = \"\";\nif (hasOcean) {\n    msg = `<b><i class=\"fas fa-water\"></i> 重溟反击</b><br>命中 ${args.hitCount} 人，共回复 ${args.hitCount*10} 点气血内力。请手动移除 <b>2</b> 个负面状态。`;\n} else {\n    msg = `<b><i class=\"fas fa-cloud\"></i> 穹苍反击</b><br>对目标造成了 20 气血流失。请手动移除 <b>2</b> 个负面状态。`;\n}\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #34495e; background: rgba(52, 73, 94, 0.1);\">${msg}</div></div>` });\n\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_bleed\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_heal\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_switched\", 1);"
                         }
                     ]
                 },
                 {
-                    "name": "海晏河清",
+                    "name": "海晏河清（失传）",
                     "type": "real",
                     "isUltimate": true,
                     "element": "taiji",
@@ -748,7 +784,7 @@
                     "targetInfo": "3x10范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，将全身内力悉数灌注此招，真气剑气如洪如瀑，狂飙卷动千尺浪，对正前方 3 米宽*10 米长范围内所有敌人造成 0.9 力量点伤害。</p><p>·穹苍式：将真气剑气轰入敌人体内，对他们造成此招消耗内力数值一半的气血流失。</p><p>·重溟式：真气环流，生生不息，回复此招消耗内力数值一半的气血。</p><p>·从【重溟式】切换至【穹苍式】时，剑气过盛，此招不可用于施展濒死一击。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1。</p>",
-                    "automationNote": "消耗全部内力自动。流失自动。回复手动(提示数值)。",
+                    "automationNote": "清空内力自动。濒死一击验证发卡提示。穹苍流失自动。重溟回复自动。云垂连携自动。出招时需手动选内外功。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -775,30 +811,103 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗全蓝",
+                            "label": "清空内力与限制",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "const currentMp = actor.system.resources.mp.value;\nconst switched = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_switched\");\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\n\nif (args.costConfig.isDesperate && switched && hasSky) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-exclamation-triangle\"></i> 规则警告</b><br>若您刚才从重溟切至穹苍，剑气过盛，此招不可用于施展濒死一击！请自觉中止。</div></div>` });\n}\n\nargs.costConfig.qiongmingCost = currentMp;"
+                        },
+                        {
+                            "label": "执行扣除",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const currentMp = actor.system.resources.mp.value;\nconst consumed = currentMp;\nawait actor.update({\"system.resources.mp.value\": 0});\nconst effectVal = Math.floor(consumed / 2);\n// 暂存数值\nargs.flags.damageResult.qiongmingVal = effectVal;"
+                            "script": "const cost = actor.system.resources.mp.value;\nawait actor.update({\"system.resources.mp.value\": 0});\nargs.flags.damageResult.qiongmingCost = cost;"
                         },
                         {
-                            "label": "姿态判定",
+                            "label": "姿态适配",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nargs.config.type = (mode === \"ocean\") ? \"neigong\" : \"waigong\";"
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nargs.config.type = hasOcean ? \"neigong\" : \"waigong\";"
                         },
                         {
-                            "label": "应用效果",
+                            "label": "命中效果与云垂连携",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = args.damageResult.qiongmingVal || 0;\nif (mode === \"sky\") {\n    await args.target.applyHealing({amount: -val, type: \"hp\", showScrolling: true});\n}"
+                            "script": "if (!args.isHit) return;\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nconst cost = args.damageResult.qiongmingCost || 0;\nconst val = Math.floor(cost / 2);\n\nif (hasSky && val > 0) {\n    await args.target.applyHealing({amount: -val, type: \"hp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-wind\"></i> 剑气轰入</b><br>${args.target.name} 承受 ${val} 气血流失！</div></div>` });\n}\n\n// --- 云垂海立 连携特效 ---\nconst waitBleed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_bleed\");\nif (waitBleed) {\n    const lvl = waitBleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = 5 + (lvl - 1) * 5;\n    await args.target.applyHealing({amount: -dmg, type: \"hp\", showScrolling: true});\n}\nconst waitHeal = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_heal\");\nif (waitHeal) {\n    const lvl = waitHeal.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const heal = 5 + (lvl - 1) * 5;\n    await actor.applyHealing({amount: heal, type: \"mp\", showScrolling: true});\n}"
                         },
                         {
-                            "label": "重溟回复提示",
+                            "label": "重溟回复与清理",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const mode = actor.getFlag(\"xjzl-system\", \"wuxue_qiongming_mode\") || \"sky\";\nconst val = args.baseDamage; // 实际上flags里没有传qiongmingVal到hit_once，这里重新算或者手动提示\n// 简单起见，提示手动\nif (mode === \"ocean\" && args.hitCount > 0) {\n    ui.notifications.info(\"重溟式：请手动回复消耗内力一半的气血。\");\n}"
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nif (hasOcean && args.hitCount > 0) {\n    const cost = args.damageResult.qiongmingCost || 0;\n    const val = Math.floor(cost / 2);\n    if (val > 0) {\n        await actor.applyHealing({amount: val, type: \"hp\", showScrolling: true});\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\"><b><i class=\"fas fa-leaf\"></i> 生生不息</b><br>回复了 ${val} 气血。</div></div>` });\n    }\n}\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_bleed\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_heal\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_switched\", 1);"
                         }
                     ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "穹苍式",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "本套路使用外功命中，造成外功伤害。带有额外派生效果。\n【注意】出招时请在弹窗手动将伤害类型选为外功。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_qiongming_sky",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "重溟式",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "本套路使用内功命中，造成内功伤害。带有额外派生效果。\n【注意】出招时请在弹窗手动将伤害类型选为内功。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_qiongming_ocean",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "穹溟_已切换",
+                    "icon": "icons/svg/cycle.svg",
+                    "description": "下一次穹溟剑法将附带切换特效",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_qiongming_switched",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "穹苍_待流失",
+                    "icon": "icons/svg/blood.svg",
+                    "description": "下一次穹溟剑法命中额外流失气血",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_qiongming_wait_bleed",
+                            "stackable": true
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "重溟_待回复",
+                    "icon": "icons/svg/heal.svg",
+                    "description": "下一次穹溟剑法命中额外回复内力",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_qiongming_wait_heal",
+                            "stackable": true
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }
