@@ -2600,17 +2600,9 @@
             "tier": 3,
             "description": "<p>炊烟袅袅，怡然自得。食神府弟子修炼至高深时，彻悟“食为天”之理。人道将存，不可无食，美食不仅是花红柳绿，酒池肉林，更是繁衍延续，传承之大道，是以酒肉烟火气，最抚凡人心。</p><p><strong>需求：</strong>《灶王神诀》修炼圆满</p><p><strong>效果：</strong>你的[烹饪]、[酒艺]每有 1 级，你的气血、内力上限+1。</p><p>·在战斗中，你可以用次要动作，消耗一份佳肴和一壶酒（而非饮食），有酒也有肉，人生何处快意恩仇，获得一层“烟火气”，持续到战斗脱离。</p><p><strong>烟火气：</strong>你可以消耗一层烟火气，使用主要动作在战斗食用佳肴或美酒。</p><p>·你可以消耗两层烟火气，给一名其他目标（包括敌人）喂佳肴或美酒。</p><p><strong>升级：</strong>烹饪酒艺每级提供的气血内力+1，获得“烟火气”的层数+1</p>",
             "requirements": "《灶王神诀》修炼圆满",
-            "scripts": [
-                {
-                    "label": "被动属性提升",
-                    "trigger": "passive",
-                    "script": "// 必须遍历所有招式来确定最高等级\nlet maxLvl = 1;\nif (item.system.moves) {\n    for(const m of item.system.moves) {\n        if ((m.computedLevel || 0) > maxLvl) maxLvl = m.computedLevel;\n    }\n}\n\nconst pengren = actor.system.arts.pengren.total || 0;\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nconst multiplier = 1 + (maxLvl - 1);\nconst bonus = (pengren + jiuyi) * multiplier;\n\n// 直接修改 max\nactor.system.resources.hp.bonus += bonus;\nactor.system.resources.mp.bonus += bonus;",
-                    "active": true
-                }
-            ],
             "moves": [
                 {
-                    "name": "获得烟火气",
+                    "name": "人间烟火",
                     "type": "qi",
                     "actionType": "buff",
                     "element": "none",
@@ -2619,8 +2611,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>消耗一份佳肴和一壶酒，获得“烟火气”。</p><p><strong>升级：</strong>获得“烟火气”的层数+1。</p>",
-                    "automationNote": "消耗物品手动。获得层数自动。",
+                    "description": "<p>【此招式包含被动属性提升，升级此招式即可获得全效】</p><p>消耗一份佳肴和一壶酒，获得“烟火气”。</p><p><strong>烟火气：</strong>消耗层数快速进食或喂食。</p><p><strong>升级：</strong>烹饪酒艺每级提供的气血内力+1，获得“烟火气”的层数+1。</p>",
+                    "automationNote": "被动气血内力上限提升完全自动化。战斗中消耗酒肉手动。使用招式获得烟火气层数。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2632,10 +2624,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "被动属性提升",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst pengren = actor.system.arts.pengren.total || 0;\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nconst bonus = (pengren + jiuyi) * lvl;\nS.resources.hp.bonus += bonus;\nS.resources.mp.bonus += bonus;"
+                        },
+                        {
                             "label": "获得烟火气",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"烟火气\").toObject();\n// 叠加\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nui.notifications.info(`消耗酒肉，获得 ${stacks} 层烟火气！`);",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst stacks = lvl;\nconst eff = thisItem.effects.getName(\"烟火气\").toObject();\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e67e22; background: rgba(230, 126, 34, 0.1);\"><b><i class=\"fas fa-utensils\"></i> 人间烟火</b><br>请手动消耗一份佳肴和一壶酒。获得了 ${stacks} 层 [烟火气]！</div></div>` });"
                         }
                     ]
                 }
@@ -2644,7 +2642,7 @@
                 {
                     "name": "烟火气",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "消耗层数快速进食或喂食。",
+                    "description": "消耗1层可用主要动作进食；消耗2层可给目标喂食。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
