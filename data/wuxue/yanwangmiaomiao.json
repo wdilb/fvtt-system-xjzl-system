@@ -1237,7 +1237,7 @@
                         {
                             "label": "施加流血",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"bleed_stack\", true);\n    ui.notifications.info(`${args.target.name} 流血了喵！`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"bleed_stack\", true);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-tint\"></i> 圣火昭昭</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">${args.target.name} 流血了喵！</div></div></div>` });\n}",
                             "active": true
                         }
                     ]
@@ -1252,7 +1252,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，挥舞猫爪令牌，对敌人造成 0.4 内息点内功伤害。若你的速度快于对方，招式必定命中，无法闪避。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "速度判定必中自动。",
+                    "automationNote": "速度判定必定命中自动（依然会投骰子判定暴击）。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -1272,9 +1272,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "速度必中",
+                            "label": "速度必定命中",
                             "trigger": "check",
-                            "script": "const mySpeed = actor.system.combat.speedTotal || 0;\nconst targetSpeed = args.target.system.combat.speedTotal || 0;\nif (mySpeed > targetSpeed) {\n    args.flags.forceHit = true;\n}",
+                            "script": "const mySpeed = actor.system.combat.speedTotal || 0;\nconst targetSpeed = args.target.system.combat.speedTotal || 0;\nif (mySpeed > targetSpeed) {\n    args.flags.alwaysHit = true;\n}",
                             "active": true
                         }
                     ]
@@ -1289,7 +1289,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，双手靠于胸前向前握拳，开启架招。格挡成功时，对方流失 20 点气血，若他消耗反应动作，大喊“喵呜喵呜”，则不流失气血。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "流失气血自动。若对方喊喵请手动回血或忽略。",
+                    "automationNote": "流失气血自动。若对方喊喵请手动回血或撤回。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -1305,14 +1305,15 @@
                         {
                             "label": "格挡流失",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyHealing({ amount: -20, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`${args.attacker.name} 因 [凡我弟子] 流失 20 气血 (喊喵可免)`);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyHealing({ amount: -20, type: \"hp\", showScrolling: true });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-cat\"></i> 凡我弟子</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">${args.attacker.name} 因格挡流失 20 气血！<br><span style=\"color:#888;\">(若消耗反应动作大喊“喵呜喵呜”，可免除流失)</span></div></div></div>` });\n}",
                             "active": true
                         }
                     ]
                 },
                 {
                     "name": "喵喵喵喵",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "taiji",
                     "damageType": "none",
@@ -1321,7 +1322,7 @@
                     "targetInfo": "友方",
                     "actionCost": "反应动作",
                     "description": "<p>当范围内一个友方开始回合时，你可以消耗反应动作大喊“喵”，根据你喊出的喵字数量，使他获得对应效果，每个喵字使招式额外消耗 1 怒气。</p><p>喵：你和他互换位置。</p><p>喵喵：获得三层“乘风”，持续到战斗脱离。</p><p>喵喵喵：获得三层“劲力”，持续到战斗脱离。</p><p>喵喵喵喵：你和他移除身上的任意效果。</p><p><strong>升级：</strong>释放距离+2，消耗怒气-1，内力消耗+2。</p>",
-                    "automationNote": "效果均为手动。请在对话框选择效果。",
+                    "automationNote": "出招前弹窗选择,互换位置与净化需手动执行，乘风与劲力系统自动挂载。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1340,15 +1341,20 @@
                     },
                     "scripts": [
                         {
-                            "label": "选择喵效果",
+                            "label": "选择喵字数量",
+                            "trigger": "preAttack",
+                            "script": "const content = `<div style=\"display:flex; flex-direction:column; gap:5px;\">\n    <button data-action=\"1\">喵 (额外1怒): 换位</button>\n    <button data-action=\"2\">喵喵 (额外2怒): 乘风x3</button>\n    <button data-action=\"3\">喵喵喵 (额外3怒): 劲力x3</button>\n    <button data-action=\"4\">喵喵喵喵 (额外4怒): 净化</button>\n</div>`;\nconst selection = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"喵喵喵喵\" },\n    content: content,\n    ok: { callback: (e, b) => e.submitter.dataset.action },\n    rejectClose: false\n});\nif (!selection) {\n    args.flags.abort = true;\n    return;\n}\nconst cost = parseInt(selection) || 0;\nargs.costConfig.rage += cost;\nargs.flags.miaoSelection = selection;",
+                            "active": true
+                        },
+                        {
+                            "label": "结算效果",
                             "trigger": "hit",
-                            "script": "const target = args.target;\nconst content = `<div style=\"display:flex; flex-direction:column; gap:5px;\">\n    <button data-action=\"1\">喵 (1怒): 换位</button>\n    <button data-action=\"2\">喵喵 (2怒): 乘风x3</button>\n    <button data-action=\"3\">喵喵喵 (3怒): 劲力x3</button>\n    <button data-action=\"4\">喵喵喵喵 (4怒): 净化</button>\n</div>`;\n\nconst selection = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"喵喵喵喵\" },\n    content: content,\n    ok: { callback: (e, b) => e.submitter.dataset.action }\n});\n\nconst cost = parseInt(selection) || 0;\n// 扣除额外怒气 (基础消耗已在roll时扣除，这里扣额外的)\nif (cost > 0) {\n    await actor.update({ \"system.resources.rage.value\": Math.max(0, actor.system.resources.rage.value - cost) });\n}\n\nif (selection === \"1\") {\n    ui.notifications.info(\"请手动互换位置\");\n} else if (selection === \"2\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"chengfeng\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n} else if (selection === \"3\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"jinli\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n} else if (selection === \"4\") {\n    ui.notifications.info(\"请手动移除双方状态\");\n}",
+                            "script": "const selection = args.flags.miaoSelection;\nconst target = args.target;\nif (selection === \"1\") {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2980b9; background: rgba(41,128,185,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-exchange-alt\"></i> 喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">请与目标手动互换位置！</div></div></div>` });\n} else if (selection === \"2\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"chengfeng\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-wind\"></i> 喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">目标获得了 3 层乘风！</div></div></div>` });\n} else if (selection === \"3\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"jinli\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230,126,34,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#e67e22;\"><i class=\"fas fa-fist-raised\"></i> 喵喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">目标获得了 3 层劲力！</div></div></div>` });\n} else if (selection === \"4\") {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#f39c12;\"><i class=\"fas fa-magic\"></i> 喵喵喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">净化之光！请手动为自己和目标移除任意状态。</div></div></div>` });\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": []
+            ]
         }
     },
     {
@@ -1457,13 +1463,13 @@
                         {
                             "label": "选择曲目",
                             "trigger": "attack",
-                            "script": "const content = `<select name=\"tune\" style=\"width:100%\">\n    <option value=\"gong\">宫 (下盘不稳)</option>\n    <option value=\"shang\">商 (错骨)</option>\n    <option value=\"jue\">角 (回复气血)</option>\n    <option value=\"zhi\">徵 (花轿Buff)</option>\n    <option value=\"yu\">羽 (移除状态)</option>\n</select>`;\nconst tune = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"选择律音\" },\n    content: content,\n    ok: { callback: (e, b) => b.form.elements.tune.value }\n});\n// 暂存选择到 flags 供 hit 使用\nargs.flags.tuneSelection = tune;",
+                            "script": "const content = `<select name=\"tune\" style=\"width:100%\">\n    <option value=\"gong\">宫 (下盘不稳)</option>\n    <option value=\"shang\">商 (错骨)</option>\n    <option value=\"jue\">角 (回复气血)</option>\n    <option value=\"zhi\">徵 (花轿Buff)</option>\n    <option value=\"yu\">羽 (移除状态)</option>\n</select>`;\nconst tune = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"选择律音\" },\n    content: content,\n    ok: { callback: (e, b) => b.form.elements.tune.value },\n    rejectClose: false\n});\nif (!tune) { args.flags.abort = true; return; }\nargs.flags.tuneSelection = tune;",
                             "active": true
                         },
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const tune = args.flags.tuneSelection;\nif (tune === \"gong\") {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"unstable\", true);\n} else if (tune === \"shang\") {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"cuogu\", true);\n} else if (tune === \"jue\") {\n    ui.notifications.info(\"角·百鸟朝凤：请手动对友方使用 [应用治疗] (基础50)\");\n} else if (tune === \"zhi\") {\n    ui.notifications.info(\"徵·抬花轿：请手动添加 Buff\");\n} else if (tune === \"yu\") {\n    ui.notifications.info(\"羽·天乐：请手动移除状态\");\n}",
+                            "script": "const tune = args.flags.tuneSelection;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nif (tune === \"gong\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: rounds } });\n} else if (tune === \"shang\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { rounds: rounds } });\n} else if (tune === \"jue\") {\n    ui.notifications.info(`角·百鸟朝凤：请手动对友方使用 [应用治疗] (基础 ${50 + (lvl - 1) * 20})`);\n} else if (tune === \"zhi\") {\n    const buff = {\n        name: \"花轿\",\n        icon: move.img || \"icons/svg/sound.svg\",\n        duration: { rounds: rounds },\n        changes: [\n            { key: \"system.combat.crit_waigong\", mode: 2, value: \"-3\" },\n            { key: \"system.combat.crit_neigong\", mode: 2, value: \"-3\" }\n        ]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, buff);\n} else if (tune === \"yu\") {\n    ui.notifications.info(\"羽·天乐：请手动移除状态\");\n}",
                             "active": true
                         }
                     ]
@@ -1531,7 +1537,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，真气化爪，疯狂乱抓，对目标造成 0.4 身法点内功伤害，击破目标架招时，目标进行一次[忍耐]检定（难度 15），失败则陷入“走火入魔”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，检定难度+2，内力消耗+2。</p>",
-                    "automationNote": "击破忍耐检定自动。走火入魔自动。",
+                    "automationNote": "击破忍耐检定自动。失败施加1回合走火入魔自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1553,7 +1559,7 @@
                         {
                             "label": "击破检定",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"rennai\",\n        dc: dc,\n        label: \"抵抗走火入魔\",\n        onFail: \"rage\"\n    });\n}",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"rennai\",\n        dc: dc,\n        label: \"抵抗走火入魔\",\n        onFail: { id: \"rage\", duration: { rounds: 1 } }\n    });\n}",
                             "active": true
                         }
                     ]
