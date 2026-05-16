@@ -177,7 +177,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双掌合十，心无杂念，开启架招。成功格挡时，自身和攻击者同时获得一层“悲悯”状态，至多三层，持续到战斗脱离。</p><p><strong>悲悯：</strong>当你获得 3 层悲悯时，移除所有悲悯，然后进行一次[定力]检定（难度 10），失败则陷入“自闭”状态，持续一回合。</p><p>·你进行该次检定时结果+2。</p><p><strong>升级：</strong>格挡值+10，检定结果再+2，内力消耗+2。</p>",
-                    "automationNote": "格挡添加悲悯自动。三层判定与检定请求自动(检定加值需手动修正)。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -193,7 +193,7 @@
                         {
                             "label": "格挡-悲悯",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 1. 定义处理悲悯的函数\nconst handlePeiMin = async (target) => {\n    if (!target) return;\n    const effData = thisItem.effects.getName(\"悲悯\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 添加特效 (管理器会自动叠加)\n    const effect = await game.xjzl.api.effects.addEffect(target, effData);\n    \n    // 检查层数触发判定 (仅针对自身，且仅当刚刚更新了特效时)\n    if (target.uuid === actor.uuid && effect) {\n        const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        if (stacks >= 3) {\n            await effect.delete();\n            // 发起定力检定\n            // 规则：难度10，检定+2。等价于难度8。\n            // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n            const bonus = 2 + (lvl - 1) * 2;\n            const effectiveDC = 10 - bonus;\n            \n            ui.notifications.info(\"悲悯已满，触发自闭判定！\");\n            await Macros.requestSave({\n                target: target,\n                attacker: target, // 自己对自己\n                type: \"dingli\",\n                dc: effectiveDC,\n                label: \"悲悯爆发-自闭判定\",\n                onFail: \"zibi\"\n            });\n        }\n    }\n};\n\n// 2. 对双方应用\nawait handlePeiMin(actor);\nawait handlePeiMin(args.attacker);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst handlePeiMin = async (target, isSelf) => {\n    if (!target) return;\n    const currentStacks = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n    \n    if (currentStacks >= 2) {\n        await game.xjzl.api.effects.removeEffect(target, \"beimin\", currentStacks);\n        \n        let saveBonus = 0;\n        if (isSelf) {\n            const moveData = thisItem.system.moves.find(m => m.name === \"大慈大悲\");\n            const lvl = Math.max(1, moveData?.computedLevel || 1);\n            saveBonus = lvl * 2; // lvl1=2, lvl2=4, lvl3=6\n        }\n        \n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: target}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-pray\"></i> 悲悯反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">悲悯已达 3 层，触发自闭判定！</div></div></div>` });\n\n        await Macros.requestSave({\n            target: target,\n            attacker: target,\n            type: \"dingli\",\n            dc: 10,\n            bonus: saveBonus, // 完美传入数值加成\n            label: \"悲悯爆发-自闭判定\",\n            onFail: { id: \"zibi\", duration: {rounds: 1} }\n        });\n    } else {\n        const effData = thisItem.effects.getName(\"悲悯\").toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(target, effData);\n    }\n};\n\nawait handlePeiMin(actor, true);\nawait handlePeiMin(args.attacker, false);",
                             "active": true
                         }
                     ]
@@ -208,7 +208,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双掌合拍，内力震荡，对敌人造成伤害。若目标无架招，为对方增加一层“悲悯”，自己也获得一层“悲悯”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "命中无架招添加悲悯自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -230,7 +230,7 @@
                         {
                             "label": "添加悲悯",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effData = thisItem.effects.getName(\"悲悯\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    await game.xjzl.api.effects.addEffect(actor, effData);\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const handlePeiMin = async (target, isSelf) => {\n        if (!target) return;\n        const currentStacks = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n        if (currentStacks >= 2) {\n            await game.xjzl.api.effects.removeEffect(target, \"beimin\", currentStacks);\n            \n            let saveBonus = 0;\n            if (isSelf) {\n                const moveData = thisItem.system.moves.find(m => m.name === \"大慈大悲\");\n                const lvl = Math.max(1, moveData?.computedLevel || 1);\n                saveBonus = lvl * 2;\n            }\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: target}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-pray\"></i> 悲悯反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">悲悯已达 3 层，触发自闭判定！</div></div></div>` });\n            await Macros.requestSave({ target: target, attacker: target, type: \"dingli\", dc: 10, bonus: saveBonus, label: \"悲悯爆发-自闭判定\", onFail: { id: \"zibi\", duration: {rounds: 1} } });\n        } else {\n            const effData = thisItem.effects.getName(\"悲悯\").toObject();\n            delete effData._id;\n            effData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, effData);\n        }\n    };\n    await handlePeiMin(actor, true);\n    await handlePeiMin(args.target, false);\n}",
                             "active": true
                         }
                     ]
@@ -245,7 +245,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>作悲天悯人状，吟唱大悲咒，对周围敌人造成伤害，击破架招时，减少其 1 点怒气，为其添加“下盘不稳”两回合，再为自己和对方增加一层“悲悯”。</p><p><strong>升级：</strong>额外减少 1 怒气，内力消耗+4。</p>",
-                    "automationNote": "击破扣怒、下盘不稳、添加悲悯自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0,
@@ -267,7 +267,7 @@
                         {
                             "label": "击破效果",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    // 1. 扣怒\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rageLoss = 1 + (lvl - 1);\n    const curRage = args.target.system.resources.rage.value || 0;\n    await args.target.update({\"system.resources.rage.value\": Math.max(0, curRage - rageLoss)});\n    \n    // 2. 下盘不稳\n    const rootEff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (rootEff) {\n        const data = foundry.utils.deepClone(rootEff);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    \n    // 3. 悲悯\n    const peimin = thisItem.effects.getName(\"悲悯\").toObject();\n    delete peimin._id;\n    peimin.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, peimin);\n    await game.xjzl.api.effects.addEffect(args.target, peimin);\n}",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rageLoss = lvl;\n    const curRage = args.target.system.resources.rage.value || 0;\n    const finalRage = Math.max(0, curRage - rageLoss);\n    await args.target.update({\"system.resources.rage.value\": finalRage});\n    \n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bolt\"></i> 云海悲思</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">击破架招，扣除对方 <span style=\"color:#8e44ad; font-weight:bold;\">${curRage - finalRage}</span> 点怒气！</div></div></div>` });\n\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: 2 } });\n    \n    const handlePeiMin = async (target, isSelf) => {\n        if (!target) return;\n        const currentStacks = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n        if (currentStacks >= 2) {\n            await game.xjzl.api.effects.removeEffect(target, \"beimin\", currentStacks);\n            \n            let saveBonus = 0;\n            if (isSelf && actor.system.martial.stanceActive) {\n                const stanceId = actor.system.martial.stance;\n                const moveData = actor.items.find(i=>i.type===\"wuxue\")?.system.moves.find(m => m.id === stanceId);\n                const stLvl = Math.max(1, moveData?.computedLevel || 1);\n                saveBonus = stLvl * 2;\n            }\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: target}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-pray\"></i> 悲悯反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">悲悯已达 3 层，触发自闭判定！</div></div></div>` });\n            await Macros.requestSave({ target: target, attacker: target, type: \"dingli\", dc: 10, bonus: saveBonus, label: \"悲悯爆发-自闭判定\", onFail: { id: \"zibi\", duration: {rounds: 1} } });\n        } else {\n            const effData = thisItem.effects.getName(\"悲悯\").toObject();\n            delete effData._id;\n            effData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, effData);\n        }\n    };\n    await handlePeiMin(actor, true);\n    await handlePeiMin(args.target, false);\n}",
                             "active": true
                         }
                     ]
@@ -282,7 +282,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，掌风奔涌，造成伤害，同时进行一次[角力]对抗，胜利则夺取对方兵器。</p><p>你每有一层“悲悯”，检定结果+1。对方每有一层“悲悯”，检定结果-1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "自动发起角力对抗。层数修正会显示在标题中。夺武效果手动。",
+                    "automationNote": "夺武效果手动。其他自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -304,7 +304,7 @@
                         {
                             "label": "夺武对抗",
                             "trigger": "hit",
-                            "script": "const selfStacks = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nconst targetStacks = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n\nif (args.isHit) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'jiaoli',\n        label: `衔悲茹恨 (我方+${selfStacks} / 敌方-${targetStacks})`,\n        outcome: {\n            win: { text: '对抗胜利：请手动夺取对方兵器。' },\n            lose: { text: '对抗失败：夺取未遂。' }\n        }\n    });\n}",
+                            "script": "const selfStacks = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\nconst targetStacks = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\")?.getFlag(\"xjzl-system\", \"stacks\") || 0;\n\nif (args.isHit) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: 'jiaoli',\n        attBonus: selfStacks, // 传入自身数值加成\n        defBonus: -targetStacks, // 传入敌方数值减值\n        label: `衔悲茹恨 (我方+${selfStacks} / 敌方-${targetStacks})`,\n        outcome: {\n            win: { text: '对抗胜利：请手动夺取对方兵器。' },\n            lose: { text: '对抗失败：夺取未遂。' }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -320,7 +320,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>轻吟佛号，取解脱意，消耗“悲悯”，每消耗一层，本回合施展《大悲手》暴击骰-1。</p><p><strong>升级：</strong>每层使暴击骰再-1，内力消耗+2。</p>",
-                    "automationNote": "消耗悲悯自动。施加暴击修正BUFF自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -336,7 +336,7 @@
                         {
                             "label": "消耗悲悯获益",
                             "trigger": "hit",
-                            "script": "// 1. 消耗悲悯\nconst peimin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\");\nif (!peimin) return ui.notifications.warn(\"无悲悯层数！\");\n\nconst stacks = peimin.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait peimin.delete();\n\n// 2. 计算修正\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst critMod = (1 + (lvl - 1)) * stacks * -1; // 负数更好\n\n// 3. 应用临时BUFF\nconst buffData = {\n    name: \"泣麟悲凤\",\n    icon: move.img,\n    duration: { rounds: 1 },\n    changes: [\n        { key: \"system.combat.crit_waigong\", mode: 2, value: String(critMod) },\n        { key: \"system.combat.crit_neigong\", mode: 2, value: String(critMod) }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(actor, buffData);\nui.notifications.info(`消耗 ${stacks} 层悲悯，暴击骰 ${critMod}`);",
+                            "script": "const peimin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beimin\");\nif (!peimin) return ui.notifications.warn(\"无悲悯层数！\");\n\nconst stacks = peimin.getFlag(\"xjzl-system\", \"stacks\") || 1;\nawait peimin.delete();\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst critMod = lvl * stacks * -1; // lvl1=-1, lvl2=-2\n\nconst buffData = {\n    name: \"泣麟悲凤\",\n    icon: move.img,\n    duration: { rounds: 1 },\n    changes: [\n        { key: \"system.combat.crit_waigong\", mode: 2, value: String(critMod) },\n        { key: \"system.combat.crit_neigong\", mode: 2, value: String(critMod) }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(actor, buffData);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52,152,219,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-dove\"></i> 泣麟悲凤</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗 ${stacks} 层悲悯，内外功暴击骰 <span style=\"color:#2980b9; font-weight:bold;\">${critMod}</span>。</div></div></div>` });",
                             "active": true
                         }
                     ]
@@ -344,6 +344,7 @@
                 {
                     "name": "悲痛欲绝",
                     "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "taiji",
                     "damageType": "none",
@@ -352,7 +353,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>悲不自胜，忍无可忍，进入“悲怒”状态，持续两回合。</p><p><strong>悲怒：</strong>你施展《大悲手》招式并造成暴击时，额外造成 40 点气血流失。</p><p><strong>升级：</strong>气血流失再+30，怒气消耗-1，消耗+4。</p>",
-                    "automationNote": "获得悲怒状态自动。悲怒的额外伤害自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -373,7 +374,7 @@
                         {
                             "label": "开启悲怒",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"悲怒\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\n\n// 注入伤害数值到 flag\nconst dmg = 40 + (lvl - 1) * 30;\neff.flags[\"xjzl-system\"].beinuDmg = dmg;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"悲怒\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 40 + (lvl - 1) * 30;\n\neff.duration = { rounds: 2 };\neff.flags[\"xjzl-system\"].beinuDmg = dmg;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -382,7 +383,7 @@
             "effects": [
                 {
                     "name": "悲悯",
-                    "icon": "icons/magic/light/beam-rays-yellow-orange.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "3层时进行定力检定，失败自闭。",
                     "transfer": false,
                     "flags": {
@@ -396,8 +397,8 @@
                 },
                 {
                     "name": "悲怒",
-                    "icon": "icons/magic/fire/flame-burning-skeleton-explosion.webp",
-                    "description": "大悲手暴击造成流失。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "大悲手暴击造成额外流失。",
                     "transfer": false,
                     "duration": {
                         "rounds": 2
@@ -408,10 +409,10 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "悲怒触发",
+                                    "label": "悲怒流失",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "// args.move 是当前使用的招式\n// 检查是否是大悲手招式 (通过 Item 名字)\n// args.item 是招式所属的物品\nif (args.isCrit && args.item && args.item.name === \"大悲手\") {\n    const dmg = thisEffect.getFlag(\"xjzl-system\", \"beinuDmg\") || 40;\n    // 应用流失\n    await args.target.applyDamage({\n        amount: dmg,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`悲怒触发！额外流失 ${dmg} 气血`);\n}"
+                                    "script": "if (args.isCrit && args.item && args.item.name === \"大悲手\") {\n    const dmg = thisEffect.getFlag(\"xjzl-system\", \"beinuDmg\") || 40;\n    await args.target.applyDamage({\n        amount: dmg,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-fire\"></i> 悲怒触发</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">大悲手暴击，额外造成 <span style=\"color:#c0392b; font-weight:bold;\">${dmg}</span> 点气血流失！</div></div></div>` });\n}"
                                 }
                             ]
                         }
