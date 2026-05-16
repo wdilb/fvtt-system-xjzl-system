@@ -1951,7 +1951,8 @@ export class ChatCardManager {
         // 这会弹出一个新的聊天卡片显示骰子结果
         // 读取 flags.level (发起请求时设定的优劣势)
         const roll = await actor.rollAttributeTest(flags.attribute, {
-            level: flags.level || 0
+            level: flags.level || 0,
+            bonus: flags.bonus || 0
         });
 
         // 3. 比对结果

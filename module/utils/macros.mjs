@@ -17,10 +17,11 @@ export class XJZLMacros {
      * @param {Object} [options.damageOnFail] 失败时扣除资源 { value: 10, type: "hp" }
      * @param {Actor} [options.attacker] 发起者 Actor (可选，用于显示名字，脚本里通常是 `actor` 或 `attacker`)
      * @param {Number} options.level 预设优劣势 (正数=优, 负数=劣)
+     * @param {Number} options.bouns 预设加减值
      * @param {String} [options.successText] 成功时的提示文本
      * @param {String} [options.failureText] 失败时的提示文本
      */
-    static async requestSave({ target, type, dc, label, onFail, damageOnFail, attacker, level = 0, successText, failureText }) {
+    static async requestSave({ target, type, dc, label, onFail, damageOnFail, attacker, level = 0, bonus = 0, successText, failureText }) {
         if (!target) return ui.notifications.error("requestSave: 缺少目标 (target)");
         if (!type) return ui.notifications.error("requestSave: 缺少属性类型 (type)");
 
@@ -67,6 +68,7 @@ export class XJZLMacros {
             onFail: safeOnFail, // 直接存入 Effect 数据对象
             damageOnFail: damageOnFail, //失败扣减的数值
             level: level, //优势劣势等级
+            bonus: bonus,
             successText: successText || null,
             failureText: failureText || null
         };
