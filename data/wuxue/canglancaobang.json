@@ -1002,20 +1002,6 @@
             "tier": 1,
             "description": "<p>与一般陆地上的武功不一样，为了适应摇晃的船身，船上功夫既稳又轻，似出非出，似打非打，出招敏捷，收招迅速。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
             "requirements": "徒手",
-            "effects": [
-                {
-                    "name": "水中环境",
-                    "icon": "icons/magic/water/wave-water-blue.webp",
-                    "description": "标记：处于水中。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "environment_water"
-                        }
-                    },
-                    "changes": []
-                }
-            ],
             "moves": [
                 {
                     "name": "船猫捕鼠",
@@ -1027,7 +1013,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，伺机出手，造成 0.4 力量点外功伤害。若目标存在下盘不稳，下盘不稳持续回合数+1。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "延长下盘不稳手动。",
+                    "automationNote": "完全自动化：命中后若目标处于下盘不稳，将自动为其延长 1 回合。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -1045,7 +1031,14 @@
                             3
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "延长下盘不稳",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const hasUnstable = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\n    if (hasUnstable) {\n        // 借助底层管理器的叠加机制，再次施加1回合的系统通用状态，系统会自动将原有回合数+1\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: 1 } });\n        actor.showFloatyText(\"下盘不稳延长!\", { fill: \"#FFA500\" });\n    }\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "浑水摸鱼",
@@ -1094,7 +1087,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，单手横臂，开启架招。格挡成功时，为目标添加“下盘不稳”，持续一回合。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "格挡施加下盘不稳自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -1111,7 +1104,7 @@
                             "label": "施加下盘不稳",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nawait game.xjzl.api.effects.addEffect(args.attacker, \"unstable\");\nui.notifications.info(`${args.attacker.name} 下盘不稳！`);"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nawait game.xjzl.api.effects.addEffect(args.attacker, { id: \"unstable\", duration: { rounds: 1 } });\nactor.showFloatyText(\"下盘不稳！\", { fill: \"#FFA500\" });"
                         }
                     ]
                 },
@@ -1154,12 +1147,51 @@
                             "label": "东倒西歪",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const unstable = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (unstable) {\n    await unstable.delete();\n    // 东倒西歪 (临时AE)\n    const dongdao = {\n        name: \"东倒西歪\",\n        icon: \"icons/svg/daze.svg\",\n        duration: { rounds: 3 },\n        changes: [\n            { key: \"flags.xjzl-system.forceSpeedZero\", mode: 5, value: \"true\" }, // 描述说减至1，这里用forceSpeedZero模拟禁足，或者手动改速度\n            // 修正：描述说“移动速度减至1”，不是归零。这里用属性覆盖。\n            { key: \"system.combat.speed\", mode: 5, value: \"1\" },\n            { key: \"flags.xjzl-system.blockStance\", mode: 5, value: \"true\" }\n        ],\n        flags: { \"xjzl-system\": { slug: \"dongdao\" } }\n    };\n    await game.xjzl.api.effects.addEffect(args.target, dongdao);\n    ui.notifications.info(`${args.target.name} 陷入 [东倒西歪]`);\n}"
+                            "script": "const unstable = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (unstable) {\n    await unstable.delete();\n    const dongdaoAE = thisItem.effects.getName(\"东倒西歪\");\n    if (dongdaoAE) {\n        const eff = dongdaoAE.toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 陷入 [东倒西歪]`);\n    }\n}"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "处于水中",
+                "icon": "icons/magic/water/wave-water-blue.webp",
+                "description": "标记：所处环境为水中。可触发漕帮水上武学的特殊加成。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "in_water",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "东倒西歪",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "你的移动速度减至 1，期间内无法施展架招。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "dongdaoxiwai",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 5,
+                        "value": "1"
+                    },
+                    {
+                        "key": "flags.xjzl-system.blockStance",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "破船锥法",
@@ -1172,39 +1204,6 @@
             "tier": 2,
             "description": "<p>水上讨生活的侠士所修武功，名为破船，实为家破人亡的绝户招法。</p><p><strong>需求：</strong>匕首</p><p><strong>属性：</strong>太极</p>",
             "requirements": "匕首",
-            "effects": [
-                {
-                    "name": "处于水中 (破船)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "标记：处于水中。触发破船锥法部分招式加成。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "pochuan_water"
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "溺水",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "目标陷入“缚身”且移动速度-5。（移动速度减免已自动生效；“缚身”效果及相关判定需手动处理）",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "nishui",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "-5"
-                        }
-                    ]
-                }
-            ],
             "moves": [
                 {
                     "name": "凿船破板",
@@ -1246,7 +1245,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，钉其面门，造成 0.4 力量点外功伤害，击破敌人架招时，使其陷入“溺水”，持续一回合。</p><p><strong>溺水：</strong>你陷入“缚身”且移动速度-5。</p><p>·若在水中施展此招，虚招值+2。</p><p><strong>升级：</strong>招式伤害+10，溺水持续回合+1，消耗+2。</p>",
-                    "automationNote": "若自身具有[处于水中 (破船)]状态，虚招加成自动计算。击破敌方架招后，自动施加[溺水]状态 (减速自动，缚身手动)。",
+                    "automationNote": "若自身具有[处于水中]状态，虚招加成自动计算。击破敌方架招后，自动施加[溺水]状态 (减速自动，缚身手动)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1269,7 +1268,7 @@
                             "label": "水中虚招加成",
                             "trigger": "calc",
                             "active": true,
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pochuan_water\")) {\n    args.output.feint += 2;\n    args.output.feintBonusDesc.push(\"水中作战: 虚招值 +2\");\n}"
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) {\n    args.output.feint += 2;\n    args.output.feintBonusDesc.push(\"水中作战: 虚招值 +2\");\n}"
                         },
                         {
                             "label": "击破溺水",
@@ -1320,7 +1319,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，作潜水状，开启架招。若你在水中，架招持续期间，额外格挡值+5，且看破值+1。</p><p><strong>升级：</strong>格挡值+10，看破值+1，内力消耗+2。</p>",
-                    "automationNote": "若自身具有[处于水中 (破船)]状态，开启架招时自动计算额外加值。",
+                    "automationNote": "若自身具有[处于水中]状态，开启架招时自动计算额外加值。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1337,7 +1336,7 @@
                             "label": "水中架招加成",
                             "trigger": "passive",
                             "active": true,
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pochuan_water\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    S.combat.block += 5 + (lvl - 1) * 5;\n    S.combat.kanpo += 1 + (lvl - 1) * 1;\n}"
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    S.combat.block += 5 + (lvl - 1) * 5;\n    S.combat.kanpo += 1 + (lvl - 1) * 1;\n}"
                         }
                     ]
                 },
@@ -1378,7 +1377,41 @@
                     "scripts": []
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "处于水中",
+                "icon": "icons/magic/water/wave-water-blue.webp",
+                "description": "标记：所处环境为水中。可触发漕帮水上武学的特殊加成。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "in_water",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "溺水",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "目标陷入“缚身”且移动速度-5。（移动速度减免已自动生效；“缚身”效果及相关判定需手动处理）",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "nishui",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "-5"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "漕运行",
@@ -1451,21 +1484,6 @@
             "tier": 2,
             "description": "<p>船家时常下水作业，多会习得一些水下憋气的法门，而漕帮的这套口诀，却是他们横行大明水域的独门绝技，一旦学会，如鱼得水。</p>",
             "requirements": "",
-            "effects": [
-                {
-                    "name": "处于水中 (水栖)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "标记：处于水中。触发水栖诀加成。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "shuiqi_water",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
-            ],
             "moves": [
                 {
                     "name": "水栖诀",
@@ -1488,11 +1506,26 @@
                             "label": "被动成长与虚招强化",
                             "trigger": "passive",
                             "active": true,
-                            "script": "// 1. 闭气成长计算 (常驻)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.biqi.mod += 2 + (lvl - 1) * 2;\n\n// 2. 检测水中作战状态 (水栖专属)\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'shuiqi_water')) {\n    // 虚招对抗成长\n    const feintBonus = 1 + (lvl - 1) * 1;\n    S.combat.xuzhao += feintBonus;\n    S.combat.kanpo += feintBonus;\n}"
+                            "script": "// 1. 闭气成长计算 (常驻)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.biqi.mod += 2 + (lvl - 1) * 2;\n\n// 2. 检测水中作战状态 (统一水域标记)\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'in_water')) {\n    // 虚招对抗成长\n    const feintBonus = 1 + (lvl - 1) * 1;\n    S.combat.xuzhao += feintBonus;\n    S.combat.kanpo += feintBonus;\n}"
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "处于水中",
+                "icon": "icons/magic/water/wave-water-blue.webp",
+                "description": "标记：所处环境为水中。可触发漕帮水上武学的特殊加成。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "in_water",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     }
 ]
