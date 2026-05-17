@@ -624,7 +624,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>一掸袖袍，洒出一阵白雾，开启架招。格挡成功后，为自己添加“莫测”状态，持续到战斗脱离。</p><p><strong>莫测：</strong>你的虚招对抗检定结果+1。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡获莫测自动。莫测加成自动(虚招值+1)。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -638,10 +638,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡-莫测",
+                            "label": "格挡获莫测",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"莫测\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"莫测\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"莫测！\", { fill: \"#00ffff\" });"
                         }
                     ]
                 },
@@ -655,7 +655,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>持剑诡异一刺，角度刁钻，造成 0.4 力量点外功伤害。击破架招时，可消耗反应动作施展【千幻点穴手】（不需要看破虚招便可释放）。</p><p>·可以消耗“莫测”状态，将手中单剑化为白雾，然后使此招虚招值+3。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破提示追击。莫测消耗需手动(计算阶段提示)。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -675,22 +675,22 @@
                     },
                     "scripts": [
                         {
-                            "label": "莫测加成",
+                            "label": "莫测加成预览",
                             "trigger": "calc",
-                            "script": "const hasMoce = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (hasMoce) {\n    args.output.bonusDesc.push(\"可选: 手动消耗 [莫测] 使虚招值+3\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const hasMoce = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (hasMoce) {\n    args.output.feintBonusDesc.push(\"可选: 手动消耗 [莫测] 使虚招值+3\");\n}"
                         },
                         {
-                            "label": "消耗与加成执行",
+                            "label": "消耗莫测",
                             "trigger": "attack",
-                            "script": "const hasMoce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (hasMoce) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"云山雾绕\" },\n        content: `<p>是否消耗 [莫测] 使虚招值+3？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        await hasMoce.delete();\n        args.flags.bonusFeint += 3;\n        ui.notifications.info(\"已消耗 [莫测]，虚招值+3\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"云山雾绕\" },\n        content: `<p>是否消耗 [莫测] 使本次虚招值 <b>+3</b>？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"moce\", 1);\n        args.flags.bonusFeint += 3;\n        actor.showFloatyText(\"消耗莫测\", { fill: \"#00ffff\" });\n    }\n}"
                         },
                         {
-                            "label": "击破追击",
+                            "label": "击破追击提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"击破架招！可消耗反应动作施展 [千幻点穴手]。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #d35400; background: rgba(211,84,0,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-bolt\"></i> 击破破绽</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">可消耗反应动作施展 <b>【千幻点穴手】</b>（无需看破）。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -704,7 +704,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，单指点向对手大穴，对目标造成 0.6 力量点外功伤害。</p><p>·可消耗“莫测”状态，使目标陷入点穴状态（冲穴难度 10），持续三回合。</p><p><strong>升级：</strong>招式伤害+10，冲穴难度+1，内力消耗+2。</p>",
-                    "automationNote": "消耗莫测点穴自动(弹窗确认)。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -724,10 +724,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗点穴",
+                            "label": "消耗莫测点穴",
                             "trigger": "hit",
-                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"千幻点穴手\" },\n        content: `<p>是否消耗 [莫测] 施展点穴？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        await moce.delete();\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const dc = 10 + (lvl - 1);\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"neixi\",\n            dc: dc,\n            label: \"抵抗点穴\",\n            onFail: {\n                name: \"点穴\",\n                img: \"icons/svg/target.svg\",\n                duration: { rounds: 3 },\n                changes: [\n                    { key: \"flags.xjzl-system.stun\", mode: 5, value: \"true\" }\n                ]\n            }\n        });\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"千幻点穴手\" },\n        content: `<p>是否消耗 [莫测] 点穴目标？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        // 1. 消耗莫测\n        await game.xjzl.api.effects.removeEffect(actor, \"moce\", 1);\n        actor.showFloatyText(\"消耗莫测\", { fill: \"#00ffff\" });\n\n        // 2. 直接施加点穴，持续3回合\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"dianxue\", duration: { rounds: 3 } });\n\n        // 3. 计算冲穴难度\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const dc = 10 + (lvl - 1);\n\n        // 4. 发送提示卡片\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-bullseye\"></i> 千幻点穴手</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗了 [莫测]，封住了 <b>${args.target.name}</b> 的大穴！<br>目标陷入 <b>[点穴]</b>，持续 3 回合。<br><span style=\"color:#c0392b; font-weight:bold;\">冲穴难度：${dc}</span></div></div></div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}"
                         }
                     ]
                 },
@@ -742,7 +742,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双手无形，剑势无常，消耗“莫测”，进入“千幻”，持续一回合。</p><p><strong>千幻：</strong>你选择一套徒手武学，与《千幻十三式》共同施展时无需遵循武学套路切换规则。</p><p><strong>升级：</strong>千幻持续回合+1，消耗+2。</p>",
-                    "automationNote": "消耗莫测自动。套路切换规则需玩家手动执行。",
+                    "automationNote": "消耗莫测自动。套路切换规则需玩家根据卡片提示手动执行。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -756,10 +756,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗莫测",
+                            "label": "消耗莫测入千幻",
                             "trigger": "hit",
-                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    await moce.delete();\n    ui.notifications.info(\"已消耗 [莫测]，获得 [千幻] 状态。\");\n    // 这里可以加一个纯文本Buff提示\n} else {\n    ui.notifications.warn(\"未拥有 [莫测]，无法完全发挥此招。\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    await game.xjzl.api.effects.removeEffect(actor, \"moce\", 1);\n    const eff = thisItem.effects.getName(\"千幻\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    eff.duration = { rounds: 1 + (lvl - 1) };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"千幻！\", { fill: \"#8e44ad\" });\n} else {\n    ui.notifications.warn(\"缺少 [莫测] 状态，无法施展。\");\n}"
                         }
                     ]
                 },
@@ -774,7 +774,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当被对手反击攻击时，可消耗反应动作施展，消耗“莫测”，压制对手反击，寒光陡闪，如梦如幻，刺向目标胸口，造成 1.0 力量点外功伤害。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "消耗莫测自动(出招检查)。反应条件需手动判断。",
+                    "automationNote": "反应条件需手动判断。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -799,10 +799,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗检查",
+                            "label": "莫测强校验",
                             "trigger": "attack",
-                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (!moce) {\n    ui.notifications.warn(\"缺少 [莫测] 状态，无法施展！\");\n    args.flags.abort = true;\n} else {\n    await moce.delete();\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (!moce) {\n    args.flags.abortReason = \"缺少 [莫测] 状态，无法施展！\";\n    args.flags.abort = true;\n} else {\n    await game.xjzl.api.effects.removeEffect(actor, \"moce\", 1);\n    actor.showFloatyText(\"消耗莫测\", { fill: \"#00ffff\" });\n}"
                         }
                     ]
                 }
@@ -810,8 +810,8 @@
             "effects": [
                 {
                     "name": "莫测",
-                    "icon": "icons/magic/air/fog-gas-smoke-dense-white.webp",
-                    "description": "虚招对抗检定结果+1。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "虚招对抗检定与看破检定结果+1。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -824,8 +824,25 @@
                             "key": "system.combat.xuzhao",
                             "mode": 2,
                             "value": "1"
+                        },
+                        {
+                            "key": "system.combat.kanpo",
+                            "mode": 2,
+                            "value": "1"
                         }
                     ]
+                },
+                {
+                    "name": "千幻",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "与《千幻十三式》共同施展徒手武学时，无需遵循套路切换规则。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "qianhuan",
+                            "stackable": false
+                        }
+                    }
                 }
             ]
         }
