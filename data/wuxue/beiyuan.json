@@ -652,7 +652,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，做独钴印，真劲交织，不动如山，水火不侵。开启架招，同时获得“不动”，持续一回合或解除架招。</p><p><strong>不动：</strong>免疫点穴、击退、击飞、击倒、错骨。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "开启获得BUFF自动。免疫效果需玩家手动确认。",
+                    "automationNote": "开启自动获得不动状态AE。点穴、击退等免疫效果请参考状态描述手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -669,8 +669,8 @@
                         {
                             "label": "获得不动",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"不动\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"不动\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #f1c40f; background:rgba(241,196,15,0.1);\"><b>不动明王：</b>免疫点穴、击退、击飞、击倒、错骨。请在遇袭时手动判定免疫。</div></div>`\n});"
                         }
                     ]
                 },
@@ -683,8 +683,8 @@
                     "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，做大金刚轮印，劲力如锥，无坚不摧，对扇形范围内所有敌人造成伤害。</p><p>·若目标无架招，则将其击飞 1 米并倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "击飞倒地手动。",
+                    "description": "<p>蓄力动作，做大金刚轮印，劲力如锥，无坚不摧，对扇形范围内所有敌人造成 0.6 力量点内功伤害。</p><p>·若目标无架招，则将其击飞 1 米并倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
+                    "automationNote": "倒地自动施加。击飞发送卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -705,10 +705,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "效果提示",
+                            "label": "击飞与倒地",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米并倒地！`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #e74c3c; background:rgba(231,76,60,0.1);\"><b>击飞：</b>将 ${args.target.name} 击飞 1 米并倒地！</div></div>`\n    });\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
                         }
                     ]
                 },
@@ -721,8 +721,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，做外狮子印，印指叩击，金铁铮鸣，对周围敌人造成伤害，击破架招时，使敌人陷入眩晕，持续一回合。</p><p>·若敌人有[佛法]或[道法]等级，可进行[定力]检定（难度 13），成功则不会陷入眩晕。</p><p><strong>升级：</strong>招式伤害+10，检定难度+2，内力消耗+8。</p>",
-                    "automationNote": "击破后请求检定自动。检定失败施加眩晕自动。",
+                    "description": "<p>蓄力动作，做外狮子印，印指叩击，金铁铮鸣，对周围敌人造成 0.5 力量点内功伤害，击破架招时，使敌人陷入眩晕，持续一回合。</p><p>·若敌人有[佛法]或[道法]等级，可进行[定力]检定（难度 13），成功则不会陷入眩晕。</p><p><strong>升级：</strong>招式伤害+10，检定难度+2，内力消耗+8。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -743,10 +743,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "请求检定",
+                            "label": "眩晕与检定",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 13 + (lvl - 1) * 2;\n    \n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"抵抗眩晕 (佛法/道法)\",\n        onFail: \"xuanyun\"\n    });\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const fofa = args.target.system.arts.fofa?.total || 0;\n    const daofa = args.target.system.arts.daofa?.total || 0;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    \n    if (fofa > 0 || daofa > 0) {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"dingli\",\n            dc: 13 + (lvl - 1) * 2,\n            label: \"抵抗眩晕 (佛/道法)\",\n            onFail: { id: \"xuanyun\", duration: { rounds: 1 } }\n        });\n    } else {\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"xuanyun\", duration: { rounds: 1 } });\n    }\n}"
                         }
                     ]
                 },
@@ -761,10 +761,12 @@
                     "targetInfo": "自身",
                     "actionCost": "全回合动作",
                     "description": "<p>全回合动作，做内狮子印，三吸二吐，移除身上一个状态，同时恢复最大气血 10%的气血。</p><p><strong>升级：</strong>回复气血提高 10%，内力消耗+4。</p>",
-                    "automationNote": "回血自动。移除状态手动。",
+                    "automationNote": "百分比回血自动。移除状态请手动。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
-                        "growth": 0
+                        "growth": 0,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -782,10 +784,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "计算回血",
+                            "label": "计算百分比回血",
                             "trigger": "calc",
-                            "script": "const maxHp = actor.system.resources.hp.max;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst ratio = 0.1 + (lvl - 1) * 0.1;\nargs.output.damage = Math.floor(maxHp * ratio);",
-                            "active": true
+                            "active": true,
+                            "script": "const maxHp = S.resources.hp.max;\nconst lvl = Math.max(1, move.computedLevel || 1);\nargs.output.damage = Math.floor(maxHp * (0.1 + (lvl - 1) * 0.1));"
+                        },
+                        {
+                            "label": "提示移除状态",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #2ecc71; background:rgba(46,204,113,0.1);\"><b>三吸二吐：</b>请手动移除身上一个负面状态。</div></div>`\n});"
                         }
                     ]
                 },
@@ -799,7 +807,7 @@
                     "targetInfo": "自身",
                     "actionCost": "反应动作",
                     "description": "<p>看破虚招后，消耗反应动作压制虚招，做外缚印，五官六感超凡敏锐，获得“避凶”，持续到脱战。</p><p><strong>避凶：</strong>技能、伤残、死亡检定、虚招对抗结果+1。</p><p><strong>升级：</strong>避凶的结果+1，内力消耗+4。</p>",
-                    "automationNote": "获得BUFF自动。检定加值需系统支持（目前自动加全局检定）。",
+                    "automationNote": "虚招对抗加成自动。其他类型检定的加成需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -816,8 +824,8 @@
                         {
                             "label": "获得避凶",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"避凶\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 1 + (lvl - 1);\n\neff.changes[0].value = String(bonus);\n// 这里只加了全局检定，虚招对抗等可能需要手动或后续系统支持\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"避凶\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 1 + (lvl - 1);\neff.changes[0].value = String(bonus);\neff.changes[1].value = String(bonus);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #9b59b6; background:rgba(155,89,182,0.1);\"><b>避凶：</b>虚招与看破加成已自动应用。<br>技能、伤残、死亡检定 +${bonus}，请在检定时手动输入加值。</div></div>`\n});"
                         }
                     ]
                 },
@@ -832,7 +840,7 @@
                     "targetInfo": "单体",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，做内缚印，提升瞬间爆发力，快若闪电，目标获得“阵”，持续一回合。</p><p><strong>“阵”：</strong>速度+1，移动时不会被《趁虚而入》。</p><p><strong>升级：</strong>移动速度+3，“阵”持续回合+1，消耗+4</p>",
-                    "automationNote": "加BUFF自动。免疫趁虚而入手动。",
+                    "automationNote": "速度加成自动。免疫趁虚而入手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -849,8 +857,8 @@
                         {
                             "label": "获得阵",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"阵\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst spd = 1 + (lvl - 1) * 3;\nconst dur = 1 + (lvl - 1);\n\neff.changes[0].value = String(spd);\neff.duration = { rounds: dur };\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"阵\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.duration = { rounds: 1 + (lvl - 1) };\neff.changes[0].value = String(1 + (lvl - 1) * 3);\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #3498db; background:rgba(52,152,219,0.1);\"><b>阵：</b>速度加成已应用。<br>移动时不会被《趁虚而入》，请手动处理。</div></div>`\n});"
                         }
                     ]
                 },
@@ -863,8 +871,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>若有敌人处于半空中，可消耗反应动作释放此招，做智拳印，气生于内而活于野，遮天蔽日辉曜十方，对其造成伤害，将其击飞三米，并使其陷入目盲一回合。</p><p><strong>升级：</strong>招式伤害+10，目盲回合+1，内力消耗+4。</p>",
-                    "automationNote": "命中目盲自动。击飞手动。",
+                    "description": "<p>若有敌人处于半空中，可消耗反应动作释放此招，做智拳印，气生于内而活于野，遮天蔽日辉曜十方，对其造成 0.7 力量点内功伤害，将其击飞三米，并使其陷入目盲一回合。</p><p><strong>升级：</strong>招式伤害+10，目盲回合+1，内力消耗+4。</p>",
+                    "automationNote": "目盲自动。击飞发送卡片提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -885,10 +893,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加目盲",
+                            "label": "击飞与目盲",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        const lvl = Math.max(1, move.computedLevel || 1);\n        data.duration = { rounds: 1 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #e67e22; background:rgba(230,126,34,0.1);\"><b>击飞：</b>将 ${args.target.name} 击飞 3 米！</div></div>`\n    });\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"blind\", duration: { rounds: 1 + (lvl - 1) } });\n}"
                         }
                     ]
                 },
@@ -901,8 +909,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，做日轮印，一气生五元，对敌人造成伤害，击破架招时，敌人受到“生克煎熬”，持续到战斗脱离。</p><p><strong>生克煎熬：</strong>每次出招，内外功伤害类型随机变化（投掷 D20，奇数外，偶数内，影响命中暴击）。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击破施加BUFF自动。随机伤害类型需玩家出招时手动投掷裁定。",
+                    "description": "<p>主要动作，做日轮印，一气生五元，对敌人造成 0.4 力量+0.3 内息点内功伤害，击破架招时，敌人受到“生克煎熬”，持续到战斗脱离。</p><p><strong>生克煎熬：</strong>每次出招，内外功伤害类型随机变化（投掷 D20，奇数外，偶数内，影响命中暴击）。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "击破施加状态自动。出招前需受害者手动投掷D20并在弹窗中切换伤害类型。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -929,26 +937,32 @@
                         {
                             "label": "施加生克煎熬",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"生克煎熬\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"生克煎熬\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #c0392b; background:rgba(192,57,43,0.1);\"><b>生克煎熬：</b>${args.target.name} 陷入生克煎熬。<br>每次出招前需手动投掷 D20，奇数外功，偶数内功，并在配置弹窗中手动切换伤害类型！</div></div>`\n    });\n}"
                         }
                     ]
                 },
                 {
                     "name": "行",
                     "type": "qi",
-                    "actionType": "heal",
+                    "actionType": "buff",
                     "element": "yang",
                     "damageType": "none",
                     "weaponType": "unarmed",
                     "range": "3米",
-                    "targetInfo": "范围",
+                    "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>反应动作，做宝瓶印，周身大放光芒，气劲传输队友，给自己和一名队友添加 0.1 内息点护体真气，持续到战斗脱离。</p><p><strong>升级：</strong>护体真气+10，内力消耗+8。</p>",
-                    "automationNote": "计算护体自动。应用效果自动。请选中自己和队友。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
-                        "growth": 0
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.1
+                            }
+                        ]
                     },
                     "costs": {
                         "mp": [
@@ -960,10 +974,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "添加护体",
+                            "label": "给队友护体",
                             "trigger": "hit",
-                            "script": "// 计算数值\nconst neixi = actor.system.stats.neixi.total;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = Math.floor(neixi * 0.1) + (lvl - 1) * 10;\n\nawait args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });",
-                            "active": true
+                            "active": true,
+                            "script": "// 系统已算好包含所有加成的强度，保存在 baseAmount 中\nawait args.target.applyHealing({ amount: args.baseAmount, type: \"huti\", showScrolling: true });"
+                        },
+                        {
+                            "label": "给自己护体",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "await actor.applyHealing({ amount: args.baseAmount, type: \"huti\", showScrolling: true });"
                         }
                     ]
                 },
@@ -977,8 +997,8 @@
                     "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，两掌合十，气劲化作九字在周身环绕，内力气血如沧海波涛，连绵不绝，摧枯拉朽，对范围内敌人造成伤害。</p><p>·若本场战斗你已施展过【临兵斗者皆阵列前行】九招，招式伤害还会提升你【（消耗气血+消耗内力）/2】的数值。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，距离+1。</p>",
-                    "automationNote": "百分比消耗需手动计算并扣除。九招计数与加伤需手动。",
+                    "description": "<p>主要动作，两掌合十，气劲化作九字在周身环绕，内力气血如沧海波涛，连绵不绝，摧枯拉朽，对范围内敌人造成 1.0 力量点内功伤害。</p><p>·若本场战斗你已施展过【临兵斗者皆阵列前行】九招，招式伤害还会提升你【（消耗气血+消耗内力）/2】的数值。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，距离+1。</p>",
+                    "automationNote": "百分比扣除资源自动。九招前置条件通过弹窗询问，确认后自动计算并附加巨额伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -990,6 +1010,18 @@
                         ]
                     },
                     "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        "hp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
                         "rage": [
                             8,
                             7,
@@ -999,10 +1031,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗提示",
+                            "label": "扣除气血内力",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "const hpCost = Math.floor(S.resources.hp.max * 0.5);\nconst mpCost = Math.floor(S.resources.mp.max * 0.5);\nargs.costConfig.hp = hpCost;\nargs.costConfig.mp = mpCost;"
+                        },
+                        {
+                            "label": "询问九字连招",
                             "trigger": "attack",
-                            "script": "const maxHp = actor.system.resources.hp.max;\nconst maxMp = actor.system.resources.mp.max;\nconst hpCost = Math.floor(maxHp * 0.5);\nconst mpCost = Math.floor(maxMp * 0.5);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"九印合一消耗\" },\n    content: `<p>需消耗 <b>${hpCost}</b> 气血和 <b>${mpCost}</b> 内力。</p><p>确认施展？</p>`,\n    yes: { label: \"确认 (自动扣除)\" },\n    no: { label: \"取消\" }\n});\n\nif (confirm) {\n    await actor.applyHealing({ amount: -hpCost, type: \"hp\", showScrolling: true });\n    await actor.applyHealing({ amount: -mpCost, type: \"mp\", showScrolling: true });\n    \n    // 提示加伤公式\n    const bonus = Math.floor((hpCost + mpCost) / 2);\n    ui.notifications.info(`已扣除资源。若满足九招前置，请手动添加额外伤害: ${bonus}`);\n} else {\n    args.flags.abort = true;\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"九印合一\" },\n    content: `<p>是否在本场战斗中，已经完整施展过【临、兵、斗、者、皆、阵、列、前、行】前九招？</p>`,\n    yes: { label: \"是 (增加巨额伤害)\" },\n    no: { label: \"否\" }\n});\n\nif (confirm) {\n    const hpUsed = args.costConsumed.hp;\n    const mpUsed = args.costConsumed.mp;\n    const bonus = Math.floor((hpUsed + mpUsed) / 2);\n    \n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 九印共鸣: ${bonus} (消耗气血+内力的一半)`;\n    \n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #ff4500; background:rgba(255,69,0,0.1);\"><b>九字真言，天地无匹！</b><br>触发完美连招，额外附加 ${bonus} 点伤害！</div></div>`\n    });\n}"
                         }
                     ]
                 }
@@ -1010,13 +1048,14 @@
             "effects": [
                 {
                     "name": "不动",
-                    "icon": "icons/svg/shield.svg",
-                    "description": "免疫击退击飞等控制。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "免疫点穴、击退、击飞、击倒、错骨。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "budong",
-                            "stackable": false
+                            "stackable": false,
+                            "tiedToStance": true
                         }
                     },
                     "duration": {
@@ -1026,8 +1065,8 @@
                 },
                 {
                     "name": "避凶",
-                    "icon": "icons/svg/angel.svg",
-                    "description": "全检定+1。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "技能、伤残、死亡检定、虚招对抗结果+1。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1037,7 +1076,12 @@
                     },
                     "changes": [
                         {
-                            "key": "flags.xjzl-system.globalCheckLevel",
+                            "key": "system.combat.xuzhao",
+                            "mode": 2,
+                            "value": "1"
+                        },
+                        {
+                            "key": "system.combat.kanpo",
                             "mode": 2,
                             "value": "1"
                         }
@@ -1045,8 +1089,8 @@
                 },
                 {
                     "name": "阵",
-                    "icon": "icons/svg/wing.svg",
-                    "description": "速度+1，免疫趁虚。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "速度增加，移动时不会被《趁虚而入》。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1058,13 +1102,13 @@
                         {
                             "key": "system.combat.speed",
                             "mode": 2,
-                            "value": "0"
+                            "value": "1"
                         }
                     ]
                 },
                 {
                     "name": "生克煎熬",
-                    "icon": "icons/svg/daze.svg",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
                     "description": "每次出招，内外功伤害类型随机变化（投掷 D20，奇数外，偶数内，影响命中暴击）。",
                     "transfer": false,
                     "flags": {
