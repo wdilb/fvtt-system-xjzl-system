@@ -1423,7 +1423,8 @@
             "moves": [
                 {
                     "name": "混沌为一",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "element": "none",
                     "damageType": "none",
                     "weaponType": "none",
@@ -1436,17 +1437,34 @@
                         "base": 10,
                         "growth": 10
                     },
-                    "scripts": [
-                        {
-                            "label": "护体触发",
-                            "trigger": "damaged",
-                            "script": "if (args.isBroken) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const base = 10 + (lvl - 1) * 10;\n    const qigan = actor.system.stats.qigan.total;\n    const amount = base + Math.floor(qigan / 10);\n    \n    await actor.applyHealing({amount: amount, type: \"huti\", showScrolling: true});\n}",
-                            "active": true
-                        }
-                    ]
+                    "costs": {
+                        "mp": []
+                    },
+                    "scripts": []
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "混沌为一（被动特效）",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "被击破架招时自动获取护体。",
+                "transfer": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "hundunweiyi",
+                        "scripts": [
+                            {
+                                "label": "护体触发",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "if (args.isBroken) {\n    const wuxueItem = actor.items.find(i => i.name === \"混沌为一\" && i.type === \"wuxue\");\n    const moveData = wuxueItem?.system.moves.find(m => m.name === \"混沌为一\");\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const base = 10 + (lvl - 1) * 10;\n    const qigan = actor.system.stats.qigan.total || 0;\n    const amount = base + qigan;\n    \n    await actor.applyHealing({amount: amount, type: \"huti\", showScrolling: true});\n    \n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:#2980b9; font-weight:bold;\"><i class=\"fas fa-shield-alt\"></i> 混沌为一</p><p>架招被击破，感悟万物，获得 <b>${amount}</b> 点护体真气！</p></div>`\n    });\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     },
     {
         "name": "千象万化手",
@@ -1463,6 +1481,7 @@
                 {
                     "name": "千象万化手",
                     "type": "qi",
+                    "actionType": "buff",
                     "element": "none",
                     "damageType": "none",
                     "weaponType": "unarmed",
@@ -1470,7 +1489,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>手展姿势，奇异变幻，使目标敌人产生幻象，你进行[巧手]检定，将结果与目标的[忍耐]检定对抗，若你胜利，则敌人脑海紊乱，恶心干呕，陷入“迟滞”，持续一回合。</p><p><strong>升级：</strong>[巧手]结果+2，持续回合+1，内力消耗+2。</p>",
-                    "automationNote": "对抗需手动。迟滞施加需手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1484,10 +1503,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "对抗提示",
+                            "label": "幻象对抗",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\nconst rounds = 1 + (lvl - 1);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">千象万化手</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请进行 <b>巧手</b> 检定 (结果 +${bonus})。</p>\n            <p>目标进行 <b>忍耐</b> 检定。</p>\n            <p>若你胜利，请手动给目标施加 [迟滞] (持续 ${rounds} 回合)。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst attBonus = (lvl - 1) * 2;\nconst rounds = lvl; // 1 + (lvl - 1)\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"qiaoshou\",\n    defType: \"rennai\",\n    attBonus: attBonus,\n    label: \"千象万化手 - 幻象迷惑\",\n    outcome: {\n        win: {\n            text: \"目标脑海紊乱，恶心干呕，陷入迟滞！\",\n            targetEffect: { id: \"chizhi\", duration: { rounds: rounds } }\n        },\n        lose: {\n            text: \"目标看破了你的幻象，并未受到影响。\"\n        }\n    }\n});"
                         }
                     ]
                 }
