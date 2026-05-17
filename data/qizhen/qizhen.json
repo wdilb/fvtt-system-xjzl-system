@@ -1124,5 +1124,48 @@
                 }
             }
         ]
+    },
+    {
+        "name": "赤蛇冰蟾",
+        "type": "qizhen",
+        "img": "systems/xjzl-system/assets/icons/qizhen/奇珍3.png",
+        "system": {
+            "quantity": 1,
+            "price": 2250,
+            "quality": 3,
+            "description": "<p>极为罕见的毒物与奇物伴生之兆。</p><br><p><strong>效果：</strong>服食效果：内息+20。</p><p>你在濒死状态下可以使用内力抵消毒素伤害，每点内力可以抵消 5 点。</p>",
+            "automationNote": "完全自动化。",
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "赤蛇冰蟾",
+                "icon": "systems/xjzl-system/assets/icons/qizhen/奇珍3.png",
+                "transfer": true,
+                "disabled": false,
+                "description": "内息+20。濒死状态下内力抵消毒伤。",
+                "changes": [
+                    {
+                        "key": "system.stats.neixi.mod",
+                        "mode": 2,
+                        "value": "20"
+                    }
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "chishebingchan",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "以气御毒",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "if (args.type === 'poison' && actor.system.resources.hp.value <= 0) {\n    const dmg = args.output.damage;\n    if (dmg <= 0) return;\n    const mpCurrent = actor.system.resources.mp.value;\n    if (mpCurrent <= 0) return;\n    \n    const costNeed = Math.ceil(dmg / 5);\n    const actualCost = Math.min(costNeed, mpCurrent);\n    const reduceDmg = actualCost * 5;\n    \n    args.output.damage = Math.max(0, dmg - reduceDmg);\n    actor.update({\"system.resources.mp.value\": mpCurrent - actualCost});\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #27ae60; background:rgba(39,174,96,0.1); padding:6px;\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-shield-virus\"></i> 赤蛇冰蟾：以气御毒！</div><div style=\"font-size:0.9em; margin-top:4px;\">濒死毒发，自动消耗 <b>${actualCost}</b> 点内力，抵消了 <b>${Math.min(dmg, reduceDmg)}</b> 点毒素伤害！</div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     }
 ]
