@@ -221,8 +221,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，刀卷黄沙，旋转袭敌，对目标造成伤害，击破架招时，使其陷入“目盲”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破目盲自动。",
+                    "description": "<p>主要动作，刀卷黄沙，旋转袭敌，对目标造成 0.4 内息点内功伤害，击破架招时，使其陷入“目盲”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -244,7 +244,7 @@
                         {
                             "label": "击破目盲",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"blind\", true);\n    ui.notifications.info(`${args.target.name} 双目被黄沙迷障！`);\n}",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, 'blind', true);\n    ui.notifications.info(`${args.target.name} 双目被黄沙迷障！`);\n}",
                             "active": true
                         }
                     ]
@@ -258,8 +258,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，狂风扫沙，当头一刀，对目标及其周围 1 米的敌人造成伤害。</p><p>·若你处于重伤（气血 50%以下），伤害+10。</p><p>·若你处于奄奄一息（气血 10%以下），伤害再+10</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "血量判断加伤自动。范围攻击手动选目标。",
+                    "description": "<p>蓄力动作，狂风扫沙，当头一刀，对目标及其周围 1 米的敌人造成 0.4 内息点内功伤害。</p><p>·若你处于重伤（气血 50%以下），伤害+10。</p><p>·若你处于奄奄一息（气血 10%以下），伤害再+10</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -279,9 +279,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "绝境加伤",
+                            "label": "绝境加伤预览",
                             "trigger": "calc",
-                            "script": "const hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nconst pct = hp / maxHp;\n\nlet bonus = 0;\nif (pct <= 0.5) bonus += 10;\nif (pct <= 0.1) bonus += 10;\n\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`绝境加伤 +${bonus}`);\n}",
+                            "script": "const hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nconst pct = hp / maxHp;\nlet bonus = 0;\nif (pct <= 0.5) bonus += 10;\nif (pct <= 0.1) bonus += 10;\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`绝境加伤 +${bonus}`);\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "绝境加伤播报",
+                            "trigger": "attack",
+                            "script": "const hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nconst pct = hp / maxHp;\nlet bonus = 0;\nif (pct <= 0.5) bonus += 10;\nif (pct <= 0.1) bonus += 10;\nif (bonus > 0) {\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #e67e22; background: rgba(230, 126, 34, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#d35400;'><i class='fas fa-fire'></i> 绝境爆发</div><div style='font-size:0.9em; color:#555; margin-top:3px;'>触发绝境加伤，招式额外造成 <span style='color:#e67e22; font-weight:bold;'>\" + bonus + \"</span> 点伤害！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}",
                             "active": true
                         }
                     ]
@@ -297,7 +303,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，刀浪如沙，铺天盖地，使自身获得“刀浪”状态，持续一回合。</p><p><strong>刀浪：</strong>你的招式伤害+10，虚招值+1。</p><p>·若你处于重伤，则伤害+10，虚招值+2。</p><p>·若你处于奄奄一息，则伤害+20，虚招值+4。</p><p><strong>升级：</strong>持续回合+1，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。根据血量获得对应强度的BUFF。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -316,9 +322,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得刀浪",
+                            "label": "赋予刀浪",
                             "trigger": "hit",
-                            "script": "const hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nconst pct = hp / maxHp;\n\nlet dmgBonus = 10;\nlet feintBonus = 1;\n\nif (pct <= 0.5) {\n    dmgBonus = 10; \n    feintBonus = 2;\n}\nif (pct <= 0.1) {\n    dmgBonus = 20;\n    feintBonus = 4;\n}\n\n// 获取模板\nconst eff = thisItem.effects.getName(\"刀浪\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 写入数值\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.duration = { rounds: 1 + (lvl - 1) };\neff.changes[0].value = String(dmgBonus);\neff.changes[1].value = String(feintBonus);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`获得 [刀浪] (伤+${dmgBonus}, 虚+${feintBonus})`);",
+                            "script": "const eff = thisItem.effects.getName('刀浪').toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.duration = { rounds: 1 + (lvl - 1) };\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -327,13 +333,13 @@
                     "name": "破沙裂天",
                     "type": "counter",
                     "element": "rou",
-                    "damageType": "neigong",
+                    "damageType": "liushi",
                     "weaponType": "blade",
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>看破虚招时，消耗反应动作施展，刀气如锋，后发先至，斩向目标，压制目标虚招，使目标流失【此次压制虚招伤害】等额的气血（不会造成暴击）。</p><p><strong>升级：</strong>流失气血+10，内力消耗+2。</p>",
-                    "automationNote": "伤害计算自动。注意：此招式本身造成内功伤害，描述中的“流失等额气血”在本系统中被视为此次攻击的效果，即直接造成伤害，并禁用了暴击。",
+                    "automationNote": "半自动化。出招时会弹窗让玩家手动输入目标虚招的伤害并加上去。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -347,6 +353,12 @@
                         ]
                     },
                     "scripts": [
+                        {
+                            "label": "虚招数值补充",
+                            "trigger": "attack",
+                            "script": "const confirm = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '破沙裂天 - 虚招压制' },\n    content: '<p>看破对方虚招！请输入对方此次<b>虚招伤害</b>的面板数值：</p><input type=\"number\" name=\"dmgVal\" value=\"0\" style=\"text-align:center;\">',\n    ok: {\n        label: '确定',\n        callback: (ev, btn) => parseInt(new FormData(btn.form).get('dmgVal')) || 0\n    }\n});\nif (confirm) {\n    args.flags.damageResult.damage += confirm;\n    args.flags.damageResult.breakdown += `\\n+ 压制虚招: ${confirm}`;\n}",
+                            "active": true
+                        },
                         {
                             "label": "禁用暴击",
                             "trigger": "preDamage",
@@ -365,8 +377,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，连绵风沙，凌厉席卷，对周围敌人造成伤害，击中无架招目标使其流失 50 点气血。</p><p>·若自身处于奄奄一息（气血 10%以下），则使所有敌人陷入“封招”一回合。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+8，怒气消耗-1。</p>",
-                    "automationNote": "无架招流失自动。绝境封招自动。",
+                    "description": "<p>蓄力动作，连绵风沙，凌厉席卷，对周围敌人造成 0.7 内息点内功伤害，击中无架招目标使其流失 50 点气血。</p><p>·若自身处于奄奄一息（气血 10%以下），则使所有敌人陷入“封招”一回合。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+8，怒气消耗-1。</p>",
+                    "automationNote": "全自动化。无架招目标流失伤害自动结算；自动检测气血附加封招状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -391,9 +403,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "流失与封招",
+                            "label": "无架招流失与绝境封招",
                             "trigger": "hit",
-                            "script": "// 1. 无架招流失\nif (!args.target.system.martial.stanceActive) {\n    await args.target.applyHealing({ amount: -50, type: \"hp\", showScrolling: true });\n}\n\n// 2. 绝境封招\nconst hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nif (hp / maxHp <= 0.1) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n       const data = foundry.utils.deepClone(eff);\n       data.duration = { rounds: 1 };\n       await game.xjzl.api.effects.addEffect(args.target, data);\n       ui.notifications.info(`${args.target.name} 被绝境风沙封招！`);\n    }\n}",
+                            "script": "if (!args.target.system.martial?.stanceActive) {\n    await args.target.applyDamage({ amount: 50, type: 'liushi', attacker: actor, isHit: true, ignoreDefense: true, ignoreBlock: true, ignoreStance: true });\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#8b0000;'><i class='fas fa-tint'></i> 黄沙葬骸</div><div style='font-size:0.9em; color:#555; margin-top:3px;'><b>\" + args.target.name + \"</b> 未开启架招，被风沙侵入心肺，受到流失伤害！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}\n\nconst hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nif (hp / maxHp <= 0.1) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: 'fengzhao', duration: { rounds: 1 } });\n    const msg2 = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #2980b9; background: rgba(41, 128, 185, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#154360;'><i class='fas fa-lock'></i> 绝境反击</div><div style='font-size:0.9em; color:#555; margin-top:3px;'><b>\" + args.target.name + \"</b> 受到强震，陷入<span style='color:red; font-weight:bold;'>封招</span>！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg2 });\n}",
                             "active": true
                         }
                     ]
@@ -403,24 +415,38 @@
                 {
                     "name": "刀浪",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "description": "提升招式伤害与虚招值。",
+                    "description": "刀卷黄沙，提升招式伤害与虚招值。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "daolang",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "绝境加成预览",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "const hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nconst pct = hp / maxHp;\nlet dmgBonus = 0;\nlet feintBonus = 0;\nif (pct <= 0.5) { dmgBonus += 10; feintBonus += 1; }\nif (pct <= 0.1) { dmgBonus += 10; feintBonus += 2; }\nif (dmgBonus > 0) {\n    args.output.damage += dmgBonus;\n    args.output.feint += feintBonus;\n    args.output.bonusDesc.push('刀浪绝境强化');\n}"
+                                },
+                                {
+                                    "label": "绝境加成播报",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "const hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nconst pct = hp / maxHp;\nif (pct <= 0.5) {\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #d35400; background: rgba(211, 84, 0, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#c0392b;'><i class='fas fa-wind'></i> 绝境刀浪</div><div style='font-size:0.9em; color:#555; margin-top:3px;'>刀浪效果大幅增强！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                                }
+                            ]
                         }
                     },
                     "changes": [
                         {
                             "key": "system.combat.damages.skill.mod",
                             "mode": 2,
-                            "value": "0"
+                            "value": "10"
                         },
                         {
                             "key": "system.combat.xuzhao",
                             "mode": 2,
-                            "value": "0"
+                            "value": "1"
                         }
                     ]
                 }
@@ -487,7 +513,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>需在无架招状态下施展，次要动作，放弃防御，本回合内，击中无架招目标时招式伤害+10，并立即结束自己的回合，之后使自己和目标同时陷入“眩晕”一回合。</p><p><strong>升级：</strong>招式伤害再+10，内力消耗+2。</p>",
-                    "automationNote": "应用BUFF自动。BUFF触发伤害与眩晕自动。",
+                    "automationNote": "全自动化。自动限制无架招施展；获得的BUFF会自动在攻击无架招目标时增加真实面板伤害；命中后双方眩晕及结束回合自动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -506,10 +532,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "应用无上形",
+                            "label": "无架招出招限制",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.system.martial?.stanceActive) {\n    args.flags.abort = true;\n    args.flags.abortReason = '无上形必须在无架招状态下施展！';\n}"
+                        },
+                        {
+                            "label": "赋予无上形状态",
                             "trigger": "hit",
-                            "script": "if (actor.system.martial.stanceActive) return ui.notifications.warn(\"必须在无架招状态下施展！\");\n\nconst eff = thisItem.effects.getName(\"无上形\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态计算加伤\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 10;\neff.flags[\"xjzl-system\"].wushangxingDmg = dmgBonus;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName('无上形').toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = 10 + (lvl - 1) * 10;\neff.flags['xjzl-system'] = eff.flags['xjzl-system'] || {};\neff.flags['xjzl-system'].wushangxingDmg = dmgBonus;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -555,7 +587,7 @@
                 {
                     "name": "无上形",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "击中无架招目标增伤并眩晕双方。",
+                    "description": "放弃防御，本回合击中无架招目标时增加伤害，随后双方陷入眩晕。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -563,16 +595,16 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "触发效果",
-                                    "trigger": "hit",
+                                    "label": "无架招增伤",
+                                    "trigger": "preDamage",
                                     "active": true,
-                                    "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 应用眩晕\n    await game.xjzl.api.effects.toggleStatus(actor, \"xuanyun\", true);\n    await game.xjzl.api.effects.toggleStatus(args.target, \"xuanyun\", true);\n    ui.notifications.info(\"无上形触发：双方眩晕！\");\n    \n    // 移除自身Buff (一次性)\n    await thisEffect.delete();\n}"
+                                    "script": "if (!args.target.system.martial?.stanceActive) {\n    const bonus = thisEffect.getFlag('xjzl-system', 'wushangxingDmg') || 10;\n    args.config.amount += bonus;\n}"
                                 },
                                 {
-                                    "label": "攻击加伤",
-                                    "trigger": "attack",
+                                    "label": "触发反噬眩晕与结束回合",
+                                    "trigger": "hit",
                                     "active": true,
-                                    "script": "if (!args.target) return;\n// 判断目标是否无架招 (注意：这里是在 Attack 阶段判断目标状态，符合逻辑)\nif (!args.target.system.martial.stanceActive) {\n    const bonus = thisEffect.getFlag(\"xjzl-system\", \"wushangxingDmg\") || 10;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 无上形: ${bonus}`;\n}"
+                                    "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const bonus = thisEffect.getFlag('xjzl-system', 'wushangxingDmg') || 10;\n    const stunData = { id: 'xuanyun', duration: { rounds: 1 } };\n    await game.xjzl.api.effects.addEffect(actor, stunData);\n    await game.xjzl.api.effects.addEffect(args.target, stunData);\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#d35400;'><i class='fas fa-bolt'></i> 无上形 爆发</div><div style='font-size:0.9em; color:#555; margin-top:3px;'>无上形反噬！招式附加了 <span style='color:red; font-weight:bold;'>\" + bonus + \"</span> 点伤害，且双方陷入<span style='color:red; font-weight:bold;'>眩晕</span>！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    if (game.combat && game.combat.combatant?.actorId === actor.id) {\n        await game.combat.nextTurn();\n    }\n    await thisEffect.delete();\n}"
                                 }
                             ]
                         }
@@ -584,7 +616,7 @@
                 },
                 {
                     "name": "癫狂",
-                    "icon": "icons/svg/skull.svg",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "状态效果替换。",
                     "transfer": false,
                     "flags": {
