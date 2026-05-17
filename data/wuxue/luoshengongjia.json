@@ -38,8 +38,7 @@
                             2,
                             3
                         ]
-                    },
-                    "scripts": []
+                    }
                 },
                 {
                     "name": "铁索连环",
@@ -51,7 +50,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>环环相扣，一拍即合，向目标射出特制勾爪，造成 0.3 力量点外功伤害，命中无架招敌人时为其添加“捆锁”，持续到挣脱捆锁。</p><p>·你可以拖拽该处于“捆锁”的目标，你每移动 1 米目标被你拖拽 1 米，并受到 1 点流血伤害，若目标处于倒地状态，则受到双倍的流血伤害。该流血伤害在你的回合末结算。</p><p><strong>捆锁：</strong>你陷入“禁足”。在你的每个回合末，可以不消耗动作进行[挣脱]检定（难度 13），成功则移除捆锁。</p><p><strong>升级：</strong>招式伤害+5，[挣脱]难度+2，内力消耗+1。</p>",
-                    "automationNote": "无架招施加禁足自动。拖拽与流血手动。挣脱检定手动。",
+                    "automationNote": "无架招施加捆锁自动。拖拽流血及挣脱检定需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -73,7 +72,7 @@
                         {
                             "label": "施加捆锁",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.toggleStatus(args.target, \"root\", true);\n    ui.notifications.info(`${args.target.name} 被捆锁(禁足)！`);\n}",
+                            "script": "const buff = thisItem.effects.getName(\"捆锁\");\nif (buff && args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = buff.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被捆锁(禁足)！`);\n}",
                             "active": true
                         }
                     ]
@@ -110,7 +109,7 @@
                         {
                             "label": "施加目盲",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"blind\", duration: { rounds: 1 } });\n}",
                             "active": true
                         }
                     ]
@@ -148,11 +147,36 @@
                             6,
                             5
                         ]
-                    },
-                    "scripts": []
+                    }
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "捆锁",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "被锁链捆绑。陷入“禁足”。回合末可不消耗动作进行挣脱检定。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kunsuo",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.forceSpeedZero",
+                        "mode": 5,
+                        "value": "true"
+                    },
+                    {
+                        "key": "flags.xjzl-system.forceDodgeZero",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "追魂夺命钩",
@@ -176,7 +200,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>一钩在前，一钩在后，前钩重掏，后钩轻扯，造成 0.4 力量点外功伤害。命中无架招敌人时给对方添加一层“易伤”，持续到战斗脱离。</p><p><strong>易伤：</strong>受到伤害时（包括特殊伤害），每有一层“易伤”流失 10 点气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无架招施加易伤自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -198,7 +222,7 @@
                         {
                             "label": "施加易伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.toggleStatus(args.target, \"yishang\", true);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"yishang\", 1);\n}",
                             "active": true
                         }
                     ]
@@ -213,7 +237,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>前钩为引，大力一掷，后钩为桩，巧力相随，对目标造成 0.5 力量点外功伤害，若目标处于“易伤”，此招式的距离变为 10 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "伤害自动。距离变化手动判断。",
+                    "automationNote": "易伤时的距离增加需手动判断。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -230,8 +254,7 @@
                             4,
                             6
                         ]
-                    },
-                    "scripts": []
+                    }
                 },
                 {
                     "name": "命悬一线",
@@ -243,7 +266,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>飞身跃起（半空中），抡钩一击，造成 0.5 力量点外功伤害，并将目标击倒。</p><p>·若有敌人处于半空状态，你可以消耗反应动作释放此招，飞身伤敌。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击倒自动。反应动作释放手动。",
+                    "automationNote": "命中击倒自动。作为反应动作释放时需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -265,7 +288,7 @@
                         {
                             "label": "击倒",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.toggleStatus(args.target, \"prone\", true);\n}",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\", 1);\n}",
                             "active": true
                         }
                     ]
@@ -280,7 +303,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招的时候，可以消耗反应动作压制对方虚招。搏命反击，造成 0.3 力量点外功伤害，并回复造成伤害（扣除防御格挡前）等额的气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "伤害与回血自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -302,7 +325,7 @@
                         {
                             "label": "伤害回血",
                             "trigger": "hit",
-                            "script": "const heal = Math.floor(args.damageResult.damage);\nif (heal > 0) {\n    await actor.applyHealing({amount: heal, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`回光返照：吸取生命 ${heal}`);\n}",
+                            "script": "const heal = Math.floor(args.damageResult.damage);\nif (heal > 0) {\n    await actor.applyHealing({amount: heal, type: \"hp\", showScrolling: true});\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:green; font-weight:bold;\"><i class=\"fas fa-heart\"></i> 回光返照</p><p>汲取了 <b>${heal}</b> 点气血！</p></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -318,14 +341,14 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双钩狂舞，冤魂漫天，对目标造成两次 0.4 力量点外功伤害。若目标处于易伤，额外造成一次 0.4 力量点外功伤害。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "基础伤害合并计算。若目标有易伤，自动追加额外伤害。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
                         "scalings": [
                             {
                                 "prop": "liliang",
-                                "ratio": 0.8
+                                "ratio": 0.4
                             }
                         ]
                     },
@@ -343,9 +366,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "易伤追加伤害",
+                            "label": "多段连击",
                             "trigger": "hit",
-                            "script": "const hasYishang = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishang\");\nif (hasYishang && args.isHit) {\n    // 追加一次 0.4 力量系数伤害（约为总伤害的一半）\n    const extraDmg = Math.floor(args.damageResult.damage / 2);\n    \n    await args.target.applyDamage({\n        amount: extraDmg,\n        type: args.move.damageType,\n        attacker: actor,\n        isHit: true,\n        ignoreBlock: args.damageResult.ignoreBlock,\n        ignoreDefense: args.damageResult.ignoreDefense,\n        ignoreStance: args.damageResult.ignoreStance\n    });\n    ui.notifications.info(`命断黄泉：易伤追加伤害 ${extraDmg}`);\n}",
+                            "script": "if (!args.isHit) return;\n// 基础算1次追加，如果有易伤算2次追加（加上面板自带的1次，合计为2或3次）\nconst hasYishang = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yishang\");\nconst extraTimes = hasYishang ? 2 : 1;\n\n// args.baseDamage 是算好了武器、0.4属性系数加成的纯面板伤害\nconst singleDmg = Math.floor(args.baseDamage);\n\n// 连续追加伤害\nfor (let i = 0; i < extraTimes; i++) {\n    await args.target.applyDamage({\n        amount: singleDmg,\n        type: args.move.damageType,\n        attacker: actor,\n        isHit: true,\n        ignoreBlock: args.config.ignoreBlock,\n        ignoreDefense: args.config.ignoreDefense,\n        ignoreStance: args.config.ignoreStance,\n        element: args.move.element,\n        move: args.move,\n        item: args.item,\n        source: \"move\"\n    });\n}\n\n// 发送卡片提示连击情况\nconst hitDesc = hasYishang ? \"目标处于易伤，连击爆发！承受了额外的 <b>两段</b> 攻击！\" : \"双钩乱舞，目标承受了额外的 <b>一段</b> 攻击！\";\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><div class=\"card-content-wrapper\"><p style=\"color:#8b0000; font-weight:bold;\"><i class=\"fas fa-skull\"></i> 命断黄泉 (多段追击)</p><p>${hitDesc}</p><p style=\"font-size:0.8em; color:#888;\">(每段攻击基准面板伤害: ${singleDmg})</p></div></div>`\n});",
                             "active": true
                         }
                     ]
@@ -375,7 +398,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>转动锁镰，对周围敌人造成 0.3 力量点外功伤害，命中无架招敌人时，给对方添加一层“易伤”，持续到战斗脱离。</p><p><strong>易伤：</strong>受到伤害时（包括特殊伤害），每有一层“易伤”流失 10 点气血。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无架招施加易伤自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -397,7 +420,7 @@
                         {
                             "label": "施加易伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.toggleStatus(args.target, \"yishang\", true);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"yishang\", 1);\n}",
                             "active": true
                         }
                     ]
@@ -412,7 +435,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>飞掷锁镰，盘绕捆绑目标，对其造成 0.5 力量点外功伤害，命中无架招敌人时，为其添加“捆锁”，持续到挣脱捆锁。</p><p>·你可以拖拽该处于“捆锁”的目标，你每移动 1 米目标被你拖拽 1 米，并受到 1 点流血伤害，若目标处于倒地状态，则受到双倍的流血伤害。该流血伤害在你的回合末结算。</p><p><strong>捆锁：</strong>你陷入“禁足”。在你的每个回合末，可以不消耗动作进行[挣脱]检定（难度 13），成功则移除捆锁。</p><p><strong>升级：</strong>招式伤害+10，[挣脱]难度+2，消耗+2。</p>",
-                    "automationNote": "无架招施加禁足自动。拖拽与流血手动。",
+                    "automationNote": "无架招施加捆锁自动。拖拽与流血需要手动扣减。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -434,7 +457,7 @@
                         {
                             "label": "施加捆锁",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.toggleStatus(args.target, \"root\", true);\n    ui.notifications.info(`${args.target.name} 被捆锁(禁足)！`);\n}",
+                            "script": "const buff = thisItem.effects.getName(\"捆锁\");\nif (buff && args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = buff.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被捆锁(禁足)！`);\n}",
                             "active": true
                         }
                     ]
@@ -449,7 +472,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>甩动锁镰，开启架招。格挡成功后，为目标添加一层“流血”，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡施加流血自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -465,7 +488,7 @@
                         {
                             "label": "反击流血",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await game.xjzl.api.effects.toggleStatus(args.attacker, \"bleed_stack\", true);\n    ui.notifications.info(`${args.attacker.name} 触发水月难寻，受到流血！`);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await game.xjzl.api.effects.addEffect(args.attacker, \"bleed_stack\", 1);\n    actor.showFloatyText(\"水月难寻触发！\", { fill: \"#FFA500\" });\n}",
                             "active": true
                         }
                     ]
@@ -480,7 +503,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作压制对方虚招，锁镰一收一放，借势进攻，对其造成 0.6 力量点外功伤害，同时为目标添加一层“流血”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "施加流血自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -502,7 +525,7 @@
                         {
                             "label": "施加流血",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.toggleStatus(args.target, \"bleed_stack\", true);",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\", 1);\n}",
                             "active": true
                         }
                     ]
@@ -518,7 +541,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>乱镰齐出，漫天飞锁，对目标造成 0.8 力量点外功伤害。若目标处于“捆锁”，将其击倒并甩动绕圈拖拽 10 米，再朝任意方向击飞 3 米。</p><p><strong>升级：</strong>伤害+20，拖拽+5 米，怒气-1，消耗+4。</p>",
-                    "automationNote": "对禁足目标自动击倒。拖拽与击飞手动。",
+                    "automationNote": "对捆锁目标自动击倒。拖拽与击飞手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -545,13 +568,39 @@
                         {
                             "label": "捆锁追击",
                             "trigger": "hit",
-                            "script": "// 检查是否处于禁足状态 (捆锁的系统Flag)\nconst isRooted = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"root\");\nif (isRooted) {\n    await game.xjzl.api.toggleStatus(args.target, \"prone\", true);\n    ui.notifications.info(`${args.target.name} 被天狗食月击倒！(请手动处理拖拽击飞)`);\n}",
+                            "script": "const isRooted = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kunsuo\");\nif (isRooted && args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\", 1);\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:#8b0000; font-weight:bold;\"><i class=\"fas fa-street-view\"></i> 天狗食月</p><p>目标已被击倒！请手动处理 <b>拖拽</b> 和 <b>击飞</b> 位移。</p></div>`\n    });\n}",
                             "active": true
                         }
                     ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "捆锁",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "被锁链捆绑。陷入“禁足”。回合末可不消耗动作进行挣脱检定。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kunsuo",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.forceSpeedZero",
+                        "mode": 5,
+                        "value": "true"
+                    },
+                    {
+                        "key": "flags.xjzl-system.forceDodgeZero",
+                        "mode": 5,
+                        "value": "true"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "殊途同死",
@@ -754,7 +803,7 @@
                         {
                             "label": "施加禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.toggleStatus(args.target, \"root\", true);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effect.toggleStatus(args.target, \"root\", true);\n}",
                             "active": true
                         }
                     ]
@@ -841,7 +890,7 @@
                                     "label": "合璧倒地",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "// 检查攻击来源是否为对对胡\nif (args.item && args.item.name.includes(\"对对胡\")) {\n    game.xjzl.api.toggleStatus(actor, \"prone\", true);\n    ui.notifications.info(`${actor.name} 触发合璧，倒地！`);\n}"
+                                    "script": "// 检查攻击来源是否为对对胡\nif (args.item && args.item.name.includes(\"对对胡\")) {\n    game.xjzl.api.effect.toggleStatus(actor, \"prone\", true);\n    ui.notifications.info(`${actor.name} 触发合璧，倒地！`);\n}"
                                 }
                             ]
                         }
