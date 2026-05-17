@@ -444,7 +444,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>毒覆全身，开启架招。格挡成功时，释放毒虫钻入对方衣襟，使对方获得一层“毒物”，最多三层，持续到战斗脱离。</p><p><strong>毒物：</strong>每次主动消耗内力时，每层毒物使自身受到 5 点毒素伤害。</p><p><strong>升级：</strong>格挡值+10，毒物最大层数+1，消耗+2。</p>",
-                    "automationNote": "格挡添加毒物自动。毒物效果自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -460,7 +460,7 @@
                         {
                             "label": "格挡-毒物",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 动态最大层数\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    effData.flags[\"xjzl-system\"].maxStacks = 3 + (lvl - 1);\n    \n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n}",
+                            "script": "if (!Macros.checkStance(actor, args) || !args.attacker) return;\nconst moveData = actor.items.find(i=>i.type==='wuxue' && i.system.moves.some(m=>m.name==='五毒俱全'))?.system.moves.find(m=>m.name==='五毒俱全');\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\nconst effData = thisItem.effects.getName(\"毒物\").toObject();\ndelete effData._id; effData.origin = thisItem.uuid;\neffData.flags[\"xjzl-system\"].maxStacks = 3 + (lvl - 1);\n\nawait game.xjzl.api.effects.addEffect(args.attacker, effData);",
                             "active": true
                         }
                     ]
@@ -475,7 +475,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>掌击毒砂，对目标造成伤害。若对方无架招，还会送出毒物啃啮目标，使对方获得一层“毒物”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无架招添加毒物自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -497,7 +497,7 @@
                         {
                             "label": "添加毒物",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const moveData = actor.items.find(i=>i.type==='wuxue' && i.system.moves.some(m=>m.name==='五毒俱全'))?.system.moves.find(m=>m.name==='五毒俱全');\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    \n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id; effData.origin = thisItem.uuid;\n    effData.flags[\"xjzl-system\"].maxStacks = 3 + (lvl - 1);\n    \n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
                             "active": true
                         }
                     ]
@@ -512,7 +512,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>看破对方虚招时，消耗反应动作释放，压制对方虚招，残酷反击，毒气侵敌，对其造成伤害。同时引起蛇虫欢鸣，啃噬躯干，对方每有一层“毒物”，额外受到 10 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，每层毒物伤害+5，消耗+2。</p>",
-                    "automationNote": "毒物额外伤害自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -533,8 +533,8 @@
                     "scripts": [
                         {
                             "label": "毒物爆发",
-                            "trigger": "attack",
-                            "script": "// 获取目标\nconst targets = game.user.targets;\nif (targets.size === 1) {\n    const target = targets.first().actor;\n    const duwu = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duwu\");\n    if (duwu) {\n        const stacks = duwu.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const lvl = Math.max(1, args.move.computedLevel || 1);\n        const extraDmg = stacks * (10 + (lvl - 1) * 5);\n        \n        args.flags.damageResult.damage += extraDmg;\n        args.flags.damageResult.breakdown += `\\n+ 毒物爆发: ${extraDmg}`;\n    }\n}",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst duwu = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duwu\");\nif (duwu) {\n    const stacks = duwu.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const extraDmg = stacks * (10 + (lvl - 1) * 5);\n    const dmgRes = await args.target.applyDamage({ amount: extraDmg, type: \"poison\", attacker: actor, isHit: true, ignoreBlock: true, ignoreStance: true, ignoreDefense: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #8e44ad; background:rgba(142,68,173,0.1); padding:6px;\"><div style=\"font-weight:bold; color:#5e3370;\"><i class=\"fas fa-spider\"></i> 心狠手辣：毒物爆发！</div><div style=\"font-size:0.9em; margin-top:4px;\">目标身上有 ${stacks} 层毒物，受到 <span style=\"color:red;font-weight:bold;\">${dmgRes.finalDamage}</span> 点真实毒素伤害！</div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}",
                             "active": true
                         }
                     ]
@@ -550,7 +550,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>至恶至毒，化为己用，双掌持毒齐出，对目标造成伤害，同时使对方获得一层“毒物”，持续到战斗脱离。</p><p>此时对方每有一层“毒物”，你凝毒化血，回复 10 点气血。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，额外给对方添加一层“毒物”，内力消耗+4。</p>",
-                    "automationNote": "添加毒物自动。回血自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -577,7 +577,7 @@
                         {
                             "label": "毒物处理",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 升级效果: 额外层数\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const stacksToAdd = 1 + (lvl - 1);\n    \n    // 循环添加 (因为 addEffect 每次加 1 层)\n    for(let i=0; i<stacksToAdd; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n    \n    // 回血逻辑\n    // 重新获取目标身上的层数\n    const duwu = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duwu\");\n    if (duwu) {\n        const currentStacks = duwu.getFlag(\"xjzl-system\", \"stacks\") || 0;\n        const heal = currentStacks * 10;\n        await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n    }\n}",
+                            "script": "if (args.isHit) {\n    const moveData = actor.items.find(i=>i.type==='wuxue' && i.system.moves.some(m=>m.name==='五毒俱全'))?.system.moves.find(m=>m.name==='五毒俱全');\n    const lvlStance = Math.max(1, moveData?.computedLevel || 1);\n    const effData = thisItem.effects.getName(\"毒物\").toObject();\n    delete effData._id; effData.origin = thisItem.uuid;\n    effData.flags[\"xjzl-system\"].maxStacks = 3 + (lvlStance - 1);\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const stacksToAdd = 1 + (lvl - 1);\n    \n    for(let i=0; i<stacksToAdd; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n    \n    const duwu = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duwu\");\n    const currentStacks = duwu ? (duwu.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n    const heal = currentStacks * 10;\n    if (heal > 0) {\n        await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -586,20 +586,20 @@
             "effects": [
                 {
                     "name": "毒物",
-                    "icon": "icons/creatures/invertebrates/scorpion-tail-poison-green.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
                     "description": "消耗内力时受到毒素伤害。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "duwu",
                             "stackable": true,
-                            "maxStacks": 3,
+                            "maxStacks": 0,
                             "scripts": [
                                 {
                                     "label": "噬心",
                                     "trigger": "attack",
                                     "active": true,
-                                    "script": "if (args.move && args.move.currentCost && args.move.currentCost.mp > 0) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = stacks * 5;\n    actor.applyDamage({\n        amount: dmg,\n        type: \"poison\",\n        isHit: true,\n        ignoreDefense: true\n    }).then(res => {\n        ui.notifications.info(`${actor.name} 毒物发作: -${res.finalDamage} HP`);\n    });\n}"
+                                    "script": "if (args.move && args.move.currentCost && args.move.currentCost.mp > 0) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = stacks * 5;\n    actor.applyDamage({ amount: dmg, type: \"poison\", isHit: true, ignoreDefense: true }).then(res => {\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #8e44ad; background:rgba(142,68,173,0.1); padding:4px;\"><span style=\"color:#5e3370; font-weight:bold;\"><i class=\"fas fa-spider\"></i> 毒物发作:</span> 损失 <span style=\"color:red;\">${res.finalDamage}</span> 点气血</div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    });\n}"
                                 }
                             ]
                         }
