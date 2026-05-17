@@ -697,7 +697,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>与对方进行[定力]对抗，若你胜利，则祸心乱神，动摇对方武道，令对方陷入“走火入魔”，持续一回合。</p><p><strong>升级：</strong>对抗结果+1，持续回合+1，内力消耗+4。</p>",
-                    "automationNote": "纯手动。弹出提示卡片，请手动进行对抗并施加[走火入魔]。",
+                    "automationNote": "命中后自动发起对抗，胜利自动施加[走火入魔]。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -712,10 +712,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "对抗提示",
+                            "label": "祸心乱神对抗",
                             "trigger": "hit",
-                            "script": "ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">倾城一笑 - 对抗提示</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>请与目标进行 <b>定力对抗</b>。</p>\n            <hr>\n            <p>若胜利，请手动给目标施加 [走火入魔] (rage) 状态。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 1;\nconst rounds = 1 + (lvl - 1);\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"shencai\",\n    defType: \"dingli\",\n    attBonus: bonus,\n    label: \"倾城一笑 - 祸乱心神\",\n    outcome: {\n        win: {\n            text: \"目标眼神涣散，动摇武道，走火入魔！\",\n            targetEffect: { id: \"rage\", duration: { rounds: rounds } }\n        },\n        lose: {\n            text: \"目标意志坚定，未被魅惑。\"\n        }\n    }\n});"
                         }
                     ]
                 }
