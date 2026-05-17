@@ -21,7 +21,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>倚剑而立，万劫不惧。造成伤害。若击破对方架招，额外增加一点怒气。</p><p>·若你虚招对抗失败，则受到 5 点气血流失。</p><p><strong>升级：</strong>招式伤害+5，受到额外 5 点气血流失，内力消耗+1。</p>",
-                    "automationNote": "击破回怒自动。对抗失败扣血需手动（系统无法检测对抗结果）。",
+                    "automationNote": "击破回怒自动。命中后发送卡片提醒玩家：若对抗失败需手动扣除气血。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -41,9 +41,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破回怒",
+                            "label": "击破回怒与失败提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value + 1});\n    ui.notifications.info(\"击破架招，怒气+1\");\n}",
+                            "script": "if (args.isBroken) {\n    await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value + 1});\n    ui.notifications.info(\"击破架招，怒气+1\");\n}\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst loss = 5 + (lvl - 1) * 5;\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #e74c3c; background:rgba(231,76,60,0.1); padding:6px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-exclamation-triangle\"></i> 剑鬼收劫反噬提醒</div><div style=\"font-size:0.9em; margin-top:4px;\">请留意后续的虚招对抗，<b>若你对抗失败</b>，请手动操作扣除 <span style=\"color:red;font-weight:bold;\">${loss}</span> 点气血！</div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
@@ -158,9 +158,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "残血暴击与穿透",
+                            "label": "残血暴击 (Attack阶段)",
                             "trigger": "attack",
-                            "script": "// 残血判定\nif (actor.system.resources.hp.value < (actor.system.resources.hp.max / 2)) {\n    args.flags.critThresholdMod += 2;\n}\n// 穿透询问\nif (actor.system.resources.rage.value >= 1) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"剑鬼贪杀\" },\n        content: `<p>是否消耗额外 1 点怒气以无视格挡？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value - 1});\n        args.flags.ignoreBlock = true;\n        ui.notifications.info(\"已消耗怒气，无视格挡！\");\n    }\n}",
+                            "script": "if (actor.system.resources.hp.value < (actor.system.resources.hp.max / 2)) {\n    args.flags.critThresholdMod += 2;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "穿透询问 (PreDamage阶段)",
+                            "trigger": "preDamage",
+                            "script": "if (actor.system.resources.rage.value >= 1 && !args.config.ignoreBlock) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"剑鬼贪杀\" },\n        content: `<p>是否消耗额外 1 点怒气以无视格挡？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value - 1});\n        args.config.ignoreBlock = true;\n        ui.notifications.info(\"已消耗怒气，无视格挡！\");\n    }\n}",
                             "active": true
                         }
                     ]
