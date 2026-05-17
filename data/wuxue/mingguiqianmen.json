@@ -1108,7 +1108,7 @@
             "sect": "jianghushili",
             "subSect": "qianmen",
             "tier": 2,
-            "description": "<p>奇爻异术起源于周易，掷出暗器，天决阴阳，形成卦象，自然产生异象。</p><p><strong>需求：</strong>暗器</p><p><strong>属性：</strong>太极</p><p>注：爻分阳和阴，当集齐三个爻时，会形成一个八卦卦符并产生效果，该效果持续两回合，然后卦符和爻消除。</p><p>坤：阴阴阴，周围 3 米友方增加 5 点格挡值。</p><p>艮：阳阴阴，周围 3 米范围变为困难地形。</p><p>坎：阴阳阴，本套路属性视为阴柔。</p><p>震：阴阴阳，造成伤害时，击退目标 1 米。</p><p>巽：阳阳阴，周围 3 米友方移动速度+3。</p><p>离：阳阴阳，本套路的招式造成伤害时，将额外对目标造成 10 点火焰伤害。</p><p>兑：阴阳阳，下一次本套路的招式命中无架招目标时，为目标添加缚身一回合，兑持续到战斗脱离。</p><p>乾：阳阳阳，立即给予自身两点怒气。</p>",
+            "description": "<p>奇爻异术起源于周易，掷出暗器，天决阴阳，形成卦象，自然产生异象。</p><p><strong>需求：</strong>暗器 <strong>属性：</strong>太极</p><p>注：爻分阳和阴，当集齐三个爻时，会形成一个八卦卦符并产生效果，该效果持续两回合，然后卦符和爻消除。</p><p>坤：阴阴阴，周围 3 米友方增加 5 点格挡值。</p><p>艮：阳阴阴，周围 3 米范围变为困难地形。</p><p>坎：阴阳阴，本套路属性视为阴柔。</p><p>震：阴阴阳，造成伤害时，击退目标 1 米。</p><p>巽：阳阳阴，周围 3 米友方移动速度+3。</p><p>离：阳阴阳，本套路的招式造成伤害时，将额外对目标造成 10 点火焰伤害。</p><p>兑：阴阳阳，下一次本套路的招式命中无架招目标时，为目标添加缚身一回合，兑持续到战斗脱离。</p><p>乾：阳阳阳，立即给予自身两点怒气。</p>",
             "requirements": "暗器",
             "moves": [
                 {
@@ -1121,7 +1121,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>御使暗器，绘制卦象，对敌人造成伤害。</p><p>击中无架招的敌人时，可给予自身一层随机爻（D20，奇数阴、偶数阳），持续到战斗脱离。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "命中获爻自动。卦象合成及所有光环/地形效果均为手动。",
+                    "automationNote": "完全自动化（部分卦象效果需手动，如果要手动调整阴阳，请配合合集包中的宏中的flags相关宏使用）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1141,9 +1141,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "随机爻",
+                            "label": "随机爻与八卦生成",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const r = await new Roll(\"1d20\").evaluate();\n    const isYang = (r.total % 2 === 0);\n    const effName = isYang ? \"阳爻\" : \"阴爻\";\n    const eff = thisItem.effects.getName(effName).toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(`获得 ${effName} (1d20=${r.total})`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const r = await new Roll(\"1d20\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n    const isYang = (r.total % 2 === 0);\n    const yaoStr = isYang ? \"yang\" : \"yin\";\n    const yaoName = isYang ? \"阳\" : \"阴\";\n    \n    let yaos = actor.getFlag(\"xjzl-system\", \"qiyao\") || [];\n    yaos.push(yaoStr);\n    \n    let msgHtml = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #9b59b6; background:rgba(155,89,182,0.1); padding:6px;\"><p>掷爻得: <b>${yaoName}爻</b> (d20=${r.total})</p><p>当前卦列: [${yaos.map(y=>y===\"yang\"?\"阳\":\"阴\").join(\", \")}]</p></div>`;\n    \n    if (yaos.length >= 3) {\n        const gua = yaos.join(\"\");\n        yaos = [];\n        msgHtml += `<div style=\"margin-top:5px; font-weight:bold; color:#8e44ad;\">三爻齐聚，化生八卦！</div>`;\n        \n        const guaMap = {\n            \"yinyinyin\": { name: \"坤\", eff: \"坤卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【坤卦】赋予周围3米内的其他友方。\" },\n            \"yangyinyin\": { name: \"艮\", eff: \"艮卦\", text: \"周围3米变为困难地形 (请GM处理)。\" },\n            \"yinyangyin\": { name: \"坎\", eff: \"坎卦\", text: \"本套路属性视为阴柔 (出招时请手动覆盖属性)。\" },\n            \"yinyinyang\": { name: \"震\", eff: \"震卦\", text: \"造成伤害时击退目标1米。\" },\n            \"yangyangyin\": { name: \"巽\", eff: \"巽卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【巽卦】赋予周围3米内的其他友方。\" },\n            \"yangyinyang\": { name: \"离\", eff: \"离卦\", text: \"本套路招式造成伤害时附带10点火焰伤害。\" },\n            \"yinyangyang\": { name: \"兑\", eff: \"兑卦\", text: \"下次本套路招式命中无架招目标时施加缚身。\" }\n        };\n        \n        if (gua === \"yangyangyang\") {\n            await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value + 2});\n            msgHtml += `<p style=\"color:#e67e22;\">【乾卦】现！立即获得 2 点怒气。</p>`;\n        } else {\n            const gData = guaMap[gua];\n            if (gData) {\n                const effData = thisItem.effects.getName(gData.eff)?.toObject();\n                if (effData) {\n                    delete effData._id; effData.origin = thisItem.uuid;\n                    await game.xjzl.api.effects.addEffect(actor, effData);\n                }\n                msgHtml += `<p style=\"color:#2980b9;\">【${gData.name}卦】现！${gData.text}</p>`;\n            }\n        }\n    }\n    await actor.setFlag(\"xjzl-system\", \"qiyao\", yaos);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msgHtml });\n}",
                             "active": true
                         }
                     ]
@@ -1158,7 +1158,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>变化算法，改变运势，将自己身上的一个爻转化为阴或阳。</p><p><strong>升级:</strong>内力消耗-10。</p>",
-                    "automationNote": "需手动移除旧爻添加新爻。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1169,7 +1169,15 @@
                             20,
                             10
                         ]
-                    }
+                    },
+                    "scripts": [
+                        {
+                            "label": "爻变翻转",
+                            "trigger": "attack",
+                            "script": "let yaos = actor.getFlag(\"xjzl-system\", \"qiyao\") || [];\nif (yaos.length === 0) {\n    ui.notifications.warn(\"当前身上没有爻，无法爻变！\");\n    args.flags.abort = true;\n    return;\n}\n\nlet radios = yaos.map((y, i) => `<label><input type=\"radio\" name=\"yaoIndex\" value=\"${i}\" ${i===0?'checked':''}> 第 ${i+1} 爻 (${y==='yang'?'阳':'阴'})</label><br>`).join('');\n\nconst chosenIndex = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"爻变\" },\n    content: `<p>请选择要反转的爻：</p><form>${radios}</form>`,\n    ok: { callback: (event, button) => parseInt(new FormData(button.form).get(\"yaoIndex\")) }\n});\n\nif (chosenIndex === null || chosenIndex === undefined) {\n    args.flags.abort = true; return;\n}\n\nyaos[chosenIndex] = (yaos[chosenIndex] === \"yang\") ? \"yin\" : \"yang\";\n\nlet msgHtml = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #3498db; background:rgba(52,152,219,0.1); padding:6px;\"><p>爻变成功！当前卦列: [${yaos.map(y=>y===\"yang\"?\"阳\":\"阴\").join(\", \")}]</p></div>`;\n\nif (yaos.length >= 3) {\n    const gua = yaos.join(\"\");\n    yaos = [];\n    msgHtml += `<div style=\"margin-top:5px; font-weight:bold; color:#8e44ad;\">三爻齐聚，化生八卦！</div>`;\n    const guaMap = {\n        \"yinyinyin\": { name: \"坤\", eff: \"坤卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【坤卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyin\": { name: \"艮\", eff: \"艮卦\", text: \"周围3米变为困难地形。\" },\n        \"yinyangyin\": { name: \"坎\", eff: \"坎卦\", text: \"本套路属性视为阴柔。\" },\n        \"yinyinyang\": { name: \"震\", eff: \"震卦\", text: \"造成伤害时击退目标1米。\" },\n        \"yangyangyin\": { name: \"巽\", eff: \"巽卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【巽卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyang\": { name: \"离\", eff: \"离卦\", text: \"本套路招式造成伤害时附带10点火焰伤害。\" },\n        \"yinyangyang\": { name: \"兑\", eff: \"兑卦\", text: \"下次命中无架招目标时施加缚身。\" }\n    };\n    if (gua === \"yangyangyang\") {\n        await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value + 2});\n        msgHtml += `<p style=\"color:#e67e22;\">【乾卦】现！立即获得 2 点怒气。</p>`;\n    } else {\n        const gData = guaMap[gua];\n        if (gData) {\n            const effData = thisItem.effects.getName(gData.eff)?.toObject();\n            if (effData) {\n                delete effData._id; effData.origin = thisItem.uuid;\n                await game.xjzl.api.effects.addEffect(actor, effData);\n            }\n            msgHtml += `<p style=\"color:#2980b9;\">【${gData.name}卦】现！${gData.text}</p>`;\n        }\n    }\n}\nawait actor.setFlag(\"xjzl-system\", \"qiyao\", yaos);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msgHtml });",
+                            "active": true
+                        }
+                    ]
                 },
                 {
                     "name": "爻错",
@@ -1181,7 +1189,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双手交叉于胸前，掐指计算，开启架招，格挡成功后，给予自身一层随机爻（D20，奇数阴、偶数阳），持续到战斗脱离。</p><p><strong>升级:</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡获爻自动。",
+                    "automationNote": "完全自动化。战斗开始自动清空遗留卦象。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1195,9 +1203,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡获爻",
+                            "label": "清空卦象",
+                            "trigger": "combatStart",
+                            "script": "await actor.setFlag(\"xjzl-system\", \"qiyao\", []);\nui.notifications.info(\"奇爻异术：上一场战斗的卦象已清空。\");",
+                            "active": true
+                        },
+                        {
+                            "label": "格挡获爻与八卦生成",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst r = await new Roll(\"1d20\").evaluate();\nconst isYang = (r.total % 2 === 0);\nconst effName = isYang ? \"阳爻\" : \"阴爻\";\nconst eff = thisItem.effects.getName(effName).toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst r = await new Roll(\"1d20\").evaluate();\nif (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\nconst isYang = (r.total % 2 === 0);\nconst yaoStr = isYang ? \"yang\" : \"yin\";\nconst yaoName = isYang ? \"阳\" : \"阴\";\nlet yaos = actor.getFlag(\"xjzl-system\", \"qiyao\") || [];\nyaos.push(yaoStr);\nlet msgHtml = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #9b59b6; background:rgba(155,89,182,0.1); padding:6px;\"><p>格挡得: <b>${yaoName}爻</b> (d20=${r.total})</p><p>当前卦列: [${yaos.map(y=>y===\"yang\"?\"阳\":\"阴\").join(\", \")}]</p></div>`;\nif (yaos.length >= 3) {\n    const gua = yaos.join(\"\");\n    yaos = [];\n    msgHtml += `<div style=\"margin-top:5px; font-weight:bold; color:#8e44ad;\">三爻齐聚，化生八卦！</div>`;\n    const guaMap = {\n        \"yinyinyin\": { name: \"坤\", eff: \"坤卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【坤卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyin\": { name: \"艮\", eff: \"艮卦\", text: \"周围3米变为困难地形。\" },\n        \"yinyangyin\": { name: \"坎\", eff: \"坎卦\", text: \"本套路属性视为阴柔。\" },\n        \"yinyinyang\": { name: \"震\", eff: \"震卦\", text: \"造成伤害时击退目标1米。\" },\n        \"yangyangyin\": { name: \"巽\", eff: \"巽卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【巽卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyang\": { name: \"离\", eff: \"离卦\", text: \"本套路招式造成伤害时附带10点火焰伤害。\" },\n        \"yinyangyang\": { name: \"兑\", eff: \"兑卦\", text: \"下次本套路招式命中无架招目标时施加缚身。\" }\n    };\n    if (gua === \"yangyangyang\") {\n        await actor.update({\"system.resources.rage.value\": actor.system.resources.rage.value + 2});\n        msgHtml += `<p style=\"color:#e67e22;\">【乾卦】现！立即获得 2 点怒气。</p>`;\n    } else {\n        const gData = guaMap[gua];\n        if (gData) {\n            const effData = thisItem.effects.getName(gData.eff)?.toObject();\n            if (effData) {\n                delete effData._id; effData.origin = thisItem.uuid;\n                await game.xjzl.api.effects.addEffect(actor, effData);\n            }\n            msgHtml += `<p style=\"color:#2980b9;\">【${gData.name}卦】现！${gData.text}</p>`;\n        }\n    }\n}\nawait actor.setFlag(\"xjzl-system\", \"qiyao\", yaos);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msgHtml });",
                             "active": true
                         }
                     ]
@@ -1213,7 +1227,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>依算而行，扔出暗器，对目标造成伤害，并移除身上所有的爻。</p><p>每移除一层阳爻，本次攻击的暴击骰-2。</p><p>每移除一层阴爻，招式伤害+10。</p><p><strong>升级:</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "自动统计并消耗爻，自动计算加成。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1238,9 +1252,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗爻",
+                            "label": "清空爻阵并加成",
                             "trigger": "attack",
-                            "script": "const yang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yangyao\");\nconst yin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinyao\");\n\nlet yangCount = yang ? (yang.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nlet yinCount = yin ? (yin.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (yangCount > 0) args.flags.critThresholdMod += (yangCount * 2);\nif (yinCount > 0) {\n    args.flags.damageResult.damage += (yinCount * 10);\n    args.flags.damageResult.breakdown += `\\n+ 阴爻加成: ${yinCount * 10}`;\n}\n\nif (yang) await yang.delete();\nif (yin) await yin.delete();\n\nui.notifications.info(`消耗: 阳${yangCount}, 阴${yinCount}`);",
+                            "script": "let yaos = actor.getFlag(\"xjzl-system\", \"qiyao\") || [];\nlet yangCount = yaos.filter(y => y === \"yang\").length;\nlet yinCount = yaos.filter(y => y === \"yin\").length;\n\nif (yangCount > 0) {\n    args.flags.critThresholdMod += (yangCount * 2);\n}\nif (yinCount > 0) {\n    args.flags.damageResult.damage += (yinCount * 10);\n    args.flags.damageResult.breakdown += `\\n+ 阴爻加成: ${yinCount * 10}`;\n}\n\nif (yaos.length > 0) {\n    await actor.setFlag(\"xjzl-system\", \"qiyao\", []);\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #e74c3c; background:rgba(231,76,60,0.1); padding:6px;\"><p style=\"color:#c0392b; font-weight:bold;\"><i class=\"fas fa-meteor\"></i> 羲爻齐出！</p><p style=\"margin-top:3px;\">消耗 <b>阳爻 x${yangCount}</b>：本次攻击暴击骰阈值 <span style=\"color:#c0392b;\">-${yangCount * 2}</span></p><p>消耗 <b>阴爻 x${yinCount}</b>：招式伤害 <span style=\"color:#c0392b;\">+${yinCount * 10}</span></p></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}",
                             "active": true
                         }
                     ]
@@ -1248,28 +1262,149 @@
             ],
             "effects": [
                 {
-                    "name": "阳爻",
-                    "icon": "icons/magic/symbols/runes-star-blue.webp",
-                    "description": "阳。",
+                    "name": "坤卦",
+                    "icon": "icons/magic/symbols/runes-star-magenta.webp",
+                    "description": "格挡值+5。若由奇爻异术生成，请手动为周围3米内友方添加此状态。",
                     "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
                     "flags": {
                         "xjzl-system": {
-                            "slug": "yangyao",
-                            "stackable": true
+                            "slug": "bagua_kun",
+                            "stackable": false
                         }
-                    }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.block",
+                            "mode": 2,
+                            "value": "5"
+                        }
+                    ]
                 },
                 {
-                    "name": "阴爻",
+                    "name": "艮卦",
+                    "icon": "icons/magic/symbols/runes-star-blue.webp",
+                    "description": "周围3米变为困难地形。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bagua_gen",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "坎卦",
                     "icon": "icons/magic/symbols/runes-star-magenta.webp",
-                    "description": "阴。",
+                    "description": "本套路属性视为阴柔，请出招时手动覆盖属性。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bagua_kan",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "震卦",
+                    "icon": "icons/magic/symbols/runes-star-blue.webp",
+                    "description": "造成伤害时，击退目标1米。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bagua_zhen",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "击退提示",
+                                    "trigger": "hit",
+                                    "script": "if (args.isHit && args.baseDamage > 0) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #8e44ad; background:rgba(142,68,173,0.1); padding:4px;\"><b><i class=\"fas fa-wind\"></i> 震卦触发：</b>强大的冲击力击退了 ${args.target.name} 1米！</div>` });\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "巽卦",
+                    "icon": "icons/magic/symbols/runes-star-magenta.webp",
+                    "description": "移动速度+3。若由奇爻异术生成，请手动为周围3米内友方添加此状态。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bagua_xun",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "3"
+                        }
+                    ]
+                },
+                {
+                    "name": "离卦",
+                    "icon": "icons/magic/symbols/runes-star-blue.webp",
+                    "description": "奇爻异术的招式造成伤害时额外造成10点火焰伤害。",
+                    "transfer": false,
+                    "duration": {
+                        "rounds": 2
+                    },
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bagua_li",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "附加火伤",
+                                    "trigger": "hit",
+                                    "script": "if (args.isHit && args.baseDamage > 0 && args.item?.name === \"奇爻异术\") {\n    const dmgRes = await args.target.applyDamage({ amount: 10, type: \"fire\", attacker: actor, isHit: true, ignoreBlock: true, ignoreStance: true, ignoreDefense: true });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #e74c3c; background:rgba(231,76,60,0.1); padding:4px;\"><b><i class=\"fas fa-fire\"></i> 离卦触发：</b>烈焰附着，额外造成 <span style=\"color:red;font-weight:bold;\">${dmgRes.finalDamage}</span> 点火焰伤害！</div>` });\n}",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "兑卦",
+                    "icon": "icons/magic/symbols/runes-star-magenta.webp",
+                    "description": "下次奇爻异术的招式命中无架招目标时，施加缚身1回合。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "yinyao",
-                            "stackable": true
+                            "slug": "bagua_dui",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "施加缚身并移除",
+                                    "trigger": "hit",
+                                    "script": "if (args.isHit && !args.target.system.martial.stanceActive && args.item?.name === \"奇爻异术\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 1 } });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #2ecc71; background:rgba(46,204,113,0.1); padding:4px;\"><b><i class=\"fas fa-link\"></i> 兑卦触发：</b>对 ${args.target.name} 施加了 [缚身]！</div>` });\n    await thisEffect.delete();\n}",
+                                    "active": true
+                                }
+                            ]
                         }
-                    }
+                    },
+                    "changes": []
                 }
             ]
         }
