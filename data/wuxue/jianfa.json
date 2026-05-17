@@ -3054,7 +3054,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>左辅右弼，方成大业，对目标造成两次伤害（只需一次命中检定）。此招式每次攻击都会强制消耗 1 层“北斗七星”，若“北斗七星”状态不足，则会使自己进入点穴状态（冲穴难度 14）。</p><p>·若对方无架招，则不消耗“北斗七星”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "连击手动。消耗/惩罚检测自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3074,9 +3074,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗判定",
-                            "trigger": "attack",
-                            "script": "const target = args.targets[0];\nif (target) {\n    const targetActor = target.actor || target;\n    if (targetActor.system.martial.stanceActive) {\n        // 需消耗\n        const star = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beidouqixing\");\n        if (star) {\n            await game.xjzl.api.effects.removeEffect(actor, \"beidouqixing\", 1);\n            ui.notifications.info(\"消耗 1 层北斗七星\");\n        } else {\n            // 不足\n            const dianxue = CONFIG.statusEffects.find(e => e.id === \"dianxue\");\n            if(dianxue) {\n                await game.xjzl.api.effects.addEffect(actor, dianxue);\n                ui.notifications.warn(\"星力不足，自身受制（点穴）！\");\n            }\n        }\n    }\n}",
+                            "label": "星力判定与连击",
+                            "trigger": "hit",
+                            "script": "if (!args.isHit) return;\nconst tActor = args.target;\nif (tActor.system.martial.stanceActive) {\n    const star = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beidouqixing\");\n    if (star) {\n        await game.xjzl.api.effects.removeEffect(actor, \"beidouqixing\", 1);\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; padding:4px; border-left:3px solid #f1c40f;\">左辅右弼: 消耗 1 层北斗七星。</div>` });\n    } else {\n        await game.xjzl.api.effects.addEffect(actor, \"dianxue\");\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; padding:4px; border-left:3px solid #c0392b; color:#c0392b;\"><b>星力不足，自身遭到反噬 (点穴)！</b></div>` });\n    }\n}\n// 自动造成第二段伤害 (连击)\nconst dmgRes = await tActor.applyDamage({ amount: args.baseDamage, type: args.damageType, attacker: actor, isHit: true, ignoreBlock: args.config?.ignoreBlock, ignoreDefense: args.config?.ignoreDefense, ignoreStance: args.config?.ignoreStance, isSkill: true, source: \"move\", element: args.element, applyCritDamage: args.isCrit });\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #3498db; background:rgba(52,152,219,0.1); padding:6px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-bolt\"></i> 左辅右弼 - 二连击</div><div style=\"font-size:0.9em; margin-top:4px;\">对 ${tActor.name} 造成第二段伤害：<span style=\"color:red;font-weight:bold;\">${dmgRes.finalDamage}</span></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
