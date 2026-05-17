@@ -471,7 +471,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>持剑防御，开启架招，当此架招被击破后，第二回合依然可以施展架招，但仅能施展【万里无云】。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "击破后次日限制请玩家手动记忆。",
+                    "automationNote": "击破后要施展请手动删除破防的BUFF。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -494,7 +494,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>以剑横扫，对目标造成 0.3 力量点外功伤害，击中格挡中的目标，不会使对手因“格挡成功”而获得武学状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无视架招特效自动(Identify as IgnoreStance)。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -516,8 +516,14 @@
                         {
                             "label": "无视架招触发",
                             "trigger": "check",
-                            "script": "args.flags.ignoreStance = true;",
-                            "active": true
+                            "active": true,
+                            "script": "args.flags.ignoreStance = true;"
+                        },
+                        {
+                            "label": "弥补架招格挡抵扣",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "if (args.target && args.target.system.martial?.stanceActive) {\n    const stanceBlock = args.target.system.combat.stanceBlockValue || 0;\n    if (stanceBlock > 0) {\n        args.config.amount = Math.max(0, args.config.amount - stanceBlock);\n    }\n}"
                         }
                     ]
                 },
@@ -561,7 +567,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>剑光闪烁，直刺敌人七大要穴，对目标造成 0.8 力量点外功伤害，并使目标陷入“血流不止”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "流血自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -588,8 +594,8 @@
                         {
                             "label": "血流不止",
                             "trigger": "hit",
-                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"bleed_stack\");\nif(eff) {\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"endless_bleed\");\n}"
                         }
                     ]
                 }
