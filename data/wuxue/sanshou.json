@@ -17,19 +17,34 @@
                     "weaponType": "unarmed",
                     "range": "1米",
                     "targetInfo": "单体",
-                    "actionCost": "无",
+                    "actionCost": "反应动作",
                     "description": "<p>当你的普通攻击命中敌方目标时，可以消耗反应动作，与目标进行[角力]对抗，若你获胜，给对方添加“错骨”一回合。</p><p><strong>升级：</strong>此次[角力]对抗检定结果+1。</p>",
-                    "automationNote": "普攻命中后请手动点击此招式以记录（或纯RP）。对抗与状态施加均为手动。",
+                    "automationNote": "完全自动化。（设置伤害确保可以点击应用触发效果，实际不会造成伤害）",
                     "calculation": {
-                        "base": 0,
+                        "base": 10,
                         "growth": 0
                     },
                     "costs": {
                         "mp": [
+                            0,
+                            0,
                             0
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "阻断默认伤害",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;"
+                        },
+                        {
+                            "label": "错骨对抗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = lvl - 1;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    label: \"分筋错骨 - 角力擒拿\",\n    attBonus: bonus,\n    outcome: {\n        win: {\n            text: \"角力获胜！你分筋错骨，制服了对方。\",\n            targetEffect: { id: \"cuogu\", duration: { rounds: 1 } }\n        },\n        lose: {\n            text: \"对方力量强横，挣脱了你的擒拿。\"\n        }\n    }\n});"
+                        }
+                    ]
                 }
             ]
         }
