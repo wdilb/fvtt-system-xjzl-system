@@ -1213,8 +1213,10 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     resources.mp.max = Math.floor(S.neixi * 1 + (resources.mp.bonus || 0) + mpAdd);
     // 怒气上限固定
     resources.rage.max = 10;
-    // 酒量 = 体魄
-    resources.alcohol.max = S.tipo;
+    // 酒量 = 体魄 + bonus
+    resources.alcohol.max = Math.max(0, S.tipo + (resources.alcohol.bonus || 0));
+    // 饱食度 = 基础100 + bonus
+    resources.satiety.max = Math.max(0, 100 + (resources.satiety.bonus || 0));
 
 
     // 2. 抗性计算 (Resistances)

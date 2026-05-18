@@ -132,6 +132,8 @@ export function getModifierChoices() {
   const groupRes = game.i18n.localize("XJZL.Resources.Label");
   add(groupRes, "resources.hp.bonus", `${game.i18n.localize("XJZL.Resources.HP")} (Bonus)`);
   add(groupRes, "resources.mp.bonus", `${game.i18n.localize("XJZL.Resources.MP")} (Bonus)`);
+  add(groupRes, "resources.alcohol.bonus", `${game.i18n.localize("XJZL.Resources.Alcohol")} (Bonus)`);
+  add(groupRes, "resources.satiety.bonus", `${game.i18n.localize("XJZL.Resources.Satiety")} (Bonus)`);
 
   // 1. 七维属性 (Stats)和自由属性
   const groupStats = game.i18n.localize("XJZL.Stats.Label");
