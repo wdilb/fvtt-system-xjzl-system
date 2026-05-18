@@ -1750,8 +1750,11 @@ export class XJZLActor extends Actor {
       const currentRage = sys.resources.rage.value;
       const maxRage = sys.resources.rage.max;
       const noRecover = this.xjzlStatuses?.noRecoverRage;
+      // 读取受击不回怒标记
+      const noRageOnHit = this.xjzlStatuses?.noRageOnHit;
 
-      if (currentRage < maxRage && !noRecover) {
+      // 只有在没有“不怒”且没有“受击不回怒”时，才增加怒气
+      if (currentRage < maxRage && !noRecover && !noRageOnHit) {
         await this.update({ "system.resources.rage.value": currentRage + 1 });
         rageGained = true;
       }

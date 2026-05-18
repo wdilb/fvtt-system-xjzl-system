@@ -560,6 +560,7 @@ XJZL.statusFlags = {
   noRecoverRage: "XJZL.Status.NoRecoverRage",     // 无法获得怒气 (怒气锁定)
   noRecoverNeili: "XJZL.Status.NoRecoverNeili",   // 无法获得内力 (内力锁定)
   noRecoverHP: "XJZL.Status.NoRecoverHP",         // 无法获得气血 (禁疗)
+  noRageOnHit: "XJZL.Status.NoRageOnHit",         // 受击不回怒 (但主动攻击仍可回怒)
 
   // --- C. 行为限制类  ---
   // 在 Item.roll() 开头检测这些 Flag
@@ -1271,6 +1272,16 @@ XJZL.statusEffects = [
     // changes: [
     //   { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
     // ]
+  },
+  {
+    id: "wutong",
+    name: "XJZL.Status.Wutong", // 无痛
+    description: "XJZL.Status.WutongDesc",
+    img: "systems/xjzl-system/assets/icons/ae/无痛.png",
+    flags: { "xjzl-system": { slug: "wutong", stackable: false } },
+    changes: [
+      { key: "flags.xjzl-system.noRageOnHit", mode: 5, value: "true" }
+    ]
   }
 ];
 
