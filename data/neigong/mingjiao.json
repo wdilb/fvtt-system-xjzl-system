@@ -147,6 +147,8 @@
             "sect": "mingjiao",
             "description": "<p>明教五行旗心法，天有五行，分时化育，以成万物，此心法循天地机理，可化万物灵气，纳之己用，慧藏气海，使运气如涓涓溪水，绵而不绝。</p>",
             "requirement": "悟性4",
+            "xpInvested": 0,
+            "active": false,
             "automationNote": "半自动化。对敌人施加“五行”减伤Debuff是自动的。自身根据场上层数获得“五行共鸣”Buff需玩家手动添加。",
             "config": {
                 "stage1": {
@@ -157,7 +159,10 @@
                         "neixi": 9,
                         "qigan": 9,
                         "shencai": 3
-                    }
+                    },
+                    "xpCostRatio": 1,
+                    "description": "",
+                    "scripts": []
                 },
                 "stage2": {
                     "stats": {
@@ -168,13 +173,14 @@
                         "qigan": 18,
                         "shencai": 6
                     },
+                    "xpCostRatio": 1,
                     "description": "<p>小成运功特效：<br>招式命中无架招目标时，为其添加一层“五行”，在战斗脱离后消失，最多叠加三层。<br>五行：每层减少招式伤害5点。</p>",
                     "scripts": [
                         {
                             "label": "五行心法-施加五行(小成)",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (!args.isHit) return;\n// 检查目标是否有架招\nconst targetStance = args.target.system?.martial?.stanceActive;\nif (targetStance) return;\n\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
+                            "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity') return;\nif (!args.isHit) return;\n\n// 检查目标架招。趁虚而入(opportunity)或击破架招(isBroken)均视为无架招。\nconst targetStance = args.target.system?.martial?.stanceActive;\nif (targetStance && args.move.id !== 'opportunity' && !args.isBroken) return;\n\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
                         }
                     ]
                 },
@@ -187,13 +193,14 @@
                         "qigan": 27,
                         "shencai": 9
                     },
+                    "xpCostRatio": 1,
                     "description": "<p>圆满运功特效：<br>招式命中目标时，为其添加一层“五行”，在战斗脱离后消失，最多叠加三层。<br>五行：每层减少招式伤害5点。<br>·战斗场景内每有一层“五行”，自身招式伤害提升5点。（至多+30）</p><p>修满特效：修满[永久]：气血+40，内力+20，全属性+2。</p>",
                     "scripts": [
                         {
                             "label": "五行心法-施加五行(圆满)",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (!args.isHit) return;\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
+                            "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity') return;\nif (!args.isHit) return;\n\n// 圆满境界不再需要判定“无架招”，直接施加\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
                         }
                     ]
                 }
@@ -238,12 +245,13 @@
                 "name": "五行",
                 "icon": "systems/xjzl-system/assets/icons/neigong/明教.png",
                 "transfer": false,
+                "disabled": false,
                 "description": "每层减少招式伤害5点。",
                 "changes": [
                     {
                         "key": "system.combat.damages.skill.mod",
                         "mode": 2,
-                        "value": -5
+                        "value": "-5"
                     }
                 ],
                 "flags": {
@@ -258,12 +266,13 @@
                 "name": "五行共鸣",
                 "icon": "systems/xjzl-system/assets/icons/neigong/明教.png",
                 "transfer": false,
+                "disabled": false,
                 "description": "战斗场景内每有一层“五行”，自身招式伤害提升5点。",
                 "changes": [
                     {
                         "key": "system.combat.damages.skill.mod",
                         "mode": 2,
-                        "value": 5
+                        "value": "5"
                     }
                 ],
                 "flags": {
