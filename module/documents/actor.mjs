@@ -114,10 +114,9 @@ export class XJZLActor extends Actor {
       const maxAlcohol = this.system.resources.alcohol.max;
       if (newAlcohol > maxAlcohol) {
         const hasZuidao = this.effects.some(e => e.getFlag("xjzl-system", "slug") === "zuidao" || e.statuses.has("zuidao"));
-        const hasZuixian = this.effects.some(e => e.getFlag("xjzl-system", "slug") === "zuixian");
 
-        // 如果醉意超标，且身上既没醉倒也没醉仙，则自动施加系统醉倒
-        if (!hasZuidao && !hasZuixian) {
+        // 如果醉意超标，且身上没醉倒，则自动施加系统醉倒
+        if (!hasZuidao) {
           game.xjzl.api.effects.toggleStatus(this, "zuidao", true);
         }
       }
