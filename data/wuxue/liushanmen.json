@@ -173,13 +173,13 @@
                                 {
                                     "label": "沉舟增伤",
                                     "trigger": "calc",
-                                    "script": "if (args.move.type === 'basic' && args.move.id === 'opportunity-attack') return;\nconst dmgBonus = thisEffect.getFlag(\"xjzl-system\", \"wuxue_chenzhouDmg\") || 5;\nargs.output.damage += dmgBonus;\nargs.output.bonusDesc.push(`沉舟 +${dmgBonus}`);",
+                                    "script": "if (args.move.type === 'basic' && args.move.id === 'opportunity') return;\nconst dmgBonus = thisEffect.getFlag(\"xjzl-system\", \"wuxue_chenzhouDmg\") || 5;\nargs.output.damage += dmgBonus;\nargs.output.bonusDesc.push(`沉舟 +${dmgBonus}`);",
                                     "active": true
                                 },
                                 {
                                     "label": "出招后移除",
                                     "trigger": "hit_once",
-                                    "script": "if (args.move.type === 'basic' && args.move.id === 'opportunity-attack') return;\nawait thisEffect.delete();",
+                                    "script": "if (args.move.type === 'basic' && args.move.id === 'opportunity') return;\nawait thisEffect.delete();",
                                     "active": true
                                 }
                             ]
@@ -1326,13 +1326,13 @@
                                 "label": "伤害预估 (预览用)",
                                 "trigger": "calc",
                                 "active": true,
-                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst mpCost = args.move.currentCost?.mp || 0;\nif (mpCost <= 0) return;\n\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\nconst bonus = Math.floor(mpCost * multiplier);\n\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`一以贯通(Lv.${level}): +${bonus} (基于面板消耗${mpCost}预估，不代表最终结果)`);\n}"
+                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity')) return;\nconst mpCost = args.move.currentCost?.mp || 0;\nif (mpCost <= 0) return;\n\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\nconst bonus = Math.floor(mpCost * multiplier);\n\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`一以贯通(Lv.${level}): +${bonus} (基于面板消耗${mpCost}预估，不代表最终结果)`);\n}"
                             },
                             {
                                 "label": "真实伤害校准",
                                 "trigger": "attack",
                                 "active": true,
-                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst mpCost = args.move.currentCost?.mp || 0;\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\n\n// 1. 先把 calc 阶段加的预估值扣掉\nconst previewBonus = Math.floor(mpCost * multiplier);\nargs.flags.damageResult.damage -= previewBonus;\n\n// 2. 获取本次真正扣掉的内力 (含减耗、免费施法、濒死额外耗蓝)\nconst realMp = args.costConsumed?.mp || 0;\nconst realBonus = Math.floor(realMp * multiplier);\n\n// 3. 把真正的加值加进去\nargs.flags.damageResult.damage += realBonus;\n\n// 4. 更新卡片描述\nif (realBonus !== previewBonus) {\n    args.flags.damageResult.breakdown += `\\n+ 一以贯通 (实扣${realMp}内力): +${realBonus}`;\n}\n\n// 5. 只要造成了额外伤害，发一张带边距的卡片\nif (realBonus > 0) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bolt\"></i> 一以贯通 (Lv.${level})</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">实际消耗 ${realMp} 点内力，招式伤害提升 <span style=\"color:#8e44ad; font-weight:bold;\">${realBonus}</span> 点！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity')) return;\nconst mpCost = args.move.currentCost?.mp || 0;\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\n\n// 1. 先把 calc 阶段加的预估值扣掉\nconst previewBonus = Math.floor(mpCost * multiplier);\nargs.flags.damageResult.damage -= previewBonus;\n\n// 2. 获取本次真正扣掉的内力 (含减耗、免费施法、濒死额外耗蓝)\nconst realMp = args.costConsumed?.mp || 0;\nconst realBonus = Math.floor(realMp * multiplier);\n\n// 3. 把真正的加值加进去\nargs.flags.damageResult.damage += realBonus;\n\n// 4. 更新卡片描述\nif (realBonus !== previewBonus) {\n    args.flags.damageResult.breakdown += `\\n+ 一以贯通 (实扣${realMp}内力): +${realBonus}`;\n}\n\n// 5. 只要造成了额外伤害，发一张带边距的卡片\nif (realBonus > 0) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bolt\"></i> 一以贯通 (Lv.${level})</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">实际消耗 ${realMp} 点内力，招式伤害提升 <span style=\"color:#8e44ad; font-weight:bold;\">${realBonus}</span> 点！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                             }
                         ]
                     }
