@@ -57,6 +57,7 @@ import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
 import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
+import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -490,6 +491,17 @@ Hooks.once("init", async function () {
     requiresReload: true
   });
 
+  // 是否打开音阶追踪器
+  game.settings.register("xjzl-system", "enableToneTracker", {
+    name: "开启五声音阶追踪器",
+    hint: "在屏幕左上角显示五声音阶面板，支持手动快捷记录、轮换与推入。",
+    scope: "world", // 世界级别，GM统一开关
+    config: true,
+    type: Boolean,
+    default: true,
+    requiresReload: true
+  });
+
   // 是否解除目盲视野遮挡
   game.settings.register("xjzl-system", "disableBlindVision", {
     name: "解除目盲视野遮挡",
@@ -566,6 +578,12 @@ Hooks.once("ready", async function () {
   if (game.settings.get("xjzl-system", "enableActionTracker")) {
     ActionTracker.init();
   }
+
+  // 5·加载音阶计数器
+  if (game.settings.get("xjzl-system", "enableToneTracker")) {
+    ToneTracker.init();
+  }
+
   console.log("侠界之旅系统 - 准备就绪");
 });
 
@@ -1519,6 +1537,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/compendiumbrowser/sidebar.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览
+    "systems/xjzl-system/templates/apps/tone-tracker.hbs",//音阶计数器
+    "systems/xjzl-system/templates/apps/action-tracker.hbs",//动作计数器
     // 向导界面
     "systems/xjzl-system/templates/apps/character-wizard/sidebar.hbs",
     "systems/xjzl-system/templates/apps/character-wizard/main.hbs",
