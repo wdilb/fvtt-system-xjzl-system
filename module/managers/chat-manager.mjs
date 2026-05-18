@@ -54,6 +54,9 @@ export class ChatCardManager {
         const action = button.dataset.action;
         const flags = message.flags["xjzl-system"] || {};
 
+        // 捕获 Shift 按键状态
+        const isShiftPressed = event.shiftKey;
+
         // 优先拦截撤回请求
         if (action === "refundCost") {
             await ChatCardManager._onRefundCost(message);
@@ -68,13 +71,13 @@ export class ChatCardManager {
         // 0. 特殊处理2：属性判定请求处理 (前置拦截)
         // 判定是防御者自己的行为，不需要攻击者或源物品参与
         if (action === "rollSave") {
-            await ChatCardManager._rollSave(flags, message);
+            await ChatCardManager._rollSave(flags, message, isShiftPressed);
             return;
         }
 
         // 0. 特殊处理3：对抗投掷处理 (前置拦截)
         if (action === "rollContest") {
-            await ChatCardManager._onContestRoll(button.dataset.role, flags, message);
+            await ChatCardManager._onContestRoll(button.dataset.role, flags, message, isShiftPressed);
             return;
         }
 
@@ -1936,7 +1939,7 @@ export class ChatCardManager {
      * 2. 比对 DC
      * 3. 失败则自动创建 ActiveEffect
      */
-    static async _rollSave(flags, message) {
+    static async _rollSave(flags, message, autoFail = false) {
         // 1. 获取防御者 (Flags 里存的是 targetUuid)
         const targetUuid = flags.targetUuid;
         const doc = await fromUuid(targetUuid);
@@ -1950,10 +1953,14 @@ export class ChatCardManager {
         // 2. 调用 Actor 的检定方法
         // 这会弹出一个新的聊天卡片显示骰子结果
         // 读取 flags.level (发起请求时设定的优劣势)
+        const requestBonus = flags.bonus || 0;
         const roll = await actor.rollAttributeTest(flags.attribute, {
             level: flags.level || 0,
-            bonus: flags.bonus || 0
+            skipDialog: autoFail,      // 如果按了Shift，直接跳过弹窗
+            bonus: autoFail ? -999 : requestBonus
         });
+
+        if (!roll) return; // 防呆，万一取消了
 
         // 3. 比对结果
         const total = roll.total;
@@ -2155,7 +2162,7 @@ export class ChatCardManager {
      * 处理对抗中的单方投掷
      * @param {String} role "attacker" | "defender"
      */
-    static async _onContestRoll(role, flags, message) {
+    static async _onContestRoll(role, flags, message, autoFail = false) {
         // 1. 获取当前内存中的状态（仅用于初步检查，防止重复点击）
         const currentState = message.flags["xjzl-system"]?.state || {};
         const updateKey = role === "attacker" ? "attRoll" : "defRoll";
@@ -2178,8 +2185,9 @@ export class ChatCardManager {
         const specificBonus = role === "attacker" ? (config.attBonus || 0) : (config.defBonus || 0);
         const roll = await actor.rollAttributeTest(attrKey, {
             chatMessage: false,
-            // === 传入 bonus，actor.mjs 中的 options.bonus 会自动将其设为弹窗的默认值 ===
-            bonus: specificBonus
+            skipDialog: autoFail, // 按住 Shift 直接跳过弹窗
+            // 如果没按 Shift，传入特定的 bonus；如果按了，强制 -999
+            bonus: autoFail ? -999 : specificBonus
         });
 
         if (!roll) return;
