@@ -108,6 +108,21 @@ export class XJZLActor extends Actor {
 
     this._enforceResourceIntegrity();
 
+    // 醉意监控
+    const newAlcohol = foundry.utils.getProperty(changed, "system.resources.alcohol.value");
+    if (newAlcohol !== undefined) {
+      const maxAlcohol = this.system.resources.alcohol.max;
+      if (newAlcohol > maxAlcohol) {
+        const hasZuidao = this.effects.some(e => e.getFlag("xjzl-system", "slug") === "zuidao" || e.statuses.has("zuidao"));
+        const hasZuixian = this.effects.some(e => e.getFlag("xjzl-system", "slug") === "zuixian");
+
+        // 如果醉意超标，且身上既没醉倒也没醉仙，则自动施加系统醉倒
+        if (!hasZuidao && !hasZuixian) {
+          game.xjzl.api.effects.toggleStatus(this, "zuidao", true);
+        }
+      }
+    }
+
     // =====================================================
     // 2. 濒死/死亡状态自动解除
     // =====================================================
