@@ -1083,24 +1083,29 @@ export class XJZLItem extends Item {
         if (calcOutput.bonusDesc.length > 0) {
           breakdownText += `\n` + calcOutput.bonusDesc.map(d => `   └ ${d}`).join(`\n`);
         }
+        // 避免非虚招也显示虚招值
+        if (effectiveType !== 'feint') {
+          calcOutput.feint = 0;
+          feintBreakdown = "";
+        } else {
+          if (!feintBreakdown) {
+            feintBreakdown = `基础虚招: ${feintVal}`;
+          }
+          const scriptFeintBonus = calcOutput.feint - feintVal;
+          const hasFeintScriptChange = scriptFeintBonus !== 0;
+          const hasFeintScriptDesc = calcOutput.feintBonusDesc && calcOutput.feintBonusDesc.length > 0;
 
-        if (!feintBreakdown) {
-          feintBreakdown = `基础虚招: ${feintVal}`;
-        }
-        const scriptFeintBonus = calcOutput.feint - feintVal;
-        const hasFeintScriptChange = scriptFeintBonus !== 0;
-        const hasFeintScriptDesc = calcOutput.feintBonusDesc && calcOutput.feintBonusDesc.length > 0;
+          if (hasFeintScriptChange || hasFeintScriptDesc) {
+            const sign = scriptFeintBonus > 0 ? "+" : "";
+            feintBreakdown += `\n${sign} 特效修正: ${scriptFeintBonus}`;
 
-        if (hasFeintScriptChange || hasFeintScriptDesc) {
-          const sign = scriptFeintBonus > 0 ? "+" : "";
-          feintBreakdown += `\n${sign} 特效修正: ${scriptFeintBonus}`;
-
-          if (hasFeintScriptDesc) {
-            calcOutput.feintBonusDesc.forEach(desc => {
-              feintBreakdown += `\n   └ ${desc}`;
-            });
-          } else {
-            feintBreakdown += ` (计算/被动特效)`;
+            if (hasFeintScriptDesc) {
+              calcOutput.feintBonusDesc.forEach(desc => {
+                feintBreakdown += `\n   └ ${desc}`;
+              });
+            } else {
+              feintBreakdown += ` (计算/被动特效)`;
+            }
           }
         }
 
@@ -1258,7 +1263,11 @@ export class XJZLItem extends Item {
 
     // 4. 读取结果
     const finalDamage = Math.floor(calcOutput.damage);
-    const finalFeint = Math.floor(calcOutput.feint);
+    let finalFeint = Math.floor(calcOutput.feint);
+    // 避免非虚招也显示虚招值
+    if (effectiveType !== 'feint') {
+      finalFeint = 0;
+    }
 
     // 计算脚本带来的差值 (用于显示 Breakdown)
     scriptDmgBonus = finalDamage - preScriptDmg;
@@ -1294,23 +1303,27 @@ export class XJZLItem extends Item {
         breakdownText += ` (计算/被动特效)\n`;
       }
     }
+    // 避免非虚招也显示虚招值
+    if (effectiveType !== 'feint') {
+      feintBreakdown = "";
+    } else {
+      if (!feintBreakdown) {
+        feintBreakdown = `基础虚招: ${feintVal}`;
+      }
+      const hasFeintScriptChange = scriptFeintBonus !== 0;
+      const hasFeintScriptDesc = calcOutput.feintBonusDesc && calcOutput.feintBonusDesc.length > 0;
 
-    if (!feintBreakdown) {
-      feintBreakdown = `基础虚招: ${feintVal}`;
-    }
-    const hasFeintScriptChange = scriptFeintBonus !== 0;
-    const hasFeintScriptDesc = calcOutput.feintBonusDesc && calcOutput.feintBonusDesc.length > 0;
+      if (hasFeintScriptChange || hasFeintScriptDesc) {
+        const sign = scriptFeintBonus > 0 ? "+" : "";
+        feintBreakdown += `\n${sign} 特效修正: ${scriptFeintBonus}`;
 
-    if (hasFeintScriptChange || hasFeintScriptDesc) {
-      const sign = scriptFeintBonus > 0 ? "+" : "";
-      feintBreakdown += `\n${sign} 特效修正: ${scriptFeintBonus}`;
-
-      if (hasFeintScriptDesc) {
-        calcOutput.feintBonusDesc.forEach(desc => {
-          feintBreakdown += `\n   └ ${desc}`;
-        });
-      } else {
-        feintBreakdown += ` (计算/被动特效)`;
+        if (hasFeintScriptDesc) {
+          calcOutput.feintBonusDesc.forEach(desc => {
+            feintBreakdown += `\n   └ ${desc}`;
+          });
+        } else {
+          feintBreakdown += ` (计算/被动特效)`;
+        }
       }
     }
 
