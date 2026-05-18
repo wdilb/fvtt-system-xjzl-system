@@ -2,6 +2,7 @@ import { XJZL } from "../config.mjs";
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
+import { xjzlSocket } from "../socket.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 
@@ -34,16 +35,25 @@ export class XJZLItem extends Item {
    * 统一的使用接口
    * 外部调用 item.use() 即可，无需关心具体类型
    */
-  async use() {
+  async use(options = {}) {
     if (!this.actor) return ui.notifications.warn("该物品不在角色身上，无法使用。");
 
     // 1. 触发使用前钩子 (允许外部取消使用)
     if (Hooks.call("xjzl.preUseItem", this, this.actor) === false) return;
 
+    let targetActor = options.targetActor || this.actor;
+
+    // 1.5 如果是消耗品，且未静默，弹窗选择目标 (默认自己)
+    if (this.type === "consumable" && !options.skipDialog) {
+      const selectedActor = await this._promptTargetSelection();
+      if (!selectedActor) return; // 用户点X取消
+      targetActor = selectedActor;
+    }
+
     let result;
     switch (this.type) {
       case "consumable":
-        result = await this._useConsumable();
+        result = await this._useConsumable(targetActor);
         break;
       case "manual":
         result = await this._readManual();
@@ -64,13 +74,92 @@ export class XJZLItem extends Item {
   /* -------------------------------------------- */
 
   /**
+   * 弹出目标选择框
+   * 包含自己，以及当前场景中所有非隐藏的 Token
+   */
+  async _promptTargetSelection() {
+    const owner = this.actor;
+    // 获取场景中所有有效且非隐藏的 token
+    const tokens = canvas.tokens.placeables.filter(t =>
+      t.actor && !t.document.hidden
+    );
+
+    // 默认第一个是自己
+    let optionsHtml = `<option value="${owner.uuid}">自身 (${owner.name})</option>`;
+
+    // 使用 Set 记录 UUID，防止因为 owner 就在场景里导致出现两个一样的选项
+    const addedUuids = new Set([owner.uuid]);
+
+    for (const t of tokens) {
+      if (!t.actor) continue;
+      const actorUuid = t.actor.uuid;
+      if (!addedUuids.has(actorUuid)) {
+        optionsHtml += `<option value="${actorUuid}">${t.name}</option>`;
+        addedUuids.add(actorUuid);
+      }
+    }
+
+    // 必须包裹 form，保证兼容性
+    const content = `
+        <form>
+            <div class="form-group" style="margin-bottom: 10px;">
+                <label style="font-weight:bold;">使用目标</label>
+                <div class="form-fields">
+                    <select name="targetUuid" style="width: 100%; padding: 4px;">
+                        ${optionsHtml}
+                    </select>
+                </div>
+            </div>
+        </form>
+    `;
+
+    const result = await foundry.applications.api.DialogV2.prompt({
+      window: { title: `使用 ${this.name}`, icon: "fas fa-flask" },
+      content: content,
+      ok: {
+        label: "使用",
+        icon: "fas fa-check",
+        callback: (event, button) => {
+          // 最稳健的取值方式：不用 button.form，直接去 DOM 里找
+          const dialogEl = button.closest('.dialog') || document;
+          const selectEl = dialogEl.querySelector("select[name='targetUuid']");
+          return selectEl ? selectEl.value : null;
+        }
+      },
+      rejectClose: false
+    });
+
+    if (!result) return null;
+
+    // 从 UUID 完美解析，兼容 Unlinked 的 Token
+    const doc = await fromUuid(result);
+    if (!doc) return null;
+
+    // 如果是 TokenDocument，取它的 actor 属性
+    const finalActor = (doc instanceof Actor) ? doc : doc.actor;
+
+    if (!finalActor || !finalActor.system) {
+      ui.notifications.error("无法获取目标角色数据。");
+      return null;
+    }
+
+    return finalActor;
+  }
+
+  /**
    * 内部逻辑：使用消耗品
    */
-  async _useConsumable() {
-    const actor = this.actor;
+  async _useConsumable(target) {
+
+    // 防空，确保传入的 target 具备所有需要的方法
+    if (!target || !target.system || !target.effects) {
+      return ui.notifications.error("无效的使用目标。");
+    }
+    // owner: 物品的实际持有者 (发起源)
+    const owner = this.actor;
     const config = this.system;
 
-    // 0. 检查数量
+    // 0. 检查物品数量
     if (this.system.quantity <= 0) {
       return ui.notifications.warn(`${this.name} 数量不足。`);
     }
@@ -79,13 +168,15 @@ export class XJZLItem extends Item {
     const tags = [];
     const resultLines = [];
 
-    // 1. 恢复资源
+    // =====================================================
+    // 1. 恢复资源 (作用于 target)
+    // =====================================================
     const updates = {};
     if (config.recovery) {
       for (const [key, val] of Object.entries(config.recovery)) {
         if (val && val !== 0) {
-          const current = actor.system.resources?.[key]?.value || 0;
-          const max = actor.system.resources?.[key]?.max || 999;
+          const current = target.system.resources?.[key]?.value || 0;
+          const max = target.system.resources?.[key]?.max || 999;
           const newVal = Math.min(max, current + val);
 
           if (newVal !== current) {
@@ -97,61 +188,96 @@ export class XJZLItem extends Item {
         }
       }
     }
-    if (!foundry.utils.isEmpty(updates)) await actor.update(updates);
 
+    // 跨权限更新目标数值
+    // 如果目标是自己或自己有所有权的 Token，直接更新；否则呼叫 GM Socket 代理
+    if (!foundry.utils.isEmpty(updates)) {
+      if (target.isOwner) {
+        await target.update(updates);
+      } else {
+        await xjzlSocket.executeAsGM("updateDocument", target.uuid, updates);
+      }
+    }
+
+    // =====================================================
     // 2. 应用特效 (互斥逻辑)
+    // =====================================================
     const consumableType = config.type || "other";
-    if (config.autoReplace ?? true) {  //如果为空或者定义为true则触发互斥
-      // 移除互斥旧特效
-      const effectsToDelete = actor.effects
+    if (config.autoReplace ?? true) {
+      // 找出目标身上同类型的旧消耗品特效
+      const effectsToDelete = target.effects
         .filter(e => e.getFlag("xjzl-system", "consumableType") === consumableType)
         .map(e => e.id);
 
       if (effectsToDelete.length > 0) {
-        await actor.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
-        ui.notifications.info(`旧的 [${consumableType}] 效果已被覆盖。`); // 可选提示
+        // 同理，跨权限删除
+        if (target.isOwner) {
+          await target.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
+        } else {
+          await xjzlSocket.executeAsGM("deleteEmbedded", target.uuid, "ActiveEffect", effectsToDelete);
+        }
+        ui.notifications.info(`目标旧的 [${game.i18n.localize(CONFIG.XJZL.consumableTypes[consumableType]) || consumableType}] 效果已被覆盖。`);
       }
     }
 
-
-    // 创建新特效
+    // 创建新特效 (施加于目标)
     const effectsToCreate = this.effects.map(e => {
       const data = e.toObject();
       foundry.utils.setProperty(data, "flags.xjzl-system.consumableType", consumableType);
       data.transfer = false;
       data.disabled = false;
-      // 如果物品将销毁，Origin 指向 Actor，否则指向 Item
-      data.origin = willDestroy ? actor.uuid : this.uuid;
+      // 如果物品即将销毁，Origin 必须指向使用者的 Actor，否则特效会因为来源丢失而报错
+      data.origin = willDestroy ? owner.uuid : this.uuid;
       return data;
     });
 
     if (effectsToCreate.length > 0) {
-      await actor.createEmbeddedDocuments("ActiveEffect", effectsToCreate);
+      // 借用我们强大的 Manager 自动处理添加与权限穿透 (Manager 内部自带 Socket)
+      for (const eff of effectsToCreate) {
+        await game.xjzl.api.effects.addEffect(target, eff);
+      }
       resultLines.push(`应用状态: [${effectsToCreate.map(e => e.name).join(", ")}]`);
       tags.push("状态");
     }
 
-    // 3. 执行脚本(消耗品仍保留旧的 usageScript 逻辑，或者可以以后统一)
+    // =====================================================
+    // 3. 执行脚本 (Usage Script)
+    // =====================================================
     let scriptOutput = "";
     if (config.usageScript && config.usageScript.trim()) {
       try {
-        // 使用 AsyncFunction 构造器(异步支持)
         const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
-        // 参数名列表
         const argNames = ["actor", "item", "game", "ui", "Macros"];
-        // 实例化
+
+        // 权限代理
+        // 如果当前玩家没有目标 target 的所有权，我们临时劫持它的底层数据库操作
+        // 这样即使脚本里写了纯原生的 target.update(...)，也会被拦截并发送给 GM
+        const scriptTarget = target;
+        if (!scriptTarget.isOwner) {
+          scriptTarget.update = async (data, ctx) => xjzlSocket.executeAsGM("updateDocument", scriptTarget.uuid, data, ctx);
+          scriptTarget.createEmbeddedDocuments = async (type, data, ctx) => xjzlSocket.executeAsGM("createEmbedded", scriptTarget.uuid, type, data, ctx);
+          scriptTarget.deleteEmbeddedDocuments = async (type, ids, ctx) => xjzlSocket.executeAsGM("deleteEmbedded", scriptTarget.uuid, type, ids, ctx);
+        }
+
         const fn = new AsyncFunction(...argNames, config.usageScript);
-        // 执行并等待
-        const result = await fn(actor, this, game, ui, XJZLMacros);
-        if (typeof result === "string") scriptOutput = result;// 允许脚本返回文本用于显示
+
+        // 脚本上下文注入：
+        // 这里的 scriptTarget 在脚本中对应变量名 "actor"
+        // 这样消耗品的脚本就能精确作用于“目标”身上
+        const result = await fn(scriptTarget, this, game, ui, XJZLMacros);
+
+        // 如果脚本 return 了一段文本，记录下来用于卡片显示
+        if (typeof result === "string") scriptOutput = result;
         tags.push("特殊效果");
       } catch (err) {
-        console.error(err);
+        console.error("消耗品脚本执行错误:", err);
         ui.notifications.error(`脚本错误: ${err.message}`);
       }
     }
 
-    // 4. 发送聊天卡片
+    // =====================================================
+    // 4. 发送聊天卡片 (动态文案)
+    // =====================================================
     const templateData = {
       item: this,
       tags: tags,
@@ -165,14 +291,21 @@ export class XJZLItem extends Item {
       templateData
     );
 
+    // 文案区别：自用 vs 他用
+    const flavorText = owner.uuid === target.uuid
+      ? `${owner.name} 服用了 ${this.name}`
+      : `${owner.name} 对 ${target.name} 使用了 ${this.name}`;
+
     ChatMessage.create({
       user: game.user.id,
-      speaker: ChatMessage.getSpeaker({ actor: actor }),
-      flavor: `${actor.name} 使用了 ${this.name}`,
+      speaker: ChatMessage.getSpeaker({ actor: owner }),
+      flavor: flavorText,
       content: content
     });
 
-    // 5. 扣除数量
+    // =====================================================
+    // 5. 扣除拥有者的物品数量 (在自己包里，肯定有权限)
+    // =====================================================
     if (willDestroy) {
       await this.delete();
     } else {
