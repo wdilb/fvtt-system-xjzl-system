@@ -270,9 +270,9 @@
             "tier": 2,
             "element": "yang",
             "sect": "zhenwujiao",
-            "description": "道家功法之精华，吸气腾飞，呼气沉海，气形合二为一，内外双修，外炼拍打体躯，内练五脏六腑，凝成阳烈真气，祛邪扶正。",
+            "description": "<p>道家功法之精华，吸气腾飞，呼气沉海，气形合二为一，内外双修，外炼拍打体躯，内练五脏六腑，凝成阳烈真气，祛邪扶正。</p>",
             "requirement": "悟性 4",
-            "automationNote": "完全自动化。采用分级AE策略，圆满阶段震伤包含计数器逻辑。",
+            "automationNote": "完全自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -296,14 +296,14 @@
                         "qigan": 14,
                         "shencai": 8
                     },
-                    "description": "小成运功特效：对目标造成伤害后给目标添加“震伤”，持续两回合。\n震伤：每次被攻击都会流失10点气血。",
+                    "description": "<p><strong>小成运功特效：</strong>对目标造成伤害后给目标添加“震伤”，持续两回合。</p><p><strong>震伤：</strong>每次被攻击都会流失10点气血。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "施加震伤(小成)",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.isHeal) {\n    // 直接调用专用的'小成'版特效，无需动态修改脚本\n    const sourceEffect = thisItem.effects.getName(\"震伤 (小成)\");\n    if (!sourceEffect) return ui.notifications.warn(\"数据缺失：震伤(小成)特效未找到\");\n\n    const effectData = sourceEffect.toObject();\n    effectData.origin = thisItem.uuid;\n    // 统一显示名称为'震伤'，避免玩家看到后缀出戏\n    effectData.name = \"震伤\"; \n\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit && args.finalDamage > 0) {\n    const sourceEffect = thisItem.effects.getName(\"震伤 (小成)\");\n    if (!sourceEffect) return ui.notifications.warn(\"数据缺失：震伤(小成)特效未找到\");\n\n    const effectData = sourceEffect.toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.name = \"震伤\"; \n\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -316,14 +316,14 @@
                         "qigan": 21,
                         "shencai": 12
                     },
-                    "description": "圆满运功特效：对目标造成伤害后给目标添加“震伤”，持续两回合。\n震伤：每次被攻击都会流失10点气血，若在此期间出招三次后，还会被添加“内伤”两回合。\n内伤：陷入“禁实”“禁虚”“禁足”。\n修满特效：气血+30，内力+30，体魄+5。",
+                    "description": "<p><strong>圆满运功特效：</strong>对目标造成伤害后给目标添加“震伤”，持续两回合。</p><p><strong>震伤：</strong>每次被攻击都会流失10点气血，若在此期间出招三次后，还会被添加“内伤”两回合。</p><p><strong>内伤：</strong>陷入“禁实”“禁虚”“禁足”。</p><p><strong>修满特效：</strong>气血+30，内力+30，体魄+5。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
                             "label": "施加震伤(圆满)",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.isHeal) {\n    const sourceEffect = thisItem.effects.getName(\"震伤 (圆满)\");\n    if (!sourceEffect) return ui.notifications.warn(\"数据缺失：震伤(圆满)特效未找到\");\n\n    const effectData = sourceEffect.toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.name = \"震伤\";\n\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "if (args.isHit && args.finalDamage > 0) {\n    const sourceEffect = thisItem.effects.getName(\"震伤 (圆满)\");\n    if (!sourceEffect) return ui.notifications.warn(\"数据缺失：震伤(圆满)特效未找到\");\n\n    const effectData = sourceEffect.toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.name = \"震伤\";\n\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 }
@@ -357,7 +357,7 @@
                 "duration": {
                     "rounds": 2
                 },
-                "description": "每次被攻击流失10血。",
+                "description": "每次被攻击流失10气血。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "zhenshang_chunyang_minor",
@@ -367,7 +367,7 @@
                                 "label": "震伤流血",
                                 "trigger": "damaged",
                                 "active": true,
-                                "script": "// 防止流失伤害递归触发\nif (args.type === 'liushi') return;\n\n// 发送提示卡片\nChatMessage.create({\n    content: `<div style=\"padding:5px; border:1px solid #8b0000; background:#fff0f0; color:#8b0000; text-align:center;\"><b>${actor.name}</b> 震伤发作！流失10气血！</div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\n// 造成伤害\nawait actor.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
+                                "script": "if (args.type === 'liushi') return;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);\"><div style=\"color:#8b0000; font-weight:bold; font-size:0.9em;\"><i class=\"fas fa-bolt\"></i> 震伤发作！</div><div style=\"color:#555; font-size:0.85em;\">由于被攻击，流失了 <b style=\"color:red;\">10</b> 点气血。</div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\nawait actor.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
                             }
                         ]
                     }
@@ -379,7 +379,7 @@
                 "duration": {
                     "rounds": 2
                 },
-                "description": "每次被攻击流失10血。出招3次后转为内伤。",
+                "description": "每次被攻击流失10气血。出招3次后转为内伤。",
                 "flags": {
                     "xjzl-system": {
                         "slug": "zhenshang_chunyang_mastery",
@@ -390,13 +390,13 @@
                                 "label": "震伤流血",
                                 "trigger": "damaged",
                                 "active": true,
-                                "script": "if (args.type === 'liushi') return;\n\nChatMessage.create({\n    content: `<div style=\"padding:5px; border:1px solid #8b0000; background:#fff0f0; color:#8b0000; text-align:center;\"><b>${actor.name}</b> 纯阳震伤发作！</div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\nawait actor.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
+                                "script": "if (args.type === 'liushi') return;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);\"><div style=\"color:#8b0000; font-weight:bold; font-size:0.9em;\"><i class=\"fas fa-bolt\"></i> 震伤发作！</div><div style=\"color:#555; font-size:0.85em;\">由于被攻击，流失了 <b style=\"color:red;\">10</b> 点气血。</div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\nawait actor.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
                             },
                             {
                                 "label": "内伤计数",
                                 "trigger": "attack",
                                 "active": true,
-                                "script": "// 读取并增加计数\nlet count = thisEffect.getFlag('xjzl-system', 'neigong_chunyang_count') || 0;\ncount++;\n\nif (count >= 3) {\n    // --- 触发内伤 ---\n    ChatMessage.create({\n         content: `<div style=\"padding:5px; border:2px solid darkred; background:#000; color:red; text-align:center; font-weight:bold;\">⚠ ${actor.name} 震伤积蓄，引发内伤！</div>`,\n         speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n    \n    const sourceItem = await fromUuid(thisEffect.origin);\n    if (sourceItem) {\n        const neishangProto = sourceItem.effects.getName(\"内伤\");\n        if (neishangProto) {\n            const neishangData = neishangProto.toObject();\n            neishangData.origin = thisEffect.origin;\n            // 添加/刷新内伤 (Manager会自动处理存在时的刷新逻辑)\n            await game.xjzl.api.effects.addEffect(actor, neishangData);\n        }\n    }\n    \n    // --- 重置循环 ---\n    // 计数归零，准备下一个3次循环\n    await thisEffect.setFlag('xjzl-system', 'neigong_chunyang_count', 0);\n\n} else {\n    // --- 更新进度 ---\n    await thisEffect.setFlag('xjzl-system', 'neigong_chunyang_count', count);\n}"
+                                "script": "// 排除纯粹的普通攻击，但允许趁虚而入\nif (args.move?.type === 'basic' && args.move?.id === 'basic-attack') return;\n\n// 读取并增加计数\nlet count = thisEffect.getFlag('xjzl-system', 'neigong_chunyang_count') || 0;\ncount++;\n\nif (count >= 3) {\n    ChatMessage.create({\n         content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border:2px solid darkred; background:rgba(139,0,0,0.1); color:darkred; text-align:center; font-weight:bold;\">⚠ ${actor.name} 震伤积蓄，引发内伤！</div>`,\n         speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n    \n    // 利用 origin 回溯内功物品，抽取内伤 AE\n    const sourceItem = await fromUuid(thisEffect.origin);\n    if (sourceItem) {\n        const neishangProto = sourceItem.effects.getName(\"内伤\");\n        if (neishangProto) {\n            const neishangData = neishangProto.toObject();\n            neishangData.origin = thisEffect.origin;\n            await game.xjzl.api.effects.addEffect(actor, neishangData);\n        }\n    }\n    \n    // 重置循环\n    await thisEffect.setFlag('xjzl-system', 'neigong_chunyang_count', 0);\n} else {\n    // 视觉反馈进度\n    actor.showFloatyText(`震伤积蓄: ${count}/3`, { fill: \"#ff0000\", fontSize: 24 });\n    await thisEffect.setFlag('xjzl-system', 'neigong_chunyang_count', count);\n}"
                             }
                         ]
                     }
@@ -422,6 +422,11 @@
                     },
                     {
                         "key": "flags.xjzl-system.forceSpeedZero",
+                        "mode": 5,
+                        "value": "true"
+                    },
+                    {
+                        "key": "flags.xjzl-system.forceDodgeZero",
                         "mode": 5,
                         "value": "true"
                     }
