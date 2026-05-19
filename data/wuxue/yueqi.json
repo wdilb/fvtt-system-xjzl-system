@@ -102,30 +102,33 @@
           "targetInfo": "范围",
           "actionCost": "蓄力动作",
           "description": "<p>吹奏靡靡之曲，范围内敌方角色进行[定力]检定（难度 11），失败受到 10 点精神伤害，成功减半。</p><p>·获得“转”，持续到战斗脱离。</p><p><strong>升级：</strong>难度+2，精神伤害+10，内力消耗+2。</p>",
-          "automationNote": "发起定力检定请求自动。伤害应用需根据检定结果手动调整（全额或半额）。获得“转”自动。",
+          "automationNote": "完全自动化。通过延迟伤害机制，目标点击聊天卡的判定按钮后系统自动对其扣除全额或半额精神伤害。",
           "calculation": {
             "base": 10,
-            "growth": 10
+            "growth": 10,
+            "scalings": []
           },
           "costs": {
             "mp": [
               2,
               4,
               6
-            ]
+            ],
+            "rage": [],
+            "hp": []
           },
           "scripts": [
             {
-              "label": "请求检定与获转",
-              "trigger": "hit",
-              "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 11 + (lvl - 1) * 2;\nawait Macros.requestSave({\n    target: args.target,\n    type: \"dingli\",\n    dc: dc,\n    label: \"抵抗靡靡之曲\",\n    attacker: actor\n});",
-              "active": true
+              "label": "延迟伤害与检定",
+              "trigger": "preDamage",
+              "active": true,
+              "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 11 + (lvl - 1) * 2;\n\n// 截获已经计算了所有增伤的最终面板伤害\nconst dmg = args.config.amount;\n// 让当前主流程的伤害归零（以免重复扣血）\nargs.config.amount = 0;\n\n// 发送异步判定卡片，利用底层新支持的 damageOnSuccess 机制完美结算\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: dc,\n    label: \"靡靡之音 (定力豁免)\",\n    damageOnFail: { value: dmg, type: \"mental\" },\n    damageOnSuccess: { value: Math.floor(dmg / 2), type: \"mental\" },\n    failureText: \"心神失守，遭受全额精神冲击！\",\n    successText: \"定力护持，精神冲击减半！\"\n});"
             },
             {
               "label": "获得转",
               "trigger": "hit_once",
-              "script": "const eff = thisItem.effects.getName(\"转\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-              "active": true
+              "active": true,
+              "script": "const eff = thisItem.effects.getName('转').toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
             }
           ]
         },
