@@ -1726,11 +1726,11 @@ export class XJZLItem extends Item {
       }
 
       // 类型封锁
-      if (s.blockShiZhao && move.type === "real") return ui.notifications.warn("无法施展实招！");
-      if (s.blockXuZhao && move.type === "feint") return ui.notifications.warn("无法施展虚招！");
-      if (s.blockQiZhao && move.type === "qi") return ui.notifications.warn("无法施展气招！");
-      if (s.blockCounter && move.type === "counter") return ui.notifications.warn("无法施展反击！");
-      if (s.blockStance && move.type === "stance") return ui.notifications.warn("无法开启架招！");
+      if (s.blockShiZhao && move.type === "real" && !move.isUltimate) return ui.notifications.warn("无法施展实招！");
+      if (s.blockXuZhao && move.type === "feint" && !move.isUltimate) return ui.notifications.warn("无法施展虚招！");
+      if (s.blockQiZhao && move.type === "qi" && !move.isUltimate) return ui.notifications.warn("无法施展气招！");
+      if (s.blockCounter && move.type === "counter" && !move.isUltimate) return ui.notifications.warn("无法施展反击！");
+      if (s.blockStance && move.type === "stance" && !move.isUltimate) return ui.notifications.warn("无法开启架招！");
       if (s.blockUltimate && move.isUltimate) return ui.notifications.warn("无法施展绝招！");
 
       // 插入 Hook：允许模组在招式执行前进行干预 (例如：定身状态下无法攻击)
