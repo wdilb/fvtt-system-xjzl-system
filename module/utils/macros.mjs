@@ -13,15 +13,21 @@ export class XJZLMacros {
      * @param {String} options.type      属性 Key (如 "liliang", "neixi", "wuxing")
      * @param {Number} options.dc        难度等级
      * @param {String} [options.label]   自定义标题 (可选)
+     * 
      * @param {Object|Array} [options.onFail] 失败时应用的 Effect 数据 (必须包含 name, changes 等)
-     * @param {Object} [options.damageOnFail] 失败时扣除资源 { value: 10, type: "hp" }
+     * @param {Object} [options.damageOnFail] 失败时扣除资源或造成伤害 { value: 10, type: "poison" } 
+     *                                        (注: type支持"hp"等系统资源直接流失，也支持"poison","waigong"等伤害类型，走完整抗性结算)
+     * 
+     * @param {Object|Array} [options.onSuccess] 成功时应用的 Effect 数据 (格式同 onFail)
+     * @param {Object} [options.damageOnSuccess] 成功时扣除资源/造成伤害 (格式同 damageOnFail，常用于豁免后伤害减半)
+     * 
      * @param {Actor} [options.attacker] 发起者 Actor (可选，用于显示名字，脚本里通常是 `actor` 或 `attacker`)
-     * @param {Number} options.level 预设优劣势 (正数=优, 负数=劣)
-     * @param {Number} options.bouns 预设加减值
+     * @param {Number} options.level     预设优劣势 (正数=优, 负数=劣)
+     * @param {Number} options.bonus     预设加减值
      * @param {String} [options.successText] 成功时的提示文本
      * @param {String} [options.failureText] 失败时的提示文本
      */
-    static async requestSave({ target, type, dc, label, onFail, damageOnFail, attacker, level = 0, bonus = 0, successText, failureText }) {
+    static async requestSave({ target, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText }) {
         if (!target) return ui.notifications.error("requestSave: 缺少目标 (target)");
         if (!type) return ui.notifications.error("requestSave: 缺少属性类型 (type)");
 
@@ -39,12 +45,16 @@ export class XJZLMacros {
 
         // 数据清洗与防错
         let safeOnFail = onFail;
+        let safeOnSuccess = onSuccess;
 
-        // 检查 onFail 是否为函数
+        // 检查 onFail/onSuccess 是否为函数
         if (typeof onFail === 'function') {
-            console.warn(`XJZL Dev Warning | Macros.requestSave: onFail 参数不能是函数，因为它无法存入数据库。已自动忽略该参数。如果你想显示提示，请使用 'failureWarning' 参数。`);
-            // 强制置空，防止脏数据进入 flags
+            console.warn(`XJZL Dev Warning | Macros.requestSave: onFail 参数不能是函数，因为它无法存入数据库。已自动忽略该参数。如果你想显示提示，请使用 'failureText' 参数。`);
             safeOnFail = null;
+        }
+        if (typeof onSuccess === 'function') {
+            console.warn(`XJZL Dev Warning | Macros.requestSave: onSuccess 参数不能是函数，因为它无法存入数据库。已自动忽略该参数。如果你想显示提示，请使用 'successText' 参数。`);
+            safeOnSuccess = null;
         }
 
         // 2. 渲染模板
@@ -67,6 +77,8 @@ export class XJZLMacros {
             dc: dc,
             onFail: safeOnFail, // 直接存入 Effect 数据对象
             damageOnFail: damageOnFail, //失败扣减的数值
+            onSuccess: safeOnSuccess, // 成功时的 Effect 数据
+            damageOnSuccess: damageOnSuccess, //成功扣减的数值
             level: level, //优势劣势等级
             bonus: bonus,
             successText: successText || null,
@@ -145,7 +157,7 @@ export class XJZLMacros {
                 defLabel: defLabel,
                 label: label || "属性对抗",
                 outcome: finalOutcome, // 存入清洗后的自动化配置
-                attBonus: attBonus, 
+                attBonus: attBonus,
                 defBonus: defBonus
             },
             // 状态记录

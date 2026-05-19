@@ -1934,10 +1934,12 @@ export class ChatCardManager {
     }
 
     /**
-     * 执行属性判定 (Saving Throw)
-     * 1. 读取 Actor 属性并投骰子
-     * 2. 比对 DC
-     * 3. 失败则自动创建 ActiveEffect
+     * 执行属性判定 
+     * 响应 requestSave 卡片上的判定按钮
+     * 1. 验证权限并读取 Actor 属性进行投掷
+     * 2. 比对 DC 确定成功/失败
+     * 3. 根据结果执行封装好的 Effect / Damage 逻辑
+     * 4. 原地刷新卡片 UI
      */
     static async _rollSave(flags, message, autoFail = false) {
         // 1. 获取防御者 (Flags 里存的是 targetUuid)
@@ -1967,53 +1969,20 @@ export class ChatCardManager {
         const dc = flags.dc || 10;
         const isSuccess = total >= dc;
 
-        // 我们可以直接从 roll.data 里拿 (前提是 Actor 里传了)，或者重新读一遍
-        // 这里最简单的方法是直接读取 roll.data.val，这是我们在 Actor.rollAttributeTest 里传入的
+        // 这是我们在 Actor.rollAttributeTest 里传入的
         const attrVal = roll.data.val || 0;
         const diceResult = roll.terms[0].total; // 骰子本身的结果
 
-        // 4. 处理结果
-        let resultHtml = "";
-        let color = "";
+        // ==========================================================
+        // 内部辅助函数：统一处理 AE 的施加与 伤害/资源的扣除
+        // ==========================================================
+        const processEffectsAndDamage = async (effectsConfig, damageConfig) => {
+            let html = "";
 
-        if (isSuccess) {
-            color = "#27ae60"; // Green
-            resultHtml = `
-                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
-                    <i class="fas fa-check-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Success")}
-                </div>
-                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.SuccessHint")}</div>
-            `;
-            // 如果有成功回调（比如发个聊天消息），以后可以扩展
-            // === 成功文本 ===
-            if (flags.successText) {
-                resultHtml += `
-                <div style="margin-top:5px; padding:5px; background:rgba(39, 174, 96, 0.1); border-radius:4px; font-size:0.9em; color:#1e8449;">
-                    <i class="fas fa-info-circle"></i> ${flags.successText}
-                </div>`;
-            }
-        } else {
-            color = "#c0392b"; // Red
-            resultHtml = `
-                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
-                    <i class="fas fa-times-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Failure")}
-                </div>
-                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.FailureHint")}</div>
-            `;
-            // === 失败文本 ===
-            if (flags.failureText) {
-                resultHtml += `
-                <div style="margin-top:5px; padding:5px; background:rgba(192, 57, 43, 0.1); border-radius:4px; font-size:0.9em; color:#922b21;">
-                    <i class="fas fa-exclamation-circle"></i> ${flags.failureText}
-                </div>`;
-            }
-
-            // 应用惩罚 (Effects)
-            // 脚本里传递过来的 onFail 对象，应该是一个标准的 ActiveEffect Data 对象 (或数组)
-            if (flags.onFail) {
+            // --- A. 应用状态 (Effects) ---
+            if (effectsConfig) {
                 // 标准化为数组
-                const effectsData = Array.isArray(flags.onFail) ? flags.onFail : [flags.onFail];
-
+                const effectsData = Array.isArray(effectsConfig) ? effectsConfig : [effectsConfig];
                 // 用于收集成功应用的名字，显示在卡片上
                 const appliedNames = [];
 
@@ -2022,25 +1991,14 @@ export class ChatCardManager {
                     let effectData;
                     // 支持直接传入字符串 ID (如 "dianxue")
                     if (typeof e === "string") {
-                        // 构造成 ActiveEffectManager 能识别的 "Patch Object"
-                        // Manager 内部会发现有 id 字段，自动去 CONFIG.statusEffects 找模板并合并
-                        effectData = {
-                            id: e,
-                            origin: message.uuid,
-                            disabled: false
-                        };
+                        effectData = { id: e, origin: message.uuid, disabled: false };
                     } else {
                         // 是对象，直接展开
-                        effectData = {
-                            ...e,
-                            origin: message.uuid,
-                            disabled: false
-                        };
+                        effectData = { ...e, origin: message.uuid, disabled: false };
                     }
 
                     // 调用核心管理器
                     const createdEffect = await ActiveEffectManager.addEffect(actor, effectData);
-
                     if (createdEffect) {
                         appliedNames.push(createdEffect.name);
                     }
@@ -2049,26 +2007,26 @@ export class ChatCardManager {
                 // 在卡片上追加一行小字
                 if (appliedNames.length > 0) {
                     const appliedLabel = game.i18n.localize("XJZL.UI.Chat.RequestSave.EffectApplied");
-                    resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(0,0,0,0.05); border-radius:4px;">
+                    html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(0,0,0,0.05); border-radius:4px;">
                         ${appliedLabel}: <b>${appliedNames.join(", ")}</b>
                     </div>`;
                 }
             }
-            // 应用惩罚 (扣资源或造成伤害)
-            if (flags.damageOnFail) {
+
+            // --- B. 应用数值惩罚 (扣资源或造成伤害) ---
+            if (damageConfig) {
                 // 1. 解析参数 (确保是固定数值)
-                const dmgConfig = flags.damageOnFail;
-                const rawVal = Number(dmgConfig.value);
+                const rawVal = Number(damageConfig.value);
                 const amount = isNaN(rawVal) ? 0 : rawVal; // 保底为0
-                const typeKey = dmgConfig.type || "hp";    // 默认为气血
-                // 2. 调用 失败结果
+                const typeKey = damageConfig.type || "hp";    // 默认为气血
+
                 if (amount > 0) {
                     // 判断 typeKey 是否在系统定义的伤害类型中 (如 poison, fire, waigong)
                     // 注意：CONFIG.XJZL.damageTypes 包含了 liushi, none 等
                     const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
 
                     if (isDamageType) {
-                        // === 分支 A: 造成伤害 (走 applyDamage) ===
+                        // === 分支 1: 造成伤害 (走 applyDamage) ===
                         // 这样可以计算抗性、护体抵扣、触发受击特效等
 
                         // 尝试解析发起者 (用于日志)
@@ -2079,7 +2037,7 @@ export class ChatCardManager {
                         }
 
                         // 调用伤害逻辑
-                        // 判定失败的伤害通常：必中(true),但会受到 抗性 (Resistances) 的减免
+                        // 判定触发的伤害通常：必中(true),但会受到 抗性 (Resistances) 的减免
                         const damageResult = await actor.applyDamage({
                             amount: amount,
                             type: typeKey,
@@ -2097,14 +2055,14 @@ export class ChatCardManager {
                         const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes[typeKey]);
                         const lossText = losses.length > 0 ? losses.join(", ") : "被抗性抵消";
 
-                        resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
-                            <i class="fas fa-bolt"></i> 判定失败: <b>${amount}</b> 点${typeLabel}伤害<br>
+                        html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                            <i class="fas fa-bolt"></i> 受到 <b>${amount}</b> 点${typeLabel}伤害<br>
                             <span style="color:#555;">(实际结算: -${lossText})</span>
                         </div>`;
 
                     }
                     else {
-                        // === 分支 B: 直接资源流失 (走 applyHealing) ===
+                        // === 分支 2: 直接资源流失 (走 applyHealing) ===
                         // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)
 
                         await actor.applyHealing({
@@ -2113,7 +2071,6 @@ export class ChatCardManager {
                             showScrolling: true
                         });
 
-                        // 更新卡片文本
                         // 简单的字典映射
                         const typeLabels = {
                             hp: "气血", mp: "内力", neili: "内力",
@@ -2121,12 +2078,54 @@ export class ChatCardManager {
                         };
                         const label = typeLabels[typeKey] || typeKey;
 
-                        resultHtml += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
-                            <i class="fas fa-heart-broken"></i> 判定失败: <b>${amount}</b> 点${label}流失
+                        html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(255,0,0,0.1); color:#8b0000; border-radius:4px;">
+                            <i class="fas fa-heart-broken"></i> <b>${amount}</b> 点${label}流失
                         </div>`;
                     }
                 }
             }
+            return html;
+        };
+
+        // 4. 处理结果 (组装 HTML)
+        let resultHtml = "";
+        let color = "";
+
+        if (isSuccess) {
+            color = "#27ae60"; // Green
+            resultHtml = `
+                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
+                    <i class="fas fa-check-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Success")}
+                </div>
+                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.SuccessHint")}</div>
+            `;
+            // === 成功文本 ===
+            if (flags.successText) {
+                resultHtml += `
+                <div style="margin-top:5px; padding:5px; background:rgba(39, 174, 96, 0.1); border-radius:4px; font-size:0.9em; color:#1e8449;">
+                    <i class="fas fa-info-circle"></i> ${flags.successText}
+                </div>`;
+            }
+            // 执行成功的 Effect 与 伤害
+            resultHtml += await processEffectsAndDamage(flags.onSuccess, flags.damageOnSuccess);
+
+        } else {
+            color = "#c0392b"; // Red
+            resultHtml = `
+                <div style="color:${color}; font-weight:bold; font-size:1.2em;">
+                    <i class="fas fa-times-circle"></i> ${game.i18n.localize("XJZL.UI.Chat.RequestSave.Failure")}
+                </div>
+                <div style="font-size:0.8em; color:#666;">${game.i18n.localize("XJZL.UI.Chat.RequestSave.FailureHint")}</div>
+            `;
+            // === 失败文本 ===
+            if (flags.failureText) {
+                resultHtml += `
+                <div style="margin-top:5px; padding:5px; background:rgba(192, 57, 43, 0.1); border-radius:4px; font-size:0.9em; color:#922b21;">
+                    <i class="fas fa-exclamation-circle"></i> ${flags.failureText}
+                </div>`;
+            }
+            // 执行失败的 Effect 与 伤害
+            resultHtml += await processEffectsAndDamage(flags.onFail, flags.damageOnFail);
         }
 
         // 5. 更新卡片 (禁用按钮，显示结果)
@@ -2141,17 +2140,13 @@ export class ChatCardManager {
         `;
 
         // 替换原来放置按钮的 .card-buttons 区域
-        // 1. 创建临时 DOM 容器
         const div = document.createElement("div");
         div.innerHTML = message.content;
 
-        // 2. 精准查找按钮容器
         const btnContainer = div.querySelector(".card-buttons");
 
-        // 3. 替换内容
         if (btnContainer) {
             btnContainer.outerHTML = resultBlock;
-            // 4. 更新消息
             await ChatCardManager._safeUpdateMessage(message, { content: div.innerHTML });
         } else {
             console.error("XJZL | 无法在卡片中找到 .card-buttons 容器");
