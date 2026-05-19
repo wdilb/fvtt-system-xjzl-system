@@ -2474,7 +2474,7 @@ export class XJZLActor extends Actor {
           actionType: "basic-attack", // 特殊标识
           // 这里不传 itemId 和 moveId，或者传特定的标记
           itemId: "basic",
-          moveId: isOpportunity ? "opportunity" : "basic", // 区分 ID
+          moveId: virtualMove.id, // 区分 ID
           moveType: "basic",
           scriptBonusHit: scriptBonusHit,
           critThresholdMod: attackContext.flags.critThresholdMod || 0,
