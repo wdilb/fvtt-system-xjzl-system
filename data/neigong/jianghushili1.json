@@ -1676,10 +1676,16 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "鱼龙真气-增伤耗内",
-                            "trigger": "passive",
-                            "script": "S.combat.costs.neili.mod -= 1; S.combat.damages.skill.mod += 5;",
-                            "active": true
+                            "label": "鱼龙·内力消耗",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "args.costConfig.mp += 1;"
+                        },
+                        {
+                            "label": "鱼龙·招式增伤",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "args.output.damage += 5;\nargs.output.bonusDesc.push(`鱼龙真气: +5`);"
                         }
                     ]
                 }
@@ -2668,7 +2674,7 @@
             "sect": "jianghushili",
             "description": "佛门俗世功法，主修青白二气，出淤泥而不染，居俗世而不群。\n圆满运功特效：你施展阳属性武学招式后，获得一层“青气”，你施展刚属性武学招式后，获得一层“白气”，持续到战斗脱离。\n·你在出招时可以同时消耗一层“青气”和“白气”，击飞周围1米内的敌人3米。\n修满特效：修满[永久]：气血+10，内力+10，内外功防御+1。",
             "requirement": "悟性2",
-            "automationNote": "部分自动化：自动累积青白气，但消耗青白气需手动。",
+            "automationNote": "完全自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -2709,10 +2715,10 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "青莲心法-积气",
-                            "trigger": "hit_once",
-                            "script": "if (args.move.element === 'yang') { const eff = thisItem.effects.getName('青气').toObject(); delete eff._id; eff.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, eff); } if (args.move.element === 'gang') { const eff = thisItem.effects.getName('白气').toObject(); delete eff._id; eff.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, eff); }",
-                            "active": true
+                            "label": "青莲心法-气劲交汇",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "let qingAdded = false;\nlet baiAdded = false;\n\nif (args.element === 'yang') {\n    const eff = thisItem.effects.getName('青气').toObject();\n    delete eff._id; eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    qingAdded = true;\n}\nif (args.element === 'gang') {\n    const eff = thisItem.effects.getName('白气').toObject();\n    delete eff._id; eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    baiAdded = true;\n}\n\nconst qingEff = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'neigong_qingqi');\nconst baiEff = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'neigong_baiqi');\nconst qingStacks = (qingEff ? (qingEff.getFlag('xjzl-system', 'stacks') || 1) : 0) + (qingAdded && !qingEff ? 1 : 0);\nconst baiStacks = (baiEff ? (baiEff.getFlag('xjzl-system', 'stacks') || 1) : 0) + (baiAdded && !baiEff ? 1 : 0);\n\nif (qingStacks > 0 && baiStacks > 0) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"青莲心法\" },\n        content: \"<p>你当前同时拥有【青气】与【白气】。</p><p>是否各消耗 1 层，击飞周围 1 米内的敌人 3 米？</p>\",\n        yes: { label: \"消耗并击飞\" },\n        no: { label: \"保留\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"neigong_qingqi\", 1);\n        await game.xjzl.api.effects.removeEffect(actor, \"neigong_baiqi\", 1);\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2ecc71; background: rgba(46,204,113,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-wind\"></i> 青莲交汇</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">青白二气激荡爆发，<span style=\"color:#e74c3c; font-weight:bold;\">击飞</span>周围 1 米内的所有敌人 3 米！<br><span style=\"font-size:0.8em;color:#888;\">(请根据占位手动移动相关敌人)</span></div></div></div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}"
                         }
                     ]
                 }
@@ -2745,10 +2751,10 @@
         "effects": [
             {
                 "name": "青气",
-                "icon": "icons/svg/aura.svg",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖3.png",
                 "description": "消耗一层青气和白气可击飞敌人。",
                 "transfer": false,
-                "disabled": true,
+                "disabled": false,
                 "duration": {
                     "rounds": 10
                 },
@@ -2762,10 +2768,10 @@
             },
             {
                 "name": "白气",
-                "icon": "icons/svg/aura.svg",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖3.png",
                 "description": "消耗一层青气和白气可击飞敌人。",
                 "transfer": false,
-                "disabled": true,
+                "disabled": false,
                 "duration": {
                     "rounds": 10
                 },
@@ -3571,7 +3577,7 @@
             "sect": "jianghushili",
             "description": "来自西域的毒功，邪异恐怖，修炼者需浸泡于剧毒池中，任毒液蚕食每一寸肌肤，又以邪法，凝聚腐烂毒肤，练成之后，状如毒尸，金铁不侵。",
             "requirement": "悟性 1",
-            "automationNote": "完全自动化。运功防御加成通过 passive 实现。修满特效通过 preTake 脚本检测架招状态并减少内外功伤害。",
+            "automationNote": "完全自动化。运功防御加成自动。修满后请在特效页面手动开启【修满被动】即可获得无架招减伤。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -3620,23 +3626,39 @@
                     ]
                 }
             },
-            "masteryEffect": "修满[永久]：你在无架招状态时，受到的内外功伤害减少10点。",
+            "masteryEffect": "修满[永久]：你在无架招状态时，受到的内外功伤害减少10点。\n（请在特效配置界面手动开启修满被动）",
             "masteryChanges": [],
             "xpInvested": 0,
             "active": false,
             "sourceBreakdown": {
                 "general": 0,
                 "specific": 0
-            },
-            "masteryScripts": [
-                {
-                    "label": "百毒·修满减伤",
-                    "trigger": "preTake",
-                    "active": true,
-                    "script": "if (!actor.system.martial.stanceActive && [\"waigong\", \"neigong\"].includes(args.type)) {\n    args.output.damage = Math.max(0, args.output.damage - 10);\n}"
-                }
-            ]
-        }
+            }
+        },
+        "effects": [
+            {
+                "name": "百毒功·修满被动",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
+                "description": "修满《百毒功》后获得的永久被动。你在无架招状态时，受到的内外功伤害减少10点。",
+                "transfer": true,
+                "disabled": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "baidu_mastery_passive",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "无架招减伤",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "if (!actor.system.martial.stanceActive && ['waigong', 'neigong'].includes(args.type)) {\n    args.output.damage = Math.max(0, args.output.damage - 10);\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "《开元功》",
@@ -4569,7 +4591,7 @@
             "sect": "jianghushili",
             "description": "风雅颂不止，赋比兴见义，此功源于诵读诗书而来，以诗书促功法修炼。大成后使人气质潇洒，功力脱俗。",
             "requirement": "悟性 5",
-            "automationNote": "完全自动化。在 calc 阶段检测招式名称长度并给予伤害加成。",
+            "automationNote": "完全自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -4626,7 +4648,7 @@
                             "label": "诗经·格挡",
                             "trigger": "passive",
                             "active": true,
-                            "script": "S.combat.block += 1; // 简化处理，直接被动+1"
+                            "script": "if (actor.system.martial.stanceActive && actor.system.martial.stanceItemId && actor.system.martial.stance) {\n    const stanceItem = actor.items.get(actor.system.martial.stanceItemId);\n    if (stanceItem && stanceItem.system.moves) {\n        const stanceMove = stanceItem.system.moves.find(m => m.id === actor.system.martial.stance);\n        if (stanceMove && stanceMove.name) {\n            S.combat.block += stanceMove.name.length;\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -4652,7 +4674,8 @@
                 "general": 0,
                 "specific": 0
             }
-        }
+        },
+        "effects": []
     },
     {
         "name": "《遁去的一》",
@@ -6319,7 +6342,7 @@
             "sect": "jianghushili",
             "description": "江湖奇功，“于天蚕作茧自缚，置之死地而后生”，修炼者需摒弃一切，散去全身内力，以纯阴汇于阳，重新修炼，方可脱胎换骨，重获新生。",
             "requirement": "悟性 12, 需散功",
-            "automationNote": "击中效果自动化。化茧逻辑需手动处理。",
+            "automationNote": "击中效果自动化。化茧时会自动抽干内力发提示卡，但具体的茧承伤逻辑需手动处理。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -6337,7 +6360,7 @@
                             "label": "天蚕·丝缠",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if(args.finalDamage > 0) { await game.xjzl.api.effects.toggleStatus(args.target, 'unstable', true, {duration:{rounds:1}}); }"
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif(args.finalDamage > 0) { await game.xjzl.api.effects.toggleStatus(args.target, 'unstable', true, {duration:{rounds:1}}); }"
                         }
                     ]
                 },
@@ -6357,7 +6380,13 @@
                             "label": "天蚕·丝缠",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if(args.finalDamage > 0) { await game.xjzl.api.effects.toggleStatus(args.target, 'unstable', true, {duration:{rounds:1}}); }"
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif(args.finalDamage > 0) { await game.xjzl.api.effects.toggleStatus(args.target, 'unstable', true, {duration:{rounds:1}}); }"
+                        },
+                        {
+                            "label": "天蚕·化茧",
+                            "trigger": "dying",
+                            "active": true,
+                            "script": "if (!args.preventDying) {\n    args.preventDying = true;\n    const mp = actor.system.resources.mp.value;\n    const shieldHp = mp * 5;\n    await actor.update({\"system.resources.mp.value\": 0});\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-spider\"></i> 天蚕化茧</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">你消耗了所有内力 (<span style=\"color:#2980b9; font-weight:bold;\">${mp}</span>)，化为天蚕巨茧！<br>茧拥有 <span style=\"color:#c0392b; font-weight:bold;\">${shieldHp}</span> 点气血，防御与你相同。<br><span style=\"color:#888;\">请手动记录化茧状态并在第五回合初苏醒。</span></div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -6377,7 +6406,13 @@
                             "label": "天蚕·丝缠(强)",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if(args.finalDamage > 0) { await game.xjzl.api.effects.toggleStatus(args.target, 'unstable', true, {duration:{rounds:2}}); }"
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif(args.finalDamage > 0) { await game.xjzl.api.effects.toggleStatus(args.target, 'unstable', true, {duration:{rounds:2}}); }"
+                        },
+                        {
+                            "label": "天蚕·化茧",
+                            "trigger": "dying",
+                            "active": true,
+                            "script": "if (!args.preventDying) {\n    args.preventDying = true;\n    const mp = actor.system.resources.mp.value;\n    const shieldHp = mp * 5;\n    await actor.update({\"system.resources.mp.value\": 0});\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-spider\"></i> 天蚕化茧</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">你消耗了所有内力 (<span style=\"color:#2980b9; font-weight:bold;\">${mp}</span>)，化为天蚕巨茧！<br>茧拥有 <span style=\"color:#c0392b; font-weight:bold;\">${shieldHp}</span> 点气血，防御与你相同。<br><span style=\"color:#888;\">请手动记录化茧状态并在第四回合初苏醒。</span></div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 }
@@ -6407,6 +6442,7 @@
                 "general": 0,
                 "specific": 0
             }
-        }
+        },
+        "effects": []
     }
 ]
