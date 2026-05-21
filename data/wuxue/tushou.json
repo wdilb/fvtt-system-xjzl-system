@@ -7310,15 +7310,7 @@
             "tier": 2,
             "description": "<p>掌法空旷澄澈，需内心清明无垢方能发挥最大力量，若敌人心机过重，必陷囫囵。</p><p>注：该武学悟性大于等于 15 后无法领悟，施展此武学时，你无法开启架招，若有，则立即解除。</p><p><strong>需求：</strong>徒手-拳掌</p><p><strong>属性：</strong>柔</p>",
             "requirements": "徒手-拳掌",
-            "automationNote": "施展时自动解除架招。",
-            "scripts": [
-                {
-                    "label": "自动解除架招",
-                    "trigger": "attack",
-                    "script": "if (actor.system.martial.stanceActive) {\n    await actor.stopStance();\n    ui.notifications.warn(\"空明掌法特性触发：架招已自动解除。\");\n}",
-                    "active": true
-                }
-            ],
+            "automationNote": "施展时自动解除架招效果请手动。",
             "moves": [
                 {
                     "name": "探虚掏空",
@@ -7329,8 +7321,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>一掌绵绵递出，劲道空虚，看似不能穿纸，造成伤害。</p><p>若目标上回合受到过虚招攻击，则本招虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
-                    "automationNote": "上回合状态判断手动。",
+                    "description": "<p>一掌绵绵递出，劲道空虚，看似不能穿纸，造成 0.4 内息点内功伤害。</p><p>若目标上回合受到过虚招攻击，则本招虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7350,9 +7342,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "升级虚招值加成",
-                            "trigger": "calc",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nif (lvl > 1) {\n    const bonus = lvl - 1;\n    args.output.feint += bonus;\n    args.output.feintBonusDesc.push(`升级虚招加值 +${bonus}`);\n}",
+                            "label": "询问与虚招加值",
+                            "trigger": "attack",
+                            "script": "if (args.flags.autoApplied) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"探虚掏空\" },\n    content: \"<p>目标上回合是否受到过<b>虚招</b>攻击？</p>\",\n    yes: { label: \"是\", icon: \"fas fa-check\" },\n    no: { label: \"否\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = 1 + (lvl > 1 ? lvl - 1 : 0);\n    args.flags.bonusFeint += bonus;\n    args.flags.damageResult.feintBreakdown += `\\n+ 探虚掏空: ${bonus} (目标受过虚招)`;\n}",
                             "active": true
                         }
                     ]
@@ -7368,7 +7360,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>左手空，右手空，获得“明”状态，持续到脱战，并移除“空”状态。</p><p><strong>明：</strong>他人观察你时，认为你处于开启架招的状态（实际上你无架招），你受到虚招以外的内外功伤害-10，开启架招后此状态消散。</p><p>·敌方对你施展虚招时，无需进行虚招对抗（因为你处于无架招），直接结算伤害，你移除“明”状态，获得“空”状态，持续到战斗脱离，同时敌方陷入“不明”，持续到战斗脱离。</p><p><strong>升级：</strong>伤害额外减免提高 10 点，内力消耗+2。</p>",
-                    "automationNote": "获明去空自动。明减伤自动。明被虚招互换状态需手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -7384,7 +7376,7 @@
                         {
                             "label": "状态切换",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"kong\");\nconst eff = thisItem.effects.getName(\"明\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\n// 基础减伤10 + 升级(Lv-1)*10\nconst reduction = 10 + (lvl - 1) * 10;\neff.changes[0].value = `-${reduction}`;\neff.changes[1].value = `-${reduction}`;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"kong\");\nconst sourceItem = actor.items.find(i => i.name === '空明掌法' && i.type === 'wuxue');\nif (sourceItem) {\n    const effData = sourceItem.effects.getName(\"明\").toObject();\n    const lvl = Math.max(1, move.computedLevel || 1);\n    effData.flags[\"xjzl-system\"].mingLevel = lvl;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
                             "active": true
                         }
                     ]
@@ -7400,7 +7392,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双手后背，中门大开，身体柔韧，获得“空”状态，持续到脱战，并移除“明”状态。</p><p><strong>空：</strong>受到招式攻击时，自身流失 40 点气血，但若对方招式会给你添加状态，将该状态转移给对方。</p><p>·你只能转移人级、地级的状态，转移后，“空”结束，获得“明”，持续到战斗脱离，同时敌方陷入“不空”，持续到战斗脱离。</p><p><strong>升级：</strong>流失的气血减少 10 点，内力消耗+2。</p>",
-                    "automationNote": "获空去明自动。空受击流失自动。状态转移及后续切换手动。",
+                    "automationNote": "空受击流失自动计算。状态转移及后续切换操作需根据卡片提示手动执行。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -7416,7 +7408,7 @@
                         {
                             "label": "状态切换",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"ming\");\nconst eff = thisItem.effects.getName(\"空\").toObject();\n// 写入升级后的流失值到 Flag，供 damaged 脚本使用\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst loss = Math.max(0, 40 - (lvl - 1) * 10);\neff.flags[\"xjzl-system\"].lossAmount = loss;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"ming\");\nconst sourceItem = actor.items.find(i => i.name === '空明掌法' && i.type === 'wuxue');\nif (sourceItem) {\n    const effData = sourceItem.effects.getName(\"空\").toObject();\n    const lvl = Math.max(1, move.computedLevel || 1);\n    effData.flags[\"xjzl-system\"].kongLevel = lvl;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
                             "active": true
                         }
                     ]
@@ -7430,8 +7422,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你受到以反应动作释放的招式攻击时，可消耗反应动作与目标进行一次[武学内功]的对抗，若胜利，则压制对方招式，双掌虚握，柔中带韧对目标造成伤害。</p><p>·若对方存在“不空”或“不明”，对抗检定+1。</p><p>·若对方同时存在“不空”和“不明”，你获胜时，对方彻底迷茫，陷入“封招”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，对抗检定+1，内力消耗+2。</p>",
-                    "automationNote": "对抗请求自动。检定加值及封招施加需人工判断。",
+                    "description": "<p>当你受到以反应动作释放的招式攻击时，可消耗反应动作与目标进行一次[武学内功]的对抗，若胜利，则压制对方招式，双掌虚握，柔中带韧对目标造成 0.5 内息点内功伤害。</p><p>·若对方存在“不空”或“不明”，对抗检定+1。</p><p>·若对方同时存在“不空”和“不明”，你获胜时，对方彻底迷茫，陷入“封招”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，对抗检定+1，内力消耗+2。</p>",
+                    "automationNote": "自动设为必中并阻断默认伤害，转为发起对抗。若对抗成功请手动给对方造成伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7456,9 +7448,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
+                            "label": "注入必中",
+                            "trigger": "attack",
+                            "script": "args.flags.forceHit = true;",
+                            "active": true
+                        },
+                        {
+                            "label": "拦截默认伤害",
+                            "trigger": "preDamage",
+                            "script": "args.config.amount = 0;\nargs.config.ignoreMinDamage = true;",
+                            "active": true
+                        },
+                        {
+                            "label": "发起化解对抗",
                             "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    label: \"司空见惯 - 化解对抗\",\n    outcome: {\n        win: { text: \"化解成功！若敌方同时有[不空/不明]，请手动施加[封招]。\" },\n        lose: { text: \"化解失败。\" }\n    }\n});",
+                            "script": "if(!args.target) return;\nlet bonus = 0;\nconst hasBuming = args.target.effects.some(e => e.name === '不明' || e.getFlag('xjzl-system','slug')==='buming');\nconst hasBukong = args.target.effects.some(e => e.name === '不空' || e.getFlag('xjzl-system','slug')==='bukong');\n\nif (hasBuming || hasBukong) bonus += 1;\nconst lvl = Math.max(1, move.computedLevel || 1);\nif (lvl > 1) bonus += (lvl - 1);\n\nconst dmg = args.baseDamage || 0;\n\n// 构建动态结果文本和效果\nconst winObj = { \n    text: `化解成功！压制招式，请手动让目标扣除 ${dmg} 点内功伤害。`\n};\nif (hasBuming && hasBukong) {\n    winObj.text += \" 对方彻底迷茫，陷入[封招]！\";\n    winObj.targetEffect = { id: \"fengzhao\", duration: { rounds: 1 } };\n}\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    attBonus: bonus,\n    label: \"司空见惯 - 武学化解\",\n    outcome: {\n        win: winObj,\n        lose: { text: \"化解失败。\" }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -7473,8 +7477,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>若有若无，似实似虚。不明不白地击出一掌，造成伤害。</p><p>·若对方身上同时有“不空”和“不明”，则懵懵懂懂迷迷糊糊，陷入“一忘皆空”，持续到脱战。</p><p><strong>一忘皆空：</strong>不可再施展当前使用的武学套路。</p><p>·若你受到绝招攻击，可消耗反应动作释放此招，与目标进行一次[武学内功]的对抗，若胜利，则压制对方绝招，并造成伤害和效果，失败则此招释放失败（消耗对应的怒气和内力）。</p><p>·若对方同时存在“不空”和“不明”，招式对抗检定+1。</p><p><strong>升级：</strong>招式伤害+20，对抗检定+1，怒气-1，内力消耗+4。</p>",
-                    "automationNote": "对抗请求自动。特殊状态组合效果手动。",
+                    "description": "<p>若有若无，似实似虚。主要动作，不明不白地击出一掌，造成 0.8 内息点内功伤害。</p><p>·若对方身上同时有“不空”和“不明”，则懵懵懂懂迷迷糊糊，陷入“一忘皆空”，持续到脱战。</p><p><strong>一忘皆空：</strong>不可再施展当前使用的武学套路。</p><p>·若你受到绝招攻击，可消耗反应动作释放此招，与目标进行一次[武学内功]的对抗，若胜利，则压制对方绝招，并造成伤害和效果，失败则此招释放失败（消耗对应的怒气和内力）。</p><p>·若对方同时存在“不空”和“不明”，招式对抗检定+1。</p><p><strong>升级：</strong>招式伤害+20，对抗检定+1，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "出招弹窗选择主动/反应施展。反应施展时自动阻断默认伤害转为对抗，若对抗成功请手动对对方造成伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -7499,9 +7503,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "武学对抗",
+                            "label": "选择释放模式",
+                            "trigger": "attack",
+                            "script": "if (args.flags.autoApplied) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"空空如也\" },\n    content: \"<p>请选择释放方式：</p>\",\n    yes: { label: \"反应施展 (反制绝招)\", icon: \"fas fa-shield-alt\" },\n    no: { label: \"主动施展 (直击)\", icon: \"fas fa-fist-raised\" }\n});\n// 用 Actor 的临时标记，跨越异步阻断伤害\nactor.kongkongIsReaction = confirm;\nif (confirm) {\n    args.flags.forceHit = true;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "拦截伤害 (仅反应模式)",
+                            "trigger": "preDamage",
+                            "script": "if (actor.kongkongIsReaction) {\n    args.config.amount = 0;\n    args.config.ignoreMinDamage = true;\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "结算效果",
                             "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxue\",\n    label: \"空空如也 - 虚实对抗\",\n    outcome: {\n        win: { text: \"对抗获胜！若敌方满足条件，施加[一忘皆空](手动)。\" },\n        lose: { text: \"对抗失败。\" }\n    }\n});",
+                            "script": "if(!args.target) return;\nconst t = args.target;\nconst hasBuming = t.effects.some(e => e.name === '不明' || e.getFlag('xjzl-system','slug')==='buming');\nconst hasBukong = t.effects.some(e => e.name === '不空' || e.getFlag('xjzl-system','slug')==='bukong');\n\nconst yiwangData = {\n    name: \"一忘皆空\",\n    icon: \"icons/magic/symbols/question-stone-yellow.webp\",\n    description: \"不可再施展当前使用的武学套路。\",\n    transfer: false,\n    flags: { \"xjzl-system\": { slug: \"yiwangjiekong\", stackable: false } },\n    changes: []\n};\n\nif (actor.kongkongIsReaction) {\n    let bonus = 0;\n    if (hasBuming && hasBukong) bonus += 1;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    if (lvl > 1) bonus += (lvl - 1);\n    const dmg = args.baseDamage || 0;\n    \n    const winObj = { \n        text: `绝招压制成功！请手动对目标造成 ${dmg} 点内功伤害。` \n    };\n    if (hasBuming && hasBukong) {\n        winObj.text += \" 目标陷入[一忘皆空]！\";\n        winObj.targetEffect = yiwangData;\n    }\n    \n    await Macros.requestContest({\n        attacker: actor,\n        defender: t,\n        type: \"wuxue\",\n        attBonus: bonus,\n        label: \"空空如也 - 绝招压制\",\n        outcome: {\n            win: winObj,\n            lose: { text: \"压制失败，招式放空。\" }\n        }\n    });\n    delete actor.kongkongIsReaction; // 用完即删\n} else {\n    if (hasBuming && hasBukong) {\n        await game.xjzl.api.effects.addEffect(t, yiwangData);\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142, 68, 173, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-brain\"></i> 懵懵懂懂</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">目标身上同时存在[不空]和[不明]，陷入<b>一忘皆空</b>！<br>当前套路已被封印。</div></div></div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -7510,32 +7526,35 @@
             "effects": [
                 {
                     "name": "明",
-                    "icon": "icons/magic/light/beam-rays-yellow-orange.webp",
-                    "description": "受到虚招以外伤害减少。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "被认为处于架招。受到虚招以外内外功伤害降低。被虚招击中状态转化。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "ming",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "减伤抗性",
+                                    "trigger": "preTake",
+                                    "active": true,
+                                    "script": "if (args.type === 'waigong' || args.type === 'neigong') {\n    if (args.move && args.move.type !== 'feint') {\n        const lvl = Number(thisEffect.getFlag('xjzl-system', 'mingLevel')) || 1;\n        const reduction = 10 + (lvl - 1) * 10;\n        args.output.damage = Math.max(0, args.output.damage - reduction);\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f1c40f; background: rgba(241, 196, 15, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#f39c12;\"><i class=\"fas fa-shield-alt\"></i> [明] 减伤生效</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">受到非虚招伤害，减免了 <b>${reduction}</b> 点伤害。</div></div></div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}"
+                                },
+                                {
+                                    "label": "虚招破明",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "if (args.move && args.move.type === 'feint' && args.attacker) {\n    await game.xjzl.api.effects.removeEffect(actor, 'ming', 1);\n    const sourceItem = actor.items.find(i => i.name === '空明掌法' && i.type === 'wuxue');\n    if (sourceItem) {\n        const kongData = sourceItem.effects.getName('空');\n        if (kongData) {\n            const effData = kongData.toObject();\n            const lvl = Number(thisEffect.getFlag('xjzl-system', 'mingLevel')) || 1;\n            effData.flags['xjzl-system'].kongLevel = lvl;\n            await game.xjzl.api.effects.addEffect(actor, effData);\n        }\n        const bumingData = sourceItem.effects.getName('不明');\n        if (bumingData) await game.xjzl.api.effects.addEffect(args.attacker, bumingData.toObject());\n    }\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230, 126, 34, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-exchange-alt\"></i> [明] 识破虚招</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">受到虚招伤害，自动转化为 [空] 状态，并使攻击者陷入 [不明]。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "10"
-                        },
-                        {
-                            "key": "system.combat.def_neigong",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "changes": []
                 },
                 {
                     "name": "空",
-                    "icon": "icons/magic/air/wind-tornado-wall-blue.webp",
-                    "description": "受击流失气血，可转移状态。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "受到招式攻击流失气血，可手动转移负面状态。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -7543,12 +7562,51 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "受击流失",
+                                    "label": "受击流失与转移提示",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "const loss = Number(thisEffect.getFlag('xjzl-system', 'lossAmount')) || 40;\nawait actor.applyDamage({amount: loss, type: 'liushi', attacker: args.attacker, isHit: true});\nui.notifications.info(`${actor.name} 触发[空]：流失 ${loss} 气血。若有状态可转移，请手动操作。`);"
+                                    "script": "if (!args.move || (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst lvl = Number(thisEffect.getFlag('xjzl-system', 'kongLevel')) || 1;\nconst loss = Math.max(0, 40 - (lvl - 1) * 10);\nawait actor.applyDamage({amount: loss, type: 'liushi', attacker: args.attacker, isHit: true});\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-wind\"></i> [空] 状态触发</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">受到招式攻击，流失 ${loss} 气血。<hr><b>战术提示：</b>若对方招式会给你添加状态（人级/地级），你可以手动将该状态转移给对方！<br>转移后，请<b>手动删除 [空]</b>，<b>添加 [明]</b>，并给对方<b>添加 [不空]</b>。</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
                                 }
                             ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "不明",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "被虚招击中处于明状态的目标后获得。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "buming",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "不空",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "目标从空状态转移异常状态后获得。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bukong",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "一忘皆空",
+                    "icon": "icons/magic/symbols/question-stone-yellow.webp",
+                    "description": "不可再施展当前使用的武学套路。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yiwangjiekong",
+                            "stackable": false
                         }
                     },
                     "changes": []
