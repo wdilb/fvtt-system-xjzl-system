@@ -299,7 +299,7 @@ export class ActiveEffectManager {
                 this._showScrollingText(actor, `~ ${existingEffect.name}`, "neutral");
             } else {
                 // 未达上限：增加层数
-                const newStacks = currentStacks + count;
+                let newStacks = currentStacks + count;
 
                 // 溢出检查
                 if (maxStacks > 0 && newStacks > maxStacks) {
