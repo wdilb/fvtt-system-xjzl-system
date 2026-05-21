@@ -7122,7 +7122,7 @@
                     "targetInfo": "周围",
                     "actionCost": "蓄力动作",
                     "description": "<p>横旋甩臂，烈火昭昭，对周围敌方造成伤害。</p><p>·若武器具有“火灼”，可选择移除至多一层，使招式暴击骰-2。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "需手动给角色添加“火灼”BUFF。消耗及暴击修正自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7144,7 +7144,7 @@
                         {
                             "label": "消耗火灼",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huozhuo\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"凭地一声雷\" },\n        content: \"<p>消耗 1 层 [火灼] 使暴击骰 -2？</p>\",\n        yes: { label: \"消耗\", icon: \"fas fa-fire\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"huozhuo\", 1);\n        args.flags.critThresholdMod = (args.flags.critThresholdMod || 0) + 2; \n        ui.notifications.info(\"消耗火灼，暴击率提升！\");\n    }\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huozhuo\");\nif (buff) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"凭地一声雷\" },\n        content: \"<p>是否消耗 1 层 [火灼] 使暴击阈值 -2？</p>\",\n        yes: { label: \"消耗\", icon: \"fas fa-fire\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"huozhuo\", 1);\n        args.flags.critThresholdMod = (args.flags.critThresholdMod || 0) + 2; \n        ui.notifications.info(\"消耗火灼，暴击率提升！\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -7181,7 +7181,7 @@
                         {
                             "label": "击破目盲",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huozhuo\");\n    if (hasBuff) {\n        const blind = CONFIG.statusEffects.find(e => e.id === \"blind\");\n        if (blind) {\n            const data = foundry.utils.deepClone(blind);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 被致盲！(周围目标请手动处理)`);\n        }\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huozhuo\");\n    if (hasBuff) {\n        const blind = CONFIG.statusEffects.find(e => e.id === \"blind\");\n        if (blind) {\n            const data = foundry.utils.deepClone(blind);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-eye-slash\"></i> 熏烟目盲</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">目标被致盲！<br><b>注：</b>请手动将目标周围 2 米内的敌人添加[目盲]状态。</div></div></div>`;\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -7255,7 +7255,7 @@
                         {
                             "label": "转火焰伤害",
                             "trigger": "preDamage",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huozhuo\");\nconst stacks = buff ? (buff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3) {\n    if (args.isManual) { return; }\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"天火流星坠\" },\n        content: \"<p>消耗 3 层 [火灼] 将伤害转为 <b>火焰</b> 类型？</p>\",\n        yes: { label: \"消耗\", icon: \"fas fa-fire\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"huozhuo\", 3);\n        args.config.type = \"fire\";\n        ui.notifications.info(\"伤害已转化为火焰！\");\n    }\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huozhuo\");\nconst stacks = buff ? (buff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3) {\n    if (args.isManual) { return; }\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"天火流星坠\" },\n        content: \"<p>是否消耗 3 层 [火灼] 将伤害转为 <b>火焰</b> 类型？</p>\",\n        yes: { label: \"消耗\", icon: \"fas fa-fire\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"huozhuo\", 3);\n        args.config.type = \"fire\";\n        ui.notifications.info(\"伤害已转化为火焰！\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -7278,13 +7278,21 @@
                 {
                     "name": "火灼",
                     "icon": "icons/svg/fire.svg",
-                    "description": "火树银花不夜天特效标记，手动添加。",
+                    "description": "每次命中时可选择消耗一层，额外造成 10 点火焰伤害。遇水熄灭。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "huozhuo",
                             "stackable": true,
-                            "maxStacks": 5
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "引爆火药",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "if(!args.isHit || !args.target) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"火灼引爆\" },\n    content: \"<p>是否消耗 1 层 [火灼]，额外造成 <b>10</b> 点火焰伤害？</p>\",\n    yes: { label: \"引爆\", icon: \"fas fa-fire\" },\n    no: { label: \"保留\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"huozhuo\", 1);\n    await args.target.applyDamage({ amount: 10, type: \"fire\", attacker: actor, isHit: true, ignoreDefense: true, ignoreBlock: true, ignoreStance: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-fire\"></i> 火灼引爆</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">造成了 <b>10</b> 点火焰伤害！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                                }
+                            ]
                         }
                     },
                     "changes": []
