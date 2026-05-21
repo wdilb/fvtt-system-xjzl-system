@@ -814,7 +814,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，垂臂直立，稳扎弓马，开启架招。</p><p>格挡成功后，可选择解除本架招，然后消耗反应动作施展一次【十字蹦脚尖】，这次十字蹦脚尖的施展距离+1 米。</p><p><strong>升级：</strong>格挡值+5，施展距离+1，内力消耗+1。</p>",
-                    "automationNote": "反击提示自动。若选择反击，请手动点击十字蹦脚尖，并注意距离增加。",
+                    "automationNote": "格挡成功发送卡片。若选择反击，请手动解除架招并施展十字蹦脚尖。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -824,14 +824,16 @@
                             1,
                             2,
                             3
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "反击提示",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst moveData = thisItem.system.moves.find(m => m.name === \"狮子双戏水\");\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst rangeBonus = 1 + (lvl - 1);\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"狮子双戏水\" },\n    content: `<p>格挡成功！是否消耗架招进行反击？</p><p>反击招式：<b>十字蹦脚尖</b> (距离+${rangeBonus})</p>`,\n    yes: { label: \"反击\", icon: \"fas fa-fist-raised\" },\n    no: { label: \"维持架招\", icon: \"fas fa-shield-alt\" }\n});\n\nif (confirm) {\n    await actor.stopStance();\n    ui.notifications.info(`架招已解除。请手动施展 [十字蹦脚尖] (距离增加 ${rangeBonus} 米)。`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取自身招式等级\nconst myMove = thisItem.system.moves.find(m => m.name === \"狮子双戏水\");\nconst lvl = Math.max(1, myMove?.computedLevel || 1);\nconst rangeBonus = lvl;\n\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n    <div style=\"border-left: 3px solid #e67e22; background: rgba(230,126,34,0.1); padding: 5px 8px;\">\n        <div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-shield-alt\"></i> 狮子双戏水·格挡反击</div>\n        <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n            你成功格挡了攻击！你可以选择手动解除本架招，并消耗反应动作施展一次 <b>【十字蹦脚尖】</b>。<br>\n            <span style=\"color:#d35400;\">本次施展距离 +${rangeBonus} 米。</span>\n        </div>\n    </div>\n</div>`;\n\nChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 },
@@ -1406,7 +1408,8 @@
                 },
                 {
                     "name": "按嘱服药",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "taiji",
                     "damageType": "none",
@@ -1415,7 +1418,7 @@
                     "targetInfo": "单体",
                     "actionCost": "全回合动作",
                     "description": "<p>全回合动作，从行囊内掏出一份药品，然后给目标喂下，目标获得药品原有效果，并额外回复 10 点气血内力。</p><p>·每有 1 级[医术]，额外回复 2 点气血内力。</p><p>·若你的[医术]达到 5 级，还可以移除目标身上一个地级及以下的状态。</p><p><strong>升级：</strong>释放距离+1，额外回复 10 点气血内力，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "喂药效果手动。额外回血自动。移除状态手动。",
+                    "automationNote": "发送卡片提醒。喂药效果手动。移除状态手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1430,14 +1433,15 @@
                             7,
                             6,
                             5
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "额外回复",
+                            "label": "额外回复与指示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 基础回复: 10 + (Lv-1)*10\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const baseHeal = 10 + (lvl - 1) * 10;\n    \n    // 医术加成: Skill * 2\n    const yishu = actor.system.arts.yishu?.total || 0;\n    const extra = yishu * 2;\n    \n    const total = baseHeal + extra;\n    \n    await args.target.applyHealing({amount: total, type: 'hp', showScrolling: true});\n    await args.target.applyHealing({amount: total, type: 'mp', showScrolling: true});\n    \n    if (yishu >= 5) {\n        ui.notifications.info(\"医术精湛：请手动移除目标一个地级及以下状态。\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst baseHeal = 10 + (lvl - 1) * 10;\nconst yishu = actor.system.arts.yishu?.total || 0;\nconst total = baseHeal + (yishu * 2);\n\nawait args.target.applyHealing({amount: total, type: 'hp', showScrolling: true});\nawait args.target.applyHealing({amount: total, type: 'mp', showScrolling: true});\n\nlet extraHtml = \"\";\nif (yishu >= 5) {\n    extraHtml = `<div style=\"margin-top:5px; padding-top:4px; border-top:1px dashed #27ae60; color:#27ae60; font-weight:bold;\"><i class=\"fas fa-hand-holding-medical\"></i> 医术精湛：请手动移除目标身上一个地级及以下的状态。</div>`;\n}\n\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n    <div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\">\n        <div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-pills\"></i> 按嘱服药</div>\n        <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n            目标额外回复了 <b>${total}</b> 点气血与内力。<br>\n            <span style=\"color:#888;\">（请勿忘记手动应用药品原本的效果）</span>\n            ${extraHtml}\n        </div>\n    </div>\n</div>`;\n\nChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 }
@@ -2548,7 +2552,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>内力运转，掌心发黑，为自己下 1 次攻击添加“毒掌”效果，持续到战斗脱离。</p><p><strong>毒掌：</strong>命中敌人后添加一层“黑神毒”，若敌人无架招，额外添加一层。黑神毒最多叠加 9 层，持续到战斗脱离。</p><p><strong>黑神毒：</strong>每层使你的[韧性]等级-1（最低 0）。</p><p><strong>升级：</strong>“毒掌”可攻击次数+1，内力消耗+1。</p>",
-                    "automationNote": "应用Buff自动。毒掌触发黑神毒自动。黑神毒效果自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2558,14 +2562,16 @@
                             1,
                             2,
                             3
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "应用毒掌",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"毒掌\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\n\n// 动态计算次数 (1 + Lv-1)\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.flags[\"xjzl-system\"].maxStacks = lvl;\neff.flags[\"xjzl-system\"].stacks = lvl; // 初始给满次数\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"毒掌\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\neff.flags[\"xjzl-system\"].maxStacks = lvl;\neff.flags[\"xjzl-system\"].stacks = lvl;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -2579,7 +2585,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>黑气萦绕，开启架招。格挡成功时，给对方添加 1 层“黑神毒”，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "格挡自动给攻击者施加黑神毒。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -2589,14 +2595,16 @@
                             1,
                             2,
                             3
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "格挡附毒",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst poison = thisItem.effects.getName(\"黑神毒\").toObject();\ndelete poison._id; poison.origin = thisItem.uuid;\nif (args.attacker) {\n    await game.xjzl.api.effects.addEffect(args.attacker, poison);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const wuxueItem = actor.items.find(i => i.name === \"黑心掌\" && i.type === \"wuxue\");\n    if (wuxueItem) {\n        const poison = wuxueItem.effects.getName(\"黑神毒\").toObject();\n        delete poison._id; poison.origin = wuxueItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, poison);\n    }\n}"
                         }
                     ]
                 },
@@ -2610,7 +2618,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>黑心掌击出，造成 0.4 力量点外功伤害。</p><p>·若目标当前的[韧性]为 0，招式暴击骰-3。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "自动检测目标韧性并修正暴击阈值。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -2626,14 +2634,16 @@
                             1,
                             2,
                             3
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "韧性检测",
-                            "trigger": "attack",
-                            "script": "const targets = Array.from(game.user.targets).map(t => t.document.actor);\n// 仅检测首要目标\nif (targets.length > 0) {\n    const target = targets[0];\n    const renxing = target.system.skills.renxing.total;\n    if (renxing <= 0) {\n        args.flags.critThresholdMod = (args.flags.critThresholdMod || 0) + 3;\n        ui.notifications.info(\"目标韧性归零，暴击率提升！\");\n    }\n}",
-                            "active": true
+                            "trigger": "check",
+                            "active": true,
+                            "script": "const renxing = args.target.system.skills.renxing?.total || 0;\nif (renxing <= 0) {\n    args.flags.critThresholdMod += 3;\n    \n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n        <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n            <div style=\"font-size:0.9em; color:#555;\">\n                目标 <b>${args.target.name}</b> 韧性崩溃，本次对其攻击 <b>暴击骰 -3</b>！\n            </div>\n        </div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
                         }
                     ]
                 },
@@ -2648,7 +2658,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双掌拍出，造成 0.3 力量+0.3 内息点外功伤害，引爆目标体内毒素，目标每有一层“黑神毒”，流失 5 点内力。</p><p>·若目标中此招后内力低于内力上限的 50%，则在内力值恢复至 50%之前，受到《黑心掌》招式伤害时，变为受到毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "自动引爆毒素消减内力。内力过低变伤效果需手动处理。",
+                    "automationNote": "自动引爆毒素并流失内力。内力低于50%的转化毒素伤害需手动修改出招时候的伤害类型。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2673,14 +2683,15 @@
                             7,
                             6,
                             5
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "爆毒",
+                            "label": "爆毒削内",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heishendu\");\n    if (poison) {\n        const stacks = poison.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const mpDrain = stacks * 5;\n        await args.target.applyHealing({amount: -mpDrain, type: 'mp', showScrolling: true});\n        ui.notifications.info(`引爆 ${stacks} 层黑神毒，消减 ${mpDrain} 内力！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heishendu\");\n    if (poison) {\n        const stacks = poison.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const mpDrain = stacks * 5;\n        await args.target.applyHealing({amount: -mpDrain, type: 'mp', showScrolling: true});\n        \n        const content = `\n        <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n            <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n                <div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-biohazard\"></i> 毒素爆体！</div>\n                <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                    引爆目标体内 ${stacks} 层黑神毒，消融其 <b>${mpDrain}</b> 点内力！\n                </div>\n            </div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n    }\n}"
                         }
                     ]
                 }
@@ -2688,8 +2699,8 @@
             "effects": [
                 {
                     "name": "毒掌",
-                    "icon": "icons/magic/death/hand-withered-green.webp",
-                    "description": "攻击附带黑神毒。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "接下来的攻击附带黑神毒。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -2700,7 +2711,7 @@
                                     "label": "附毒",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "// 仅对攻击招式生效\nif (args.actionType === 'attack' && args.isHit) {\n    // 扣除次数\n    await game.xjzl.api.effects.removeEffect(actor, \"duzhang\", 1);\n    \n    // 施加黑神毒\n    const poisonName = \"黑神毒\";\n    // 从来源物品里找毒的模板\n    const poisonTemplate = thisItem.effects.getName(poisonName);\n    if (poisonTemplate) {\n        const pData = poisonTemplate.toObject();\n        delete pData._id; pData.origin = thisItem.uuid;\n        \n        // 基础1层\n        let layers = 1;\n        // 无架招+1层\n        if (!args.target.system.martial.stanceActive) layers++;\n        \n        for(let i=0; i<layers; i++) {\n            await game.xjzl.api.effects.addEffect(args.target, pData);\n        }\n        ui.notifications.info(`${args.target.name} 中毒 ${layers} 层`);\n    }\n}"
+                                    "script": "if (args.actionType === 'attack' && args.isHit) {\n    await game.xjzl.api.effects.removeEffect(actor, \"duzhang\", 1);\n    const wuxueItem = actor.items.find(i => i.name === \"黑心掌\" && i.type === \"wuxue\");\n    if (wuxueItem) {\n        const poisonTemplate = wuxueItem.effects.getName(\"黑神毒\");\n        if (poisonTemplate) {\n            const pData = poisonTemplate.toObject();\n            delete pData._id; pData.origin = wuxueItem.uuid;\n            let layers = args.target.system.martial.stanceActive ? 1 : 2;\n            for(let i=0; i<layers; i++) {\n                await game.xjzl.api.effects.addEffect(args.target, pData);\n            }\n            const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-size:0.9em; color:#1e8449;\">毒掌侵蚀：目标沾染了 <b>${layers}</b> 层黑神毒。</div></div></div>`;\n            ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n        }\n    }\n}"
                                 }
                             ]
                         }
@@ -2709,8 +2720,8 @@
                 },
                 {
                     "name": "黑神毒",
-                    "icon": "icons/creatures/invertebrates/spider-face-purple.webp",
-                    "description": "每层韧性-1。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "每层使韧性-1。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -3642,7 +3653,8 @@
                 },
                 {
                     "name": "小鹿乱撞",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "taiji",
                     "damageType": "none",
@@ -3651,7 +3663,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>当你手上被敌方衣物占据时，才能施展此招。</p><p>眉眼巧逗弄，指尖悄抹粉，物归原主！</p><p>·你将夺取的衣物还给目标。同时目标只需要花费一个次要动作就能穿好这件衣物。</p><p>·若目标重新穿上这件装备，就会沾染春粉，心神荡漾，忐忑不安，并进行一个[定力]检定（难度 12），失败则陷入“荡漾”状态，持续三回合。</p><p><strong>荡漾：</strong>你在每回合初获得 1 点怒气，你无法以状态添加者为攻击目标。</p><p><strong>升级：</strong>[定力]检定难度+2，怒气-1，内力消耗+2。</p>",
-                    "automationNote": "前置条件/归还物品手动。命中后自动发起定力检定，失败自动施加荡漾。",
+                    "automationNote": "施展时发放提示卡片。目标穿衣时请手动点击检定按钮，判定失败会自动施加荡漾。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -3666,14 +3678,15 @@
                             5,
                             4,
                             3
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "定力检定",
+                            "label": "延迟机制提示与检定",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 12 + (lvl - 1) * 2;\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: dc,\n    label: \"抵抗荡漾\",\n    onFail: {\n        name: \"荡漾\",\n        changes: [{ key: \"flags.xjzl-system.regenRageTurnStart\", mode: 2, value: \"1\" }],\n        duration: { rounds: 3 }\n    }\n});",
-                            "active": true
+                            "active": true,
+                            "script": "const content = `\n<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n    <div style=\"border-left: 3px solid #e91e63; background: rgba(233,30,99,0.1); padding: 5px 8px;\">\n        <div style=\"font-weight:bold; color:#c2185b;\"><i class=\"fas fa-heart\"></i> 春粉暗藏</div>\n        <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n            已将夺取的衣物悄然归还！<br><b>请目标花费次要动作穿上该衣物后，再处理下方的定力检定。</b>\n        </div>\n    </div>\n</div>`;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst dc = 12 + (lvl - 1) * 2;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: dc,\n    label: \"抵抗荡漾\",\n    onFail: {\n        name: \"荡漾\",\n        icon: \"icons/magic/control/control-charm-pink.webp\",\n        description: \"回合初获1怒气，且无法攻击状态施加者\",\n        duration: { rounds: 3 },\n        changes: [{ key: \"flags.xjzl-system.regenRageTurnStart\", mode: 2, value: \"1\" }]\n    },\n    failureText: \"心神荡漾，忐忑不安！\"\n});"
                         }
                     ]
                 }
@@ -4115,7 +4128,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双手连环，四指攻向目标双眼，对其造成 0.4 身法点外功伤害。</p><p>若此招被对方架招格挡，则你的手指受弯折疼痛，你流失 10 点气血，获得 1 点怒气，且下回合无法再使用《双龙指》套路。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "被格挡自动反噬。封锁套路需手动记忆。",
+                    "automationNote": "格挡反噬完全自动。被格挡后自动流失气血并获得怒气，系统会发送战报提示您下回合封锁套路。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -4131,14 +4144,16 @@
                             1,
                             2,
                             3
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "格挡反噬",
                             "trigger": "hit",
-                            "script": "if (!args.isHit && args.target.system.martial.stanceActive && !args.ignoreStance) {\n    await actor.applyHealing({amount: -10, type: 'hp', showScrolling: true});\n    await actor.update({\"system.resources.rage.value\": (actor.system.resources.rage.value || 0) + 1});\n    ui.notifications.warn(\"双龙夺珠被格挡！手指折断！\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && args.target.system.martial.stanceActive && !args.isBroken) {\n    await actor.applyHealing({amount: -10, type: 'hp', showScrolling: true});\n    const currentRage = actor.system.resources.rage.value || 0;\n    await actor.update({\"system.resources.rage.value\": Math.min(10, currentRage + 1)});\n    \n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n        <div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\">\n            <div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-hand-paper\"></i> 手指折断！</div>\n            <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                你的双指插在了敌人的架招之上，巨大的反震力令手指弯折！<br><br>\n                <b>反噬后果：</b><br>\n                > 流失 <b>10</b> 点气血<br>\n                > 获得 <b>1</b> 点怒气<br>\n                <span style=\"color:#c0392b; font-weight:bold;\">> 你的下回合无法使用《双龙指》套路。</span>\n            </div>\n        </div>\n    </div>`;\n    \n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: content\n    });\n}"
                         }
                     ]
                 },
@@ -4255,7 +4270,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，弓步冲拳，接双劈拳，对目标造成 0.5 力量点外功伤害。若本回合在招式命中前直线移动满 5 米，招式暴击骰-1，且获得一层“拳势”，至多三层，持续到脱战或更换其他武器的武学套路。</p><p><strong>拳势：</strong>每层使徒手武学命中+10。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "移动判断手动(弹窗询问)。获得拳势需手动确认移动条件。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4271,20 +4286,16 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
-                            "label": "移动检测与拳势",
+                            "label": "移动检测与拳势应用",
                             "trigger": "attack",
-                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"移动检测\" },\n    content: `<p>本回合是否直线移动满 5 米？</p>`,\n    yes: { label: \"是\", icon: \"fas fa-check\" },\n    no: { label: \"否\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    args.flags.critThresholdMod += 1;\n    ui.notifications.info(\"移动满5米：暴击骰-1\");\n    // 标记后续hit脚本\n    args.flags.moved5m = true;\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "获得拳势",
-                            "trigger": "hit",
-                            "script": "if (args.isHit && args.attacker.flags?.moved5m) {\n    const eff = thisItem.effects.getName(\"拳势\").toObject();\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"移动检测\" },\n    content: `<p>本回合在攻击前，是否直线移动满 5 米？</p>`,\n    yes: { label: \"是\", icon: \"fas fa-running\" },\n    no: { label: \"否\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    args.flags.critThresholdMod += 1;\n    \n    const quanshi = thisItem.effects.getName(\"拳势\");\n    if (quanshi) {\n        const effData = quanshi.toObject();\n        delete effData._id; effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, effData, 1);\n        \n        const content = `\n        <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n            <div style=\"border-left: 3px solid #2980b9; background: rgba(41,128,185,0.1); padding: 5px 8px;\">\n                <div style=\"font-weight:bold; color:#1f618d;\"><i class=\"fas fa-wind\"></i> 冲步连环</div>\n                <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                    借冲刺之势，本次攻击 <b>暴击骰-1</b>，并获得一层 <b>【拳势】</b>。\n                </div>\n            </div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n    } else {\n        ui.notifications.warn(\"武学内缺失【拳势】特效模板。\");\n    }\n}"
                         }
                     ]
                 },
@@ -5960,14 +5971,6 @@
             "tier": 2,
             "description": "<p>江湖拳掌口诀，伤人伤己，每次出招含有七股不同劲力，敌人抵挡不住便会深受内伤。</p><p><strong>需求：</strong>徒手-拳掌</p><p><strong>注：</strong>若你内力上限不足 200，每次施展《七伤诀》招式前，先流失 50 点气血。</p>",
             "requirements": "徒手-拳掌",
-            "scripts": [
-                {
-                    "label": "内力反噬",
-                    "trigger": "attack",
-                    "script": "if (actor.system.resources.mp.max < 200) {\n    await actor.applyHealing({amount: -50, type: \"hp\", showScrolling: true});\n    ui.notifications.warn(\"内力不足 200，七伤诀反噬！\");\n}",
-                    "active": true
-                }
-            ],
             "moves": [
                 {
                     "name": "失意恍惚",
@@ -5979,7 +5982,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，神无定散，开启架招。格挡成功后，为目标添加一层“伤”，至多七层，持续到脱战。</p><p><strong>伤：</strong>叠至七层后全部移除并使目标陷入“封招”，持续一回合。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡施加伤自动。七层爆发封招自动。",
+                    "automationNote": "格挡施伤及满层爆发封招完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -5989,14 +5992,22 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
+                            "label": "内力反噬检测",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (actor.system.resources.mp.max < 200) {\n    await actor.applyHealing({amount: -50, type: \"hp\", showScrolling: true});\n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n        <div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\">\n            <div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-skull-crossbones\"></i> 七伤反噬</div>\n            <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                内力底蕴不足以驾驭此招，强行催动导致流失 <b>50</b> 点气血！\n            </div>\n        </div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
+                        },
+                        {
                             "label": "格挡施伤",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"伤\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args) || !args.attacker) return;\nconst wuxueItem = actor.items.find(i => i.name === \"七伤诀\" && i.type === \"wuxue\");\nif (!wuxueItem) return;\nconst eff = wuxueItem.effects.getName(\"伤\").toObject();\ndelete eff._id; eff.origin = wuxueItem.uuid;\n\n// 提取通用加伤函数\nconst applyShang = async (target, effData, count) => {\n    const existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qishang_shang\");\n    const currentStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (currentStacks + count >= 7) {\n        if (existing) await existing.delete();\n        const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n        if (fengzhao) {\n            const data = foundry.utils.deepClone(fengzhao);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(target, data);\n            const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bomb\"></i> 七伤爆发！</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">劲力攻入五脏六腑！目标陷入 <b>封招</b> 1回合。</div></div></div>`;\n            ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n        }\n    } else {\n        for(let i=0; i<count; i++) await game.xjzl.api.effects.addEffect(target, effData);\n    }\n};\n\nawait applyShang(args.attacker, eff, 1);"
                         }
                     ]
                 },
@@ -6010,7 +6021,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，双拳飘忽不定击出，对目标造成 0.7 力量点外功伤害。同时给目标添加一层“伤”，持续到战斗脱离。</p><p>·若招式造成暴击，额外添加一层“伤”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "命中施伤自动。暴击额外施伤自动。",
+                    "automationNote": "命中与暴击叠加伤完全自动化，满层爆发自动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -6026,14 +6037,22 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
+                            "label": "内力反噬检测",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (actor.system.resources.mp.max < 200) {\n    await actor.applyHealing({amount: -50, type: \"hp\", showScrolling: true});\n    const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-skull-crossbones\"></i> 七伤反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">内力底蕴不足以驾驭此招，强行催动导致流失 <b>50</b> 点气血！</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
+                        },
+                        {
                             "label": "施加伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"伤\").toObject();\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    if (args.isCrit) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(\"暴击！额外施加一层伤\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const wuxueItem = actor.items.find(i => i.name === \"七伤诀\" && i.type === \"wuxue\");\n    if (!wuxueItem) return;\n    const eff = wuxueItem.effects.getName(\"伤\").toObject();\n    delete eff._id; eff.origin = wuxueItem.uuid;\n    \n    const applyShang = async (target, effData, count) => {\n        const existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qishang_shang\");\n        const currentStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n        if (currentStacks + count >= 7) {\n            if (existing) await existing.delete();\n            const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n            if (fengzhao) {\n                const data = foundry.utils.deepClone(fengzhao);\n                data.duration = { rounds: 1 };\n                await game.xjzl.api.effects.addEffect(target, data);\n                const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bomb\"></i> 七伤爆发！</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">劲力攻入五脏六腑！目标陷入 <b>封招</b> 1回合。</div></div></div>`;\n                ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n            }\n        } else {\n            for(let i=0; i<count; i++) await game.xjzl.api.effects.addEffect(target, effData);\n        }\n    };\n    \n    let layers = args.isCrit ? 2 : 1;\n    await applyShang(args.target, eff, layers);\n}"
                         }
                     ]
                 },
@@ -6047,7 +6066,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制虚招，寸拳刚柔，对其造成 0.8 力量点外功伤害。同时给目标添加三层“伤”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "命中施加3层伤自动。",
+                    "automationNote": "命中后施加3层伤完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -6063,14 +6082,22 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
+                            "label": "内力反噬检测",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (actor.system.resources.mp.max < 200) {\n    await actor.applyHealing({amount: -50, type: \"hp\", showScrolling: true});\n    const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-skull-crossbones\"></i> 七伤反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">内力底蕴不足以驾驭此招，强行催动导致流失 <b>50</b> 点气血！</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
+                        },
+                        {
                             "label": "施加三层伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"伤\").toObject();\n    eff.origin = thisItem.uuid;\n    for(let i=0; i<3; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const wuxueItem = actor.items.find(i => i.name === \"七伤诀\" && i.type === \"wuxue\");\n    if (!wuxueItem) return;\n    const eff = wuxueItem.effects.getName(\"伤\").toObject();\n    delete eff._id; eff.origin = wuxueItem.uuid;\n    \n    const applyShang = async (target, effData, count) => {\n        const existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qishang_shang\");\n        const currentStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n        if (currentStacks + count >= 7) {\n            if (existing) await existing.delete();\n            const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n            if (fengzhao) {\n                const data = foundry.utils.deepClone(fengzhao);\n                data.duration = { rounds: 1 };\n                await game.xjzl.api.effects.addEffect(target, data);\n                const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bomb\"></i> 七伤爆发！</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">劲力攻入五脏六腑！目标陷入 <b>封招</b> 1回合。</div></div></div>`;\n                ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n            }\n        } else {\n            for(let i=0; i<count; i++) await game.xjzl.api.effects.addEffect(target, effData);\n        }\n    };\n    \n    await applyShang(args.target, eff, 3);\n}"
                         }
                     ]
                 },
@@ -6084,7 +6111,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，势如雷霆，对目标造成 0.6 力量点外功伤害。命中无架招目标时，给其添加两层“伤”。</p><p><strong>升级：</strong>招式伤害+10，额外添加一层伤，消耗+2。</p>",
-                    "automationNote": "命中无架招施加2层伤自动 (升级+1伤需手动添加)。",
+                    "automationNote": "对无架招目标自动施加伤层数(随等级成长)，爆发自动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -6100,14 +6127,22 @@
                             2,
                             4,
                             6
-                        ]
+                        ],
+                        "rage": [],
+                        "hp": []
                     },
                     "scripts": [
                         {
+                            "label": "内力反噬检测",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (actor.system.resources.mp.max < 200) {\n    await actor.applyHealing({amount: -50, type: \"hp\", showScrolling: true});\n    const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-skull-crossbones\"></i> 七伤反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">内力底蕴不足以驾驭此招，强行催动导致流失 <b>50</b> 点气血！</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
+                        },
+                        {
                             "label": "无架招施伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"伤\").toObject();\n    eff.origin = thisItem.uuid;\n    // 基础2层，升级暂不处理\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const wuxueItem = actor.items.find(i => i.name === \"七伤诀\" && i.type === \"wuxue\");\n    if (!wuxueItem) return;\n    const eff = wuxueItem.effects.getName(\"伤\").toObject();\n    delete eff._id; eff.origin = wuxueItem.uuid;\n    \n    const applyShang = async (target, effData, count) => {\n        const existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qishang_shang\");\n        const currentStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n        if (currentStacks + count >= 7) {\n            if (existing) await existing.delete();\n            const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n            if (fengzhao) {\n                const data = foundry.utils.deepClone(fengzhao);\n                data.duration = { rounds: 1 };\n                await game.xjzl.api.effects.addEffect(target, data);\n                const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bomb\"></i> 七伤爆发！</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">劲力攻入五脏六腑！目标陷入 <b>封招</b> 1回合。</div></div></div>`;\n                ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n            }\n        } else {\n            for(let i=0; i<count; i++) await game.xjzl.api.effects.addEffect(target, effData);\n        }\n    };\n    \n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const layers = 2 + (lvl - 1);\n    await applyShang(args.target, eff, layers);\n}"
                         }
                     ]
                 },
@@ -6122,7 +6157,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，大喝一声，左右双拳连续击出七拳，威猛无敌，对目标造成 1.0 力量点外功伤害。</p><p>·目标每存在一层“伤”便额外流失 10 点气血。</p><p><strong>升级：</strong>招式伤害+20，每层伤额外流失气血+5，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "根据伤层数流失气血自动。",
+                    "automationNote": "根据伤层数流失气血完全自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -6143,14 +6178,21 @@
                             7,
                             6,
                             5
-                        ]
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
+                            "label": "内力反噬检测",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (actor.system.resources.mp.max < 200) {\n    await actor.applyHealing({amount: -50, type: \"hp\", showScrolling: true});\n    const content = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-skull-crossbones\"></i> 七伤反噬</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">内力底蕴不足以驾驭此招，强行催动导致流失 <b>50</b> 点气血！</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
+                        },
+                        {
                             "label": "引爆伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const shang = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qishang_shang\");\n    if (shang) {\n        const stacks = shang.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const damagePerStack = 10 + (lvl - 1) * 5;\n        const totalLoss = stacks * damagePerStack;\n        await args.target.applyHealing({ amount: -totalLoss, type: \"hp\", showScrolling: true });\n        ui.notifications.info(`七伤引爆：${stacks}层 x ${damagePerStack} = ${totalLoss} 气血流失`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const shang = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qishang_shang\");\n    if (shang) {\n        const stacks = shang.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const lvl = Math.max(1, args.move.computedLevel || 1);\n        const damagePerStack = 10 + (lvl - 1) * 5;\n        const totalLoss = stacks * damagePerStack;\n        \n        await args.target.applyHealing({ amount: -totalLoss, type: \"hp\", showScrolling: true });\n        \n        const content = `\n        <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n            <div style=\"border-left: 3px solid #8b0000; background: rgba(139,0,0,0.1); padding: 5px 8px;\">\n                <div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-tint\"></i> 七伤反噬爆发</div>\n                <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                    引爆目标体内 <b>${stacks}</b> 层暗伤！使其额外流失了 <span style=\"color:#8b0000; font-weight:bold;\">${totalLoss}</span> 点气血。\n                </div>\n            </div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n    }\n}"
                         }
                     ]
                 }
@@ -6165,15 +6207,7 @@
                         "xjzl-system": {
                             "slug": "qishang_shang",
                             "stackable": true,
-                            "maxStacks": 7,
-                            "scripts": [
-                                {
-                                    "label": "七层封招",
-                                    "trigger": "turnStart",
-                                    "active": true,
-                                    "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nif (stacks >= 7) {\n    const fengzhao = CONFIG.statusEffects.find(e => e.id === 'fengzhao');\n    if (fengzhao) {\n        const data = foundry.utils.deepClone(fengzhao);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(actor, data);\n        ui.notifications.info(`${actor.name} 七伤爆发：封招！`);\n        await thisEffect.delete();\n    }\n}"
-                                }
-                            ]
+                            "maxStacks": 7
                         }
                     },
                     "changes": []
