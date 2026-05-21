@@ -2552,7 +2552,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>内力运转，掌心发黑，为自己下 1 次攻击添加“毒掌”效果，持续到战斗脱离。</p><p><strong>毒掌：</strong>命中敌人后添加一层“黑神毒”，若敌人无架招，额外添加一层。黑神毒最多叠加 9 层，持续到战斗脱离。</p><p><strong>黑神毒：</strong>每层使你的[韧性]等级-1（最低 0）。</p><p><strong>升级：</strong>“毒掌”可攻击次数+1，内力消耗+1。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "完全自动化（毒掌次数用叠层实现，每次扣减一层，实际上是不可叠层的buff）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2571,7 +2571,7 @@
                             "label": "应用毒掌",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"毒掌\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\neff.flags[\"xjzl-system\"].maxStacks = lvl;\neff.flags[\"xjzl-system\"].stacks = lvl;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                            "script": "const eff = thisItem.effects.getName(\"毒掌\").toObject();\ndelete eff._id; eff.origin = thisItem.uuid;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\neff.flags[\"xjzl-system\"].maxStacks = lvl;\nawait game.xjzl.api.effects.addEffect(actor, eff, lvl);"
                         }
                     ]
                 },
@@ -2604,7 +2604,7 @@
                             "label": "格挡附毒",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const wuxueItem = actor.items.find(i => i.name === \"黑心掌\" && i.type === \"wuxue\");\n    if (wuxueItem) {\n        const poison = wuxueItem.effects.getName(\"黑神毒\").toObject();\n        delete poison._id; poison.origin = wuxueItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, poison);\n    }\n}"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const wuxueItem = actor.items.find(i => i.name === \"黑心掌\" && i.type === \"wuxue\");\n    if (wuxueItem) {\n        const poison = wuxueItem.effects.getName(\"黑神毒\").toObject();\n        delete poison._id; poison.origin = wuxueItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, poison);\n        actor.showFloatyText(\"黑气反噬！\", {fill: \"#8e44ad\"});\n    }\n}"
                         }
                     ]
                 },
@@ -2644,6 +2644,12 @@
                             "trigger": "check",
                             "active": true,
                             "script": "const renxing = args.target.system.skills.renxing?.total || 0;\nif (renxing <= 0) {\n    args.flags.critThresholdMod += 3;\n    \n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n        <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n            <div style=\"font-size:0.9em; color:#555;\">\n                目标 <b>${args.target.name}</b> 韧性崩溃，本次对其攻击 <b>暴击骰 -3</b>！\n            </div>\n        </div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
+                        },
+                        {
+                            "label": "毒素伤害转化",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const gaohuang = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"durugaohuang\");\nif (gaohuang) {\n    args.config.type = \"poison\";\n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n        <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n            <div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-biohazard\"></i> 黑神爆体-毒素生效</div>\n            <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                目标无力压制毒性，《黑心掌》掌力已转化为 <span style=\"color:#8e44ad; font-weight:bold;\">毒素伤害</span>！\n            </div>\n        </div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
                         }
                     ]
                 },
@@ -2658,7 +2664,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双掌拍出，造成 0.3 力量+0.3 内息点外功伤害，引爆目标体内毒素，目标每有一层“黑神毒”，流失 5 点内力。</p><p>·若目标中此招后内力低于内力上限的 50%，则在内力值恢复至 50%之前，受到《黑心掌》招式伤害时，变为受到毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "自动引爆毒素并流失内力。内力低于50%的转化毒素伤害需手动修改出招时候的伤害类型。",
+                    "automationNote": "完全自动化。若目标内力低于50%，系统会自动施加[黑神爆体-毒素]状态以转化后续黑心掌招式的伤害，内力恢复后请手动删除该状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2688,10 +2694,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "爆毒削内",
-                            "trigger": "hit",
+                            "label": "毒素伤害转化",
+                            "trigger": "preDamage",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heishendu\");\n    if (poison) {\n        const stacks = poison.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const mpDrain = stacks * 5;\n        await args.target.applyHealing({amount: -mpDrain, type: 'mp', showScrolling: true});\n        \n        const content = `\n        <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n            <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n                <div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-biohazard\"></i> 毒素爆体！</div>\n                <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                    引爆目标体内 ${stacks} 层黑神毒，消融其 <b>${mpDrain}</b> 点内力！\n                </div>\n            </div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n    }\n}"
+                            "script": "const gaohuang = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"durugaohuang\");\nif (gaohuang) {\n    args.config.type = \"poison\";\n    const content = `\n    <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n        <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n            <div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-biohazard\"></i> 黑神爆体-毒素生效</div>\n            <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                目标无力压制毒性，《黑心掌》掌力已转化为 <span style=\"color:#8e44ad; font-weight:bold;\">毒素伤害</span>！\n            </div>\n        </div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content});\n}"
+                        },
+                        {
+                            "label": "引爆毒素与内力检测",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "for (const res of args.targets) {\n    if (!res.isHit) continue;\n    const target = res.target;\n    \n    // 1. 引爆毒素\n    const poison = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heishendu\");\n    if (poison) {\n        const stacks = poison.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const mpDrain = stacks * 5;\n        await target.applyHealing({amount: -mpDrain, type: 'mp', showScrolling: true});\n        \n        const content1 = `\n        <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n            <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n                <div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-biohazard\"></i> 毒素引爆！</div>\n                <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                    引爆目标体内 ${stacks} 层黑神毒，消融其 <b style=\"color:#8e44ad;\">${mpDrain}</b> 点内力！\n                </div>\n            </div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content1});\n    }\n    \n    // 2. 检测内力与施加黑神爆体-毒素\n    const currentMp = target.system.resources.mp.value || 0;\n    const maxMp = target.system.resources.mp.max || 1;\n    \n    if (currentMp < maxMp * 0.5) {\n        const hasGaohuang = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"durugaohuang\");\n        if (!hasGaohuang) {\n            const wuxueItem = actor.items.find(i => i.name === \"黑心掌\" && i.type === \"wuxue\");\n            if (wuxueItem) {\n                const effTemplate = wuxueItem.effects.getName(\"黑神爆体-毒素\");\n                if (effTemplate) {\n                    const effData = effTemplate.toObject();\n                    delete effData._id; \n                    effData.origin = wuxueItem.uuid;\n                    await game.xjzl.api.effects.addEffect(target, effData);\n                    \n                    const content2 = `\n                    <div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n                        <div style=\"border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1); padding: 5px 8px;\">\n                            <div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-skull\"></i> 黑神爆体-毒素</div>\n                            <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n                                目标内力不足一半，无力压制毒性！<br>\n                                <span style=\"color:#c0392b; font-weight:bold;\">受到《黑心掌》招式的伤害将自动转化为毒素伤害。</span><br>\n                                <span style=\"color:#888;\">(若内力恢复至50%以上，请手动删除此状态)</span>\n                            </div>\n                        </div>\n                    </div>`;\n                    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: content2});\n                }\n            }\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -2737,6 +2749,19 @@
                             "value": "-1"
                         }
                     ]
+                },
+                {
+                    "name": "黑神爆体-毒素",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "内力低于50%，受到《黑心掌》招式伤害时，变为受到毒素伤害。若内力恢复至50%以上，请手动删除此状态。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "durugaohuang",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }
