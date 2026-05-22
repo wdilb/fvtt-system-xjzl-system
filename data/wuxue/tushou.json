@@ -7775,19 +7775,20 @@
                 },
                 {
                     "name": "大日焚天",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "yang",
-                    "damageType": "neigong",
+                    "damageType": "none",
                     "weaponType": "unarmed",
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当自己虚招被对方反击压制时，可消耗反应动作释放，压制目标反击。双臂毛孔瞬间迸发热浪，使虚招正常造成伤害，招式伤害+50，使其浑身烧伤皮肤开裂，陷入“焚身”持续到脱战。</p><p><strong>焚身：</strong>你无法施展架招。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "增伤自动(反应反击逻辑需手动触发本招)。施加焚身自动。",
+                    "automationNote": "施加焚身自动。追加虚招伤害请使用 Shift+点击 之前虚招卡片的应用伤害按钮进行手动补偿。",
                     "calculation": {
-                        "base": 50,
-                        "growth": 20
+                        "base": 0,
+                        "growth": 0
                     },
                     "costs": {
                         "mp": [
@@ -7803,15 +7804,35 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加焚身",
+                            "label": "大日焚天结算",
                             "trigger": "hit",
-                            "script": "const data = {\n    name: \"焚身\",\n    icon: \"icons/svg/fire.svg\",\n    description: \"你无法施展架招。\",\n    changes: [{key: \"flags.xjzl-system.blockStance\", mode: 5, value: \"true\"}],\n    flags: {\"xjzl-system\": {slug: \"fenshen\", stackable: false}}\n};\nawait game.xjzl.api.effects.addEffect(args.target, data);\nui.notifications.info(`${args.target.name} 陷入焚身，无法开启架招！`);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"焚身\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, eff);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonusDmg = 50 + 20 * (lvl - 1);\n\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; padding: 5px; border-left: 3px solid #c0392b; background: rgba(192,57,43,0.1);\">\n    <div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-fire\"></i> 大日焚天 - 压制反击</div>\n    <div style=\"font-size:0.9em; margin-top:4px;\">\n        已给目标施加 <b>[焚身]</b> 状态。<br>\n        <span style=\"color:#d35400;\">请 <b>Shift+左键</b> 点击刚才被压制的虚招聊天卡片中的【应用伤害】按钮。</span><br>\n        并在弹窗的【伤害修正】中输入 <b style=\"color:red;\">${bonusDmg}</b> 以造成正常伤害与额外伤害。\n    </div>\n</div>`;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});"
                         }
                     ]
                 }
             ],
-            "effects": []
+            "effects": [
+                {
+                    "name": "焚身",
+                    "icon": "icons/svg/fire.svg",
+                    "description": "浑身烧伤皮肤开裂，无法施展架招。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "fenshen",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.blockStance",
+                            "mode": 5,
+                            "value": "true"
+                        }
+                    ]
+                }
+            ]
         }
     },
     {
@@ -7835,7 +7856,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>两手成虎爪后藏于腰，身直而眼向前望，突然出爪，造成伤害，给敌人添加一层“绝户”，持续到战斗脱离。</p><p>·击破架招后获得“恶虎”，持续到战斗脱离。</p><p><strong>恶虎：</strong>《绝户爪法》暴击骰-2。</p><p><strong>绝户：</strong>累计绝户层数大于等于五后，移除所有绝户，对其造成肾精损伤，失去生育能力，需花费 500 两，疗养三年方能治好。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "施加绝户及层数检测自动。击破获恶虎自动。恶虎暴击修正需配合calc/attack脚本实现。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7855,10 +7876,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加绝户",
+                            "label": "施加绝户与判定",
                             "trigger": "hit",
-                            "script": "// 添加绝户并检测\nconst eff = thisItem.effects.getName(\"绝户\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, eff);\n\n// 检测层数\nsetTimeout(() => {\n    const targetEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\n    if (targetEff && (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 5) {\n        targetEff.delete();\n        const msg = `<div class=\"xjzl-chat-card\"><div style=\"color:red;font-weight:bold;\">断子绝孙！</div><p>${args.target.name} 绝户叠满 5 层！</p><p>失去生育能力，需花费 500 两疗养三年。</p></div>`;\n        ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: args.target})});\n        // 标记永久损伤Flag\n        args.target.setFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\", true);\n    }\n}, 200);\n\n// 击破获恶虎\nif (args.isBroken) {\n    const ehu = thisItem.effects.getName(\"恶虎\").toObject();\n    ehu.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, ehu);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"绝户\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, eff);\n\nconst isSterilized = args.target.getFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\");\nif (!isSterilized) {\n    const targetEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\n    const stacks = targetEff ? (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks >= 5) {\n        await targetEff.delete();\n        await args.target.setFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\", true);\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #8b0000; background: rgba(139,0,0,0.1); padding: 5px;\">\n            <div style=\"color:#8b0000;font-weight:bold;\"><i class=\"fas fa-skull\"></i> 断子绝孙！</div>\n            <p style=\"margin: 3px 0;\">${args.target.name} 绝户叠满 5 层！</p>\n            <p style=\"margin: 0; font-size: 0.9em; color:#555;\">造成肾精损伤，失去生育能力，需花费 500 两疗养三年方能治好。</p>\n        </div>`;\n        ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: args.target})});\n    }\n}\n\nif (args.isBroken) {\n    const ehu = thisItem.effects.getName(\"恶虎\").toObject();\n    ehu.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, ehu);\n}"
                         }
                     ]
                 },
@@ -7872,7 +7893,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>侧身出爪，左高右低两爪连环，直攻两肋，造成伤害。命中无架招的敌人时，为其添加一层“绝户”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无架招施加绝户自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7892,10 +7913,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加绝户",
+                            "label": "施加绝户与判定",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"绝户\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    \n    // 同样的层数检测逻辑，此处略去重复代码，建议封装\n    setTimeout(() => {\n        const targetEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\n        if (targetEff && (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 5) {\n            targetEff.delete();\n            const msg = `<div class=\"xjzl-chat-card\"><div style=\"color:red;font-weight:bold;\">断子绝孙！</div><p>${args.target.name} 绝户叠满 5 层！</p></div>`;\n            ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: args.target})});\n            args.target.setFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\", true);\n        }\n    }, 200);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"绝户\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    \n    const isSterilized = args.target.getFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\");\n    if (!isSterilized) {\n        const targetEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\n        const stacks = targetEff ? (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n        if (stacks >= 5) {\n            await targetEff.delete();\n            await args.target.setFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\", true);\n            const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #8b0000; background: rgba(139,0,0,0.1); padding: 5px;\">\n                <div style=\"color:#8b0000;font-weight:bold;\"><i class=\"fas fa-skull\"></i> 断子绝孙！</div>\n                <p style=\"margin: 3px 0;\">${args.target.name} 绝户叠满 5 层！</p>\n                <p style=\"margin: 0; font-size: 0.9em; color:#555;\">造成肾精损伤，失去生育能力，需花费 500 两疗养三年方能治好。</p>\n            </div>`;\n            ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: args.target})});\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -7909,7 +7930,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>识破虚招后消耗反应动作，扭身回首，双手虎爪从上往下划，对敌人造成伤害。同时为其添加一层“绝户”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "施加绝户自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7929,10 +7950,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加绝户",
+                            "label": "施加绝户与判定",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"绝户\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, eff);\n// 层数检测略",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"绝户\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, eff);\n\nconst isSterilized = args.target.getFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\");\nif (!isSterilized) {\n    const targetEff = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\n    const stacks = targetEff ? (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks >= 5) {\n        await targetEff.delete();\n        await args.target.setFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\", true);\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #8b0000; background: rgba(139,0,0,0.1); padding: 5px;\">\n            <div style=\"color:#8b0000;font-weight:bold;\"><i class=\"fas fa-skull\"></i> 断子绝孙！</div>\n            <p style=\"margin: 3px 0;\">${args.target.name} 绝户叠满 5 层！</p>\n            <p style=\"margin: 0; font-size: 0.9em; color:#555;\">造成肾精损伤，失去生育能力，需花费 500 两疗养三年方能治好。</p>\n        </div>`;\n        ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: args.target})});\n    }\n}"
                         }
                     ]
                 },
@@ -7946,7 +7967,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>下桩需稳，如猛虎下山，气势凶狠，头昂而目视高，开启架招。格挡成功时，击倒目标，若其已经存在“绝户”，给他再添加一层。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡击倒手动。格挡添加绝户自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -7960,10 +7981,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡特效",
+                            "label": "格挡击倒与绝户",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nui.notifications.info(\"格挡成功！请手动击倒目标。\");\n\nconst hasJuehu = args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\nif (hasJuehu) {\n    const eff = thisItem.effects.getName(\"绝户\").toObject();\n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n    ui.notifications.info(`${args.attacker.name} 已有绝户，层数+1`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 击倒提示卡片\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #d35400; background: rgba(211,84,0,0.1); padding: 5px;\">\n    <div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-paw\"></i> 猛虎下山 - 格挡反击</div>\n    <div style=\"font-size:0.9em; margin-top:3px;\">格挡成功！请手动击倒目标 <b>${args.attacker.name}</b>。</div>\n</div>`;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n\n// 检查攻击者是否有绝户\nconst hasJuehu = args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\nif (hasJuehu) {\n    const eff = thisItem.effects.getName(\"绝户\").toObject();\n    await game.xjzl.api.effects.addEffect(args.attacker, eff);\n    \n    // 对攻击者应用绝嗣逻辑\n    const isSterilized = args.attacker.getFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\");\n    if (!isSterilized) {\n        const targetEff = args.attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"juehu\");\n        const stacks = targetEff ? (targetEff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n        if (stacks >= 5) {\n            await targetEff.delete();\n            await args.attacker.setFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\", true);\n            const jmsg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #8b0000; background: rgba(139,0,0,0.1); padding: 5px;\">\n                <div style=\"color:#8b0000;font-weight:bold;\"><i class=\"fas fa-skull\"></i> 断子绝孙！</div>\n                <p style=\"margin: 3px 0;\">${args.attacker.name} 绝户叠满 5 层！</p>\n                <p style=\"margin: 0; font-size: 0.9em; color:#555;\">造成肾精损伤，失去生育能力，需花费 500 两疗养三年方能治好。</p>\n            </div>`;\n            ChatMessage.create({content: jmsg, speaker: ChatMessage.getSpeaker({actor: args.attacker})});\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -7978,7 +7999,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>纵身猛扑，俩爪搂腰，双臂不动，指尖发力，造成伤害。</p><p>·若目标已经失去生育能力，为其添加“禁绝”，持续三回合。</p><p><strong>禁绝：</strong>无法施展绝招。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "检测永久损伤并施加禁绝自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -8005,8 +8026,8 @@
                         {
                             "label": "施加禁绝",
                             "trigger": "hit",
-                            "script": "const isSterilized = args.target.getFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\");\nif (isSterilized) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"jinjue\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} (已绝户) 被禁绝 3 回合！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const isSterilized = args.target.getFlag(\"xjzl-system\", \"wuxue_juehu_sterilized\");\nif (isSterilized) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"jinjue\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        \n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px;\">\n            <div style=\"font-weight:bold; color:#8e44ad;\"><i class=\"fas fa-ban\"></i> 虎跃千山 - 绝户镇压</div>\n            <div style=\"font-size:0.9em; margin-top:3px;\"><b>${args.target.name}</b> 因旧伤隐疾，陷入 <b>[禁绝]</b> 状态，持续 3 回合！</div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n    }\n}"
                         }
                     ]
                 }
@@ -8039,7 +8060,7 @@
                                     "label": "暴击修正",
                                     "trigger": "attack",
                                     "active": true,
-                                    "script": "// 仅对绝户爪法生效\nif (item.name === \"绝户爪法\") {\n    args.flags.critThresholdMod += 2; // 骰子-2等于阈值+2\n}"
+                                    "script": "if (item && item.name === \"绝户爪法\") {\n    args.flags.critThresholdMod += 2;\n}"
                                 }
                             ]
                         }
@@ -8070,7 +8091,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双掌齐出，造成伤害，击中无架招目标使其寒气入体，进入“冰冻”状态，持续一回合。</p><p><strong>冰冻：</strong>每次流失气血时额外流失 10 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "无架招施加冰冻自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -8092,8 +8113,8 @@
                         {
                             "label": "施加冰冻",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"冰冻\").toObject();\n    eff.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"冰冻\").toObject();\n    eff.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
                         }
                     ]
                 },
@@ -8107,7 +8128,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>冰冷一掌，寒气四溢，造成伤害，击破架招使目标寒气入体，为其添加“冰冻”状态，持续三回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破施加冰冻自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -8127,10 +8148,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "击破冰冻",
+                            "label": "击破施加冰冻",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"冰冻\").toObject();\n    eff.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"冰冻\").toObject();\n    eff.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
                         }
                     ]
                 },
@@ -8144,7 +8165,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>寒气凝集皮肤，开启架招。格挡成功后，攻击者因寒气流失 5 点气血。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡反伤自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -8158,10 +8179,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡反伤",
+                            "label": "寒气反伤",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nawait args.attacker.applyDamage({amount: 5, type: \"liushi\", attacker: actor, isHit: true});\nui.notifications.info(`${args.attacker.name} 触碰寒气，流失 5 气血`);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nawait args.attacker.applyDamage({ amount: 5, type: \"liushi\", attacker: actor, isHit: true, ignoreDefense: true, ignoreStance: true, ignoreMinDamage: true, source: \"dot\" });\n\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #2980b9; background: rgba(41,128,185,0.1); padding: 5px;\">\n    <div style=\"color:#2980b9; font-weight:bold;\"><i class=\"fas fa-shield-alt\"></i> 天寒地冻 - 寒气反噬</div>\n    <div style=\"font-size:0.9em; margin-top:3px;\">${args.attacker.name} 触碰寒气，流失 <b>5</b> 点气血。</div>\n</div>`;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});"
                         }
                     ]
                 },
@@ -8175,7 +8196,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>看破虚招消耗反应释放，连拍数掌，寒气如刀，轰击至目标身躯，造成伤害，为其添加“冰冻”状态，持续两回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "施加冰冻自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -8197,8 +8218,8 @@
                         {
                             "label": "施加冰冻",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"冰冻\").toObject();\neff.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"冰冻\").toObject();\neff.duration = { rounds: 2 };\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 },
@@ -8213,7 +8234,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>寒气入掌，打入目标体内，造成伤害，并添加“寒气肆虐”10 回合。</p><p><strong>寒气肆虐：</strong>你每回合开始时流失 4 点气血。</p><p><strong>升级：</strong>招式伤害+20，流失气血+3，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "施加寒气肆虐自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -8238,34 +8259,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "寒气肆虐",
+                            "label": "施加动态寒气肆虐",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"寒气肆虐\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 4 + (lvl - 1) * 3;\neff.changes[0].value = `-${dmg}`;\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"寒气肆虐\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmg = 4 + (lvl - 1) * 3;\n\n// 动态写入伤害供 turnStart 脚本读取\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.hanqiDamage\", dmg);\neff.description = `你每回合开始时流失 ${dmg} 点气血。`;\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 }
             ],
             "effects": [
-                {
-                    "name": "冰冻",
-                    "icon": "icons/magic/water/ice-snowflake-blue.webp",
-                    "description": "流失气血时额外流失。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "bingdong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.bleedOnHit",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
-                },
                 {
                     "name": "寒气肆虐",
                     "icon": "icons/magic/water/ice-shards-blue.webp",
@@ -8277,16 +8279,39 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "hanqisinue",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "持续流失",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "const dmg = thisEffect.getFlag(\"xjzl-system\", \"hanqiDamage\") || 4;\nawait actor.applyDamage({ amount: dmg, type: \"liushi\", isHit: true, ignoreDefense: true, ignoreStance: true, ignoreMinDamage: true, source: \"dot\" });\n\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #2980b9; background: rgba(41,128,185,0.1); padding: 5px;\">\n    <div style=\"color:#2980b9; font-weight:bold;\"><i class=\"fas fa-snowflake\"></i> 寒气肆虐</div>\n    <div style=\"font-size:0.9em; margin-top:3px;\">回合开始，寒气发作，流失 <b>${dmg}</b> 点气血。</div>\n</div>`;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});"
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenHpTurnStart",
-                            "mode": 2,
-                            "value": "-4"
+                    "changes": []
+                },
+                {
+                    "name": "冰冻",
+                    "icon": "icons/magic/water/ice-snowflake-blue.webp",
+                    "description": "每次流失气血时额外流失 10 点。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "bingdong",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "流失联动加深",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "if (args.type === \"liushi\" && !actor.isReceivingBingdong && args.finalDamage > 0) {\n    actor.isReceivingBingdong = true;\n    try {\n        await actor.applyDamage({ amount: 10, type: \"liushi\", isHit: true, ignoreDefense: true, ignoreStance: true, ignoreMinDamage: true, source: \"dot\" });\n        \n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #3498db; background: rgba(52,152,219,0.1); padding: 5px;\">\n            <div style=\"color:#2980b9; font-weight:bold;\"><i class=\"fas fa-icicles\"></i> 冰冻恶化</div>\n            <div style=\"font-size:0.9em; margin-top:3px;\">气血败坏，额外流失 <b>10</b> 点气血。</div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n    } finally {\n        actor.isReceivingBingdong = false;\n    }\n}"
+                                }
+                            ]
                         }
-                    ]
+                    },
+                    "changes": []
                 }
             ]
         }
@@ -8312,7 +8337,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>身影飘忽，开启架招。被击破架招时，进入“飞鸿踏雪”状态，持续到敌人该回合结束。</p><p><strong>飞鸿踏雪：</strong>自身免疫所有你不想要的状态。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "击破提示飞鸿踏雪。免疫效果手动。",
+                    "automationNote": "被击破后发送提示卡片。请手动删除对应 BUFF来达成免疫效果。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -8328,8 +8353,8 @@
                         {
                             "label": "被击破提示",
                             "trigger": "damaged",
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(`${actor.name} 架招被破，进入 [飞鸿踏雪] 状态！(本回合免疫状态，请手动处理)`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px;\">\n        <div style=\"color:#8e44ad; font-weight:bold;\"><i class=\"fas fa-feather-alt\"></i> 乌云盖雪 - 飞鸿踏雪</div>\n        <div style=\"font-size:0.9em; margin-top:4px;\">\n            <b>${actor.name}</b> 的架招被击破，身形变幻进入 <b>[飞鸿踏雪]</b> 状态。<br>\n            <span style=\"color:#555;\">在对方这回合结束之前，可<b>免疫所有不想要的状态</b>。请玩家在收到异常状态后手动删除对应BUFF。</span>\n        </div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
                         }
                     ]
                 },
@@ -8647,7 +8672,8 @@
                 },
                 {
                     "name": "贞观治世",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "taiji",
                     "damageType": "none",
@@ -8655,8 +8681,8 @@
                     "range": "7米",
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
-                    "description": "<p>消耗所有“锦鲤”，进入“盛世”状态，持续两回合。</p><p><strong>盛世：</strong>范围内有角色受伤时，你可以消耗反应动作使此次伤害减少，数值为消耗锦鲤层数*30。</p><p><strong>升级：</strong>持续时间+1 回合，怒气消耗-1，消耗+4。</p>",
-                    "automationNote": "消耗锦鲤获盛世自动。盛世减伤手动。",
+                    "description": "<p>消耗所有“锦鲤”，进入“盛世”状态，持续两回合。</p><p><strong>盛世：</strong>范围内有角色受伤时，你可以消耗反应动作使此次伤害减少，数值为消耗锦鲤层数*30。</p><p><strong>升级：</strong>持续时间+1 回合，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "自动消耗锦鲤生成动态[盛世]BUFF。当范围内有人受伤时，请手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -8677,8 +8703,8 @@
                         {
                             "label": "开启盛世",
                             "trigger": "hit",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinli\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await buff.delete();\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 2 + (lvl - 1);\n    \n    // 创建盛世BUFF提示\n    const data = {\n        name: `盛世 (${stacks*30}减免)`,\n        icon: \"icons/magic/light/beam-rays-yellow.webp\",\n        duration: { rounds: rounds },\n        description: `可消耗反应减免 ${stacks*30} 伤害`,\n        flags: {\"xjzl-system\": {slug: \"shengshi\", stackable: false}}\n    };\n    await game.xjzl.api.effects.addEffect(actor, data);\n    ui.notifications.info(`消耗 ${stacks} 层锦鲤，开启盛世！`);\n} else {\n    ui.notifications.warn(\"无锦鲤层数，无法开启盛世！\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jinli\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await buff.delete();\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 2 + (lvl - 1);\n    const blockAmount = stacks * 30;\n    \n    const sourceAe = thisItem.effects.getName(\"盛世\");\n    if (sourceAe) {\n        const eff = sourceAe.toObject();\n        eff.duration = { rounds: rounds };\n        eff.name = `盛世 (减免${blockAmount})`;\n        eff.description = `范围内有角色受伤时，你可以消耗反应动作使此次伤害减少 ${blockAmount} 点。`;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n        \n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.1); padding: 5px;\">\n            <div style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-sun\"></i> 贞观治世 - 盛世降临</div>\n            <div style=\"font-size:0.9em; margin-top:4px;\">\n                消耗了 <b>${stacks}</b> 层 [锦鲤]，进入 <b>[盛世]</b> 状态，持续 <b>${rounds}</b> 回合。<br>\n                <span style=\"color:#555;\">范围内有角色受伤时，可手动消耗反应动作使该次伤害减少 <b style=\"color:#c0392b;\">${blockAmount}</b> 点。(请在对方【应用伤害】前手动从面板扣减)</span>\n            </div>\n        </div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n    }\n} else {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px; border-left: 3px solid #7f8c8d; background: rgba(127,140,141,0.1); padding: 5px;\">\n        <div style=\"color:#2c3e50; font-weight:bold;\"><i class=\"fas fa-times-circle\"></i> 施放失败</div>\n        <div style=\"font-size:0.9em; margin-top:4px;\">身上没有 [锦鲤] 层数，无法开启盛世。</div>\n    </div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
                         }
                     ]
                 }
@@ -8686,7 +8712,7 @@
             "effects": [
                 {
                     "name": "锦鲤",
-                    "icon": "icons/creatures/fish/fish-carp-orange.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "闪避增加，受击减少层数。",
                     "transfer": false,
                     "flags": {
@@ -8711,6 +8737,19 @@
                             "value": "3"
                         }
                     ]
+                },
+                {
+                    "name": "盛世",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "范围内有角色受伤时，你可以消耗反应动作使伤害减少。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shengshi",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }
