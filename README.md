@@ -502,95 +502,97 @@ await Macros.requestSave({
 在脚本中通过 `Macros` 对象调用。
 
 ### 4.1 `Macros.requestSave(options)`
-**功能**: 向目标发起属性判定请求（如点穴、中毒豁免），支持**失败后自动扣除资源、造成伤害**和**自动应用状态**。
+**功能**: 向目标发起属性判定请求（如点穴、中毒豁免），支持**成功/失败后的自动化结算**（如扣除资源、造成伤害、应用状态）。
 
 | 参数 | 类型 | 说明 |
 | :--- | :--- | :--- |
-| `target` | Actor/Token | 目标角色 (必须)。 |
-| `type` | String | 属性 Key (如 `"tizhi"`, `"neixi"`, `"shenfa"`)。 |
-| `dc` | Number | 难度等级。 |
-| `label` | String | 弹窗标题 (可选)。 |
-| `level` | Number | 预设优劣势 (正数=优, 负数=劣)。 |
-| `onFail` | String/Object/Array | **(可选)** 失败时自动应用的状态。支持系统状态ID字符串 (如 `"dianxue"`) 或完整的 Active Effect 数据对象。 |
-| `damageOnFail` | Object | **(可选)** 失败时的惩罚。结构: `{ value: 10, type: "..." }`。<br>• 若 `type` 为资源 (如 `"hp"`, `"mp"`)：**直接流失**，无视护体。<br>• 若 `type` 为伤害 (如 `"poison"`, `"fire"`)：**造成伤害**，会计算抗性和护体抵扣。 |
-| `attacker`| Actor | 发起者 (可选，用于在卡片上显示名字及作为伤害来源)。 |
-| `successText` | String | **(可选)** 成功时的自定义提示文本。 |
-| `failureText` | String | **(可选)** 失败时的自定义提示文本。 |
+| `target` | Actor | 目标角色 (必须)。 |
+| `type` | String | 属性/技能 Key (如 `"tizhi"`, `"neixi"`, `"qiaoshou"`)。 |
+| `dc` | Number | 难度等级 (DC)。 |
+| `label` | String | **(可选)** 弹窗与卡片标题。 |
+| `level` | Number | **(可选)** 预设优劣势 (正数=优, 负数=劣)。默认 `0`。 |
+| `bonus` | Number | **(可选)** 预设检定数值修正。默认 `0`。 |
+| `attacker`| Actor | **(可选)** 发起者。用于在卡片上显示名字，及作为伤害来源以便计算反伤/受击特效。 |
+| `onFail` / `onSuccess` | String/Object/Array | **(可选)** 失败/成功时自动应用的状态。支持系统预设 ID (如 `"dianxue"`) 或自定义 AE 数据对象。 |
+| `damageOnFail` / `damageOnSuccess` | Object | **(可选)** 失败/成功时的后果。结构: `{ value: 10, type: "..." }`。<br>• 若 `type` 为资源 (`"hp"`, `"mp"`, `"tili"`)：**直接流失**，无视护甲抗性。<br>• 若 `type` 为伤害 (`"poison"`, `"waigong"`)：**造成伤害**，正常计算目标抗性和护体抵扣。 |
+| `successText` / `failureText` | String | **(可选)** 成功/失败时的自定义战报提示文本。 |
 
-**示例**:
+**示例: 剧毒陷阱 (失败中毒，成功伤害减半)**:
 ```javascript
-// 发起体质判定，失败则受到毒素伤害并应用“中毒”状态
 await Macros.requestSave({
     target: args.target,
     attacker: actor,
     type: "tizhi",
     dc: 15,
     label: "剧毒陷阱",
-    level: -1, // 劣势
-    // 失败后果
-    // 类型为 "poison"，系统会自动计算目标的毒素抗性和护体真气
+    level: -1, // 目标处于劣势
+    bonus: 0,
+    
+    // 失败后果：受到全额毒伤，并中毒
     damageOnFail: { value: 20, type: "poison" }, 
-    onFail: "poison", // 直接使用系统预设 ID
-    failureText: "毒气攻心！"
+    onFail: "poison", 
+    failureText: "毒气攻心，身中剧毒！",
+
+    // 成功后果：抵抗了毒素状态，仅受到一半毒伤
+    damageOnSuccess: { value: 10, type: "poison" },
+    successText: "屏气凝神，抵挡了大部分毒气。"
 });
 ```
 
 ---
 
 ### 4.2 `Macros.requestContest(options)`
-**功能**: 发起对抗请求（如内力比拼、兵刃招架）。
-**机制**: 创建一个**异步记分牌**卡片，支持**并发防冲突**。双方投掷后系统自动裁定胜负，并可根据配置**自动执行胜负后果**（回血、扣血、上状态）。
+**功能**: 发起对抗请求（如内力比拼、兵刃招架、精神压制）。
+**机制**: 创建一个**异步记分牌**卡片，支持**并发防冲突**。双方独立投掷后，系统自动裁定胜负，并根据预设的 `outcome` **自动执行后果**（回血、扣血、上状态）。
 
 | 参数 | 类型 | 说明 |
 | :--- | :--- | :--- |
 | `attacker` | Actor | 发起者角色 (必须)。 |
 | `defender` | Actor | 对抗者角色 (必须)。 |
-| `attBonus` | Number | 发起者在本次对抗中的临时加值/减值（默认0）。 |
-| `defBonus` | Number | 对抗者在本次对抗中的临时加值/减值（默认0）。 |
-| `type` | String | 发起者的属性 Key (如 `"neili"`)。 |
+| `type` | String | 发起者的属性/技能 Key (如 `"neili"`)。 |
 | `defType` | String | **(可选)** 对抗者的属性 Key。不填则默认与发起者相同。 |
 | `label` | String | **(可选)** 卡片标题 (如 "吸星大法")。 |
-| `winText` | String | **(可选)** 发起者获胜时的描述文本。 |
-| `loseText` | String | **(可选)** 发起者失败时的描述文本。 |
+| `attBonus` | Number | **(可选)** 发起方在本次对抗中的临时数值修正 (正加负减，默认 `0`)。 |
+| `defBonus` | Number | **(可选)** 对抗方在本次对抗中的临时数值修正 (默认 `0`)。 |
+| `winText` / `loseText`| String | **(可选)** 发起者获胜/失败时的简单描述文本 (若配了 `outcome` 内部的 `text` 则会被覆盖)。 |
 | `outcome` | Object | **(可选)** 自动化结算配置对象。详见下表。 |
 
 #### `outcome` 配置结构
-`outcome` 对象包含 `win` (发起者胜) 和 `lose` (发起者负) 两个子对象，结构通用：
+`outcome` 对象基于**发起者 (Attacker) 的视角**，包含 `win` (发起者胜出) 和 `lose` (发起者失败) 两个节点。它们的内部结构完全一致：
 
 | Key | 说明 | 示例 |
 | :--- | :--- | :--- |
-| `text` | 覆盖 winText/loseText 的文本 | `"对方内力耗尽！"` |
+| `text` | 本次结果的战报描述 | `"你的丹田如黑洞般吞噬了对方的内力！"` |
 | `selfRecovery` | 发起者恢复资源 | `{ value: 30, type: "mp" }` |
-| `selfDamage` | 发起者受到伤害/流失。<br>• 资源类型(`hp`)：直接流失。<br>• 伤害类型(`poison`)：计算抗性。 | `{ value: 10, type: "hp" }` (流失)<br>`{ value: 20, type: "neigong" }` (伤害) |
-| `selfEffect` | 发起者获得状态 | `"prone"` (倒地) |
-| `targetDamage` | 对抗者受到伤害/流失。<br>规则同上。 | `{ value: 50, type: "mp" }` |
-| `targetEffect` | 对抗者获得状态 | `"weak"` (虚弱) |
+| `selfDamage` | 发起者受到伤害/资源流失 | `{ value: 20, type: "neigong" }` (计算抗性) <br> `{ value: 10, type: "hp" }` (直接流失) |
+| `selfEffect` | 发起者获得状态 | `"prone"` (系统预设的倒地状态) |
+| `targetDamage` | 对抗者受到伤害/资源流失 | `{ value: 50, type: "mp" }` |
+| `targetEffect` | 对抗者获得状态 | `"weak"` |
 
-**示例**:
+**示例: 吸星大法 (内力 vs 定力)**:
 ```javascript
-// 发起【吸星大法】对抗
 await Macros.requestContest({
     attacker: actor,
     defender: args.target,
-    type: "neili",     // 攻方: 内力
-    defType: "dingli", // 守方: 定力
+    type: "neili",     // 攻方使用内力
+    defType: "dingli", // 守方使用定力抵抗
     label: "吸星大法",
+    attBonus: 2,       // 攻方获得临时+2加值
     
-    // 自动化配置
+    // 自动化后果配置
     outcome: {
-        // 发起者赢: 吸干对方内力
+        // 攻方赢: 吸干对方内力
         win: {
             text: "你的丹田如黑洞般吞噬了对方的内力！",
-            selfRecovery: { value: 50, type: "mp" }, // 自回蓝
-            targetDamage: { value: 50, type: "mp" }, // 敌流失蓝 (无视抗性)
-            targetEffect: "weak" // 敌虚弱
+            selfRecovery: { value: 50, type: "mp" }, // 自身回蓝
+            targetDamage: { value: 50, type: "mp" }, // 敌方流失蓝 (无视抗性)
+            targetEffect: "fatigue"                  // 敌方疲劳
         },
-        // 发起者输: 遭到反噬 (内功伤害)
+        // 攻方输: 遭到反噬
         lose: {
             text: "对方内力浑厚，你吸取不成反遭真气反噬！",
-            // 造成内功伤害，如果自己有内功抗性或护体，可以抵扣
-            selfDamage: { value: 30, type: "neigong" }, 
-            selfEffect: "prone" // 自倒地
+            selfDamage: { value: 30, type: "neigong" }, // 自身受内功伤害 (吃抗性和护体抵扣)
+            selfEffect: "prone"                         // 自身倒地
         }
     }
 });
