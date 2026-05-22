@@ -1450,6 +1450,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     if (!neigong) return 0;
 
     const neigongElement = neigong.system.element; // yin, yang, taiji
+    // 如果内功也是无属性，直接不提供任何加成
+    if (neigongElement === "none") return 0;
 
     // 2. 根据规则判定加成
     let bonus = 0;

@@ -57,7 +57,7 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       tier: new fields.NumberField({ required: true, initial: 1, choices: [1, 2, 3], label: "XJZL.Neigong.Tier" }),
 
       // 内功属性: yin, yang, taiji
-      element: new fields.StringField({ required: true, initial: "taiji", choices: ["yin", "yang", "taiji"], label: "XJZL.Neigong.Element" }),
+      element: new fields.StringField({ required: true, initial: "taiji", choices: ["yin", "yang", "taiji", "none"], label: "XJZL.Neigong.Element" }),
       sect: new fields.StringField({ label: "XJZL.Wuxue.Sect" }),
       // === 二级势力 ===
       subSect: new fields.StringField({ initial: "none", label: "XJZL.Wuxue.SubSect" }),

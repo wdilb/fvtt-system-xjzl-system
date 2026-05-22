@@ -67,7 +67,8 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.elementChoices = {
             "yin": game.i18n.localize("XJZL.Neigong.ElementYin"),
             "yang": game.i18n.localize("XJZL.Neigong.ElementYang"),
-            "taiji": game.i18n.localize("XJZL.Neigong.ElementTaiji")
+            "taiji": game.i18n.localize("XJZL.Neigong.ElementTaiji"),
+            "none": game.i18n.localize("XJZL.Neigong.ElementNone")
         };
 
         context.tierChoices = {
