@@ -95,20 +95,31 @@ export class XJZLMacros {
     }
 
     /**
-     * 发起对抗请求 (Request Contest)
-     * 这是一个异步的“记分牌”系统。
-     * @param {Object} options
-     * @param {Actor} options.attacker   发起者 Actor (通常是 current actor)
-     * @param {Actor} options.defender   对抗者 Actor (目标)
-     * @param {Number} [options.attBonus=0] 发起者在本次对抗中的临时加值/减值
-     * @param {Number} [options.defBonus=0] 对抗者在本次对抗中的临时加值/减值
-     * @param {String} options.type      发起者的属性 Key (如 "neili")
-     * @param {String} [options.defType] 对抗者的属性 Key (如果不填，默认和发起者一致)
-     * @param {String} [options.label]   对抗标题 (如 "内力比拼", "吸星大法")
-     * @param {String} [options.winText] 发起者获胜时的描述文本
-     * @param {String} [options.loseText] 发起者失败时的描述文本
-     * @param {Object} [options.outcome] 自动化配置
-     */
+      * 发起对抗请求 (Request Contest)
+      * 这是一个异步的“记分牌”系统，支持并发防冲突与自动化结算。
+      * 
+      * @param {Object} options 配置对象
+      * @param {Actor} options.attacker   发起者 Actor (通常是 current actor，必须)
+      * @param {Actor} options.defender   对抗者 Actor (目标，必须)
+      * @param {String} options.type      发起者的属性/技能/技艺 Key (如 "neili", "liliang")
+      * @param {String} [options.defType] 对抗者的属性 Key (如果不填，默认和发起者一致)
+      * @param {String} [options.label]   对抗标题 (如 "内力比拼", "吸星大法")
+      * @param {Number} [options.attBonus=0] 发起者在本次对抗中的临时数值修正 (正数为加值，负数为减值)
+      * @param {Number} [options.defBonus=0] 对抗者在本次对抗中的临时数值修正
+      * @param {String} [options.winText] 发起者获胜时的描述文本 (会被 outcome.win.text 覆盖)
+      * @param {String} [options.loseText] 发起者失败时的描述文本 (会被 outcome.lose.text 覆盖)
+      * 
+      * @param {Object} [options.outcome] 自动化后果配置 (基于发起者视角)
+      * @param {Object} [options.outcome.win] 发起者获胜时执行的结果
+      * @param {String} [options.outcome.win.text] 获胜描述文本
+      * @param {Object} [options.outcome.win.selfRecovery] 发起者恢复资源 { value: 10, type: "hp/mp/rage" }
+      * @param {Object} [options.outcome.win.selfDamage] 发起者流失资源/受伤害 { value: 10, type: "hp/poison..." }
+      * @param {String|Object|Array} [options.outcome.win.selfEffect] 发起者获得状态 (如 "prone")
+      * @param {Object} [options.outcome.win.targetDamage] 对抗者流失资源/受伤害
+      * @param {String|Object|Array} [options.outcome.win.targetEffect] 对抗者获得状态
+      * 
+      * @param {Object} [options.outcome.lose] 发起者失败时执行的结果 (内部结构同 win)
+      */
     static async requestContest({ attacker, defender, type, defType, label, winText, loseText, outcome, attBonus = 0, defBonus = 0 }) {
         if (!attacker || !defender) return ui.notifications.error("对抗请求缺少参与双方。");
         if (!type) return ui.notifications.error("对抗请求缺少属性类型。");
