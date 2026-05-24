@@ -465,12 +465,15 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             name: game.i18n.localize(CONFIG.XJZL?.arts?.[k] || `XJZL.Arts.${this._capitalize(k)}`), value: d.total
         }));
 
+        const formatTitle = (name) => name.includes("《") ? name : `《${name}》`;
+
         context.activeNeigong = null;
         if (system.martial.active_neigong) {
             const ng = actor.items.get(system.martial.active_neigong);
             if (ng) {
                 const stageConf = ng.system.config[`stage${Math.max(1, ng.system.stage || 0)}`];
-                context.activeNeigong = { name: ng.name, effect: this._cleanRichText(stageConf?.description) || "暂无特效" };
+                // 智能应用书名号
+                context.activeNeigong = { name: formatTitle(ng.name), effect: this._cleanRichText(stageConf?.description) || "暂无特效" };
             }
         }
 
@@ -488,7 +491,8 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             let catDisplay = CONFIG.XJZL?.wuxueCategories?.[catKey] ? game.i18n.localize(CONFIG.XJZL.wuxueCategories[catKey]) : game.i18n.localize(`XJZL.Wuxue.Category.${this._capitalize(catKey)}`);
 
             context.wuxueGroups.push({
-                name: wuxue.name, category: catDisplay,
+                // 智能应用书名号
+                name: formatTitle(wuxue.name), category: catDisplay,
                 tierName: tierMap[wuxue.system.tier] || `${wuxue.system.tier}级`,
                 moves: pinnedMoves.map(m => {
                     const derived = wuxue.calculateMoveDamage(m.id) || { damage: 0 };
@@ -506,7 +510,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                     return {
                         name: m.name,
                         tierName: tierMap[mTier] || `${mTier}级`,
-                        levelName: levelNames[Math.min(4, Math.max(0, m.computedLevel || 0))],
+                        levelName: levelNames[Math.min(4, Math.max(0, m.effectiveStage ?? m.computedLevel ?? 0))],
                         type: m.type, typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
                         isUltimate: m.isUltimate, range: m.range, isStance: m.type === "stance", isFeint: m.type === "feint",
                         blockValue, feintValue, damage: derived.damage, description: this._cleanRichText(m.description) || "暂无描述",
