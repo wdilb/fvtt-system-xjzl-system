@@ -1275,7 +1275,7 @@
             "tier": 3,
             "element": "yang",
             "description": "<p>缅甸军队中最为强大的内功。其修炼者能在战斗中爆发出惊人的力量与速度，势不可挡。</p><p><strong>属性：</strong>阳刚 <strong>悟性：</strong>11</p>",
-            "automationNote": "在回合开始与受到伤害后自动检查血量是否触发，并发送卡片提醒。回复血量超过阈值会自动移除狂暴。。",
+            "automationNote": "在回合开始与受到伤害后，系统会自动检查血量并赋予对应的【狂暴】状态。若需手动干预，武学中已附带3个阶段的完整AE。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -1290,16 +1290,22 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "动态狂暴检测",
+                            "label": "狂暴状态检测(受击)",
                             "trigger": "damaged",
-                            "script": "const stage = thisItem.system.stage || 1;\nlet threshold = 0;\nlet hitMod = 0, dmgMod = 0;\n\nif (stage === 1) { threshold = Math.floor(S.resources.hp.max / 3); hitMod = 5; dmgMod = 10; }\nelse if (stage === 2) { threshold = Math.floor(S.resources.hp.max / 2); hitMod = 10; dmgMod = 20; }\nelse if (stage >= 3) { threshold = S.resources.hp.max - 1; hitMod = 15; dmgMod = 30; }\n\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    eff.changes.push({ key: \"system.combat.hit_waigong\", mode: 2, value: String(hitMod) });\n    eff.changes.push({ key: \"system.combat.hit_neigong\", mode: 2, value: String(hitMod) });\n    eff.changes.push({ key: \"system.combat.damages.global.mod\", mode: 2, value: String(dmgMod) });\n\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\">\\n        <div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div>\\n        <div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害大幅提升，并获得减伤！</div>\\n    </div>`;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: content\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const threshold = Math.floor(S.resources.hp.max / 3);\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴 (领悟)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害提升，并获得减伤！</div></div>`\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}"
                         },
                         {
-                            "label": "动态狂暴检测(回合初)",
+                            "label": "狂暴状态检测(回合初)",
                             "trigger": "turnStart",
-                            "script": "const stage = thisItem.system.stage || 1;\nlet threshold = 0;\nlet hitMod = 0, dmgMod = 0;\n\nif (stage === 1) { threshold = Math.floor(S.resources.hp.max / 3); hitMod = 5; dmgMod = 10; }\nelse if (stage === 2) { threshold = Math.floor(S.resources.hp.max / 2); hitMod = 10; dmgMod = 20; }\nelse if (stage >= 3) { threshold = S.resources.hp.max - 1; hitMod = 15; dmgMod = 30; }\n\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    eff.changes.push({ key: \"system.combat.hit_waigong\", mode: 2, value: String(hitMod) });\n    eff.changes.push({ key: \"system.combat.hit_neigong\", mode: 2, value: String(hitMod) });\n    eff.changes.push({ key: \"system.combat.damages.global.mod\", mode: 2, value: String(dmgMod) });\n\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\">\\n        <div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div>\\n        <div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害大幅提升，并获得减伤！</div>\\n    </div>`;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: content\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const threshold = Math.floor(S.resources.hp.max / 3);\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴 (领悟)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害提升，并获得减伤！</div></div>`\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}"
+                        },
+                        {
+                            "label": "狂暴减伤",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\")) return;\nif (args.damageType === \"liushi\") return;\n\nconst resMod = 10;\nlet finalDmg = args.output.damage - resMod;\n\nif ([\"waigong\", \"neigong\"].includes(args.damageType)) {\n    finalDmg = Math.max(1, finalDmg);\n} else {\n    finalDmg = Math.max(0, finalDmg);\n}\n\nconst prevented = args.output.damage - finalDmg;\nargs.output.damage = finalDmg;\n\nif (prevented > 0) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-shield-alt\"></i> 狂暴减伤</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">野兽本能抵御了 <b>${prevented}</b> 点伤害！</div></div>`\n    });\n}"
                         }
                     ]
                 },
@@ -1314,7 +1320,26 @@
                     },
                     "description": "<p>小成运功特效：血量降为一半后进入‘狂暴’状态。</p><p>狂暴：专注杀敌，将一切交给野兽本能，命中+10，伤害+20，受到伤害-20。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "狂暴状态检测(受击)",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "const threshold = Math.floor(S.resources.hp.max / 2);\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴 (小成)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害提升，并获得减伤！</div></div>`\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}"
+                        },
+                        {
+                            "label": "狂暴状态检测(回合初)",
+                            "trigger": "turnStart",
+                            "active": true,
+                            "script": "const threshold = Math.floor(S.resources.hp.max / 2);\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴 (小成)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害提升，并获得减伤！</div></div>`\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}"
+                        },
+                        {
+                            "label": "狂暴减伤",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\")) return;\nif (args.damageType === \"liushi\") return;\n\nconst resMod = 20;\nlet finalDmg = args.output.damage - resMod;\n\nif ([\"waigong\", \"neigong\"].includes(args.damageType)) {\n    finalDmg = Math.max(1, finalDmg);\n} else {\n    finalDmg = Math.max(0, finalDmg);\n}\n\nconst prevented = args.output.damage - finalDmg;\nargs.output.damage = finalDmg;\n\nif (prevented > 0) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-shield-alt\"></i> 狂暴减伤</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">野兽本能抵御了 <b>${prevented}</b> 点伤害！</div></div>`\n    });\n}"
+                        }
+                    ]
                 },
                 "stage3": {
                     "stats": {
@@ -1327,17 +1352,28 @@
                     },
                     "description": "<p>圆满运功特效：受伤后进入‘狂暴’状态。</p><p>狂暴：专注杀敌，将一切交给野兽本能，命中+15，伤害+30，受到伤害-30。</p>",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "狂暴状态检测(受击)",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "const threshold = S.resources.hp.max - 1;\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴 (圆满)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害提升，并获得减伤！</div></div>`\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}"
+                        },
+                        {
+                            "label": "狂暴状态检测(回合初)",
+                            "trigger": "turnStart",
+                            "active": true,
+                            "script": "const threshold = S.resources.hp.max - 1;\nconst currentHp = S.resources.hp.value;\nconst hasRampage = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\");\n\nif (currentHp <= threshold && !hasRampage) {\n    const eff = thisItem.effects.getName(\"狂暴 (圆满)\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-biohazard\"></i> 触发【狂暴】状态！</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">将一切交给野兽本能，命中与伤害提升，并获得减伤！</div></div>`\n    });\n} else if (currentHp > threshold && hasRampage) {\n    await game.xjzl.api.effects.removeEffect(actor, \"kuangbao\", 1);\n}"
+                        },
+                        {
+                            "label": "狂暴减伤",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\")) return;\nif (args.damageType === \"liushi\") return;\n\nconst resMod = 30;\nlet finalDmg = args.output.damage - resMod;\n\nif ([\"waigong\", \"neigong\"].includes(args.damageType)) {\n    finalDmg = Math.max(1, finalDmg);\n} else {\n    finalDmg = Math.max(0, finalDmg);\n}\n\nconst prevented = args.output.damage - finalDmg;\nargs.output.damage = finalDmg;\n\nif (prevented > 0) {\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1); margin-left:2px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-shield-alt\"></i> 狂暴减伤</div><div style=\"font-size:0.9em; color:#555; margin-top:4px;\">野兽本能抵御了 <b>${prevented}</b> 点伤害！</div></div>`\n    });\n}"
+                        }
+                    ]
                 }
             },
-            "scripts": [
-                {
-                    "label": "狂暴减伤 (防流失保底)",
-                    "trigger": "preTake",
-                    "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangbao\")) return;\n\nconst stage = thisItem.system.stage || 1;\nlet resMod = 0;\nif (stage === 1) resMod = 10;\nelse if (stage === 2) resMod = 20;\nelse if (stage >= 3) resMod = 30;\n\n// 真实伤害（流失）不参与减免\nif (args.damageType === \"liushi\") return;\n\nlet finalDmg = args.output.damage - resMod;\n\n// 内外功保底1点，其他伤害保底0点\nif ([\"waigong\", \"neigong\"].includes(args.damageType)) {\n    finalDmg = Math.max(1, finalDmg);\n} else {\n    finalDmg = Math.max(0, finalDmg);\n}\n\nargs.output.damage = finalDmg;",
-                    "active": true
-                }
-            ],
             "masteryEffect": "<p>修满[永久]：气血+80，内力+40，力量+5，体魄+5。</p>",
             "masteryChanges": [
                 {
@@ -1364,9 +1400,9 @@
         },
         "effects": [
             {
-                "name": "狂暴",
+                "name": "狂暴 (领悟)",
                 "icon": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
-                "description": "专注杀敌，将一切交给野兽本能。命中与伤害提升，受到伤害减少。",
+                "description": "专注杀敌，将一切交给野兽本能。命中+5，伤害+10，受到伤害-10。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -1374,7 +1410,81 @@
                         "stackable": false
                     }
                 },
-                "changes": []
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.damages.global.mod",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            },
+            {
+                "name": "狂暴 (小成)",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
+                "description": "专注杀敌，将一切交给野兽本能。命中+10，伤害+20，受到伤害-20。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuangbao",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "10"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "10"
+                    },
+                    {
+                        "key": "system.combat.damages.global.mod",
+                        "mode": 2,
+                        "value": "20"
+                    }
+                ]
+            },
+            {
+                "name": "狂暴 (圆满)",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
+                "description": "专注杀敌，将一切交给野兽本能。命中+15，伤害+30，受到伤害-30。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuangbao",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "15"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
+                        "mode": 2,
+                        "value": "15"
+                    },
+                    {
+                        "key": "system.combat.damages.global.mod",
+                        "mode": 2,
+                        "value": "30"
+                    }
+                ]
             }
         ]
     },
