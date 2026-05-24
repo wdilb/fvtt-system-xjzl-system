@@ -247,7 +247,7 @@
             "sect": "xiaoyaopai",
             "description": "左道内功，修炼需将毒物涂在手掌之上，运功化毒，若七日不涂则功力减退。练成后以霸道剧毒化解敌人内力修为，中者内力于顷刻间化尽。",
             "requirement": "悟性需求: 4",
-            "automationNote": "内力流失与毒素伤害已完全自动化。濒死时的修为扣除属于永久性数据破坏，请GM根据自动化说明手动执行。",
+            "automationNote": "完全自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -277,7 +277,7 @@
                         {
                             "label": "化功毒蚀(小成)",
                             "trigger": "hit",
-                            "script": "if (args.actionType === 'attack'  && (args.move.type !== 'basic' || args.move.id === 'opportunity-attack')) { await args.target.applyHealing({amount: -5, type: 'mp', showScrolling: true}); await args.target.applyDamage({amount: 10, type: 'poison', isHit: true}); }",
+                            "script": "if (!args.isHit) return;\nif (args.actionType !== 'attack' || (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\n\nawait args.target.applyHealing({amount: -5, type: 'mp', showScrolling: true});\n\nconst dmgResult = await args.target.applyDamage({\n    amount: 10,\n    type: 'poison',\n    attacker: actor,\n    isHit: true\n});\n\nconst msg = `\n<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n    <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n        <div style=\"font-weight:bold; color:#732d91;\">\n            <i class=\"fas fa-skull-crossbones\"></i> 化功秘法\n        </div>\n        <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n            使目标流失 <b>5</b> 点内力。<br>\n            附加毒素伤害: <b>10</b> 点<br>\n            <span style=\"color:#888;\">(扣除抗性后实际造成 <b style=\"color:#d35400;\">${dmgResult.finalDamage}</b> 点毒伤)</span>\n        </div>\n    </div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
@@ -297,7 +297,7 @@
                         {
                             "label": "化功毒蚀(圆满)",
                             "trigger": "hit",
-                            "script": "if (args.actionType === 'attack' && (args.move.type !== 'basic' || args.move.id === 'opportunity-attack')) { await args.target.applyHealing({amount: -5, type: 'mp', showScrolling: true}); await args.target.applyDamage({amount: 20, type: 'poison', isHit: true}); }",
+                            "script": "if (!args.isHit) return;\nif (args.actionType !== 'attack' || (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\n\nawait args.target.applyHealing({amount: -5, type: 'mp', showScrolling: true});\n\nconst dmgResult = await args.target.applyDamage({\n    amount: 20,\n    type: 'poison',\n    attacker: actor,\n    isHit: true\n});\n\nlet extraNote = \"\";\nif (args.target.system.resources.hp.value <= 0 || dmgResult.isDying) {\n     extraNote = `<br><span style=\"color:#c0392b; font-weight:bold;\">⚠️ 目标处于濒死，请GM手动执行化功削减修为效果！</span>`;\n}\n\nconst msg = `\n<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\">\n    <div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\">\n        <div style=\"font-weight:bold; color:#732d91;\">\n            <i class=\"fas fa-skull-crossbones\"></i> 化功秘法 (圆满)\n        </div>\n        <div style=\"font-size:0.9em; color:#555; margin-top:3px;\">\n            使目标流失 <b>5</b> 点内力。<br>\n            附加毒素伤害: <b>20</b> 点<br>\n            <span style=\"color:#888;\">(扣除抗性后实际造成 <b style=\"color:#d35400;\">${dmgResult.finalDamage}</b> 点毒伤)</span>${extraNote}\n        </div>\n    </div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         }
                     ]
