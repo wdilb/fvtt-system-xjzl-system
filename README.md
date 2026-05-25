@@ -11,7 +11,8 @@
 
 > [![QQ Group](https://img.shields.io/badge/侠界交流群-753714737-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
 > [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
-> <img width="3077" height="1687" alt="image" src="https://github.com/user-attachments/assets/fedfaa11-de4c-42b3-9944-64d601bf47d6" />
+> <img width="3382" height="1690" alt="image" src="https://github.com/user-attachments/assets/26f7149a-79f9-4fa4-8cdf-c939ced99f25" />
+> <img width="1722" height="1122" alt="image" src="https://github.com/user-attachments/assets/5743f73e-65c7-4f61-8d84-54c7387a26c7" />
 
 ---
 
@@ -32,7 +33,7 @@
 
 ### 🧶 全周期脚本引擎 (Script Engine)
 系统内置了强大的事件驱动脚本引擎，允许 GM 或模组作者为物品编写 JavaScript 逻辑：
-*   **全时机覆盖**：支持 `Passive` (常驻)、`Attack` (出招前)、`Hit` (命中后)、`Damaged` (受击时)、`Dying` (濒死) 等 10+ 种触发时机。
+*   **全时机覆盖**：支持 `Passive` (常驻)、`Attack` (出招前)、`Hit` (命中后)、`Damaged` (受击时)、`Dying` (濒死) 等 10+ 种触发时机。为规则中95%以上的资源实现了特效自动化。
 *   **沙盒化环境**：内置 `Macros` 工具库，轻松实现是否触发架招、让对方检定属性失败则触发效果等复杂逻辑。
 *   **所见即所得**：在物品栏直接编写代码，即刻生效。
 
@@ -59,18 +60,31 @@
 <details>
 <summary><strong>点击展开：战斗交互卡片</strong></summary>
 <br>
-<img width="525" height="1206" alt="z1" src="https://github.com/user-attachments/assets/61f4d5bc-2a34-4b63-9f2b-967c1940dc1a" />
-<img width="520" height="838" alt="z2" src="https://github.com/user-attachments/assets/456f033d-28db-43f7-a38f-5b4dc0afe45d" />
-<img width="508" height="805" alt="z3" src="https://github.com/user-attachments/assets/657f3897-bd0b-46cf-b143-2ed96a4c5c62" />
-<img width="516" height="1269" alt="z4" src="https://github.com/user-attachments/assets/6001e8b5-d9ea-460a-bfe3-e0205f05fef8" />
+<img width="544" height="1017" alt="image" src="https://github.com/user-attachments/assets/94fd3e75-34d4-4a15-98f2-0b6b8401e292" />
+<img width="1064" height="1432" alt="image" src="https://github.com/user-attachments/assets/bb65deaf-1eb4-4382-b862-df0978d0ce84" />
+<img width="500" height="583" alt="image" src="https://github.com/user-attachments/assets/507705ae-4a03-4f89-bfb4-e0ab903e7310" />
 </details>
 
-### 经脉与穴位 (Jingmai)
-*可视化的穴位冲穴与奇珍镶嵌系统。*
+### 建卡向导 (character-wizard)
+*建卡流程全自动指引*
 <details>
-<summary><strong>点击展开：经脉界面</strong></summary>
+<summary><strong>点击展开：建卡向导</strong></summary>
 <br>
-<img width="1916" height="1288" alt="6" src="https://github.com/user-attachments/assets/c914b504-a3fd-4be5-b90d-128e3744493e" />
+<img width="2476" height="1555" alt="image" src="https://github.com/user-attachments/assets/cf8c91c9-dee7-40ec-bd64-520661fd355e" />
+<img width="2557" height="1510" alt="image" src="https://github.com/user-attachments/assets/3cb08c8e-b1b6-437a-9a1f-c64421a3bed9" />
+<img width="2230" height="1449" alt="image" src="https://github.com/user-attachments/assets/579b89ac-0a3f-43c5-922d-67fa354f1557" />
+<img width="2613" height="1563" alt="image" src="https://github.com/user-attachments/assets/46fc320c-8d9e-4e9d-afeb-b1e40465ae72" />
+</details>
+
+### 特效自动化 (CustomModifiers)
+*为规则中绝大部分的资源特效实现了自动化*
+<details>
+<summary><strong>点击展开：部分资源化展示</strong></summary>
+<br>
+<img width="1440" height="783" alt="image" src="https://github.com/user-attachments/assets/b9032139-0096-4b2f-b110-536092657999" />
+<img width="716" height="1016" alt="image" src="https://github.com/user-attachments/assets/d68ec265-85ea-40b3-be9b-76d5c30069a0" />
+<img width="518" height="1335" alt="image" src="https://github.com/user-attachments/assets/d3371da6-ce2c-4cbb-8a9a-e76b92107004" />
+<img width="491" height="471" alt="image" src="https://github.com/user-attachments/assets/6e31efb8-7f3a-4d06-a343-f0761fe0c8ad" />
 </details>
 
 ### 手动修正 (CustomModifiers)
