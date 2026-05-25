@@ -2576,7 +2576,7 @@
             "subSect": "mingguizong",
             "description": "集合仙·鬼·佛三种武学理念而创造的明鬼宗至高武学，催化人类极限、以命换招，练此功者犹如鬼神临世，势不可挡。",
             "requirement": "杀孽50以上。",
-            "automationNote": "半自动化。叠层完全自动。爆发效果（4层引爆）需玩家手动处理。",
+            "automationNote": "半自动化。灾厄叠层自动。引爆的效果需玩家手动结算。修满[永久]特效的绝招伤害加成，需在内功圆满后，手动开启武学里的【三罪落无间-修满被动】。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -2591,10 +2591,16 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "添加灾厄",
-                            "trigger": "hit",
+                            "label": "内功加持：暴击修正",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.actionType !== 'attack') return;\nconst eff = thisItem.effects.getName(\"灾厄 (领悟/小成)\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);"
+                            "script": "const zaie = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'zaie');\nif (zaie) {\n    const stacks = zaie.getFlag('xjzl-system', 'stacks') || 1;\n    args.flags.critThresholdMod += stacks * 1; // 领悟每层暴击骰-1\n}"
+                        },
+                        {
+                            "label": "添加灾厄与提醒",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (args.actionType !== 'attack' || args.hitCount === 0) return;\n\nconst eff = thisItem.effects.getName(\"灾厄\").toObject();\neff.origin = thisItem.uuid;\n\n// 1. 给所有命中目标上状态\nfor (const t of args.targets) {\n    if (t.isHit) {\n        await game.xjzl.api.effects.addEffect(t.target, eff);\n    }\n}\n\n// 2. 给自己上1层状态 (解决AOE给自己加多层问题)\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\n// 3. 发送机制提醒卡片\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"padding:2px;\">\n    <div style=\"border-left: 3px solid #8b0000; background: rgba(139,0,0,0.05); padding: 6px;\">\n        <div style=\"font-weight:bold; color:#8b0000; font-size:1.05em;\"><i class=\"fas fa-biohazard\"></i> 灾厄蔓延</div>\n        <div style=\"font-size:0.9em; margin-top:3px; color:#333;\">\n            已向命中的目标及自身各施加了 <b>1层</b> 灾厄。\n        </div>\n        <hr style=\"margin:5px 0; border:0; border-top:1px dashed #ccc;\">\n        <div style=\"font-size:0.85em; color:#555;\">\n            <b>[机制提醒]</b> 场景内累计达到 <b>4层</b> 时引爆：<br>\n            敌人每层流失 <span style=\"color:red; font-weight:bold;\">10</span> 点气血，随后请手动移除所有灾厄。\n        </div>\n    </div>\n</div>`;\n\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 },
@@ -2611,10 +2617,16 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "添加灾厄",
-                            "trigger": "hit",
+                            "label": "内功加持：暴击修正",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.actionType !== 'attack') return;\nconst eff = thisItem.effects.getName(\"灾厄 (领悟/小成)\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);"
+                            "script": "const zaie = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'zaie');\nif (zaie) {\n    const stacks = zaie.getFlag('xjzl-system', 'stacks') || 1;\n    args.flags.critThresholdMod += stacks * 1; // 小成每层暴击骰-1\n}"
+                        },
+                        {
+                            "label": "添加灾厄与提醒",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (args.actionType !== 'attack' || args.hitCount === 0) return;\n\nconst eff = thisItem.effects.getName(\"灾厄\").toObject();\neff.origin = thisItem.uuid;\n\nfor (const t of args.targets) {\n    if (t.isHit) {\n        await game.xjzl.api.effects.addEffect(t.target, eff);\n    }\n}\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"padding:2px;\">\n    <div style=\"border-left: 3px solid #8b0000; background: rgba(139,0,0,0.05); padding: 6px;\">\n        <div style=\"font-weight:bold; color:#8b0000; font-size:1.05em;\"><i class=\"fas fa-biohazard\"></i> 灾厄蔓延</div>\n        <div style=\"font-size:0.9em; margin-top:3px; color:#333;\">\n            已向命中的目标及自身各施加了 <b>1层</b> 灾厄。\n        </div>\n        <hr style=\"margin:5px 0; border:0; border-top:1px dashed #ccc;\">\n        <div style=\"font-size:0.85em; color:#555;\">\n            <b>[机制提醒]</b> 场景内累计达到 <b>4层</b> 时引爆：<br>\n            敌人每层流失 <span style=\"color:red; font-weight:bold;\">15</span> 点气血，随后请手动移除所有灾厄。\n        </div>\n    </div>\n</div>`;\n\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 },
@@ -2627,25 +2639,25 @@
                         "qigan": 43,
                         "shencai": 20
                     },
-                    "description": "圆满特效：造成伤害时，给目标和自身添加一层“灾厄”持续到脱战。你每有一层灾厄暴击骰-2。\n·战斗场景内累计4层灾厄时爆发，敌人每拥有一层灾厄流失 20 点气血，然后移除所有灾厄。\n修满特效：修满[永久]：增加气血100点，内力20点。绝招伤害+10。",
+                    "description": "圆满特效：造成伤害时，给目标和自身添加一层“灾厄”持续到脱战。你每有一层灾厄暴击骰-2。\n·战斗场景内累计4层灾厄时爆发，敌人每拥有一层灾厄流失 20 点气血，然后移除所有灾厄。",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "添加灾厄",
-                            "trigger": "hit",
+                            "label": "内功加持：暴击修正",
+                            "trigger": "attack",
                             "active": true,
-                            "script": "if (args.actionType !== 'attack') return;\nconst eff = thisItem.effects.getName(\"灾厄 (圆满)\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);"
+                            "script": "const zaie = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'zaie');\nif (zaie) {\n    const stacks = zaie.getFlag('xjzl-system', 'stacks') || 1;\n    args.flags.critThresholdMod += stacks * 2; // 圆满每层暴击骰-2\n}"
                         },
                         {
-                            "label": "绝招伤害加成",
-                            "trigger": "calc",
+                            "label": "添加灾厄与提醒",
+                            "trigger": "hit_once",
                             "active": true,
-                            "script": "if (args.move && args.move.isUltimate) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"三罪落无间 (圆满): +10\");\n}"
+                            "script": "if (args.actionType !== 'attack' || args.hitCount === 0) return;\n\nconst eff = thisItem.effects.getName(\"灾厄\").toObject();\neff.origin = thisItem.uuid;\n\nfor (const t of args.targets) {\n    if (t.isHit) {\n        await game.xjzl.api.effects.addEffect(t.target, eff);\n    }\n}\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nconst content = `\n<div class=\"xjzl-chat-card\" style=\"padding:2px;\">\n    <div style=\"border-left: 3px solid #8b0000; background: rgba(139,0,0,0.05); padding: 6px;\">\n        <div style=\"font-weight:bold; color:#8b0000; font-size:1.05em;\"><i class=\"fas fa-biohazard\"></i> 灾厄蔓延</div>\n        <div style=\"font-size:0.9em; margin-top:3px; color:#333;\">\n            已向命中的目标及自身各施加了 <b>1层</b> 灾厄。\n        </div>\n        <hr style=\"margin:5px 0; border:0; border-top:1px dashed #ccc;\">\n        <div style=\"font-size:0.85em; color:#555;\">\n            <b>[机制提醒]</b> 场景内累计达到 <b>4层</b> 时引爆：<br>\n            敌人每层流失 <span style=\"color:red; font-weight:bold;\">20</span> 点气血，随后请手动移除所有灾厄。\n        </div>\n    </div>\n</div>`;\n\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: content\n});"
                         }
                     ]
                 }
             },
-            "masteryEffect": "",
+            "masteryEffect": "修满[永久]：增加气血100点，内力20点。绝招伤害+10。",
             "masteryChanges": [
                 {
                     "key": "resources.hp.bonus",
@@ -2665,40 +2677,33 @@
         },
         "effects": [
             {
-                "name": "灾厄 (领悟/小成)",
-                "icon": "icons/svg/skull.svg",
-                "description": "每有一层灾厄暴击骰-1。",
+                "name": "灾厄",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+                "description": "明鬼宗三罪落无间产生的印记，累计4层后爆发。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
                         "slug": "zaie",
                         "stackable": true,
-                        "maxStacks": 4,
-                        "scripts": [
-                            {
-                                "label": "灾厄·暴击加成",
-                                "trigger": "attack",
-                                "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1; args.flags.critThresholdMod += stacks * 1;"
-                            }
-                        ]
+                        "maxStacks": 4
                     }
                 }
             },
             {
-                "name": "灾厄 (圆满)",
-                "icon": "icons/svg/skull.svg",
-                "description": "每有一层灾厄暴击骰-2。",
-                "transfer": false,
+                "name": "三罪落无间-修满被动",
+                "icon": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+                "description": "绝招伤害+10。",
+                "transfer": true,
+                "disabled": true,
                 "flags": {
                     "xjzl-system": {
-                        "slug": "zaie_master",
-                        "stackable": true,
-                        "maxStacks": 4,
+                        "slug": "sanzui_passive",
                         "scripts": [
                             {
-                                "label": "灾厄·暴击加成",
-                                "trigger": "attack",
-                                "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1; args.flags.critThresholdMod += stacks * 2;"
+                                "label": "绝招伤害加成",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "if (args.move && args.move.isUltimate) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"三罪落无间 (修满): +10\");\n}"
                             }
                         ]
                     }
