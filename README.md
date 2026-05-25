@@ -76,7 +76,7 @@
 <img width="2613" height="1563" alt="image" src="https://github.com/user-attachments/assets/46fc320c-8d9e-4e9d-afeb-b1e40465ae72" />
 </details>
 
-### 特效自动化 (CustomModifiers)
+### 特效自动化 (AutomatedEffects)
 *为规则中绝大部分的资源特效实现了自动化*
 <details>
 <summary><strong>点击展开：部分资源化展示</strong></summary>
