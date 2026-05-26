@@ -320,6 +320,16 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             el.removeAttribute('contenteditable');
             el.removeAttribute('spellcheck');
         });
+
+        // 处理操作备注：如果是默认提示文本，则清空文字但保留打印手写用的空行
+        const notesContent = element.querySelector('.notes-content');
+        if (notesContent) {
+            const currentText = notesContent.textContent || "";
+            if (currentText.includes("可在此处输入该角色的特殊机制、行动优先级、特殊装备或操作指南等信息...")) {
+                // 替换为纯换行，保留原有的高度供玩家手写
+                notesContent.innerHTML = "<br><br><br>";
+            }
+        }
     }
 
     /**
@@ -512,7 +522,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                         tierName: tierMap[mTier] || `${mTier}级`,
                         levelName: levelNames[Math.min(4, Math.max(0, m.effectiveStage ?? m.computedLevel ?? 0))],
                         type: m.type, typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
-                        isUltimate: m.isUltimate, range: m.range, isStance: m.type === "stance", isFeint: m.type === "feint",
+                        isUltimate: m.isUltimate, actionCost: m.actionCost || "主要动作", range: m.range, isStance: m.type === "stance", isFeint: m.type === "feint",
                         blockValue, feintValue, damage: derived.damage, description: this._cleanRichText(m.description) || "暂无描述",
                         cost: {
                             hp: m.costs.hp?.[Math.max(0, m.computedLevel - 1)] || 0,
