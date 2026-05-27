@@ -1145,6 +1145,12 @@ if (currentStacks > 0 && currentMpCost > 0) {
 6.  **优先使用 Active Effect 脚本**:
     *   对于赋予状态后产生的逻辑（如“每回合扣血”、“攻击附带效果”），请优先将脚本写在 Active Effect 中，而不是在物品脚本里创建“虚拟物品”来监听。这样当 Buff 消失时，逻辑也会自动停止，更加清洁高效。
 
+7.  **脚本调用伤害/治疗的溯源规范 (用于统计功能)**:
+    *   当你在脚本中手动调用底层的 `applyDamage` 或 `applyHealing` 时，**强烈建议传入触发源 Actor (`attacker` 或 `healer`)**。
+    *   **示例 (伤害)**: `await args.target.applyDamage({ amount: 15, type: "poison", attacker: actor })`
+    *   **示例 (治疗)**: `await actor.applyHealing({ amount: 20, type: "hp", healer: actor })`
+    *   **原理**: 底层执行上下文栈 (Context Stack) 会通过传入的 Actor 顺藤摸瓜，精准识别出这笔伤害/治疗是由“哪件装备”、“哪个特效”触发的。如果不传该参数，战斗统计功能将只能把这些数值归类为“未知来源”。
+
 </details>
 
 ---

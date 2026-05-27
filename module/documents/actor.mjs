@@ -1840,13 +1840,14 @@ export class XJZLActor extends Actor {
   }
 
   /**
-   * [核心] 治疗处理函数
-   * @param {Object} data
-   * @param {number} data.amount - 治疗数值 (正数=回复, 负数=流失)
-   * @param {string} data.type - 类型: "hp" | "neili" | "mp" | "huti"
-   * @param {boolean} data.showScrolling - 是否显示飘字
-   * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
-   */
+     * [核心] 治疗处理函数
+     * @param {Object} data
+     * @param {number} data.amount - 治疗数值 (正数=回复, 负数=流失)
+     * @param {string} data.type - 类型: "hp" | "neili" | "mp" | "huti"
+     * @param {boolean} [data.showScrolling=true] - 是否显示飘字
+     * @param {Actor} [data.healer] - 施加治疗/流失的源头 Actor。传入此参数有助于底层脚本引擎精准溯源该效果是由哪件装备/Buff触发的（用于战斗统计）。
+     * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
+     */
   async applyHealing(data) {
     // [权限拦截]
     if (!this.isOwner) return await xjzlSocket.executeAsGM("applyHealing", this.uuid, data);
@@ -1995,7 +1996,7 @@ export class XJZLActor extends Actor {
       const ctx = healer._scriptContextStack[healer._scriptContextStack.length - 1];
       const sourceItem = ctx.item || ctx.effect || null;
       const sourceName = sourceItem ? sourceItem.name : ctx.label;
-      
+
       Hooks.callAll("xjzl.scriptHealingApplied", {
         healer: healer,
         target: this,
