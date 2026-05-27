@@ -921,7 +921,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>高举手中之剑，开启架招。</p><p>你被击破架招时，在该回合末回复 5 点气血。</p><p><strong>升级：</strong>格挡值+5，被击破回合末回复+5，消耗+1。</p>",
-                    "automationNote": "击破回血提示手动。",
+                    "automationNote": "击破回血判定较为复杂，被击破后的回合末请玩家手动回复气血。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -933,14 +933,7 @@
                             3
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "击破提示",
-                            "trigger": "damaged",
-                            "script": "if (args.isBroken) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const heal = 5 + (lvl-1)*5;\n    ui.notifications.info(`架招被破：请在回合末手动回复 ${heal} 点气血`);\n}",
-                            "active": true
-                        }
-                    ]
+                    "scripts": []
                 },
                 {
                     "name": "虔诚之佑",
@@ -953,7 +946,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>用剑在胸前飞速画一个十字，使天主护佑自身，获得“虔诚”，持续三回合。</p><p><strong>虔诚：</strong>直到你造成伤害为止，你的速度增加 2 点。你下一次出招，招式伤害+10。</p><p><strong>升级：</strong>虔诚提供的速度+1，招式伤害+5，消耗+1。</p>",
-                    "automationNote": "获得BUFF自动。BUFF加速自动。下一次出招加伤并移除BUFF自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -967,10 +960,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得虔诚",
+                            "label": "赋予虔诚BUFF",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"虔诚\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst spd = 2 + (lvl - 1);\nconst dmg = 10 + (lvl - 1) * 5;\n\n// 写入动态数值\neff.changes[0].value = String(spd);\neff.flags[\"xjzl-system\"].qianchengDmg = dmg;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"虔诚\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst spd = 2 + (lvl - 1);\nconst dmg = 10 + (lvl - 1) * 5;\n\n// 动态推入属性修改\neff.changes[0].value = String(spd);\neff.changes.push({\n    key: \"system.combat.damages.skill.mod\",\n    mode: 2,\n    value: String(dmg)\n});\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -983,8 +976,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>双手持剑，跨步斩击，对目标造成伤害，并为其添加“奴隶标记”，持续一回合。</p><p><strong>奴隶标记：</strong>每次受到《侍从之剑》《骑誓之剑》《西洋剑法》的伤害时，额外流失 10 点气血。</p><p>·若有敌人处于半空状态，你可以消耗反应动作释放此招，跃至半空劈斩，造成伤害。</p><p><strong>升级：</strong>招式伤害+5，奴隶标记持续回合数+1，消耗+1。</p>",
-                    "automationNote": "添加标记自动。标记增伤自动 (需匹配武学名称)。",
+                    "description": "<p>双手持剑，跨步斩击，对目标造成 0.5 力量点外功伤害，并为其添加“奴隶标记”，持续一回合。</p><p><strong>奴隶标记：</strong>每次受到《侍从之剑》《骑誓之剑》《西洋剑法》的伤害时，额外流失 10 点气血。</p><p>·若有敌人处于半空状态，你可以消耗反应动作释放此招，跃至半空劈斩，造成伤害。</p><p><strong>升级：</strong>招式伤害+5，奴隶标记持续回合数+1，消耗+1。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -1004,10 +997,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "添加标记",
+                            "label": "添加奴隶标记",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"奴隶标记\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    eff.duration = { rounds: 1 + (lvl - 1) };\n\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"奴隶标记\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    eff.duration = { rounds: 1 + (lvl - 1) };\n\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
                         }
                     ]
                 },
@@ -1022,8 +1015,9 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>大力劈出手中之剑，贯穿目标。对目标造成自身气血上限 20%的外功伤害（外功命中，可暴击）。</p><p>若目标拥有“奴隶标记”，还会将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "百分比伤害计算自动。击飞手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
                         "growth": 10
                     },
@@ -1041,16 +1035,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "百分比伤害",
+                            "label": "气血转化真伤",
                             "trigger": "calc",
-                            "script": "const hpMax = actor.system.resources.hp.max;\nconst bonus = Math.floor(hpMax * 0.2);\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`20%血量加成 (+${bonus})`);",
-                            "active": true
+                            "active": true,
+                            "script": "const maxHp = S.resources.hp.max;\nconst bonus = Math.floor(maxHp * 0.2);\n// 引擎底层已加了 Growth*(Lvl-1)，这里只加气血20%部分\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`20%气血上限转化: ${bonus}`);"
                         },
                         {
-                            "label": "标记击飞",
+                            "label": "判定标记击飞",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        ui.notifications.info(`${args.target.name} 被击飞 1 米`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #2980b9; background:rgba(41,128,185,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-wind\"></i> 裁决击飞</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\"><b>${args.target.name}</b> 带有奴隶标记，被强劲的力道击飞 <b>1 米</b>！(请手动调整棋子位置)</div></div></div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n    }\n}"
                         }
                     ]
                 }
@@ -1058,19 +1052,22 @@
             "effects": [
                 {
                     "name": "虔诚",
-                    "icon": "icons/magic/light/hand-sparks-glow-yellow.webp",
-                    "description": "速度+2，下次出招伤害增加。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "天主护佑：速度增加，且下一次出招招式伤害提升。",
                     "transfer": false,
+                    "duration": {
+                        "rounds": 3
+                    },
                     "flags": {
                         "xjzl-system": {
                             "slug": "qiancheng",
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "出招加伤",
-                                    "trigger": "preDamage",
+                                    "label": "消耗移除",
+                                    "trigger": "hit_once",
                                     "active": true,
-                                    "script": "if ([\"waigong\", \"neigong\"].includes(args.config.type)) {\n    const dmg = thisEffect.getFlag(\"xjzl-system\", \"qianchengDmg\") || 10;\n    args.config.amount += dmg;\n    await thisEffect.delete();\n    ui.notifications.info(`虔诚消耗：伤害 +${dmg}`);\n}"
+                                    "script": "if (args.actionType === \"attack\") {\n    await thisEffect.delete();\n    actor.showFloatyText(\"虔诚结束\", {fill: \"#ffffff\"});\n}"
                                 }
                             ]
                         }
@@ -1086,12 +1083,20 @@
                 {
                     "name": "奴隶标记",
                     "icon": "icons/svg/degen.svg",
-                    "description": "受到特定武学伤害时流失气血。",
+                    "description": "异教烙印：受到《侍从之剑》《骑誓之剑》《西洋剑法》伤害时，额外承受真实流失伤害。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "slave_mark",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "连携流失伤害",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "if (!args.attacker || !args.item) return;\nconst validItems = [\"侍从之剑\", \"骑誓之剑\", \"西洋剑法\"];\n\nif (validItems.includes(args.item.name)) {\n    await actor.applyDamage({\n        amount: 10,\n        type: \"liushi\",\n        attacker: args.attacker, \n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #8b0000; background:rgba(139,0,0,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-tint\"></i> 奴隶标记触发</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">受西洋剑系连击，伤口崩裂，额外流失了 <b>10</b> 点气血。</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
+                                }
+                            ]
                         }
                     },
                     "changes": []
