@@ -737,6 +737,8 @@ export class XJZLActor extends Actor {
    * [内部] 同步执行 (用于 Passive, Calc)
    */
   _runScriptsSync(scripts, sandbox) {
+    // 初始化执行上下文栈
+    if (!this._scriptContextStack) this._scriptContextStack = [];
     for (const entry of scripts) {
       try {
         // 动态注入 thisItem，指向当前脚本所属的物品
@@ -767,6 +769,12 @@ export class XJZLActor extends Actor {
         }
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
+        // 入栈：记录当前正在执行的脚本来源
+        this._scriptContextStack.push({
+          item: thisItem,
+          effect: thisEffect,
+          label: entry.label
+        });
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -779,6 +787,10 @@ export class XJZLActor extends Actor {
         // 可选：开发模式下弹出提示
         // ui.notifications.error(`脚本错误: ${entry.label}`);
       }
+      finally {
+        // 出栈：无论成功失败，保证栈的清洁
+        this._scriptContextStack.pop();
+      }
     }
   }
 
@@ -786,6 +798,8 @@ export class XJZLActor extends Actor {
    * [内部] 异步执行 (用于 Attack, Hit, TurnStart...)
    */
   async _runScriptsAsync(scripts, sandbox) {
+    // 初始化执行上下文栈
+    if (!this._scriptContextStack) this._scriptContextStack = [];
 
     for (const entry of scripts) {
       try {
@@ -812,6 +826,12 @@ export class XJZLActor extends Actor {
         }
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
+        // 入栈：记录当前正在执行的脚本来源
+        this._scriptContextStack.push({
+          item: thisItem,
+          effect: thisEffect,
+          label: entry.label
+        });
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
         // console.log(`[XJZL] 执行脚本 [${entry.label}]:`, entry.script);
@@ -820,6 +840,9 @@ export class XJZLActor extends Actor {
       } catch (err) {
         console.error(`[XJZL] 异步脚本错误 [${entry.label}]:`, err);
         ui.notifications.error(`特效脚本执行失败: ${entry.label}`);
+      } finally {
+        // 出栈：无论成功失败，保证栈的清洁
+        this._scriptContextStack.pop();
       }
     }
   }
@@ -1285,10 +1308,32 @@ export class XJZLActor extends Actor {
         this.showFloatyText("未破防", { fill: "#cccccc" });
       }
 
-      return {
+      const finalDamageResult = {
         finalDamage: tiliLost, tiliLost: tiliLost, hpLost: 0, hutiLost: 0, mpLost: 0,
-        isDead: isDead, isDying: false
+        isDead: isDead, isDying: false, isHit: true
       };
+
+      // 野兽特化逻辑的溯源 Hook (仅限脚本引擎调用的伤害)，用于后续的数据统计功能
+      // 解构获取 type (因为野兽逻辑前面可能还没解构 type，我们需要从 data 里取一下)
+      const damageType = data.type || "waigong";
+      const attacker = data.attacker || null;
+
+      if (attacker && attacker._scriptContextStack?.length > 0) {
+        const ctx = attacker._scriptContextStack[attacker._scriptContextStack.length - 1];
+        const sourceItem = ctx.item || ctx.effect || null;
+        const sourceName = sourceItem ? sourceItem.name : ctx.label;
+
+        Hooks.callAll("xjzl.scriptDamageDealt", {
+          attacker: attacker,
+          defender: this,
+          damageType: damageType,
+          sourceItem: sourceItem,
+          sourceName: sourceName,
+          result: finalDamageResult
+        });
+      }
+
+      return finalDamageResult;
     }
 
     // =====================================================
@@ -1763,7 +1808,7 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 11. 返回结果
     // =====================================================
-    return {
+    const finalDamageResult = {
       finalDamage: finalDamage,
       hpLost: stdHpLost,
       hutiLost: stdHutiLost,
@@ -1774,6 +1819,24 @@ export class XJZLActor extends Actor {
       rageGained: rageGained,
       isHit: true
     };
+    // 针对脚本触发伤害的隐式溯源 Hook (仅限脚本引擎调用的伤害)，用于后续的数据统计功能
+    // 判定条件：没有通过标准卡片传入 data.item，且攻击者正处于脚本执行栈中
+    if (attacker && attacker._scriptContextStack?.length > 0) {
+      const ctx = attacker._scriptContextStack[attacker._scriptContextStack.length - 1];
+      const sourceItem = ctx.item || ctx.effect || null;
+      const sourceName = sourceItem ? sourceItem.name : ctx.label;
+
+      Hooks.callAll("xjzl.scriptDamageDealt", {
+        attacker: attacker,
+        defender: this,
+        damageType: type,
+        sourceItem: sourceItem,
+        sourceName: sourceName,
+        result: finalDamageResult
+      });
+    }
+
+    return finalDamageResult;
   }
 
   /**
@@ -1918,12 +1981,32 @@ export class XJZLActor extends Actor {
       }
     }
     // 返回详细结果供调用者使用
-    return {
+    const finalHealResult = {
       actualHeal: actualHeal,
       type: type,
       overflow: amount - actualHeal, // 溢出/被浪费的治疗量
       isBlocked: (actualHeal === 0 && amount !== 0 && newVal === oldVal) // 是否完全无效
     };
+    // 针对脚本触发治疗的隐式溯源 Hook,用于后续的数据统计功能
+    // 获取施法源：优先看有没有传入 healer，没有则默认是自己 (this) 身上挂的 Buff 触发的
+    const healer = data.healer || this;
+
+    if (healer._scriptContextStack?.length > 0) {
+      const ctx = healer._scriptContextStack[healer._scriptContextStack.length - 1];
+      const sourceItem = ctx.item || ctx.effect || null;
+      const sourceName = sourceItem ? sourceItem.name : ctx.label;
+
+      Hooks.callAll("xjzl.scriptHealingApplied", {
+        healer: healer,
+        target: this,
+        healType: type,
+        sourceItem: sourceItem,
+        sourceName: sourceName,
+        result: finalHealResult
+      });
+    }
+
+    return finalHealResult;
   }
 
   /**
