@@ -3493,7 +3493,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，一手握枪尾，一手握中段，枪锋护身，暗含黑云压城之势，开启架招。格挡成功后，可使用反应动作对目标释放【裂甲】。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "开启架招自动。格挡成功后请手动判断距离释放【裂甲】。",
+                    "automationNote": "格挡成功后自动发送卡片提示。反应动作释放【裂甲】请手动执行。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -3507,10 +3507,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡提示",
+                            "label": "压城反击提示",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"格挡成功！可消耗反应动作施展 [裂甲]\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #f39c12; background:rgba(243,156,18,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#d68910;\"><i class=\"fas fa-shield-alt\"></i> 压城格挡</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">格挡成功！你可消耗反应动作对攻击者施展 <b>[裂甲]</b>。</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
                         }
                     ]
                 },
@@ -3523,8 +3523,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当有敌人进入你周围三米范围内，在你三米范围内消耗移动速度移动或是施展轻功经过，你可以消耗反应动作施展此招，提枪横扫，碎甲断骨，对其造成伤害，并使目标倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。命中后自动给予目标[倒地]状态。",
+                    "description": "<p>当有敌人进入你周围三米范围内，在你三米范围内消耗移动速度移动或是施展轻功经过，你可以消耗反应动作施展此招，提枪横扫，碎甲断骨，对其造成 0.5 力量点外功伤害，并使目标倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中后自动给予目标[倒地]状态。触发时机需玩家手动把握。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3544,10 +3544,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加倒地",
+                            "label": "碎甲倒地",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被击倒在地！`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #c0392b; background:rgba(192,57,43,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-falling\"></i> 碎甲断骨</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\"><b>${args.target.name}</b> 被长枪扫中，失去平衡倒地！</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
                         }
                     ]
                 },
@@ -3560,8 +3560,8 @@
                     "range": "3米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，枪破万千，对目标造成伤害，击破架招时，可以不消耗动作，对目标释放一次【裂甲】。</p><p>·你可以额外消耗怒气，每额外 1 点使虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "半自动化。出招前弹窗询问是否投入额外怒气。击破架招后请手动施展免费的【裂甲】。",
+                    "description": "<p>主要动作，枪破万千，对目标造成 0.4 力量点外功伤害，击破架招时，可以不消耗动作，对目标释放一次【裂甲】。</p><p>·你可以额外消耗怒气，每额外 1 点使虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3586,22 +3586,23 @@
                     },
                     "scripts": [
                         {
-                            "label": "怒气加成决策",
+                            "label": "额外怒气投入",
                             "trigger": "attack",
-                            "script": "const currentRage = actor.system.resources.rage.value;\nif (currentRage > 0) {\n    const confirm = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"狼袭 - 怒气加成\" },\n        content: `<p>当前剩余怒气: ${currentRage}</p><div class=\"form-group\"><label>额外投入怒气 (每点虚招+1)</label><input type=\"number\" name=\"rage\" value=\"0\" min=\"0\" max=\"${currentRage}\" autofocus></div>`,\n        ok: {\n            label: \"确定\",\n            callback: (event, button) => button.form.elements.rage.valueAsNumber\n        }\n    });\n    \n    const extraRage = confirm || 0;\n    if (extraRage > 0) {\n        await actor.update({ \"system.resources.rage.value\": currentRage - extraRage });\n        args.flags.bonusFeint += extraRage;\n        ui.notifications.info(`消耗 ${extraRage} 点额外怒气，虚招值 +${extraRage}`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const currentRage = actor.system.resources.rage.value;\nif (currentRage > 0) {\n    const confirm = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"狼袭 - 燃怒加成\", icon: \"fas fa-fire\" },\n        content: `<div style=\"margin-bottom: 5px; color: #555;\"><p>当前剩余怒气: <b>${currentRage}</b></p><p style=\"color:#c0392b;\">是否额外投入怒气？(每1点怒气 = 虚招值+1)</p></div><div class=\"form-group\"><label style=\"font-weight:bold;\">额外消耗:</label><input type=\"number\" name=\"rage\" value=\"0\" min=\"0\" max=\"${currentRage}\" style=\"text-align:center; background:rgba(0,0,0,0.05);\"></div>`,\n        ok: {\n            label: \"确定\",\n            icon: \"fas fa-check\",\n            callback: (event, button) => parseInt(button.form.elements.rage.value) || 0\n        },\n        rejectClose: false\n    });\n    \n    if (confirm && confirm > 0) {\n        const extraRage = Math.min(confirm, currentRage);\n        await actor.update({ \"system.resources.rage.value\": currentRage - extraRage });\n        args.flags.bonusFeint += extraRage;\n        const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #e74c3c; background:rgba(231,76,60,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-fire-alt\"></i> 怒火加持</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">额外燃烧了 <b>${extraRage}</b> 点怒气，本次虚招值大幅提升！</div></div></div>`;\n        ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n    }\n}"
                         },
                         {
-                            "label": "击破提示",
+                            "label": "破架招提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(\"击破架招！请免费施展 [裂甲]\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #c0392b; background:rgba(192,57,43,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-bolt\"></i> 乘胜追击</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">架招已破！你可<b>不消耗动作</b>对目标立即施展一次【裂甲】。</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
                         }
                     ]
                 },
                 {
                     "name": "焚江",
                     "type": "qi",
+                    "actionType": "buff",
                     "element": "gang",
                     "damageType": "none",
                     "weaponType": "staff",
@@ -3609,7 +3610,7 @@
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，极速攒刺，枪影翻飞，热浪汹涌，你本回合内获得一个额外的反应动作，并获得“焚江煮海”，持续一回合。</p><p><strong>焚江煮海：</strong>你的次要动作可以当做反应动作使用。</p><p>·你以反应动作释放的招式伤害+10。</p><p><strong>升级：</strong>焚江煮海令反应招式伤害+10，消耗+2。</p>",
-                    "automationNote": "应用后获得BUFF。请玩家在施展反应招式时，手动在弹窗的'伤害修正'中输入加值（+10/20）。额外动作请手动管理。",
+                    "automationNote": "应用后自动获得BUFF标记。因动作类型属于玩家自行分配范畴，施展反应动作的伤害加成（+10/+20/+30）需玩家在出招时手动填入修正框内。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -3623,13 +3624,12 @@
                     },
                     "scripts": [
                         {
-                            "label": "获得BUFF",
+                            "label": "施加焚江",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"焚江煮海\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 提示玩家伤害加值\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = lvl >= 2 ? 20 : 10;\nui.notifications.info(`焚江煮海生效：下一次反应招式伤害应 +${dmgBonus} (请手动修正)`);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"焚江煮海\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dmgBonus = lvl >= 3 ? 30 : (lvl >= 2 ? 20 : 10);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #e67e22; background:rgba(230,126,34,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-fire\"></i> 焚江煮海</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\"><p>你本回合获得了一个额外的反应动作。</p><p style=\"color:#c0392b;\"><b>注意：</b>持续期间你的反应招式伤害将 <b>+${dmgBonus}</b>，请在出招弹窗中手动补入此数值！</p></div></div></div>`;\nChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});"
                         }
-                    ],
-                    "actionType": "buff"
+                    ]
                 },
                 {
                     "name": "破军",
@@ -3641,8 +3641,8 @@
                     "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，进入“极烈”之境，持续 4 个回合（极烈属特殊状态，无法移除）。</p><p>在极烈结束的回合初，你冲锋到范围内目标面前，一枪刺出，破尽千军，摧毁其身上的随机一件非玉品防具，并造成伤害。</p><p>·你每有一种武器技能达到 8，此招暴击骰-1。</p><p><strong>极烈：</strong>你失去且无法使用主要、次要动作。</p><p><strong>升级：</strong>招式伤害+20，极烈持续回合减 1，怒气-1，内力消耗+4。</p>",
-                    "automationNote": "手动流程：1. 正常出招，获得BUFF，请忽略此次伤害。2. BUFF结束回合，再次点击出招(勾选免费)，应用伤害。防具摧毁手动。",
+                    "description": "<p>蓄力动作，进入“极烈”之境，持续 4 个回合（极烈属特殊状态，无法移除）。</p><p>在极烈结束的回合初，你冲锋到范围内目标面前，一枪刺出，破尽千军，摧毁其身上的随机一件非玉品防具，并造成 1.0 力量点外功伤害。</p><p>·你每有一种武器技能达到 8，此招暴击骰-1。</p><p><strong>极烈：</strong>你失去且无法使用主要、次要动作。</p><p><strong>升级：</strong>招式伤害+20，极烈持续回合减 1，怒气-1，内力消耗+4。</p>",
+                    "automationNote": "延时招式。初次施展仅启动蓄力（请忽略伤害卡片）。极烈结束后再次施展，系统将自动核算暴击加成并触发真伤。摧毁防具请手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -3667,10 +3667,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "极烈处理",
+                            "label": "极烈启动与暴击降临",
                             "trigger": "attack",
-                            "script": "// 检查是否已处于极烈状态（判断是第1阶段还是第2阶段）\nconst hasBuff = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jilie\");\n\nif (!hasBuff) {\n    // 阶段1：施加状态\n    const lvl = Math.max(1, move.computedLevel || 1);\n    let rounds = 4;\n    if (lvl >= 2) rounds = 3;\n    if (lvl >= 3) rounds = 2;\n\n    const eff = thisItem.effects.getName(\"极烈\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    \n    ui.notifications.info(\"进入 [极烈] 状态。本次出招仅为启动，请忽略伤害卡片。\");\n} else {\n    // 阶段2：结算伤害，计算暴击修正\n    let skillCount = 0;\n    const ranks = actor.system.combat.weaponRanks;\n    for (const key in ranks) {\n        if (ranks[key].total >= 8) skillCount++;\n    }\n    // 暴击阈值修正 (正数 = 阈值降低 = 更容易暴击)\n    args.flags.critThresholdMod += skillCount;\n    \n    ui.notifications.info(`[破军] 结算：武器技能修正暴击骰 -${skillCount}`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const isPrimed = actor.getFlag(\"xjzl-system\", \"pojun_primed\");\n\nif (!isPrimed) {\n    // 阶段1：启动蓄力，写入持久化 Flag 锁定状态\n    await actor.setFlag(\"xjzl-system\", \"pojun_primed\", true);\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = Math.max(1, 4 - (lvl - 1));\n\n    const eff = thisItem.effects.getName(\"极烈\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #8e44ad; background:rgba(142,68,173,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-meteor\"></i> 极烈蓄势</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\"><p>进入极烈之境，持续 <b>${rounds}</b> 回合。期间失去主要和次要动作。</p><p style=\"color:#8b0000;\">本次出招为蓄力宣告，请<b>忽略</b>附带的伤害/命中卡片！</p></div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n} else {\n    // 阶段2：解除锁定，爆发打击\n    await actor.unsetFlag(\"xjzl-system\", \"pojun_primed\");\n    let skillCount = 0;\n    const ranks = S.combat.weaponRanks;\n    for (const key in ranks) {\n        if (ranks[key].total >= 8) skillCount++;\n    }\n    if (skillCount > 0) {\n        args.flags.critThresholdMod += skillCount;\n        args.flags.damageResult.breakdown += `\\n+ 武器大师：暴击阈值 -${skillCount}`;\n    }\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #2c3e50; background:rgba(44,62,80,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#2c3e50;\"><i class=\"fas fa-gavel\"></i> 破尽千军</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\"><p>享受武器大师加持，暴击阈值降低 <b>${skillCount}</b> 点！</p><p style=\"color:#c0392b;\"><b>请注意：</b>若命中，请手动摧毁目标身上随机一件非玉品防具！</p></div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
                         }
                     ]
                 }
