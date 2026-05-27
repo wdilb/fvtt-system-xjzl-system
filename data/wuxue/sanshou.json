@@ -1193,45 +1193,93 @@
             "requirements": "",
             "moves": [
                 {
-                    "name": "无音 (被动光环)",
-                    "type": "qi",
-                    "actionType": "buff",
-                    "damageType": "none",
-                    "weaponType": "none",
-                    "range": "1米",
-                    "targetInfo": "敌方",
-                    "actionCost": "无",
-                    "description": "<p>敌人在你 1 米内开始回合时流失 30 气血。</p><p><strong>升级：</strong>无音流失气血+10。</p>",
-                    "automationNote": "光环效果手动。请手动检测距离并应用流失伤害。",
-                    "costs": {
-                        "mp": [
-                            0
-                        ]
-                    }
-                },
-                {
                     "name": "通音",
                     "type": "qi",
                     "actionType": "heal",
+                    "element": "none",
                     "damageType": "none",
                     "weaponType": "none",
                     "range": "1米",
                     "targetInfo": "友方",
                     "actionCost": "反应动作",
                     "description": "<p>你靠近未濒死的友方时，可以消耗反应动作，为其恢复 30 点气血。</p><p><strong>升级：</strong>通音回复气血+10。</p>",
-                    "automationNote": "完全自动化。点击应用治疗即可。",
+                    "automationNote": "进战自动获得[无音]状态。治疗效果完全自动化，点击应用即可。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 30,
-                        "growth": 10
+                        "growth": 10,
+                        "scalings": []
                     },
                     "costs": {
-                        "mp": [
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "进战获取无音",
+                            "trigger": "combatStart",
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName('无音').toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">无形神音 - 无音光环</div>\n        <div style=\"padding:5px; font-size:0.9em; color:#555;\">\n            <p>内力环身无形颤动，获得“无音”状态。</p>\n            <p style=\"color:darkred;\"><b>敌人在你 1 米内开始回合时流失气血！</b></p>\n            <p>请使用招式【无音】手动对其造成流失伤害。</p>\n        </div>\n    </div>`\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "无音",
+                    "type": "qi",
+                    "actionType": "attack",
+                    "element": "none",
+                    "damageType": "liushi",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "敌方",
+                    "actionCost": "无",
+                    "description": "<p>敌人在你 1 米内开始回合时流失 30 气血。</p><p><strong>升级：</strong>无音流失气血+10。</p>",
+                    "automationNote": "辅助用招式。无消耗，无动作。请在满足条件的敌方回合开始时对其使用此招式，将自动根据[通音]等级计算流失伤害。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
                             0
-                        ]
-                    }
+                        ],
+                        "mappedStage": 0
+                    },
+                    "calculation": {
+                        "isFixed": true,
+                        "base": 30,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "动态伤害读取",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const tongyin = thisItem.system.moves.find(m => m.name === '通音');\nconst lvl = Math.max(1, tongyin?.computedLevel || 1);\nconst dmg = 30 + (lvl - 1) * 10;\nargs.output.damage = dmg;\nargs.output.bonusDesc.push(`读取[通音]等级(Lv.${lvl})计算流失伤害: ${dmg}`);"
+                        }
+                    ]
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "无音",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "光环：敌人在你 1 米内开始回合时，对其造成气血流失。(请手动使用招式【无音】)",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuyin_aura",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "摄魂心法",
