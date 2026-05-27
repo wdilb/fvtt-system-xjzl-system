@@ -62,7 +62,7 @@
                             "label": "提按端挤",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst totalHeal = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ amount: totalHeal, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });"
+                            "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst totalHeal = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"hp\", showScrolling: true });"
                         }
                     ],
                     "weaponType": "unarmed",
@@ -165,7 +165,7 @@
                         {
                             "label": "青龙摆尾",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst base = 10 + (lvl - 1) * 5;\n\n// 获取技能/技艺等级\nconst liaoshang = actor.system.skills.liaoshang.total || 0;\nconst yishu = actor.system.arts.yishu.total || 0;\n\nconst total = base + liaoshang * 1 + yishu * 2;\n\nawait args.target.applyHealing({ amount: total, type: \"huti\", showScrolling: true });",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst base = 10 + (lvl - 1) * 5;\n\n// 获取技能/技艺等级\nconst liaoshang = actor.system.skills.liaoshang.total || 0;\nconst yishu = actor.system.arts.yishu.total || 0;\n\nconst total = base + liaoshang * 1 + yishu * 2;\n\nawait args.target.applyHealing({ healer: actor,  amount: total, type: \"huti\", showScrolling: true });",
                             "active": true
                         }
                     ]
@@ -531,7 +531,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_spleen');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    // 锋针: 持续回血 (基础3回合 + 升级)\n    const template = thisItem.effects.getName(\"蕴脾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const amount = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ amount: amount, type: \"hp\", showScrolling: true });\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_spleen');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    // 锋针: 持续回血 (基础3回合 + 升级)\n    const template = thisItem.effects.getName(\"蕴脾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针: 瞬间回血 (30 + (lvl-1)*10)\n    const amount = 30 + (lvl - 1) * 10;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"hp\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -575,7 +575,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_lung');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"理肺-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"mp\", showScrolling: true });\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_lung');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"理肺-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"mp\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -619,7 +619,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_kidney');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"生肾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_kidney');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"生肾-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    const amount = 15 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"huti\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -766,7 +766,7 @@
                                     "label": "每回合加护体",
                                     "trigger": "turnStart",
                                     "active": true,
-                                    "script": "await actor.applyHealing({ amount: 5, type: 'huti', showScrolling: true });"
+                                    "script": "await actor.applyHealing({ healer: actor,  amount: 5, type: 'huti', showScrolling: true });"
                                 }
                             ]
                         }
@@ -864,7 +864,7 @@
                             "label": "流失与气虚",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n// 流失内力\nconst mpDrain = 10 + (lvl - 1) * 10;\nawait args.target.applyHealing({ amount: -mpDrain, type: 'mp', showScrolling: true });\n\n// 子午加成：叠加气虚 (限制最多加三层)\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nif (hasZiwu) {\n    const stacks = Math.min(3, 1 + (lvl - 1));\n    const qixuData = CONFIG.statusEffects.find(e => e.id === 'qixu');\n    if (qixuData) {\n        const eff = foundry.utils.deepClone(qixuData);\n        eff.origin = thisItem.uuid;\n        for(let i=0; i<stacks; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, eff);\n        }\n    }\n}"
+                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n// 流失内力\nconst mpDrain = 10 + (lvl - 1) * 10;\nawait args.target.applyHealing({ healer: actor,  amount: -mpDrain, type: 'mp', showScrolling: true });\n\n// 子午加成：叠加气虚 (限制最多加三层)\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nif (hasZiwu) {\n    const stacks = Math.min(3, 1 + (lvl - 1));\n    const qixuData = CONFIG.statusEffects.find(e => e.id === 'qixu');\n    if (qixuData) {\n        const eff = foundry.utils.deepClone(qixuData);\n        eff.origin = thisItem.uuid;\n        for(let i=0; i<stacks; i++) {\n             await game.xjzl.api.effects.addEffect(args.target, eff);\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -928,7 +928,7 @@
                             "label": "疗伤与加势",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\n\n// 1. 发起带等级加值的疗伤检定\nconst roll = await actor.rollAttributeTest('liaoshang', { dc: 15, bonus: bonus });\nif (!roll) return;\n\nif (roll.total >= 15) {\n    const totalHeal = roll.total;\n    \n    // 2. 治疗\n    await args.target.applyHealing({ amount: totalHeal, type: 'hp', showScrolling: true });\n    await args.target.applyHealing({ amount: totalHeal, type: 'mp', showScrolling: true });\n    \n    // 3. 生成X势\n    const weapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (weapon) {\n        const wType = weapon.system.type;\n        const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType] || wType);\n        const effectData = {\n            name: `${wLabel}势`,\n            icon: 'icons/svg/upgrade.svg',\n            description: `使用${wLabel}时命中+10`,\n            origin: thisItem.uuid,\n            changes:[\n                { key: `system.combat.hit_waigong`, mode: 2, value: \"10\" }\n            ],\n            flags: { 'xjzl-system': { stackable: true } }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [${wLabel}势]！`);\n    }\n} else {\n    ui.notifications.warn('疗伤检定失败。');\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\n\n// 1. 发起带等级加值的疗伤检定\nconst roll = await actor.rollAttributeTest('liaoshang', { dc: 15, bonus: bonus });\nif (!roll) return;\n\nif (roll.total >= 15) {\n    const totalHeal = roll.total;\n    \n    // 2. 治疗\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'hp', showScrolling: true });\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'mp', showScrolling: true });\n    \n    // 3. 生成X势\n    const weapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (weapon) {\n        const wType = weapon.system.type;\n        const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType] || wType);\n        const effectData = {\n            name: `${wLabel}势`,\n            icon: 'icons/svg/upgrade.svg',\n            description: `使用${wLabel}时命中+10`,\n            origin: thisItem.uuid,\n            changes:[\n                { key: `system.combat.hit_waigong`, mode: 2, value: \"10\" }\n            ],\n            flags: { 'xjzl-system': { stackable: true } }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [${wLabel}势]！`);\n    }\n} else {\n    ui.notifications.warn('疗伤检定失败。');\n}"
                         }
                     ]
                 },
@@ -972,7 +972,7 @@
                             "label": "阴阳子午结算",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const baseAmount = args.baseAmount || 0; \nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nconst hasYang = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yang-sheng');\nconst hasYin = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yin-sheng');\n\nlet finalAmount = baseAmount;\nlet type = 'hp';\n\n// 子午交互\nif (hasZiwu) {\n    const input = await foundry.applications.api.DialogV2.prompt({\n        window: { title: `子午加成: ${args.target.name}` },\n        content: `<p>目标开启了多少条十二正经？(每条+10)</p><div style=\"text-align:center;\"><input type=\"number\" name=\"count\" value=\"0\" style=\"width:60px; text-align:center;\" autofocus></div>`,\n        ok: { callback: (event, btn) => parseInt(btn.form.elements.count.value) || 0 },\n        rejectClose: false\n    });\n    if (input) finalAmount += (input * 10);\n}\n\n// 阴阳逻辑转化\nif (hasYang) {\n    type = 'mp';\n    ui.notifications.info(`【阳盛】催发，对 ${args.target.name} 的治疗转为回复内力。`);\n} else if (hasYin) {\n    type = 'hp';\n    finalAmount = -finalAmount; // 负数触发流失\n    ui.notifications.info(`【阴盛】反噬，使 ${args.target.name} 气血流失。`);\n}\n\n// 执行最终结算\nawait args.target.applyHealing({ amount: finalAmount, type: type, showScrolling: true });"
+                            "script": "const baseAmount = args.baseAmount || 0; \nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nconst hasYang = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yang-sheng');\nconst hasYin = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yin-sheng');\n\nlet finalAmount = baseAmount;\nlet type = 'hp';\n\n// 子午交互\nif (hasZiwu) {\n    const input = await foundry.applications.api.DialogV2.prompt({\n        window: { title: `子午加成: ${args.target.name}` },\n        content: `<p>目标开启了多少条十二正经？(每条+10)</p><div style=\"text-align:center;\"><input type=\"number\" name=\"count\" value=\"0\" style=\"width:60px; text-align:center;\" autofocus></div>`,\n        ok: { callback: (event, btn) => parseInt(btn.form.elements.count.value) || 0 },\n        rejectClose: false\n    });\n    if (input) finalAmount += (input * 10);\n}\n\n// 阴阳逻辑转化\nif (hasYang) {\n    type = 'mp';\n    ui.notifications.info(`【阳盛】催发，对 ${args.target.name} 的治疗转为回复内力。`);\n} else if (hasYin) {\n    type = 'hp';\n    finalAmount = -finalAmount; // 负数触发流失\n    ui.notifications.info(`【阴盛】反噬，使 ${args.target.name} 气血流失。`);\n}\n\n// 执行最终结算\nawait args.target.applyHealing({ healer: actor,  amount: finalAmount, type: type, showScrolling: true });"
                         }
                     ]
                 }

@@ -764,7 +764,7 @@
                         {
                             "label": "那若D4(小成)",
                             "trigger": "attack",
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst r = await new Roll('1d4').evaluate(); if(game.dice3d) game.dice3d.showForRoll(r, game.user, true); const val = r.total; if(val===1) { ui.notifications.info('灵热：伤害+15'); } else if(val===2) { ui.notifications.info('幻观：命中+15'); args.flags.bonusHit += 15; } else if(val===3) { ui.notifications.info('梦观：距离+15米(手动)'); } else { ui.notifications.info('净观：回复15血内'); await actor.applyHealing({amount:15, type:'hp'}); await actor.applyHealing({amount:15, type:'mp'}); }",
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst r = await new Roll('1d4').evaluate(); if(game.dice3d) game.dice3d.showForRoll(r, game.user, true); const val = r.total; if(val===1) { ui.notifications.info('灵热：伤害+15'); } else if(val===2) { ui.notifications.info('幻观：命中+15'); args.flags.bonusHit += 15; } else if(val===3) { ui.notifications.info('梦观：距离+15米(手动)'); } else { ui.notifications.info('净观：回复15血内'); await actor.applyHealing({ healer: actor, amount:15, type:'hp'}); await actor.applyHealing({ healer: actor, amount:15, type:'mp'}); }",
                             "active": true
                         }
                     ]
@@ -784,7 +784,7 @@
                         {
                             "label": "那若D6(圆满)",
                             "trigger": "attack",
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst r = await new Roll('1d6').evaluate(); if(game.dice3d) game.dice3d.showForRoll(r, game.user, true); const val = r.total; if(val===1) { ui.notifications.info('灵热：伤害+20'); } else if(val===2) { ui.notifications.info('幻观：命中+20'); args.flags.bonusHit += 20; } else if(val===3) { ui.notifications.info('梦观：距离+20米(手动)'); } else if(val===4) { ui.notifications.info('净观：回复20血内'); await actor.applyHealing({amount:20, type:'hp'}); await actor.applyHealing({amount:20, type:'mp'}); } else if(val===5) { ui.notifications.info('中阴：无视格挡(手动请点Shift)'); } else { ui.notifications.info('往生：动作降级(手动)'); }",
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst r = await new Roll('1d6').evaluate(); if(game.dice3d) game.dice3d.showForRoll(r, game.user, true); const val = r.total; if(val===1) { ui.notifications.info('灵热：伤害+20'); } else if(val===2) { ui.notifications.info('幻观：命中+20'); args.flags.bonusHit += 20; } else if(val===3) { ui.notifications.info('梦观：距离+20米(手动)'); } else if(val===4) { ui.notifications.info('净观：回复20血内'); await actor.applyHealing({ healer: actor, amount:20, type:'hp'}); await actor.applyHealing({ healer: actor, amount:20, type:'mp'}); } else if(val===5) { ui.notifications.info('中阴：无视格挡(手动请点Shift)'); } else { ui.notifications.info('往生：动作降级(手动)'); }",
                             "active": true
                         }
                     ]
@@ -1717,7 +1717,7 @@
                         {
                             "label": "洛神反噬",
                             "trigger": "damaged",
-                            "script": "if (args.attacker && args.move) {\n    const mpCost = args.move.currentCost?.mp || 0;\n    const noStance = !actor.system.martial?.stanceActive;\n    let msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><div class=\"card-content-wrapper\"><p style=\"color:#8e44ad; font-weight:bold;\">洛神反噬</p>`;\n    let didSomething = false;\n    if (mpCost > 0) {\n        await args.attacker.applyDamage({ amount: mpCost, type: \"liushi\", attacker: actor, isHit: true, ignoreMinDamage: true });\n        msg += `<p>攻击者受到内功反噬，承受 <b>${mpCost}</b> 点流失伤害。</p><p style=\"font-size:0.8em; color:#888;\">(基于其招式基础面板内力消耗，如果对方有改变消耗的特效请手动修正)</p>`;\n        didSomething = true;\n    }\n    if (noStance) {\n        await args.attacker.applyHealing({ amount: -10, type: \"mp\", showScrolling: true });\n        msg += `<p>你未开启架招，攻击者额外流失 <b>10</b> 内力。</p>`;\n        didSomething = true;\n    }\n    msg += `</div></div>`;\n    if (didSomething) {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}",
+                            "script": "if (args.attacker && args.move) {\n    const mpCost = args.move.currentCost?.mp || 0;\n    const noStance = !actor.system.martial?.stanceActive;\n    let msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><div class=\"card-content-wrapper\"><p style=\"color:#8e44ad; font-weight:bold;\">洛神反噬</p>`;\n    let didSomething = false;\n    if (mpCost > 0) {\n        await args.attacker.applyDamage({ amount: mpCost, type: \"liushi\", attacker: actor, isHit: true, ignoreMinDamage: true });\n        msg += `<p>攻击者受到内功反噬，承受 <b>${mpCost}</b> 点流失伤害。</p><p style=\"font-size:0.8em; color:#888;\">(基于其招式基础面板内力消耗，如果对方有改变消耗的特效请手动修正)</p>`;\n        didSomething = true;\n    }\n    if (noStance) {\n        await args.attacker.applyHealing({ healer: actor,  amount: -10, type: \"mp\", showScrolling: true });\n        msg += `<p>你未开启架招，攻击者额外流失 <b>10</b> 内力。</p>`;\n        didSomething = true;\n    }\n    msg += `</div></div>`;\n    if (didSomething) {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1737,7 +1737,7 @@
                         {
                             "label": "洛神反噬",
                             "trigger": "damaged",
-                            "script": "if (args.attacker && args.move) {\n    const mpCost = args.move.currentCost?.mp || 0;\n    const noStance = !actor.system.martial?.stanceActive;\n    let msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><div class=\"card-content-wrapper\"><p style=\"color:#8e44ad; font-weight:bold;\">洛神反噬</p>`;\n    let didSomething = false;\n    if (mpCost > 0) {\n        await args.attacker.applyDamage({ amount: mpCost, type: \"liushi\", attacker: actor, isHit: true, ignoreMinDamage: true });\n        msg += `<p>攻击者受到内功反噬，承受 <b>${mpCost}</b> 点流失伤害。</p><p style=\"font-size:0.8em; color:#888;\">(基于其招式基础面板内力消耗，如果对方有改变消耗的特效请手动修正)</p>`;\n        didSomething = true;\n    }\n    if (noStance) {\n        await args.attacker.applyHealing({ amount: -15, type: \"mp\", showScrolling: true });\n        msg += `<p>你未开启架招，攻击者额外流失 <b>15</b> 内力。</p>`;\n        didSomething = true;\n    }\n    msg += `</div></div>`;\n    if (didSomething) {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}",
+                            "script": "if (args.attacker && args.move) {\n    const mpCost = args.move.currentCost?.mp || 0;\n    const noStance = !actor.system.martial?.stanceActive;\n    let msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><div class=\"card-content-wrapper\"><p style=\"color:#8e44ad; font-weight:bold;\">洛神反噬</p>`;\n    let didSomething = false;\n    if (mpCost > 0) {\n        await args.attacker.applyDamage({ amount: mpCost, type: \"liushi\", attacker: actor, isHit: true, ignoreMinDamage: true });\n        msg += `<p>攻击者受到内功反噬，承受 <b>${mpCost}</b> 点流失伤害。</p><p style=\"font-size:0.8em; color:#888;\">(基于其招式基础面板内力消耗，如果对方有改变消耗的特效请手动修正)</p>`;\n        didSomething = true;\n    }\n    if (noStance) {\n        await args.attacker.applyHealing({ healer: actor,  amount: -15, type: \"mp\", showScrolling: true });\n        msg += `<p>你未开启架招，攻击者额外流失 <b>15</b> 内力。</p>`;\n        didSomething = true;\n    }\n    msg += `</div></div>`;\n    if (didSomething) {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1757,7 +1757,7 @@
                         {
                             "label": "洛神反噬",
                             "trigger": "damaged",
-                            "script": "if (args.attacker && args.move) {\n    const mpCost = args.move.currentCost?.mp || 0;\n    const noStance = !actor.system.martial?.stanceActive;\n    let msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><div class=\"card-content-wrapper\"><p style=\"color:#8e44ad; font-weight:bold;\">洛神反噬</p>`;\n    let didSomething = false;\n    if (mpCost > 0) {\n        await args.attacker.applyDamage({ amount: mpCost, type: \"liushi\", attacker: actor, isHit: true, ignoreMinDamage: true });\n        msg += `<p>攻击者受到内功反噬，承受 <b>${mpCost}</b> 点流失伤害。</p><p style=\"font-size:0.8em; color:#888;\">(基于其招式基础面板内力消耗，如果对方有改变消耗的特效请手动修正)</p>`;\n        didSomething = true;\n    }\n    if (noStance) {\n        await args.attacker.applyHealing({ amount: -20, type: \"mp\", showScrolling: true });\n        msg += `<p>你未开启架招，攻击者额外流失 <b>20</b> 内力。</p>`;\n        didSomething = true;\n    }\n    msg += `</div></div>`;\n    if (didSomething) {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}",
+                            "script": "if (args.attacker && args.move) {\n    const mpCost = args.move.currentCost?.mp || 0;\n    const noStance = !actor.system.martial?.stanceActive;\n    let msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><div class=\"card-content-wrapper\"><p style=\"color:#8e44ad; font-weight:bold;\">洛神反噬</p>`;\n    let didSomething = false;\n    if (mpCost > 0) {\n        await args.attacker.applyDamage({ amount: mpCost, type: \"liushi\", attacker: actor, isHit: true, ignoreMinDamage: true });\n        msg += `<p>攻击者受到内功反噬，承受 <b>${mpCost}</b> 点流失伤害。</p><p style=\"font-size:0.8em; color:#888;\">(基于其招式基础面板内力消耗，如果对方有改变消耗的特效请手动修正)</p>`;\n        didSomething = true;\n    }\n    if (noStance) {\n        await args.attacker.applyHealing({ healer: actor,  amount: -20, type: \"mp\", showScrolling: true });\n        msg += `<p>你未开启架招，攻击者额外流失 <b>20</b> 内力。</p>`;\n        didSomething = true;\n    }\n    msg += `</div></div>`;\n    if (didSomething) {\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2001,7 +2001,7 @@
                         {
                             "label": "宫永流失",
                             "trigger": "hit",
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.isHit) { await args.target.applyDamage({amount: 5, type: 'liushi', isHit: true}); }",
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.isHit) { await args.target.applyDamage({ attacker: actor, amount: 5, type: 'liushi', isHit: true}); }",
                             "active": true
                         }
                     ]
@@ -2021,7 +2021,7 @@
                         {
                             "label": "宫永流失",
                             "trigger": "hit",
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.isHit) { await args.target.applyDamage({amount: 10, type: 'liushi', isHit: true}); await args.target.applyHealing({amount: -5, type: 'mp'}); }",
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nif (args.isHit) { await args.target.applyDamage({ attacker: actor, amount: 10, type: 'liushi', isHit: true}); await args.target.applyHealing({ healer: actor, amount: -5, type: 'mp'}); }",
                             "active": true
                         }
                     ]
@@ -3967,7 +3967,7 @@
                                 "label": "煞魔饮血",
                                 "trigger": "hit_once",
                                 "active": true,
-                                "script": "if (args.hitCount === 0) return;\nconst originItem = fromUuidSync(thisEffect.origin);\nif (!originItem || originItem.system.stage < 3) return;\nconst myHpPct = S.resources.hp.value / S.resources.hp.max;\nlet targetLowHp = false;\nfor (const t of args.targets) {\n    if (t.isHit) {\n        const tHpPct = t.target.system.resources.hp.value / t.target.system.resources.hp.max;\n        if (tHpPct < 0.5) { targetLowHp = true; break; }\n    }\n}\nif (myHpPct < 0.5 || targetLowHp) {\n    const heal = Math.floor(args.baseDamage * 0.5);\n    await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1);\"><span style=\"color:#8b0000; font-weight:bold;\"><i class=\"fas fa-skull\"></i> 煞魔饮血</span><br>剥夺生机，恢复 <b>${heal}</b> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}"
+                                "script": "if (args.hitCount === 0) return;\nconst originItem = fromUuidSync(thisEffect.origin);\nif (!originItem || originItem.system.stage < 3) return;\nconst myHpPct = S.resources.hp.value / S.resources.hp.max;\nlet targetLowHp = false;\nfor (const t of args.targets) {\n    if (t.isHit) {\n        const tHpPct = t.target.system.resources.hp.value / t.target.system.resources.hp.max;\n        if (tHpPct < 0.5) { targetLowHp = true; break; }\n    }\n}\nif (myHpPct < 0.5 || targetLowHp) {\n    const heal = Math.floor(args.baseDamage * 0.5);\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #8b0000; background:rgba(139,0,0,0.1);\"><span style=\"color:#8b0000; font-weight:bold;\"><i class=\"fas fa-skull\"></i> 煞魔饮血</span><br>剥夺生机，恢复 <b>${heal}</b> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}"
                             }
                         ]
                     }

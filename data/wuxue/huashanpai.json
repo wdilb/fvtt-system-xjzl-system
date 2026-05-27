@@ -482,7 +482,7 @@
                         {
                             "label": "输送内力",
                             "trigger": "hit",
-                            "script": "const transferAmount = 10 + (Math.max(1, args.move.computedLevel||1) - 1) * 10;\nawait args.target.applyHealing({ amount: transferAmount, type: \"mp\" });\nChatMessage.create({content: `${actor.name} 为 ${args.target.name} 输送了 ${transferAmount} 点内力。`});"
+                            "script": "const transferAmount = 10 + (Math.max(1, args.move.computedLevel||1) - 1) * 10;\nawait args.target.applyHealing({ healer: actor,  amount: transferAmount, type: \"mp\" });\nChatMessage.create({content: `${actor.name} 为 ${args.target.name} 输送了 ${transferAmount} 点内力。`});"
                         }
                     ]
                 },
@@ -604,7 +604,7 @@
                         {
                             "label": "获取护体与状态",
                             "trigger": "attack",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst hutiVal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({amount: hutiVal, type: \"huti\", showScrolling: true});\n\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"善吾\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel||1);\nconst hutiVal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ healer: actor, amount: hutiVal, type: \"huti\", showScrolling: true});\n\nconst rounds = 1 + (lvl - 1);\nconst effectData = thisItem.effects.getName(\"善吾\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
                             "active": true
                         }
                     ]
@@ -1325,7 +1325,7 @@
                         {
                             "label": "混沌运气",
                             "trigger": "hit",
-                            "script": "// 1. 混元强化提示\nconst hasHunyuan = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"hunyuan\");\nif (hasHunyuan) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><p><i class=\"fas fa-info-circle\"></i> <b>混沌未形：</b><br>当前处于[混元]状态，获得 <b>不可被招式选中</b> 效果。<br>(请GM手动处理)</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}\n\n// 2. 施加延时回血状态\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst calcHeal = 40 + (lvl - 1) * 30;\n\n// 获取AE模板\nconst eff = thisItem.effects.getName(\"运气中\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态修改脚本中的回血数值\nconst scriptObj = eff.flags[\"xjzl-system\"].scripts.find(s => s.trigger === \"turnStart\");\nif (scriptObj) {\n    scriptObj.script = `\n        if (actor.system.resources.rage.value === 0) {\n            await actor.applyHealing({ amount: ${calcHeal}, type: \"hp\", showScrolling: true });\n            ui.notifications.info(\"混沌未形：气息归田，回复气血。\");\n        } else {\n            ui.notifications.warn(\"混沌未形：心有怒气，回血失败。\");\n        }\n        await thisEffect.delete();\n    `;\n}\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "// 1. 混元强化提示\nconst hasHunyuan = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"hunyuan\");\nif (hasHunyuan) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><p><i class=\"fas fa-info-circle\"></i> <b>混沌未形：</b><br>当前处于[混元]状态，获得 <b>不可被招式选中</b> 效果。<br>(请GM手动处理)</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}\n\n// 2. 施加延时回血状态\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst calcHeal = 40 + (lvl - 1) * 30;\n\n// 获取AE模板\nconst eff = thisItem.effects.getName(\"运气中\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 动态修改脚本中的回血数值\nconst scriptObj = eff.flags[\"xjzl-system\"].scripts.find(s => s.trigger === \"turnStart\");\nif (scriptObj) {\n    scriptObj.script = `\n        if (actor.system.resources.rage.value === 0) {\n            await actor.applyHealing({ healer: actor,  amount: ${calcHeal}, type: \"hp\", showScrolling: true });\n            ui.notifications.info(\"混沌未形：气息归田，回复气血。\");\n        } else {\n            ui.notifications.warn(\"混沌未形：心有怒气，回血失败。\");\n        }\n        await thisEffect.delete();\n    `;\n}\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -1826,7 +1826,7 @@
                                     "label": "出招流失与延长",
                                     "trigger": "attack",
                                     "active": true,
-                                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\n await actor.applyHealing({ amount: -20, type: \"hp\", showScrolling: true });\nthisEffect.update({ \"duration.rounds\": thisEffect.duration.rounds + 1 });\nui.notifications.info(`${actor.name} 破绽流失气血，且破绽持续时间延长。`);"
+                                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\n await actor.applyHealing({ healer: actor,  amount: -20, type: \"hp\", showScrolling: true });\nthisEffect.update({ \"duration.rounds\": thisEffect.duration.rounds + 1 });\nui.notifications.info(`${actor.name} 破绽流失气血，且破绽持续时间延长。`);"
                                 }
                             ]
                         }
@@ -2270,7 +2270,7 @@
                         {
                             "label": "回复内力与提示",
                             "trigger": "hit",
-                            "script": "if (args.finalAmount > 0) {\n    await args.target.applyHealing({ amount: args.finalAmount, type: 'mp', showScrolling: true });\n    ui.notifications.info('请在角色面板手动移除一个负面状态。');\n}"
+                            "script": "if (args.finalAmount > 0) {\n    await args.target.applyHealing({ healer: actor,  amount: args.finalAmount, type: 'mp', showScrolling: true });\n    ui.notifications.info('请在角色面板手动移除一个负面状态。');\n}"
                         }
                     ]
                 },

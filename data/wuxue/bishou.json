@@ -347,7 +347,7 @@
                         {
                             "label": "格挡效果",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 回复内力\nawait actor.applyHealing({ amount: 5, type: \"mp\", showScrolling: true });\n\n// 获得乘风\nconst eff = thisItem.effects.getName(\"乘风\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 回复内力\nawait actor.applyHealing({ healer: actor,  amount: 5, type: \"mp\", showScrolling: true });\n\n// 获得乘风\nconst eff = thisItem.effects.getName(\"乘风\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -1741,7 +1741,7 @@
                         {
                             "label": "格挡效果",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst healAmt = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ amount: healAmt, type: \"hp\", showScrolling: true });\n\nconst eff = thisItem.effects.getName(\"黄泉气\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst healAmt = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ healer: actor,  amount: healAmt, type: \"hp\", showScrolling: true });\n\nconst eff = thisItem.effects.getName(\"黄泉气\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -1773,7 +1773,7 @@
                         {
                             "label": "消耗与内力",
                             "trigger": "attack",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst hpCost = 10 + (lvl - 1) * 10;\nconst mpHeal = 5 + (lvl - 1) * 5;\n\nawait actor.applyHealing({ amount: -hpCost, type: \"hp\", showScrolling: true });\nui.notifications.info(`已消耗 ${hpCost} 气血。请手动为目标回复 ${mpHeal} 内力。`);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst hpCost = 10 + (lvl - 1) * 10;\nconst mpHeal = 5 + (lvl - 1) * 5;\n\nawait actor.applyHealing({ healer: actor,  amount: -hpCost, type: \"hp\", showScrolling: true });\nui.notifications.info(`已消耗 ${hpCost} 气血。请手动为目标回复 ${mpHeal} 内力。`);",
                             "active": true
                         }
                     ]
@@ -2511,7 +2511,7 @@
                         {
                             "label": "自伤",
                             "trigger": "attack",
-                            "script": "await actor.applyHealing({ amount: -50, type: \"hp\", showScrolling: true });",
+                            "script": "await actor.applyHealing({ healer: actor,  amount: -50, type: \"hp\", showScrolling: true });",
                             "active": true
                         },
                         {
@@ -2599,7 +2599,7 @@
                         {
                             "label": "流失气血",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyHealing({amount: -5, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`${args.target.name} 流失 5 点气血`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyHealing({ healer: actor, amount: -5, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`${args.target.name} 流失 5 点气血`);\n}",
                             "active": true
                         }
                     ]
@@ -2892,7 +2892,7 @@
                         {
                             "label": "夺魄补回气血",
                             "trigger": "attack",
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\")) {\n    const cost = move.currentCost.hp;\n    if (cost > 0) {\n        await actor.applyHealing({amount: cost, type: \"hp\", showScrolling: false});\n        ui.notifications.info(\"夺魄：免疫气血消耗\");\n    }\n}",
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\")) {\n    const cost = move.currentCost.hp;\n    if (cost > 0) {\n        await actor.applyHealing({ healer: actor, amount: cost, type: \"hp\", showScrolling: false});\n        ui.notifications.info(\"夺魄：免疫气血消耗\");\n    }\n}",
                             "active": true
                         },
                         {
@@ -2935,7 +2935,7 @@
                         {
                             "label": "怒气判定免耗",
                             "trigger": "attack",
-                            "script": "const rage = actor.system.resources.rage.value;\nconst hasDuopo = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\");\nif (rage > 5 || hasDuopo) {\n    const cost = move.currentCost.hp;\n    if (cost > 0) {\n        await actor.applyHealing({amount: cost, type: \"hp\", showScrolling: false});\n        ui.notifications.info(\"怒气/夺魄：免疫气血消耗\");\n    }\n}",
+                            "script": "const rage = actor.system.resources.rage.value;\nconst hasDuopo = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\");\nif (rage > 5 || hasDuopo) {\n    const cost = move.currentCost.hp;\n    if (cost > 0) {\n        await actor.applyHealing({ healer: actor, amount: cost, type: \"hp\", showScrolling: false});\n        ui.notifications.info(\"怒气/夺魄：免疫气血消耗\");\n    }\n}",
                             "active": true
                         },
                         {
@@ -2972,7 +2972,7 @@
                         {
                             "label": "夺魄免耗",
                             "trigger": "attack",
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\")) {\n    const cost = move.currentCost.hp;\n    await actor.applyHealing({amount: cost, type: \"hp\", showScrolling: false});\n    ui.notifications.info(\"夺魄：免疫气血消耗\");\n}",
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\")) {\n    const cost = move.currentCost.hp;\n    await actor.applyHealing({ healer: actor, amount: cost, type: \"hp\", showScrolling: false});\n    ui.notifications.info(\"夺魄：免疫气血消耗\");\n}",
                             "active": true
                         },
                         {
@@ -3010,7 +3010,7 @@
                         {
                             "label": "怒气转化",
                             "trigger": "hit",
-                            "script": "const currentRage = actor.system.resources.rage.value;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst maxExtra = lvl - 1;\nlet extra = 0;\nif (maxExtra > 0 && currentRage > 0) {\n    extra = Math.min(currentRage, maxExtra);\n    await actor.update({\"system.resources.rage.value\": currentRage - extra});\n}\nconst totalConsumed = 1 + extra;\nconst heal = Math.floor(actor.system.resources.hp.max * 0.1 * totalConsumed);\nawait actor.applyHealing({amount: heal, type: \"hp\", showScrolling: true});\nui.notifications.info(`消耗 ${totalConsumed} 怒气，回复气血`);",
+                            "script": "const currentRage = actor.system.resources.rage.value;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst maxExtra = lvl - 1;\nlet extra = 0;\nif (maxExtra > 0 && currentRage > 0) {\n    extra = Math.min(currentRage, maxExtra);\n    await actor.update({\"system.resources.rage.value\": currentRage - extra});\n}\nconst totalConsumed = 1 + extra;\nconst heal = Math.floor(actor.system.resources.hp.max * 0.1 * totalConsumed);\nawait actor.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true});\nui.notifications.info(`消耗 ${totalConsumed} 怒气，回复气血`);",
                             "active": true
                         }
                     ]
@@ -3209,7 +3209,7 @@
                         {
                             "label": "击破效果",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await actor.applyHealing({amount: 20, type: \"hp\", showScrolling: true});\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n}",
+                            "script": "if (args.isBroken) {\n    await actor.applyHealing({ healer: actor, amount: 20, type: \"hp\", showScrolling: true});\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n}",
                             "active": true
                         }
                     ]

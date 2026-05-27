@@ -2722,7 +2722,7 @@
                             "label": "怒气减免",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const nongmei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_nongmei\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst rageCost = args.costConsumed.rage || 0;\n\nif (stacks > 0 && rageCost > 0) {\n    const maxToConsume = Math.min(stacks, rageCost);\n    const html = `<p>当前拥有 <b>${stacks}</b> 层【弄梅】。</p><p>本招式消耗了 <b>${rageCost}</b> 点怒气。你想消耗几层弄梅来返还等额怒气？</p><div style=\"text-align:center;\"><input type=\"number\" id=\"nongmei-cost\" value=\"${maxToConsume}\" min=\"0\" max=\"${maxToConsume}\" style=\"width:60px; text-align:center;\"/> 层</div>`;\n    \n    const consumed = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"傲梅迎雪 - 怒气减免\" },\n        content: html,\n        ok: {\n            label: \"确定\",\n            callback: (ev, btn) => parseInt(btn.form.elements[\"nongmei-cost\"].value) || 0\n        }\n    });\n    \n    if (consumed > 0) {\n        // 扣除弄梅\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhengqi_nongmei\", consumed);\n        // 返还怒气\n        await actor.applyHealing({ amount: consumed, type: \"rage\", showScrolling: false });\n        actor.showFloatyText(`怒气返还 +${consumed}`, {fill: \"#ff4500\"});\n        ui.notifications.info(`消耗了 ${consumed} 层弄梅，减免了 ${consumed} 点怒气消耗。`);\n    }\n}"
+                            "script": "const nongmei = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhengqi_nongmei\");\nconst stacks = nongmei ? (nongmei.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst rageCost = args.costConsumed.rage || 0;\n\nif (stacks > 0 && rageCost > 0) {\n    const maxToConsume = Math.min(stacks, rageCost);\n    const html = `<p>当前拥有 <b>${stacks}</b> 层【弄梅】。</p><p>本招式消耗了 <b>${rageCost}</b> 点怒气。你想消耗几层弄梅来返还等额怒气？</p><div style=\"text-align:center;\"><input type=\"number\" id=\"nongmei-cost\" value=\"${maxToConsume}\" min=\"0\" max=\"${maxToConsume}\" style=\"width:60px; text-align:center;\"/> 层</div>`;\n    \n    const consumed = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"傲梅迎雪 - 怒气减免\" },\n        content: html,\n        ok: {\n            label: \"确定\",\n            callback: (ev, btn) => parseInt(btn.form.elements[\"nongmei-cost\"].value) || 0\n        }\n    });\n    \n    if (consumed > 0) {\n        // 扣除弄梅\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhengqi_nongmei\", consumed);\n        // 返还怒气\n        await actor.applyHealing({ healer: actor,  amount: consumed, type: \"rage\", showScrolling: false });\n        actor.showFloatyText(`怒气返还 +${consumed}`, {fill: \"#ff4500\"});\n        ui.notifications.info(`消耗了 ${consumed} 层弄梅，减免了 ${consumed} 点怒气消耗。`);\n    }\n}"
                         },
                         {
                             "label": "获得傲梅",
@@ -3046,7 +3046,7 @@
                             "label": "回复与缴械",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 1. 基础HP回复已由系统处理\n// 2. 额外回复内力 (数值等于实际治疗面板)\nif (args.finalAmount > 0) {\n    await args.target.applyHealing({ amount: args.finalAmount, type: 'mp', showScrolling: true });\n    \n    // 3. 回复怒气 (固定1点)\n    const curRage = args.target.system.resources.rage.value;\n    const maxRage = args.target.system.resources.rage.max;\n    if (curRage < maxRage) {\n        await args.target.update({'system.resources.rage.value': curRage + 1});\n        ui.notifications.info(`${args.target.name} 怒气 +1`);\n    }\n}\n\n// 4. 施加缴械 (持续1回合)\nconst jiaoxieData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'jiaoxie'));\njiaoxieData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, jiaoxieData);"
+                            "script": "// 1. 基础HP回复已由系统处理\n// 2. 额外回复内力 (数值等于实际治疗面板)\nif (args.finalAmount > 0) {\n    await args.target.applyHealing({ healer: actor,  amount: args.finalAmount, type: 'mp', showScrolling: true });\n    \n    // 3. 回复怒气 (固定1点)\n    const curRage = args.target.system.resources.rage.value;\n    const maxRage = args.target.system.resources.rage.max;\n    if (curRage < maxRage) {\n        await args.target.update({'system.resources.rage.value': curRage + 1});\n        ui.notifications.info(`${args.target.name} 怒气 +1`);\n    }\n}\n\n// 4. 施加缴械 (持续1回合)\nconst jiaoxieData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'jiaoxie'));\njiaoxieData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, jiaoxieData);"
                         }
                     ]
                 },
@@ -3205,7 +3205,7 @@
                                     "trigger": "dying",
                                     "label": "文骨复活",
                                     "active": true,
-                                    "script": "args.preventDying = true;\nawait actor.applyHealing({amount: 1, type: 'hp', showScrolling: true});\nui.notifications.info(`${actor.name} 触发文骨，免疫濒死！`);"
+                                    "script": "args.preventDying = true;\nawait actor.applyHealing({ healer: actor, amount: 1, type: 'hp', showScrolling: true});\nui.notifications.info(`${actor.name} 触发文骨，免疫濒死！`);"
                                 }
                             ]
                         }
@@ -3427,7 +3427,7 @@
                         {
                             "label": "应用护体与提示",
                             "trigger": "hit",
-                            "script": "// 获得护体 (heal类型招式自动根据 output.damage 提供数值，但需脚本指定为 huti 类型应用)\n// 注意：Hit脚本中 args.finalAmount 即为计算后的数值\nif (args.finalAmount > 0) {\n    await args.target.applyHealing({ amount: args.finalAmount, type: \"huti\" });\n}\n\n// 添加提示Buff\nconst effect = thisItem.effects.getName(\"立志明心 (免疫)\");\nif (effect) {\n    await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}",
+                            "script": "// 获得护体 (heal类型招式自动根据 output.damage 提供数值，但需脚本指定为 huti 类型应用)\n// 注意：Hit脚本中 args.finalAmount 即为计算后的数值\nif (args.finalAmount > 0) {\n    await args.target.applyHealing({ healer: actor,  amount: args.finalAmount, type: \"huti\" });\n}\n\n// 添加提示Buff\nconst effect = thisItem.effects.getName(\"立志明心 (免疫)\");\nif (effect) {\n    await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}",
                             "active": true
                         }
                     ],

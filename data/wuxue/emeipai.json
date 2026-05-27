@@ -354,7 +354,7 @@
                             "label": "施加护体",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const amount = Math.floor(args.finalAmount);\nif (amount > 0) {\n    await args.target.applyHealing({ amount: amount, type: \"huti\", showScrolling: true });\n}"
+                            "script": "const amount = Math.floor(args.finalAmount);\nif (amount > 0) {\n    await args.target.applyHealing({ healer: actor,  amount: amount, type: \"huti\", showScrolling: true });\n}"
                         }
                     ]
                 }
@@ -629,7 +629,7 @@
                             "label": "自身回血与提示",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n\nif (actor.effects.some(e => e.name === \"阴阳调和\")) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><p><b>推窗望月·阴阳：</b></p><p>可消耗反应动作，将目标朝你拉扯 <b>1米</b>。</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n\nif (actor.effects.some(e => e.name === \"阴阳调和\")) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><p><b>推窗望月·阴阳：</b></p><p>可消耗反应动作，将目标朝你拉扯 <b>1米</b>。</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ]
                 },
@@ -1034,7 +1034,7 @@
                             "label": "计算治疗与Buff",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 1. 计算治疗量\nconst skillVal = actor.system.skills.liaoshang.total;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 10;\nconst totalHeal = skillVal + bonus;\n\n// 执行治疗\nawait args.target.applyHealing({ amount: totalHeal, type: \"hp\", showScrolling: true });\n\n// 2. 应用云霞Buff\nconst source = thisItem.effects.getName(\"云霞\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
+                            "script": "// 1. 计算治疗量\nconst skillVal = actor.system.skills.liaoshang.total;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 10;\nconst totalHeal = skillVal + bonus;\n\n// 执行治疗\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"hp\", showScrolling: true });\n\n// 2. 应用云霞Buff\nconst source = thisItem.effects.getName(\"云霞\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}"
                         }
                     ]
                 },
@@ -1148,7 +1148,7 @@
                             "label": "友方治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const getDisp = (a) => {\n    if (a.token) return a.token.disposition;\n    if (a.prototypeToken) return a.prototypeToken.disposition;\n    return 0;\n};\n\nconst actorDisp = getDisp(actor);\nconst targetDisp = getDisp(args.target);\n\nif (actorDisp === targetDisp) {\n    // 计算治疗量: (疗伤*2) + (等级-1)*10\n    const skillVal = actor.system.skills.liaoshang.total;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const bonus = (lvl - 1) * 10;\n    const heal = (skillVal * 2) + bonus;\n    \n    await args.target.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
+                            "script": "const getDisp = (a) => {\n    if (a.token) return a.token.disposition;\n    if (a.prototypeToken) return a.prototypeToken.disposition;\n    return 0;\n};\n\nconst actorDisp = getDisp(actor);\nconst targetDisp = getDisp(args.target);\n\nif (actorDisp === targetDisp) {\n    // 计算治疗量: (疗伤*2) + (等级-1)*10\n    const skillVal = actor.system.skills.liaoshang.total;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const bonus = (lvl - 1) * 10;\n    const heal = (skillVal * 2) + bonus;\n    \n    await args.target.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n}"
                         }
                     ]
                 }
@@ -1593,7 +1593,7 @@
                             "label": "击破回血",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础10% + 升级5%\n    const pct = 0.10 + (lvl - 1) * 0.05;\n    const heal = Math.floor(actor.system.resources.hp.max * pct);\n    await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n}"
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础10% + 升级5%\n    const pct = 0.10 + (lvl - 1) * 0.05;\n    const heal = Math.floor(actor.system.resources.hp.max * pct);\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n}"
                         }
                     ]
                 },

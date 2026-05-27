@@ -3161,7 +3161,7 @@
                         {
                             "label": "劝世回春",
                             "trigger": "hit",
-                            "script": "const rage = args.target.system.resources.rage.value || 0;\n\n// 1. 自动丢刀逻辑\nconst equippedWeapons = actor.itemTypes.weapon.filter(w => w.system.equipped);\nif (equippedWeapons.length > 0) {\n    const updates = equippedWeapons.map(w => ({ _id: w.id, \"system.equipped\": false }));\n    await actor.updateEmbeddedDocuments(\"Item\", updates);\n    ui.notifications.info(\"你丢下了手中的兵刃。\");\n}\n\n// 2. 治疗逻辑\nif (rage > 0) {\n    const healHP = rage * (10 + (args.move.computedLevel - 1) * 5);\n    const healMP = rage * (5 + (args.move.computedLevel - 1) * 5);\n    await actor.applyHealing({ amount: healHP, type: \"hp\" });\n    await actor.applyHealing({ amount: healMP, type: \"mp\" });\n    \n    // 3. 缴械逻辑 (修正持续时间)\n    if (rage > 5) {\n        // 获取系统标准状态并修改持续时间\n        const jiaoxieData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jiaoxie\"));\n        if (jiaoxieData) {\n            jiaoxieData.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, jiaoxieData);\n            ui.notifications.info(\"放下屠刀：目标怒火攻心，兵刃脱手(1回合)！\");\n        }\n    }\n} else {\n    ui.notifications.warn(\"目标心中无怒，无法度化。\");\n}"
+                            "script": "const rage = args.target.system.resources.rage.value || 0;\n\n// 1. 自动丢刀逻辑\nconst equippedWeapons = actor.itemTypes.weapon.filter(w => w.system.equipped);\nif (equippedWeapons.length > 0) {\n    const updates = equippedWeapons.map(w => ({ _id: w.id, \"system.equipped\": false }));\n    await actor.updateEmbeddedDocuments(\"Item\", updates);\n    ui.notifications.info(\"你丢下了手中的兵刃。\");\n}\n\n// 2. 治疗逻辑\nif (rage > 0) {\n    const healHP = rage * (10 + (args.move.computedLevel - 1) * 5);\n    const healMP = rage * (5 + (args.move.computedLevel - 1) * 5);\n    await actor.applyHealing({ healer: actor,  amount: healHP, type: \"hp\" });\n    await actor.applyHealing({ healer: actor,  amount: healMP, type: \"mp\" });\n    \n    // 3. 缴械逻辑 (修正持续时间)\n    if (rage > 5) {\n        // 获取系统标准状态并修改持续时间\n        const jiaoxieData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jiaoxie\"));\n        if (jiaoxieData) {\n            jiaoxieData.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, jiaoxieData);\n            ui.notifications.info(\"放下屠刀：目标怒火攻心，兵刃脱手(1回合)！\");\n        }\n    }\n} else {\n    ui.notifications.warn(\"目标心中无怒，无法度化。\");\n}"
                         }
                     ],
                     "weaponType": "blade"
@@ -3953,7 +3953,7 @@
                             "label": "寂灭无恼-加护体",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const huti = 10 + (Math.max(1, args.move.computedLevel || 1) - 1) * 10;\nawait actor.applyHealing({ amount: huti, type: 'huti' });\nui.notifications.info(`请手动移除一个负面状态。`);"
+                            "script": "const huti = 10 + (Math.max(1, args.move.computedLevel || 1) - 1) * 10;\nawait actor.applyHealing({ healer: actor,  amount: huti, type: 'huti' });\nui.notifications.info(`请手动移除一个负面状态。`);"
                         }
                     ],
                     "weaponType": "blade"
@@ -4549,7 +4549,7 @@
                             "label": "持守灵台-反击",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const huiProto = thisItem.effects.getName('秽');\n    if (huiProto) {\n        const huiData = huiProto.toObject();\n        huiData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, huiData);\n    }\n    const attackerHui = args.attacker.effects.find(e => e.name === '秽');\n    if (attackerHui) {\n        const stacks = attackerHui.getFlag('xjzl-system', 'stacks') || 1;\n        // 回复自身内力\n        await actor.applyHealing({amount: stacks * 10, type: 'mp', showScrolling: true});\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const huiProto = thisItem.effects.getName('秽');\n    if (huiProto) {\n        const huiData = huiProto.toObject();\n        huiData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, huiData);\n    }\n    const attackerHui = args.attacker.effects.find(e => e.name === '秽');\n    if (attackerHui) {\n        const stacks = attackerHui.getFlag('xjzl-system', 'stacks') || 1;\n        // 回复自身内力\n        await actor.applyHealing({ healer: actor, amount: stacks * 10, type: 'mp', showScrolling: true});\n    }\n}"
                         }
                     ],
                     "weaponType": "staff"
@@ -4694,7 +4694,7 @@
                                     "label": "秽-受击流失",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "if (args.type === 'liushi') return;\n\nconst stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nconst loss = stacks * 10;\n\nif (loss > 0) {\n    ChatMessage.create({\n         content: `<div style=\"padding:5px; border:1px solid #555; background:#eee; color:#333; text-align:center;\"><b>${actor.name}</b> 污秽缠身，气血流失 ${loss}！</div>`,\n         speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n    await actor.applyDamage({ amount: loss, type: 'liushi', isHit: true, ignoreDefense: true });\n}"
+                                    "script": "if (args.type === 'liushi') return;\n\nconst stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nconst loss = stacks * 10;\n\nif (loss > 0) {\n    ChatMessage.create({\n         content: `<div style=\"padding:5px; border:1px solid #555; background:#eee; color:#333; text-align:center;\"><b>${actor.name}</b> 污秽缠身，气血流失 ${loss}！</div>`,\n         speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n    await actor.applyDamage({ attacker: actor,  amount: loss, type: 'liushi', isHit: true, ignoreDefense: true });\n}"
                                 }
                             ]
                         }
@@ -5567,7 +5567,7 @@
                                     "label": "无畏-转移与移除",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "// 1. 找到施法者 (origin)\nlet caster = null;\nif (thisEffect.origin) {\n    caster = fromUuidSync(thisEffect.origin);\n    if (caster && caster instanceof Item) caster = caster.actor;\n    if (caster && caster instanceof Actor) {}\n    else caster = null;\n}\n\n// 2. 转移伤害\nif (caster) {\n    // 转移量 = 实际掉血量 (hpLost) ? \n    // 规则说: \"流失与他受到伤害相同数值的气血\"\n    // 这里的\"受到伤害\"通常指实际扣的血。如果护盾挡了，应该不算。\n    const amount = args.hpLost;\n    if (amount > 0) {\n        // 对高僧造成流失伤害 (无视防御)\n        caster.applyDamage({\n            amount: amount,\n            type: 'liushi',\n            ignoreDefense: true,\n            ignoreBlock: true\n        });\n        ui.notifications.info(`${actor.name} 的伤害已转移给 ${caster.name}！`);\n    }\n} else {\n    ui.notifications.warn(\"无畏印无法找到施法者，伤害未转移。请手动扣除高僧气血。\");\n}\n\n// 3. 移除自己 (生效一次后消失)\nawait thisEffect.delete();"
+                                    "script": "// 1. 找到施法者 (origin)\nlet caster = null;\nif (thisEffect.origin) {\n    caster = fromUuidSync(thisEffect.origin);\n    if (caster && caster instanceof Item) caster = caster.actor;\n    if (caster && caster instanceof Actor) {}\n    else caster = null;\n}\n\n// 2. 转移伤害\nif (caster) {\n    // 转移量 = 实际掉血量 (hpLost) ? \n    // 规则说: \"流失与他受到伤害相同数值的气血\"\n    // 这里的\"受到伤害\"通常指实际扣的血。如果护盾挡了，应该不算。\n    const amount = args.hpLost;\n    if (amount > 0) {\n        // 对高僧造成流失伤害 (无视防御)\n        caster.applyDamage({ attacker: actor, \n            amount: amount,\n            type: 'liushi',\n            ignoreDefense: true,\n            ignoreBlock: true\n        });\n        ui.notifications.info(`${actor.name} 的伤害已转移给 ${caster.name}！`);\n    }\n} else {\n    ui.notifications.warn(\"无畏印无法找到施法者，伤害未转移。请手动扣除高僧气血。\");\n}\n\n// 3. 移除自己 (生效一次后消失)\nawait thisEffect.delete();"
                                 }
                             ]
                         }
@@ -5754,7 +5754,7 @@
                         {
                             "label": "击中回血",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst healAmount = 5 + (lvl - 1) * 5;\nif (args.isHit) {\n    await args.attacker.applyHealing({ amount: healAmount, type: 'hp', showScrolling: true });\n}",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst healAmount = 5 + (lvl - 1) * 5;\nif (args.isHit) {\n    await args.attacker.applyHealing({ healer: actor,  amount: healAmount, type: 'hp', showScrolling: true });\n}",
                             "active": true
                         }
                     ],

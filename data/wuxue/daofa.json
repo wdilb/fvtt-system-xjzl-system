@@ -623,7 +623,7 @@
                         {
                             "label": "回复内力",
                             "trigger": "hit",
-                            "script": "// 气招类型heal默认回血，脚本处理回蓝\nconst amount = args.baseAmount;\nawait actor.applyHealing({amount: amount, type: 'mp', showScrolling: true});\nui.notifications.info(\"本回合残疾检定获得优势。\");",
+                            "script": "// 气招类型heal默认回血，脚本处理回蓝\nconst amount = args.baseAmount;\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'mp', showScrolling: true});\nui.notifications.info(\"本回合残疾检定获得优势。\");",
                             "active": true
                         }
                     ]
@@ -1528,7 +1528,7 @@
                         {
                             "label": "暴击特效",
                             "trigger": "hit",
-                            "script": "if (args.isCrit) {\n    // 1. 击倒 (Prone)\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    \n    // 2. 流失 (武器伤害)\n    const weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === move.weaponType);\n    const val = weapon ? (weapon.system.damage || 0) : 0;\n    \n    if (val > 0) {\n        await args.target.applyDamage({ amount: val, type: \"liushi\" });\n        ui.notifications.info(`${args.target.name} 暴击流血：${val} 点！`);\n    }\n}",
+                            "script": "if (args.isCrit) {\n    // 1. 击倒 (Prone)\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    \n    // 2. 流失 (武器伤害)\n    const weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === move.weaponType);\n    const val = weapon ? (weapon.system.damage || 0) : 0;\n    \n    if (val > 0) {\n        await args.target.applyDamage({ attacker: actor,  amount: val, type: \"liushi\" });\n        ui.notifications.info(`${args.target.name} 暴击流血：${val} 点！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2719,7 +2719,7 @@
                         {
                             "label": "调和回血",
                             "trigger": "turnStart",
-                            "script": "const hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    await actor.applyHealing({amount: 10, type: 'hp', showScrolling: true});\n}",
+                            "script": "const hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    await actor.applyHealing({ healer: actor, amount: 10, type: 'hp', showScrolling: true});\n}",
                             "active": true
                         }
                     ]
@@ -2836,7 +2836,7 @@
                         {
                             "label": "调理阴阳",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 20 + (lvl - 1) * 20;\nawait actor.applyHealing({amount: amount, type: 'hp', showScrolling: true});\nawait actor.applyHealing({amount: amount, type: 'mp', showScrolling: true});\n\nconst hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    ui.notifications.info(\"阴阳调和触发：请让队友回复等额气血并获得1怒气。\");\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 20 + (lvl - 1) * 20;\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'hp', showScrolling: true});\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'mp', showScrolling: true});\n\nconst hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    ui.notifications.info(\"阴阳调和触发：请让队友回复等额气血并获得1怒气。\");\n}",
                             "active": true
                         }
                     ]
@@ -4783,7 +4783,7 @@
                             "label": "抽取资源",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasEhou = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"ehou\");\nif (!hasEhou) return ui.notifications.warn(`${args.target.name} 未处于扼喉状态！`);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst hpDrain = 40 + (lvl - 1) * 20;\nconst mpDrain = 10 + (lvl - 1) * 10;\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"饮血镟锋\" },\n    content: `<p>选择抽取类型：</p>`,\n    yes: { label: `气血 (${hpDrain})`, icon: \"fas fa-heart\" },\n    no: { label: `内力 (${mpDrain})`, icon: \"fas fa-bolt\" }\n});\n\nif (confirm) {\n    // 抽血\n    await args.target.applyDamage({ amount: hpDrain, type: \"liushi\", attacker: actor });\n    await actor.applyHealing({ amount: hpDrain, type: \"hp\" });\n} else {\n    // 抽蓝 (模拟扣蓝)\n    await args.target.applyHealing({ amount: -mpDrain, type: \"mp\" });\n    await actor.applyHealing({ amount: mpDrain, type: \"mp\" });\n}"
+                            "script": "const hasEhou = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"ehou\");\nif (!hasEhou) return ui.notifications.warn(`${args.target.name} 未处于扼喉状态！`);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst hpDrain = 40 + (lvl - 1) * 20;\nconst mpDrain = 10 + (lvl - 1) * 10;\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"饮血镟锋\" },\n    content: `<p>选择抽取类型：</p>`,\n    yes: { label: `气血 (${hpDrain})`, icon: \"fas fa-heart\" },\n    no: { label: `内力 (${mpDrain})`, icon: \"fas fa-bolt\" }\n});\n\nif (confirm) {\n    // 抽血\n    await args.target.applyDamage({ amount: hpDrain, type: \"liushi\", attacker: actor });\n    await actor.applyHealing({ healer: actor,  amount: hpDrain, type: \"hp\" });\n} else {\n    // 抽蓝 (模拟扣蓝)\n    await args.target.applyHealing({ healer: actor,  amount: -mpDrain, type: \"mp\" });\n    await actor.applyHealing({ healer: actor,  amount: mpDrain, type: \"mp\" });\n}"
                         }
                     ]
                 },

@@ -1321,7 +1321,7 @@
                         {
                             "label": "极速回内",
                             "trigger": "attack",
-                            "script": "if (actor.system.combat.speedTotal >= 10) {\n    await actor.applyHealing({amount: 5, type: \"mp\", showScrolling: true});\n}",
+                            "script": "if (actor.system.combat.speedTotal >= 10) {\n    await actor.applyHealing({ healer: actor, amount: 5, type: \"mp\", showScrolling: true});\n}",
                             "active": true
                         }
                     ]
@@ -1387,7 +1387,7 @@
                         {
                             "label": "格挡回内",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 计算回复量 (基础3 + Lv-1)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst amount = 3 + (lvl - 1);\n\nawait actor.applyHealing({amount: amount, type: \"mp\", showScrolling: true});",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 计算回复量 (基础3 + Lv-1)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst amount = 3 + (lvl - 1);\n\nawait actor.applyHealing({ healer: actor, amount: amount, type: \"mp\", showScrolling: true});",
                             "active": true
                         }
                     ]
@@ -1862,7 +1862,7 @@
                         {
                             "label": "赤诚献血",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const isXia = (actor.system.social.xiayi >= 100 && actor.system.social.exing <= 50);\n    if (isXia) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const maxCost = 10 + (lvl - 1) * 10;\n        const hp = actor.system.resources.hp.value;\n        const limit = Math.min(hp, maxCost);\n\n        const confirm = await foundry.applications.api.DialogV2.prompt({\n            window: { title: \"丹心如血\" },\n            content: `<p>你是[侠]，可消耗气血造成额外流失伤害。</p><div class=\"form-group\"><label>消耗气血 (最大 ${limit})</label><input type=\"number\" name=\"cost\" value=\"0\" min=\"0\" max=\"${limit}\"></div>`,\n            ok: {\n                label: \"献祭\",\n                callback: (event, button) => button.form.elements.cost.value\n            }\n        });\n\n        const cost = parseInt(confirm) || 0;\n        if (cost > 0) {\n            await actor.applyHealing({amount: -cost, type: \"hp\", showScrolling: true});\n            await args.target.applyDamage({amount: cost, type: \"liushi\", attacker: actor});\n            ui.notifications.info(`${actor.name} 消耗 ${cost} 气血，造成等额流失！`);\n        }\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const isXia = (actor.system.social.xiayi >= 100 && actor.system.social.exing <= 50);\n    if (isXia) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const maxCost = 10 + (lvl - 1) * 10;\n        const hp = actor.system.resources.hp.value;\n        const limit = Math.min(hp, maxCost);\n\n        const confirm = await foundry.applications.api.DialogV2.prompt({\n            window: { title: \"丹心如血\" },\n            content: `<p>你是[侠]，可消耗气血造成额外流失伤害。</p><div class=\"form-group\"><label>消耗气血 (最大 ${limit})</label><input type=\"number\" name=\"cost\" value=\"0\" min=\"0\" max=\"${limit}\"></div>`,\n            ok: {\n                label: \"献祭\",\n                callback: (event, button) => button.form.elements.cost.value\n            }\n        });\n\n        const cost = parseInt(confirm) || 0;\n        if (cost > 0) {\n            await actor.applyHealing({ healer: actor, amount: -cost, type: \"hp\", showScrolling: true});\n            await args.target.applyDamage({amount: cost, type: \"liushi\", attacker: actor});\n            ui.notifications.info(`${actor.name} 消耗 ${cost} 气血，造成等额流失！`);\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2222,7 +2222,7 @@
                         {
                             "label": "死生抉择",
                             "trigger": "preDamage",
-                            "script": "if (args.outcome.isHit && !args.target.system.martial.stanceActive && !args.isManual) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const healVal = 10 + (lvl - 1) * 10;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"死生同归\" },\n        content: `<p>命中无架招目标！</p><p>是否<b>伤害减半</b>并<b>回复 ${healVal} 点气血</b>？</p>`,\n        yes: { label: \"吸取生机\", icon: \"fas fa-heart\" },\n        no: { label: \"全力输出\", icon: \"fas fa-skull\" }\n    });\n    \n    if (confirm) {\n        // 伤害减半\n        args.config.amount = Math.floor(args.config.amount / 2);\n        // 执行回血\n        await actor.applyHealing({ amount: healVal, type: \"hp\", showScrolling: true });\n        // 卡片提示\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"color:blue;\">已发动 <b>死生同归</b>：伤害减半，汲取生机。</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
+                            "script": "if (args.outcome.isHit && !args.target.system.martial.stanceActive && !args.isManual) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const healVal = 10 + (lvl - 1) * 10;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"死生同归\" },\n        content: `<p>命中无架招目标！</p><p>是否<b>伤害减半</b>并<b>回复 ${healVal} 点气血</b>？</p>`,\n        yes: { label: \"吸取生机\", icon: \"fas fa-heart\" },\n        no: { label: \"全力输出\", icon: \"fas fa-skull\" }\n    });\n    \n    if (confirm) {\n        // 伤害减半\n        args.config.amount = Math.floor(args.config.amount / 2);\n        // 执行回血\n        await actor.applyHealing({ healer: actor,  amount: healVal, type: \"hp\", showScrolling: true });\n        // 卡片提示\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"color:blue;\">已发动 <b>死生同归</b>：伤害减半，汲取生机。</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3177,7 +3177,7 @@
                                 {
                                     "label": "附带流失",
                                     "trigger": "hit",
-                                    "script": "if (args.actionType === \"attack\" && args.isHit) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const loss = 10 * stacks;\n    // 直接扣血 (流失)\n    await args.target.applyHealing({ amount: -loss, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`星辰之力：目标流失 ${loss} 气血`);\n}",
+                                    "script": "if (args.actionType === \"attack\" && args.isHit) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const loss = 10 * stacks;\n    // 直接扣血 (流失)\n    await args.target.applyHealing({ healer: actor,  amount: -loss, type: \"hp\", showScrolling: true });\n    ui.notifications.info(`星辰之力：目标流失 ${loss} 气血`);\n}",
                                     "active": true
                                 }
                             ]
@@ -4353,7 +4353,7 @@
                         {
                             "label": "吞气回血",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const qi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"changshengqi\");\n    if (qi) {\n        const stacks = qi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        await qi.delete();\n        \n        // 使用 baseDamage 模拟扣除防御前\n        const heal = Math.floor(args.baseDamage * 0.1 * stacks);\n        await actor.applyHealing({ amount: heal, type: \"hp\", showScrolling: true });\n        ui.notifications.info(`一剑落旄头：吞噬 ${stacks} 层长生气，回复 ${heal} 气血`);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const qi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"changshengqi\");\n    if (qi) {\n        const stacks = qi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        await qi.delete();\n        \n        // 使用 baseDamage 模拟扣除防御前\n        const heal = Math.floor(args.baseDamage * 0.1 * stacks);\n        await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n        ui.notifications.info(`一剑落旄头：吞噬 ${stacks} 层长生气，回复 ${heal} 气血`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -5607,7 +5607,7 @@
                         {
                             "label": "气奏回血",
                             "trigger": "hit_once",
-                            "script": "const qizou = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qizou\");\nconst stacks = qizou ? (qizou.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (stacks >= 3) {\n    const heal = stacks * 10;\n    await actor.applyHealing({amount: heal, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`仙授长生：回复 ${heal} 点气血`);\n}",
+                            "script": "const qizou = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qizou\");\nconst stacks = qizou ? (qizou.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (stacks >= 3) {\n    const heal = stacks * 10;\n    await actor.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`仙授长生：回复 ${heal} 点气血`);\n}",
                             "active": true
                         }
                     ]
@@ -7697,7 +7697,7 @@
                         {
                             "label": "消耗内力获无终",
                             "trigger": "hit",
-                            "script": "const maxMp = actor.system.resources.mp.max;\nconst burn = Math.floor(maxMp * 0.2);\nif (actor.system.resources.mp.value < burn) {\n    ui.notifications.warn(\"内力不足 20%，无法施展！\");\n    // 理想情况下应该在attack阻断，但这里是扣血逻辑，只能事后诸葛亮或者强制扣到0\n} \nawait actor.applyHealing({ amount: -burn, type: 'mp', showScrolling: true });\n\nconst eff = thisItem.effects.getName(\"无终\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 注入回复系数\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst healPct = 0.05 + (lvl - 1) * 0.05;\neff.flags[\"xjzl-system\"].wuxue_healPct = healPct;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const maxMp = actor.system.resources.mp.max;\nconst burn = Math.floor(maxMp * 0.2);\nif (actor.system.resources.mp.value < burn) {\n    ui.notifications.warn(\"内力不足 20%，无法施展！\");\n    // 理想情况下应该在attack阻断，但这里是扣血逻辑，只能事后诸葛亮或者强制扣到0\n} \nawait actor.applyHealing({ healer: actor,  amount: -burn, type: 'mp', showScrolling: true });\n\nconst eff = thisItem.effects.getName(\"无终\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 注入回复系数\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst healPct = 0.05 + (lvl - 1) * 0.05;\neff.flags[\"xjzl-system\"].wuxue_healPct = healPct;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -8001,7 +8001,7 @@
                                     "label": "淹溺结算",
                                     "trigger": "turnEnd",
                                     "active": true,
-                                    "script": "// 流失气血\nawait actor.applyDamage({ amount: 50, type: \"liushi\", isHit: true, ignoreDefense: true });\n\n// 韧性检定 (难度20)\nconst dc = 20;\n// 读取上次失败积累的难度减免\nconst reduce = actor.getFlag(\"xjzl-system\", \"wuxue_yanniReduce\") || 0;\nconst finalDc = dc - reduce;\n\nawait Macros.requestSave({\n    target: actor,\n    type: \"renxing\",\n    dc: finalDc,\n    label: \"淹溺挣扎\",\n    onFail: [], // 失败不加状态，而是改 Flag\n});\n// 注意：requestSave 无法直接回调 JS 逻辑，只能让玩家看到结果手动删 BUFF\n// 这里只能做到提示。\nui.notifications.info(`淹溺生效：流失 50 气血。请进行韧性检定(DC ${finalDc})，成功则手动移除本BUFF。`);"
+                                    "script": "// 流失气血\nawait actor.applyDamage({ attacker: actor,  amount: 50, type: \"liushi\", isHit: true, ignoreDefense: true });\n\n// 韧性检定 (难度20)\nconst dc = 20;\n// 读取上次失败积累的难度减免\nconst reduce = actor.getFlag(\"xjzl-system\", \"wuxue_yanniReduce\") || 0;\nconst finalDc = dc - reduce;\n\nawait Macros.requestSave({\n    target: actor,\n    type: \"renxing\",\n    dc: finalDc,\n    label: \"淹溺挣扎\",\n    onFail: [], // 失败不加状态，而是改 Flag\n});\n// 注意：requestSave 无法直接回调 JS 逻辑，只能让玩家看到结果手动删 BUFF\n// 这里只能做到提示。\nui.notifications.info(`淹溺生效：流失 50 气血。请进行韧性检定(DC ${finalDc})，成功则手动移除本BUFF。`);"
                                 }
                             ]
                         }

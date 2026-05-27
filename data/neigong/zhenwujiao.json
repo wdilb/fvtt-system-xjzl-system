@@ -53,7 +53,7 @@
                             "label": "两仪护体",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "await actor.applyHealing({ amount: 20, type: 'huti' });\nconst content = `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><div style=\"border-left: 4px solid #1565c0; background: rgba(21, 101, 192, 0.05); padding: 5px;\"><div style=\"font-weight:bold; color:#0d47a1; font-size:1.1em;\"><i class=\"fas fa-shield-alt\"></i> 运转两仪！</div><div style=\"font-size:0.9em; margin-top:3px; color:#555;\"><b>${actor.name}</b> 运转两仪心法，周身真气流转，获得 <b>20</b> 点护体真气。</div></div></div>`;\nChatMessage.create({ content: content, speaker: ChatMessage.getSpeaker({actor: actor}) });"
+                            "script": "await actor.applyHealing({ healer: actor,  amount: 20, type: 'huti' });\nconst content = `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px;\"><div style=\"border-left: 4px solid #1565c0; background: rgba(21, 101, 192, 0.05); padding: 5px;\"><div style=\"font-weight:bold; color:#0d47a1; font-size:1.1em;\"><i class=\"fas fa-shield-alt\"></i> 运转两仪！</div><div style=\"font-size:0.9em; margin-top:3px; color:#555;\"><b>${actor.name}</b> 运转两仪心法，周身真气流转，获得 <b>20</b> 点护体真气。</div></div></div>`;\nChatMessage.create({ content: content, speaker: ChatMessage.getSpeaker({actor: actor}) });"
                         },
                         {
                             "label": "护体破碎提示",
@@ -128,7 +128,7 @@
                             "label": "混元桩回气",
                             "trigger": "turnEnd",
                             "active": true,
-                            "script": "if (!actor.effects.some(e => e.statuses.has('dying') || e.statuses.has('dead'))) {\n    await actor.applyHealing({ amount: 10, type: 'huti', showScrolling: true });\n}"
+                            "script": "if (!actor.effects.some(e => e.statuses.has('dying') || e.statuses.has('dead'))) {\n    await actor.applyHealing({ healer: actor,  amount: 10, type: 'huti', showScrolling: true });\n}"
                         }
                     ]
                 },
@@ -148,7 +148,7 @@
                             "label": "混元桩回气",
                             "trigger": "turnEnd",
                             "active": true,
-                            "script": "if (!actor.effects.some(e => e.statuses.has('dying') || e.statuses.has('dead'))) {\n    await actor.applyHealing({ amount: 10, type: 'huti', showScrolling: true });\n}"
+                            "script": "if (!actor.effects.some(e => e.statuses.has('dying') || e.statuses.has('dead'))) {\n    await actor.applyHealing({ healer: actor,  amount: 10, type: 'huti', showScrolling: true });\n}"
                         },
                         {
                             "label": "护体强化格挡",
@@ -238,7 +238,7 @@
                             "label": "三阳反震",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.attacker) {\n    // 标记为反伤来源，防止死循环 (虽然applyDamage internal handling should cover it, but strict adherence)\n    args.attacker.runtimeFlags = args.attacker.runtimeFlags || {};\n    if (args.attacker.runtimeFlags.isReflecting) return;\n\n    actor.runtimeFlags = actor.runtimeFlags || {};\n    actor.runtimeFlags.isReflecting = true;\n    try {\n        await args.attacker.applyDamage({\n            amount: 5,\n            type: 'liushi',\n            isHit: true\n        });\n        ui.notifications.info(`${actor.name} 真武三阳功反震！`);\n    } finally {\n        actor.runtimeFlags.isReflecting = false;\n    }\n}"
+                            "script": "if (args.attacker) {\n    // 标记为反伤来源，防止死循环 (虽然applyDamage internal handling should cover it, but strict adherence)\n    args.attacker.runtimeFlags = args.attacker.runtimeFlags || {};\n    if (args.attacker.runtimeFlags.isReflecting) return;\n\n    actor.runtimeFlags = actor.runtimeFlags || {};\n    actor.runtimeFlags.isReflecting = true;\n    try {\n        await args.attacker.applyDamage({ attacker: actor, \n            amount: 5,\n            type: 'liushi',\n            isHit: true\n        });\n        ui.notifications.info(`${actor.name} 真武三阳功反震！`);\n    } finally {\n        actor.runtimeFlags.isReflecting = false;\n    }\n}"
                         }
                     ]
                 }
@@ -367,7 +367,7 @@
                                 "label": "震伤流血",
                                 "trigger": "damaged",
                                 "active": true,
-                                "script": "if (args.type === 'liushi') return;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);\"><div style=\"color:#8b0000; font-weight:bold; font-size:0.9em;\"><i class=\"fas fa-bolt\"></i> 震伤发作！</div><div style=\"color:#555; font-size:0.85em;\">由于被攻击，流失了 <b style=\"color:red;\">10</b> 点气血。</div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\nawait actor.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
+                                "script": "if (args.type === 'liushi') return;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);\"><div style=\"color:#8b0000; font-weight:bold; font-size:0.9em;\"><i class=\"fas fa-bolt\"></i> 震伤发作！</div><div style=\"color:#555; font-size:0.85em;\">由于被攻击，流失了 <b style=\"color:red;\">10</b> 点气血。</div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\nawait actor.applyDamage({ attacker: actor,  amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
                             }
                         ]
                     }
@@ -390,7 +390,7 @@
                                 "label": "震伤流血",
                                 "trigger": "damaged",
                                 "active": true,
-                                "script": "if (args.type === 'liushi') return;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);\"><div style=\"color:#8b0000; font-weight:bold; font-size:0.9em;\"><i class=\"fas fa-bolt\"></i> 震伤发作！</div><div style=\"color:#555; font-size:0.85em;\">由于被攻击，流失了 <b style=\"color:red;\">10</b> 点气血。</div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\nawait actor.applyDamage({ amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
+                                "script": "if (args.type === 'liushi') return;\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px; border-left:3px solid #8b0000; background:rgba(139,0,0,0.05);\"><div style=\"color:#8b0000; font-weight:bold; font-size:0.9em;\"><i class=\"fas fa-bolt\"></i> 震伤发作！</div><div style=\"color:#555; font-size:0.85em;\">由于被攻击，流失了 <b style=\"color:red;\">10</b> 点气血。</div></div>`,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});\n\nawait actor.applyDamage({ attacker: actor,  amount: 10, type: 'liushi', isHit: true, ignoreDefense: true });"
                             },
                             {
                                 "label": "内伤计数",
@@ -636,7 +636,7 @@
                             "label": "稳定双倍治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 仅在应用治疗且数值大于0时触发\nif (args.actionType === 'heal' && args.finalAmount > 0) {\n    ui.notifications.info(\"先天诀生效，真气流转生生不息！\");\n    // 再次应用一次同等数值的治疗\n    await args.target.applyHealing({ amount: args.finalAmount, type: 'hp' });\n}"
+                            "script": "// 仅在应用治疗且数值大于0时触发\nif (args.actionType === 'heal' && args.finalAmount > 0) {\n    ui.notifications.info(\"先天诀生效，真气流转生生不息！\");\n    // 再次应用一次同等数值的治疗\n    await args.target.applyHealing({ healer: actor,  amount: args.finalAmount, type: 'hp' });\n}"
                         }
                     ]
                 }
@@ -701,13 +701,13 @@
                             "label": "九天护体",
                             "trigger": "attack",
                             "active": true,
-                            "script": "await actor.applyHealing({ amount: 10, type: 'huti' });"
+                            "script": "await actor.applyHealing({ healer: actor,  amount: 10, type: 'huti' });"
                         },
                         {
                             "label": "罡气破裂反伤",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.hutiLost > 0 && S.resources.huti === 0 && args.attacker) {\n    ui.notifications.warn(`${actor.name} 的九天罡气破裂！`);\n    await args.attacker.applyDamage({ amount: 10, type: 'liushi', isHit: true });\n}"
+                            "script": "if (args.hutiLost > 0 && S.resources.huti === 0 && args.attacker) {\n    ui.notifications.warn(`${actor.name} 的九天罡气破裂！`);\n    await args.attacker.applyDamage({ attacker: actor,  amount: 10, type: 'liushi', isHit: true });\n}"
                         }
                     ]
                 },
@@ -727,13 +727,13 @@
                             "label": "九天护体",
                             "trigger": "attack",
                             "active": true,
-                            "script": "await actor.applyHealing({ amount: 10, type: 'huti' });"
+                            "script": "await actor.applyHealing({ healer: actor,  amount: 10, type: 'huti' });"
                         },
                         {
                             "label": "罡气破裂反伤",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.hutiLost > 0 && S.resources.huti === 0 && args.attacker) {\n    ui.notifications.warn(`${actor.name} 的九天罡气破裂！`);\n    await args.attacker.applyDamage({ amount: 20, type: 'liushi', isHit: true });\n}"
+                            "script": "if (args.hutiLost > 0 && S.resources.huti === 0 && args.attacker) {\n    ui.notifications.warn(`${actor.name} 的九天罡气破裂！`);\n    await args.attacker.applyDamage({ attacker: actor,  amount: 20, type: 'liushi', isHit: true });\n}"
                         }
                     ]
                 }
@@ -789,7 +789,7 @@
                             "label": "耗内回血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 估算净消耗：招式消耗 - 减耗\nconst cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\n// 只有确实产生了消耗才回血\nif (cost > 0) {\n    await actor.applyHealing({ amount: 5, type: 'hp' });\n}"
+                            "script": "// 估算净消耗：招式消耗 - 减耗\nconst cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\n// 只有确实产生了消耗才回血\nif (cost > 0) {\n    await actor.applyHealing({ healer: actor,  amount: 5, type: 'hp' });\n}"
                         }
                     ]
                 },
@@ -809,7 +809,7 @@
                             "label": "耗内回血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ amount: 10, type: 'hp' });\n}"
+                            "script": "const cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ healer: actor,  amount: 10, type: 'hp' });\n}"
                         }
                     ]
                 },
@@ -829,7 +829,7 @@
                             "label": "耗内回血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ amount: 20, type: 'hp' });\n}"
+                            "script": "const cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ healer: actor,  amount: 20, type: 'hp' });\n}"
                         }
                     ]
                 }
@@ -1109,7 +1109,7 @@
                             {
                                 "label": "清气回复",
                                 "trigger": "turnEnd",
-                                "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nawait actor.applyHealing({ amount: 5 * stacks, type: 'hp' });\nawait actor.applyHealing({ amount: 5 * stacks, type: 'mp' });"
+                                "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nawait actor.applyHealing({ healer: actor,  amount: 5 * stacks, type: 'hp' });\nawait actor.applyHealing({ healer: actor,  amount: 5 * stacks, type: 'mp' });"
                             }
                         ]
                     }

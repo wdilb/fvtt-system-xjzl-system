@@ -861,7 +861,7 @@
                         {
                             "label": "消耗黄金比例",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huangjinbili\");\n    if (buff) {\n        await buff.delete();\n        await actor.applyHealing({amount: 10, type: 'hp', showScrolling: true});\n        await actor.applyHealing({amount: 10, type: 'mp', showScrolling: true});\n        ui.notifications.info(`${actor.name} 消耗 [黄金比例] 回复状态！`);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huangjinbili\");\n    if (buff) {\n        await buff.delete();\n        await actor.applyHealing({ healer: actor, amount: 10, type: 'hp', showScrolling: true});\n        await actor.applyHealing({ healer: actor, amount: 10, type: 'mp', showScrolling: true});\n        ui.notifications.info(`${actor.name} 消耗 [黄金比例] 回复状态！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -924,7 +924,7 @@
                         {
                             "label": "额外效果",
                             "trigger": "hit",
-                            "script": "// 基础回复已由 heal 模式处理(HP)，需额外处理MP\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 5 + (lvl - 1) * 5;\nawait actor.applyHealing({amount: amount, type: 'mp', showScrolling: true});\n\n// 添加黄金比例\nconst eff = thisItem.effects.getName(\"黄金比例\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nui.notifications.info(\"请手动消耗一个主食或小吃。\");",
+                            "script": "// 基础回复已由 heal 模式处理(HP)，需额外处理MP\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 5 + (lvl - 1) * 5;\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'mp', showScrolling: true});\n\n// 添加黄金比例\nconst eff = thisItem.effects.getName(\"黄金比例\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nui.notifications.info(\"请手动消耗一个主食或小吃。\");",
                             "active": true
                         }
                     ]
@@ -1077,7 +1077,7 @@
                         {
                             "label": "击破吸血",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const pengren = actor.system.arts.pengren.total || 0;\n    // 基础流失由等级成长决定? 原文说 升级:流失气血+10，这里假设烹饪*5是基础公式，升级增加额外值。\n    // 修正理解：原文\"流失等于你[烹饪]等级*5 的气血\"，升级部分说\"流失气血+10\"。\n    // 组合公式： (烹饪 * 5) + ((Lv-1) * 10)\n    const bleedAmount = (pengren * 5) + ((lvl - 1) * 10);\n    \n    await args.target.applyDamage({\n        amount: bleedAmount,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    await actor.applyHealing({amount: bleedAmount, type: 'hp', showScrolling: true});\n    ui.notifications.info(`击破吸血：造成 ${bleedAmount} 流失，回复自身。`);\n}",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const pengren = actor.system.arts.pengren.total || 0;\n    // 基础流失由等级成长决定? 原文说 升级:流失气血+10，这里假设烹饪*5是基础公式，升级增加额外值。\n    // 修正理解：原文\"流失等于你[烹饪]等级*5 的气血\"，升级部分说\"流失气血+10\"。\n    // 组合公式： (烹饪 * 5) + ((Lv-1) * 10)\n    const bleedAmount = (pengren * 5) + ((lvl - 1) * 10);\n    \n    await args.target.applyDamage({\n        amount: bleedAmount,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    await actor.applyHealing({ healer: actor, amount: bleedAmount, type: 'hp', showScrolling: true});\n    ui.notifications.info(`击破吸血：造成 ${bleedAmount} 流失，回复自身。`);\n}",
                             "active": true
                         }
                     ]
@@ -2100,7 +2100,7 @@
                         {
                             "label": "醉意消耗检查",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\n// 触发回血检测 (因为这里也是消耗醉意出招)\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\n// 触发回血检测 (因为这里也是消耗醉意出招)\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({ healer: actor, amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
                             "active": true
                         },
                         {
@@ -2143,7 +2143,7 @@
                         {
                             "label": "醉意消耗与回血",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 回血\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n    // 暴击修正\n    args.flags.critThresholdMod += stacks;\n}",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    // 回血\n    await actor.applyHealing({ healer: actor, amount: 5 * stacks, type: \"hp\", showScrolling: true});\n    // 暴击修正\n    args.flags.critThresholdMod += stacks;\n}",
                             "active": true
                         }
                     ]
@@ -2174,13 +2174,13 @@
                         {
                             "label": "醉意消耗与回血联动",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({ healer: actor, amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
                             "active": true
                         },
                         {
                             "label": "效果结算",
                             "trigger": "hit",
-                            "script": "// 1. 倒地\nconst prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\nif (prone) await game.xjzl.api.effects.addEffect(actor, prone);\n\n// 2. 回血 (基础)\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseHeal = jiuyi + 10 + (lvl - 1) * 5;\nawait actor.applyHealing({amount: baseHeal, type: \"hp\", showScrolling: true});\n\n// 3. 获得醉卧提示Buff\nconst eff = thisItem.effects.getName(\"醉卧\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "// 1. 倒地\nconst prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\nif (prone) await game.xjzl.api.effects.addEffect(actor, prone);\n\n// 2. 回血 (基础)\nconst jiuyi = actor.system.arts.jiuyi.total || 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst baseHeal = jiuyi + 10 + (lvl - 1) * 5;\nawait actor.applyHealing({ healer: actor, amount: baseHeal, type: \"hp\", showScrolling: true});\n\n// 3. 获得醉卧提示Buff\nconst eff = thisItem.effects.getName(\"醉卧\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -2217,7 +2217,7 @@
                         {
                             "label": "醉意消耗与回血",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({ healer: actor, amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
                             "active": true
                         },
                         {
@@ -2260,7 +2260,7 @@
                         {
                             "label": "醉意消耗与回血",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({ healer: actor, amount: 5 * stacks, type: \"hp\", showScrolling: true});\n}",
                             "active": true
                         },
                         {
@@ -2335,7 +2335,7 @@
                         {
                             "label": "醉意消耗与回血",
                             "trigger": "attack",
-                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({amount: 5 * stacks, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`当前 [醉八仙] 层数 ${stacks}，施法距离应为 ${2 + stacks * 2} 米。`);\n}",
+                            "script": "const alc = actor.system.resources.alcohol.value;\nif (alc < 10) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"醉意不足 (需要 10点)\";\n    return;\n}\nawait actor.update({\"system.resources.alcohol.value\": alc - 10});\n\nconst zbx = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zui_ba_xian\");\nif (zbx) {\n    const stacks = zbx.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.applyHealing({ healer: actor, amount: 5 * stacks, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`当前 [醉八仙] 层数 ${stacks}，施法距离应为 ${2 + stacks * 2} 米。`);\n}",
                             "active": true
                         }
                     ]

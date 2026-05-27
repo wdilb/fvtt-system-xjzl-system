@@ -1995,7 +1995,7 @@ export class XJZLActor extends Actor {
       const ctx = healer._scriptContextStack[healer._scriptContextStack.length - 1];
       const sourceItem = ctx.item || ctx.effect || null;
       const sourceName = sourceItem ? sourceItem.name : ctx.label;
-
+      
       Hooks.callAll("xjzl.scriptHealingApplied", {
         healer: healer,
         target: this,

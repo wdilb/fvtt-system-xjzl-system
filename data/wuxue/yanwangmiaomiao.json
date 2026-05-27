@@ -204,7 +204,7 @@
                                 {
                                     "label": "出招流失",
                                     "trigger": "attack",
-                                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nawait actor.applyHealing({ amount: -10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ amount: -10, type: \"mp\", showScrolling: true });\nui.notifications.info(`${actor.name} 因 [夺命] 流失气血内力`);",
+                                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nawait actor.applyHealing({ healer: actor,  amount: -10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ healer: actor,  amount: -10, type: \"mp\", showScrolling: true });\nui.notifications.info(`${actor.name} 因 [夺命] 流失气血内力`);",
                                     "active": true
                                 }
                             ]
@@ -495,7 +495,7 @@
                         {
                             "label": "侠义反转与治疗",
                             "trigger": "hit",
-                            "script": "// 1. 读取基础数值 (来自面板)\nlet healAmount = args.baseDamage || 0;\n\n// 2. 读取目标侠义 (NaN防卫)\nconst xiayi = Number(args.target.system.social?.xiayi) || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ amount: finalValue, type: \"hp\", showScrolling: true });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "// 1. 读取基础数值 (来自面板)\nlet healAmount = args.baseDamage || 0;\n\n// 2. 读取目标侠义 (NaN防卫)\nconst xiayi = Number(args.target.system.social?.xiayi) || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ healer: actor,  amount: finalValue, type: \"hp\", showScrolling: true });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         },
                         {
@@ -1031,7 +1031,7 @@
                         {
                             "label": "转化护体",
                             "trigger": "hit",
-                            "script": "const current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nif (current <= 0) return ui.notifications.warn(\"没有不死气！\");\n\nawait actor.applyHealing({ amount: current, type: \"huti\", showScrolling: true });\nawait actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", 0);\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #2e7d32; background: rgba(46, 125, 50, 0.05);\">\n            <div style=\"font-weight:bold; color: #2e7d32;\">阎王不死印 - 借力</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                不死气转化为护体。<br>\n                消耗: <b>${current}</b>\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
+                            "script": "const current = actor.getFlag(\"xjzl-system\", \"wuxue_undyingQi\") || 0;\nif (current <= 0) return ui.notifications.warn(\"没有不死气！\");\n\nawait actor.applyHealing({ healer: actor,  amount: current, type: \"huti\", showScrolling: true });\nawait actor.setFlag(\"xjzl-system\", \"wuxue_undyingQi\", 0);\n\nconst content = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #2e7d32; background: rgba(46, 125, 50, 0.05);\">\n            <div style=\"font-weight:bold; color: #2e7d32;\">阎王不死印 - 借力</div>\n            <div style=\"font-size: 0.9em; margin-top: 4px;\">\n                不死气转化为护体。<br>\n                消耗: <b>${current}</b>\n            </div>\n        </div>\n    </div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor: actor}), content: content });",
                             "active": true
                         }
                     ]
@@ -1305,7 +1305,7 @@
                         {
                             "label": "格挡流失",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyHealing({ amount: -20, type: \"hp\", showScrolling: true });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-cat\"></i> 凡我弟子</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">${args.attacker.name} 因格挡流失 20 气血！<br><span style=\"color:#888;\">(若消耗反应动作大喊“喵呜喵呜”，可免除流失)</span></div></div></div>` });\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyHealing({ healer: actor,  amount: -20, type: \"hp\", showScrolling: true });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-cat\"></i> 凡我弟子</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">${args.attacker.name} 因格挡流失 20 气血！<br><span style=\"color:#888;\">(若消耗反应动作大喊“喵呜喵呜”，可免除流失)</span></div></div></div>` });\n}",
                             "active": true
                         }
                     ]
@@ -1590,7 +1590,7 @@
                         {
                             "label": "反击效果",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst loss = 20 + (lvl - 1) * 10;\nawait args.target.applyHealing({ amount: -loss, type: \"hp\", showScrolling: true });\nui.notifications.info(`${args.target.name} 流失 ${loss} 气血。请手动调整友方先攻。`);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst loss = 20 + (lvl - 1) * 10;\nawait args.target.applyHealing({ healer: actor,  amount: -loss, type: \"hp\", showScrolling: true });\nui.notifications.info(`${args.target.name} 流失 ${loss} 气血。请手动调整友方先攻。`);",
                             "active": true
                         }
                     ]
@@ -1812,7 +1812,7 @@
                         {
                             "label": "复活与叠加",
                             "trigger": "hit",
-                            "script": "// 恢复状态\nawait actor.applyHealing({ amount: 10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ amount: 10, type: \"mp\", showScrolling: true });\nawait actor.toggleStatusEffect(\"dying\", { active: false });\nawait actor.toggleStatusEffect(\"dead\", { active: false });\n\n// 添加九命\nconst effData = thisItem.effects.getName(\"九命\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 检查层数\nconst existing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jiuming\");\nconst stacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 9) {\n    ui.notifications.warn(\"九命已满，回天乏术！\");\n} else {\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(\"九死还生！获得一层 [九命]\");\n}",
+                            "script": "// 恢复状态\nawait actor.applyHealing({ healer: actor,  amount: 10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ healer: actor,  amount: 10, type: \"mp\", showScrolling: true });\nawait actor.toggleStatusEffect(\"dying\", { active: false });\nawait actor.toggleStatusEffect(\"dead\", { active: false });\n\n// 添加九命\nconst effData = thisItem.effects.getName(\"九命\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\n// 检查层数\nconst existing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jiuming\");\nconst stacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 9) {\n    ui.notifications.warn(\"九命已满，回天乏术！\");\n} else {\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(\"九死还生！获得一层 [九命]\");\n}",
                             "active": true
                         }
                     ]

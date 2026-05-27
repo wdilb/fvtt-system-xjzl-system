@@ -325,7 +325,7 @@
                         {
                             "label": "伤害回血",
                             "trigger": "hit",
-                            "script": "const heal = Math.floor(args.damageResult.damage);\nif (heal > 0) {\n    await actor.applyHealing({amount: heal, type: \"hp\", showScrolling: true});\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:green; font-weight:bold;\"><i class=\"fas fa-heart\"></i> 回光返照</p><p>汲取了 <b>${heal}</b> 点气血！</p></div>`\n    });\n}",
+                            "script": "const heal = Math.floor(args.damageResult.damage);\nif (heal > 0) {\n    await actor.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true});\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:green; font-weight:bold;\"><i class=\"fas fa-heart\"></i> 回光返照</p><p>汲取了 <b>${heal}</b> 点气血！</p></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -974,7 +974,7 @@
                         {
                             "label": "格挡削蓝",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyHealing({amount: -15, type: \"mp\", showScrolling: true});\n    ui.notifications.info(`${args.attacker.name} 触发一股连枝，流失 15 内力！`);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyHealing({ healer: actor, amount: -15, type: \"mp\", showScrolling: true});\n    ui.notifications.info(`${args.attacker.name} 触发一股连枝，流失 15 内力！`);\n}",
                             "active": true
                         }
                     ]
@@ -1055,7 +1055,7 @@
                             "label": "伤害转治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 1. 抓取被截断前的原始面板伤害\nconst rawDamage = args.baseDamage;\n\n// 2. 抓取技能\nconst liaoshang = actor.system.skills.liaoshang.total;\nconst totalHeal = rawDamage + liaoshang;\n\n// 3. 执行回血\nawait actor.applyHealing({amount: totalHeal, type: \"hp\", showScrolling: true});\n\n// 4. 发送反馈卡片\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-heart\"></i> 一色常青</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">气血流转，招式伤害融合疗伤技艺，回复了 <b>${totalHeal}</b> 点气血！</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
+                            "script": "// 1. 抓取被截断前的原始面板伤害\nconst rawDamage = args.baseDamage;\n\n// 2. 抓取技能\nconst liaoshang = actor.system.skills.liaoshang.total;\nconst totalHeal = rawDamage + liaoshang;\n\n// 3. 执行回血\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: \"hp\", showScrolling: true});\n\n// 4. 发送反馈卡片\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-heart\"></i> 一色常青</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">气血流转，招式伤害融合疗伤技艺，回复了 <b>${totalHeal}</b> 点气血！</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
                         }
                     ]
                 },
@@ -1097,7 +1097,7 @@
                         {
                             "label": "削蓝",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = 20 + (lvl - 1) * 5;\n    await args.target.applyHealing({amount: -drain, type: \"mp\", showScrolling: true});\n}",
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = 20 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor, amount: -drain, type: \"mp\", showScrolling: true});\n}",
                             "active": true
                         }
                     ]
@@ -1221,7 +1221,7 @@
                             "label": "三元护体",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const tingpai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tingpai\");\nconst stacks = tingpai ? (tingpai.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst coef = 10 + (lvl - 1) * 10;\nconst hutiAmount = stacks * coef;\n\nif (hutiAmount > 0) {\n    await actor.applyHealing({amount: hutiAmount, type: \"huti\", showScrolling: true});\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f39c12; background: rgba(243,156,18,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-shield-alt\"></i> 顶聚三元</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">降下三元真气！自身获得 <b>${hutiAmount}</b> 点护体，请手动为范围内友方添加等量护体。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                            "script": "const tingpai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tingpai\");\nconst stacks = tingpai ? (tingpai.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst coef = 10 + (lvl - 1) * 10;\nconst hutiAmount = stacks * coef;\n\nif (hutiAmount > 0) {\n    await actor.applyHealing({ healer: actor, amount: hutiAmount, type: \"huti\", showScrolling: true});\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f39c12; background: rgba(243,156,18,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-shield-alt\"></i> 顶聚三元</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">降下三元真气！自身获得 <b>${hutiAmount}</b> 点护体，请手动为范围内友方添加等量护体。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
