@@ -45,6 +45,7 @@ import { XJZLTraitSheet } from "./module/sheets/trait-sheet.mjs";
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
 import { TargetManager } from "./module/managers/target-manager.mjs";
 import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs";
+import { CombatStatsManager } from "./module/managers/combat-stats-manager.mjs";
 
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
@@ -58,6 +59,7 @@ import { XJZLMacros } from "./module/utils/macros.mjs";
 import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
 import { ToneTracker } from "./module/applications/tone-tracker.mjs";
+import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -512,6 +514,17 @@ Hooks.once("init", async function () {
     default: true,       // 默认阻止 FVTT 的自带效果
     requiresReload: true // 因为涉及核心 CONFIG 变量的修改，需要刷新页面生效
   });
+
+  // 是否启用战斗统计
+  game.settings.register("xjzl-system", "enableCombatStats", {
+    name: "开启战斗统计系统",
+    hint: "开启后，系统将在战斗中精确记录伤害、治疗、承受伤害、闪避、看破以及资源消耗情况。",
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    requiresReload: true
+  });
 });
 
 Hooks.once("setup", () => {
@@ -583,6 +596,13 @@ Hooks.once("ready", async function () {
   if (game.settings.get("xjzl-system", "enableToneTracker")) {
     ToneTracker.init();
   }
+
+  // 6·加载战斗统计工具
+  if (game.settings.get("xjzl-system", "enableCombatStats")) {
+    CombatStatsManager.init();
+    CombatMeterUI.init();
+  }
+
 
   console.log("侠界之旅系统 - 准备就绪");
 });
@@ -708,7 +728,40 @@ Hooks.on('getSceneControlButtons', (controls) => {
     }
   }
 
-  // 3·注入 AOE Creator 按钮 
+  // 3·战斗统计面板
+  if (game.settings.get("xjzl-system", "enableCombatStats")) {
+    const meterBtn = {
+      name: "combat-meter",
+      title: "战斗统计 (Details)",
+      icon: "fas fa-chart-bar", // 柱状图图标
+      visible: true,
+      button: true, // 点击型按钮
+      onChange: () => {
+        // 直接通过单例实例来控制开关
+        const app = CombatMeterUI.instance;
+        if (app) {
+          if (app.rendered) {
+            app.close();
+          } else {
+            app.render({ force: true });
+          }
+        }
+      }
+    };
+
+    if (tokenLayer) {
+      const tools = tokenLayer.tools;
+      if (tools instanceof Map) {
+        if (!tools.has('combat-meter')) tools.set('combat-meter', meterBtn);
+      } else if (Array.isArray(tools)) {
+        if (!tools.some(t => t.name === 'combat-meter')) tools.push(meterBtn);
+      } else if (tools && !tools['combat-meter']) {
+        tokenLayer.tools['combat-meter'] = meterBtn;
+      }
+    }
+  }
+
+  // 4·注入 AOE Creator 按钮 
   // 1. 查找 templates 层级 (测量工具在代码里叫 templates)
   let templateLayer = null;
 
@@ -1539,6 +1592,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览
     "systems/xjzl-system/templates/apps/tone-tracker.hbs",//音阶计数器
     "systems/xjzl-system/templates/apps/action-tracker.hbs",//动作计数器
+    "systems/xjzl-system/templates/apps/combat-meter.hbs",//数据统计
     // 向导界面
     "systems/xjzl-system/templates/apps/character-wizard/sidebar.hbs",
     "systems/xjzl-system/templates/apps/character-wizard/main.hbs",

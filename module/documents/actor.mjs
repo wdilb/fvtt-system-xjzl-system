@@ -1317,19 +1317,44 @@ export class XJZLActor extends Actor {
       // 解构获取 type (因为野兽逻辑前面可能还没解构 type，我们需要从 data 里取一下)
       const damageType = data.type || "waigong";
       const attacker = data.attacker || null;
+      let isScriptDamage = false; // 防重复拦截锁
 
-      if (attacker && attacker._scriptContextStack?.length > 0) {
+      if (game.settings.get("xjzl-system", "enableCombatStats") && attacker && attacker._scriptContextStack?.length > 0) {
+        isScriptDamage = true; // <== 锁上，后面的常规统计不再执行
         const ctx = attacker._scriptContextStack[attacker._scriptContextStack.length - 1];
         const sourceItem = ctx.item || ctx.effect || null;
         const sourceName = sourceItem ? sourceItem.name : ctx.label;
 
         Hooks.callAll("xjzl.scriptDamageDealt", {
+          eventType: "script_damage",
           attacker: attacker,
           defender: this,
           damageType: damageType,
           sourceItem: sourceItem,
           sourceName: sourceName,
           result: finalDamageResult
+        });
+      }
+
+      // === [战斗统计] 野兽伤害 ===
+      if (game.settings.get("xjzl-system", "enableCombatStats") && !isScriptDamage) {
+        Hooks.callAll("xjzl.combatStatRecord", {
+          eventType: "damage",
+          attacker: data.attacker || null,
+          defender: this,
+          source: data.source || "extra",
+          move: data.move || null,
+          item: data.item || null,
+          damageType: damageType,
+          amount: finalDamageResult.finalDamage,
+          hutiLost: 0,
+          mpLost: 0,
+          tiliLost: finalDamageResult.tiliLost,
+          isHit: finalDamageResult.isHit,
+          isCrit: data.isCrit || false,
+          isBroken: false,
+          isDying: false,
+          isDead: finalDamageResult.isDead
         });
       }
 
@@ -1821,18 +1846,43 @@ export class XJZLActor extends Actor {
     };
     // 针对脚本触发伤害的隐式溯源 Hook (仅限脚本引擎调用的伤害)，用于后续的数据统计功能
     // 判定条件：没有通过标准卡片传入 data.item，且攻击者正处于脚本执行栈中
-    if (attacker && attacker._scriptContextStack?.length > 0) {
+    let isScriptDamage = false; // 防重复拦截锁
+    if (game.settings.get("xjzl-system", "enableCombatStats") && attacker && attacker._scriptContextStack?.length > 0) {
+      isScriptDamage = true; // 锁定，防止重复统计
       const ctx = attacker._scriptContextStack[attacker._scriptContextStack.length - 1];
       const sourceItem = ctx.item || ctx.effect || null;
       const sourceName = sourceItem ? sourceItem.name : ctx.label;
 
       Hooks.callAll("xjzl.scriptDamageDealt", {
+        eventType: "script_damage",
         attacker: attacker,
         defender: this,
         damageType: type,
         sourceItem: sourceItem,
         sourceName: sourceName,
         result: finalDamageResult
+      });
+    }
+
+    // === [战斗统计] 常规伤害 ===
+    if (game.settings.get("xjzl-system", "enableCombatStats") && !isScriptDamage) {
+      Hooks.callAll("xjzl.combatStatRecord", {
+        eventType: "damage",
+        attacker: attacker || null, // 可能为null，如环境伤害/跌落
+        defender: this,
+        source: source,             // "move", "basic", "dot", "extra"
+        move: move || null,
+        item: item || null,
+        damageType: type,
+        amount: finalDamage,        // 造成了多少伤害（护甲折算后）
+        hutiLost: stdHutiLost + liuHutiLost, // 破了多少护体
+        mpLost: stdMpLost + liuMpLost,       // 扣了多少内力（以蓝代血）
+        tiliLost: 0,
+        isHit: isHit,
+        isCrit: config.isCrit,      // 使用最终暴击状态
+        isBroken: isBroken,
+        isDying: isDying,
+        isDead: isDead
       });
     }
 
@@ -1991,19 +2041,34 @@ export class XJZLActor extends Actor {
     // 针对脚本触发治疗的隐式溯源 Hook,用于后续的数据统计功能
     // 获取施法源：优先看有没有传入 healer，没有则默认是自己 (this) 身上挂的 Buff 触发的
     const healer = data.healer || this;
-
-    if (healer._scriptContextStack?.length > 0) {
+    let isScriptHealing = false; // 防重复拦截锁
+    if (game.settings.get("xjzl-system", "enableCombatStats") && healer._scriptContextStack?.length > 0) {
+      isScriptHealing = true; // 防重复拦截
       const ctx = healer._scriptContextStack[healer._scriptContextStack.length - 1];
       const sourceItem = ctx.item || ctx.effect || null;
       const sourceName = sourceItem ? sourceItem.name : ctx.label;
 
       Hooks.callAll("xjzl.scriptHealingApplied", {
+        eventType: "script_healing",
         healer: healer,
         target: this,
         healType: type,
         sourceItem: sourceItem,
         sourceName: sourceName,
         result: finalHealResult
+      });
+    }
+
+    // === [战斗统计] 治疗与流失 ===
+    if (game.settings.get("xjzl-system", "enableCombatStats") && !isScriptHealing) {
+      Hooks.callAll("xjzl.combatStatRecord", {
+        eventType: "healing",
+        healer: data.healer || this, // 如果没传 healer，默认视为自身产生的效果
+        target: this,
+        healType: type,
+        amount: actualHeal,
+        overflow: amount - actualHeal, // 溢出量
+        isBlocked: finalHealResult.isBlocked
       });
     }
 
@@ -2248,6 +2313,17 @@ export class XJZLActor extends Actor {
       mp: 0, hp: 0, rage: 0,
       morale: moraleSpent
     };
+
+    // === [战斗统计] 普攻出招 ===
+    if (game.settings.get("xjzl-system", "enableCombatStats")) {
+      Hooks.callAll("xjzl.combatStatRecord", {
+        eventType: "cast",
+        attacker: this.actor,
+        move: virtualMove,
+        item: virtualItem,
+        cost: costConsumed
+      });
+    }
 
     // =====================================================
     // 3.5 构建“虚拟物品”对象 (Virtual Item)

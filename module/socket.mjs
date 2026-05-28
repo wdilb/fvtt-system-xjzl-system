@@ -1,3 +1,5 @@
+import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
+
 export let xjzlSocket;
 
 export function setupSocket() {
@@ -12,10 +14,14 @@ export function setupSocket() {
     xjzlSocket.register("createEmbedded", _socketCreateEmbedded);
     xjzlSocket.register("deleteEmbedded", _socketDeleteEmbedded);
     xjzlSocket.register("stopStance", _socketStopStance);
+    // 注册战斗动作计数器
+    xjzlSocket.register("recordCombatStat", _socketRecordCombatStat);
+    xjzlSocket.register("broadcastCombatStats", _socketBroadcastCombatStats);
 
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
     xjzlSocket.register("showScrollingText", _socketShowScrollingText);
+
 }
 
 // ================= GM 侧执行函数 =================
@@ -134,4 +140,27 @@ async function _socketStopStance(targetUuid) {
 
     // 3. 执行
     return await actor.stopStance();
+}
+
+/**
+ * 战斗统计
+ * @returns 
+ */
+async function _socketRecordCombatStat(data) {
+    // 只有活跃的 GM 会处理数据汇总
+    if (isNotActiveGM()) return null;
+    // 直接交给管理器处理
+    CombatStatsManager.processStatRecord(data);
+}
+
+/**
+ * 接收 GM 广播的战斗统计最新数据 (仅非 GM 客户端会收到并处理)
+ */
+async function _socketBroadcastCombatStats(activeStats) {
+    // 动态导入管理器，更新本地内存
+    import("./managers/combat-stats-manager.mjs").then(module => {
+        module.CombatStatsManager._activeStats = activeStats;
+        // 触发本地的 UI 刷新
+        Hooks.callAll("xjzl.combatStatsUpdated");
+    });
 }

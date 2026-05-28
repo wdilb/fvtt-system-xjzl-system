@@ -1863,6 +1863,17 @@ export class XJZLItem extends Item {
         desperateBonus: desperateBonus // 额外记录一下，虽然撤回时主要是看 mp，但留个记录也好
       };
 
+      // === [战斗统计] 武学出招 ===
+      if (game.settings.get("xjzl-system", "enableCombatStats")) {
+        Hooks.callAll("xjzl.combatStatRecord", {
+          eventType: "cast",
+          attacker: actor,
+          move: move,
+          item: this,
+          cost: costConsumed
+        });
+      }
+
       // =====================================================
       // 3.6 基础伤害计算 (提前到脚本前)
       // =====================================================

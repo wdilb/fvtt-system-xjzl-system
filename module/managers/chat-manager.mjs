@@ -1015,6 +1015,15 @@ export class ChatCardManager {
         // 判定规则: 攻方 >= 守方 则破防 (Defender loses on ties)
         const isBroken = atkTotal >= defTotal;
 
+        // === [战斗统计] 虚招对抗 ===
+        if (game.settings.get("xjzl-system", "enableCombatStats")) {
+            Hooks.callAll("xjzl.combatStatRecord", {
+                eventType: "kanpo",
+                defender: targetActor,
+                isBroken: isBroken // false = 看破成功, true = 失败被击破
+            });
+        }
+
         // =====================================================
         // 6. 状态变更与视觉反馈 (State Updates & VFX)
         // =====================================================
