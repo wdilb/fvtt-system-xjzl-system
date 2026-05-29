@@ -1019,6 +1019,7 @@ export class ChatCardManager {
         if (game.settings.get("xjzl-system", "enableCombatStats")) {
             Hooks.callAll("xjzl.combatStatRecord", {
                 eventType: "kanpo",
+                attacker: attackerActor,
                 defender: targetActor,
                 isBroken: isBroken // false = 看破成功, true = 失败被击破
             });
