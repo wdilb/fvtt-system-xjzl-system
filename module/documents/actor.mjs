@@ -2344,7 +2344,7 @@ export class XJZLActor extends Actor {
     if (game.settings.get("xjzl-system", "enableCombatStats")) {
       Hooks.callAll("xjzl.combatStatRecord", {
         eventType: "cast",
-        attacker: this.actor,
+        attacker: this,
         move: virtualMove,
         item: virtualItem,
         cost: costConsumed
