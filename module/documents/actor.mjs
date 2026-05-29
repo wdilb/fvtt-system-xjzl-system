@@ -2314,17 +2314,6 @@ export class XJZLActor extends Actor {
       morale: moraleSpent
     };
 
-    // === [战斗统计] 普攻出招 ===
-    if (game.settings.get("xjzl-system", "enableCombatStats")) {
-      Hooks.callAll("xjzl.combatStatRecord", {
-        eventType: "cast",
-        attacker: this.actor,
-        move: virtualMove,
-        item: virtualItem,
-        cost: costConsumed
-      });
-    }
-
     // =====================================================
     // 3.5 构建“虚拟物品”对象 (Virtual Item)
     // 目的: 填充脚本上下文中的 args.item，防止脚本报错
@@ -2344,6 +2333,17 @@ export class XJZLActor extends Actor {
       getFlag: (scope, key) => null,
       flags: {}
     };
+
+    // === [战斗统计] 普攻出招 ===
+    if (game.settings.get("xjzl-system", "enableCombatStats")) {
+      Hooks.callAll("xjzl.combatStatRecord", {
+        eventType: "cast",
+        attacker: this.actor,
+        move: virtualMove,
+        item: virtualItem,
+        cost: costConsumed
+      });
+    }
 
     // =====================================================
     // 4. 触发 "出招" 回复 (Regen On Attack)
