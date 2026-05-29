@@ -1904,7 +1904,7 @@ export class XJZLActor extends Actor {
     // --- 容器无法治疗 ---
     if (this.type === "container") return { actualHeal: 0 };
 
-    const { amount = 0, type = "hp", showScrolling = true, move = null, item = null, source = "extra", healer = null } = data;
+    const { amount = 0, type = "hp", showScrolling = true, move = null, item = null, source = "extra" } = data;
 
     // 允许负数，只拦截 0
     if (amount === 0) return { actualHeal: 0 };
