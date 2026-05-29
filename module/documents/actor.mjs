@@ -1904,7 +1904,7 @@ export class XJZLActor extends Actor {
     // --- 容器无法治疗 ---
     if (this.type === "container") return { actualHeal: 0 };
 
-    const { amount = 0, type = "hp", showScrolling = true, move = null, item = null, source = "extra" } = data;
+    const { amount = 0, type = "hp", showScrolling = true, move = null, item = null, source = "extra", healer = null } = data;
 
     // 允许负数，只拦截 0
     if (amount === 0) return { actualHeal: 0 };
@@ -2040,7 +2040,7 @@ export class XJZLActor extends Actor {
     };
     // 针对脚本触发治疗的隐式溯源 Hook,用于后续的数据统计功能
     // 获取施法源：优先看有没有传入 healer，没有则默认是自己 (this) 身上挂的 Buff 触发的
-    const healer = data.healer || this;
+    const actualHealer = healer || this; // 如果没传，才算作自身被动
     let isScriptHealing = false; // 防重复拦截锁
     if (game.settings.get("xjzl-system", "enableCombatStats") && actualHealer._scriptContextStack?.length > 0) {
       isScriptHealing = true;
