@@ -1904,7 +1904,7 @@ export class XJZLActor extends Actor {
     // --- 容器无法治疗 ---
     if (this.type === "container") return { actualHeal: 0 };
 
-    const { amount = 0, type = "hp", showScrolling = true } = data;
+    const { amount = 0, type = "hp", showScrolling = true, move = null, item = null, source = "extra", healer = null } = data;
 
     // 允许负数，只拦截 0
     if (amount === 0) return { actualHeal: 0 };
@@ -2042,20 +2042,23 @@ export class XJZLActor extends Actor {
     // 获取施法源：优先看有没有传入 healer，没有则默认是自己 (this) 身上挂的 Buff 触发的
     const healer = data.healer || this;
     let isScriptHealing = false; // 防重复拦截锁
-    if (game.settings.get("xjzl-system", "enableCombatStats") && healer._scriptContextStack?.length > 0) {
-      isScriptHealing = true; // 防重复拦截
-      const ctx = healer._scriptContextStack[healer._scriptContextStack.length - 1];
-      const sourceItem = ctx.item || ctx.effect || null;
+    if (game.settings.get("xjzl-system", "enableCombatStats") && actualHealer._scriptContextStack?.length > 0) {
+      isScriptHealing = true;
+      const ctx = actualHealer._scriptContextStack[actualHealer._scriptContextStack.length - 1];
+      // 兼容招式透传过来的 item
+      const sourceItem = ctx.item || ctx.effect || item || null;
       const sourceName = sourceItem ? sourceItem.name : ctx.label;
 
       Hooks.callAll("xjzl.scriptHealingApplied", {
         eventType: "script_healing",
-        healer: healer,
+        healer: actualHealer,
         target: this,
         healType: type,
         sourceItem: sourceItem,
         sourceName: sourceName,
-        result: finalHealResult
+        result: finalHealResult,
+        move: move || ctx.contextData || null,
+        item: item || sourceItem
       });
     }
 
@@ -2063,12 +2066,15 @@ export class XJZLActor extends Actor {
     if (game.settings.get("xjzl-system", "enableCombatStats") && !isScriptHealing) {
       Hooks.callAll("xjzl.combatStatRecord", {
         eventType: "healing",
-        healer: data.healer || this, // 如果没传 healer，默认视为自身产生的效果
+        healer: actualHealer,
         target: this,
         healType: type,
         amount: actualHeal,
-        overflow: amount - actualHeal, // 溢出量
-        isBlocked: finalHealResult.isBlocked
+        overflow: amount - actualHeal,
+        isBlocked: finalHealResult.isBlocked,
+        move: move,     // 透传招式对象
+        item: item,     // 透传物品对象
+        source: source  // 透传来源 (move/script/extra)
       });
     }
 

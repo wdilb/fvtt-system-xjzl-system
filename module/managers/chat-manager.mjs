@@ -2480,7 +2480,11 @@ export class ChatCardManager {
                 const result = await targetActor.applyHealing({
                     amount: baseAmount,
                     type: "hp", // 默认回血
-                    showScrolling: true
+                    showScrolling: true,
+                    healer: attacker,
+                    move: move,
+                    item: item,
+                    source: "move"      // 明确来源是武学招式
                 });
 
                 // 获取实际加了多少
