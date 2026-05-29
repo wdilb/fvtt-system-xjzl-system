@@ -1,11 +1,31 @@
 <div class="combat-meter-container">
 
-    <!-- 顶部控制栏 -->
+    <!-- 顶部战斗场次选择器 -->
+    <div class="session-header" style="background:#1a1a1a; padding: 4px; border-bottom: 1px solid #333;">
+        <select class="session-select"
+            style="width: 100%; background: #222; color: #e67e22; border: 1px solid #444; padding: 2px;">
+            {{#each sessions}}
+            <option value="{{this.id}}" {{#if this.selected}}selected{{/if}}>{{this.name}}</option>
+            {{/each}}
+        </select>
+    </div>
+
+    <!-- 控制栏 -->
     <header class="meter-controls">
+        {{#unless isLevel1}}
+        <button type="button" class="back-btn" title="返回上层">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        {{/unless}}
+
         <select class="metric-select">
-            <option value="damageDealt" {{#if isDamageDealt}}selected{{/if}}>造成伤害 (Damage Dealt)</option>
-            <option value="healingDealt" {{#if isHealingDealt}}selected{{/if}}>造成治疗 (Healing Dealt)</option>
-            <option value="damageTaken" {{#if isDamageTaken}}selected{{/if}}>承受伤害 (Damage Taken)</option>
+            <option value="damageDealt">造成伤害</option>
+            <option value="healingDealt">造成治疗</option>
+            <option value="damageTaken">承受伤害</option>
+            <option value="brokenStanceDealt">破架次数</option>
+            <option value="mpSpent">内力消耗</option>
+            <option value="rageSpent">怒气消耗</option> <!-- 【新增】 -->
+            <option value="castsDealt">施展次数</option>
         </select>
 
         {{#if isGM}}
@@ -15,31 +35,92 @@
         {{/if}}
     </header>
 
-    <!-- 列表展示区 -->
-    <ul class="meter-list">
+    <div class="meter-breadcrumb">
+        {{viewTitle}}
+    </div>
+
+    {{#if isLevel3}}
+    <div class="skill-stats-board">
+        <div class="skill-header">
+            <img src="{{skillDetails.img}}" onerror="this.src='icons/svg/combat.svg';" />
+            <div>
+                <div class="title">{{skillDetails.skillName}}</div>
+                <div class="subtitle">属性: {{skillDetails.damageTypeLabel}}</div>
+            </div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-box">
+                <span class="label">施展/命中</span>
+                <span class="val">{{skillDetails.stats.casts}} / {{skillDetails.stats.hits}}</span>
+            </div>
+
+            {{#if isHealing}}
+            <div class="stat-box highlight-heal">
+                <span class="label">有效/过量</span>
+                <span class="val">{{skillDetails.stats.healing}} / {{skillDetails.stats.overheal}}</span>
+            </div>
+            {{else}}
+            <div class="stat-box">
+                <span class="label">平均伤害</span>
+                <span class="val">{{skillDetails.stats.avgDamage}}</span>
+            </div>
+            {{/if}}
+
+            <div class="stat-box">
+                <span class="label">命中率</span>
+                <span class="val">{{skillDetails.stats.hitRate}}%</span>
+            </div>
+            <div class="stat-box">
+                <span class="label">暴击率</span>
+                <span class="val">{{skillDetails.stats.critRate}}%</span>
+            </div>
+
+            {{#if skillDetails.stats.totalBroken}}
+            <div class="stat-box highlight">
+                <span class="label">破架次数</span>
+                <span class="val">{{skillDetails.stats.totalBroken}}</span>
+            </div>
+            {{/if}}
+        </div>
+        <div class="target-title"><i class="fas fa-crosshairs"></i> 目标分布明细</div>
+    </div>
+    {{/if}}
+
+    <ul class="meter-list {{#if isLevel3}}level-3-list{{/if}}">
         {{#if rows.length}}
         {{#each rows}}
-        <li class="meter-row" data-uuid="{{this.uuid}}" title="{{this.name}}">
-            <!-- 进度条背景 -->
-            <div class="meter-bar" style="width: {{this.percent}}%; background-color: {{this.color}};"></div>
+        <li class="meter-row" data-id="{{#if this.uuid}}{{this.uuid}}{{else}}{{this.id}}{{/if}}" title="{{this.name}}">
+            <div class="meter-bar" style="width: {{this.barPercent}}%; background-color: {{this.color}};"></div>
 
-            <!-- 内容层 -->
             <div class="meter-content">
                 <span class="rank">{{this.rank}}</span>
-                <img src="{{this.img}}" class="avatar" />
+                {{#if this.img}}
+                <img src="{{this.img}}" class="avatar" onerror="this.src='icons/svg/mystery-man.svg';" />
+                {{else}}
+                <img src="icons/svg/mystery-man.svg" class="avatar" />
+                {{/if}}
+
                 <span class="name">{{this.name}}</span>
-                <span class="value">{{this.value}} ({{this.percent}}%)</span>
+
+                <div class="value-group">
+                    {{#if this.overheal}}
+                    <span class="sub-val"
+                        style="color:#2ecc71; font-size:0.8em; margin-right:4px;">{{this.value}}有效</span>
+                    {{/if}}
+
+                    <span class="value">{{#if this.displayVal}}{{this.displayVal}}{{else}}{{this.value}}{{/if}}</span>
+                    <span class="percent">({{this.textPercent}}%)</span>
+                </div>
             </div>
         </li>
         {{/each}}
         {{else}}
-        <li class="empty-state">暂无战斗数据...</li>
+        <li class="empty-state">暂无相关数据...</li>
         {{/if}}
     </ul>
 
-    <!-- 底部总计 -->
     <footer class="meter-footer">
-        <span>总计 (Total):</span>
-        <span class="total-value">{{totalValue}}</span>
+        <span>当前指标: {{metricLabel}}</span>
+        <span class="total-value">总计: {{totalValue}}</span>
     </footer>
 </div>

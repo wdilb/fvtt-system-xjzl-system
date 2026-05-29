@@ -525,6 +525,16 @@ Hooks.once("init", async function () {
     default: true,
     requiresReload: true
   });
+
+  // 隐形的持久化数据库，不在设置面板显示，专门用于存储战斗统计数据
+  game.settings.register("xjzl-system", "combatStatsStorage", {
+    name: "战斗统计缓存",
+    hint: "开启后，将会在GM刷新之后也保存之前的战斗记录，但需要注意仅仅会在战斗开始与结束的瞬间保存。",
+    scope: "world",     // 仅GM有权限写入世界级设置
+    config: false,      // false: 不在系统的设置弹窗中显示给玩家看
+    type: Object,       // 允许保存对象类型
+    default: { active: null, history: [] }
+  });
 });
 
 Hooks.once("setup", () => {
@@ -601,6 +611,7 @@ Hooks.once("ready", async function () {
   if (game.settings.get("xjzl-system", "enableCombatStats")) {
     CombatStatsManager.init();
     CombatMeterUI.init();
+    await CombatStatsManager.ready();
   }
 
 

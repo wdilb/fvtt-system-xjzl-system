@@ -17,6 +17,7 @@ export function setupSocket() {
     // 注册战斗动作计数器
     xjzlSocket.register("recordCombatStat", _socketRecordCombatStat);
     xjzlSocket.register("broadcastCombatStats", _socketBroadcastCombatStats);
+    xjzlSocket.register("requestCombatStats", _socketRequestCombatStats);
 
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
@@ -163,4 +164,15 @@ async function _socketBroadcastCombatStats(activeStats) {
         // 触发本地的 UI 刷新
         Hooks.callAll("xjzl.combatStatsUpdated");
     });
+}
+
+/**
+ * 非 GM 玩家登录时，向 GM 索要当前的统计数据
+ * 因为 socketlib 的 executeAsGM 支持返回值，所以直接 return 即可
+ */
+async function _socketRequestCombatStats() {
+    if (isNotActiveGM()) return null;
+    // 动态引入管理器，导出当前的完整数据
+    const module = await import("./managers/combat-stats-manager.mjs");
+    return module.CombatStatsManager.exportSyncData();
 }

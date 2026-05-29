@@ -1,18 +1,19 @@
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 import { CombatStatsManager } from "../managers/combat-stats-manager.mjs";
 
-/**
- * 战斗统计悬浮面板 (Combat Meter UI)
- * 职责: 响应用户交互、从 Manager 拉取数据并动态渲染
- */
 export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
     static instance = null;
     static debouncedRefresh = null;
 
     constructor(options = {}) {
         super(options);
-        // 当前展示的排序指标
         this.currentMetric = "damageDealt";
+
+        this.viewState = {
+            level: 1,
+            actorUuid: null,
+            skillId: null
+        };
     }
 
     static DEFAULT_OPTIONS = {
@@ -26,13 +27,12 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             resizable: true,
         },
         position: {
-            width: 300,
-            height: 400,
+            width: 320,
+            height: 480,
             top: 50,
             left: window.innerWidth - 350
         },
         actions: {
-            // GM 专属清空按钮
             clearData: function () { this._onClearData(); }
         }
     };
@@ -43,81 +43,174 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     };
 
-    /**
-     * 单例初始化及全局事件绑定
-     */
     static init() {
         this.instance = new CombatMeterUI();
-
-        // UI 渲染防抖 (100ms)
-        // 保证在密集攻击(如 AOE或多端同步)时，界面平滑过渡，不浪费性能
         this.debouncedRefresh = foundry.utils.debounce(() => {
             if (this.instance && this.instance.rendered) {
                 this.instance.render({ force: true });
             }
         }, 100);
 
-        // 监听来自数据中枢的更新信号
         Hooks.on("xjzl.combatStatsUpdated", () => {
             this.debouncedRefresh();
         });
     }
 
-    /* -------------------------------------------- */
-    /*  生命周期与渲染钩子                            */
-    /* -------------------------------------------- */
-
-    /**
-     * 准备 Handlebars 模板所需的数据
-     */
     async _prepareContext(options) {
-        const rows = CombatStatsManager.getMeterData(this.currentMetric) || [];
-        const totalValue = rows.reduce((acc, r) => acc + r.value, 0);
+        let rows = [];
+        let totalValue = 0;
+        let viewTitle = "";
+        let skillDetails = null;
+
+        // 【新增】构建顶部的战斗场次下拉框数据
+        const sessions = [];
+        if (CombatStatsManager._activeStats) {
+            sessions.push({
+                id: "current",
+                name: `[进行中] ${CombatStatsManager._activeStats.name}`,
+                selected: CombatStatsManager._viewingId === "current"
+            });
+        }
+        CombatStatsManager._history.forEach(h => {
+            sessions.push({
+                id: h.id,
+                name: `[历史] ${h.name}`,
+                selected: CombatStatsManager._viewingId === h.id
+            });
+        });
+
+        if (this.viewState.level === 1) {
+            rows = CombatStatsManager.getMeterData(this.currentMetric) || [];
+            totalValue = rows.reduce((acc, r) => acc + r.value, 0);
+            viewTitle = "全局排行";
+        }
+        else if (this.viewState.level === 2) {
+            const skillData = CombatStatsManager.getActorSkillsData(this.viewState.actorUuid, this.currentMetric);
+            if (skillData) {
+                rows = skillData.rows;
+                totalValue = rows.reduce((acc, r) => acc + r.value, 0);
+                viewTitle = `${skillData.actorName} 的明细`;
+            } else {
+                this.viewState.level = 1;
+                return this._prepareContext(options);
+            }
+        }
+        else if (this.viewState.level === 3) {
+            const details = CombatStatsManager.getSkillDetailsData(
+                this.viewState.actorUuid,
+                this.viewState.skillId,
+                this.currentMetric
+            );
+            if (details) {
+                skillDetails = details;
+                rows = details.targets;
+                totalValue = rows.reduce((acc, r) => acc + (r.displayVal || r.value), 0);
+                viewTitle = `技能详情: ${details.skillName}`;
+            } else {
+                this.viewState.level = 2;
+                return this._prepareContext(options);
+            }
+        }
 
         return {
+            sessions: sessions, // 传入场次数据
             rows: rows,
             totalValue: totalValue,
-            // 提供布尔值供模板的 <select> 标签识别当前项
-            isDamageDealt: this.currentMetric === "damageDealt",
-            isHealingDealt: this.currentMetric === "healingDealt",
-            isDamageTaken: this.currentMetric === "damageTaken",
+            isLevel1: this.viewState.level === 1,
+            isLevel3: this.viewState.level === 3,
+            skillDetails: skillDetails,
+            viewTitle: viewTitle,
+            isHealing: this.currentMetric === "healingDealt",
+            isDamage: this.currentMetric === "damageDealt" || this.currentMetric === "damageTaken",
+            metricLabel: this._getMetricLabel(this.currentMetric),
             isGM: game.user.isGM
         };
     }
 
-    /**
-     * FVTT V13 绑定原生 DOM 事件
-     */
+    _getMetricLabel(metric) {
+        const map = {
+            damageDealt: "造成伤害", healingDealt: "造成治疗", damageTaken: "承受伤害",
+            brokenStanceDealt: "破架次数", mpSpent: "内力消耗", rageSpent: "怒气消耗", castsDealt: "施展次数"
+        };
+        return map[metric] || metric;
+    }
+
     _attachPartListeners(partId, htmlElement, options) {
         super._attachPartListeners(partId, htmlElement, options);
 
-        // 绑定下拉框的 change 事件
-        // 这是为了规避 V13 ApplicationV2 中 click 事件导致的 select 标签无法正常展开问题
+        // 监听场次切换
+        const sessionSelect = htmlElement.querySelector(".session-select");
+        if (sessionSelect) {
+            sessionSelect.addEventListener("change", (event) => {
+                CombatStatsManager._viewingId = event.target.value;
+                this.viewState.level = 1; // 切换场次强制退回根目录
+                this.render({ force: true });
+            });
+        }
+
         const selectElement = htmlElement.querySelector(".metric-select");
         if (selectElement) {
+            selectElement.value = this.currentMetric;
             selectElement.addEventListener("change", (event) => {
-                const metric = event.target.value;
-                if (!metric) return;
-
-                this.currentMetric = metric;
+                this.currentMetric = event.target.value;
+                this.viewState.level = 1;
                 this.render({ force: true });
+            });
+        }
+
+        const backBtn = htmlElement.querySelector(".back-btn");
+        if (backBtn) {
+            backBtn.addEventListener("click", () => {
+                if (this.viewState.level > 1) {
+                    this.viewState.level--;
+                    this.render({ force: true });
+                }
+            });
+        }
+
+        const listEl = htmlElement.querySelector(".meter-list");
+        if (listEl) {
+            listEl.addEventListener("click", (event) => {
+                const row = event.target.closest(".meter-row");
+                if (!row) return;
+
+                if (this.viewState.level === 1) {
+                    const actorUuid = row.dataset.id;
+                    if (actorUuid) {
+                        this.viewState.level = 2;
+                        this.viewState.actorUuid = actorUuid;
+                        this.render({ force: true });
+                    }
+                }
+                else if (this.viewState.level === 2) {
+                    // 【修改】怒气消耗也不需要进目标视图
+                    if (["mpSpent", "rageSpent", "castsDealt"].includes(this.currentMetric)) return;
+
+                    const skillId = row.dataset.id;
+                    let actualSkillId = skillId;
+
+                    if (this.currentMetric === "damageTaken") {
+                        const parts = skillId.split("_");
+                        this.viewState.actorUuid = parts[0];
+                        actualSkillId = parts.slice(1).join("_");
+                    }
+
+                    if (actualSkillId) {
+                        this.viewState.level = 3;
+                        this.viewState.skillId = actualSkillId;
+                        this.render({ force: true });
+                    }
+                }
             });
         }
     }
 
-    /* -------------------------------------------- */
-    /*  内部交互逻辑                                  */
-    /* -------------------------------------------- */
-
     async _onClearData() {
         const confirm = await foundry.applications.api.DialogV2.confirm({
             window: { title: "清空数据" },
-            content: "<p>确定要清空当前的战斗统计数据吗？</p>",
+            content: "<p>确定要清空包含历史记录在内的所有战斗统计数据吗？</p>",
             rejectClose: false
         });
-
-        if (confirm) {
-            CombatStatsManager.clearData();
-        }
+        if (confirm) CombatStatsManager.clearData();
     }
 }
