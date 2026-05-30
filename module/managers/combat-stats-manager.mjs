@@ -88,7 +88,7 @@ export class CombatStatsManager {
         // 只有当产生过实际数据时，才值得归档
         if (this._activeStats && Object.keys(this._activeStats.actors).length > 0) {
             // 使用 JSON 深拷贝断开内存引用，防止后续修改污染历史数据
-            this._history.unshift(JSON.parse(JSON.stringify(this._activeStats)));
+            this._history.unshift(foundry.utils.deepClone(this._activeStats));
             if (this._history.length > 5) this._history.pop();
         }
     }

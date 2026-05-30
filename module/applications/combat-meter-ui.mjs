@@ -18,7 +18,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
 
     static DEFAULT_OPTIONS = {
         id: "xjzl-combat-meter",
-        classes: ["xjzl-app", "combat-meter"],
+        classes: ["xjzl-combat-meter"],
         tag: "div",
         window: {
             title: "战斗统计 (Details)",
@@ -138,6 +138,18 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
     _attachPartListeners(partId, htmlElement, options) {
         super._attachPartListeners(partId, htmlElement, options);
 
+        // 右键任意位置返回上一层
+        htmlElement.addEventListener("contextmenu", (event) => {
+            // 如果是在下拉框等原生控件上右键，不拦截
+            if (event.target.tagName === "SELECT") return;
+
+            if (this.viewState.level > 1) {
+                event.preventDefault(); // 阻止浏览器默认弹出的右键菜单
+                this.viewState.level--;
+                this.render({ force: true });
+            }
+        });
+
         // 监听场次切换
         const sessionSelect = htmlElement.querySelector(".session-select");
         if (sessionSelect) {
@@ -158,6 +170,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             });
         }
 
+        // 左键返回按钮 (保留作为视觉提示)
         const backBtn = htmlElement.querySelector(".back-btn");
         if (backBtn) {
             backBtn.addEventListener("click", () => {
@@ -168,6 +181,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             });
         }
 
+        // 列表左键点击进入下一层
         const listEl = htmlElement.querySelector(".meter-list");
         if (listEl) {
             listEl.addEventListener("click", (event) => {
@@ -183,7 +197,6 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
                     }
                 }
                 else if (this.viewState.level === 2) {
-                    // 【修改】怒气消耗也不需要进目标视图
                     if (["mpSpent", "rageSpent", "castsDealt"].includes(this.currentMetric)) return;
 
                     const skillId = row.dataset.id;

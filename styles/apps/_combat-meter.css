@@ -1,279 +1,555 @@
 /* ========================================= */
-/* 战斗统计面板 (Combat Meter)               */
+/* 战斗统计面板 (Combat Meter)                */
 /* ========================================= */
-.combat-meter .window-content {
-    padding: 0;
-    background: rgba(30, 30, 30, 0.95);
-    color: #eee;
-    display: flex;
-    flex-direction: column;
+
+/* --- 0. 全局动画定义 --- */
+@keyframes meter-sweep {
+    0% {
+        transform: translateX(-150px) skewX(-15deg);
+    }
+
+    30% {
+        transform: translateX(400px) skewX(-15deg);
+    }
+
+    /* 扫过整个条 */
+    100% {
+        transform: translateX(400px) skewX(-15deg);
+    }
+
+    /* 停顿时间 */
 }
 
-.combat-meter-container {
+@keyframes crown-float {
+    0% {
+        transform: translateY(0) rotate(-15deg);
+    }
+
+    50% {
+        transform: translateY(-3px) rotate(-10deg);
+        filter: brightness(1.2);
+    }
+
+    100% {
+        transform: translateY(0) rotate(-15deg);
+    }
+}
+
+/* --- 定制滚动条 --- */
+.xjzl-combat-meter .window-content::-webkit-scrollbar,
+.xjzl-combat-meter .meter-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.xjzl-combat-meter .window-content::-webkit-scrollbar-track,
+.xjzl-combat-meter .meter-list::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.xjzl-combat-meter .window-content::-webkit-scrollbar-thumb,
+.xjzl-combat-meter .meter-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+}
+
+.xjzl-combat-meter .window-content::-webkit-scrollbar-thumb:hover,
+.xjzl-combat-meter .meter-list::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* --- 1. 窗口基础层 --- */
+.xjzl-combat-meter.app-window .window-content {
+    padding: 0;
+    background: #121212;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    font-family: "Microsoft YaHei", sans-serif;
+}
+
+.xjzl-combat-meter .combat-meter-container {
     display: flex;
     flex-direction: column;
     height: 100%;
     width: 100%;
+    user-select: none;
 }
 
-/* 控制栏 */
-.meter-controls {
-    display: flex;
-    padding: 5px;
-    background: #111;
-    border-bottom: 1px solid #333;
-    gap: 5px;
-}
-
-.meter-controls .back-btn {
-    flex: 0 0 30px;
-    background: #34495e;
-    color: #fff;
-    border: none;
-    line-height: 24px;
-    cursor: pointer;
-    border-radius: 3px;
-}
-
-.meter-controls select {
-    flex: 1;
-    background: #222;
-    color: #eee;
-    border: 1px solid #444;
-    padding: 2px 6px;
-    border-radius: 3px;
-}
-
-.meter-controls .clear-btn {
-    flex: 0 0 30px;
-    background: #c0392b;
-    color: #fff;
-    border: none;
-    line-height: 24px;
-    cursor: pointer;
-    border-radius: 3px;
-}
-
-.meter-breadcrumb {
+/* --- 2. 顶部控件区 --- */
+.xjzl-combat-meter .meter-header {
     background: #1a1a1a;
-    padding: 4px 8px;
-    font-size: 0.85em;
-    color: #999;
-    border-bottom: 1px solid #333;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    padding: 6px 8px;
+    border-bottom: 1px solid #2a2a2a;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    z-index: 10;
 }
 
-/* 列表区 */
-.meter-list {
+.xjzl-combat-meter .controls-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+    align-items: center;
+}
+
+.xjzl-combat-meter .select-group {
+    position: relative;
+    width: 100%;
+}
+
+.xjzl-combat-meter .select-group.fluid {
+    flex: 1;
+}
+
+.xjzl-combat-meter .select-icon {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #e67e22;
+    font-size: 0.85em;
+    pointer-events: none;
+}
+
+.xjzl-combat-meter select {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    background: #242424;
+    color: #ddd;
+    border: 1px solid #333;
+    padding: 4px 24px 4px 26px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.2s;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px top 50%;
+    background-size: 10px auto;
+}
+
+.xjzl-combat-meter select.metric-select {
+    padding-left: 8px;
+}
+
+.xjzl-combat-meter select:hover {
+    border-color: #555;
+    background-color: #2a2a2a;
+}
+
+.xjzl-combat-meter select:focus {
+    outline: none;
+    border-color: #e67e22;
+}
+
+.xjzl-combat-meter .icon-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #888;
+    width: 26px;
+    height: 26px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.xjzl-combat-meter .icon-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: #444;
+    color: #eee;
+}
+
+.xjzl-combat-meter .clear-btn:hover {
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.1);
+    border-color: rgba(231, 76, 60, 0.3);
+}
+
+/* --- 3. 面包屑导航 --- */
+.xjzl-combat-meter .meter-breadcrumb {
+    background: #111;
+    padding: 6px 10px;
+    font-size: 0.85em;
+    color: #aaa;
+    border-bottom: 1px solid #222;
+    display: flex;
+    align-items: center;
+}
+
+.xjzl-combat-meter .pulse-dot {
+    width: 6px;
+    height: 6px;
+    background: #e67e22;
+    border-radius: 50%;
+    margin-right: 8px;
+    box-shadow: 0 0 5px #e67e22;
+}
+
+/* --- 4. 列表区与进度条 --- */
+.xjzl-combat-meter .meter-list {
     list-style: none;
     margin: 0;
-    padding: 0;
+    padding: 4px;
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
 }
 
-.meter-row {
+/* 清爽的扁平行 */
+.xjzl-combat-meter .meter-row {
     position: relative;
-    height: 28px;
-    margin-bottom: 2px;
-    background: #2a2a2a;
+    height: 32px;
+    margin-bottom: 4px;
+    background: #1f1f1f;
+    /* 未填充区域的底色 */
+    border-radius: 3px;
     cursor: pointer;
-    overflow: hidden;
+    /* 防止特效溢出 */
+    border: 1px solid rgba(255, 255, 255, 0.03);
+    /* 极细极暗的边框，不破坏原本颜色 */
 }
 
-.meter-row:hover {
-    filter: brightness(1.2);
+.xjzl-combat-meter .meter-row:hover {
+    filter: brightness(1.15);
 }
 
-.meter-bar {
+.xjzl-combat-meter .meter-bar {
     position: absolute;
     top: 0;
     left: 0;
     height: 100%;
-    transition: width 0.3s ease-out;
+    transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
     z-index: 1;
-    opacity: 0.8;
+    overflow: hidden;
+    /* 将超出隐藏加在颜色条上，确保扫光动画不溢出 */
+    border-radius: 3px;
+    /* 补充圆角 */
 }
 
-.meter-content {
+/* 进度条顶部微弱的高光层 (增加立体感) */
+.xjzl-combat-meter .meter-bar-highlight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40%;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.15), transparent);
+}
+
+.xjzl-combat-meter .meter-content {
     position: relative;
     z-index: 2;
     display: flex;
     align-items: center;
     height: 100%;
-    padding: 0 5px;
-    text-shadow: 1px 1px 2px #000;
+    padding: 0 8px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-.meter-content .rank {
-    width: 18px;
-    font-size: 0.85em;
-    color: #bbb;
+
+/* ========================================= */
+/* 【特效专区】 皇冠标志、奖牌与扫光动画       */
+/* ========================================= */
+
+.xjzl-combat-meter .meter-content .rank {
+    width: 20px;
+    font-size: 0.9em;
+    font-weight: bold;
+    color: #888;
     text-align: center;
 }
 
-.meter-content .avatar {
-    width: 20px;
-    height: 20px;
-    border: 1px solid rgba(0, 0, 0, 0.5);
-    margin: 0 6px;
+.xjzl-combat-meter .meter-content .avatar {
+    width: 22px;
+    height: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    margin: 0 8px;
     object-fit: cover;
-    border-radius: 2px;
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    z-index: 5;
 }
 
-.meter-content .name {
+/* 1. 扫光特效 (仅挂载在前三名的颜色条内部) */
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="1"] .meter-bar::before,
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="2"] .meter-bar::before,
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="3"] .meter-bar::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -20px;
+    width: 40px;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6), transparent);
+    z-index: 10;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="1"] .meter-bar::before {
+    animation: meter-sweep 3s infinite;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="2"] .meter-bar::before {
+    animation: meter-sweep 3.5s infinite;
+    animation-delay: 0.5s;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="3"] .meter-bar::before {
+    animation: meter-sweep 4s infinite;
+    animation-delay: 1.2s;
+}
+
+
+/* 2. 静态标志 */
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="1"] .meter-content::after,
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="2"] .meter-content::after,
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="3"] .meter-content::after {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+    /* 添加全局图标的高级下拉阴影 */
+    filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.85));
+    z-index: 10;
+}
+
+/* 👑 第一名: 立体渐变金皇冠 */
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="1"] .rank {
+    color: #f1c40f;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="1"] .avatar {
+    border-color: #f1c40f;
+    box-shadow: 0 0 5px rgba(241, 196, 15, 0.6);
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="1"] .meter-content::after {
+    left: 20px;
+    top: -10px;
+    /* 向上悬浮突出 */
+    width: 24px;
+    height: 24px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23fff0a8%22%2F%3E%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23f1c40f%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23b8860b%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22s%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffffff%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23805d00%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20fill%3D%22url%28%23g%29%22%20stroke%3D%22url%28%23s%29%22%20stroke-width%3D%224%22%20stroke-linejoin%3D%22round%22%20d%3D%22M15%2C80%20L20%2C35%20L38%2C52%20L50%2C20%20L62%2C52%20L80%2C35%20L85%2C80%20Z%22%20%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2235%22%20r%3D%225%22%20fill%3D%22%23fff%22%20stroke%3D%22url%28%23s%29%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2250%22%20cy%3D%2220%22%20r%3D%225%22%20fill%3D%22%23fff%22%20stroke%3D%22url%28%23s%29%22%20stroke-width%3D%222%22%2F%3E%3Ccircle%20cx%3D%2280%22%20cy%3D%2235%22%20r%3D%225%22%20fill%3D%22%23fff%22%20stroke%3D%22url%28%23s%29%22%20stroke-width%3D%222%22%2F%3E%3Crect%20x%3D%2220%22%20y%3D%2280%22%20width%3D%2260%22%20height%3D%228%22%20rx%3D%224%22%20fill%3D%22url%28%23g%29%22%20stroke%3D%22url%28%23s%29%22%20stroke-width%3D%223%22%2F%3E%3C%2Fsvg%3E");
+    animation: crown-float 2s ease-in-out infinite;
+}
+
+/* 💠 第二名: 秘银渐变菱形星徽 */
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="2"] .rank {
+    color: #bdc3c7;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="2"] .avatar {
+    border-color: #bdc3c7;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="2"] .meter-content::after {
+    left: 20px;
+    top: -5px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22slv%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffffff%22%2F%3E%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23c0c5ce%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23656d78%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22slvS%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffffff%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%23434a54%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpolygon%20points%3D%2250%2C15%2085%2C50%2050%2C85%2015%2C50%22%20fill%3D%22url%28%23slv%29%22%20stroke%3D%22url%28%23slvS%29%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpolygon%20points%3D%2250%2C25%2075%2C50%2050%2C75%2025%2C50%22%20fill%3D%22rgba%28255%2C255%2C255%2C0.6%29%22%20%2F%3E%3C%2Fsvg%3E");
+}
+
+/* 🛡️ 第三名: 古铜渐变小盾徽 */
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="3"] .rank {
+    color: #cd7f32;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="3"] .avatar {
+    border-color: #cd7f32;
+}
+
+.xjzl-combat-meter .level-1-list .meter-row[data-rank="3"] .meter-content::after {
+    left: 20px;
+    top: -5px;
+    background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22brz%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffce9e%22%2F%3E%3Cstop%20offset%3D%2250%25%22%20stop-color%3D%22%23cd7f32%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%238b4513%22%2F%3E%3C%2FlinearGradient%3E%3ClinearGradient%20id%3D%22brzS%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%3Cstop%20offset%3D%220%25%22%20stop-color%3D%22%23ffebd6%22%2F%3E%3Cstop%20offset%3D%22100%25%22%20stop-color%3D%22%235e2e0b%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M20%2C15%20L80%2C15%20L80%2C45%20C80%2C70%2050%2C85%2050%2C85%20C50%2C85%2020%2C70%2020%2C45%20Z%22%20fill%3D%22url%28%23brz%29%22%20stroke%3D%22url%28%23brzS%29%22%20stroke-width%3D%225%22%20stroke-linejoin%3D%22round%22%2F%3E%3Cpath%20d%3D%22M30%2C25%20L70%2C25%20L70%2C42%20C70%2C60%2050%2C72%2050%2C72%20C50%2C72%2030%2C60%2030%2C42%20Z%22%20fill%3D%22rgba%28255%2C255%2C255%2C0.35%29%22%2F%3E%3C%2Fsvg%3E");
+}
+
+
+/* --- 普通文本 --- */
+.xjzl-combat-meter .meter-content .name {
     flex: 1;
     font-size: 0.95em;
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    padding-right: 5px;
+    letter-spacing: 0.5px;
 }
 
-/* 数值展示排版 */
-.value-group {
+.xjzl-combat-meter .value-group {
     display: flex;
     align-items: baseline;
     justify-content: flex-end;
-    font-family: monospace;
+    font-family: "Consolas", monospace;
 }
 
-.value-group .value {
-    font-size: 1.1em;
+.xjzl-combat-meter .value-group .sub-val {
+    color: #2ecc71;
+    font-size: 0.8em;
+    margin-right: 6px;
+    opacity: 0.9;
+}
+
+.xjzl-combat-meter .value-group .value {
+    font-size: 1.15em;
     font-weight: bold;
 }
 
-.value-group .percent {
-    font-size: 0.85em;
-    color: #ddd;
-    margin-left: 4px;
-    width: 45px;
-    /* 固定百分比宽度防止跳动 */
+.xjzl-combat-meter .value-group .percent {
+    font-size: 0.8em;
+    color: rgba(255, 255, 255, 0.6);
+    margin-left: 6px;
+    width: 50px;
     text-align: right;
 }
 
-/* ========================================= */
-/* Level 3 数据看板                          */
-/* ========================================= */
-.skill-stats-board {
+/* --- 5. 详情面板 (Level 3) --- */
+.xjzl-combat-meter .skill-stats-board {
     background: #181818;
-    border-bottom: 2px solid #333;
-    padding: 8px 10px;
+    border-bottom: 1px solid #2a2a2a;
+    padding: 12px;
+    box-shadow: inset 0 -4px 10px rgba(0, 0, 0, 0.2);
 }
 
-.skill-header {
+.xjzl-combat-meter .skill-header {
     display: flex;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
-.skill-header img {
-    width: 36px;
-    height: 36px;
-    border: 1px solid #555;
+.xjzl-combat-meter .skill-icon-wrapper img {
+    width: 42px;
+    height: 42px;
+    border: 1px solid #444;
     border-radius: 4px;
-    margin-right: 10px;
-    background: #000;
+    margin-right: 12px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
-.skill-header .title {
+.xjzl-combat-meter .skill-info .title {
     font-weight: bold;
-    color: #e67e22;
-    font-size: 1.15em;
-    line-height: 1.2;
+    color: #f39c12;
+    font-size: 1.2em;
+    line-height: 1.1;
+    margin-bottom: 4px;
 }
 
-.skill-header .subtitle {
+.xjzl-combat-meter .skill-info .subtitle {
     font-size: 0.8em;
-    color: #888;
-    margin-top: 2px;
+    color: #777;
 }
 
-.stats-grid {
+.xjzl-combat-meter .stats-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 8px;
     margin-bottom: 10px;
 }
 
-.stat-box {
-    background: rgba(255, 255, 255, 0.05);
-    padding: 4px 8px;
-    border-radius: 3px;
+.xjzl-combat-meter .stat-card {
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+    padding: 6px 10px;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 0.85em;
-    border: 1px solid transparent;
+    flex-direction: column;
+    justify-content: center;
 }
 
-.stat-box .label {
-    color: #aaa;
+.xjzl-combat-meter .stat-card .label {
+    font-size: 0.75em;
+    color: #888;
+    margin-bottom: 2px;
+    text-transform: uppercase;
 }
 
-.stat-box .val {
+.xjzl-combat-meter .stat-card .val {
+    font-size: 1.1em;
     font-weight: bold;
-    font-family: monospace;
     color: #ddd;
+    font-family: "Consolas", monospace;
 }
 
-.stat-box.highlight {
-    border-color: rgba(231, 76, 60, 0.3);
-    background: rgba(231, 76, 60, 0.1);
+.xjzl-combat-meter .stat-card .val small {
+    font-size: 0.7em;
+    color: #888;
+    margin-left: 1px;
 }
 
-.stat-box.highlight .val {
+.xjzl-combat-meter .stat-card .val .dim {
+    color: #666;
+}
+
+.xjzl-combat-meter .highlight-break {
+    border-left: 2px solid #e74c3c;
+}
+
+.xjzl-combat-meter .highlight-break .val {
     color: #e74c3c;
 }
 
-.stat-box.highlight-heal {
-    border-color: rgba(46, 204, 113, 0.3);
-    background: rgba(46, 204, 113, 0.1);
+.xjzl-combat-meter .highlight-heal {
+    border-left: 2px solid #2ecc71;
 }
 
-.stat-box.highlight-heal .val {
+.xjzl-combat-meter .highlight-heal .val {
     color: #2ecc71;
 }
 
-.target-title {
-    font-size: 0.85em;
-    color: #aaa;
-    border-bottom: 1px dashed #444;
-    padding-bottom: 4px;
+.xjzl-combat-meter .target-title {
+    font-size: 0.8em;
+    color: #999;
+    padding-top: 8px;
+    border-top: 1px dashed #333;
     margin-top: 4px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
 }
 
-.level-3-list .meter-row {
-    background: #1f1f1f;
-    /* 目标列表稍微暗淡一些，拉开视觉层次 */
+.xjzl-combat-meter .level-3-list .meter-row {
+    background: #171717;
 }
 
-/* 底部栏 */
-.meter-footer {
+/* --- 6. 底部统计栏 --- */
+.xjzl-combat-meter .meter-footer {
     display: flex;
     justify-content: space-between;
-    padding: 6px 10px;
+    align-items: center;
+    padding: 8px 12px;
     background: #111;
-    border-top: 1px solid #333;
+    border-top: 1px solid #2a2a2a;
     font-size: 0.9em;
+    color: #888;
+}
+
+.xjzl-combat-meter .meter-footer .total-value {
     color: #aaa;
 }
 
-.meter-footer .total-value {
+.xjzl-combat-meter .meter-footer .total-value .num {
     font-weight: bold;
     color: #fff;
-    font-family: monospace;
+    font-size: 1.1em;
+    font-family: "Consolas", monospace;
+    margin-left: 4px;
 }
 
-.empty-state {
-    text-align: center;
-    padding: 20px;
-    color: #666;
-    font-style: italic;
+/* --- 7. 空状态 --- */
+.xjzl-combat-meter .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100px;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.xjzl-combat-meter .empty-state i {
+    font-size: 2em;
+    margin-bottom: 8px;
+    opacity: 0.5;
 }
