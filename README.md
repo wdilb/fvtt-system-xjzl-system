@@ -87,6 +87,17 @@
 <img width="491" height="471" alt="image" src="https://github.com/user-attachments/assets/6e31efb8-7f3a-4d06-a343-f0761fe0c8ad" />
 </details>
 
+### 战斗数据统计 (CombatStats)
+*内置DPS统计，让你用评分狠狠压力队友*
+<details>
+<summary><strong>点击展开：战斗数据统计展示</strong></summary>
+<br>
+<img width="584" height="854" alt="image" src="https://github.com/user-attachments/assets/29cac985-52c4-4b83-b45f-b6c6dd439b41" />
+<img width="543" height="529" alt="image" src="https://github.com/user-attachments/assets/14322f30-d738-41c0-b362-60ec570997a2" />
+<img width="1008" height="1043" alt="image" src="https://github.com/user-attachments/assets/8a7dcc6d-ebda-484e-9684-be7eb1e35b87" />
+<img width="1001" height="1043" alt="image" src="https://github.com/user-attachments/assets/1b3eb645-8cae-4170-9b54-179d99187d88" />
+</details>
+
 ### 手动修正 (CustomModifiers)
 *为了避免自动化无法涉及的部分，添加了手动修正。*
 <details>
