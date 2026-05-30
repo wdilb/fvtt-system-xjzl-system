@@ -62,7 +62,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         let viewTitle = "";
         let skillDetails = null;
 
-        // 【新增】构建顶部的战斗场次下拉框数据
+        // 构建顶部的战斗场次下拉框数据
         const sessions = [];
         if (CombatStatsManager._activeStats) {
             sessions.push({
@@ -121,7 +121,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             skillDetails: skillDetails,
             viewTitle: viewTitle,
             isHealing: this.currentMetric === "healingDealt",
-            isDamage: this.currentMetric === "damageDealt" || this.currentMetric === "damageTaken",
+            isDamage: this.currentMetric === "damageDealt" || this.currentMetric === "damageTaken" || this.currentMetric === "dyingTaken",
             metricLabel: this._getMetricLabel(this.currentMetric),
             isGM: game.user.isGM
         };
@@ -130,7 +130,8 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
     _getMetricLabel(metric) {
         const map = {
             damageDealt: "造成伤害", healingDealt: "造成治疗", damageTaken: "承受伤害",
-            brokenStanceDealt: "破架次数", mpSpent: "内力消耗", rageSpent: "怒气消耗", castsDealt: "施展次数"
+            brokenStanceDealt: "破架次数", mpSpent: "内力消耗", rageSpent: "怒气消耗", castsDealt: "施展次数",
+            dyingTaken: "濒死次数"
         };
         return map[metric] || metric;
     }
@@ -202,7 +203,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
                     const skillId = row.dataset.id;
                     let actualSkillId = skillId;
 
-                    if (this.currentMetric === "damageTaken") {
+                    if (this.currentMetric === "damageTaken" || this.currentMetric === "dyingTaken") {
                         const parts = skillId.split("_");
                         this.viewState.actorUuid = parts[0];
                         actualSkillId = parts.slice(1).join("_");

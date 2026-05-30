@@ -252,7 +252,8 @@ export class CombatStatsManager {
                     brokenStanceDealt: 0, // 破架次数
                     mpSpent: 0,           // 内力消耗
                     rageSpent: 0,         // 怒气消耗
-                    castsDealt: 0         // 施展次数
+                    castsDealt: 0,        // 施展次数
+                    dyingTaken: 0
                 },
                 skills: {},
                 defense: { dodges: 0, kanpoSuccess: 0, kanpoFailed: 0, brokenCount: 0, dyingCount: 0 }
@@ -293,7 +294,7 @@ export class CombatStatsManager {
                 type: type,
                 damageType: damageType,
                 casts: 0, hits: 0, misses: 0, crits: 0, brokenStance: 0,
-                damage: 0, healing: 0, overheal: 0,
+                damage: 0, healing: 0, overheal: 0, dyingCaused: 0,
                 cost: { mp: 0, hp: 0, rage: 0, morale: 0 },
                 targets: {}
             };
@@ -320,7 +321,8 @@ export class CombatStatsManager {
                 overheal: 0, // 新增目标过量治疗
                 hits: 0,
                 crits: 0,
-                broken: 0
+                broken: 0,
+                dying: 0
             };
         }
         return skill.targets[targetUuid];
@@ -351,7 +353,13 @@ export class CombatStatsManager {
             defEntity.summary.damageTaken += amount;
             defEntity.summary.hutiAbsorbed += (Number(data.hutiLost) || 0);
             if (data.isHit === false) defEntity.defense.dodges += 1;
-            if (data.isDying) defEntity.defense.dyingCount += 1;
+
+            // 濒死统计
+            if (data.isDying) {
+                defEntity.defense.dyingCount += 1;
+                defEntity.summary.dyingTaken += 1; // 计入全局统计
+                skill.dyingCaused += 1;            // 计入技能统计
+            }
 
             // 目标被破防/破架
             if (data.isBroken) {
@@ -373,6 +381,7 @@ export class CombatStatsManager {
                 targetRecord.damage += amount;
                 if (data.isCrit) targetRecord.crits += 1;
                 if (data.isBroken) targetRecord.broken += 1;
+                if (data.isDying) targetRecord.dying += 1;
             }
         } else {
             skill.misses += 1;
@@ -565,12 +574,15 @@ export class CombatStatsManager {
         let totalSum = 0;
         let targetActorName = viewStats.actors[actorUuid]?.name || "未知";
 
-        if (metric === "damageTaken") {
+        if (metric === "damageTaken" || metric === "dyingTaken") {
             for (const [atkUuid, attackerEntity] of Object.entries(viewStats.actors)) {
                 for (const [skillKey, skill] of Object.entries(attackerEntity.skills)) {
                     const targetData = skill.targets[actorUuid];
-                    if (targetData && targetData.damage > 0) {
-                        const val = targetData.damage;
+
+                    // 根据 metric 决定是取 damage 还是 dying
+                    const val = metric === "dyingTaken" ? targetData?.dying : targetData?.damage;
+
+                    if (targetData && val > 0) {
                         if (val > maxVal) maxVal = val;
                         totalSum += val;
 
@@ -658,6 +670,7 @@ export class CombatStatsManager {
         let targetField = "damage";
         if (metric === "healingDealt") targetField = "healing";
         else if (metric === "brokenStanceDealt") targetField = "broken";
+        else if (metric === "dyingTaken") targetField = "dying";
         // 耗蓝、怒气等不统计目标，强制为空
         const skipTargets = ["mpSpent", "rageSpent", "castsDealt"].includes(metric);
 
@@ -706,6 +719,7 @@ export class CombatStatsManager {
                 hitRate: hitRate,
                 critRate: critRate,
                 totalBroken: skill.brokenStance,
+                totalDying: skill.dyingCaused,
                 avgDamage: avgDamage,
                 // 治疗专供数据
                 healing: skill.healing,

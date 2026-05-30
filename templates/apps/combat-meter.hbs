@@ -23,6 +23,7 @@
                     <option value="damageDealt">造成伤害</option>
                     <option value="healingDealt">造成治疗</option>
                     <option value="damageTaken">承受伤害</option>
+                    <option value="dyingTaken">濒死次数</option>
                     <option value="brokenStanceDealt">破架次数</option>
                     <option value="mpSpent">内力消耗</option>
                     <option value="rageSpent">怒气消耗</option>
@@ -38,99 +39,111 @@
         </div>
     </header>
 
-    <!-- 面包屑导航 -->
-    <div class="meter-breadcrumb">
-        <span class="pulse-dot"></span> {{viewTitle}}
-    </div>
+    <!-- 统一的滚动主体容器 -->
+    <main class="meter-body">
 
-    <!-- 详情面板 (Level 3) -->
-    {{#if isLevel3}}
-    <div class="skill-stats-board">
-        <div class="skill-header">
-            <div class="skill-icon-wrapper">
-                <img src="{{skillDetails.img}}" onerror="this.src='icons/svg/combat.svg';" />
-            </div>
-            <div class="skill-info">
-                <div class="title">{{skillDetails.skillName}}</div>
-                <div class="subtitle"><i class="fas fa-tag"></i> {{skillDetails.damageTypeLabel}}</div>
-            </div>
+        <!-- 面包屑导航 -->
+        <div class="meter-breadcrumb">
+            <span class="pulse-dot"></span> {{viewTitle}}
         </div>
 
-        <div class="stats-grid">
-            <div class="stat-card">
-                <span class="label">施展 / 命中</span>
-                <span class="val">{{skillDetails.stats.casts}} / {{skillDetails.stats.hits}}</span>
-            </div>
-            {{#if isHealing}}
-            <div class="stat-card highlight-heal">
-                <span class="label">有效 / 过量</span>
-                <span class="val">{{skillDetails.stats.healing}} / <span
-                        class="dim">{{skillDetails.stats.overheal}}</span></span>
-            </div>
-            {{else}}
-            <div class="stat-card">
-                <span class="label">平均伤害</span>
-                <span class="val">{{skillDetails.stats.avgDamage}}</span>
-            </div>
-            {{/if}}
-            <div class="stat-card">
-                <span class="label">命中率</span>
-                <span class="val">{{skillDetails.stats.hitRate}}<small>%</small></span>
-            </div>
-            <div class="stat-card">
-                <span class="label">暴击率</span>
-                <span class="val">{{skillDetails.stats.critRate}}<small>%</small></span>
-            </div>
-            {{#if skillDetails.stats.totalBroken}}
-            <div class="stat-card highlight-break">
-                <span class="label">破架次数</span>
-                <span class="val">{{skillDetails.stats.totalBroken}}</span>
-            </div>
-            {{/if}}
-        </div>
-        <div class="target-title"><i class="fas fa-crosshairs"></i> 目标分布</div>
-    </div>
-    {{/if}}
-
-    <!-- 核心列表 -->
-    <ul class="meter-list {{#if isLevel1}}level-1-list{{/if}} {{#if isLevel3}}level-3-list{{/if}}">
-        {{#if rows.length}}
-        {{#each rows}}
-        <li class="meter-row" data-id="{{#if this.uuid}}{{this.uuid}}{{else}}{{this.id}}{{/if}}"
-            data-rank="{{this.rank}}" title="{{this.name}}">
-            <!-- 进度条本体 -->
-            <div class="meter-bar" style="width: {{this.barPercent}}%; background-color: {{this.color}};">
-                <div class="meter-bar-highlight"></div>
-            </div>
-
-            <div class="meter-content">
-                <span class="rank">{{this.rank}}</span>
-                {{#if this.img}}
-                <img src="{{this.img}}" class="avatar" onerror="this.src='icons/svg/mystery-man.svg';" />
-                {{else}}
-                <img src="icons/svg/mystery-man.svg" class="avatar" />
-                {{/if}}
-
-                <span class="name">{{this.name}}</span>
-
-                <div class="value-group">
-                    {{#if this.overheal}}
-                    <span class="sub-val">{{this.value}}有效</span>
-                    {{/if}}
-
-                    <span class="value">{{#if this.displayVal}}{{this.displayVal}}{{else}}{{this.value}}{{/if}}</span>
-                    <span class="percent">({{this.textPercent}}%)</span>
+        <!-- 详情面板 (Level 3) -->
+        {{#if isLevel3}}
+        <div class="skill-stats-board">
+            <div class="skill-header">
+                <div class="skill-icon-wrapper">
+                    <img src="{{skillDetails.img}}" onerror="this.src='icons/svg/combat.svg';" />
+                </div>
+                <div class="skill-info">
+                    <div class="title">{{skillDetails.skillName}}</div>
+                    <div class="subtitle"><i class="fas fa-tag"></i> {{skillDetails.damageTypeLabel}}</div>
                 </div>
             </div>
-        </li>
-        {{/each}}
-        {{else}}
-        <div class="empty-state">
-            <i class="fas fa-wind"></i>
-            <p>风平浪静，暂无数据...</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="label">施展 / 命中</span>
+                    <span class="val">{{skillDetails.stats.casts}} / {{skillDetails.stats.hits}}</span>
+                </div>
+                {{#if isHealing}}
+                <div class="stat-card highlight-heal">
+                    <span class="label">有效 / 过量</span>
+                    <span class="val">{{skillDetails.stats.healing}} / <span
+                            class="dim">{{skillDetails.stats.overheal}}</span></span>
+                </div>
+                {{else}}
+                <div class="stat-card">
+                    <span class="label">平均伤害</span>
+                    <span class="val">{{skillDetails.stats.avgDamage}}</span>
+                </div>
+                {{/if}}
+                <div class="stat-card">
+                    <span class="label">命中率</span>
+                    <span class="val">{{skillDetails.stats.hitRate}}<small>%</small></span>
+                </div>
+                <div class="stat-card">
+                    <span class="label">暴击率</span>
+                    <span class="val">{{skillDetails.stats.critRate}}<small>%</small></span>
+                </div>
+                {{#if skillDetails.stats.totalBroken}}
+                <div class="stat-card highlight-break">
+                    <span class="label">破架次数</span>
+                    <span class="val">{{skillDetails.stats.totalBroken}}</span>
+                </div>
+                {{/if}}
+                {{#if skillDetails.stats.totalDying}}
+                <div class="stat-card highlight-break">
+                    <span class="label">致濒死</span>
+                    <span class="val">{{skillDetails.stats.totalDying}}</span>
+                </div>
+                {{/if}}
+            </div>
+            <div class="target-title"><i class="fas fa-crosshairs"></i> 目标分布</div>
         </div>
         {{/if}}
-    </ul>
+
+        <!-- 核心列表 -->
+        <ul class="meter-list {{#if isLevel1}}level-1-list{{/if}} {{#if isLevel3}}level-3-list{{/if}}">
+            {{#if rows.length}}
+            {{#each rows}}
+            <li class="meter-row" data-id="{{#if this.uuid}}{{this.uuid}}{{else}}{{this.id}}{{/if}}"
+                data-rank="{{this.rank}}" title="{{this.name}}">
+                <!-- 进度条本体 -->
+                <div class="meter-bar" style="width: {{this.barPercent}}%; background-color: {{this.color}};">
+                    <div class="meter-bar-highlight"></div>
+                </div>
+
+                <div class="meter-content">
+                    <span class="rank">{{this.rank}}</span>
+                    {{#if this.img}}
+                    <img src="{{this.img}}" class="avatar" onerror="this.src='icons/svg/mystery-man.svg';" />
+                    {{else}}
+                    <img src="icons/svg/mystery-man.svg" class="avatar" />
+                    {{/if}}
+
+                    <span class="name">{{this.name}}</span>
+
+                    <div class="value-group">
+                        {{#if this.overheal}}
+                        <span class="sub-val">{{this.value}}有效</span>
+                        {{/if}}
+
+                        <span class="value">{{#if
+                            this.displayVal}}{{this.displayVal}}{{else}}{{this.value}}{{/if}}</span>
+                        <span class="percent">({{this.textPercent}}%)</span>
+                    </div>
+                </div>
+            </li>
+            {{/each}}
+            {{else}}
+            <div class="empty-state">
+                <i class="fas fa-wind"></i>
+                <p>风平浪静，暂无数据...</p>
+            </div>
+            {{/if}}
+        </ul>
+
+    </main>
 
     <!-- 底部统计 -->
     <footer class="meter-footer">
