@@ -1499,7 +1499,11 @@ export class XJZLActor extends Actor {
     // 检查是否允许伤害归零 (默认为 false，即保底 1)
     // 某些情况下我们允许伤害归零
     // 或者不是内外功伤害，保底也为0
-    const minDamage = (data.ignoreMinDamage || !["waigong", "neigong"].includes(type)) ? 0 : 1;
+    // 或者如果招式自带的面板基础伤害(amount)为 0，说明是纯控制/特殊机制招式，不触发保底 1 伤害！
+    let minDamage = 0;
+    if (amount > 0) {
+      minDamage = (data.ignoreMinDamage || !["waigong", "neigong"].includes(type)) ? 0 : 1;
+    }
     reducedDamage = Math.max(minDamage, reducedDamage);
     // =====================================================
     // 6. 受伤前置/护盾脚本 (Trigger: PRE_TAKE)
