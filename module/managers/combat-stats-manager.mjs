@@ -28,9 +28,8 @@ export class CombatStatsManager {
         this._debouncedSync = foundry.utils.debounce(() => {
             if (!this._activeStats) return;
             Hooks.callAll("xjzl.combatStatsUpdated"); // 触发本机UI刷新
-
-            if (game.user.isGM && xjzlSocket) {
-                // GM 将当前内存数据广播给所有玩家
+            // GM 将当前内存数据广播给所有玩家，仅限一个GM执行
+            if (game.users.activeGM?.isSelf && xjzlSocket) {
                 xjzlSocket.executeForOthers("broadcastCombatStats", this.exportSyncData());
             }
         }, 200);
@@ -161,7 +160,11 @@ export class CombatStatsManager {
     }
 
     static clearData() {
-        if (!game.user.isGM) return;
+        // 严格限制只有主 GM 能清空全局统计数据
+        if (!game.users.activeGM?.isSelf) {
+            ui.notifications.warn("只有主 GM 才能清空战斗统计数据！");
+            return;
+        }
 
         // 清空内存数据
         this._history = [];

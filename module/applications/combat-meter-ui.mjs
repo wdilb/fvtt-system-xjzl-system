@@ -33,7 +33,8 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             left: window.innerWidth - 350
         },
         actions: {
-            clearData: function () { this._onClearData(); }
+            clearData: function () { this._onClearData(); },
+            reportToChat: function () { this._onReportToChat(); }
         }
     };
 
@@ -117,6 +118,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             rows: rows,
             totalValue: totalValue,
             isLevel1: this.viewState.level === 1,
+            isLevel2: this.viewState.level === 2,
             isLevel3: this.viewState.level === 3,
             skillDetails: skillDetails,
             viewTitle: viewTitle,
@@ -130,7 +132,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
     _getMetricLabel(metric) {
         const map = {
             damageDealt: "造成伤害", healingDealt: "造成治疗", damageTaken: "承受伤害",
-            brokenStanceDealt: "破架次数", mpSpent: "内力消耗", rageSpent: "怒气消耗", castsDealt: "施展次数",
+            brokenStanceDealt: "破架次数", mpSpent: "内力消耗", rageSpent: "怒气消耗", castsDealt: "出招次数",
             dyingTaken: "濒死次数"
         };
         return map[metric] || metric;
@@ -219,6 +221,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         }
     }
 
+    // 清除数据
     async _onClearData() {
         const confirm = await foundry.applications.api.DialogV2.confirm({
             window: { title: "清空数据" },
@@ -226,5 +229,70 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
             rejectClose: false
         });
         if (confirm) CombatStatsManager.clearData();
+    }
+
+    // 发送到聊天
+    async _onReportToChat() {
+        let rows = [];
+        let title = "";
+        let total = 0;
+        const metricLabel = this._getMetricLabel(this.currentMetric);
+
+        // 根据当前层级获取数据
+        if (this.viewState.level === 1) {
+            rows = CombatStatsManager.getMeterData(this.currentMetric) || [];
+            title = `【战斗统计】${metricLabel}`;
+            total = rows.reduce((acc, r) => acc + r.value, 0);
+        } else if (this.viewState.level === 2) {
+            const skillData = CombatStatsManager.getActorSkillsData(this.viewState.actorUuid, this.currentMetric);
+            if (!skillData) return ui.notifications.warn("暂无数据可发送");
+            rows = skillData.rows;
+            title = `【战斗统计】${skillData.actorName} - ${metricLabel}`;
+            total = rows.reduce((acc, r) => acc + r.value, 0);
+        } else {
+            return; // Level 3 暂不提供一键发送
+        }
+
+        if (rows.length === 0) return ui.notifications.warn("当前风平浪静，没有数据可以发送！");
+
+        // 为了防止聊天框被刷屏，截取前 10 条
+        const MAX_ROWS = 10;
+        const topRows = rows.slice(0, MAX_ROWS);
+
+        // 构建精美的 HTML 聊天卡片 (复用部分进度条的设计感)
+        let content = `
+    <div class="xjzl-combat-meter-chat-card">
+        <header class="chat-card-header">
+            <div class="card-title"><i class="fas fa-chart-bar"></i> ${title}</div>
+            <div class="card-total">总计: <span>${total}</span></div>
+        </header>
+        <ul class="chat-card-list">
+    `;
+
+        topRows.forEach(row => {
+            // 保证样式内联或依赖系统 CSS
+            content += `
+            <li class="chat-row">
+                <div class="chat-bar" style="width: ${row.barPercent}%; background-color: ${row.color};"></div>
+                <div class="chat-content">
+                    <span class="rank">${row.rank}.</span>
+                    <span class="name">${row.name}</span>
+                    <span class="val">${row.displayVal || row.value} <small>(${row.textPercent}%)</small></span>
+                </div>
+            </li>
+        `;
+        });
+
+        if (rows.length > MAX_ROWS) {
+            content += `<li class="chat-row-more">...及其他 ${rows.length - MAX_ROWS} 项未显示</li>`;
+        }
+
+        content += `</ul></div>`;
+
+        // 发送消息
+        ChatMessage.create({
+            speaker: ChatMessage.getSpeaker(),
+            content: content
+        });
     }
 }

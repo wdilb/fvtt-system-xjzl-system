@@ -157,13 +157,11 @@ async function _socketRecordCombatStat(data) {
 /**
  * 接收 GM 广播的战斗统计最新数据 (仅非 GM 客户端会收到并处理)
  */
-async function _socketBroadcastCombatStats(activeStats) {
-    // 动态导入管理器，更新本地内存
-    import("./managers/combat-stats-manager.mjs").then(module => {
-        module.CombatStatsManager._activeStats = activeStats;
-        // 触发本地的 UI 刷新
-        Hooks.callAll("xjzl.combatStatsUpdated");
-    });
+async function _socketBroadcastCombatStats(syncData) {
+    CombatStatsManager.importSyncData(syncData);
+    // 触发本地的 UI 刷新
+    Hooks.callAll("xjzl.combatStatsUpdated");
+
 }
 
 /**
@@ -172,7 +170,5 @@ async function _socketBroadcastCombatStats(activeStats) {
  */
 async function _socketRequestCombatStats() {
     if (isNotActiveGM()) return null;
-    // 动态引入管理器，导出当前的完整数据
-    const module = await import("./managers/combat-stats-manager.mjs");
-    return module.CombatStatsManager.exportSyncData();
+    return CombatStatsManager.exportSyncData();
 }
