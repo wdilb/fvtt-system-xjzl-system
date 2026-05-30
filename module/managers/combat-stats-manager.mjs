@@ -732,4 +732,98 @@ export class CombatStatsManager {
             targets: targetRows
         };
     }
+
+    /* -------------------------------------------- */
+    /*  评分系统                                     */
+    /* -------------------------------------------- */
+
+    // 评分系数配置 (仅保留你需要的四个维度)
+    static SCORE_CONFIG = {
+        damageDealt: 0.1,    // 伤害系数
+        healingDealt: 0.15,  // 治疗系数
+        damageTaken: 0.05,   // 承伤系数
+        brokenStance: 50     // 破架系数
+    };
+
+    static getScoringData() {
+        const viewStats = this.getViewingStats();
+        if (!viewStats) return [];
+
+        const actorsData = [];
+        let maxStats = { damage: 0.1, healing: 0.1, taken: 0.1, broken: 0.1 };
+
+        // 第一遍：计算基础分 和 寻找最高值
+        for (const [uuid, entity] of Object.entries(viewStats.actors)) {
+            const d = entity.summary;
+            const hasActivity = d.damageDealt > 0 || d.healingDealt > 0 || d.damageTaken > 0 || d.brokenStanceDealt > 0;
+            if (entity.isEnvironment || !hasActivity) continue;
+
+            const rawDmg = d.damageDealt;
+            const rawHeal = d.healingDealt;
+            const rawTaken = d.damageTaken;
+            const rawBroken = d.brokenStanceDealt;
+
+            if (rawDmg > maxStats.damage) maxStats.damage = rawDmg;
+            if (rawHeal > maxStats.healing) maxStats.healing = rawHeal;
+            if (rawTaken > maxStats.taken) maxStats.taken = rawTaken;
+            if (rawBroken > maxStats.broken) maxStats.broken = rawBroken;
+
+            let baseScore =
+                (rawDmg * this.SCORE_CONFIG.damageDealt) +
+                (rawHeal * this.SCORE_CONFIG.healingDealt) +
+                (rawTaken * this.SCORE_CONFIG.damageTaken) +
+                (rawBroken * this.SCORE_CONFIG.brokenStance);
+
+            actorsData.push({
+                uuid: uuid,
+                name: entity.name,
+                img: entity.img,
+                baseScore: Math.max(0, baseScore),
+                raw: { damage: rawDmg, healing: rawHeal, taken: rawTaken, broken: rawBroken }
+            });
+        }
+
+        // 第二遍：顺位加成、评级与生成 SVG
+        actorsData.sort((a, b) => b.baseScore - a.baseScore);
+
+        actorsData.forEach((a, index) => {
+            a.rank = index + 1;
+
+            let multiplier = 1.0;
+            if (a.rank === 1) multiplier = 1.15;
+            else if (a.rank === 2) multiplier = 1.05;
+
+            a.score = Math.round(a.baseScore * multiplier);
+
+            // 评级
+            if (a.score >= 700) a.grade = "EX";
+            else if (a.score >= 500) a.grade = "S";
+            else if (a.score >= 350) a.grade = "A";
+            else if (a.score >= 200) a.grade = "B";
+            else if (a.score >= 100) a.grade = "C";
+            else a.grade = "D";
+
+            const pDmg = (a.raw.damage / maxStats.damage);
+            const pHeal = (a.raw.healing / maxStats.healing);
+            const pTaken = (a.raw.taken / maxStats.taken);
+            const pBrk = (a.raw.broken / maxStats.broken);
+
+            // 使用 Math.max 确保哪怕分数再低，也有一个 4px 的基础半径，不会缩成一个看不见的点
+            const rDmg = Math.max(4, Math.round(pDmg * 40));
+            const rHeal = Math.max(4, Math.round(pHeal * 40));
+            const rTaken = Math.max(4, Math.round(pTaken * 40));
+            const rBrk = Math.max(4, Math.round(pBrk * 40));
+
+            // 计算四个顶点
+            a.radar = {
+                damage: Math.round(pDmg * 100),
+                healing: Math.round(pHeal * 100),
+                taken: Math.round(pTaken * 100),
+                broken: Math.round(pBrk * 100),
+                svgPolygon: `${50},${50 - rDmg} ${50 + rHeal},${50} ${50},${50 + rTaken} ${50 - rBrk},${50}`
+            };
+        });
+
+        return actorsData;
+    }
 }

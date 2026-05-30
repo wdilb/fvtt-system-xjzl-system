@@ -1604,6 +1604,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/tone-tracker.hbs",//音阶计数器
     "systems/xjzl-system/templates/apps/action-tracker.hbs",//动作计数器
     "systems/xjzl-system/templates/apps/combat-meter.hbs",//数据统计
+    "systems/xjzl-system/templates/apps/combat-score.hbs",//数据评分
     // 向导界面
     "systems/xjzl-system/templates/apps/character-wizard/sidebar.hbs",
     "systems/xjzl-system/templates/apps/character-wizard/main.hbs",

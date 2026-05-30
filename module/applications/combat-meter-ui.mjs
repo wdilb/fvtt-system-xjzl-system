@@ -1,5 +1,6 @@
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 import { CombatStatsManager } from "../managers/combat-stats-manager.mjs";
+import { CombatScoreUI } from "./combat-score-app.mjs";
 
 export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
     static instance = null;
@@ -34,7 +35,8 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         },
         actions: {
             clearData: function () { this._onClearData(); },
-            reportToChat: function () { this._onReportToChat(); }
+            reportToChat: function () { this._onReportToChat(); },
+            openScoreUI: function () { CombatScoreUI.toggle(); }
         }
     };
 
