@@ -187,7 +187,9 @@ export class CombatStatsManager {
 
         // 无权限客户端直接委托给 GM，利用 Socket 绕过数据库
         if (!game.user.isGM) {
-            xjzlSocket.executeAsGM("recordCombatStat", data);
+            // 将 Actor/Item 实例降级为 UUID 或纯数据，防止跨网络序列化时丢失 uuid getter
+            const safeData = this._sanitizeDataForSocket(data);
+            xjzlSocket.executeAsGM("recordCombatStat", safeData);
             return;
         }
         this.processStatRecord(data);
@@ -222,6 +224,44 @@ export class CombatStatsManager {
     static _getUuid(target, fallback = null) {
         if (!target) return fallback;
         return typeof target === "string" ? target : target.uuid;
+    }
+
+    /** 
+     * 专用于 Socket 传输的数据净化。
+     * 解决 FVTT 中 Actor/Item 实例的 getter (如 .uuid) 无法被 JSON 序列化的问题。
+     */
+    static _sanitizeDataForSocket(data) {
+        // 浅拷贝一层避免污染原始数据
+        const safeData = { ...data };
+
+        // 1. 降级所有的 Actor 实例为 UUID 字符串
+        const docKeys = ["attacker", "healer", "defender", "target"];
+        for (const key of docKeys) {
+            if (safeData[key] && typeof safeData[key] !== "string") {
+                // 读取实例的 getter 并将其固化为字符串
+                safeData[key] = safeData[key].uuid;
+            }
+        }
+
+        // 2. 降级 Item 实例为仅包含基础信息的普通对象
+        // 因为统计面板其实只需要 item 的 id, name 和 img 即可
+        if (safeData.item && typeof safeData.item === "object" && safeData.item.uuid) {
+            safeData.item = {
+                id: safeData.item.id,
+                img: safeData.item.img,
+                name: safeData.item.name
+            };
+        }
+
+        if (safeData.sourceItem && typeof safeData.sourceItem === "object" && safeData.sourceItem.uuid) {
+            safeData.sourceItem = {
+                id: safeData.sourceItem.id,
+                img: safeData.sourceItem.img,
+                name: safeData.sourceItem.name
+            };
+        }
+
+        return safeData;
     }
 
     static _getOrInitEntity(actorUuid) {
