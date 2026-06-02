@@ -428,7 +428,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         };
 
         // 3. 核心七维属性
-        const statKeys = ["liliang", "shenfa", "tipo", "wuxing", "neixi", "qigan", "shencai"];
+        const statKeys = ["wuxing", "liliang", "shenfa", "tipo", "neixi", "qigan", "shencai"];
         context.stats = statKeys.map(key => ({
             label: game.i18n.localize(`XJZL.Stats.${this._capitalize(key)}`),
             value: system.stats[key].total
