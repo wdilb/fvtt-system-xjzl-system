@@ -10,6 +10,15 @@ export class CombatStatsManager {
     static _viewingId = "current";// UI当前正在查看的场次ID (默认 current)
     static _debouncedSync = null; // 防抖同步器 (节流网络与重绘开销)
 
+    // 评分系数配置 (仅保留你需要的四个维度)
+    static SCORE_CONFIG = {
+        damageDealt: 0.1,    // 伤害系数
+        healingDealt: 0.15,  // 治疗系数
+        damageTaken: 0.05,   // 承伤系数
+        brokenStance: 10,    // 破架基础分数
+        brokenStanceFactor: 2 // 破架系数（乘上对方看破值）
+    };
+
     /**
      * 初始化系统监听
      */
@@ -293,6 +302,7 @@ export class CombatStatsManager {
                     damageTaken: 0,
                     hutiAbsorbed: 0,
                     brokenStanceDealt: 0, // 破架次数
+                    brokenStanceScore: 0, // 破架动态积分
                     mpSpent: 0,           // 内力消耗
                     rageSpent: 0,         // 怒气消耗
                     castsDealt: 0,        // 施展次数
@@ -408,6 +418,8 @@ export class CombatStatsManager {
             if (data.isBroken) {
                 defEntity.defense.brokenCount += 1;
                 entity.summary.brokenStanceDealt += 1; // [新增统计] 施法者破架次数增加
+                // 破架积分动态计算: 10 + 敌方看破值 * 2
+                entity.summary.brokenStanceScore += (this.SCORE_CONFIG.brokenStance + (Number(data.targetKanpo) || 0) * this.SCORE_CONFIG.brokenStanceFactor);
                 skill.brokenStance += 1; // 技能破架次数增加
             }
         }
@@ -777,13 +789,6 @@ export class CombatStatsManager {
     /*  评分系统                                     */
     /* -------------------------------------------- */
 
-    // 评分系数配置 (仅保留你需要的四个维度)
-    static SCORE_CONFIG = {
-        damageDealt: 0.1,    // 伤害系数
-        healingDealt: 0.15,  // 治疗系数
-        damageTaken: 0.05,   // 承伤系数
-        brokenStance: 50     // 破架系数
-    };
 
     static getScoringData() {
         const viewStats = this.getViewingStats();
@@ -812,7 +817,7 @@ export class CombatStatsManager {
                 (rawDmg * this.SCORE_CONFIG.damageDealt) +
                 (rawHeal * this.SCORE_CONFIG.healingDealt) +
                 (rawTaken * this.SCORE_CONFIG.damageTaken) +
-                (rawBroken * this.SCORE_CONFIG.brokenStance);
+                (d.brokenStanceScore || 0);
 
             actorsData.push({
                 uuid: uuid,

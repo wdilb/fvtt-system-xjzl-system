@@ -1371,6 +1371,7 @@ export class XJZLActor extends Actor {
       attacker = null,    // 攻击者 Actor
       isHit = true,       // 是否命中
       isBroken = false,   // 是否被破防 (状态，不可逆)
+      targetKanpo = 0,    // 接收敌方看破值，用于战斗统计功能
       isSkill = true,     // false表示普通攻击
       move = null,
       item = null,
@@ -1885,6 +1886,7 @@ export class XJZLActor extends Actor {
         isHit: isHit,
         isCrit: config.isCrit,      // 使用最终暴击状态
         isBroken: isBroken,
+        targetKanpo: targetKanpo,  // 用于战斗统计功能
         isDying: isDying,
         isDead: isDead
       });

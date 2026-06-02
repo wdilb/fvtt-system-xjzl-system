@@ -1231,10 +1231,15 @@ export class ChatCardManager {
                     validRageHits++;
                 }
             }
+            // 提前声明用于统计的破架相关数据
+            let targetKanpo = 0;
             // =====================================================
             // 把击破架招移动到这里来处理
             // =====================================================
             if (isHit && isBroken && targetActor.system.martial.stanceActive) {
+
+                // 记录敌方看破值
+                targetKanpo = targetActor.system.combat?.kanpoTotal || 0;
 
                 // A. 判定失败：移除架招状态
                 // 改为调用stopStance，可以自动化处理持续到架招结束的ae
@@ -1318,6 +1323,7 @@ export class ChatCardManager {
                 isCrit: isCrit,            // 暴击状态 (用于触发特效)
                 applyCritDamage: damageConfig.applyCritDamage, // 配置: 是否应用暴击伤害倍率 (用于计算数值)
                 isBroken: isBroken,        // 破防状态
+                targetKanpo: targetKanpo,               // 传入敌方看破值，用于数据统计功能
                 ignoreBlock: damageConfig.ignoreBlock,    //无视格挡
                 ignoreDefense: damageConfig.ignoreDefense, //无视内外功防御
                 ignoreStance: damageConfig.ignoreStance,  //无视架招
@@ -1686,7 +1692,11 @@ export class ChatCardManager {
             // =====================================================
             // 处理手动应用伤害时击破架招效果
             // =====================================================
+            // 声明用于统计破架的变量
+            let targetKanpo = 0;
             if (isHit && config.isBroken && targetActor.system.martial?.stanceActive) {
+                // 记录真实破架
+                targetKanpo = targetActor.system.combat?.kanpoTotal || 0;
                 // A. 移除架招状态
                 // 改为调用stopStance，可以自动化处理持续到架招结束的ae
                 await targetActor.stopStance();
@@ -1748,6 +1758,7 @@ export class ChatCardManager {
                 isCrit: config.isCrit,     // 强制暴击状态
                 applyCritDamage: damageConfig.applyCritDamage, // 是否计算双倍
                 isBroken: config.isBroken, // 强制破防
+                targetKanpo: targetKanpo,               // 用于战斗统计功能
                 ignoreBlock: damageConfig.ignoreBlock,
                 ignoreDefense: damageConfig.ignoreDefense,
                 ignoreStance: damageConfig.ignoreStance,
