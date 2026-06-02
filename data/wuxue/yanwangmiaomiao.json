@@ -21,7 +21,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，聚气若芒，夺手飞扬，对敌人造成 0.5 力量点外功伤害，若击破架招，为其添加“夺命”，持续三回合。</p><p><strong>夺命：</strong>每次出招后流失 10 点气血、内力。</p><p>·你每有 1 点杀孽，招式虚招值+1。（至多+4）</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "击破施加夺命自动。杀孽加成自动。",
+                    "automationNote": "击破施加夺命自动。杀孽加成虚招自动，于预览中可见。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -42,14 +42,14 @@
                     "scripts": [
                         {
                             "label": "杀孽加成",
-                            "trigger": "attack",
-                            "script": "const shanie = actor.system.resources.shanie || 0;\nconst bonus = Math.min(shanie, 4);\nargs.flags.bonusFeint += bonus;",
+                            "trigger": "calc",
+                            "script": "const shanie = actor.system.resources.shanie || 0;\nconst bonus = Math.min(shanie, 4);\nif (bonus > 0) {\n    args.output.feint += bonus;\n    args.output.feintBonusDesc.push(`杀孽加成: +${bonus}`);\n}",
                             "active": true
                         },
                         {
                             "label": "施加夺命",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n    ui.notifications.info(`${args.target.name} 被施加 [夺命]`);\n}",
+                            "script": "if (args.isBroken) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}",
                             "active": true
                         }
                     ]
@@ -110,7 +110,7 @@
                         {
                             "label": "格挡反击",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    ui.notifications.info(\"格挡成功！反弹 [夺命]\");\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    const effData = thisItem.effects.getName(\"夺命\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.attacker, effData);\n    actor.showFloatyText(\"格挡反震！\", { fill: \"#FFA500\" });\n}",
                             "active": true
                         }
                     ]
@@ -151,7 +151,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，勾魂之舞，连攻要害，溅血连击。对目标造成 0.7 力量点外功伤害。若目标身上存在“夺命”，可击飞目标 1 米。</p><p>·你每有 1 点杀孽，招式伤害+10。（至多+100）</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "杀孽加伤自动。击飞手动。",
+                    "automationNote": "杀孽加伤自动，于预览中可见。击飞判定自动广播卡片提示，实际位移请手动移动Token。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -177,14 +177,14 @@
                     "scripts": [
                         {
                             "label": "杀孽加伤",
-                            "trigger": "attack",
-                            "script": "const shanie = actor.system.resources.shanie || 0;\nconst bonus = Math.min(shanie * 10, 100);\nif (bonus > 0) {\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 杀孽加成: ${bonus}`;\n}",
+                            "trigger": "calc",
+                            "script": "const shanie = actor.system.resources.shanie || 0;\nconst bonus = Math.min(shanie * 10, 100);\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`杀孽加成: +${bonus}`);\n}",
                             "active": true
                         },
                         {
                             "label": "击飞提示",
                             "trigger": "hit",
-                            "script": "const hasDuoming = args.target.effects.some(e => e.name === \"夺命\");\nif (hasDuoming) {\n    ui.notifications.info(`${args.target.name} 身上有 [夺命]，被击飞 1 米。`);\n}",
+                            "script": "if (!args.isHit) return;\nconst hasDuoming = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duoming\");\nif (hasDuoming) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p style=\"color:darkred; font-weight:bold;\"><i class=\"fas fa-wind\"></i> 击飞触发！</p><p>目标身上存在 [夺命] 状态，被击飞 <b>1 米</b>。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -194,7 +194,7 @@
                 {
                     "name": "夺命",
                     "icon": "icons/svg/blood.svg",
-                    "description": "每次出招后流失气血内力。",
+                    "description": "每次出招后流失 10 点气血、内力。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -204,7 +204,7 @@
                                 {
                                     "label": "出招流失",
                                     "trigger": "attack",
-                                    "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nawait actor.applyHealing({ healer: actor,  amount: -10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ healer: actor,  amount: -10, type: \"mp\", showScrolling: true });\nui.notifications.info(`${actor.name} 因 [夺命] 流失气血内力`);",
+                                    "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nawait actor.applyHealing({ healer: actor, amount: -10, type: \"hp\", showScrolling: true });\nawait actor.applyHealing({ healer: actor, amount: -10, type: \"mp\", showScrolling: true });\nactor.showFloatyText(\"夺命反噬！\", { fill: \"#8b0000\" });",
                                     "active": true
                                 }
                             ]
