@@ -71,6 +71,10 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
     async _onExportA4Image(event) {
         event.preventDefault();
 
+        // 读取页面上的清晰度选项
+        const dpiSelector = this.element.querySelector("#export-dpi-selector");
+        const selectedPixelRatio = dpiSelector ? parseFloat(dpiSelector.value) : 1.0;
+
         await this._loadExportEngines(true); // 加载截图与ZIP引擎
         ui.notifications.info("正在排版高清A4图，请稍候...");
 
@@ -157,7 +161,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                 await new Promise(resolve => setTimeout(resolve, 400));
 
                 const dataUrl = await htmlToImage.toPng(windowContent, {
-                    quality: 1.0, pixelRatio: 1.0, skipFonts: true,
+                    quality: 1.0, pixelRatio: selectedPixelRatio, skipFonts: true,
                     imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", // 如果某张图片fetch失败，用透明1像素图代替，而不是直接报错
                     filter: (node) => node.tagName !== 'SCRIPT'
                 });
@@ -211,6 +215,10 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
     async _onExportImage(event) {
         event.preventDefault();
 
+        // 读取页面上的清晰度选项
+        const dpiSelector = this.element.querySelector("#export-dpi-selector");
+        const selectedPixelRatio = dpiSelector ? parseFloat(dpiSelector.value) : 1.0;
+
         await this._loadExportEngines(false); // 仅需截图引擎
         ui.notifications.info("正在印制长图，请稍候...");
 
@@ -260,7 +268,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             // 执行截图渲染
             const dataUrl = await htmlToImage.toPng(windowContent, {
                 quality: 1.0,
-                pixelRatio: 1.2,
+                pixelRatio: selectedPixelRatio,
                 skipFonts: true, // 忽略字体跨域报错（已通过图标替换解决）
                 filter: (node) => {
                     if (node.tagName === 'SCRIPT') return false;
@@ -524,7 +532,13 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                         levelName: levelNames[Math.min(4, Math.max(0, m.effectiveStage ?? m.computedLevel ?? 0))],
                         type: m.type, typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
                         isUltimate: m.isUltimate, actionCost: m.actionCost || "主要动作", range: m.range, isStance: m.type === "stance", isFeint: m.type === "feint",
-                        blockValue, feintValue, damage: derived.damage, description: this._cleanRichText(m.description) || "暂无描述",
+                        blockValue, feintValue, damage: (() => {
+                            let baseDmg = Number(derived.damage) || 0;
+                            if (baseDmg > 0) {
+                                return `${baseDmg}/${baseDmg * 2}`;
+                            }
+                            return derived.damage || 0;
+                        })(), description: this._cleanRichText(m.description) || "暂无描述",
                         cost: {
                             hp: m.costs.hp?.[Math.max(0, m.computedLevel - 1)] || 0,
                             mp: m.costs.mp?.[Math.max(0, m.computedLevel - 1)] || 0,
