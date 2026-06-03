@@ -158,6 +158,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
 
                 const dataUrl = await htmlToImage.toPng(windowContent, {
                     quality: 1.0, pixelRatio: 1.0, skipFonts: true,
+                    imagePlaceholder: "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", // 如果某张图片fetch失败，用透明1像素图代替，而不是直接报错
                     filter: (node) => node.tagName !== 'SCRIPT'
                 });
 
