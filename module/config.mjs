@@ -1067,7 +1067,7 @@ XJZL.statusEffects = [
     changes: [
       { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
       { key: "system.combat.kanpo", mode: 2, value: "-5" },
-      { key: "system.combat.resistances.global.mod", mode: 2, value: "-10" }
+      { key: "system.combat.resistances.skill.mod", mode: 2, value: "-10" }
     ]
   },
   {
