@@ -2685,7 +2685,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             }, {
                 action: "cancel",
                 label: "取消",
-                icon: "fas fa-times"
+                icon: "fas fa-times",
+                callback: () => null
             }],
             // 渲染回调：处理动态总价计算
             render: (event) => {
@@ -2713,11 +2714,17 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         });
 
         // 5. 如果用户取消
-        if (result === null || result === undefined) return;
+        if (result === null || result === undefined || typeof result !== "number") return;
 
         // 6. 执行交易逻辑
         const modifier = result;
         const totalCost = Math.floor(price * quantity * modifier);
+
+        // 防止 NaN 导致后续崩溃
+        if (isNaN(totalCost) || totalCost < 0) {
+            return ui.notifications.error("交易金额异常，无法结算！");
+        }
+
 
         // 防止负数 Bug
         if (totalCost < 0) {
