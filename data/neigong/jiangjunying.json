@@ -9,7 +9,7 @@
             "sect": "jiangjunying",
             "description": "<p>朝廷禁军入门功法，以战场磨炼士卒意志，通晓屡败屡战，方能百战不殆之理。练至大成后，性格坚韧，胜不骄、败不馁，不抛弃、不放弃。</p>",
             "requirement": "悟性1",
-            "automationNote": "完全自动化。战斗开始添加勇武Buff，第一回合结束自动清除。",
+            "automationNote": "完全自动化。因机制限制，先攻+5转为常驻被动生效（以确保投骰时享受加成）；战斗开始时自动附加[勇武]状态提供伤害加成，第一回合结束自动清除。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -43,7 +43,13 @@
                     "description": "<p>圆满运功特效：进入战斗后，获得“勇武”，持续到你的第一个回合结束。<br>勇武：你的先攻+5，招式伤害+10。<br>·若你是友方先攻最高者，你可以将任意一个友方的先攻顺序调整到你之后。</p><p>修满特效：修满[永久]：气血+10，内力+10。</p>",
                     "scripts": [
                         {
-                            "label": "百战诀-勇武",
+                            "label": "百战诀-先攻补偿",
+                            "trigger": "passive",
+                            "active": true,
+                            "script": "// VTT机制补偿：让先攻加成常驻，以确保加入战斗、投掷先攻时必然生效\nS.combat.initiative += 5;"
+                        },
+                        {
+                            "label": "百战诀-勇武(伤害)",
                             "trigger": "combatStart",
                             "active": true,
                             "script": "const sourceEffect = thisItem.effects.getName(\"勇武\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}"
@@ -67,20 +73,15 @@
                 "name": "勇武",
                 "icon": "systems/xjzl-system/assets/icons/neigong/将军营.png",
                 "transfer": false,
-                "description": "先攻+5，招式伤害+10。",
+                "description": "招式伤害+10。（先攻加成已转为被动常驻）",
                 "duration": {
                     "turns": 1
                 },
                 "changes": [
                     {
-                        "key": "system.combat.initiative",
-                        "mode": 2,
-                        "value": 5
-                    },
-                    {
                         "key": "system.combat.damages.skill.mod",
                         "mode": 2,
-                        "value": 10
+                        "value": "10"
                     }
                 ],
                 "flags": {
