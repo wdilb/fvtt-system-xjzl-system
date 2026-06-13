@@ -1537,14 +1537,14 @@
             "price": 8000,
             "damage": 22,
             "block": 12,
-            "description": "商武丁在位五十九年，以元年岁次午铸一剑，长三尺，可号令四方，征服蛮夷。<br><b>效果：</b>进入战斗时，你每有一个友方，你获得20护体真气，持续到战斗脱离（至多100）。",
-            "automationNote": "完全自动化",
+            "description": "<p>商武丁在位五十九年，以元年岁次午铸一剑，长三尺，可号令四方，征服蛮夷。</p><br><strong>效果：</strong><p>进入战斗时，你每有一个友方，你获得20护体真气，持续到战斗脱离（至多100）。</p>",
+            "automationNote": "完全自动化。",
             "scripts": [
                 {
                     "label": "照胆-聚众护体",
                     "trigger": "combatStart",
                     "active": true,
-                    "script": "// 获取同阵营 Token 数量 (减去自己)\nconst allies = canvas.tokens.placeables.filter(t => t.document.disposition === actor.token?.document.disposition).length - 1;\nif (allies > 0) {\n    const huti = Math.min(100, allies * 20);\n    await actor.applyHealing({ healer: actor,  amount: huti, type: 'huti' });\n    ui.notifications.info(`照胆剑：感召${allies}名友方，获得${huti}护体！`);\n}"
+                    "script": "const myToken = actor.token?.object || actor.getActiveTokens()[0];\nif (!myToken) return;\nconst myDisposition = myToken.document.disposition;\n\nlet alliesCount = 0;\nfor (const t of canvas.tokens.placeables) {\n    if (t.actor && t.id !== myToken.id && t.document.disposition === myDisposition && !t.document.hidden && t.inCombat) {\n        alliesCount++;\n    }\n}\n\nif (alliesCount > 0) {\n    const hutiAmount = Math.min(100, alliesCount * 20);\n    await actor.applyHealing({ healer: actor, amount: hutiAmount, type: 'huti' });\n    \n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px;\">\n            <div style=\"font-weight:bold; color:#e67e22; border-bottom:1px solid #ccc; margin-bottom:4px;\"><i class=\"fas fa-users\"></i> 照胆剑 - 特效</div>\n            <div style=\"font-size:0.9em; color:#333;\">开战感召 <b>${alliesCount}</b> 名参战友方，剑气凝结，获得 <b style=\"color:#00ffff; font-size:1.1em;\">${hutiAmount}</b> 点护体真气！</div>\n        </div>`\n    });\n}"
                 }
             ]
         }
