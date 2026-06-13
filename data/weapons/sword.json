@@ -1452,14 +1452,20 @@
             "price": 12000,
             "damage": 23,
             "block": 10,
-            "description": "在天时、地利、人和三道归一之时铸成此剑，剑气以无形存于万物中。<br><b>效果：</b>攻击与你性格相同的目标，必定暴击；攻击与你性格不同的目标时，招式伤害+10。",
-            "automationNote": "完全自动化",
+            "description": "<p>在天时、地利、人和三道归一之时铸成此剑，剑气以无形存于万物中。</p><br><strong>效果：</strong><p>攻击与你性格相同的目标，必定暴击；攻击与你性格不同的目标时，招式伤害+10。</p>",
+            "automationNote": "完全自动化。",
             "scripts": [
                 {
-                    "label": "泰阿-威道之剑",
+                    "label": "泰阿-同道必暴",
+                    "trigger": "check",
+                    "active": true,
+                    "script": "if (!args.target) return;\nconst sPers = (actor.itemTypes.personality?.[0]?.name || '').trim();\nconst tPers = (args.target.itemTypes.personality?.[0]?.name || '').trim();\nif (sPers === tPers) {\n    args.flags.critThresholdMod += 20;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: `<div class=\"xjzl-chat-card item-card\" style=\"padding: 6px 10px;\">\n            <div style=\"font-weight:bold; color:#8e44ad; border-bottom:1px solid #ccc; margin-bottom:4px; padding-bottom:2px;\"><i class=\"fas fa-balance-scale\"></i> 泰阿剑 - 威道</div>\n            <div style=\"font-size:0.9em; color:#555;\">性格共振：[${sPers || '无'}]<br>性格相同，<span style=\"color:#e74c3c; font-weight:bold;\">必定暴击</span>！</div>\n        </div>`\n    });\n}"
+                },
+                {
+                    "label": "泰阿-异道加伤",
                     "trigger": "preDamage",
                     "active": true,
-                    "script": "if (!args.target) return;\nconst sPers = actor.system.info.personality;\nconst tPers = args.target.system.info.personality;\n\nif (sPers && tPers) {\n    if (sPers === tPers) {\n        args.config.isCrit = true;\n        ui.notifications.info(\"泰阿剑：道同相惜，必定暴击！\");\n    } else {\n        args.config.amount += 10;\n    }\n}"
+                    "script": "if (!args.target) return;\nconst sPers = (actor.itemTypes.personality?.[0]?.name || '').trim();\nconst tPers = (args.target.itemTypes.personality?.[0]?.name || '').trim();\nif (sPers !== tPers) {\n    args.config.amount += 10;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: `<div class=\"xjzl-chat-card item-card\" style=\"padding: 6px 10px;\">\n            <div style=\"font-weight:bold; color:#8e44ad; border-bottom:1px solid #ccc; margin-bottom:4px; padding-bottom:2px;\"><i class=\"fas fa-balance-scale\"></i> 泰阿剑 - 威道</div>\n            <div style=\"font-size:0.9em; color:#555;\">目标性格：[${tPers || '无'}] (自身: [${sPers || '无'}])<br>性格不同，招式伤害 <span style=\"color:#e74c3c; font-weight:bold;\">+10</span>！</div>\n        </div>`\n    });\n}"
                 }
             ]
         }
