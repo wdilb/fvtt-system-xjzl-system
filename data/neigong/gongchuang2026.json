@@ -1,0 +1,186 @@
+[
+    {
+        "name": "断舌诀",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "tier": 2,
+            "element": "yin",
+            "description": "<p>离心道内功，专修“封人之口”之道。运功时，周身气息阴冷，如无数只无形的手按住对手的喉舌，中招者纵然有千言万语，也如鲠在喉，吐不出来。</p><p><strong>属性：</strong>阴柔 <strong>悟性：</strong>3</p>",
+            "requirement": "悟性:3",
+            "automationNote": "完全自动化。满级永久属性由系统自动应用。回合初自动投掷欺瞒判定，成功后自动施加[阴冷]状态；[阴冷]状态下每次出招命中会自动计算次数并向目标施加对应的负面状态。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 4,
+                        "shenfa": 10,
+                        "tipo": 9,
+                        "neixi": 15,
+                        "qigan": 15,
+                        "shencai": 8
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 7,
+                        "shenfa": 14,
+                        "tipo": 13,
+                        "neixi": 19,
+                        "qigan": 24,
+                        "shencai": 14
+                    },
+                    "description": "<p>小成运功特效：你每回合初进行一个【欺瞒】检定(难度 17)，成功则这回合你第一次出招命中为目标添加“犹豫”，第二次命中添加“愚钝”，第三次出招命中添加“疲劳”，生效后都持续一回合。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "欺瞒判定与阴冷状态",
+                            "trigger": "turnStart",
+                            "active": true,
+                            "script": "const dc = 17;\nconst qimanMod = Math.floor(actor.system.skills.qiman.total || 0);\nconst roll = await new Roll(\"1d20 + @mod\", {mod: qimanMod}).evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nawait roll.toMessage({ speaker: ChatMessage.getSpeaker({actor: actor}), flavor: `断舌诀(小成) - 欺瞒检定 (DC ${dc})` });\n\nif (roll.total >= dc) {\n    const eff = thisItem.effects.getName(\"断舌诀-阴冷\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 1 };\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.hitCount\", 0);\n    \n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"气息阴冷\", { fill: \"#8e44ad\" });\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 13,
+                        "shenfa": 18,
+                        "tipo": 16,
+                        "neixi": 24,
+                        "qigan": 28,
+                        "shencai": 16
+                    },
+                    "description": "<p>圆满运功特效：你每回合初进行一个【欺瞒】检定(难度 13)，成功则这回合你第一次出招命中为目标添加“犹豫”，第二次命中添加“愚钝”，第三次出招命中添加“疲劳”，生效后都持续一回合。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "欺瞒判定与阴冷状态",
+                            "trigger": "turnStart",
+                            "active": true,
+                            "script": "const dc = 13;\nconst qimanMod = Math.floor(actor.system.skills.qiman.total || 0);\nconst roll = await new Roll(\"1d20 + @mod\", {mod: qimanMod}).evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n\nawait roll.toMessage({ speaker: ChatMessage.getSpeaker({actor: actor}), flavor: `断舌诀(圆满) - 欺瞒检定 (DC ${dc})` });\n\nif (roll.total >= dc) {\n    const eff = thisItem.effects.getName(\"断舌诀-阴冷\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 1 };\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.hitCount\", 0);\n    \n    await game.xjzl.api.effects.addEffect(actor, eff);\n    actor.showFloatyText(\"气息阴冷\", { fill: \"#8e44ad\" });\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "<p>修满[永久]：内力+10，欺瞒+2。</p>",
+            "masteryChanges": [
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 10,
+                    "label": "内力上限"
+                },
+                {
+                    "key": "skills.qiman.mod",
+                    "value": 2,
+                    "label": "欺瞒检定"
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "断舌诀-阴冷",
+                "icon": "icons/magic/death/hand-undead-skeleton-fire-green.webp",
+                "description": "本回合内：第一次出招命中添加犹豫，第二次愚钝，第三次疲劳。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "duanshe_yinleng",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "trigger": "hit",
+                                "active": true,
+                                "script": "if (!args.isHit || !args.target || args.actionType !== \"attack\") return;\n\nlet count = thisEffect.getFlag(\"xjzl-system\", \"hitCount\") || 0;\ncount += 1;\nawait thisEffect.setFlag(\"xjzl-system\", \"hitCount\", count);\n\nlet statusToApply = \"\";\nlet statusName = \"\";\n\nif (count === 1) { statusToApply = \"youyu\"; statusName = \"犹豫\"; }\nelse if (count === 2) { statusToApply = \"yudun\"; statusName = \"愚钝\"; }\nelse if (count === 3) { statusToApply = \"fatigue\"; statusName = \"疲劳\"; }\n\nif (statusToApply) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: statusToApply, duration: { rounds: 1 } });\n    actor.showFloatyText(`施加 ${statusName}`, { fill: \"#8e44ad\", fontSize: 28 });\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "八足六眼",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+        "system": {
+            "isOfficial": false,
+            "tier": 2,
+            "element": "yin",
+            "description": "<p>离心道徽记便为六眼蜘蛛，以求多子多目之意。修行离心道武学者往往给人感觉内力似各类毒虫阴险怪异。</p><p><strong>属性：</strong>阴柔 <strong>悟性：</strong>4</p>",
+            "requirement": "悟性:4",
+            "automationNote": "被动属性自动生效。回合末自动向聊天栏发送点穴战术卡片提示，检定和移动操作需玩家手动完成以保留战术自由度。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 7,
+                        "shenfa": 13,
+                        "tipo": 10,
+                        "neixi": 17,
+                        "qigan": 18,
+                        "shencai": 12
+                    },
+                    "description": "",
+                    "xpCostRatio": 1,
+                    "scripts": []
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 9,
+                        "shenfa": 17,
+                        "tipo": 14,
+                        "neixi": 20,
+                        "qigan": 25,
+                        "shencai": 14
+                    },
+                    "description": "<p>小成运功特效：你可以在自己的回合末选中距离 3 以内的一个格子，对该距离内可以施展趁虚而入的目标不消耗动作进行一次难度 13 的【点穴】检定，成功则移动到格子内。点穴只视作将对方趁虚而入打断，不触发定身效果。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "点穴移动提示",
+                            "trigger": "turnEnd",
+                            "active": true,
+                            "script": "const content = `\n<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.05); margin-left:2px;\">\n    <div style=\"color:#8e44ad; font-weight:bold; margin-bottom: 2px;\"><i class=\"fas fa-spider\"></i> 八足六眼 (小成) - 运功伺机</div>\n    <div style=\"font-size:0.85em; color:#555;\">\n        你可以在回合末选中距离 3 以内的一个格子，对该距离内可施展趁虚而入的目标，不消耗动作进行一次 <b>DC 13</b> 的【点穴】检定。<br>\n        成功则移动到格子内，并将对方的趁虚而入打断(不触发定身)。<br>\n        <span style=\"color:#888;\">(请在左侧侧边栏手动投掷点穴，成功后手动移动 Token)</span>\n    </div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: content });"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 10,
+                        "shenfa": 20,
+                        "tipo": 17,
+                        "neixi": 25,
+                        "qigan": 30,
+                        "shencai": 18
+                    },
+                    "description": "<p>圆满运功特效：你可以在自己的回合末选中距离 3 以内的一个格子，对该距离内可以施展趁虚而入的目标不消耗动作进行一次难度 10 的【点穴】检定，成功则移动到格子内。点穴只视作将对方趁虚而入打断，不触发定身效果。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "点穴移动提示",
+                            "trigger": "turnEnd",
+                            "active": true,
+                            "script": "const content = `\n<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.05); margin-left:2px;\">\n    <div style=\"color:#8e44ad; font-weight:bold; margin-bottom: 2px;\"><i class=\"fas fa-spider\"></i> 八足六眼 (圆满) - 运功伺机</div>\n    <div style=\"font-size:0.85em; color:#555;\">\n        你可以在回合末选中距离 3 以内的一个格子，对该距离内可施展趁虚而入的目标，不消耗动作进行一次 <b>DC 10</b> 的【点穴】检定。<br>\n        成功则移动到格子内，并将对方的趁虚而入打断(不触发定身)。<br>\n        <span style=\"color:#888;\">(请手动投掷点穴，成功后手动移动 Token)</span>\n    </div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: content });"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "<p>修满[永久]：内力+10，内息+1。</p>",
+            "masteryChanges": [
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 10,
+                    "label": "内力上限"
+                },
+                {
+                    "key": "stats.neixi.mod",
+                    "value": 1,
+                    "label": "内息加成"
+                }
+            ]
+        },
+        "effects": []
+    }
+]

@@ -1,0 +1,440 @@
+[
+    {
+        "name": "秽语掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "tier": 2,
+            "description": "<p>一边嘴臭一边暗自出手的武学，很有离心道的风格。</p><p><strong>属性：</strong>阴</p>",
+            "moves": [
+                {
+                    "name": "暗箭难防",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>走向敌人，猝然出掌击其胸肋，掌风阴冷，如暗处射来的冷箭。</p><p><strong>特效：</strong>命中后造成内功伤害。破架后为目标附加一层“恶语”。如果击破架招，可以消耗反应动作释放实招。</p><p><strong>恶语：</strong>叠到三层后，受 10 精神伤害移除全部。</p><p><strong>升级：</strong>招式伤害+10，精通招式距离+1。</p>",
+                    "automationNote": "命中且破架后，自动叠加密语与防爆逻辑，自动发卡片提示玩家追加实招连击。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            2,
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "破架触发恶语与追击",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isBroken || !args.target) return;\nconst eyuEffect = thisItem.effects.getName(\"恶语\");\nif (eyuEffect) {\n    const existing = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_eyu\");\n    const stacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks >= 2) {\n        await game.xjzl.api.effects.removeEffect(args.target, \"wuxue_eyu\", 3);\n        await args.target.applyDamage({ amount: 10, type: \"mental\", attacker: actor, isHit: true, ignoreDefense: true });\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.05);\"><div style=\"color:#8e44ad; font-weight:bold;\"><i class=\"fas fa-comment-slash\"></i> 恶语反噬！</div><div style=\"font-size:0.85em;\">恶语叠满三层，在对方脑中炸开，受到 10 点精神伤害！</div></div>` });\n    } else {\n        const effData = eyuEffect.toObject();\n        delete effData._id; effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n}\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; border-left: 3px solid #c0392b; background: rgba(192,57,43,0.05);\"><div style=\"color:#c0392b; font-weight:bold;\"><i class=\"fas fa-bolt\"></i> 乘胜追击！</div><div style=\"font-size:0.85em;\">击破架招成功！你可以消耗反应动作，立即释放实招【血口喷人】。</div></div>` });"
+                        }
+                    ]
+                },
+                {
+                    "name": "血口喷人",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双掌齐出，掌风如污血泼洒。对敌人造成内功伤害。</p><p>当目标处于空中，你可以消耗反应动作释放此招式，跃起在空中以掌风击打目标。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "正常伤害。空中追击使用反应为逻辑描述，请玩家手动控制动作消耗。",
+                    "costs": {
+                        "mp": [
+                            3,
+                            5,
+                            7
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    }
+                },
+                {
+                    "name": "影随意动",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "none",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破对方招式后释放污浊的掌风，击打对方要害，并给对方附加一层“恶语”。</p><p><strong>恶语：</strong>叠到三层后，受 10 精神伤害移除全部。</p><p><strong>升级：</strong>招式伤害+5，消耗内力-1。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            4,
+                            3
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.2
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加恶语",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst eyuEffect = thisItem.effects.getName(\"恶语\");\nif (eyuEffect) {\n    const existing = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_eyu\");\n    const stacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks >= 2) {\n        await game.xjzl.api.effects.removeEffect(args.target, \"wuxue_eyu\", 3);\n        await args.target.applyDamage({ amount: 10, type: \"mental\", attacker: actor, isHit: true, ignoreDefense: true });\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.05);\"><div style=\"color:#8e44ad; font-weight:bold;\"><i class=\"fas fa-comment-slash\"></i> 恶语反噬！</div><div style=\"font-size:0.85em;\">恶语叠满三层，在对方脑中炸开，受到 10 点精神伤害！</div></div>` });\n    } else {\n        const effData = eyuEffect.toObject();\n        delete effData._id; effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "含沙射影",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>开启架招，蜷缩身形以诡异姿态抬掌防御，如毒虫藏身暗处，伺机反噬。在你格挡成功后，攻击你的敌人获得一层“恶语”。</p><p><strong>恶语：</strong>叠到三层后，受 10 精神伤害移除全部。</p><p><strong>升级：</strong>格挡值+3。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            3,
+                            3,
+                            3
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 3
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡施加恶语",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args) || !args.attacker) return;\nconst eyuEffect = thisItem.effects.getName(\"恶语\");\nif (eyuEffect) {\n    const existing = args.attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_eyu\");\n    const stacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks >= 2) {\n        await game.xjzl.api.effects.removeEffect(args.attacker, \"wuxue_eyu\", 3);\n        await args.attacker.applyDamage({ amount: 10, type: \"mental\", attacker: actor, isHit: true, ignoreDefense: true });\n        actor.showFloatyText(\"格挡反噬！\", { fill: \"#8e44ad\" });\n    } else {\n        const effData = eyuEffect.toObject();\n        delete effData._id; effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, effData);\n        actor.showFloatyText(\"格挡: 施加恶语\", { fill: \"#e67e22\" });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "众口铄金",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "none",
+                    "range": "3米",
+                    "targetInfo": "范围敌人",
+                    "actionCost": "全回合动作",
+                    "description": "<p>厉声尖笑，污言秽语化作实质音波席卷全场，对距离内所有敌人造成内功伤害。</p><p>伤害生效后若目标身上有恶语，场上所有身上有恶语的敌人受到 0.02 内息点精神伤害。</p><p><strong>升级：</strong>招式释放距离+1，消耗内力+8。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            8,
+                            16,
+                            24
+                        ],
+                        "rage": [
+                            6,
+                            6,
+                            6
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "音波连带精神伤害",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst hasEyu = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_eyu\");\n\nif (hasEyu) {\n    // 【终极防并发】群攻中打中多个带恶语的目标时，防止音波被触发多次\n    if (actor.zhongkouProcessed) return;\n    actor.zhongkouProcessed = true;\n    setTimeout(() => { actor.zhongkouProcessed = false; }, 2000);\n\n    const neixi = actor.system.stats.neixi.total || 0;\n    // 保底最少 1 点精神伤害\n    const extraDmg = Math.max(1, Math.floor(neixi * 0.02));\n    \n    // 扫描画板上所有存活且带恶语的 Token\n    const targetsToDamage = canvas.tokens.placeables.filter(t => \n        t.actor && t.actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_eyu\")\n    );\n\n    // 自动扣血\n    for (const t of targetsToDamage) {\n        await t.actor.applyDamage({ amount: extraDmg, type: \"mental\", attacker: actor, isHit: true, ignoreDefense: true });\n    }\n\n    // 发送卡片\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:4px solid #d35400; background:rgba(211,84,0,0.05); margin-left:2px;\">\n            <div style=\"color:#d35400; font-weight:bold;\"><i class=\"fas fa-bullhorn\"></i> 众口铄金 触发音波共振！</div>\n            <div style=\"font-size:0.85em; margin-top:4px; color:#555;\">\n                全场共有 <b>${targetsToDamage.length}</b> 名带有[恶语]的敌人受到音波牵连，分别承受了 <b style=\"color:red;\">${extraDmg}</b> 点精神伤害！\n            </div>\n        </div>`\n    });\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "恶语",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                    "description": "言语恶毒如咒，满三层后将引爆 10 点精神伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_eyu",
+                            "stackable": true
+                        }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        "name": "蛛魔四式",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "tier": 2,
+            "description": "<p>离心道嫡传弟子才能使用，是阴险毒辣的招式，实际上共有五招。</p><p><strong>需求：</strong>笔-匕首</p>",
+            "requirements": "笔-匕首",
+            "moves": [
+                {
+                    "name": "影踪难寻",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>后退如蜘蛛藏匿在洞中。当你格挡成功时，为你添加一层“蛛心”。</p><p><strong>蛛心：</strong>你的技能施展距离+1，最多叠三层持续到脱战。</p><p><strong>升级：</strong>格挡值+3。</p>",
+                    "automationNote": "格挡后自动叠加蛛心状态。距离加成需玩家在实战中自行把握放宽限制。",
+                    "costs": {
+                        "mp": [
+                            2,
+                            2,
+                            2
+                        ]
+                    },
+                    "calculation": {
+                        "base": 7,
+                        "growth": 3
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡得蛛心",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effData = thisItem.effects.getName(\"蛛心\").toObject();\ndelete effData._id; effData.origin = thisItem.uuid;\n// API 内置最大叠加层数保护（前提是我们在 JSON 中配置了 maxStacks）\nawait game.xjzl.api.effects.addEffect(actor, effData);\nactor.showFloatyText(\"格挡: 隐秘结网\", { fill: \"#9b59b6\" });"
+                        }
+                    ]
+                },
+                {
+                    "name": "作丝绊足",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>出笔击打敌人要害部位造成内功伤害，若命中无架目标，造成气感*0.08点毒素伤害。</p><p>你可以使用三层“蛛心”让目标陷入迟滞一回合，随后移除你身上的全部蛛心。</p><p><strong>升级：</strong>伤害+15。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            5,
+                            5,
+                            5,
+                            5
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 15,
+                        "scalings": [
+                            {
+                                "prop": "qigan",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "毒伤与蛛心羁绊",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\n\n// 1. 无架额外毒伤\nif (!args.target.system.martial.stanceActive) {\n    const qigan = actor.system.stats.qigan.total || 0;\n    // 保底最少 1 点毒素伤害\n    const poisonDmg = Math.max(1, Math.floor(qigan * 0.08));\n    \n    if (poisonDmg > 0) {\n        // 自动造成毒素伤害\n        await args.target.applyDamage({ amount: poisonDmg, type: \"poison\", attacker: actor, isHit: true });\n        actor.showFloatyText(`无架追击: ${poisonDmg}毒伤`, {fill: \"#2ecc71\"});\n        \n        // 发送卡片\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:4px solid #2ecc71; background:rgba(46,204,113,0.05); margin-left:2px;\">\n                <div style=\"color:#27ae60; font-weight:bold;\"><i class=\"fas fa-spider\"></i> 乘隙而入！</div>\n                <div style=\"font-size:0.85em; margin-top:4px; color:#555;\">\n                    命中无架势目标，注入毒液造成 <b style=\"color:red;\">${poisonDmg}</b> 点毒素伤害！\n                </div>\n            </div>`\n        });\n    }\n}\n\n// 2. 消耗蛛心施加迟滞\nconst zhuxin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhuxin\");\nconst stacks = zhuxin ? (zhuxin.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (stacks >= 3) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"作丝绊足 - 蛛网收束\" },\n        content: `<p>你拥有 ${stacks} 层 [蛛心]。</p><p>是否全部消耗，使目标陷入 <b>[迟滞]</b> 一回合？</p>`\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"wuxue_zhuxin\", 99);\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"chizhi\", duration: {rounds: 1} });\n        ChatMessage.create({ \n            speaker: ChatMessage.getSpeaker({actor: actor}), \n            content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:4px solid #2980b9; background:rgba(41,128,185,0.05); margin-left:2px;\"><div style=\"color:#2980b9; font-weight:bold;\"><i class=\"fas fa-network-wired\"></i> 蛛网收束！</div><div style=\"font-size:0.85em; margin-top:4px; color:#555;\">收割所有蛛心，目标陷入迟滞。</div></div>` \n        });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "封光乱目",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>笔专门击打人面门造成内功伤害，中招者视光则刺痛不已。若击破架招，目标陷入目盲一回合。</p><p><strong>升级：</strong>目盲持续回合+1，内力消耗+4。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            4,
+                            8,
+                            12
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": [
+                            {
+                                "prop": "qigan",
+                                "ratio": 0.3
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "破架致盲",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isBroken || !args.target) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nawait game.xjzl.api.effects.addEffect(args.target, { id: \"blind\", duration: { rounds: rounds } });\nactor.showFloatyText(\"击破防线: 致盲\", { fill: \"#e74c3c\" });"
+                        }
+                    ]
+                },
+                {
+                    "name": "啮面钻心",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "3米",
+                    "targetInfo": "1米范围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>朝空中挥笔同时按下暗格，将丝线缠绕于高出飞身回旋。你在 1 米距离内所有敌人造成内功伤害，并让目标吸入毒雾陷入“幻毒”一回合。</p><p><strong>幻毒：</strong>目标每回合末进行一个难度 12 的【韧性】检定，失败则受 5 毒素伤害并陷入一回合下盘不稳。</p><p><strong>升级：</strong>消耗内力+6，幻毒检定失败后的下盘不稳回合+1。</p>",
+                    "automationNote": "命中自动施加幻毒 AE，系统将在每个回合末向目标抛出韧性豁免要求，失败自动计算伤害与动态成长回合数的下盘不稳。",
+                    "costs": {
+                        "mp": [
+                            6,
+                            12,
+                            18
+                        ],
+                        "rage": [
+                            6,
+                            6,
+                            6,
+                            6
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": [
+                            {
+                                "prop": "qigan",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加幻毒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst effData = thisItem.effects.getName(\"幻毒\").toObject();\ndelete effData._id; effData.origin = thisItem.uuid;\n// 记录来源招式的等级，方便幻毒AE内部读取\nfoundry.utils.setProperty(effData, \"flags.xjzl-system.sourceLevel\", lvl);\neffData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, effData);"
+                        }
+                    ]
+                },
+                {
+                    "name": "天罗地网",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>你站在原地以丝线控制笔打断目标招式，造成内功伤害并将对方击倒。同时投掷一个增加你的【神采】加值的 d20(难度 15)，成功你获得一层蛛心。</p><p><strong>升级：</strong>反击招式伤害+5。</p>",
+                    "automationNote": "完全自动化。",
+                    "costs": {
+                        "mp": [
+                            3,
+                            3,
+                            3
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [
+                            {
+                                "prop": "qigan",
+                                "ratio": 0.2
+                            }
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击倒与神采试炼",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nawait game.xjzl.api.effects.addEffect(args.target, { id: \"prone\" });\n\nconst shencaiMod = Math.floor((actor.system.stats.shencai.total || 0) / 10);\nconst roll = await new Roll(\"1d20 + @mod\", {mod: shencaiMod}).evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\nawait roll.toMessage({ speaker: ChatMessage.getSpeaker({actor: actor}), flavor: `天罗地网 - 神采牵丝 (DC 15)` });\n\nif (roll.total >= 15) {\n    const effData = thisItem.effects.getName(\"蛛心\").toObject();\n    delete effData._id; effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    actor.showFloatyText(\"成功牵网: +1 蛛心\", { fill: \"#9b59b6\" });\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "蛛心",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "技能施展距离+1，最高叠加 3 层。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_zhuxin",
+                            "stackable": true,
+                            "maxStacks": 3
+                        }
+                    }
+                },
+                {
+                    "name": "幻毒",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "每回合末进行韧性检定，失败受毒素伤害及下盘不稳。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_huandu",
+                            "scripts": [
+                                {
+                                    "trigger": "turnEnd",
+                                    "active": true,
+                                    "script": "const sourceLvl = thisEffect.getFlag(\"xjzl-system\", \"sourceLevel\") || 1;\nconst rounds = 1 + (sourceLvl - 1);\nawait Macros.requestSave({\n    target: actor,\n    type: \"renxing\",\n    dc: 12,\n    label: \"幻毒发作\",\n    damageOnFail: { value: 5, type: \"poison\" },\n    onFail: { id: \"unstable\", duration: { rounds: rounds } },\n    failureText: \"幻毒发作，脚步虚浮！\",\n    successText: \"凭惊人韧性压制了幻毒的爆发。\"\n});"
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    }
+]

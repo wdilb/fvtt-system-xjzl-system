@@ -47,6 +47,7 @@ export async function seedNeigong() {
             }
             filesToFetch.push(`systems/xjzl-system/data/neigong/xiao.json`); //关山、征越等模组资源
             filesToFetch.push(`systems/xjzl-system/data/neigong/jianchen.json`); //栏杆拍遍模组资源
+            filesToFetch.push(`systems/xjzl-system/data/neigong/gongchuang2026.json`); //共创2026的资源
         } else {
             // 普通门派只读取一个文件
             filesToFetch.push(`systems/xjzl-system/data/neigong/${sect}.json`);
