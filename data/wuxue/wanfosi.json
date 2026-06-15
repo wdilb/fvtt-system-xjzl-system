@@ -49,6 +49,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>虚以实劲，横肘猛捣，造成 0.3 力量点外功伤害。击破对方架招时，给自己添加一层“刚劲”，至多三层，持续到战斗脱离。</p><p><b>刚劲</b>：每层使你的刚属性武学招式伤害+5。</p><p>升级：招式伤害+5，额外叠加一层“刚劲”，内力消耗+1。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -70,7 +71,8 @@
                         {
                             "label": "添加刚劲",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"刚劲\");\n    if (effect) {\n        await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n        if (args.move.computedLevel >= 2) await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n    }\n}"
+                            "active": true,
+                            "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"刚劲\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        \n        // 获取招式当前等级\n        const lvl = Math.max(1, args.move.computedLevel || 1);\n        \n        // 直接利用底层管理器的第三个参数传入层数\n        await game.xjzl.api.effects.addEffect(actor, effectData, lvl);\n        \n        actor.showFloatyText(`获得 ${lvl} 层刚劲`, { fill: \"#FFA500\" });\n    }\n}"
                         }
                     ]
                 },
