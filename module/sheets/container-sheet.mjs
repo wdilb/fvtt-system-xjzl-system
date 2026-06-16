@@ -90,6 +90,19 @@ export class XJZLContainerSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             const isSkill = ["wuxue", "neigong"].includes(type);
             let colorClass = isSkill ? `tier-${tier}` : `quality-${quality}`;
 
+            // =========================================================
+            // 处理数据，防止注入导致 DOM 结构断裂
+            // =========================================================
+
+            // 1. 提取原始文本，加上 String() 确保万一数据损坏时不会报错
+            const rawName = String(item.name || "未知");
+            const rawDesc = String(sys.description || "暂无描述");
+
+            // 2. 核心防御：将双引号替换为 &quot;
+            // 这样当它被放入 data-tooltip="..." 时，浏览器就不会认为属性结束了
+            const safeName = rawName.replace(/"/g, '&quot;');
+            const safeDesc = rawDesc.replace(/"/g, '&quot;');
+
             const itemData = {
                 ...item.toObject(),
                 id: item.id,
@@ -97,8 +110,10 @@ export class XJZLContainerSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 colorClass: colorClass,
                 quantity: sys.quantity || 1,
                 isStackable: (sys.quantity || 1) > 1,
-                // 构建简单的 Tooltip
-                tooltip: `<div class='xjzl-tooltip'><div class='header'>${item.name}</div><div class='body'>${sys.description || "暂无描述"}</div></div>`
+
+                // 3. 使用安全变量 (safeName/safeDesc) 构建 Tooltip
+                // 外层用反引号，里面原本的 class 必须严格使用单引号 ('xjzl-tooltip')
+                tooltip: `<div class='xjzl-tooltip'><div class='header'>${safeName}</div><div class='body'>${safeDesc}</div></div>`
             };
 
             if (sections[type]) sections[type].items.push(itemData);
