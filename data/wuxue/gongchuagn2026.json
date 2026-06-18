@@ -436,5 +436,236 @@
                 }
             ]
         }
+    },
+    {
+        "name": "摩罗幻影手",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "subSect": "moluodian",
+            "tier": 2,
+            "description": "<p>摩罗殿武学，取自魔罗曾以幻象诱惑扰乱佛陀心智的典故，使用者通过极快的身法制造幻象，令对手难以分辨真身，仿佛被无数幻影包围。</p><p><strong>需求：</strong>徒手 <strong>属性：</strong>阴</p>",
+            "requirements": "徒手",
+            "moves": [
+                {
+                    "name": "幻海生莲",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>双掌交叠推出，掌心隐现血色莲纹，对目标造成伤害，若目标无招架，为其添加一层“幻惑”。</p><p><strong>幻惑：</strong>被《摩罗幻影手》套路下的招式选为目标时，对方会制造 X（幻惑层数）道幻影，你需从 X+1 个身影（幻影+真身）中猜测真身，若猜对，则清除你所有的“幻惑”层数并正常结算对抗结果；若猜错，则你的对应检定视为劣势。</p><p>·“幻惑”上限 3 层<br>·目标可选择一道幻影进行【洞察】检定（难度 15）</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2</p>",
+                    "automationNote": "命中且无架招时自动施加幻惑状态。猜测真身与洞察检定请玩家手动交涉并在出招弹窗中调整优劣势。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "施加幻惑",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && args.target) {\n    if (!args.target.system.martial?.stanceActive) {\n        const sourceEffect = thisItem.effects.getName(\"幻惑\");\n        if (sourceEffect) {\n            const effectData = sourceEffect.toObject();\n            delete effectData._id;\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, effectData);\n            actor.showFloatyText(\"幻惑 +1\", { fill: \"#8e44ad\" });\n        }\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "千相叠嶂",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>掌击声如梵钟回荡，干扰对手听觉判断，开启架招，格挡成功时为其添加一层“幻惑”。</p><p>·若未能看破虚招，可移除一层“幻惑”重新进行一次虚招对抗。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2</p>",
+                    "automationNote": "格挡反震自动施加幻惑。未能看破时的重投机制已写入幻惑状态的智能提示中，需手动重新操作。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡施加幻惑",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const sourceEffect = thisItem.effects.getName(\"幻惑\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.attacker, effectData);\n        actor.showFloatyText(\"幻音反震\", { fill: \"#8e44ad\" });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "无间叩门",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>右掌佯攻面门，左掌暗藏内力击出，对目标造成伤害，若击破招架，则为其添加一层“幻惑”。</p><p>·若未能击破招架，可移除一层“幻惑”重新进行一次虚招对抗。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2</p>",
+                    "automationNote": "击破架招自动施加幻惑。出招时自动检测目标是否带有幻惑并发送猜影卡片，失败重投机制需手动执行。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "击破施加幻惑",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken && args.target) {\n    const sourceEffect = thisItem.effects.getName(\"幻惑\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        actor.showFloatyText(\"幻惑 +1\", { fill: \"#8e44ad\" });\n    }\n}"
+                        },
+                        {
+                            "label": "幻影猜测提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const targets = Array.from(game.user.targets);\nif (targets.some(t => t.actor?.effects.some(e => e.name === \"幻惑\"))) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; padding: 5px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.05);\">\n            <div style=\"font-weight: bold; color: #8e44ad; margin-bottom: 2px;\">\n                <i class=\"fas fa-magic\"></i> 摩罗幻影 - 猜真身\n            </div>\n            <div style=\"font-size:0.9em; color:#555;\">\n                <p>目标正受【幻惑】影响：</p>\n                <ul style=\"margin:2px 0; padding-left:15px;\">\n                    <li>场上将出现 <b>幻惑层数+1</b> 个身影(含真身)。</li>\n                    <li>目标需进行猜测，或做【洞察(DC15)】排除幻影。</li>\n                    <li><b>猜对：</b> 清除目标所有幻惑，正常对抗。</li>\n                    <li><b>猜错：</b> 目标的检定视为劣势。</li>\n                </ul>\n                <hr style=\"margin:4px 0; border-color:#ccc;\">\n                <p style=\"color:#d35400; margin-bottom:0;\"><b>虚招重投：</b> 若本次虚招未能击破架招，你可手动扣除目标 1 层幻惑，要求重新进行虚招对抗！</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "业火焚形",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>双掌赤红如烙铁，攻敌之弱，连环拍击，当你看破对方虚招时，可消耗反应动作释放此招，造成伤害并为其添加一层“幻惑”。</p><p>·若对方在“幻惑”对抗中猜错了真身，可移除对方身上一层“幻惑”层数并消耗反应动作释放此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2</p>",
+                    "automationNote": "命中后自动施加幻惑。“猜错触发反击”的特殊时机由玩家在猜影失败时手动点击武学面板释放。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            2,
+                            4,
+                            6
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "反击施加幻惑",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit && args.target) {\n    const sourceEffect = thisItem.effects.getName(\"幻惑\");\n    if (sourceEffect) {\n        const effectData = sourceEffect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        actor.showFloatyText(\"幻惑 +1\", { fill: \"#8e44ad\" });\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "摩罗问心",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>腾空倒悬，周身幻化数道掌影，造成一段基础伤害，每有一层“幻惑”则额外结算一段。</p><p><strong>升级：</strong>额外造成一段伤害，招式伤害+20，怒气消耗-1，内力消耗+8</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.1
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            4,
+                            12,
+                            20
+                        ],
+                        "rage": [
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "多段幻影结算",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const targets = Array.from(game.user.targets);\nif (targets.length === 0) return;\nconst target = targets[0].actor;\nif (!target) return;\n\n// 提取层数与段数\nconst huanhuo = target.effects.find(e => e.name === \"幻惑\");\nconst stacks = huanhuo ? (huanhuo.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\n\n// 基础1段 + 升级额外1段 + 幻惑层数段\nconst extraHit = lvl > 1 ? 1 : 0;\nconst totalHits = 1 + extraHit + stacks;\n\nif (totalHits > 1) {\n    // 这里的 damage 是已经吃全了所有面板、内功加成后的单段伤害总和\n    const baseDamage = args.flags.damageResult.damage;\n    const totalDamage = baseDamage * totalHits;\n    const bonus = totalDamage - baseDamage;\n\n    args.flags.damageResult.damage = totalDamage;\n    args.flags.damageResult.breakdown += `\\n+ 多段幻影结算 (${totalHits}段): +${bonus}`;\n    \n    actor.showFloatyText(`幻影连击 ${totalHits}段!`, { fill: \"#8e44ad\", fontSize: 36 });\n}"
+                        }
+                    ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "幻惑",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                    "description": "被《摩罗幻影手》攻击时触发猜真身机制。作为千相叠嶂的攻击者时可能被强制要求重投虚招。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "huanhuo",
+                            "stackable": true,
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "千相叠嶂反制提醒",
+                                    "trigger": "check",
+                                    "active": true,
+                                    "script": "// actor是带有幻惑的人 (攻击者)\nif (args.move.type === \"feint\" && args.target) {\n    const martial = args.target.system.martial;\n    // 检查目标是否开启了架招\n    if (martial && martial.stanceActive && martial.stanceItemId) {\n        const stanceItem = args.target.items.get(martial.stanceItemId);\n        if (stanceItem) {\n            const stanceMove = stanceItem.system.moves.find(m => m.id === martial.stance);\n            // 验证对方开的架招是不是千相叠嶂\n            if (stanceMove && stanceMove.name.includes(\"千相叠嶂\")) {\n                ChatMessage.create({\n                    content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; padding: 5px; border-left: 3px solid #e74c3c; background: rgba(231,76,60,0.05);\">\n                        <div style=\"font-weight: bold; color: #e74c3c; margin-bottom: 2px;\">\n                            <i class=\"fas fa-exclamation-triangle\"></i> 幻音反制触发\n                        </div>\n                        <div style=\"font-size:0.9em; color:#555;\">\n                            <p>你正受到【幻惑】影响，且对方开启了【千相叠嶂】！</p>\n                            <hr style=\"margin:4px 0; border-color:#ccc;\">\n                            <p style=\"margin-bottom:0;\"><b>注意：</b> 即使你本次虚招对抗成功，对方也可选择消耗你身上 1 层【幻惑】，令本次虚招判定无效，并要求你重新进行虚招对抗！<br><span style=\"color:#888; font-size:0.8em;\">(若对方要求重投，请手动再次执行虚招对抗)</span></p>\n                        </div>\n                    </div>`,\n                    speaker: ChatMessage.getSpeaker({actor: actor})\n                });\n            }\n        }\n    }\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
     }
 ]
