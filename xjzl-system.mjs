@@ -973,56 +973,6 @@ Hooks.on("renderActorDirectory", (app, html, data) => {
   }
 });
 
-/**
- * 战斗轮次流转监听
- * 用于处理 回合开始/回合结束 的自动回复与脚本
- */
-Hooks.on("updateCombat", async (combat, updateData, context) => {
-  // 1. 仅限 GM 处理 (防止重复触发)
-  // game.users.activeGM 永远指向当前在线 ID 最小的那个 GM
-  // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
-  if (!game.users.activeGM?.isSelf) return;
-
-  // 2. 检查是否是回合变更 (turn 或 round 变化)
-  if (!("turn" in updateData) && !("round" in updateData)) return;
-
-  // 3. 获取 上一位 (Previous) 和 当前位 (Current) 的 Combatant
-  // previous: 刚刚结束回合的人
-  // current:  即将开始回合的人
-  const prevId = combat.previous.combatantId;
-  const currId = combat.current.combatantId;
-
-  // --- A. 处理回合结束 (Turn End) ---
-  if (prevId) {
-    const prevCombatant = combat.combatants.get(prevId);
-    const prevActor = prevCombatant?.actor;
-    if (prevActor) {
-      // 1. 执行数值回复
-      await prevActor.processRegen("TurnEnd");
-      // 2. 执行脚本 (Script Trigger)
-      await prevActor.runScripts("turnEnd", {});
-    }
-  }
-
-  // --- B. 处理回合开始 (Turn Start) ---
-  if (currId) {
-    const currCombatant = combat.combatants.get(currId);
-    const currActor = currCombatant?.actor;
-    if (currActor) {
-      // 1. 执行数值回复
-      await currActor.processRegen("TurnStart");
-      // 2. 执行脚本 (Script Trigger)
-      await currActor.runScripts("turnStart", {});
-    }
-  }
-
-  // 遍历战斗中的所有战斗员，清除过期的ae效果
-  for (const combatant of combat.combatants) {
-    if (combatant.actor) {
-      await ActiveEffectManager.cleanExpiredEffects(combatant.actor);
-    }
-  }
-});
 
 /**
  * 监听聊天消息渲染钩子
@@ -1049,21 +999,60 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 });
 
 /**
- * 监听战斗开始 (点击 Begin Combat 按钮)
+ * 统一的战斗状态流转监听(将战斗开始、回合开始、回合结束统一监听，避免竞争执行产生的错误)
  */
 Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
-  // 1. 仅限 GM 执行，且只有当回合(round)发生变化时才触发
-  // game.users.activeGM 永远指向当前在线 ID 最小的那个 GM
-  // 这样无论多少个 GM 在线，只有一个人会跑下面的代码
+  // 1. 仅限主 GM 执行，防止多 GM 重复触发
   if (!game.users.activeGM?.isSelf) return;
-  if (!updateData.hasOwnProperty("round")) return;
-  // 2. 只有当 round 从 0 变为 1 时，才视为“战斗正式开始”
-  // updateData.round 是新回合数，combat.previous.round 是旧回合数
-  if (updateData.round === 1 && combat.previous.round === 0) {
-    console.log("XJZL | 战斗正式开始！正在触发所有参战者的脚本...");
 
-    // 3. 遍历战斗中的所有人员
+  const isCombatStart = updateData.hasOwnProperty("round") && updateData.round === 1 && combat.previous.round === 0;
+  const isTurnChange = ("turn" in updateData) || ("round" in updateData);
+
+  // 如果既不是战斗开始，也不是轮次流转，直接返回
+  if (!isCombatStart && !isTurnChange) return;
+
+  // 2. 如果是战斗正式开始，必须先执行并“完全等待”进战脚本结束
+  if (isCombatStart) {
+    console.log("XJZL | 战斗正式开始！正在触发所有参战者脚本...");
+    // await 会阻塞后续代码，直到所有 Actor 的进战 AE 成功写入数据库
     await triggerCombatStartScripts(combat.combatants);
+  }
+
+  // 3. 处理回合流转逻辑
+  if (isTurnChange) {
+    const prevId = combat.previous.combatantId;
+    const currId = combat.current.combatantId;
+
+    // --- A. 处理回合结束 (Turn End) ---
+    // 规避边界情况：如果是战斗刚开始的第一轮，不需要触发上一个人的回合结束脚本
+    if (prevId && !isCombatStart) {
+      const prevCombatant = combat.combatants.get(prevId);
+      const prevActor = prevCombatant?.actor;
+      if (prevActor) {
+        // 执行数值回复与脚本
+        await prevActor.processRegen("TurnEnd");
+        await prevActor.runScripts("turnEnd", {});
+      }
+    }
+
+    // --- B. 处理回合开始 (Turn Start) ---
+    // 此时如果是第一轮第一个人，由于上面 isCombatStart 已经 await 完毕，可以放心执行
+    if (currId) {
+      const currCombatant = combat.combatants.get(currId);
+      const currActor = currCombatant?.actor;
+      if (currActor) {
+        // 执行数值回复与脚本
+        await currActor.processRegen("TurnStart");
+        await currActor.runScripts("turnStart", {});
+      }
+    }
+  }
+
+  // 4. 遍历战斗中所有战斗人员，清除过期 AE 效果
+  for (const combatant of combat.combatants) {
+    if (combatant.actor) {
+      await ActiveEffectManager.cleanExpiredEffects(combatant.actor);
+    }
   }
 });
 
