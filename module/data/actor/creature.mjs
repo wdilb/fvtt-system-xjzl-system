@@ -51,7 +51,17 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
             // 技能列表 (简单的数组对象，不走 Item， 只存描述)
             abilities: new fields.ArrayField(new fields.SchemaField({
                 name: new fields.StringField(),
-                description: new fields.StringField()
+                description: new fields.StringField(),
+                // 是否为攻击型特性：勾选后可点击发起一次纯攻击
+                isAttack: new fields.BooleanField({ initial: false, label: "XJZL.Creature.AbilityIsAttack" }),
+                // 攻击型特性的固定伤害数值
+                damage: new fields.NumberField({ initial: 0, min: 0, integer: true, label: "XJZL.Equipment.Damage" }),
+                // 攻击型特性的伤害类型（同人物武学，下拉选择）
+                damageType: new fields.StringField({
+                    initial: "waigong",
+                    choices: Object.keys(CONFIG.XJZL.damageTypes),
+                    label: "XJZL.Wuxue.Moves.DamageType"
+                })
             }))
         };
     }

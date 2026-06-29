@@ -2,6 +2,7 @@
  * 野兽/怪物 专用角色卡
  */
 import { localizeConfig } from "../utils/utils.mjs";
+import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } from "./behaviors/effect-interactions.mjs";
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -22,7 +23,11 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             addAbility: XJZLCreatureSheet.prototype._onAddAbility,
             deleteAbility: XJZLCreatureSheet.prototype._onDeleteAbility,
             // 快捷发送
-            postAbility: XJZLCreatureSheet.prototype._onPostAbility
+            postAbility: XJZLCreatureSheet.prototype._onPostAbility,
+            // 攻击型特性
+            rollAbilityAttack: XJZLCreatureSheet.prototype._onRollAbilityAttack,
+            // 特效交互（与人物卡一致）
+            deleteEffect: XJZLCreatureSheet.prototype._onDeleteEffect
         }
     };
 
@@ -37,12 +42,16 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
         context.system = actor.system;
         context.creatureTypes = localizeConfig(CONFIG.XJZL.creatureTypes); // 用于下拉菜单
         context.choices = {
-            sizes: { small: "小型", medium: "中型", large: "大型", huge: "巨型" }
+            sizes: { small: "小型", medium: "中型", large: "大型", huge: "巨型" },
+            damageTypes: localizeConfig(CONFIG.XJZL.damageTypes) // 攻击型特性伤害类型下拉
         };
 
         // 准备体力百分比
         const tili = actor.system.resources.tili;
         context.tiliPercent = tili.max ? Math.min(100, (tili.value / tili.max) * 100) : 0;
+
+        // 准备非被动 AE（与人物卡共享同一逻辑）
+        prepareEffects(this, context);
 
         return context;
     }
@@ -50,6 +59,18 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
     /* -------------------------------------------- */
     /*  交互 Actions                                */
     /* -------------------------------------------- */
+
+    _onRender(context, options) {
+        super._onRender(context, options);
+        const html = this.element;
+
+        // 特效交互：左键加层，右键减层（委托共享逻辑）
+        const effectsContainer = html.querySelector(".active-effects-row");
+        if (effectsContainer) {
+            effectsContainer.addEventListener("click", (event) => this._onEffectAction(event, 1));
+            effectsContainer.addEventListener("contextmenu", (event) => this._onEffectAction(event, -1));
+        }
+    }
 
     /* -------------------------------------------- */
     /*  通用图片编辑器处理                            */
@@ -102,5 +123,40 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             speaker: ChatMessage.getSpeaker({ actor: this.document }),
             content: content
         });
+    }
+
+    /**
+     * 发起攻击型特性：复用人物普攻管线（弹配置窗 + d20 命中检定 + applyDamage），
+     * 野兽攻击永不暴击（由 rollBasicAttack 的 isCreatureAttack 标记处理）。
+     */
+    async _onRollAbilityAttack(event, target) {
+        const index = Number(target.dataset.index);
+        const ability = this.document.system.abilities[index];
+        if (!ability) return;
+
+        await this.document.rollBasicAttack({
+            isCreatureAttack: true,
+            baseDamage: ability.damage || 0,
+            damageType: ability.damageType || "waigong",
+            // 弹窗显示全量伤害类型，并默认选中特性上的类型（流血/毒素等不会被外功内功覆盖）
+            defaultDamageType: ability.damageType || "waigong",
+            damageTypes: CONFIG.XJZL.damageTypes,
+            label: ability.name || "野兽攻击"
+        });
+    }
+
+    /* -------------------------------------------- */
+    /*  特效交互（委托共享模块，行为与人物卡一致）      */
+    /* -------------------------------------------- */
+    async _onEffectAction(event, change) {
+        return onEffectAction(this, event, change);
+    }
+
+    async _promptEffectDuration(effect) {
+        return promptEffectDuration(this, effect);
+    }
+
+    async _onDeleteEffect(event, target) {
+        return onDeleteEffect(this, event, target);
     }
 }

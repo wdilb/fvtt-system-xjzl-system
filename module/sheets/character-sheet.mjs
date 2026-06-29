@@ -9,7 +9,7 @@ import { ChatCardManager } from "../managers/chat-manager.mjs";
 import { XJZLAuditLog } from "../applications/audit-log.mjs";
 import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 import { XJZLManageXPDialog } from "../applications/manage-xp.mjs";
-import { ActiveEffectManager } from "../managers/active-effect-manager.mjs";
+import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } from "./behaviors/effect-interactions.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { XJZLCharacterPreviewApp } from "../applications/character-preview.mjs";
 import { XJZLCharacterWizardApp } from "../applications/character-wizard.mjs";
@@ -982,117 +982,10 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     /**
      * 准备特效数据，处理分类逻辑
+     * 委托给共享模块（野兽卡复用同一逻辑）
      */
     _prepareEffects(context) {
-        const temporaryEffects = [];
-        const passiveEffects = [];
-
-        // 1. 使用 appliedEffects (包含装备衍生的特效)
-        const effects = this.actor.appliedEffects;
-
-        for (const e of effects) {
-            // 过滤掉被禁用的 (可选，如果你想显示禁用的可以去掉这行)
-            if (e.disabled) continue;
-
-            // 2. 准备显示数据
-            // sourceName 是 V13 ActiveEffect 的原生 Getter，会自动解析 origin
-            let source = e.sourceName;
-            // 如果原生 Getter 获取失败 (比如 origin 链接断了)，做个兜底
-            if (source === "Unknown" || !source) {
-                // 尝试手动获取 Item 名字
-                if (e.parent instanceof Item) source = e.parent.name;
-                else source = "未知来源";
-            }
-
-            // 如果我们在 XJZLActiveEffect 里定义了 displayLabel (带层数)，就用它
-            // 否则用 e.name
-            // const displayName = e.displayLabel || e.name;
-            const displayName = e.name;//在页面处理了叠层的显示，所以这里不需要用 displayLabel了
-
-            // 计算持续时间简写 (为了支持 轮/回合/秒 多种情况)
-            let durationLabel = null;
-            const d = e.duration;
-
-            if (d) {
-                // --- 情况 1: 基于秒的实时时间 (Seconds) ---
-                if (d.seconds) {
-                    // 获取开始时间 (如果没记录开始时间，就假设是现在)
-                    const startTime = d.startTime || game.time.worldTime;
-                    // 计算结束时间
-                    const endTime = startTime + d.seconds;
-                    // 计算剩余秒数 (最大值取0，防止出现负数)
-                    const remainingSeconds = Math.max(0, endTime - game.time.worldTime);
-
-                    // 格式化显示
-                    if (remainingSeconds >= 3600) durationLabel = `${Math.floor(remainingSeconds / 3600)}h`;
-                    else if (remainingSeconds >= 60) durationLabel = `${Math.floor(remainingSeconds / 60)}m`;
-                    else durationLabel = `${remainingSeconds}s`;
-                }
-
-                // --- 情况 2: 基于战斗轮 (Rounds) ---
-                else if (d.rounds) {
-                    // 只有在【战斗中】且战斗已开始时，才能计算剩余轮次
-                    if (game.combat && game.combat.round) {
-                        const currentRound = game.combat.round;
-                        const startRound = d.startRound || currentRound;
-
-                        // 计算已经过去了多少轮
-                        const elapsed = currentRound - startRound;
-
-                        // 计算剩余轮次 = 总轮次 - 已过轮次
-                        const remaining = Math.max(0, d.rounds - elapsed);
-
-                        // 如果剩余0轮，说明即将在本轮结束
-                        if (remaining === 0) durationLabel = "即将结束";
-                        else durationLabel = `${remaining} 回合`;
-                    } else {
-                        // 如果不在战斗中，只能显示总时长 (静态)
-                        durationLabel = `${d.rounds} 回合`;
-                    }
-                }
-
-                // --- 情况 3: 基于回合 (Turns) ---
-                // Turns 通常比较短，或者用于 Initiative 排序，简单处理
-                else if (d.turns) {
-                    durationLabel = `${d.turns} 轮`;
-                }
-            }
-
-            const effectData = {
-                id: e.id,
-                name: displayName,
-                img: e.img,
-                description: e.description,
-                sourceName: source,
-                // 为了给 HBS 里的删除按钮用，如果特效属于 Item (被动)，通常不允许在 Actor 卡直接删除
-                isItemEffect: (e.parent instanceof Item) && e.transfer,
-                isStackable: e.isStackable,
-                stacks: e.stacks,
-                // 传入计算好的时间标签
-                durationLabel: durationLabel,
-                // 还是要把原始 duration 对象传进去 (防止有其他地方用)
-                duration: e.duration
-            };
-
-            // 3. 核心分类逻辑 (Wuxia 风格)
-
-            // 判定条件 A: 是系统认定的临时特效 (有持续时间, 或 StatusEffect)
-            const isTemp = e.isTemporary;
-
-            // 判定条件 B: 非被动传输 (即由脚本/消耗品产生，Transfer = false)
-            // 这种特效即使持续时间无限，也应该算作 Buff，而不是装备属性
-            const isActiveBuff = e.transfer === false;
-
-            if (isTemp || isActiveBuff) {
-                temporaryEffects.push(effectData);
-            } else {
-                // 剩下的归为被动 (装备/内功自带，且 Transfer = true)
-                passiveEffects.push(effectData);
-            }
-        }
-
-        context.temporaryEffects = temporaryEffects;
-        context.passiveEffects = passiveEffects;
+        prepareEffects(this, context);
     }
 
     /* -------------------------------------------- */
@@ -2164,11 +2057,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     async _onDeleteEffect(event, target) {
-        const effect = this.document.effects.get(target.dataset.id);
-        if (effect) {
-            await effect.delete();
-            ui.notifications.info(`已移除状态: ${effect.name}`);
-        }
+        return onDeleteEffect(this, event, target);
     }
 
     /**
@@ -2784,163 +2673,18 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     /**
      * 统一处理特效交互 (委托模式)
-     * @param {Event} event 
+     * @param {Event} event
      * @param {Number} change 1(左键/增加) 或 -1(右键/减少)
      */
     async _onEffectAction(event, change) {
-        // 1. 向上查找被点击的 Chip 元素
-        // 判断点击的是不是我们要处理的区域
-        const chip = event.target.closest(".interactive-effect");
-
-        // 如果点的不是 Chip (比如点到了容器的空白处)，直接忽略
-        if (!chip) return;
-
-        // 2. 排除删除按钮
-        // 如果点击的是 Chip 里的删除按钮，放行事件，我们不管
-        if (event.target.closest(".effect-delete") || event.target.closest("[data-action]")) {
-            return;
-        }
-
-        // 3. 阻止默认行为 (防止右键菜单，防止文本选中等等)
-        event.preventDefault();
-        event.stopPropagation();
-
-        // 4. 防抖锁 (Optional Performance Guard)
-        // 防止用户狂点导致数据库请求阻塞。如果正在处理上一次点击，则忽略本次。
-        if (this._effectProcessing) return;
-
-        const effectId = chip.dataset.effectId;
-        const effect = this.actor.effects.get(effectId);
-
-        if (!effect) return;
-
-        // 开启锁
-        this._effectProcessing = true;
-
-        try {
-            const isStackable = effect.isStackable;
-            const currentStacks = effect.stacks || 1;
-
-            // === 增加层数 ===
-            if (change > 0) {
-                if (!isStackable) {
-                    // 如果是不可叠层的，弹出修改持续时间窗口
-                    await this._promptEffectDuration(effect);
-                } else {
-                    // 传入 toObject() 避免直接引用
-                    await ActiveEffectManager.addEffect(this.actor, effect.toObject(), 1);
-                }
-            }
-            // === 减少层数 ===
-            else {
-                if (!isStackable) return; // 不可叠层右键无反应即可，不用报错
-
-                if (currentStacks > 1) {
-                    await ActiveEffectManager.removeEffect(this.actor, effect.id, 1);
-                } else {
-                    ui.notifications.info(`"${effect.name}" 当前只有 1 层。如需移除请点击删除按钮。`);
-                }
-            }
-        } catch (err) {
-            console.error(err);
-        } finally {
-            // 无论成功还是失败，都要释放锁
-            this._effectProcessing = false;
-        }
+        return onEffectAction(this, event, change);
     }
 
     /**
      * [辅助] 修改特效持续时间弹窗
-     * @param {ActiveEffect} effect 
+     * @param {ActiveEffect} effect
      */
     async _promptEffectDuration(effect) {
-        // 1. 获取默认显示值
-        // 优先尝试获取系统计算的“剩余回合数” (effect.duration.remaining)
-        // 如果不在战斗中或没有剩余时间数据，则回退到原始定义的总回合数 (effect.duration.rounds)
-        let defaultVal = effect.duration.rounds || 0;
-
-        // 检查是否有剩余时间属性 (Foundry V11+ 特性)
-        if (effect.duration && typeof effect.duration.remaining === "number") {
-            defaultVal = effect.duration.remaining;
-        }
-
-        // 2. 构建 HTML 内容
-        // 样式调整：
-        // - label: 添加 white-space: nowrap 防止换行; flex: 0 0 auto 让它只占据文字所需宽度
-        // - input: flex: 1 占据剩余空间
-        // - p: 增加提示语
-        const content = `
-            <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-bottom:15px;">
-                <label style="flex: 0 0 auto; white-space: nowrap; font-weight:bold;">持续时间 (回合):</label>
-                <div style="flex: 1;">
-                    <input type="number" name="rounds" value="${defaultVal}" min="0" step="1" autofocus style="text-align:center; width: 100%;">
-                </div>
-            </div>
-            
-            <div style="background: rgba(0, 0, 0, 0.05); padding: 8px; border-radius: 4px; font-size: 0.85em; color: #555; line-height: 1.4;">
-                <p style="margin-bottom: 5px;">
-                    <i class="fas fa-exclamation-circle"></i> <b>机制说明：</b><br>
-                    点击更新将<b>重置</b>该状态的开始时间。<br>
-                    设定为 <b>X</b>，意味着<b>从当前时刻起</b>，该状态还将持续 X 回合。
-                </p>
-                <p style="margin: 0;">
-                    <i class="fas fa-clock"></i> <b>结束时机：</b><br>
-                    将在当前角色的第 X 个回合<b>开始时</b>自动移除。
-                </p>
-                <p style="margin-top: 5px; color: #888;">(设为 0 代表无限持续)</p>
-            </div>
-        `;
-
-        const result = await foundry.applications.api.DialogV2.wait({
-            window: {
-                title: `调整: ${effect.name}`,
-                icon: "fas fa-stopwatch",
-                width: 320 //稍微加宽一点，保证舒适度
-            },
-            content: content,
-            buttons: [{
-                action: "ok",
-                label: "更新时长",
-                icon: "fas fa-check",
-                default: true,
-                callback: (event, button, dialog) => {
-                    const input = button.form.elements.rounds;
-                    return parseInt(input.value) || 0;
-                }
-            }],
-            rejectClose: false
-        });
-
-        // 如果用户没点确认，直接返回
-        if (result === null) return;
-
-        // 准备更新数据
-        const updateData = {
-            duration: {
-                rounds: result,
-                // 重要：修改时间时，必须重置开始锚点，否则系统会按旧的开始时间计算，导致刚改完就过期
-                startTime: game.time.worldTime
-            }
-        };
-
-        // 如果在战斗中，关联战斗轮次
-        if (game.combat) {
-            updateData.duration.startRound = game.combat.round;
-            updateData.duration.startTurn = game.combat.turn;
-        } else {
-            // 不在战斗中，清除战斗锚点，防止逻辑混乱
-            updateData.duration.startRound = null;
-            updateData.duration.startTurn = null;
-        }
-
-        // 执行更新
-        await effect.update(updateData);
-
-        // 视觉反馈
-        if (result > 0) {
-            ui.notifications.info(`${effect.name} 剩余时间已重置为 ${result} 回合。`);
-        } else {
-            ui.notifications.info(`${effect.name} 已设为无限持续。`);
-        }
+        return promptEffectDuration(this, effect);
     }
 }

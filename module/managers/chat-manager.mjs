@@ -1219,6 +1219,10 @@ export class ChatCardManager {
                 }
             }
 
+            // 野兽攻击永不暴击：强制抑制 isCrit 状态
+            // (仅关 canCrit 只能去掉暴击伤害倍率，挡不住 isCrit 触发的暴击战报/特效)
+            if (flags.neverCrit) isCrit = false;
+
             // 获取对抗结果 (broken / resisted / undefined)
             // 我们储存的时候把uuid的.替换成下划线来避免被视为嵌套对象，读取的时候也必须这样读取
             const safeKey = uuid.replaceAll(".", "_");

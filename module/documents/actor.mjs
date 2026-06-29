@@ -2263,7 +2263,9 @@ export class XJZLActor extends Actor {
     if (this.type === "container") return; //容器直接返回
     const mode = options.mode || "basic";
     const isOpportunity = mode === "opportunity";
-    const label = isOpportunity ? "趁虚而入" : "普通攻击";
+    // 野兽攻击：复用本管线，但永不暴击、伤害值/类型由特性提供
+    const isCreatureAttack = options.isCreatureAttack === true;
+    const label = options.label || (isOpportunity ? "趁虚而入" : "普通攻击");
     // 0. 状态阻断检查 (Status Check)
     const s = this.xjzlStatuses || {};
     if (s.stun) return ui.notifications.warn(`${this.name} 处于晕眩状态，无法行动！`);
@@ -2273,12 +2275,13 @@ export class XJZLActor extends Actor {
     const weapon = this.itemTypes.weapon.find(i => i.system.equipped);
     const weaponType = weapon ? weapon.system.type : "unarmed";
     const weaponName = weapon ? weapon.name : "徒手";
-    const baseDamage = weapon ? (weapon.system.damage || 0) : 0; // 徒手基础伤害通常为0
+    // 野兽攻击的伤害值由特性直接提供；人物普攻取武器基础伤害
+    const baseDamage = options.baseDamage ?? (weapon ? (weapon.system.damage || 0) : 0); // 徒手基础伤害通常为0
 
     // 2. 弹窗配置 (Dialog)
     // 普攻需要选择：伤害类型 (内功/外功)、手动修正
     let config = {
-      damageType: "waigong",
+      damageType: options.damageType || "waigong",
       bonusAttack: 0,
       bonusDamage: 0,
       canCrit: true, // 普攻默认可暴击
@@ -2292,11 +2295,14 @@ export class XJZLActor extends Actor {
       config = { ...config, ...dialogResult };
     }
 
+    // 野兽攻击永不暴击：强制关闭，并经由 chat flag neverCrit 抑制 isCrit 状态
+    if (isCreatureAttack) config.canCrit = false;
+
     // 3. 构建“虚拟招式”对象 (Virtual Move)
     // 这是一个临时对象，结构模仿 Item 中的 move，以便兼容脚本引擎和聊天模板
     const virtualMove = {
-      id: isOpportunity ? "opportunity-attack" : "basic-attack",
-      name: `${label} (${weaponName})`,
+      id: isOpportunity ? "opportunity-attack" : (isCreatureAttack ? "creature-attack" : "basic-attack"),
+      name: isCreatureAttack ? label : `${label} (${weaponName})`,
       type: "basic", // 新增加一种单独的类型，避免触发其他的特效
       damageType: config.damageType, // 由弹窗决定
       weaponType: weaponType,
@@ -2639,7 +2645,7 @@ export class XJZLActor extends Actor {
     const chatData = {
       user: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
-      flavor: `发起普通攻击 ${flavorSuffix}`,
+      flavor: `${isCreatureAttack ? ("发起" + label) : "发起普通攻击"} ${flavorSuffix}`,
       content: content,
       flags: {
         "xjzl-system": {
@@ -2659,6 +2665,7 @@ export class XJZLActor extends Actor {
           calc: calcResult,
           damageType: config.damageType,
           canCrit: config.canCrit,
+          neverCrit: isCreatureAttack, // 野兽攻击永不暴击：抑制 isCrit 状态
           manualCritMod: config.manualCritMod,
           attackBonus: config.bonusAttack,
           contextLevel: {
@@ -2737,14 +2744,16 @@ export class XJZLActor extends Actor {
     // 1. 生成唯一 ID
     const formId = `roll-config-${foundry.utils.randomID()}`;
     const isOpportunity = options.mode === "opportunity"; // 判断是否趁虚而入
+    // 野兽攻击：隐藏暴击区、对所有伤害类型都显示命中区
+    const isCreatureAttack = options.isCreatureAttack === true;
     // 2. 准备基础数据
     // 必须提供 selectOptions 所需的列表，否则 Handlebars 会报错
     const moveTypes = {
       real: "实招", // 普攻只能是实招
     };
 
-    // 假设全局配置中有伤害类型，如果没有则使用默认兜底
-    const damageTypes = { waigong: "外功", neigong: "内功" };
+    // 伤害类型：野兽攻击用全量列表（由特性传入），人物普攻默认外功/内功
+    const damageTypes = options.damageTypes || { waigong: "外功", neigong: "内功" };
 
     // 3. 准备模板上下文
     const context = {
@@ -2755,15 +2764,15 @@ export class XJZLActor extends Actor {
 
       // 默认选中状态
       currentMoveType: "real",    // 普攻默认为实招
-      currentDamageType: "waigong", // 默认外功
+      currentDamageType: options.defaultDamageType || "waigong", // 默认外功（野兽取特性上的类型）
 
       // 初始显隐控制
       needsAttack: true,  // 实招默认显示攻击
       isFeint: false,     // 实招默认不显示虚招
       needsDamage: true,  // 普攻需要伤害
       isHeal: false,
-      // 趁虚而入默认不勾选暴击(!true = false)，普攻默认勾选(true)
-      canCrit: !isOpportunity,
+      // 野兽攻击永不暴击 → 隐藏暴击区；趁虚而入默认不勾选暴击，普攻默认勾选
+      canCrit: isCreatureAttack ? false : (!isOpportunity),
 
       // 额外标记
       weaponName: weaponName
@@ -2806,13 +2815,14 @@ export class XJZLActor extends Actor {
           setVisible(feintSection, mType === "feint", "block");
 
           // 2. 攻击板块 (实招且非反击)
-          const needsAtk = (mType !== "counter") && ["waigong", "neigong"].includes(dType);
+          // 野兽攻击：无论何种伤害类型都先过命中，故始终显示攻击板块
+          const needsAtk = isCreatureAttack || ((mType !== "counter") && ["waigong", "neigong"].includes(dType));
           const atkSection = root.querySelector('[data-section="attack"]');
           setVisible(atkSection, needsAtk, "block");
 
-          // 3. 暴击板块
+          // 3. 暴击板块（野兽攻击永不暴击，强制隐藏）
           const critSection = root.querySelector('[data-section="crit"]');
-          setVisible(critSection, mType !== "counter", "flex");
+          setVisible(critSection, (mType !== "counter") && !isCreatureAttack, "flex");
         };
 
         // 绑定监听
