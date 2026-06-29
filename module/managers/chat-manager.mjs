@@ -261,8 +261,11 @@ export class ChatCardManager {
         // 读取全局必中标记
         const isGlobalForceHit = flags.forceHit || false;
         const isGlobalAlwaysHit = flags.alwaysHit || false;
-        // 反击(Counter) 或 非内外功招式 不需要投骰子比对闪避
-        const needsCheck = isValidDamage && !isCounter && !isGlobalForceHit;
+        // 野兽攻击：复用普攻管线，虚拟招式 moveId 为 "creature-attack"
+        // 野兽无论何种伤害类型都先过命中检定（与人物"非内外功必中"的语义不同）
+        const isCreatureAttack = flags.moveId === "creature-attack";
+        // 反击(Counter) 或 非内外功招式 不需要投骰子比对闪避；野兽攻击即使非内外功类型也需要检定
+        const needsCheck = (isValidDamage || isCreatureAttack) && !isCounter && !isGlobalForceHit;
 
 
         // 提前计算公共加值 (修复 ReferenceError 的关键)
