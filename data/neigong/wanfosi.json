@@ -546,7 +546,7 @@
             "sect": "wanfosi",
             "description": "<p>万佛寺菩提院核心内功心法，老祖于菩提下参坐“苦禅”时所悟出的高深内功。神功初创，老祖便将心法口诀刻写于“菩提叶”之上，便于传世，故名之曰“菩提禅经”。内功出于禅门，释生死之道，道苦禅之谛，练至大成，静如枯木，无生无死，渡己伤敌于无形之中。</p>",
             "requirement": "悟性需求: 4",
-            "automationNote": "完全自动化。同死触发减伤，独生检测同死标记触发回复。",
+            "automationNote": "完全自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -576,7 +576,7 @@
                         {
                             "label": "同死",
                             "trigger": "preTake",
-                            "script": "if (['waigong', 'neigong'].includes(args.type) && args.output.damage > 0) {\n    args.output.damage = Math.max(0, args.output.damage - 10);\n}",
+                            "script": "if (['waigong', 'neigong'].includes(args.type) && args.output.damage > 0) {\n    args.output.damage = Math.max(0, args.output.damage - 10);\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#8b0000; font-weight:bold;\"><i class=\"fas fa-shield-alt\"></i> 触发同死</div><div style=\"font-size:0.85em;\">减免 10 点内外功伤害。</div></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -596,7 +596,7 @@
                         {
                             "label": "同死/独生准备",
                             "trigger": "preTake",
-                            "script": "if (['waigong', 'neigong'].includes(args.type) && args.output.damage > 0) {\n    args.output.damage = Math.max(0, args.output.damage - 10);\n    // 标记独生触发\n    const effect = thisItem.effects.getName('独生');\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}",
+                            "script": "if (['waigong', 'neigong'].includes(args.type) && args.output.damage > 0) {\n    args.output.damage = Math.max(0, args.output.damage - 10);\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#8b0000; font-weight:bold;\"><i class=\"fas fa-shield-alt\"></i> 触发同死</div><div style=\"font-size:0.85em;\">减免 10 点内外功伤害。</div></div>`\n    });\n    if (!actor.effects.some(e => e.name === '独生')) {\n        const effect = thisItem.effects.getName('独生');\n        if (effect) {\n            const effectData = effect.toObject();\n            delete effectData._id;\n            effectData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(actor, effectData);\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -627,11 +627,8 @@
         "effects": [
             {
                 "name": "独生",
-                "icon": "icons/svg/heal.svg",
-                "duration": {
-                    "turns": 1
-                },
-                "description": "下回合造成伤害时回复气血内力",
+                "icon": "systems/xjzl-system/assets/icons/neigong/万佛.png",
+                "description": "你下回合造成伤害时，回复10点气血，10点内力。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -639,8 +636,18 @@
                         "stackable": false,
                         "scripts": [
                             {
+                                "trigger": "turnStart",
+                                "script": "await thisEffect.setFlag('xjzl-system', 'dusheng_active', true);",
+                                "active": true
+                            },
+                            {
                                 "trigger": "hit_once",
-                                "script": "await args.attacker.applyHealing({ healer: actor, amount: 10, type: 'hp'});\nawait args.attacker.applyHealing({ healer: actor, amount: 10, type: 'mp'});\nif (thisEffect) await thisEffect.delete();",
+                                "script": "if (thisEffect.getFlag('xjzl-system', 'dusheng_active') && args.actionType === 'attack' && args.hitCount > 0) {\n    await actor.applyHealing({ healer: actor, amount: 10, type: 'hp'});\n    await actor.applyHealing({ healer: actor, amount: 10, type: 'mp'});\n    actor.showFloatyText(\"独生回复!\", {fill: \"#00ff00\"});\n}",
+                                "active": true
+                            },
+                            {
+                                "trigger": "turnEnd",
+                                "script": "if (thisEffect.getFlag('xjzl-system', 'dusheng_active')) {\n    await thisEffect.delete();\n}",
                                 "active": true
                             }
                         ]
