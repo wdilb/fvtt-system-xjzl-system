@@ -27,7 +27,9 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             // 攻击型特性
             rollAbilityAttack: XJZLCreatureSheet.prototype._onRollAbilityAttack,
             // 特效交互（与人物卡一致）
-            deleteEffect: XJZLCreatureSheet.prototype._onDeleteEffect
+            deleteEffect: XJZLCreatureSheet.prototype._onDeleteEffect,
+            // 设为常用
+            togglePinnedAbility: XJZLCreatureSheet.prototype._onTogglePinnedAbility
         }
     };
 
@@ -52,6 +54,14 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
 
         // 准备非被动 AE（与人物卡共享同一逻辑）
         prepareEffects(this, context);
+
+        //解析常用招式
+        const pinnedList = actor.getFlag("xjzl-system", "pinnedMoves") || [];
+        if (context.system.abilities) {
+            context.system.abilities.forEach((ab, index) => {
+                ab.isPinned = pinnedList.includes(`Ability.${index}`);
+            });
+        }
 
         return context;
     }
@@ -143,6 +153,27 @@ export class XJZLCreatureSheet extends HandlebarsApplicationMixin(ActorSheetV2) 
             damageTypes: CONFIG.XJZL.damageTypes,
             label: ability.name || "野兽攻击"
         });
+    }
+
+    /**
+     * 切换野兽特性的常用收藏状态
+     */
+    async _onTogglePinnedAbility(event, target) {
+        event.preventDefault();
+        const index = target.dataset.index;
+        const flagKey = `Ability.${index}`; // 使用特殊前缀隔离
+
+        let pinnedList = this.document.getFlag("xjzl-system", "pinnedMoves") || [];
+
+        if (pinnedList.includes(flagKey)) {
+            // 如果已有，则移除
+            pinnedList = pinnedList.filter(id => id !== flagKey);
+        } else {
+            // 如果没有，则加入
+            pinnedList = [...pinnedList, flagKey];
+        }
+
+        await this.document.setFlag("xjzl-system", "pinnedMoves", pinnedList);
     }
 
     /* -------------------------------------------- */
