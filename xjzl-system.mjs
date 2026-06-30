@@ -60,6 +60,7 @@ import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
 import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
+import { xjzlSocket } from "./module/socket.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -1029,9 +1030,7 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
       const prevCombatant = combat.combatants.get(prevId);
       const prevActor = prevCombatant?.actor;
       if (prevActor) {
-        // 执行数值回复与脚本
-        await prevActor.processRegen("TurnEnd");
-        await prevActor.runScripts("turnEnd", {});
+        await _routeActorTurnScript(prevActor, "turnEnd", "TurnEnd");
       }
     }
 
@@ -1041,9 +1040,7 @@ Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
       const currCombatant = combat.combatants.get(currId);
       const currActor = currCombatant?.actor;
       if (currActor) {
-        // 执行数值回复与脚本
-        await currActor.processRegen("TurnStart");
-        await currActor.runScripts("turnStart", {});
+        await _routeActorTurnScript(currActor, "turnStart", "TurnStart");
       }
     }
   }
@@ -1075,6 +1072,7 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
 
 /**
  * 执行战斗开始脚本，把公共部分抽象出来了
+ * GM 路由：将每个 actor 的脚本路由到对应玩家端执行，如果无 owner 则在 GM 端执行
  */
 async function triggerCombatStartScripts(combatants) {
   const promises = combatants.map(async (combatant) => {
@@ -1086,18 +1084,83 @@ async function triggerCombatStartScripts(combatants) {
       combat: combatant.combat
     };
 
+    const ownerUserId = actor.getFirstOwnerId();
+
+    // 场景 A: NPC 无 owner 或玩家掉线 → GM 端直接执行
+    if (!ownerUserId) {
+      try {
+        await actor.runScripts("combatStart", context);
+      } catch (err) {
+        console.error(`XJZL | [GM] 进战脚本执行错误 [${actor.name}]:`, err);
+      }
+      return;
+    }
+
+    // 场景 B: 在线玩家 → 路由到玩家端执行
     try {
-      // 并发执行，互不阻塞
-      await actor.runScripts("combatStart", context);
-      console.log(`XJZL | 进战脚本执行完毕: ${actor.name}`);
+      await xjzlSocket.executeForUsers(
+        "runActorScript",
+        [ownerUserId],
+        actor.uuid,
+        "combatStart",
+        context
+      );
     } catch (err) {
-      console.error(`XJZL | 进战脚本执行错误 [${actor.name}]:`, err);
+      console.error(`XJZL | 路由脚本执行失败 [${actor.name}]:`, err);
+      // 路由失败时，GM 端兜底执行
+      try {
+        await actor.runScripts("combatStart", context);
+      } catch (fallbackErr) {
+        console.error(`XJZL | [GM兜底] 进战脚本执行错误 [${actor.name}]:`, fallbackErr);
+      }
     }
   });
 
-  // 等待所有脚本触发完成
   await Promise.all(promises);
 };
+
+/**
+ * 路由单个 actor 的回合脚本执行
+ * 将 processRegen 和 runScripts 路由到对应玩家端执行
+ * @param {Actor} actor - 目标 Actor
+ * @param {string} trigger - 触发时机 (turnStart/turnEnd)
+ * @param {string} regenTiming - processRegen 的时机 (TurnStart/TurnEnd)
+ */
+async function _routeActorTurnScript(actor, trigger, regenTiming) {
+  const ownerUserId = actor.getFirstOwnerId();
+
+  // 场景 A: NPC 无 owner 或玩家掉线 → GM 端直接执行
+  if (!ownerUserId) {
+    try {
+      await actor.processRegen(regenTiming);
+      await actor.runScripts(trigger, {});
+    } catch (err) {
+      console.error(`XJZL | [GM] ${trigger} 脚本执行错误 [${actor.name}]:`, err);
+    }
+    return;
+  }
+
+  // 场景 B: 在线玩家 → 路由到玩家端执行
+  try {
+    await xjzlSocket.executeForUsers(
+      "runActorScriptWithRegen",
+      [ownerUserId],
+      actor.uuid,
+      trigger,
+      regenTiming
+    );
+  } catch (err) {
+    console.error(`XJZL | 路由脚本执行失败 [${actor.name}]:`, err);
+    // 路由失败时，GM 端兜底执行
+    try {
+      await actor.processRegen(regenTiming);
+      await actor.runScripts(trigger, {});
+    } catch (fallbackErr) {
+      console.error(`XJZL | [GM兜底] ${trigger} 脚本执行错误 [${actor.name}]:`, fallbackErr);
+    }
+  }
+}
+
 // 应该没有必要浪费性能去实现这种功能
 // 监听世界时间变化 (Seconds 变化)来清理过期AE
 // 比如 GM 手动调整时间，或使用了 Calendar 模组

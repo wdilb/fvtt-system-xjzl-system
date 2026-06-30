@@ -3428,6 +3428,50 @@ export class XJZLActor extends Actor {
   }
 
 
+  // ================= 权限辅助 =================
+
+  /**
+   * 获取 Actor 的第一个 owner 用户 ID
+   * 优先读取 Token 的 ownership（处理 unlinked token 的独立 ownership），
+   * 其次读取 Actor 的 ownership。
+   * 优先返回玩家（非 GM），如果没有玩家 owner 才返回 GM。
+   * @returns {string|null} owner userId，如果没有则返回 null
+   */
+  getFirstOwnerId() {
+    // 优先读取 Token 的 ownership
+    let ownership = null;
+    if (this.isToken && this.token && this.token.actorLink === false && this.token.ownership) {
+      ownership = this.token.ownership;
+    } else if (this.ownership) {
+      ownership = this.ownership;
+    }
+
+    if (!ownership) return null;
+
+    // 一遍遍历：优先返回在线玩家，记录第一个 GM 作为兜底
+    let firstGmOwnerId = null;
+    for (const [userId, level] of Object.entries(ownership)) {
+      if (userId === 'default') continue;
+      if (level >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER) {
+        const user = game.users.get(userId);
+        if (!user) continue;
+
+        // 如果是在线玩家，立即返回（优先级最高）
+        if (!user.isGM && user.active) {
+          return userId;
+        }
+
+        // 如果是 GM，记录第一个（作为兜底）
+        if (user.isGM && !firstGmOwnerId) {
+          firstGmOwnerId = userId;
+        }
+      }
+    }
+
+    // 如果没有在线玩家 owner，返回第一个 GM owner（让 GM 兜底执行）
+    return firstGmOwnerId;
+  }
+
   // ======= 添加代理工厂方法 =======
   _proxifySandbox(sandbox) {
     for (const [key, value] of Object.entries(sandbox)) {

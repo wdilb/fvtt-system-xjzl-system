@@ -23,6 +23,11 @@ export function setupSocket() {
     // 注册飘字广播
     xjzlSocket.register("showScrollingText", _socketShowScrollingText);
 
+    // === 脚本执行路由 ===
+    // 注册Actor脚本执行（用于战斗流转脚本路由到玩家端执行）
+    xjzlSocket.register("runActorScript", _socketRunActorScript);
+    xjzlSocket.register("runActorScriptWithRegen", _socketRunActorScriptWithRegen);
+
 }
 
 // ================= GM 侧执行函数 =================
@@ -171,4 +176,45 @@ async function _socketBroadcastCombatStats(syncData) {
 async function _socketRequestCombatStats() {
     if (isNotActiveGM()) return null;
     return CombatStatsManager.exportSyncData();
+}
+
+/**
+ * 执行指定 Actor 的脚本（用于战斗流转脚本路由）
+ * 此方法会在玩家端执行，不是 GM 专用，所以不需要 isNotActiveGM 检查
+ * @param {string} actorUuid - Actor UUID
+ * @param {string} trigger - 触发时机 (combatStart/turnStart/turnEnd)
+ * @param {Object} context - 上下文对象
+ */
+async function _socketRunActorScript(actorUuid, trigger, context) {
+    const actor = await fromUuid(actorUuid);
+    if (!actor) {
+        console.error(`XJZL | Socket 路由脚本失败：找不到 Actor [${actorUuid}]`);
+        return;
+    }
+    try {
+        await actor.runScripts(trigger, context);
+    } catch (err) {
+        console.error(`XJZL | Socket 路由脚本执行错误 [${actor.name}, ${trigger}]:`, err);
+    }
+}
+
+/**
+ * 执行指定 Actor 的回合脚本（包含 processRegen 和 runScripts）
+ * 此方法会在玩家端执行，不是 GM 专用，所以不需要 isNotActiveGM 检查
+ * @param {string} actorUuid - Actor UUID
+ * @param {string} trigger - 触发时机 (turnStart/turnEnd)
+ * @param {string} regenTiming - processRegen 的时机 (TurnStart/TurnEnd)
+ */
+async function _socketRunActorScriptWithRegen(actorUuid, trigger, regenTiming) {
+    const actor = await fromUuid(actorUuid);
+    if (!actor) {
+        console.error(`XJZL | Socket 路由脚本失败：找不到 Actor [${actorUuid}]`);
+        return;
+    }
+    try {
+        await actor.processRegen(regenTiming);
+        await actor.runScripts(trigger, {});
+    } catch (err) {
+        console.error(`XJZL | Socket 路由脚本执行错误 [${actor.name}, ${trigger}]:`, err);
+    }
 }
