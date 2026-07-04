@@ -1175,23 +1175,24 @@
         "system": {
             "category": "wuxue",
             "sect": "qingtianmen",
+            "subSect": "none",
             "tier": 2,
-            "description": "巨云峰谷底怪石嶙峋，擎天门以烈火煅烧山石，再以锤法开路，遂得此功。",
+            "description": "<p>巨云峰谷底怪石嶙峋，擎天门以烈火煅烧山石，再以锤法开路，遂得此功。</p>",
             "requirements": "奇门-锤 属性：阳",
             "moves": [
                 {
                     "name": "钻燧取火",
                     "type": "stance",
-                    "damageType": "waigong",
-                    "weaponType": "special",
                     "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
+                    "damageType": "waigong",
+                    "weaponType": "qimen",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "次要动作，杵地旋转，火星四溅，开启架招，同时获得“燧火”，持续到战斗脱离或被解除架招。<br>燧火：暴击骰-1，暴击时给目标添加“烙伤”，持续一回合。<br>烙伤：每次出招后，受到 10 点火焰伤害。",
-                    "automationNote": "架招格挡自动。反击获得'燧火'自动。燧火暴击骰减免自动。燧火暴击施加'烙伤'自动。烙伤伤害自动。",
+                    "description": "<p>次要动作，杵地旋转，火星四溅，开启架招，同时获得“燧火”，持续到战斗脱离或被解除架招。</p><p><strong>燧火：</strong>暴击骰-1，暴击时给目标添加“烙伤”，持续一回合。</p><p><strong>烙伤：</strong>每次出招后，受到 10 点火焰伤害。</p><p><strong>升级：</strong>格挡值+10，燧火暴击骰再-1，消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
+                        "isFixed": false,
                         "base": 0,
                         "growth": 10,
                         "scalings": []
@@ -1215,26 +1216,26 @@
                     },
                     "scripts": [
                         {
-                            "label": "反击获得燧火",
-                            "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取等级计算效果(暴击骰-X)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst critReduct = -1 + (lvl - 1) * (-1);\n\nconst suihuo = thisItem.effects.getName(\"燧火\");\nif (suihuo) {\n    const effectData = suihuo.toObject();\n    // 动态修改暴击骰减免 (同时改外功和内功)\n    effectData.changes[0].value = String(critReduct);\n    effectData.changes[1].value = String(critReduct);\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    ui.notifications.info(\"架招反击：获得【燧火】\");\n}",
-                            "active": true
+                            "label": "开启获得燧火",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 仅在开启架招瞬间触发\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst critReduct = -lvl; // Lv1: -1, Lv2: -2, Lv3: -3\n\nconst suihuo = thisItem.effects.getName(\"燧火\");\nif (suihuo) {\n    const effectData = suihuo.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    \n    // 动态注入当级暴击骰减免\n    effectData.changes.forEach(c => {\n        if (c.key.includes(\"crit_\")) c.value = String(critReduct);\n    });\n    effectData.description += ` (当前暴击骰: ${critReduct})`;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n    actor.showFloatyText(\"燧火萦绕\", { fill: \"#ff4500\" });\n}"
                         }
                     ]
                 },
                 {
                     "name": "锤焰滔天",
                     "type": "feint",
-                    "damageType": "waigong",
-                    "weaponType": "special",
                     "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "range": "1",
+                    "damageType": "waigong",
+                    "weaponType": "qimen",
+                    "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "主要动作，握柄砸下，锤爆火芒，对目标造成 0.4 力量点外功伤害。若命中无架招目标，可为其添加“烙伤”，持续一回合。",
-                    "automationNote": "伤害自动计算。命中无架招自动施加'烙伤'。",
+                    "description": "<p>主要动作，握柄砸下，锤爆火芒，对目标造成 0.4 力量点外功伤害。若命中无架招目标，可为其添加“烙伤”，持续一回合。</p><p><strong>升级：</strong>伤害+10，烙伤持续回合数+1，消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
+                        "isFixed": false,
                         "base": 0,
                         "growth": 10,
                         "scalings": [
@@ -1265,24 +1266,24 @@
                         {
                             "label": "无架招施加烙伤",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nif (!args.target.system.martial?.stanceActive) {\n    // 获取等级计算持续时间\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n\n    const laoshang = thisItem.effects.getName(\"烙伤\");\n    if (laoshang) {\n        const effectData = laoshang.toObject();\n        effectData.duration.rounds = rounds;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 被施加【烙伤】。`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\n\n// 判定目标当前是否开启了架招\nif (!args.target.system.martial?.stanceActive) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = lvl; // Lv1=1回合, Lv2=2回合, Lv3=3回合\n\n    const laoshang = thisItem.effects.getName(\"烙伤\");\n    if (laoshang) {\n        const effectData = laoshang.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        effectData.duration = { rounds: rounds };\n        \n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        actor.showFloatyText(\"趁虚点燃!\", { fill: \"#ff4500\" });\n    }\n}"
                         }
                     ]
                 },
                 {
                     "name": "兵毁凿击",
                     "type": "real",
-                    "damageType": "waigong",
-                    "weaponType": "special",
                     "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "range": "1",
+                    "damageType": "waigong",
+                    "weaponType": "qimen",
+                    "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "主要动作，锤尖狠凿，对目标造成 0.5 力量点外功伤害，若目标具有架招可以格挡，目标手持武器的品级如果是凡品及以下，则其格挡值在此次伤害计算中不生效。",
-                    "automationNote": "伤害自动计算。脚本自动判定目标武器品级并无视格挡。",
+                    "description": "<p>主要动作，锤尖狠凿，对目标造成 0.5 力量点外功伤害，若目标具有架招可以格挡，目标手持武器的品级如果是凡品及以下，则其格挡值在此次伤害计算中不生效。</p><p><strong>升级：</strong>伤害+10，目标手持武器的品级需求提升一级（凡-铜-银），内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
+                        "isFixed": false,
                         "base": 0,
                         "growth": 10,
                         "scalings": [
@@ -1311,10 +1312,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "判定武器品级无视格挡",
-                            "trigger": "preDamage",
-                            "script": "// 获取当前等级对应的品级需求 (0=凡, 1=铜, 2=银)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst requiredTier = 0 + (lvl - 1);\n\n// 检查目标主手武器\nconst targetWeapon = args.target.itemTypes?.weapon?.find(w => w.system.equipped);\n\n// 如果目标没武器，或者武器品级 <= 需求品级，则无视格挡\nlet ignore = false;\nif (!targetWeapon) {\n    ignore = true; // 没武器算最低级\n} else {\n    const quality = targetWeapon.system.quality ?? 0;\n    if (quality <= requiredTier) ignore = true;\n}\n\nif (ignore) {\n    args.config.ignoreBlock = true;\n    ui.notifications.info(\"兵毁凿击：目标武器品级低，无视格挡！\");\n}",
-                            "active": true
+                            "label": "判定兵器品质无视格挡",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "if (!args.target || !args.target.system.martial?.stanceActive) return;\n\n// 门槛计算：Lv1=0(凡), Lv2=1(铜), Lv3=2(银)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst threshold = lvl - 1;\n\n// 查找目标当前装备的主武器\nconst targetWeapon = args.target.itemTypes?.weapon?.find(w => w.system.equipped);\nif (targetWeapon) {\n    const quality = targetWeapon.system.quality ?? 0;\n    if (quality <= threshold) {\n        args.flags.ignoreBlock = true;\n    }\n}"
+                        },
+                        {
+                            "label": "发送破防提醒卡片",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target || !args.target.system.martial?.stanceActive) return;\n\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst threshold = lvl - 1;\nconst targetWeapon = args.target.itemTypes?.weapon?.find(w => w.system.equipped);\nconst quality = targetWeapon ? (targetWeapon.system.quality ?? 0) : 0;\n\n// 若确实满足破防条件，发送高光卡片提醒（已优化左边距 padding）\nif (quality <= threshold) {\n    const content = `\n        <div class=\"xjzl-chat-card item-card\">\n            <header class=\"card-header\" style=\"border-left: 4px solid #c0392b; padding: 6px 8px;\">\n                <img src=\"${thisItem.img}\" style=\"border:none;\" />\n                <h3 style=\"color: #c0392b; margin-left: 4px;\">兵毁凿击 · 兵器碾压</h3>\n            </header>\n            <div class=\"card-content-wrapper\" style=\"padding: 6px 8px;\">\n                <div style=\"font-weight:bold; color:#8b0000; margin-bottom:5px;\"><i class=\"fas fa-hammer\"></i> 强力凿击触发！</div>\n                <div style=\"font-size:0.9em;\">目标：<b>${args.target.name}</b> 手持的兵器品质过低，无法承受重锤震力！</div>\n                <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px; color:#d35400; font-weight:bold;\">\n                    └ 对方格挡值已被完全无视！\n                </div>\n            </div>\n        </div>\n    `;\n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n}"
                         }
                     ]
                 },
@@ -1322,16 +1329,16 @@
                     "name": "薪火相传",
                     "type": "real",
                     "isUltimate": true,
-                    "damageType": "waigong",
-                    "weaponType": "special",
                     "element": "gang",
-                    "img": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "range": "5",
+                    "damageType": "waigong",
+                    "weaponType": "qimen",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "主要动作，锤头火星大盛，砸击目标，造成 0.6 力量点外功伤害。<br>·若自身具有燧火，可选择范围内一个友方目标，为其添加“薪火”，持续到战斗脱离。<br>薪火：下一次出招招式伤害+10 且必定暴击。",
-                    "automationNote": "伤害自动计算。若有'燧火'，会提示玩家给友方添加'薪火'。薪火特效(下一次+10 dmg, 必暴)需手动操作。",
+                    "description": "<p>主要动作，锤头火星大盛，砸击目标，造成 0.6 力量点外功伤害。</p><p>·若自身具有燧火，可选择范围内一个友方目标，为其添加“薪火”，持续到战斗脱离。</p><p><strong>薪火：</strong>下一次出招招式伤害+10 且必定暴击。</p><p><strong>升级：</strong>招式伤害+20，添加薪火的目标+1，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "半自动化。出招卡片提示添加薪火。",
                     "calculation": {
+                        "isFixed": false,
                         "base": 0,
                         "growth": 20,
                         "scalings": [
@@ -1360,10 +1367,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "燧火检测与提示",
-                            "trigger": "attack",
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suihuo\")) {\n    ui.notifications.info(\"【薪火相传】检测到燧火！请选择友方施加【薪火】（伤害+10且必暴）。\");\n}",
-                            "active": true
+                            "label": "薪火卡片提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const hasSuihuo = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suihuo\");\nif (hasSuihuo) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const targetsCount = lvl; // Lv1=1人, Lv2=2人, Lv3=3人\n    \n    // 带有安全边距 padding 的高光提示卡片\n    const content = `\n        <div class=\"xjzl-chat-card item-card\">\n            <header class=\"card-header\" style=\"border-left: 4px solid #e67e22; padding: 6px 8px;\">\n                <img src=\"${thisItem.img}\" style=\"border:none;\" />\n                <h3 style=\"color: #e67e22; margin-left: 4px;\">薪火相传 · 烈火引露</h3>\n            </header>\n            <div class=\"card-content-wrapper\" style=\"padding: 6px 8px;\">\n                <div style=\"font-weight:bold; color:#d35400; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 燧火共鸣触发！</div>\n                <div style=\"font-size:0.9em; color:#333;\">\n                    你当前持有【燧火】，可将烈焰余威传承给友军。\n                </div>\n                <div style=\"margin:8px 0; padding:6px; background:#fdf2e9; border:1px solid #fae5d3; border-radius:4px; font-size:0.9em;\">\n                    请手动选择至多 <b>${targetsCount}</b> 名范围内友方目标，为其施加 <b>【薪火】</b> 状态。\n                </div>\n                <div style=\"font-size:0.8em; color:#7f8c8d;\">\n                    └ 薪火效果：下一次出招招式伤害+10 且必定暴击。\n                </div>\n            </div>\n        </div>\n    `;\n    \n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n}"
                         }
                     ]
                 }
@@ -1372,7 +1379,7 @@
                 {
                     "name": "燧火",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
-                    "description": "暴击骰-X。暴击时给目标添加“烙伤”。",
+                    "description": "暴击骰减免。暴击时给目标添加“烙伤”持续一回合。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1383,7 +1390,7 @@
                                     "label": "燧火暴击施加烙伤",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "\n                    // 必须暴击才触发\n                    if (!args.isCrit) return;\n                    \n                    // 获取烙伤模板\n                    const laoshang = args.item.effects.getName(\"烙伤\");\n                    if (laoshang) {\n                        await game.xjzl.api.effects.addEffect(args.target, laoshang);\n                        ui.notifications.info(\"燧火暴击：目标被施加【烙伤】\");\n                    }\n                "
+                                    "script": "if (!args.isCrit || !args.target) return;\n\nconst sourceItem = await fromUuid(thisEffect.origin);\n\nconst laoshang = sourceItem.effects.getName(\"烙伤\");\nif (laoshang) {\n    const effectData = laoshang.toObject();\n    delete effectData._id;\n    effectData.origin = sourceItem.uuid;\n    effectData.duration = { rounds: 1 };\n    \n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    \n    // 暴击点燃！带安全边距 padding 的专属卡片\n    const content = `\n        <div class=\"xjzl-chat-card item-card\">\n            <header class=\"card-header\" style=\"border-left: 4px solid #e74c3c; padding: 6px 8px;\">\n                <img src=\"${sourceItem.img}\" style=\"border:none;\" />\n                <h3 style=\"color: #e74c3c; margin-left: 4px;\">燧火灼心 · 烙伤触发</h3>\n            </header>\n            <div class=\"card-content-wrapper\" style=\"padding: 6px 8px;\">\n                <div style=\"font-weight:bold; color:#c0392b; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 暴击烈焰附着！</div>\n                <div style=\"font-size:0.9em;\">目标：<b>${args.target.name}</b> 被点燃，获得 <b>【烙伤】</b> 状态！</div>\n                <div style=\"font-size:0.8em; color:#7f8c8d; margin-top:4px;\">└ 每次出招后将受到 10 点火焰灼烧伤害。</div>\n            </div>\n        </div>\n    `;\n    ChatMessage.create({\n        user: game.user.id,\n        speaker: ChatMessage.getSpeaker({ actor: actor }),\n        content: content\n    });\n}"
                                 }
                             ]
                         }
@@ -1411,28 +1418,41 @@
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "laoshang"
+                            "slug": "laoshang",
+                            "scripts": [
+                                {
+                                    "label": "每次出招受到火焰伤害",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "// 当宿主发起攻击出招时，立刻造成10点火焰伤害\nawait actor.applyDamage({ \n    amount: 10, \n    type: \"fire\", \n    isHit: true, \n    ignoreDefense: true, \n    source: \"dot\" \n});\nactor.showFloatyText(\"烙伤灼烧 -10\", { fill: \"#ff4500\" });"
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenHpAttack",
-                            "mode": 2,
-                            "value": "-10"
-                        }
-                    ]
+                    "changes": []
                 },
                 {
                     "name": "薪火",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/擎天.png",
                     "description": "下一次出招招式伤害+10 且必定暴击。",
-                    "duration": {
-                        "turns": 1
-                    },
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "xinhuo"
+                            "slug": "xinhuo",
+                            "scripts": [
+                                {
+                                    "label": "薪火出招增强暴击",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "// 终极过滤：排除普通平A，但保留真正的招式与趁虚而入(id为 opportunity-attack)\nif (args.move?.type === \"basic\" && args.move?.id !== \"opportunity-attack\") return;\n\n// 必定暴击！\nargs.flags.critThresholdMod += 20;\nargs.flags.damageResult.breakdown += \"\\n+ 薪火相传：必定暴击与伤害+10\";"
+                                },
+                                {
+                                    "label": "消耗薪火智能移除与发卡",
+                                    "trigger": "hit_once",
+                                    "active": true,
+                                    "script": "// 排除普通攻击，确保不被浪费\nif (args.move?.type === \"basic\" && args.move?.id !== \"opportunity-attack\") return;\n\nconst iconImg =  \"systems/xjzl-system/assets/icons/wuxue/擎天.png\";\n\n// 移除特效\nawait thisEffect.delete();\n\n// 发送带左边距 padding 的华丽消耗提醒卡片\nconst content = `\n    <div class=\"xjzl-chat-card item-card\">\n        <header class=\"card-header\" style=\"border-left: 4px solid #f1c40f; padding: 6px 8px;\">\n            <img src=\"${iconImg}\" style=\"border:none;\" />\n            <h3 style=\"color: #d35400; margin-left: 4px;\">薪火 · 烈焰极意</h3>\n        </header>\n        <div class=\"card-content-wrapper\" style=\"padding: 6px 8px;\">\n            <div style=\"font-weight:bold; color:#e67e22; margin-bottom:5px;\"><i class=\"fas fa-fire\"></i> 薪火引爆！</div>\n            <div style=\"font-size:0.9em; color:#333;\">\n                <b>${actor.name}</b> 将传承的薪火之力完全释放，本次招式<b>伤害+10 且必定暴击！</b>\n            </div>\n            <div style=\"margin-top:5px; border-top:1px dashed #ccc; padding-top:5px; color:#7f8c8d; font-size:0.85em;\">\n                └ 【薪火】状态已完美消耗。\n            </div>\n        </div>\n    </div>\n`;\nChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: content\n});\nactor.showFloatyText(\"薪火已引爆\", { fill: \"#f1c40f\" });"
+                                }
+                            ]
                         }
                     },
                     "changes": [
@@ -1440,16 +1460,6 @@
                             "key": "system.combat.damages.skill.mod",
                             "mode": 2,
                             "value": "10"
-                        },
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "-20"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "-20"
                         }
                     ]
                 }
