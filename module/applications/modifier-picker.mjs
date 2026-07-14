@@ -53,7 +53,7 @@ export class XJZLModifierPicker extends HandlebarsApplicationMixin(ApplicationV2
     _onRender(context, options) {
         super._onRender(context, options);
 
-        // 搜索逻辑复用你参考代码里的思路
+        // 搜索逻辑
         const searchInput = this.element.querySelector("input[name='filter']");
         if (searchInput) {
             searchInput.addEventListener("input", (event) => {

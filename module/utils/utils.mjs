@@ -143,6 +143,7 @@ export function getModifierChoices() {
     add(groupStats, `stats.${k}.checkMod`, `${game.i18n.localize(labelKey)} (检定 Mod)`);
   }
   add(groupStats, `stats.freePoints.mod`, `自由属性点 (Mod)`);
+  add(groupStats, `stats.wuxing.breakLimit`, `悟性 (突破上限)`);
 
   // 2. 战斗属性 (Combat Base)
   const groupCombat = game.i18n.localize("XJZL.Combat.Label");

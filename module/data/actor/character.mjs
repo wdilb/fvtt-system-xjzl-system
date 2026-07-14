@@ -94,7 +94,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
         // 悟性特殊处理：包含玄关打通状态
         wuxing: new fields.SchemaField({
-          value: new fields.NumberField({ required: true, integer: true, initial: 1, label: "XJZL.Stats.Base" })
+          value: new fields.NumberField({ required: true, integer: true, initial: 1, label: "XJZL.Stats.Base" }),
+          breakLimit: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.WuxingBreakLimit" })
           // mod 在运行时生成
         }, { label: "XJZL.Stats.Wuxing" }),
 
@@ -1008,7 +1009,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // 上限逻辑: 读取 jingmai.xuanguan.broken
     const wuxingLimit = x.broken ? 40 : 30;
-    stats.wuxing.total = Math.min(wuxingTotal, wuxingLimit);
+    const breakLimit = stats.wuxing.breakLimit || 0;
+    stats.wuxing.total = Math.min(wuxingTotal, wuxingLimit) + breakLimit;
 
     // ===========================================
     // 4. 计算剩余自由属性点
