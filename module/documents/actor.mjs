@@ -1674,6 +1674,8 @@ export class XJZLActor extends Actor {
             if (this.system.martial?.stanceActive) {
               await this.stopStance();
             }
+            // 濒死自动倒地
+            await this.toggleStatusEffect("prone", { active: true });
           }
 
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: false });
