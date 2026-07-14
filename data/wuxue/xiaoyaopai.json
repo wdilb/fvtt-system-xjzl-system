@@ -1590,7 +1590,7 @@
             "category": "sanshou",
             "sect": "xiaoyaopai",
             "tier": 1,
-            "description": "<p>逍遥派绝技，看似正面对敌，实则内力弯曲如意，<br>随心而动，极难躲避。<br>需求：《白虹气功》修炼圆满</p>",
+            "description": "<p>逍遥派绝技，看似正面对敌，实则内力弯曲如意，随心而动，极难躲避。</p><p><strong>需求：</strong>《白虹气功》修炼圆满</p>",
             "requirements": "《白虹气功》修炼圆满",
             "moves": [
                 {
@@ -1598,11 +1598,12 @@
                     "type": "qi",
                     "actionType": "buff",
                     "damageType": "none",
+                    "weaponType": "unarmed",
                     "img": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
-                    "description": "<p>次要动作，不动声色，内力激发，你获得“白<br>玉”，持续三个回合。<br>白玉：你对距离为 1 的目标施展的徒手武学招式必<br>定命中，且暴击骰-1。<br>升级：暴击骰再-1，怒气消耗-1，内力消耗+1。</p>",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
+                    "description": "<p>次要动作，不动声色，内力激发，你获得“白玉”，持续三个回合。</p><p><strong>白玉：</strong>你对距离为 1 的目标施展的徒手武学招式必定命中，且暴击骰-1。</p><p><strong>升级：</strong>暴击骰再-1，怒气消耗-1，内力消耗+1。</p>",
                     "automationNote": "完全自动化。",
                     "costs": {
                         "mp": [
@@ -1621,12 +1622,16 @@
                             0
                         ]
                     },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
                     "scripts": [
                         {
                             "label": "施展白玉掌",
                             "trigger": "hit",
-                            "script": "const moveLvl = Math.max(1, args.move.computedLevel || 1);\nconst baseEffect = thisItem.effects.getName(\"白玉\");\nif (!baseEffect) return ui.notifications.warn(\"未找到特效配置\");\n\n// 动态设置暴击骰修正值 (Lv1: -1, Lv2: -2, Lv3: -3)\nconst critMod = moveLvl;\n\nconst effectData = baseEffect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.critMod\", critMod);\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);",
-                            "active": true
+                            "active": true,
+                            "script": "const moveLvl = Math.max(1, args.move.computedLevel || 1);\nconst baseEffect = thisItem.effects.getName(\"白玉\");\nif (!baseEffect) return ui.notifications.warn(\"未找到特效配置\");\n\nconst critMod = moveLvl;\nconst effectData = baseEffect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.critMod\", critMod);\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ]
                 }
@@ -1637,6 +1642,7 @@
                 "name": "白玉",
                 "icon": "systems/xjzl-system/assets/icons/wuxue/逍遥.png",
                 "description": "你对距离为 1 的目标施展的徒手武学招式必定命中，且暴击骰减少。",
+                "transfer": false,
                 "duration": {
                     "rounds": 3
                 },
@@ -1647,7 +1653,8 @@
                             {
                                 "label": "白玉效果",
                                 "trigger": "check",
-                                "script": "// 检查武器类型\nif (args.move.weaponType !== 'unarmed') return;\n\n// 检查距离 (需要 Token)\nconst attackerToken = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nconst targetToken = args.target.token?.object || args.target.getActiveTokens()[0];\nif (!attackerToken || !targetToken) return;\n\n// 计算网格距离\nconst dist = canvas.grid.measureDistance(attackerToken, targetToken, {gridSpaces: true});\n\n// 距离为1\nif (dist <= 1.5) { // 考虑到斜角可能略大于1，或者浮点误差，通常格点距离是整数，这里宽松一点\n    args.flags.grantHit += 100; // 必定命中\n    \n    const mod = thisEffect.getFlag(\"xjzl-system\", \"critMod\") || 1;\n    args.flags.critThresholdMod += mod;\n}"
+                                "active": true,
+                                "script": "if (args.move.weaponType !== 'unarmed') return;\n\nconst attackerToken = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nconst targetToken = args.target.token?.object || args.target.getActiveTokens()[0];\nif (!attackerToken || !targetToken) return;\n\nconst dist = canvas.grid.measureDistance(attackerToken, targetToken, {gridSpaces: true});\n\nif (dist <= 1.5) {\n    args.flags.alwaysHit = true; // 正确使用必定命中标记\n    const mod = thisEffect.getFlag(\"xjzl-system\", \"critMod\") || 1;\n    args.flags.critThresholdMod += mod;\n}"
                             }
                         ]
                     }
