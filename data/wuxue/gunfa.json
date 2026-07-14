@@ -2850,7 +2850,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，力破一点，造成伤害，击中无架招目标为其添加“灵蛇毒”持续一回合。</p><p><strong>灵蛇毒：</strong>回合末受到 10 点毒素伤害。</p><p><strong>升级：</strong>伤害+10，灵蛇毒持续回合数+1，消耗+2。</p>",
-                    "automationNote": "无架招施毒自动。",
+                    "automationNote": "无架招施毒自动，毒伤回合末自动结算。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2872,8 +2872,8 @@
                         {
                             "label": "施加灵蛇毒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"灵蛇毒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    eff.duration = { rounds: 1 + (lvl - 1) };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"灵蛇毒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    eff.duration = { rounds: 1 + (lvl - 1) };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
                         }
                     ]
                 },
@@ -2887,7 +2887,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，棍斜横扫，灵动摆击，造成伤害。若目标存在“灵蛇毒”，则加重其毒伤，使其额外受到 10 点毒素伤害。</p><p><strong>升级：</strong>伤害+10，额外受到毒素伤害+10，消耗+2。</p>",
-                    "automationNote": "额外毒伤自动。",
+                    "automationNote": "额外毒伤自动（于命中后独立造成真实毒伤结算并附带战报）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2907,10 +2907,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "追加毒伤",
-                            "trigger": "preDamage",
-                            "script": "const hasPoison = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lingshedu\");\nif (hasPoison) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = 10 + (lvl - 1) * 10;\n    args.config.amount += bonus;\n    ui.notifications.info(`追加毒伤 +${bonus}`);\n}",
-                            "active": true
+                            "label": "追加独立毒伤",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    const hasPoison = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lingshedu\");\n    if (hasPoison) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const bonus = 10 + (lvl - 1) * 10;\n        await args.target.applyDamage({\n            amount: bonus,\n            type: \"poison\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: false\n        });\n        const content = `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #8e44ad; margin-left:4px; background:rgba(142,68,173,0.05);\">\n            <div style=\"color:#8e44ad; font-weight:bold; font-size:0.9em; margin-bottom: 2px;\">\n                <i class=\"fas fa-skull-crossbones\"></i> 毒素加深\n            </div>\n            <div style=\"font-size:0.85em; color:#555;\">引发目标体内灵蛇毒，额外承受了 <b style=\"color:purple;\">${bonus}</b> 点毒素伤害！</div>\n        </div>`;\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: content });\n    }\n}"
                         }
                     ]
                 },
@@ -2940,8 +2940,8 @@
                         {
                             "label": "击破反毒",
                             "trigger": "damaged",
-                            "script": "if (args.isBroken && args.attacker) {\n    const hasPoison = args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lingshedu\");\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    \n    if (hasPoison) {\n        const eff = thisItem.effects.getName(\"奇蛇毒\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.attacker, eff);\n    } else {\n        const eff = thisItem.effects.getName(\"灵蛇毒\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, eff);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBroken && args.attacker) {\n    const hasPoison = args.attacker.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lingshedu\");\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    \n    if (hasPoison) {\n        const eff = thisItem.effects.getName(\"奇蛇毒\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        await game.xjzl.api.effects.addEffect(args.attacker, eff);\n    } else {\n        const eff = thisItem.effects.getName(\"灵蛇毒\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, eff);\n    }\n}"
                         }
                     ]
                 },
@@ -2983,8 +2983,8 @@
                         {
                             "label": "濒死提示",
                             "trigger": "hit",
-                            "script": "if (args.isDying || args.isDead) {\n    ui.notifications.info(\"目标濒死！请手动给周围敌人施加 [奇蛇毒]\");\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isDying || args.isDead) {\n    ui.notifications.info(\"目标濒死！请手动给周围敌人施加 [奇蛇毒]\");\n}"
                         }
                     ]
                 }
@@ -2992,33 +2992,31 @@
             "effects": [
                 {
                     "name": "灵蛇毒",
-                    "icon": "icons/creatures/reptiles/snake-fang-green.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "回合末受到 10 点毒素伤害。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "lingshedu",
-                            "stackable": false,
-                            "regenHpTurnEnd": -10
+                            "scripts": [
+                                {
+                                    "label": "毒素发作",
+                                    "trigger": "turnEnd",
+                                    "active": true,
+                                    "script": "await actor.applyDamage({\n    amount: 10,\n    type: \"poison\",\n    isHit: true,\n    ignoreDefense: true,\n    ignoreBlock: true,\n    ignoreStance: true,\n    source: \"dot\"\n});\nconst content = `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #8e44ad; margin-left:4px; background:rgba(142,68,173,0.05);\">\n    <div style=\"color:#8e44ad; font-weight:bold; font-size:0.9em; margin-bottom: 2px;\">\n        <i class=\"fas fa-biohazard\"></i> 灵蛇毒发作\n    </div>\n    <div style=\"font-size:0.85em; color:#555;\">毒素攻心，承受了 10 点毒素面板伤害 (已计算抗性)。</div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: content });"
+                                }
+                            ]
                         }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenHpTurnEnd",
-                            "mode": 2,
-                            "value": "-10"
-                        }
-                    ]
+                    }
                 },
                 {
                     "name": "奇蛇毒",
-                    "icon": "icons/creatures/reptiles/snake-cobra-poison-green.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
                     "description": "外功防御和韧性归零。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "qishedu",
-                            "stackable": false
+                            "slug": "qishedu"
                         }
                     },
                     "changes": [
