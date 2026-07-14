@@ -852,7 +852,7 @@
                             "label": "询问消耗气弓",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"漫天飞羽\" },\n        content: \"<p>是否消耗【气弓】使本次攻击对所有命中目标施加【禁足】？</p>\",\n        yes: { label: \"消耗气弓\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await qigong.delete();\n        args.flags.qiBowConsumed = true; // 传递给 hit 阶段\n        actor.showFloatyText(\"气弓消散！\", {fill: \"#ffffff\"});\n    }\n}"
+                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"漫天飞羽\" },\n        content: \"<p>是否消耗【气弓】使本次攻击对所有命中目标施加【禁足】？</p>\",\n        yes: { label: \"消耗气弓\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await qigong.delete();\n        args.flags.qiBowConsumed = true; \n        actor.showFloatyText(\"气弓消散！\", {fill: \"#ffffff\"});\n    }\n}"
                         },
                         {
                             "label": "施加禁足",
@@ -871,7 +871,7 @@
                     "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，轻盈之气，佯射目标，造成 0.4 身法点内功伤害，击破架招时，使目标陷入“下盘不稳”，持续三回合。</p><p>·若自身具有“气弓”，可移除气弓使虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
+                    "description": "<p>主要动作，轻盈之气，佯射目标，造成伤害，击破架招时，使目标陷入“下盘不稳”，持续三回合。</p><p>·若自身具有“气弓”，可移除气弓使虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值再+1，内力消耗+2。</p>",
                     "automationNote": "出招前自动询问是否消耗气弓以增加动态虚招值。击破架招自动施加下盘不稳。",
                     "costs": {
                         "mp": [
@@ -892,22 +892,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "询问消耗气弓",
+                            "label": "消耗气弓增加虚招值",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"漫天飞羽\" },\n        content: \"<p>是否决定消耗【气弓】使本次攻击对所有命中目标施加【禁足】？</p>\",\n        yes: { label: \"决定消耗\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        // 写入持久化标记，跨阶段传递\n        await actor.setFlag(\"xjzl-system\", \"qiBowConsumed_mantian\", true);\n        actor.showFloatyText(\"锁定气弓威能\", {fill: \"#00ffff\"});\n    }\n}"
+                            "script": "const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\nif (qigong) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"秋风送寒\" },\n        content: \"<p>是否决定消耗【气弓】使本次招式的虚招值增加？</p>\",\n        yes: { label: \"决定消耗\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await qigong.delete();\n        const lvl = Math.max(1, move.computedLevel || 1);\n        args.flags.bonusFeint += lvl;\n        actor.showFloatyText(\"气弓消散！\", {fill: \"#ffffff\"});\n        ui.notifications.info(`已消耗气弓，虚招值 +${lvl}`);\n    }\n}"
                         },
                         {
-                            "label": "施加禁足",
+                            "label": "击破施加下盘不稳",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && actor.getFlag(\"xjzl-system\", \"qiBowConsumed_mantian\")) {\n    const rootEff = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (rootEff) {\n        rootEff.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, rootEff);\n    }\n}"
-                        },
-                        {
-                            "label": "清理与消耗",
-                            "trigger": "hit_once",
-                            "active": true,
-                            "script": "if (actor.getFlag(\"xjzl-system\", \"qiBowConsumed_mantian\")) {\n    const qigong = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\");\n    if (qigong) await qigong.delete();\n    // 清理标记\n    await actor.unsetFlag(\"xjzl-system\", \"qiBowConsumed_mantian\");\n    ui.notifications.info(\"气弓已消耗，威能释放完毕。\");\n}"
+                            "script": "if (args.isBroken) {\n    const effData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n    if (effData) {\n        effData.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, effData);\n    }\n}"
                         }
                     ]
                 },
@@ -921,7 +915,7 @@
                     "range": "10米",
                     "targetInfo": "路径敌人",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，调息开步拉弓，射出贯穿气箭，对直线路径上所有敌方造成 0.7 身法点内功伤害，并为他们添加“缚身”，持续一回合。</p><p>·若自身具有“气弓”，招式暴击骰-1，且缚身的持续回合数变为三回合。</p><p><strong>升级：</strong>招式伤害+20，暴击骰再-1，怒气消耗-1，内力消耗+8。</p>",
+                    "description": "<p>蓄力动作，调息开步拉弓，射出贯穿气箭，对直线路径上所有敌方造成伤害，并为他们添加“缚身”，持续一回合。</p><p>·若自身具有“气弓”，招式暴击骰-1，且缚身的持续回合数变为三回合。</p><p><strong>升级：</strong>招式伤害+20，暴击骰再-1，怒气消耗-1，内力消耗+8。</p>",
                     "automationNote": "自动检测气弓并应用动态暴击加成及三回合缚身，不会消耗气弓。",
                     "costs": {
                         "mp": [
@@ -956,7 +950,7 @@
                             "label": "施加缚身",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    let rounds = 1;\n    // 因为不消耗气弓，所以直接重新检测 Actor 身上有没有气弓即可\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) {\n        rounds = 3;\n    }\n    \n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    if (effectData) {\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+                            "script": "if (args.isHit) {\n    let rounds = 1;\n    if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qigong\")) {\n        rounds = 3;\n    }\n    \n    const effectData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fushen\"));\n    if (effectData) {\n        effectData.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
                         }
                     ]
                 }
