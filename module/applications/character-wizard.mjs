@@ -1,4 +1,5 @@
 import { XJZLSectSelectorApp } from "./sect-selector.mjs";
+import { parseBackgroundAssets, resolveBackgroundItems } from "../utils/background-assets.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -211,6 +212,45 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
     /* -------------------------------------------- */
 
     /**
+     * 解析背景的 assets 文本，将赠品推入购物车免费区 + 添加银两
+     * 在进入 Step 6 时调用
+     */
+    async _populateBackgroundAssets() {
+        if (this.wizardData._bgAssetsPopulated) return;
+        this.wizardData._bgAssetsPopulated = true;
+
+        const bg = this.wizardData.origins.background;
+        if (!bg) return;
+
+        const assetsText = bg.system.assets;
+        if (!assetsText) return;
+
+        const parsed = parseBackgroundAssets(assetsText);
+        const resolved = await resolveBackgroundItems(parsed.items);
+
+        for (const r of resolved) {
+            if (!r.found) {
+                console.warn(`XJZL Wizard | 背景 "${bg.name}" 赠品 "${r.name}" 在合集包中未找到`);
+                continue;
+            }
+            this.wizardData.shopping.items.push({
+                id: foundry.utils.randomID(),
+                uuid: r.uuid,
+                type: r.itemData.type,
+                name: r.itemData.name,
+                img: r.itemData.img,
+                price: r.itemData.system?.price ?? 0,
+                quantity: r.quantity,
+                zone: "free",
+                isBackgroundAsset: true,
+                itemData: r.itemData
+            });
+        }
+
+        this.wizardData.shopping.silver += parsed.silver;
+    }
+
+    /**
      * [辅助方法] 手动提取并展开表单数据到 state 中
      * 解决 FVTT 数据提取时的数组转对象 Bug
      */
@@ -253,6 +293,11 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             if (this.wizardData.shopping.runtimeSilver < 0) {
                 return ui.notifications.error("银两已透支！请减少购买的物品，或增加初始银两后再继续。");
             }
+        }
+
+        // 进入 Step 6 前，填充背景赠品到免费区
+        if (this.wizardData.currentStep === 5) {
+            await this._populateBackgroundAssets();
         }
 
         if (this.wizardData.currentStep < this.wizardData.maxStep) {
@@ -302,6 +347,17 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         const dataPool = type === "background" ? this.cachedOrigins.backgrounds : this.cachedOrigins.personalities;
         const itemData = dataPool.find(i => i.uuid === uuid);
         if (!itemData) return;
+
+        // 切换背景前：收回旧背景的银两和购物车赠品
+        if (type === "background") {
+            this.wizardData._bgAssetsPopulated = false;
+            this.wizardData.shopping.items = this.wizardData.shopping.items.filter(i => !i.isBackgroundAsset);
+            const oldBg = this.wizardData.origins.background;
+            if (oldBg?.system?.assets) {
+                const oldSilver = parseBackgroundAssets(oldBg.system.assets).silver;
+                this.wizardData.shopping.silver = Math.max(0, this.wizardData.shopping.silver - oldSilver);
+            }
+        }
 
         this.wizardData.origins[type] = itemData;
         if (type === "personality") {
@@ -764,6 +820,13 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         event.preventDefault();
         this._saveCurrentStepData(); // 先保存其他可能正在输入的内容
         const id = target.dataset.id;
+
+        // 背景赠品不可删除
+        const item = this.wizardData.shopping.items.find(i => i.id === id);
+        if (item?.isBackgroundAsset) {
+            return ui.notifications.warn("身世赠送物品无法移除。如需更换，请返回第2步重新选择背景。");
+        }
+
         this.wizardData.shopping.items = this.wizardData.shopping.items.filter(i => i.id !== id);
         this._onRefreshShoppingBudget(true); // 跳过读取旧DOM
         this.render();
@@ -918,7 +981,16 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
         // --- 物品装配与经验注入 ---
         const itemsToCreate = [];
-        if (this.wizardData.origins.background) itemsToCreate.push(this.wizardData.origins.background);
+
+        // 背景：保留原始 assets（删除时需计算应收回银两），用 _wizardCreated 标记阻止钩子重复发放
+        // grantToken 用于删除背景时定位赠品（与 Actor 钩子拖入流程一致的清理机制）
+        const bgGrantToken = this.wizardData.origins.background ? foundry.utils.randomID() : null;
+        if (this.wizardData.origins.background) {
+            const bgClone = foundry.utils.deepClone(this.wizardData.origins.background);
+            foundry.utils.setProperty(bgClone, "flags.xjzl-system.grantToken", bgGrantToken);
+            foundry.utils.setProperty(bgClone, "flags.xjzl-system._wizardCreated", true);
+            itemsToCreate.push(bgClone);
+        }
         if (this.wizardData.origins.personality) itemsToCreate.push(this.wizardData.origins.personality);
 
         for (const asm of this.wizardData.assembly.items) {
@@ -978,6 +1050,10 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             const newItemData = foundry.utils.deepClone(shopItem.itemData);
             // 将购物车里决定的数量覆盖原物品的数量
             newItemData.system.quantity = shopItem.quantity;
+            // 背景赠品打标记，确保后续删除背景时能正确清理
+            if (shopItem.isBackgroundAsset && bgGrantToken) {
+                foundry.utils.setProperty(newItemData, "flags.xjzl-system.grantedByBackground", bgGrantToken);
+            }
             itemsToCreate.push(newItemData);
         }
 

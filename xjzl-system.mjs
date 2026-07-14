@@ -61,6 +61,7 @@ import { ActionTracker } from "./module/applications/action-tracker.mjs";
 import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 import { xjzlSocket } from "./module/socket.mjs";
+import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants } from "./module/utils/background-assets.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -616,6 +617,41 @@ Hooks.once("ready", async function () {
   }
 
 
+  // 7·背景赠品自动化 — 监听物品创建/删除
+  Hooks.on("createItem", async (item, options, userId) => {
+    if (userId !== game.user.id) return;
+    if (item.type !== "background") return;
+    const actor = item.parent;
+    if (!actor || actor.type === "container") return;
+    if (item.getFlag("xjzl-system", "_wizardCreated")) return;
+
+    const assetsText = item.system.assets;
+    if (!assetsText) return;
+
+    const parsed = parseBackgroundAssets(assetsText);
+    if (parsed.items.length === 0 && parsed.silver === 0) return;
+
+    const resolved = await resolveBackgroundItems(parsed.items);
+    for (const r of resolved) {
+      if (!r.found) console.warn(`XJZL | 背景 "${item.name}" 赠品 "${r.name}" 在合集包中未找到`);
+    }
+
+    await grantAndTrack(actor, resolved.filter(r => r.found), parsed.silver, item.id);
+  });
+
+  Hooks.on("deleteItem", async (item, options, userId) => {
+    if (userId !== game.user.id) return;
+    if (item.type !== "background") return;
+    const actor = item.parent;
+    if (!actor || actor.type === "container") return;
+
+    const assetsText = item.system?.assets || "";
+    const silver = parseBackgroundAssets(assetsText).silver;
+    const grantToken = item.getFlag("xjzl-system", "grantToken");
+    await revokeBackgroundGrants(actor, item.id, silver, grantToken);
+  });
+
+  console.log("XJZL | 背景赠品自动化已就绪");
   console.log("侠界之旅系统 - 准备就绪");
 });
 
