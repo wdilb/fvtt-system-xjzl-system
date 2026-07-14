@@ -61,7 +61,7 @@ import { ActionTracker } from "./module/applications/action-tracker.mjs";
 import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 import { xjzlSocket } from "./module/socket.mjs";
-import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants } from "./module/utils/background-assets.mjs";
+import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -651,6 +651,25 @@ Hooks.once("ready", async function () {
     await revokeBackgroundGrants(actor, item.id, silver, grantToken);
   });
 
+  // 8·门派赠品自动化 — 监听角色门派变更
+  Hooks.on("updateActor", async (actor, changes, options, userId) => {
+    if (userId !== game.user.id) return;
+    if (actor.type === "container" || actor.type === "creature") return;
+
+    const newSect = foundry.utils.getProperty(changes, "system.info.sect");
+    if (newSect === undefined) return;  // 门派未变更
+    // 向导流程中由向导手动处理，跳过自动发放
+    if (actor.getFlag("xjzl-system", "_wizardActive")) return;
+
+    // 先清理旧门派的赠品
+    await revokeAllSectGrants(actor);
+    // 发放新门派赠品（none 或空字符串跳过）
+    if (newSect && newSect !== "none") {
+      await grantSectAssets(actor, newSect);
+    }
+  });
+
+  console.log("XJZL | 门派赠品自动化已就绪");
   console.log("XJZL | 背景赠品自动化已就绪");
   console.log("侠界之旅系统 - 准备就绪");
 });

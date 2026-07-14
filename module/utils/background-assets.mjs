@@ -239,3 +239,88 @@ export async function revokeBackgroundGrants(actor, backgroundId, silver, grantT
         await actor.update({ "system.resources.silver": Math.max(0, currentSilver - silver) });
     }
 }
+
+// ==============================================
+// 4. 门派赠品
+// ==============================================
+
+/** 门派→物品名 映射缓存，首次加载后常驻 */
+let _sectAssetsData = null;
+
+/**
+ * 加载门派赠品数据
+ * @returns {Promise<Object<string, string[]>>}
+ */
+async function _loadSectAssets() {
+    if (_sectAssetsData) return _sectAssetsData;
+    try {
+        const resp = await fetch("systems/xjzl-system/data/sect-assets.json");
+        _sectAssetsData = await resp.json();
+        console.log("XJZL | 门派赠品数据已加载");
+    } catch (err) {
+        console.error("XJZL | 加载门派赠品数据失败:", err);
+        _sectAssetsData = {};
+    }
+    return _sectAssetsData;
+}
+
+/**
+ * 获取指定门派的物品名列表
+ * @param {string} sectKey  如 "zhengqizong"
+ * @returns {Promise<string[]>}
+ */
+export async function getSectItemNames(sectKey) {
+    if (!sectKey || sectKey === "none") return [];
+    const data = await _loadSectAssets();
+    return data[sectKey] || [];
+}
+
+/**
+ * 发放门派赠品到角色
+ * @param {Actor} actor
+ * @param {string} sectKey
+ */
+export async function grantSectAssets(actor, sectKey) {
+    const names = await getSectItemNames(sectKey);
+    if (names.length === 0) return;
+
+    const parsed = names.map(name => ({ name, quantity: 1 }));
+    const resolved = await resolveBackgroundItems(parsed);
+
+    const itemsToCreate = [];
+    for (const r of resolved) {
+        if (!r.found) {
+            console.warn(`XJZL | 门派 "${sectKey}" 赠品 "${r.name}" 在合集包中未找到`);
+            continue;
+        }
+        const itemData = foundry.utils.deepClone(r.itemData);
+        foundry.utils.setProperty(itemData, "flags.xjzl-system.grantedBySect", true);
+        itemsToCreate.push(itemData);
+    }
+
+    if (itemsToCreate.length > 0) {
+        try {
+            await actor.createEmbeddedDocuments("Item", itemsToCreate);
+        } catch (err) {
+            console.error("XJZL | 批量发放门派赠品失败:", err);
+        }
+    }
+}
+
+/**
+ * 清理所有门派赠品
+ * @param {Actor} actor
+ */
+export async function revokeAllSectGrants(actor) {
+    const grantedItems = actor.items.filter(i =>
+        i.getFlag("xjzl-system", "grantedBySect") === true
+    );
+    const idsToDelete = grantedItems.map(i => i.id);
+    if (idsToDelete.length > 0) {
+        try {
+            await actor.deleteEmbeddedDocuments("Item", idsToDelete);
+        } catch (err) {
+            // 部分物品可能已被手动删除，忽略
+        }
+    }
+}

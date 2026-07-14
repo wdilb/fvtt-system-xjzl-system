@@ -1,5 +1,5 @@
 import { XJZLSectSelectorApp } from "./sect-selector.mjs";
-import { parseBackgroundAssets, resolveBackgroundItems } from "../utils/background-assets.mjs";
+import { parseBackgroundAssets, resolveBackgroundItems, getSectItemNames } from "../utils/background-assets.mjs";
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 
@@ -251,6 +251,43 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
     }
 
     /**
+     * 将门派赠品推入购物车免费区
+     * 在进入 Step 6 时调用，背景填充之后
+     */
+    async _populateSectAssets() {
+        if (this.wizardData._sectAssetsPopulated) return;
+        this.wizardData._sectAssetsPopulated = true;
+
+        const sectKey = this.wizardData.info.sect;
+        if (!sectKey || sectKey === "none") return;
+
+        const names = await getSectItemNames(sectKey);
+        if (names.length === 0) return;
+
+        const parsed = names.map(name => ({ name, quantity: 1 }));
+        const resolved = await resolveBackgroundItems(parsed);
+
+        for (const r of resolved) {
+            if (!r.found) {
+                console.warn(`XJZL Wizard | 门派 "${sectKey}" 赠品 "${r.name}" 在合集包中未找到`);
+                continue;
+            }
+            this.wizardData.shopping.items.push({
+                id: foundry.utils.randomID(),
+                uuid: r.uuid,
+                type: r.itemData.type,
+                name: r.itemData.name,
+                img: r.itemData.img,
+                price: r.itemData.system?.price ?? 0,
+                quantity: r.quantity,
+                zone: "free",
+                isSectAsset: true,
+                itemData: r.itemData
+            });
+        }
+    }
+
+    /**
      * [辅助方法] 手动提取并展开表单数据到 state 中
      * 解决 FVTT 数据提取时的数组转对象 Bug
      */
@@ -295,9 +332,13 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             }
         }
 
-        // 进入 Step 6 前，填充背景赠品到免费区
+        // 进入 Step 6 前，填充背景/门派赠品到免费区
         if (this.wizardData.currentStep === 5) {
+            // 清理旧门派赠品（若从 Step 1 返回修改了门派）
+            this.wizardData.shopping.items = this.wizardData.shopping.items.filter(i => !i.isSectAsset);
+            this.wizardData._sectAssetsPopulated = false;
             await this._populateBackgroundAssets();
+            await this._populateSectAssets();
         }
 
         if (this.wizardData.currentStep < this.wizardData.maxStep) {
@@ -821,10 +862,13 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         this._saveCurrentStepData(); // 先保存其他可能正在输入的内容
         const id = target.dataset.id;
 
-        // 背景赠品不可删除
+        // 背景/门派赠品不可删除
         const item = this.wizardData.shopping.items.find(i => i.id === id);
         if (item?.isBackgroundAsset) {
             return ui.notifications.warn("身世赠送物品无法移除。如需更换，请返回第2步重新选择背景。");
+        }
+        if (item?.isSectAsset) {
+            return ui.notifications.warn("门派赠送物品无法移除。如需更换，请返回第1步重新选择门派。");
         }
 
         this.wizardData.shopping.items = this.wizardData.shopping.items.filter(i => i.id !== id);
@@ -1054,6 +1098,10 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             if (shopItem.isBackgroundAsset && bgGrantToken) {
                 foundry.utils.setProperty(newItemData, "flags.xjzl-system.grantedByBackground", bgGrantToken);
             }
+            // 门派赠品打标记，确保后续更换门派时能正确清理
+            if (shopItem.isSectAsset) {
+                foundry.utils.setProperty(newItemData, "flags.xjzl-system.grantedBySect", true);
+            }
             itemsToCreate.push(newItemData);
         }
 
@@ -1066,12 +1114,14 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         });
         actorUpdates["system.history"] = historyLogs;
 
-        // 提交变更
+        // 提交变更（设置 _wizardActive 标记，阻止 updateActor 钩子自动发放门派赠品）
+        await actor.setFlag("xjzl-system", "_wizardActive", true);
         await actor.update(actorUpdates);
 
         if (itemsToCreate.length > 0) {
             await actor.createEmbeddedDocuments("Item", itemsToCreate);
         }
+        await actor.unsetFlag("xjzl-system", "_wizardActive");
 
         ui.notifications.success(`${actor.name} 降生成功！`);
         // 强制关闭，跳过确认弹窗
