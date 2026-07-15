@@ -1471,45 +1471,55 @@
                 {
                     "name": "四平八稳",
                     "type": "qi",
+                    "actionType": "buff",
                     "damageType": "none",
                     "weaponType": "none",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>点击应用以获得“四平八稳”被动效果（持续到战斗脱离）。</p>",
-                    "automationNote": "被动通过应用Buff实现。普攻修正自动生效。普攻额外消耗的内力请手动扣除。",
+                    "description": "<p>被动散手。修习此招后，将自动领悟四平八稳之意，普攻将获得增强。</p>",
+                    "automationNote": "完全自动化。无需主动使用。当你发起【普通攻击】或【趁虚而入】时，系统会自动检测内力，自动扣除并应用伤害加成与优势。无视距离触发趁虚而入需玩家与GM沟通手动发起。",
                     "costs": {
                         "mp": [
                             0
                         ]
                     },
-                    "actionType": "buff"
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    }
                 }
             ],
-            "effects": [
-                {
-                    "name": "四平八稳",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "普通攻击增强。",
-                    "transfer": true,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "sipingbawen",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "普攻修正",
-                                    "trigger": "attack",
-                                    "active": true,
-                                    "script": "if (args.move.type === 'basic') {\n    // 获取招式等级 (通过 actor.items 查找)\n    // 由于这是在 AE 脚本里，我们需要找到源 Item\n    const sourceItem = thisEffect.parent instanceof Item ? thisEffect.parent : actor.items.get(thisEffect.origin?.split('.').pop()); \n    // 上面的查找可能不准，最稳妥是通过 slug 或 origin 查找\n    // 假设 origin 是准确的。如果找不到，默认 1 级。\n    // 实际上，因为这是散手，物品本身就在 actor 身上。\n    // 简化逻辑：直接假定等级关联，或者如果是 transfer effect，它就在 Item 上。\n    // 但此时 effect 在 actor 上。我们用 thisItem (指向源 Item 如果在脚本里能获取到的话，但 AE 脚本里 thisItem 是 Effect)\n    // 修正：我们需要找到“四平八稳”这个 Wuxue Item 来读取等级。\n    const wuxueItem = actor.items.find(i => i.name === \"四平八稳\" && i.type === \"wuxue\");\n    const lvl = wuxueItem ? Math.max(1, wuxueItem.system.moves[0]?.computedLevel || 1) : 1;\n    \n    const dmgBonus = 10 + (lvl - 1) * 10;\n    const mpCost = 5 + (lvl - 1) * 5;\n\n    args.flags.damageResult.damage += dmgBonus;\n    args.flags.damageResult.breakdown += `\\n+ 四平八稳: ${dmgBonus}`;\n    args.flags.level += 1;\n\n    ui.notifications.info(`触发四平八稳：请手动扣除 ${mpCost} 点内力。`);\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                }
-            ]
-        }
+            "scripts": []
+        },
+        "effects": [
+            {
+                "name": "四平八稳 (被动)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "四平八稳散手被动生效中。你的普通攻击将消耗内力以获得伤害提升和命中优势。",
+                "transfer": true,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "sipingbawen",
+                        "scripts": [
+                            {
+                                "label": "普攻增伤预览",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "if (args.move.type === 'basic') {\n    const wuxueItem = thisEffect.parent instanceof Item ? thisEffect.parent : actor.items.find(i => i.name === \"四平八稳\" && i.type === \"wuxue\");\n    const lvl = wuxueItem ? Math.max(1, wuxueItem.system.moves[0]?.computedLevel || 1) : 1;\n    const dmgBonus = 10 + (lvl - 1) * 10;\n    args.output.bonusDesc.push(`四平八稳: +${dmgBonus} (若内力充足)`);\n}"
+                            },
+                            {
+                                "label": "普攻内力扣除与加成结算",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "if (args.move.type === 'basic') {\n    const wuxueItem = thisEffect.parent instanceof Item ? thisEffect.parent : actor.items.find(i => i.name === \"四平八稳\" && i.type === \"wuxue\");\n    const lvl = wuxueItem ? Math.max(1, wuxueItem.system.moves[0]?.computedLevel || 1) : 1;\n    const mpCost = 5 + (lvl - 1) * 5;\n    const dmgBonus = 10 + (lvl - 1) * 10;\n\n    const currentMp = S.resources.mp.value;\n    if (currentMp >= mpCost) {\n        // 1. 扣除内力\n        await actor.update({\"system.resources.mp.value\": currentMp - mpCost});\n\n        // 2. 增加伤害与优势\n        args.flags.damageResult.damage += dmgBonus;\n        args.flags.damageResult.breakdown += `\\n+ 四平八稳: ${dmgBonus}`;\n        args.flags.level += 1;\n\n        // 3. 视觉反馈与战斗记录 (已增加左侧 padding 防止文字贴边)\n        actor.showFloatyText(`四平八稳! 内力 -${mpCost}`, {fill: \"#4444ff\", fontSize: 28});\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; font-size:0.9em; color:#2c3e50; border-left:3px solid #3498db; background:rgba(52,152,219,0.05);\"><i class=\"fas fa-bolt\" style=\"color:#3498db;\"></i> <b>四平八稳</b> 触发！消耗 <b>${mpCost}</b> 点内力，普攻伤害 <b>+${dmgBonus}</b>，命中获得优势。</div></div>`\n        });\n    } else {\n        // 内力不足时也发送全员可见的战报卡片 (黄色预警风格)\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; font-size:0.9em; color:#856404; border-left:3px solid #f39c12; background:rgba(243,156,18,0.05);\"><i class=\"fas fa-exclamation-triangle\" style=\"color:#f39c12;\"></i> <b>四平八稳</b> 触发失败：需要 <b>${mpCost}</b> 点内力，当前内力不足。</div></div>`\n        });\n    }\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "不入轮回",
