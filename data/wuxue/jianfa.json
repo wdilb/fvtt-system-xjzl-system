@@ -1365,13 +1365,13 @@
                     "name": "碧水依心",
                     "type": "stance",
                     "element": "rou",
-                    "damageType": "waigong",
+                    "damageType": "none",
                     "weaponType": "sword",
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>身势回旋，开启架招。格挡成功时，恢复自身 3 点内力。</p><p><strong>升级：</strong>格挡值+5，内力额外回复+1，内力消耗+1。</p>",
-                    "automationNote": "格挡回内自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -1387,7 +1387,7 @@
                         {
                             "label": "格挡回内",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 计算回复量 (基础3 + Lv-1)\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst amount = 3 + (lvl - 1);\n\nawait actor.applyHealing({ healer: actor, amount: amount, type: \"mp\", showScrolling: true});",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 3 + (lvl - 1);\nawait actor.applyHealing({ healer: actor, amount: amount, type: \"mp\", showScrolling: true});",
                             "active": true
                         }
                     ]
@@ -1419,8 +1419,7 @@
                             2,
                             3
                         ]
-                    },
-                    "scripts": []
+                    }
                 },
                 {
                     "name": "偏安一乡",
@@ -1432,7 +1431,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>看破对方虚招后，消耗反应动作压制对方虚招，剑走一线，对目标造成伤害。</p><p>·然后为其添加“荡然”，持续三回合。</p><p><strong>荡然：</strong>每次受伤后被击倒。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "施加荡然自动。击倒需手动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -1454,7 +1453,7 @@
                         {
                             "label": "施加荡然",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"荡然\").toObject();\neff.duration = { rounds: 3 };\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"荡然\").toObject();\ndelete eff._id;\neff.duration = { rounds: 3 };\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
                         }
                     ]
@@ -1470,7 +1469,7 @@
                     "targetInfo": "范围",
                     "actionCost": "主要动作",
                     "description": "<p>御剑产生雄浑‘无涯’气场，持续三回合。</p><p><strong>无涯：</strong>区域内友方招式伤害+5，每回合末回复 5 点内力。</p><p>·无涯以你为中心跟随你移动，你只能拥有一个无涯，如果你形成新的无涯，之前的消失。</p><p>·无涯的效果不可叠加。</p><p><strong>升级：</strong>招式范围+1，招式伤害再+5 点，持续回合数+1，怒气消耗-1。</p>",
-                    "automationNote": "纯手动。请使用区域模板，并手动管理BUFF。",
+                    "automationNote": "纯手动。请使用区域模板，并在物品中赋予对应等级的【无涯】状态给范围内的友方。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1481,26 +1480,102 @@
                             5,
                             4
                         ]
-                    },
-                    "scripts": []
-                }
-            ],
-            "effects": [
-                {
-                    "name": "荡然",
-                    "icon": "icons/magic/air/wind-tornado-wall-blue.webp",
-                    "description": "每次受伤后被击倒。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "dangran",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
+                    }
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "荡然",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "每次受伤后被击倒。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "dangran",
+                        "stackable": false
+                    }
+                }
+            },
+            {
+                "name": "无涯 (1级)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "区域内友方招式伤害+5，每回合末回复 5 点内力。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 3
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuya_aura"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "无涯 (2级)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "区域内友方招式伤害+10，每回合末回复 5 点内力。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 4
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuya_aura"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "10"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "无涯 (3级)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "区域内友方招式伤害+15，每回合末回复 5 点内力。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 5
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuya_aura"
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "15"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "西风剑舞",
