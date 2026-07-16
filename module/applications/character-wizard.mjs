@@ -37,7 +37,8 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             social: {
                 rep_chaoting: 0, rep_wulin: 0,
                 attitude_chaoting: "none", attitude_wulin: "none", attitude_shisu: "none",
-                shihao: ["", "", ""], relations: []
+                shihao: ["", "", ""], relations: [],
+                xiayi: 0, exing: 0
             },
 
             // Step 4: 预算与武学装配
