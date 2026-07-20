@@ -385,6 +385,13 @@ export class XJZLItem extends Item {
     const isActive = this.system.active; // 当前状态
     const targetState = !isActive;       // 目标状态 (取反)
 
+    // === 0. 记录切换前的资源状态 ===
+    const res = actor.system.resources;
+    const hpWasFull = res.hp.value >= res.hp.max;
+    const mpWasFull = res.mp.value >= res.mp.max;
+    const currentHp = res.hp.value;
+    const currentMp = res.mp.value;
+
     // === 1. 准备 Item 的更新数据 (Batch Updates) ===
     const itemUpdates = [];
 
@@ -415,13 +422,28 @@ export class XJZLItem extends Item {
       await actor.updateEmbeddedDocuments("Item", itemUpdates);
     }
 
-    // 2.2 更新 Actor 自身的记录字段 -> 触发一次界面刷新
-    // 如果开启，记录 ID；如果关闭，清空记录
+    // 2.2 更新 Actor 自身的记录字段与资源 -> 合并为一次更新
     const newActiveId = targetState ? this.id : "";
+    const actorUpdates = {};
 
-    // 只有当 Actor 记录的数据和我们预期的不一致时才更新 (节省性能)
     if (actor.system.martial.active_neigong !== newActiveId) {
-      await actor.update({ "system.martial.active_neigong": newActiveId });
+      actorUpdates["system.martial.active_neigong"] = newActiveId;
+    }
+
+    // 切换内功后，上限可能变化，按规则处理当前值：
+    // - 气血/内力：切换前满 → 切换后满；否则保留当前值，但不可超过新上限
+    // - 怒气：必定清空
+    const newRes = actor.system.resources;
+    actorUpdates["system.resources.hp.value"] = hpWasFull
+      ? newRes.hp.max
+      : Math.min(currentHp, newRes.hp.max);
+    actorUpdates["system.resources.mp.value"] = mpWasFull
+      ? newRes.mp.max
+      : Math.min(currentMp, newRes.mp.max);
+    actorUpdates["system.resources.rage.value"] = 0;
+
+    if (!foundry.utils.isEmpty(actorUpdates)) {
+      await actor.update(actorUpdates);
     }
 
     // === 3. 提示信息 ===
