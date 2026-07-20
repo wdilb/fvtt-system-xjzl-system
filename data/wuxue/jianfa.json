@@ -7047,7 +7047,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>剑气覆盖周身，开启架招，进入“剑体”状态，持续到战斗脱离，或被击破架招。</p><p><strong>剑体：</strong>每次出招时，凝聚等同于招式层数数量的“剑气”（领悟 1，掌握 2，精通 3，合一 4）。</p><p>剑气可叠加，持续到战斗脱离，或被击破架招。</p><p>·格挡成功时，自身“剑气”数量翻倍。</p><p><strong>升级：</strong>格挡值+10，消耗+4，招式修至合一后，所有剑法的虚招都无法以你为目标。</p>",
-                    "automationNote": "开启获得剑体状态。剑体出招获剑气自动。格挡剑气翻倍自动。",
+                    "automationNote": "虚招不可选中请手动。其他自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -7064,14 +7064,14 @@
                         {
                             "label": "开启剑体",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"剑体\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"剑体\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 让AE绑定在架招上，破架自动消散\neff.flags[\"xjzl-system\"].tiedToStance = true;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         },
                         {
-                            "label": "格挡翻倍",
+                            "label": "格挡剑气翻倍",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nif (jianqi) {\n    const stacks = jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0;\n    if (stacks > 0) {\n        // 增加等同于当前层数的层数 = 翻倍\n        await game.xjzl.api.effects.addEffect(actor, { \n            name: \"剑气\", \n            flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, stacks: stacks } }\n        });\n        ui.notifications.info(\"格挡成功！剑气翻倍！\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nif (jianqi) {\n    const stacks = jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0;\n    if (stacks > 0) {\n        await game.xjzl.api.effects.addEffect(actor, { \n            name: \"剑气\", \n            icon: \"systems/xjzl-system/assets/icons/wuxue/江湖2.png\",\n            flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, tiedToStance: true } }\n        }, stacks);\n        actor.showFloatyText(\"剑气翻倍！\", {fill: \"#00ffff\"});\n    }\n}"
                         }
                     ]
                 },
@@ -7085,7 +7085,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>惊鸿一击，犹如数代绝世高手同时出剑，造成伤害。击破架招时为其添加“止悟”：看破值-5，持续到战斗脱离。然后，你凝聚 5 道剑气。</p><p><strong>升级：</strong>伤害+10，看破值-1，凝聚剑气+1，消耗+4。</p>",
-                    "automationNote": "命中获剑气自动。击破施加止悟自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7110,16 +7110,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "获取剑气",
+                            "label": "击破止悟与凝聚剑气",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 5 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"剑气\").toObject();\neff.flags[\"xjzl-system\"].stacks = gain;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
-                        },
-                        {
-                            "label": "击破止悟",
-                            "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const penalty = -5 - (lvl - 1);\n    const eff = thisItem.effects.getName(\"止悟\").toObject();\n    eff.changes[0].value = String(penalty);\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n\nif (args.isBroken) {\n    const penalty = -5 - (lvl - 1);\n    const eff = thisItem.effects.getName(\"止悟\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.changes[0].value = String(penalty);\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}\n\n// 无论是否击破，只要使用（命中）就凝聚剑气\nconst gain = 5 + (lvl - 1);\nawait game.xjzl.api.effects.addEffect(actor, { \n    name: \"剑气\", \n    icon: \"systems/xjzl-system/assets/icons/wuxue/江湖2.png\",\n    flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, tiedToStance: true } }\n}, gain);\nactor.showFloatyText(`剑气 +${gain}`, {fill: \"#00ffff\"});"
                         }
                     ]
                 },
@@ -7133,7 +7127,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>气动八方，神扫剑意，造成伤害，若自身“剑气”数量超过自身悟性的一半，招式伤害提升自身内外功防御之和的伤害。</p><p>每次施展都可以消耗剑气对目标施加以下状态中的其中一个，持续一回合。</p><p>7 道“剑气”倒地。11 道“剑气”缚身。</p><p>15 道“剑气”封招。15 道“剑气”自闭。</p><p>19 道“剑气”晕眩。</p><p><strong>升级：</strong>伤害+10，每种状态消耗剑气-1，消耗+4。</p>",
-                    "automationNote": "伤害加成自动。状态施加与消耗手动（提示卡）。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7160,14 +7154,20 @@
                         {
                             "label": "剑气伤害加成",
                             "trigger": "calc",
-                            "script": "const jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst wuxing = actor.system.stats.wuxing.total;\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n\nif (stacks > wuxing / 2) {\n    const defWai = actor.system.combat.defWaigongTotal || 0;\n    const defNei = actor.system.combat.defNeigongTotal || 0;\n    const bonus = defWai + defNei;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`剑气充盈加成 +${bonus}`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst wuxing = actor.system.stats.wuxing.total;\n\nif (stacks > wuxing / 2) {\n    const defWai = actor.system.combat.defWaigongTotal || 0;\n    const defNei = actor.system.combat.defNeigongTotal || 0;\n    const bonus = defWai + defNei;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`剑气盈体加成 +${bonus}`);\n}"
                         },
                         {
                             "label": "状态选择提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduction = lvl - 1;\n\nconst costMap = {\n    \"none\": { name: \"不附加异常\", cost: 0 },\n    \"prone\": { name: \"倒地\", cost: Math.max(1, 7 - reduction) },\n    \"fushen\": { name: \"缚身\", cost: Math.max(1, 11 - reduction) },\n    \"fengzhao\": { name: \"封招\", cost: Math.max(1, 15 - reduction) },\n    \"zibi\": { name: \"自闭\", cost: Math.max(1, 15 - reduction) },\n    \"stun\": { name: \"晕眩\", cost: Math.max(1, 19 - reduction) }\n};\n\nlet optionsHtml = \"\";\nfor (const [k, v] of Object.entries(costMap)) {\n    const disabled = stacks < v.cost ? \"disabled\" : \"\";\n    const color = disabled ? \"color:#999;\" : \"\";\n    optionsHtml += `<option value=\"${k}\" ${disabled} style=\"${color}\">${v.name} (需 ${v.cost} 剑气)</option>`;\n}\n\nconst content = `\n    <div style=\"margin-bottom:10px;\">当前拥有 <b>${stacks}</b> 道剑气。可消耗剑气对目标施加状态：</div>\n    <form>\n        <div class=\"form-group\">\n            <label>附加异常状态：</label>\n            <select name=\"selectedStatus\">${optionsHtml}</select>\n        </div>\n    </form>\n`;\n\nconst result = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"神剑千秋 - 剑气化形\" },\n    content: content,\n    ok: {\n        label: \"确认\",\n        callback: (event, button) => {\n            const fd = new FormData(button.form);\n            return fd.get(\"selectedStatus\");\n        }\n    },\n    rejectClose: false\n});\n\nif (result && result !== \"none\") {\n    const cost = costMap[result].cost;\n    await game.xjzl.api.effects.removeEffect(actor, \"jianqi\", cost);\n    ui.notifications.info(`已消耗 ${cost} 道剑气，若命中将施加 [${costMap[result].name}]`);\n    args.flags.shenjianStatus = result;\n}"
+                        },
+                        {
+                            "label": "施加神剑状态",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst reduction = lvl - 1;\nconst costs = {\n    prone: 7 - reduction,\n    fushen: 11 - reduction,\n    fengzhao: 15 - reduction,\n    zibi: 15 - reduction,\n    stun: 19 - reduction\n};\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"font-weight:bold;\">神剑千秋 - 消耗剑气施加状态</div>\n        <ul style=\"font-size:0.9em; padding-left:20px;\">\n            <li><b>${costs.prone}层</b>: 倒地</li>\n            <li><b>${costs.fushen}层</b>: 缚身</li>\n            <li><b>${costs.fengzhao}层</b>: 封招 / 自闭</li>\n            <li><b>${costs.stun}层</b>: 晕眩</li>\n        </ul>\n        <p style=\"font-size:0.8em; color:#666;\">请手动在[剑气]AE中调整层数，并给目标添加对应状态。</p>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && args.flags.shenjianStatus) {\n    const statusId = args.flags.shenjianStatus;\n    await game.xjzl.api.effects.addEffect(args.target, statusId, 1);\n}"
                         }
                     ]
                 },
@@ -7181,7 +7181,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招后，消耗反应动作释放，压制对方虚招，以拙化巧，无形之招造成伤害。</p><p>若你压制的是剑法招式，你凝聚 1 道“剑气”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "压制剑法获剑气手动（需判断敌方招式）。",
+                    "automationNote": "压制剑法获剑气手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7208,8 +7208,8 @@
                         {
                             "label": "剑气提示",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"若压制的是剑法招式，请手动添加 1 层 [剑气]。\");",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst content = `\n    <div class=\"xjzl-chat-card\" style=\"padding-left: 10px;\">\n        <div class=\"card-content-wrapper\">\n            <p style=\"color:#2c3e50;\"><b><i class=\"fas fa-eye\"></i> 拙剑无式触发：</b></p>\n            <p>若你压制的是<b>剑法招式</b>，请手动为自己添加 <b>1</b> 层 [剑气]。</p>\n        </div>\n    </div>`;\nChatMessage.create({\n    content: content,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
                         }
                     ]
                 },
@@ -7224,7 +7224,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>剑气绕体，御剑进入“剑身”：受到伤害后，攻击者流失等同于你剑气数量*1 的气血，你的剑类兵器必然不会脱手，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4，每道剑气额外使攻击者流失 1 点气血。</p>",
-                    "automationNote": "反伤自动。防缴械手动（系统暂无脱手机制）。",
+                    "automationNote": "防武器脱手需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -7241,8 +7241,8 @@
                         {
                             "label": "获得剑身",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"剑身\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 注入等级系数到 Flag\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst ratio = 1 + (lvl - 1);\neff.flags[\"xjzl-system\"].damageRatio = ratio;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "const eff = thisItem.effects.getName(\"剑身\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst ratio = 1 + (lvl - 1);\neff.flags[\"xjzl-system\"].damageRatio = ratio;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         }
                     ]
                 },
@@ -7256,7 +7256,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>风清云谈，杀机四起，对目标造成伤害。</p><p>若有目标陷入地级或天级状态，可消耗反应动作释放此招，对其造成伤害。然后与目标进行一个悟性对抗，若对方失败，则目标获得的状态移除。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "伤害自动。悟性对抗自动，状态移除手动。",
+                    "automationNote": "状态移除需手动，其他自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -7281,38 +7281,35 @@
                     },
                     "scripts": [
                         {
+                            "label": "反应施放与对抗",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"尘剑悠然\" },\n    content: \"<p>是否作为<b>反应动作</b>施展此招？(目标需处于地级/天级状态)</p>\",\n    yes: { label: \"是 (消耗反应)\", icon: \"fas fa-check\" },\n    no: { label: \"否 (常规施展)\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    ui.notifications.info(\"已作为反应动作施展，请手动扣除反应动作。\");\n    args.flags.isReaction = true;\n}"
+                        },
+                        {
                             "label": "悟性对抗",
                             "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxing\",\n    defType: \"wuxing\",\n    label: \"尘剑悠然 - 悟性对抗\",\n    outcome: {\n        win: { text: \"对抗胜利：请手动移除目标状态！\" },\n        lose: { text: \"对抗失败。\" }\n    }\n});",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit || !args.flags.isReaction) return;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"wuxing\",\n    defType: \"wuxing\",\n    label: \"尘剑悠然 - 悟性压制\",\n    outcome: {\n        win: { text: \"对抗胜利！请手动移除目标的一个地级或天级状态。\" },\n        lose: { text: \"目标固守心神，对抗失败。\" }\n    }\n});"
                         }
                     ]
                 },
                 {
                     "name": "万剑归宗",
-                    "type": "real",
+                    "type": "qi",
+                    "actionType": "buff",
                     "isUltimate": true,
                     "element": "taiji",
-                    "damageType": "neigong",
+                    "damageType": "none",
                     "weaponType": "sword",
-                    "range": "20米",
-                    "targetInfo": "范围",
+                    "range": "自身",
+                    "targetInfo": "自身",
                     "actionCost": "主要动作",
                     "description": "<p>你至少拥有 50 道剑气方可施展此招。爆发所有剑气，在自身周围 20 米范围内的每一个空格内布置一道‘剑痕’，持续到战斗脱离。</p><p><strong>剑痕：</strong>区域内敌人开始自己的回合或踏入该区域时，流失 10 点气血。</p><p>“剑痕”持续期间，你可以消耗蓄力动作，缓缓握掌，湮灭所有的剑痕，对站立在剑痕内的所有敌方造成伤害，并使他们陷入“封招”，持续一回合，场上的剑痕在湮灭后消失，返还你 5 层剑气。</p><p><strong>升级：</strong>招式伤害+20，剑痕流失气血+20，剑痕湮灭后返还的剑气+5，怒气-1，消耗+16</p>",
-                    "automationNote": "条件判断手动。剑痕生成、伤害、湮灭均为手动。",
+                    "automationNote": "条件判断自动，光环伤害手动结算（回合初系统会发卡片提醒），湮灭触发请点击附属招式【万剑归宗·湮灭】。",
                     "calculation": {
                         "base": 0,
-                        "growth": 20,
-                        "scalings": [
-                            {
-                                "prop": "liliang",
-                                "ratio": 0.5
-                            },
-                            {
-                                "prop": "neixi",
-                                "ratio": 0.6
-                            }
-                        ]
+                        "growth": 0
                     },
                     "costs": {
                         "mp": [
@@ -7330,18 +7327,87 @@
                     },
                     "scripts": [
                         {
-                            "label": "剑气检查与消耗",
+                            "label": "剑气检查与释放",
                             "trigger": "attack",
-                            "script": "const jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n\nif (stacks < 50) {\n    ui.notifications.warn(`剑气不足 50 (当前 ${stacks})，无法施展万剑归宗！`);\n    args.flags.abort = true;\n} else {\n    ui.notifications.info(`请手动消耗 ${stacks} 道剑气，万剑归宗！`);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n\nif (stacks < 50) {\n    ui.notifications.warn(`剑气不足 50 (当前 ${stacks})，无法施展万剑归宗！`);\n    args.flags.abort = true;\n    return;\n}\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"万剑归宗\" },\n    content: `<p>当前拥有 ${stacks} 道剑气。是否消耗所有剑气爆发剑痕？</p>`,\n    yes: { label: \"消耗爆发\", icon: \"fas fa-fire\" },\n    no: { label: \"取消\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"jianqi\", stacks);\n    const eff = thisItem.effects.getName(\"剑痕光环\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    \n    const lvl = Math.max(1, move.computedLevel || 1);\n    const liushiDmg = 10 + 20 * (lvl - 1);\n    eff.flags[\"xjzl-system\"].liushiDmg = liushiDmg;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n} else {\n    args.flags.abort = true;\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "万剑归宗·湮灭",
+                    "type": "real",
+                    "isUltimate": false,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "20米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>“剑痕”持续期间，你可以消耗蓄力动作，缓缓握掌，湮灭所有的剑痕，对站立在剑痕内的所有敌方造成伤害，并使他们陷入“封招”，持续一回合，场上的剑痕在湮灭后消失，返还你 5 层剑气。</p><p>（此为附属招式，等级与消耗随主招式“万剑归宗”变化，不消耗资源即可施展）</p>",
+                    "automationNote": "完全自动化。必须身上挂有剑痕光环方可使用，自动返还剑气并清除光环，命中自动封招。",
+                    "progression": {
+                        "mode": "standard",
+                        "customThresholds": [],
+                        "mappedStage": 5
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "读取主等级计算伤害",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const mainMove = thisItem.system.moves.find(m => m.name === \"万剑归宗\");\nconst lvl = mainMove ? Math.max(1, mainMove.computedLevel || 1) : 1;\n\nconst liliang = actor.system.stats.liliang.total;\nconst neixi = actor.system.stats.neixi.total;\nconst dmg = Math.floor(liliang * 0.5 + neixi * 0.6) + 20 * (lvl - 1);\n\nargs.output.damage += dmg;\nargs.output.bonusDesc.push(`万剑湮灭总伤害: ${dmg} (0.5力+0.6息+成长)`);"
+                        },
+                        {
+                            "label": "湮灭剑痕返还剑气",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const aura = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianhen_aura\");\nif (!aura) {\n    ui.notifications.warn(\"你周围并没有剑痕可以湮灭！\");\n    args.flags.abort = true;\n    return;\n}\n\nawait aura.delete();\nconst mainMove = thisItem.system.moves.find(m => m.name === \"万剑归宗\");\nconst lvl = mainMove ? Math.max(1, mainMove.computedLevel || 1) : 1;\nconst regain = 5 + 5 * (lvl - 1);\n\nawait game.xjzl.api.effects.addEffect(actor, { \n    name: \"剑气\", \n    icon: \"systems/xjzl-system/assets/icons/wuxue/江湖2.png\",\n    flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, tiedToStance: true } }\n}, regain);\n\nui.notifications.info(`剑痕湮灭，成功返还 ${regain} 道剑气！`);"
+                        },
+                        {
+                            "label": "命中封招",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"fengzhao\", 1);\n}"
                         }
                     ]
                 }
             ],
             "effects": [
                 {
+                    "name": "剑体",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "天剑唯一架招附带状态，出招时可凝聚大量剑气。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jianti",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "出招凝聚",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "if (args.move.type === 'stance') return;\nconst stage = args.move.effectiveStage || Math.min(4, args.move.computedLevel || 1);\nawait game.xjzl.api.effects.addEffect(actor, { \n    name: \"剑气\", \n    icon: \"systems/xjzl-system/assets/icons/wuxue/江湖2.png\",\n    flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, tiedToStance: true } }\n}, stage);"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
                     "name": "剑气",
-                    "icon": "icons/skills/melee/sword-damaged-glowing-yellow.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "万剑诀核心资源，每层对应一道剑气。",
                     "transfer": false,
                     "flags": {
@@ -7354,29 +7420,8 @@
                     "changes": []
                 },
                 {
-                    "name": "剑体",
-                    "icon": "icons/magic/defensive/shield-barrier-glowing-blue.webp",
-                    "description": "出招时凝聚剑气。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "jianti",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "出招凝聚",
-                                    "trigger": "attack",
-                                    "active": true,
-                                    "script": "// 只有开启了架招，这个AE才存在。且只有在出招时触发。\n// 计算当前招式的境界层数 (领悟1/掌握2/精通3/合一4)\nconst move = args.move;\n// 这里需要获取招式等级，但attack上下文里的move是纯数据\n// 我们假设 computedLevel 存在\nlet stage = 1;\nif (move.effectiveStage) stage = move.effectiveStage;\nelse {\n    // 降级处理：按 level 估算 (1-4)\n    const lvl = move.computedLevel || 1;\n    stage = Math.min(4, lvl);\n}\n\n// 增加剑气\nconst eff = { name: \"剑气\", flags: { \"xjzl-system\": { slug: \"jianqi\", stackable: true, stacks: stage } } };\nawait game.xjzl.api.effects.addEffect(actor, eff);\n// ui.notifications.info(`剑体凝聚 ${stage} 道剑气`);"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                },
-                {
                     "name": "止悟",
-                    "icon": "icons/magic/control/debuff-energy-hold-blue.webp",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
                     "description": "看破值降低。",
                     "transfer": false,
                     "flags": {
@@ -7389,14 +7434,14 @@
                         {
                             "key": "system.combat.kanpo",
                             "mode": 2,
-                            "value": "-5"
+                            "value": "0"
                         }
                     ]
                 },
                 {
                     "name": "剑身",
-                    "icon": "icons/skills/melee/sword-guard-gold.webp",
-                    "description": "受击反伤。",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "受到伤害后，攻击者流失气血。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -7404,10 +7449,31 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "剑气反伤",
+                                    "label": "剑气反噬",
                                     "trigger": "damaged",
                                     "active": true,
-                                    "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nconst jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n\nif (stacks > 0) {\n    const ratio = Number(thisEffect.getFlag(\"xjzl-system\", \"damageRatio\")) || 1;\n    const dmg = stacks * ratio;\n    \n    // 流失气血 (真实伤害，忽略防御)\n    // 由于是“流失”，通常使用 poison 或 liushi 类型，且 ignoreDefense=true\n    await args.attacker.applyDamage({\n        amount: dmg,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(`剑身反震：对方流失 ${dmg} 气血`);\n}"
+                                    "script": "if (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (actor.isReceivingReflection) return;\n\nconst jianqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jianqi\");\nconst stacks = jianqi ? (jianqi.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n\nif (stacks > 0) {\n    const ratio = Number(thisEffect.getFlag(\"xjzl-system\", \"damageRatio\")) || 1;\n    const dmg = stacks * ratio;\n    \n    actor.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({\n            amount: dmg,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        const content = `\n            <div class=\"xjzl-chat-card item-card\" style=\"padding-left: 10px;\">\n                <div class=\"card-content-wrapper\">\n                    <div style=\"font-weight:bold; color:#8b0000; margin-bottom:5px;\"><i class=\"fas fa-skull-crossbones\"></i> 身剑归合·剑气反噬！</div>\n                    <p>攻击者 <b>${args.attacker.name}</b> 流失了 <span style=\"color:red; font-weight:bold;\">${dmg}</span> 点气血。</p>\n                </div>\n            </div>`;\n        ChatMessage.create({\n            user: game.user.id,\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: content\n        });\n    } finally {\n        actor.isReceivingReflection = false;\n    }\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                },
+                {
+                    "name": "剑痕光环",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "万剑归宗爆发所留。区域内敌人开始自己的回合或踏入该区域时流失气血。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jianhen_aura",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "剑痕伤害提示",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "const dmg = thisEffect.getFlag(\"xjzl-system\", \"liushiDmg\") || 10;\nconst content = `\n    <div class=\"xjzl-chat-card\" style=\"padding-left: 10px;\">\n        <div class=\"card-content-wrapper\">\n            <p style=\"color:#2c3e50;\"><b><i class=\"fas fa-bahai\"></i> 万剑归宗·剑痕：</b></p>\n            <p>周围 20 米范围内的敌人，开始回合或踏入时流失 <span style=\"color:red; font-weight:bold;\">${dmg}</span> 气血。</p>\n            <p style=\"font-size:0.8em; color:#666;\">请场上的敌人手动结算伤害！</p>\n        </div>\n    </div>`;\nChatMessage.create({\n    content: content,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
                                 }
                             ]
                         }
