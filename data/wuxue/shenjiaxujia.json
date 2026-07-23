@@ -462,8 +462,9 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>金光灿灿，朝目标投掷若干枚金钱镖，每投掷一枚使其流失 10 点气血（外功命中可暴击），至多掷出五枚。</p><p>·若目标嗜好兵器、华服、首饰、金银财宝、古玩字画中的任意一种，此招必定命中。</p><p><strong>升级：</strong>可额外掷出 5 枚。</p>",
-                    "automationNote": "投掷数量弹窗询问并计算总伤害。请玩家自觉扣除银两(50两/枚)。目标嗜好自动检测必中。",
+                    "automationNote": "出招时自动弹窗询问投掷数量并计算总伤害。请玩家手动扣除相应银两。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
                         "growth": 0
                     },
@@ -477,15 +478,15 @@
                     "scripts": [
                         {
                             "label": "数量选择与伤害计算",
-                            "trigger": "calc",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxDarts = 5 + (lvl - 1) * 5;\n\n// 弹窗询问\nconst count = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"金钱镖\" },\n    content: `<div style=\"text-align:center;\"><p>最大投掷数: ${maxDarts}</p><label>投掷数量 (请自觉扣除 50两/枚)</label><input type=\"number\" name=\"count\" value=\"1\" min=\"1\" max=\"${maxDarts}\" autofocus></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value }\n});\n\nconst num = Math.min(maxDarts, Math.max(1, parseInt(count) || 1));\n\n// 设置固定流失伤害\nargs.output.damage = num * 10;\nargs.output.bonusDesc.push(`投掷 ${num} 枚 (应耗银 ${num*50})`);",
-                            "active": true
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxDarts = 5 + (lvl - 1) * 5;\n\n// 弹窗询问\nconst countStr = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"金钱镖\" },\n    content: `<div style=\"text-align:center;\"><p>最大投掷数: ${maxDarts}</p><label>投掷数量 (请自觉扣除 50两/枚)</label><br><input type=\"number\" name=\"count\" value=\"1\" min=\"1\" max=\"${maxDarts}\" autofocus style=\"margin-top: 8px; width: 60%; text-align: center;\"></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value }\n});\n\nconst num = Math.min(maxDarts, Math.max(1, parseInt(countStr) || 1));\n\n// 直接修改最终伤害\nargs.flags.damageResult.damage = num * 10;\nargs.flags.damageResult.breakdown = `投掷 ${num} 枚金钱镖\\n固定流失伤害: ${num * 10}\\n(⚠️ 请手动扣除 ${num * 50} 两白银)`;"
                         },
                         {
                             "label": "嗜好必中检测",
                             "trigger": "check",
-                            "script": "const targetShihao = args.target.system.social?.shihao || [];\nconst moneyHobbies = [\"weapon\", \"clothes\", \"jewelry\", \"money\", \"antique\"];\n// 检查是否有交集\nconst hasHobby = targetShihao.some(h => moneyHobbies.includes(h));\nif (hasHobby) {\n    args.flags.forceHit = true;\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const targetShihao = args.target.system.social?.shihao || [];\nconst moneyHobbies = [\"weapon\", \"clothes\", \"jewelry\", \"money\", \"antique\"];\nconst hasHobby = targetShihao.some(h => moneyHobbies.includes(h));\nif (hasHobby) {\n    args.flags.alwaysHit = true;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px; border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.05);\">\n            <div style=\"font-weight:bold; color:#d35400;\">见钱眼开</div>\n            <div style=\"font-size:0.9em;\">目标对财宝的贪欲使其避无可避，金钱镖必定命中。</div>\n        </div>`\n    });\n}"
                         }
                     ]
                 }
