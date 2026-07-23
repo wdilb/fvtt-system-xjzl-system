@@ -544,42 +544,365 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         if (result) {
             const items = await this.randomize({ amount: result.amount, weighted: true, customWeights: result.weights });
-            if (items.length) this._generateLootChatCard(items, result);
+            if (items.length) {
+                if (game.settings.get("xjzl-system", "enableCompendiumDrawAnimation")) {
+                    await this._playDrawAnimation(items, result);
+                }
+                await this._generateLootChatCard(items, result);
+            }
         }
+    }
+
+    /**
+     * 将不同物品体系的品质统一为抽取演出所需的表现数据。
+     * 此处只负责显示，不参与随机权重计算。
+     */
+    _getRarityPresentation(item) {
+        const sys = item.system ?? {};
+
+        if (item.type === "wuxue" || item.type === "neigong") {
+            const rawTier = Number(sys.tier ?? 1);
+            const tier = Number.isFinite(rawTier) ? Math.min(3, Math.max(1, rawTier)) : 1;
+            const tiers = {
+                1: {
+                    colorClass: "tier-1", drawClass: "tier-1", label: "人",
+                    nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Tier1", power: 1
+                },
+                2: {
+                    colorClass: "tier-2", drawClass: "tier-2", label: "地",
+                    nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Tier2", power: 4
+                },
+                3: {
+                    colorClass: "tier-3", drawClass: "tier-3", label: "天",
+                    nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Tier3", power: 6
+                }
+            };
+            return tiers[tier];
+        }
+
+        if (item.type === "trait") {
+            const typeKey = CONFIG.XJZL.traitTypes?.[sys.type];
+            return {
+                colorClass: "rank-jin",
+                drawClass: "trait",
+                label: typeKey ? game.i18n.localize(typeKey).substring(0, 2) : "特质",
+                nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Trait",
+                power: 4
+            };
+        }
+
+        const rawQuality = Number(sys.quality ?? 0);
+        const quality = Number.isFinite(rawQuality) ? Math.min(4, Math.max(0, rawQuality)) : 0;
+        const qualities = {
+            0: {
+                colorClass: "quality-0", drawClass: "quality-0", label: "凡",
+                nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality0", power: 0
+            },
+            1: {
+                colorClass: "quality-1", drawClass: "quality-1", label: "铜",
+                nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality1", power: 1
+            },
+            2: {
+                colorClass: "quality-2", drawClass: "quality-2", label: "银",
+                nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality2", power: 2
+            },
+            3: {
+                colorClass: "quality-3", drawClass: "quality-3", label: "金",
+                nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality3", power: 4
+            },
+            4: {
+                colorClass: "quality-4", drawClass: "quality-4", label: "玉",
+                nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality4", power: 5
+            }
+        };
+        return qualities[quality];
+    }
+
+    /**
+     * 播放全屏抽取演出，结束后才将结果发送至聊天栏。
+     */
+    async _playDrawAnimation(items, { title }) {
+        const TextEditor = foundry.applications.ux.TextEditor.implementation;
+        const drawItems = items.map((item, index) => {
+            const rarity = this._getRarityPresentation(item);
+            return {
+                uuid: item.uuid,
+                name: item.name,
+                img: item.img,
+                typeLabel: game.i18n.localize(`TYPES.Item.${item.type}`),
+                rarityLabel: game.i18n.localize(rarity.nameKey),
+                drawClass: rarity.drawClass,
+                marks: Array.from({ length: Math.max(1, Math.min(5, rarity.power + 1)) }),
+                displayNumber: String(index + 1).padStart(2, "0"),
+                // 大批量抽取时将错峰时间封顶，避免 50 抽等待过久。
+                order: Math.min(index, 12),
+                power: rarity.power
+            };
+        });
+        // 十连以内保留逐件显形；大批量抽取直接进入总览，避免重复创建整套大图节点。
+        const useShowcase = drawItems.length <= 10;
+        const highest = drawItems.reduce((best, item) => item.power > best.power ? item : best, drawItems[0]);
+        const particleCount = Math.min(30, 16 + (highest.power * 2));
+        const particles = Array.from({ length: particleCount }, (_, index) => ({
+            x: (index * 37) % 101,
+            y: (index * 61) % 97,
+            delay: ((index * 17) % 23) / 10,
+            duration: 2.8 + ((index * 13) % 18) / 10,
+            size: 2 + ((index * 7) % 5)
+        }));
+        const meteors = drawItems.map((item, index) => ({
+            rarity: item.drawClass,
+            x: 12 + ((index * 29) % 77),
+            y: 17 + ((index * 41) % 52),
+            delay: (((index * 37) % Math.max(1, drawItems.length)) / Math.max(1, drawItems.length)) * 0.65,
+            duration: 1.45 + (((index * 11) % 7) / 18),
+            length: 230 + (item.power * 26) + ((index * 23) % 92),
+            angle: -36 + ((index * 7) % 14)
+        }));
+
+        const content = await renderTemplate(
+            "systems/xjzl-system/templates/apps/compendiumbrowser/draw-reveal.hbs",
+            {
+                title,
+                items: drawItems,
+                isSingle: drawItems.length === 1,
+                isLarge: drawItems.length > 10,
+                isMassive: drawItems.length > 30,
+                useShowcase,
+                countText: game.i18n.format("XJZL.CompendiumBrowser.Draw.Count", { count: drawItems.length }),
+                totalDisplay: String(drawItems.length).padStart(2, "0"),
+                highestRarity: highest.drawClass,
+                particles,
+                meteors
+            }
+        );
+        const detailByUuid = new Map(drawItems.map(item => [item.uuid, item]));
+
+        // 防止连续触发时遗留多个演出层。
+        this._drawOverlayCleanup?.();
+        this._drawOverlay?.remove();
+        const shell = document.createElement("div");
+        shell.innerHTML = content.trim();
+        const stage = shell.firstElementChild;
+        if (!stage) return;
+
+        this._drawOverlay = stage;
+        document.body.append(stage);
+
+        return new Promise(resolve => {
+            let mode = "cinematic";
+            let showcaseIndex = -1;
+            let detailOpen = false;
+            let sequenceTimer;
+            let teardownTimer;
+            let finished = false;
+            const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+            const phaseTimers = [];
+            const showcaseItems = Array.from(stage.querySelectorAll("[data-showcase-index]"));
+            const actionControls = Array.from(stage.querySelectorAll("[data-draw-action]"));
+            const resultCards = Array.from(stage.querySelectorAll("[data-draw-uuid]"));
+
+            const setPhase = phase => {
+                stage.dataset.phase = phase;
+            };
+
+            const closeDetail = () => {
+                if (!detailOpen) return;
+                detailOpen = false;
+                stage.classList.remove("has-detail");
+                const detail = stage.querySelector(".xjzl-draw-detail");
+                detail?.setAttribute("aria-hidden", "true");
+            };
+
+            const showDetail = async uuid => {
+                const item = detailByUuid.get(uuid);
+                const detail = stage.querySelector(".xjzl-draw-detail");
+                if (!item || !detail) return;
+
+                detail.dataset.uuid = uuid;
+                detail.dataset.rarity = item.drawClass;
+                const image = detail.querySelector(".xjzl-draw-detail-image");
+                if (image) {
+                    image.src = item.img;
+                    image.alt = item.name;
+                }
+                const rarity = detail.querySelector(".xjzl-draw-detail-rarity");
+                const name = detail.querySelector(".xjzl-draw-detail-name");
+                const type = detail.querySelector(".xjzl-draw-detail-type");
+                const marks = detail.querySelector(".xjzl-draw-detail-marks");
+                const description = detail.querySelector(".xjzl-draw-detail-description");
+
+                if (rarity) rarity.textContent = item.rarityLabel;
+                if (name) name.textContent = item.name;
+                if (type) type.textContent = item.typeLabel;
+                if (marks) {
+                    marks.replaceChildren(...item.marks.map(() => {
+                        const mark = document.createElement("i");
+                        mark.className = "fas fa-diamond";
+                        return mark;
+                    }));
+                }
+                if (description) description.innerHTML = item.description
+                    ?? `<p class="xjzl-draw-detail-loading"><i class="fas fa-spinner fa-spin"></i> ${game.i18n.localize("XJZL.CompendiumBrowser.Draw.LoadingDescription")}</p>`;
+
+                detailOpen = true;
+                detail.setAttribute("aria-hidden", "false");
+                stage.classList.add("has-detail");
+                detail.querySelector("[data-draw-action='detail-close']")?.focus({ preventScroll: true });
+
+                if (item.description !== undefined) return;
+                try {
+                    const itemDocument = await fromUuid(uuid);
+                    item.description = itemDocument
+                        ? await TextEditor.enrichHTML(itemDocument.system?.description ?? "", {
+                            secrets: itemDocument.isOwner,
+                            async: true,
+                            relativeTo: itemDocument
+                        })
+                        : "";
+                } catch (error) {
+                    console.error(`XJZL Browser | Failed to load draw detail: ${uuid}`, error);
+                    item.description = "";
+                }
+
+                // 用户可能已切换或关闭详情，只更新当前仍在展示的条目。
+                if (detail.dataset.uuid === uuid && description) {
+                    description.innerHTML = item.description
+                        || `<p>${game.i18n.localize("XJZL.CompendiumBrowser.Draw.NoDescription")}</p>`;
+                }
+            };
+
+            const showSummary = () => {
+                if (mode === "summary") return;
+                mode = "summary";
+                clearTimeout(sequenceTimer);
+                phaseTimers.forEach(clearTimeout);
+                stage.dataset.rarity = highest.drawClass;
+                stage.classList.remove("is-showcase");
+                stage.classList.add("is-revealed", "is-summary");
+                setPhase("result");
+                stage.querySelector("[data-draw-action='accept']")?.focus({ preventScroll: true });
+
+                // 淡出完成后卸载高开销电影/显形层，结果页只保留静态氛围与卡片。
+                teardownTimer = setTimeout(() => {
+                    if (mode !== "summary") return;
+                    stage.querySelector(".xjzl-draw-cinematic")?.remove();
+                    stage.querySelector(".xjzl-draw-showcase")?.remove();
+                }, reducedMotion ? 0 : 600);
+            };
+
+            const activateShowcaseItem = index => {
+                const item = drawItems[index];
+                if (!item) return showSummary();
+
+                showcaseIndex = index;
+                stage.dataset.rarity = item.drawClass;
+                showcaseItems.forEach(node => {
+                    node.classList.toggle("is-current", Number(node.dataset.showcaseIndex) === index);
+                });
+
+                const current = stage.querySelector("[data-showcase-current]");
+                if (current) current.textContent = item.displayNumber;
+                const nextLabel = stage.querySelector("[data-showcase-next-label]");
+                if (nextLabel) {
+                    nextLabel.textContent = game.i18n.localize(
+                        index === drawItems.length - 1
+                            ? "XJZL.CompendiumBrowser.Draw.ShowSummary"
+                            : "XJZL.CompendiumBrowser.Draw.NextItem"
+                    );
+                }
+                stage.querySelector("[data-draw-action='showcase-next']")?.focus({ preventScroll: true });
+            };
+
+            const beginShowcase = () => {
+                if (mode !== "cinematic") return;
+                mode = "showcase";
+                clearTimeout(sequenceTimer);
+                phaseTimers.forEach(clearTimeout);
+                stage.classList.add("is-showcase");
+                setPhase("showcase");
+                activateShowcaseItem(0);
+            };
+
+            const nextShowcaseItem = () => {
+                if (mode !== "showcase") return;
+                if (showcaseIndex >= drawItems.length - 1) showSummary();
+                else activateShowcaseItem(showcaseIndex + 1);
+            };
+
+            const finish = (immediate = false) => {
+                if (finished) return;
+                finished = true;
+                clearTimeout(sequenceTimer);
+                clearTimeout(teardownTimer);
+                phaseTimers.forEach(clearTimeout);
+                document.removeEventListener("keydown", onKeyDown);
+                actionControls.forEach(control => control.removeEventListener("click", onActionClick));
+                resultCards.forEach(card => card.removeEventListener("click", onCardClick));
+                stage.classList.add("is-closing");
+                setTimeout(() => stage.remove(), immediate || reducedMotion ? 0 : 240);
+                if (this._drawOverlay === stage) this._drawOverlay = null;
+                if (this._drawOverlayCleanup === cleanupOverlay) this._drawOverlayCleanup = null;
+                resolve();
+            };
+            const cleanupOverlay = () => finish(true);
+            this._drawOverlayCleanup = cleanupOverlay;
+
+            const onKeyDown = event => {
+                if (event.key !== "Escape") return;
+                event.preventDefault();
+                if (detailOpen) closeDetail();
+                else if (mode === "summary") finish();
+                else showSummary();
+            };
+
+            const onActionClick = event => {
+                event.preventDefault();
+                event.stopPropagation();
+                const action = event.currentTarget.dataset.drawAction;
+                if (action === "skip") return showSummary();
+                if (action === "showcase-next") return nextShowcaseItem();
+                if (action === "accept") return finish();
+                if (action === "detail-close") return closeDetail();
+            };
+
+            const onCardClick = event => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (mode === "summary") showDetail(event.currentTarget.dataset.drawUuid);
+            };
+
+            actionControls.forEach(control => control.addEventListener("click", onActionClick));
+            resultCards.forEach(card => card.addEventListener("click", onCardClick));
+            document.addEventListener("keydown", onKeyDown);
+            requestAnimationFrame(() => {
+                stage.classList.add("is-active");
+                stage.focus({ preventScroll: true });
+            });
+
+            if (reducedMotion) {
+                sequenceTimer = setTimeout(showSummary, 50);
+            } else {
+                phaseTimers.push(setTimeout(() => setPhase("grasp"), 900));
+                phaseTimers.push(setTimeout(() => setPhase("sword"), 1750));
+                phaseTimers.push(setTimeout(() => setPhase("rift"), 2700));
+                phaseTimers.push(setTimeout(() => setPhase("archive"), 3900));
+                phaseTimers.push(setTimeout(() => setPhase("burst"), 5500));
+                sequenceTimer = setTimeout(useShowcase ? beginShowcase : showSummary, 6300);
+            }
+        });
     }
 
     async _generateLootChatCard(items, { alias, title }) {
         const renderData = {
             title: title,
             items: items.map(i => {
-                const sys = i.system;
-                const isWuxue = i.type === "wuxue" || i.type === "neigong";
-                const isTrait = i.type === "trait";
-                let colorClass = "quality-0";
-                let label = "?";
-
-                if (isWuxue) {
-                    const val = sys.tier ?? 1;
-                    const labels = { 1: "人", 2: "地", 3: "天" };
-                    colorClass = `tier-${val}`;
-                    label = labels[val] || "?";
-                } else if (isTrait) {
-                    // 特效没有品阶，统一给高级金色样式
-                    colorClass = "rank-jin";
-                    // 显示具体的特效类型，如果没选则显示通用“特质”
-                    const typeKey = CONFIG.XJZL.traitTypes?.[sys.type];
-                    label = typeKey ? game.i18n.localize(typeKey).substring(0, 2) : "特质";
-                } else {
-                    const val = sys.quality ?? 0;
-                    const labels = { 0: "凡", 1: "铜", 2: "银", 3: "金", 4: "玉" };
-                    colorClass = `quality-${val}`;
-                    label = labels[val] || "?";
-                }
+                const rarity = this._getRarityPresentation(i);
 
                 return {
                     uuid: i.uuid, name: i.name, img: i.img, type: i.type,
-                    colorClass: colorClass,
-                    label: label
+                    colorClass: rarity.colorClass,
+                    label: rarity.label
                 };
             })
         };

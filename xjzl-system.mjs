@@ -434,6 +434,17 @@ Hooks.once("init", async function () {
     requiresReload: false // 不需要刷新，即改即生效
   });
 
+  // 是否播放江湖万卷阁的抽取演出
+  game.settings.register("xjzl-system", "enableCompendiumDrawAnimation", {
+    name: "启用江湖万卷阁抽取动画",
+    hint: "开启后，抽取物品时会播放全屏显形演出；关闭后将直接把抽取结果发送到聊天栏。",
+    scope: "client",      // 演出偏好由每位玩家自行决定
+    config: true,
+    type: Boolean,
+    default: true,
+    requiresReload: false // 抽取时即时读取，无需刷新
+  });
+
   // 是否允许玩家使用状态选取器
   game.settings.register("xjzl-system", "allowPlayerEffectPicker", {
     name: "允许玩家使用状态选取器",
@@ -1706,6 +1717,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/compendiumbrowser/content.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/compendiumbrowser/navigation.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/compendiumbrowser/sidebar.hbs", // 合集浏览器
+    "systems/xjzl-system/templates/apps/compendiumbrowser/draw-reveal.hbs", // 合集浏览器抽取演出
     "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览
     "systems/xjzl-system/templates/apps/tone-tracker.hbs",//音阶计数器
