@@ -174,7 +174,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>次要动作，静默音清，开启架招。格挡成功后，自身获得“清音”，持续一回合。</p><p><strong>清音：</strong>你的[演奏]检定结果+1。</p><p><strong>升级：</strong>格挡值+5，清音的持续回合数+1，演奏检定结果再+1，内力消耗+1。</p>",
+                    "description": "<p>静默音清，开启架招。格挡成功后，自身获得“清音”，持续一回合。</p><p><strong>清音：</strong>你的[演奏]检定结果+1。</p><p><strong>升级：</strong>格挡值+5，清音的持续回合数+1，演奏检定结果再+1，内力消耗+1。</p>",
                     "automationNote": "开启架招自动。格挡成功后自动获得[清音]状态，数值与持续时间随等级自动成长。",
                     "calculation": {
                         "base": 0,
@@ -191,8 +191,8 @@
                         {
                             "label": "格挡触发清音",
                             "trigger": "damaged",
-                            "script": "// 获取当前架招等级\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\n\n// 检查是否满足架招触发条件\nif (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    // 获取特效模板\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    // 动态修改数值\n    effect.duration.rounds = rounds;\n    effect.changes[0].value = String(bonus);\n    // 应用特效\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nif (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    effect.duration.rounds = rounds;\n    effect.changes[0].value = String(bonus);\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}"
                         }
                     ]
                 },
@@ -205,8 +205,8 @@
                     "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，思物心伤，一音三叹，对范围内所有敌人造成伤害。</p><p>·若目标的侠恶标签与你不同，招式暴击骰-2。</p><p>·若目标的性别与你不同，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
-                    "automationNote": "自动比对侠恶标签修正暴击阈值。自动比对性别修正伤害。",
+                    "description": "<p>思物心伤，一音三叹，对范围内所有敌人造成伤害。</p><p>·若目标的侠恶标签与你不同，招式暴击骰-2。</p><p>·若目标的性别与你不同，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -228,14 +228,14 @@
                         {
                             "label": "侠恶判定",
                             "trigger": "check",
-                            "script": "const myXiayi = actor.system.social.xiayi || 0; \nconst myExing = actor.system.social.exing || 0;\nconst tXiayi = args.target.system.social.xiayi || 0; \nconst tExing = args.target.system.social.exing || 0;\n\n// 定义标签计算函数 (Rule 8)\nconst getTag = (xiayi, exing) => {\n    if (xiayi >= 100 && exing <= 50) return 'good'; // 侠\n    if (exing >= 100 && xiayi <= 50) return 'evil'; // 恶\n    return 'neutral';\n};\n\nconst myTag = getTag(myXiayi, myExing);\nconst tTag = getTag(tXiayi, tExing);\n\n// 标签不同，暴击骰-2 (即更容易暴击，critThresholdMod +2)\nif (myTag !== tTag) {\n    args.flags.critThresholdMod += 2;\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const getTag = (x, e) => {\n    if (x >= 1000 && e < 200) return 'xia';\n    if (x >= 500 && e < 100) return 'xia';\n    if (x >= 100 && e < 50) return 'xia';\n    if (e >= 1000 && x < 200) return 'e';\n    if (e >= 500 && x < 100) return 'e';\n    if (e >= 100 && x < 50) return 'e';\n    return 'none';\n};\nconst myTag = getTag(actor.system.social.xiayi || 0, actor.system.social.exing || 0);\nconst tTag = getTag(args.target.system.social.xiayi || 0, args.target.system.social.exing || 0);\n\n// 只有双方都有明显的、且互不相同的标签才触发（避免无标签和有标签被判定为“不同”）\nif (myTag !== 'none' && tTag !== 'none' && myTag !== tTag) {\n    args.flags.critThresholdMod += 2;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.05);\">\n            <div style=\"font-weight:bold; color:#8e44ad;\">道不同不相为谋</div>\n            <div style=\"font-size:0.9em;\">对 [${args.target.name}] 侠恶相斥，暴击阈值降低 2 点。</div>\n        </div>`\n    });\n}"
                         },
                         {
                             "label": "性别伤害修正",
                             "trigger": "preDamage",
-                            "script": "const myGender = actor.system.info.gender;\nconst tGender = args.target.system.info.gender;\n\n// 若双方都有性别且不一致\nif (myGender && tGender && myGender !== tGender) {\n    args.config.amount += 10;\n}",
-                            "active": true
+                            "active": true,
+                            "script": "const myGender = actor.system.info.gender;\nconst tGender = args.target.system.info.gender;\nif (myGender && tGender && myGender !== tGender) {\n    args.config.amount += 10;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px; border-left: 3px solid #e74c3c; background: rgba(231,76,60,0.05);\">\n            <div style=\"font-weight:bold; color:#e74c3c;\">幽怨难鸣</div>\n            <div style=\"font-size:0.9em;\">对 [${args.target.name}] 性别相异，额外造成 10 点伤害。</div>\n        </div>`\n    });\n}"
                         }
                     ]
                 },
@@ -248,7 +248,7 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，情已死，奏短促顿音，对敌方造成伤害。击破架招时，为其添加“不怒”，持续两回合。</p><p><strong>不怒：</strong>你无法获得怒气。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "description": "<p>情已死，奏短促顿音，对敌方造成伤害。击破架招时，为其添加“不怒”，持续两回合。</p><p><strong>不怒：</strong>你无法获得怒气。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
                     "automationNote": "击破架招后自动施加[不怒]状态。",
                     "calculation": {
                         "base": 0,
@@ -271,8 +271,8 @@
                         {
                             "label": "击破添加不怒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.isBroken) {\n    // 使用标准查找方法\n    const sysEffect = CONFIG.statusEffects.find(e => e.id === 'bunu');\n    if(sysEffect) {\n        const data = foundry.utils.deepClone(sysEffect);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入 [不怒] 状态`);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isHit && args.isBroken) {\n    const sysEffect = CONFIG.statusEffects.find(e => e.id === 'bunu');\n    if(sysEffect) {\n        const data = foundry.utils.deepClone(sysEffect);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入 [不怒] 状态`);\n    }\n}"
                         }
                     ]
                 },
@@ -286,7 +286,7 @@
                     "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，清怨抑郁待天明，音色委婉痛人心，对周围敌人造成伤害。</p><p>·若目标存在任意乐器武学、乐谱散手给予的状态，每有一个，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "description": "<p>清怨抑郁待天明，音色委婉痛人心，对周围敌人造成伤害。</p><p>·若目标存在任意乐器武学、乐谱散手给予的状态，每有一个，招式伤害+10。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
                     "automationNote": "目标身上的乐器状态加成需手动计算并修正伤害。",
                     "calculation": {
                         "base": 0,
@@ -319,6 +319,7 @@
                     "name": "清音",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江南阁.png",
                     "description": "你的[演奏]检定结果+1。",
+                    "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "qingyin",
@@ -331,8 +332,7 @@
                             "mode": 2,
                             "value": "1"
                         }
-                    ],
-                    "transfer": false
+                    ]
                 }
             ]
         }
