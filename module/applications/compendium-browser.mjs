@@ -619,6 +619,620 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
+     * 创建抽取演出的实时流星。
+     * Canvas 负责星核、尾迹历史与碎片物理；素材只作为云气和碎片纹理参与合成。
+     */
+    _createDrawMeteorAnimation(stage, {
+        debrisIntensity = 1,
+        companionCount = 0,
+        reducedMotion = false
+    } = {}) {
+        const canvas = stage.querySelector(".xjzl-cinematic-meteor-canvas");
+        const context = canvas?.getContext("2d", { alpha: true, desynchronized: true });
+        if (!canvas || !context || reducedMotion) {
+            return {
+                setPhase: () => {},
+                stop: () => {}
+            };
+        }
+
+        const wispTexture = new Image();
+        wispTexture.decoding = "async";
+        wispTexture.src = "systems/xjzl-system/assets/ui/compendium-draw/draw-meteor-wisp-v2.png";
+
+        const shardTexture = new Image();
+        shardTexture.decoding = "async";
+        shardTexture.src = "systems/xjzl-system/assets/ui/compendium-draw/draw-meteor-shards-v2.png";
+
+        // 生成图中的独立碎片区域；逐片裁切后各自拥有速度、旋转和寿命。
+        const shardCrops = [
+            [1028, 36, 118, 146],
+            [1138, 68, 242, 196],
+            [680, 196, 112, 94],
+            [875, 174, 112, 94],
+            [922, 274, 132, 106],
+            [388, 454, 174, 188],
+            [432, 565, 266, 228],
+            [950, 672, 190, 182],
+            [1168, 498, 144, 136],
+            [792, 646, 126, 132]
+        ];
+
+        let width = 1;
+        let height = 1;
+        let pixelRatio = 1;
+        let animationFrame = 0;
+        let stopped = false;
+        let phase = "invitation";
+        let meteorStarted = 0;
+        let igniteStarted = 0;
+        let burstStarted = 0;
+        let lastFrame = 0;
+        let lastParticleSpawn = 0;
+        let lastDebrisSpawn = 0;
+        let rarityColor = { r: 196, g: 255, b: 244 };
+        const history = [];
+        const particles = [];
+        const debris = [];
+        const companionMeteors = Array.from(
+            { length: Math.max(0, Math.min(6, companionCount)) },
+            (_, index) => ({
+                delay: 180 + (index * 170),
+                duration: 2550 + ((index * 137) % 760),
+                startY: 0.18 + (((index * 23) % 56) / 100),
+                rise: 0.12 + (((index * 11) % 17) / 100),
+                depth: 0.46 + ((index % 3) * 0.16),
+                curve: ((index % 2 ? -1 : 1) * (0.025 + ((index % 3) * 0.012)))
+            })
+        );
+
+        const clamp = value => Math.max(0, Math.min(1, value));
+        const mix = (from, to, amount) => from + ((to - from) * clamp(amount));
+        const rgba = (color, alpha) => `rgba(${color.r}, ${color.g}, ${color.b}, ${alpha})`;
+        const easeOutCubic = value => 1 - Math.pow(1 - clamp(value), 3);
+
+        const readRarityColor = () => {
+            const raw = getComputedStyle(stage).getPropertyValue("--draw-color-rgb").trim();
+            const values = raw.split(",").map(value => Number.parseFloat(value.trim()));
+            if (values.length === 3 && values.every(Number.isFinite)) {
+                rarityColor = { r: values[0], g: values[1], b: values[2] };
+            }
+        };
+
+        const resize = () => {
+            const bounds = canvas.getBoundingClientRect();
+            const nextWidth = Math.max(1, Math.round(bounds.width));
+            const nextHeight = Math.max(1, Math.round(bounds.height));
+            const nextPixelRatio = Math.min(globalThis.devicePixelRatio || 1, 1.6);
+            if (
+                width === nextWidth
+                && height === nextHeight
+                && pixelRatio === nextPixelRatio
+                && canvas.width === Math.round(nextWidth * nextPixelRatio)
+                && canvas.height === Math.round(nextHeight * nextPixelRatio)
+            ) return;
+
+            width = nextWidth;
+            height = nextHeight;
+            pixelRatio = nextPixelRatio;
+            canvas.width = Math.round(nextWidth * nextPixelRatio);
+            canvas.height = Math.round(nextHeight * nextPixelRatio);
+            context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        };
+
+        const resizeObserver = globalThis.ResizeObserver ? new ResizeObserver(resize) : null;
+        resizeObserver?.observe(canvas);
+        resize();
+        readRarityColor();
+
+        const pointOnPath = progress => {
+            const t = clamp(progress);
+            const inverse = 1 - t;
+            const start = { x: width * -0.08, y: height * 0.73 };
+            const controlA = { x: width * 0.22, y: height * 0.69 };
+            const controlB = { x: width * 0.58, y: height * 0.38 };
+            const end = { x: width * 1.05, y: height * 0.2 };
+            return {
+                x: (inverse ** 3 * start.x)
+                    + (3 * inverse * inverse * t * controlA.x)
+                    + (3 * inverse * t * t * controlB.x)
+                    + (t ** 3 * end.x),
+                y: (inverse ** 3 * start.y)
+                    + (3 * inverse * inverse * t * controlA.y)
+                    + (3 * inverse * t * t * controlB.y)
+                    + (t ** 3 * end.y)
+            };
+        };
+
+        const tangentOnPath = progress => {
+            const before = pointOnPath(progress - 0.006);
+            const after = pointOnPath(progress + 0.006);
+            const length = Math.hypot(after.x - before.x, after.y - before.y) || 1;
+            return {
+                x: (after.x - before.x) / length,
+                y: (after.y - before.y) / length,
+                angle: Math.atan2(after.y - before.y, after.x - before.x)
+            };
+        };
+
+        const spawnParticle = (head, tangent, now, intensity) => {
+            const normal = { x: -tangent.y, y: tangent.x };
+            const spread = (Math.random() - 0.5) * (16 + (intensity * 20));
+            const speed = 0.045 + (Math.random() * 0.12);
+            particles.push({
+                x: head.x + (normal.x * spread),
+                y: head.y + (normal.y * spread),
+                vx: (-tangent.x * speed) + (normal.x * (Math.random() - 0.5) * 0.05),
+                vy: (-tangent.y * speed) + (normal.y * (Math.random() - 0.5) * 0.05),
+                born: now,
+                life: 520 + (Math.random() * 950),
+                size: 0.7 + (Math.random() * 2.8)
+            });
+            if (particles.length > 320) particles.splice(0, particles.length - 320);
+        };
+
+        const spawnDebris = (head, tangent, now, intensity) => {
+            const normal = { x: -tangent.y, y: tangent.x };
+            const spread = (Math.random() - 0.5) * (24 + (intensity * 30));
+            const crop = shardCrops[Math.floor(Math.random() * shardCrops.length)];
+            debris.push({
+                crop,
+                x: head.x - (tangent.x * (8 + Math.random() * 28)) + (normal.x * spread),
+                y: head.y - (tangent.y * (8 + Math.random() * 28)) + (normal.y * spread),
+                vx: (-tangent.x * (0.055 + Math.random() * 0.095))
+                    + (normal.x * (Math.random() - 0.5) * 0.12),
+                vy: (-tangent.y * (0.055 + Math.random() * 0.095))
+                    + (normal.y * (Math.random() - 0.5) * 0.12),
+                born: now,
+                life: 820 + (Math.random() * 1100),
+                size: (10 + Math.random() * 28) * (0.72 + intensity * 0.28),
+                rotation: Math.random() * Math.PI * 2,
+                spin: (Math.random() - 0.5) * 0.005
+            });
+            if (debris.length > 56) debris.splice(0, debris.length - 56);
+        };
+
+        const updateEntities = (now, delta) => {
+            for (const particle of particles) {
+                particle.x += particle.vx * delta;
+                particle.y += particle.vy * delta;
+            }
+            for (const fragment of debris) {
+                fragment.x += fragment.vx * delta;
+                fragment.y += fragment.vy * delta;
+                fragment.rotation += fragment.spin * delta;
+            }
+            while (particles.length && now - particles[0].born > particles[0].life) particles.shift();
+            while (debris.length && now - debris[0].born > debris[0].life) debris.shift();
+        };
+
+        const drawCompanionMeteors = (now, igniteMix) => {
+            if (!companionMeteors.length) return;
+            const jade = { r: 174, g: 238, b: 236 };
+
+            context.save();
+            context.globalCompositeOperation = "lighter";
+            context.lineCap = "round";
+            for (const [index, meteor] of companionMeteors.entries()) {
+                const localProgress = (now - meteorStarted - meteor.delay) / meteor.duration;
+                if (localProgress <= 0 || localProgress >= 1) continue;
+
+                const progress = localProgress * localProgress * (3 - (2 * localProgress));
+                const x = mix(width * -0.12, width * 1.1, progress);
+                const baseY = mix(
+                    height * meteor.startY,
+                    height * (meteor.startY - meteor.rise),
+                    progress
+                );
+                const y = baseY + (Math.sin(Math.PI * progress) * height * meteor.curve);
+                const nextProgress = clamp(progress + 0.01);
+                const nextX = mix(width * -0.12, width * 1.1, nextProgress);
+                const nextBaseY = mix(
+                    height * meteor.startY,
+                    height * (meteor.startY - meteor.rise),
+                    nextProgress
+                );
+                const nextY = nextBaseY + (Math.sin(Math.PI * nextProgress) * height * meteor.curve);
+                const angle = Math.atan2(nextY - y, nextX - x);
+                const tangent = { x: Math.cos(angle), y: Math.sin(angle) };
+                const tailLength = Math.min(width * (0.105 + meteor.depth * 0.045), 210);
+                const activeColor = {
+                    r: mix(jade.r, rarityColor.r, igniteMix * 0.38),
+                    g: mix(jade.g, rarityColor.g, igniteMix * 0.38),
+                    b: mix(jade.b, rarityColor.b, igniteMix * 0.38)
+                };
+                const alpha = Math.sin(Math.PI * localProgress) * (0.34 + meteor.depth * 0.28);
+                const tailX = x - (tangent.x * tailLength);
+                const tailY = y - (tangent.y * tailLength);
+                const gradient = context.createLinearGradient(tailX, tailY, x, y);
+                gradient.addColorStop(0, rgba(activeColor, 0));
+                gradient.addColorStop(0.48, rgba(activeColor, alpha * 0.18));
+                gradient.addColorStop(0.86, rgba(activeColor, alpha * 0.72));
+                gradient.addColorStop(1, `rgba(255,255,255,${alpha * 0.94})`);
+
+                context.strokeStyle = gradient;
+                context.lineWidth = 5.5 * meteor.depth;
+                context.beginPath();
+                context.moveTo(tailX, tailY);
+                context.lineTo(x, y);
+                context.stroke();
+
+                context.strokeStyle = `rgba(248,255,255,${alpha * 0.76})`;
+                context.lineWidth = Math.max(0.7, 1.25 * meteor.depth);
+                context.beginPath();
+                context.moveTo(tailX + (tangent.x * tailLength * 0.38), tailY + (tangent.y * tailLength * 0.38));
+                context.lineTo(x, y);
+                context.stroke();
+
+                const coreRadius = 5 + (meteor.depth * 8);
+                const core = context.createRadialGradient(x, y, 0, x, y, coreRadius);
+                core.addColorStop(0, `rgba(255,255,255,${alpha * 0.98})`);
+                core.addColorStop(0.24, rgba(activeColor, alpha));
+                core.addColorStop(1, rgba(activeColor, 0));
+                context.fillStyle = core;
+                context.beginPath();
+                context.arc(x, y, coreRadius, 0, Math.PI * 2);
+                context.fill();
+
+                // 少量沿途闪点让小流星看起来在持续运动，而不是静态短线。
+                for (let moteIndex = 1; moteIndex <= 3; moteIndex++) {
+                    const distance = tailLength * (0.22 + moteIndex * 0.19);
+                    const jitter = Math.sin((now * 0.009) + index + moteIndex) * 3.5;
+                    const normal = { x: -tangent.y, y: tangent.x };
+                    context.fillStyle = rgba(activeColor, alpha * (0.34 / moteIndex));
+                    context.beginPath();
+                    context.arc(
+                        x - (tangent.x * distance) + (normal.x * jitter),
+                        y - (tangent.y * distance) + (normal.y * jitter),
+                        Math.max(0.6, 1.8 - moteIndex * 0.3),
+                        0,
+                        Math.PI * 2
+                    );
+                    context.fill();
+                }
+            }
+            context.restore();
+        };
+
+        const drawLightCone = (head, tangent, progress, igniteMix, ignitionSwell) => {
+            const jade = { r: 176, g: 241, b: 238 };
+            const activeColor = {
+                r: mix(jade.r, rarityColor.r, igniteMix),
+                g: mix(jade.g, rarityColor.g, igniteMix),
+                b: mix(jade.b, rarityColor.b, igniteMix)
+            };
+            const arrival = easeOutCubic(progress / 0.2);
+            const length = Math.min(width * 0.68, 1040) * arrival * (1 + ignitionSwell * 0.14);
+            const outerWidth = Math.min(Math.max(height * 0.17, 96), 196) * (1 + ignitionSwell * 0.82);
+
+            context.save();
+            context.globalCompositeOperation = "source-over";
+            context.translate(head.x, head.y);
+            context.rotate(tangent.angle);
+
+            const outer = context.createLinearGradient(-length, 0, 0, 0);
+            outer.addColorStop(0, rgba(activeColor, 0));
+            outer.addColorStop(0.24, rgba(activeColor, 0.06));
+            outer.addColorStop(0.66, rgba(activeColor, 0.24));
+            outer.addColorStop(0.9, rgba(activeColor, 0.54));
+            outer.addColorStop(1, "rgba(255,255,255,0.92)");
+            context.filter = "blur(9px)";
+            context.fillStyle = outer;
+            context.beginPath();
+            context.moveTo(3, -2);
+            context.quadraticCurveTo(-length * 0.5, -outerWidth * 0.42, -length, -outerWidth * 0.52);
+            context.lineTo(-length, outerWidth * 0.52);
+            context.quadraticCurveTo(-length * 0.5, outerWidth * 0.42, 3, 2);
+            context.closePath();
+            context.fill();
+
+            const inner = context.createLinearGradient(-length * 0.82, 0, 0, 0);
+            inner.addColorStop(0, rgba(activeColor, 0));
+            inner.addColorStop(0.45, rgba(activeColor, 0.26));
+            inner.addColorStop(0.88, "rgba(242,255,255,0.82)");
+            inner.addColorStop(1, "#fff");
+            context.filter = "blur(2px)";
+            context.fillStyle = inner;
+            context.beginPath();
+            context.moveTo(2, -1.2);
+            context.lineTo(-length * 0.82, -outerWidth * 0.12);
+            context.lineTo(-length * 0.82, outerWidth * 0.12);
+            context.lineTo(2, 1.2);
+            context.closePath();
+            context.fill();
+            context.restore();
+        };
+
+        const drawWispLayers = (head, tangent, progress, now, ignitionSwell) => {
+            if (!wispTexture.complete || !wispTexture.naturalWidth) return;
+            const arrival = easeOutCubic(progress / 0.24);
+            const baseLength = Math.min(width * 0.68, 1040)
+                * arrival
+                * (1 + ignitionSwell * 0.12);
+            const baseHeight = Math.min(Math.max(height * 0.15, 90), 190)
+                * (0.72 + progress * 0.28)
+                * (1 + ignitionSwell * 0.68);
+            const flutter = Math.sin(now * 0.0042) * 0.018;
+
+            context.save();
+            // 云气纹理保留自身深蓝半透明层次；若使用加亮混合，亮背景会把它完全吃掉。
+            context.globalCompositeOperation = "source-over";
+            context.translate(head.x, head.y);
+            context.rotate(tangent.angle + flutter);
+            context.globalAlpha = 0.82;
+            context.filter = "blur(0.6px)";
+            context.drawImage(wispTexture, -baseLength, -baseHeight * 0.58, baseLength, baseHeight * 1.16);
+
+            context.rotate(-flutter * 1.8);
+            context.translate(-baseHeight * 0.04, Math.sin(now * 0.006) * baseHeight * 0.08);
+            context.globalAlpha = 0.74;
+            context.drawImage(
+                wispTexture,
+                -baseLength * 0.88,
+                -baseHeight * 0.32,
+                baseLength * 0.9,
+                baseHeight * 0.64
+            );
+
+            if (ignitionSwell > 0.02) {
+                context.rotate(Math.sin(now * 0.008) * 0.024);
+                context.translate(-baseHeight * 0.08, -baseHeight * 0.09);
+                context.globalAlpha = ignitionSwell * 0.46;
+                context.filter = "blur(2.4px)";
+                context.drawImage(
+                    wispTexture,
+                    -baseLength * 0.96,
+                    -baseHeight * 0.46,
+                    baseLength,
+                    baseHeight * 0.92
+                );
+            }
+            context.restore();
+        };
+
+        const drawHistory = igniteMix => {
+            if (history.length < 2) return;
+            const jade = { r: 178, g: 244, b: 239 };
+            context.save();
+            context.lineCap = "round";
+            context.globalCompositeOperation = "lighter";
+
+            for (let index = history.length - 2; index >= 0; index--) {
+                const current = history[index];
+                const next = history[index + 1];
+                const age = index / Math.max(1, history.length - 1);
+                const strength = 1 - age;
+                const colorWave = clamp((igniteMix * 1.55) - (age * 0.86));
+                const activeColor = {
+                    r: mix(jade.r, rarityColor.r, colorWave),
+                    g: mix(jade.g, rarityColor.g, colorWave),
+                    b: mix(jade.b, rarityColor.b, colorWave)
+                };
+
+                context.strokeStyle = rgba(activeColor, 0.055 * strength);
+                context.lineWidth = 36 * strength;
+                context.beginPath();
+                context.moveTo(next.x, next.y);
+                context.lineTo(current.x, current.y);
+                context.stroke();
+
+                context.strokeStyle = rgba(activeColor, 0.28 * strength);
+                context.lineWidth = Math.max(1, 8 * strength);
+                context.beginPath();
+                context.moveTo(next.x, next.y);
+                context.lineTo(current.x, current.y);
+                context.stroke();
+
+                context.strokeStyle = `rgba(248, 255, 255, ${0.72 * strength})`;
+                context.lineWidth = Math.max(0.6, 1.7 * strength);
+                context.beginPath();
+                context.moveTo(next.x, next.y);
+                context.lineTo(current.x, current.y);
+                context.stroke();
+            }
+            context.restore();
+        };
+
+        const drawParticles = (now, igniteMix) => {
+            const jade = { r: 176, g: 244, b: 237 };
+            const activeColor = {
+                r: mix(jade.r, rarityColor.r, igniteMix),
+                g: mix(jade.g, rarityColor.g, igniteMix),
+                b: mix(jade.b, rarityColor.b, igniteMix)
+            };
+            context.save();
+            context.globalCompositeOperation = "lighter";
+            context.lineCap = "round";
+            for (const particle of particles) {
+                const age = clamp((now - particle.born) / particle.life);
+                const alpha = Math.sin(Math.PI * age) * 0.76;
+                context.strokeStyle = rgba(activeColor, alpha);
+                context.lineWidth = particle.size;
+                context.beginPath();
+                context.moveTo(particle.x, particle.y);
+                context.lineTo(particle.x - particle.vx * 82, particle.y - particle.vy * 82);
+                context.stroke();
+            }
+            context.restore();
+        };
+
+        const drawDebris = now => {
+            if (!shardTexture.complete || !shardTexture.naturalWidth) return;
+            context.save();
+            context.globalCompositeOperation = "lighter";
+            for (const fragment of debris) {
+                const age = clamp((now - fragment.born) / fragment.life);
+                const alpha = Math.sin(Math.PI * age);
+                const [sourceX, sourceY, sourceWidth, sourceHeight] = fragment.crop;
+                const aspect = sourceWidth / sourceHeight;
+                context.save();
+                context.translate(fragment.x, fragment.y);
+                context.rotate(fragment.rotation);
+                context.globalAlpha = alpha * 0.78;
+                context.drawImage(
+                    shardTexture,
+                    sourceX,
+                    sourceY,
+                    sourceWidth,
+                    sourceHeight,
+                    -fragment.size * aspect * 0.5,
+                    -fragment.size * 0.5,
+                    fragment.size * aspect,
+                    fragment.size
+                );
+                context.restore();
+            }
+            context.restore();
+        };
+
+        const drawCore = (head, tangent, igniteMix, ignitionSwell, burstMix, now) => {
+            const jade = { r: 183, g: 248, b: 241 };
+            const activeColor = {
+                r: mix(jade.r, rarityColor.r, igniteMix),
+                g: mix(jade.g, rarityColor.g, igniteMix),
+                b: mix(jade.b, rarityColor.b, igniteMix)
+            };
+            const pulse = 1 + (Math.sin(now * 0.011) * 0.09);
+            const radius = (23 + (ignitionSwell * 18) + (burstMix * 46)) * pulse;
+
+            context.save();
+            context.globalCompositeOperation = "lighter";
+            const halo = context.createRadialGradient(head.x, head.y, 0, head.x, head.y, radius);
+            halo.addColorStop(0, "rgba(255,255,255,1)");
+            halo.addColorStop(0.08, rgba(activeColor, 0.98));
+            halo.addColorStop(0.34, rgba(activeColor, 0.36));
+            halo.addColorStop(1, rgba(activeColor, 0));
+            context.fillStyle = halo;
+            context.beginPath();
+            context.arc(head.x, head.y, radius, 0, Math.PI * 2);
+            context.fill();
+
+            context.translate(head.x, head.y);
+            context.rotate(tangent.angle);
+            const forwardFlare = 40 + (ignitionSwell * 28) + (burstMix * Math.min(width * 0.25, 330));
+            const rearFlare = 68 + (ignitionSwell * 52) + (burstMix * 112);
+            const crossFlare = 13 + (ignitionSwell * 18) + (burstMix * 58);
+            const flare = context.createLinearGradient(-rearFlare, 0, forwardFlare, 0);
+            flare.addColorStop(0, rgba(activeColor, 0));
+            flare.addColorStop(0.42, rgba(activeColor, 0.65));
+            flare.addColorStop(0.58, "#fff");
+            flare.addColorStop(1, rgba(activeColor, 0));
+            context.strokeStyle = flare;
+            context.lineWidth = 2.2 + burstMix * 4;
+            context.beginPath();
+            context.moveTo(-rearFlare, 0);
+            context.lineTo(forwardFlare, 0);
+            context.stroke();
+
+            context.strokeStyle = rgba(activeColor, 0.62 + burstMix * 0.26);
+            context.lineWidth = 1.2;
+            context.beginPath();
+            context.moveTo(0, -crossFlare);
+            context.lineTo(0, crossFlare);
+            context.stroke();
+
+            context.fillStyle = "#fff";
+            context.beginPath();
+            context.arc(0, 0, 2.8 + (burstMix * 3.4), 0, Math.PI * 2);
+            context.fill();
+            context.restore();
+        };
+
+        const draw = now => {
+            animationFrame = 0;
+            if (stopped || !stage.isConnected || !meteorStarted) return;
+
+            const delta = lastFrame ? Math.min(34, now - lastFrame) : 16;
+            lastFrame = now;
+            context.clearRect(0, 0, width, height);
+
+            const flightDuration = 3600;
+            const progress = clamp((now - meteorStarted) / flightDuration);
+            const head = pointOnPath(progress);
+            const tangent = tangentOnPath(progress);
+            const igniteAge = igniteStarted ? Math.max(0, now - igniteStarted) : 0;
+            const igniteMix = igniteStarted ? easeOutCubic(igniteAge / 780) : 0;
+            const ignitionPulse = igniteStarted
+                ? Math.sin(Math.PI * clamp(igniteAge / 980))
+                : 0;
+            // 变色瞬间先膨胀到约 1.8 倍，再稳定在比原尾焰大约 25% 的状态。
+            const ignitionSwell = (igniteMix * 0.25) + (ignitionPulse * 0.58);
+            const burstMix = burstStarted ? easeOutCubic((now - burstStarted) / 620) : 0;
+
+            history.unshift({ x: head.x, y: head.y });
+            if (history.length > 58) history.length = 58;
+
+            if (progress > 0.04 && progress < 0.98) {
+                if (now - lastParticleSpawn > 24) {
+                    const count = Math.max(1, Math.round((debrisIntensity * 2) + (ignitionSwell * 2)));
+                    for (let index = 0; index < count; index++) {
+                        spawnParticle(head, tangent, now, igniteMix);
+                    }
+                    lastParticleSpawn = now;
+                }
+                if (now - lastDebrisSpawn > 112 / debrisIntensity) {
+                    spawnDebris(head, tangent, now, 0.65 + igniteMix);
+                    lastDebrisSpawn = now;
+                }
+            }
+
+            updateEntities(now, delta);
+            drawCompanionMeteors(now, igniteMix);
+            drawLightCone(head, tangent, progress, igniteMix, ignitionSwell);
+            drawWispLayers(head, tangent, progress, now, ignitionSwell);
+            drawHistory(igniteMix);
+            drawParticles(now, igniteMix);
+            drawDebris(now);
+            drawCore(head, tangent, igniteMix, ignitionSwell, burstMix, now);
+
+            const burstAge = burstStarted ? now - burstStarted : -1;
+            if (progress < 1 || burstAge < 1050) {
+                animationFrame = requestAnimationFrame(draw);
+            }
+        };
+
+        const requestDraw = () => {
+            if (!animationFrame && !stopped) animationFrame = requestAnimationFrame(draw);
+        };
+        wispTexture.addEventListener("load", requestDraw, { once: true });
+        shardTexture.addEventListener("load", requestDraw, { once: true });
+
+        const setPhase = nextPhase => {
+            phase = nextPhase;
+            const now = performance.now();
+            if (nextPhase === "meteor" && !meteorStarted) {
+                meteorStarted = now;
+                lastFrame = now;
+                readRarityColor();
+            }
+            if (nextPhase === "ignite" && !igniteStarted) igniteStarted = now;
+            if (nextPhase === "burst" && !burstStarted) burstStarted = now;
+
+            if (["meteor", "ignite", "burst"].includes(phase)) {
+                requestDraw();
+            } else if (meteorStarted) {
+                if (animationFrame) cancelAnimationFrame(animationFrame);
+                animationFrame = 0;
+                context.clearRect(0, 0, width, height);
+            }
+        };
+
+        const stop = () => {
+            if (stopped) return;
+            stopped = true;
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            animationFrame = 0;
+            resizeObserver?.disconnect();
+            history.length = 0;
+            particles.length = 0;
+            debris.length = 0;
+            context.clearRect(0, 0, width, height);
+        };
+
+        return { setPhase, stop };
+    }
+
+    /**
      * 播放全屏抽取演出，结束后才将结果发送至聊天栏。
      */
     async _playDrawAnimation(items, { title }) {
@@ -650,16 +1264,6 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             duration: 2.8 + ((index * 13) % 18) / 10,
             size: 2 + ((index * 7) % 5)
         }));
-        const meteors = drawItems.map((item, index) => ({
-            rarity: item.drawClass,
-            x: 12 + ((index * 29) % 77),
-            y: 17 + ((index * 41) % 52),
-            delay: (((index * 37) % Math.max(1, drawItems.length)) / Math.max(1, drawItems.length)) * 0.65,
-            duration: 1.45 + (((index * 11) % 7) / 18),
-            length: 230 + (item.power * 26) + ((index * 23) % 92),
-            angle: -36 + ((index * 7) % 14)
-        }));
-
         const content = await renderTemplate(
             "systems/xjzl-system/templates/apps/compendiumbrowser/draw-reveal.hbs",
             {
@@ -672,8 +1276,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 countText: game.i18n.format("XJZL.CompendiumBrowser.Draw.Count", { count: drawItems.length }),
                 totalDisplay: String(drawItems.length).padStart(2, "0"),
                 highestRarity: highest.drawClass,
-                particles,
-                meteors
+                particles
             }
         );
         const detailByUuid = new Map(drawItems.map(item => [item.uuid, item]));
@@ -701,9 +1304,15 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             const showcaseItems = Array.from(stage.querySelectorAll("[data-showcase-index]"));
             const actionControls = Array.from(stage.querySelectorAll("[data-draw-action]"));
             const resultCards = Array.from(stage.querySelectorAll("[data-draw-uuid]"));
+            const meteorAnimation = this._createDrawMeteorAnimation(stage, {
+                debrisIntensity: Math.min(1.5, 0.72 + (drawItems.length * 0.08)),
+                companionCount: Math.min(6, Math.max(0, drawItems.length - 1)),
+                reducedMotion
+            });
 
             const setPhase = phase => {
                 stage.dataset.phase = phase;
+                meteorAnimation.setPhase(phase);
             };
 
             const closeDetail = () => {
@@ -777,6 +1386,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 mode = "summary";
                 clearTimeout(sequenceTimer);
                 phaseTimers.forEach(clearTimeout);
+                meteorAnimation.stop();
                 stage.dataset.rarity = highest.drawClass;
                 stage.classList.remove("is-showcase");
                 stage.classList.add("is-revealed", "is-summary");
@@ -819,6 +1429,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 mode = "showcase";
                 clearTimeout(sequenceTimer);
                 phaseTimers.forEach(clearTimeout);
+                meteorAnimation.stop();
                 stage.classList.add("is-showcase");
                 setPhase("showcase");
                 activateShowcaseItem(0);
@@ -836,6 +1447,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 clearTimeout(sequenceTimer);
                 clearTimeout(teardownTimer);
                 phaseTimers.forEach(clearTimeout);
+                meteorAnimation.stop();
                 document.removeEventListener("keydown", onKeyDown);
                 actionControls.forEach(control => control.removeEventListener("click", onActionClick));
                 resultCards.forEach(card => card.removeEventListener("click", onCardClick));
@@ -887,8 +1499,11 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 phaseTimers.push(setTimeout(() => setPhase("sword"), 1750));
                 phaseTimers.push(setTimeout(() => setPhase("rift"), 2700));
                 phaseTimers.push(setTimeout(() => setPhase("archive"), 3900));
-                phaseTimers.push(setTimeout(() => setPhase("burst"), 5500));
-                sequenceTimer = setTimeout(useShowcase ? beginShowcase : showSummary, 6300);
+                // 星核沿路径飞行 3.6 秒；稀有度颜色从星核向尾迹传播，而不是整张素材变色。
+                phaseTimers.push(setTimeout(() => setPhase("meteor"), 4550));
+                phaseTimers.push(setTimeout(() => setPhase("ignite"), 6900));
+                phaseTimers.push(setTimeout(() => setPhase("burst"), 7900));
+                sequenceTimer = setTimeout(useShowcase ? beginShowcase : showSummary, 9000);
             }
         });
     }
