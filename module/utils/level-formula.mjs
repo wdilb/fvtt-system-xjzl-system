@@ -4,6 +4,7 @@
  * 持久化字段可以使用形如 @{1 + @up|1} 的占位符：
  * - 左侧为受限数值公式
  * - 右侧为公式无效时显示的回退文本
+ * - 描述文本可用 action(数值公式) 将 1..5 映射为动作名称
  *
  * 这里刻意不使用 eval / Function，避免让数据字段变成任意脚本入口。
  */
@@ -46,7 +47,8 @@ export function hasLevelFormula(value) {
  * 解析描述、距离等可混排文本中的全部等级公式。
  * @param {*} value 原始字段
  * @param {object} variables 公式变量
- * @param {object} [options]
+ * @param {object} [options] 可通过 markResolved 标记成功计算出的文本片段，
+ *   通过 onResolved 获知字段中至少有一条公式成功计算
  * @returns {*} 不含公式时原样返回
  */
 export function resolveLevelFormulaText(value, variables, options = {}) {
@@ -111,6 +113,7 @@ export function resolveActionCostFormula(value, variables, options = {}) {
     }
 
     const level = Math.min(5, Math.max(1, result));
+    options.onResolved?.();
     return ACTION_COSTS[level];
   } catch (error) {
     warnOnce(token.expression, error.message, options);
@@ -135,12 +138,28 @@ function resolveTokenText(token, variables, options) {
   }
 
   try {
+    if (token.expression.startsWith("action(") && token.expression.endsWith(")")) {
+      const expression = token.expression.slice("action(".length, -1);
+      const result = evaluateFormula(expression, variables);
+      if (!Number.isInteger(result)) {
+        throw new FormulaError("动作格式化公式结果必须是整数");
+      }
+      const level = Math.min(5, Math.max(1, result));
+      return formatResolvedText(ACTION_COSTS[level], options);
+    }
+
     const result = evaluateFormula(token.expression, variables);
-    return formatNumber(result);
+    return formatResolvedText(formatNumber(result), options);
   } catch (error) {
     warnOnce(token.expression, error.message, options);
     return token.fallback;
   }
+}
+
+function formatResolvedText(value, options) {
+  options.onResolved?.();
+  if (!options.markResolved) return value;
+  return `<span class="xjzl-level-formula-result">${value}</span>`;
 }
 
 function readFormulaToken(value, start) {

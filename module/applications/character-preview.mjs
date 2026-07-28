@@ -531,7 +531,9 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                         tierName: tierMap[mTier] || `${mTier}级`,
                         levelName: levelNames[Math.min(4, Math.max(0, m.effectiveStage ?? m.computedLevel ?? 0))],
                         type: m.type, typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
-                        isUltimate: m.isUltimate, actionCost: m.actionCost || "主要动作", range: m.range, isStance: m.type === "stance", isFeint: m.type === "feint",
+                        isUltimate: m.isUltimate, actionCost: m.actionCost || "主要动作", range: m.range,
+                        formulaFields: m.formulaFields,
+                        isStance: m.type === "stance", isFeint: m.type === "feint",
                         blockValue, feintValue, damage: (() => {
                             let baseDmg = Number(derived.damage) || 0;
                             if (baseDmg > 0) {

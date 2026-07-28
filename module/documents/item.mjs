@@ -2675,7 +2675,7 @@ export class XJZLItem extends Item {
 
     // 3. 准备 Properties
     const properties = [];
-    const addProp = (label, value) => properties.push({ label, value });
+    const addProp = (label, value, isFormula = false) => properties.push({ label, value, isFormula });
 
     // 招式类型
     addProp("类型", game.i18n.localize(CONFIG.XJZL.moveTypes[move.type]));
@@ -2694,7 +2694,7 @@ export class XJZLItem extends Item {
     if (costs.length > 0) addProp("消耗", costs.join(" / "));
 
     // 距离与范围
-    if (move.range) addProp("距离", move.range);
+    if (move.range) addProp("距离", move.range, move.formulaFields?.range);
 
     // === 需求 ===
     if (move.requirements) {

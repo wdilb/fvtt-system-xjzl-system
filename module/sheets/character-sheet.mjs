@@ -206,6 +206,25 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         };
 
         /**
+         * Tooltip 仍以纯文本为主，但保留系统生成的公式结果标记。
+         */
+        const cleanFormulaDescription = (description) => {
+            const formulaResults = [];
+            const tokenized = description.replace(
+                /<span class="xjzl-level-formula-result">([^<]*)<\/span>/g,
+                (_match, result) => `XJZLFORMULARESULT${formulaResults.push(result) - 1}END`
+            );
+            let text = cleanRichText(tokenized);
+            for (const [index, result] of formulaResults.entries()) {
+                text = text.replace(
+                    `XJZLFORMULARESULT${index}END`,
+                    `<span class='xjzl-level-formula-result'>${result}</span>`
+                );
+            }
+            return text;
+        };
+
+        /**
          * 构建自动化说明的 HTML 片段 (蓝色框)
          */
         const buildAutomationHTML = (note) => {
@@ -222,7 +241,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
          */
         const buildDescriptionHTML = (description, maxLength = 0) => {
             if (!description) return "";
-            let text = cleanRichText(description);
+            let text = cleanFormulaDescription(description);
             if (maxLength > 0 && text.length > maxLength) {
                 text = text.substring(0, maxLength) + "...";
             }
@@ -740,7 +759,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                         context.pinnedMoves.push({
                             name: move.name, type: move.type, isUltimate: move.isUltimate, computedLevel: move.computedLevel,
                             range: move.range, derived: move.derived, tooltip: move.tooltip, currentCost: move.currentCost,
-                            parentName: item.name, itemId: item.id, moveId: moveId, isPinned: true, actionCost: move.actionCost
+                            parentName: item.name, itemId: item.id, moveId: moveId, isPinned: true, actionCost: move.actionCost,
+                            formulaFields: move.formulaFields
                         });
                     }
                 }

@@ -334,20 +334,42 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       };
       const formulaOptions = { label: `${this.parent?.name ?? "武学"}／${move.name}` };
       const sourceMove = this._source.moves?.[moveIndex] ?? {};
+      const sourceRange = sourceMove.range ?? move.range;
+      const sourceActionCost = sourceMove.actionCost ?? move.actionCost;
+      const sourceDescription = sourceMove.description ?? move.description;
+      let rangeResolved = false;
+      let actionCostResolved = false;
+      let descriptionResolved = false;
 
       // 始终从 _source 解析，使重复 prepare 也保持幂等；源字段缺失时才
       // 回退到经过 Schema 初始化的当前值。
-      move.range = resolveLevelFormulaText(sourceMove.range ?? move.range, formulaVariables, formulaOptions);
+      move.range = resolveLevelFormulaText(sourceRange, formulaVariables, {
+        ...formulaOptions,
+        onResolved: () => { rangeResolved = true; }
+      });
       move.actionCost = resolveActionCostFormula(
-        sourceMove.actionCost ?? move.actionCost,
+        sourceActionCost,
         formulaVariables,
-        formulaOptions
+        {
+          ...formulaOptions,
+          onResolved: () => { actionCostResolved = true; }
+        }
       );
       move.description = resolveLevelFormulaText(
-        sourceMove.description ?? move.description,
+        sourceDescription,
         formulaVariables,
-        formulaOptions
+        {
+          ...formulaOptions,
+          markResolved: true,
+          onResolved: () => { descriptionResolved = true; }
+        }
       );
+      // 仅供展示层判断颜色，不写回持久化数据，也不改变 range/actionCost 的纯文本值。
+      move.formulaFields = {
+        range: rangeResolved,
+        actionCost: actionCostResolved,
+        description: descriptionResolved
+      };
     }
   }
 }

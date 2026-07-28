@@ -572,8 +572,21 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
             // 纯文本清洗辅助函数
             const cleanText = (htmlStr) => {
                 if (!htmlStr) return "暂无描述";
-                let txt = htmlStr.replace(/<[^>]*>?/gm, '').substring(0, 120);
-                return txt.length >= 120 ? txt + "..." : txt;
+                const formulaResults = [];
+                const tokenized = htmlStr.replace(
+                    /<span class="xjzl-level-formula-result">([^<]*)<\/span>/g,
+                    (_match, result) => String.fromCharCode(0xE000 + formulaResults.push(result) - 1)
+                );
+                let txt = tokenized.replace(/<[^>]*>?/gm, '');
+                const truncated = txt.length > 120;
+                txt = txt.substring(0, 120);
+                for (const [index, result] of formulaResults.entries()) {
+                    txt = txt.replace(
+                        String.fromCharCode(0xE000 + index),
+                        `<span class="xjzl-level-formula-result">${result}</span>`
+                    );
+                }
+                return truncated ? txt + "..." : txt;
             };
 
             let tooltipHtml = "";
