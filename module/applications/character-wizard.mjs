@@ -581,6 +581,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
             if (item.type === "wuxue") {
                 const defaultTier = itemDataObj.system.tier ?? 1;
+                const preparedMovesById = new Map((item.system.moves || []).map(move => [move.id, move]));
 
                 // 武学书本：蓝色主题 + 显眼品阶徽章
                 tooltipHtml = `
@@ -595,13 +596,14 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                     const t = m.tier ?? defaultTier;
                     m.hasHeyi = t >= 3;
                     const typeLabel = game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`);
+                    const preparedDescription = preparedMovesById.get(m.id)?.description ?? m.description;
 
                     // 招式效果：绿色主题 + 招式类型徽章
                     m.tooltip = `
                         <div style='text-align:left; max-width:260px; border-left: 3px solid #2ecc71; padding-left: 8px;'>
                             <strong style='color:#2ecc71; font-size:1.1em;'>${m.name}</strong>
                             <span style='background:#2ecc71; color:#000; padding:2px 6px; border-radius:3px; font-size:0.8em; margin-left:6px; box-shadow:0 0 5px rgba(46,204,113,0.5);'>${typeLabel}</span>
-                            <div style='font-size:12px; color:#ccc; margin-top:8px; line-height:1.5;'>${cleanText(m.description)}</div>
+                            <div style='font-size:12px; color:#ccc; margin-top:8px; line-height:1.5;'>${cleanText(preparedDescription)}</div>
                         </div>
                     `;
                 });

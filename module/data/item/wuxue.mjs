@@ -8,6 +8,11 @@
  * ==========================================
  */
 import { makeScriptEffectSchema } from "../common.mjs";
+import {
+  resolveActionCostFormula,
+  resolveLevelFormulaText
+} from "../../utils/level-formula.mjs";
+
 export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
 
   static defineSchema() {
@@ -204,7 +209,7 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
     // 1. 获取顶层的默认 Tier (书本品阶)
     const bookTier = this.tier ?? 1;
     // 2. 遍历每个招式，计算状态
-    for (const move of this.moves) {
+    for (const [moveIndex, move] of this.moves.entries()) {
       // 如果招式自己设定了 tier (不为null)，就用招式的；否则用书本的
       // 这行代码把计算结果存入 move 对象内存中，供后续逻辑使用
       move.computedTier = move.tier ?? bookTier;
@@ -317,6 +322,32 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       // 如果是虚招类型，计算基础值：层数 * 系数
       // 注意：如果未入门(lvl=0)，虚招值也为0
       move.baseFeint = (move.type === 'feint') ? (lvl * feintCoef) : 0;
+
+      // D. 解析等级公式
+      // 持久化源数据仍保留公式；这里只修改 prepare 后的内存值。
+      // 未入门时按 1 级预览，与 currentCost 的处理保持一致。
+      const formulaLevel = Math.max(1, lvl);
+      const formulaVariables = {
+        level: formulaLevel,
+        up: formulaLevel - 1,
+        maxLevel: Math.max(1, move.maxLevel)
+      };
+      const formulaOptions = { label: `${this.parent?.name ?? "武学"}／${move.name}` };
+      const sourceMove = this._source.moves?.[moveIndex] ?? {};
+
+      // 始终从 _source 解析，使重复 prepare 也保持幂等；源字段缺失时才
+      // 回退到经过 Schema 初始化的当前值。
+      move.range = resolveLevelFormulaText(sourceMove.range ?? move.range, formulaVariables, formulaOptions);
+      move.actionCost = resolveActionCostFormula(
+        sourceMove.actionCost ?? move.actionCost,
+        formulaVariables,
+        formulaOptions
+      );
+      move.description = resolveLevelFormulaText(
+        sourceMove.description ?? move.description,
+        formulaVariables,
+        formulaOptions
+      );
     }
   }
 }

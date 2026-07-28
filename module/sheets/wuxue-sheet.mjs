@@ -55,7 +55,31 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
     async _prepareContext(options) {
         const context = await super._prepareContext(options);
-        context.system = this.document.system;
+        // 表单必须编辑持久化的源数据（其中可能含等级公式），而不是
+        // prepareDerivedData 生成的当前等级显示值。
+        context.system = this.document.system.toObject(true);
+        const preparedMoves = this.document.system.moves || [];
+        const preparedMovesById = new Map(preparedMoves.map(move => [move.id, move]));
+
+        // 只把界面需要的衍生属性叠加到源数据副本；绝不覆盖 description、
+        // range、actionCost，确保自动保存不会把公式替换成当前等级快照。
+        for (const [index, sourceMove] of (context.system.moves || []).entries()) {
+            const preparedMove = preparedMovesById.get(sourceMove.id) ?? preparedMoves[index];
+            if (!preparedMove) continue;
+
+            for (const key of [
+                "computedTier",
+                "computedLevel",
+                "maxLevel",
+                "effectiveStage",
+                "progress",
+                "currentCost",
+                "baseFeint"
+            ]) {
+                sourceMove[key] = preparedMove[key];
+            }
+            sourceMove._preparedDescription = preparedMove.description;
+        }
         context.tabs = this.tabGroups;
 
         // 1. 侧边栏总纲描述 (异步解析)
@@ -130,11 +154,12 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             await Promise.all(context.system.moves.map(async (move) => {
 
                 // 解析每个招式的描述
-                // 这里需要处理 description 可能为 null 的情况
+                // 编辑器的 value 使用原始 description；预览区域使用计算后的描述。
                 move.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-                    move.description || "",
+                    move._preparedDescription || "",
                     { secrets: this.document.isOwner, async: true, relativeTo: this.document }
                 );
+                delete move._preparedDescription;
 
                 // 为下拉菜单准备一个专门的值：如果 tier 是 null，就转为空字符串 ""
                 // 这样 selectOptions 就能匹配到 choices 中的 "" 选项了
@@ -245,7 +270,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     // 通用辅助：获取招式和索引
     _getMove(target) {
         const index = Number(target.closest("[data-move-index]").dataset.moveIndex);
-        const source = this.document.system.toObject();
+        const source = this.document.system.toObject(true);
         const moves = source.moves || [];
         return { index, moves, move: moves[index] };
     }
@@ -271,7 +296,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     /* -------------------------------------------- */
 
     async _onAddMove(event, target) {
-        const source = this.document.system.toObject();
+        const source = this.document.system.toObject(true);
         const moves = source.moves || [];
 
         // 创建新招式默认数据
@@ -294,7 +319,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
     async _onDeleteMove(event, target) {
         const moveId = target.dataset.id;
-        const source = this.document.system.toObject();
+        const source = this.document.system.toObject(true);
         const moves = source.moves || [];
 
         // 按 ID 过滤
