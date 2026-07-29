@@ -23,7 +23,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         classes: ["xjzl-window", "actor", "character", "theme-dark"],
         position: { width: 1100, height: 750 },
         window: { resizable: true },
-        // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
+        // 告诉 V13："请帮我监听 Input 变化，并且在重绘时保持滚动位置"
         form: {
             submitOnChange: true,
             closeOnSubmit: false
@@ -502,7 +502,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 if (move.progression.mode === "custom" && move.progression.customThresholds.length > 0) {
                     // 使用自定义门槛
                     rawThresholds = move.progression.customThresholds;
-                    // 自定义模式没有固定的“领悟/小成”叫法，生成通用标签
+                    // 自定义模式没有固定的"领悟/小成"叫法，生成通用标签
                     labels = rawThresholds.map((_, i) => `阶段 ${i + 1}`);
                 }
                 else if (wuxue.system.category === "qinggong" || wuxue.system.category === "zhenfa") {
@@ -1054,7 +1054,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             const userState = this._collapsedDetails.get(uid);
 
             // A. 恢复状态
-            // 如果这个ID在“已关闭”名单里，这就移除 open 属性
+            // 如果这个ID在"已关闭"名单里，这就移除 open 属性
             if (userState !== undefined) {
                 // 1. 如果用户操作过，以用户最后的状态为准 (无论 HTML 默认是什么)
                 if (userState) {
@@ -1070,7 +1070,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 使用 toggle 事件监听用户开关操作
             el.addEventListener("toggle", (event) => {
                 // 只要状态变了，就记录下来
-                // 注意：这里我们记录的是“当前是开还是关”，这就完美兼容了两种默认情况
+                // 注意：这里我们记录的是"当前是开还是关"，这就完美兼容了两种默认情况
                 this._collapsedDetails.set(uid, el.open);
             });
         });
@@ -1119,8 +1119,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 手动绑定拖拽事件 (Drag & Drop fix)
         // =====================================================
         // 1. 选取所有需要拖拽的元素类名
-        //    不包含 .wuxue-group，因为在 HTML 里写了 ondragstart 内联代码处理排序，我们避开它以免冲突
         const dragSelectors = [
+            ".wuxue-group",       // 武学分组（排序拖拽）
             ".move-card",         // 招式
             ".item-grid-card",    // 物品/消耗品
             ".neigong-card",      // 内功
@@ -1132,7 +1132,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         dragSelectors.forEach(selector => {
             const elements = html.querySelectorAll(selector);
             elements.forEach(el => {
-                // 强制确保有 draggable 属性 (双重保险)
+                // 强制确保有 draggable 属性（双重保险）
                 el.setAttribute("draggable", "true");
 
                 // 移除旧的监听器 (防止重绘多次绑定，虽说 AppV2 重绘是替换节点，但好习惯)
@@ -1143,6 +1143,24 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 el.addEventListener("dragstart", this._onDragStart.bind(this));
             });
         });
+
+        // =====================================================
+        // 武学拖拽视觉反馈：事件委托在 .wuxue-list 上
+        // 只在排序模式下显示 ghost + 落点指示器
+        // =====================================================
+        if (!this._wuxueDragHandlers) {
+            this._wuxueDragHandlers = {
+                dragover: this._onWuxueDragOver.bind(this),
+                dragleave: this._onWuxueDragLeave.bind(this),
+                dragend: this._onWuxueDragEnd.bind(this),
+            };
+        }
+        const wuxueList = html.querySelector(".wuxue-list");
+        if (wuxueList) {
+            wuxueList.addEventListener("dragover", this._wuxueDragHandlers.dragover);
+            wuxueList.addEventListener("dragleave", this._wuxueDragHandlers.dragleave);
+            wuxueList.addEventListener("dragend", this._wuxueDragHandlers.dragend);
+        }
 
         // =====================================================
         // 计算并显示丹田占用情况
@@ -1302,7 +1320,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     _getHeaderControls() {
         const controls = super._getHeaderControls();
 
-        // 往菜单里塞入“预览角色卡”按钮
+        // 往菜单里塞入"预览角色卡"按钮
         controls.push({
             action: "previewCharacter",
             label: "预览角色卡",
@@ -1327,7 +1345,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-     * 点击“预览角色卡”时的处理逻辑
+     * 点击"预览角色卡"时的处理逻辑
      */
     async _onPreviewCharacter(event) {
         event.preventDefault();
@@ -1337,7 +1355,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     }
 
     /**
-     * 点击“向导建卡”时的处理逻辑
+     * 点击"向导建卡"时的处理逻辑
      */
     async _onOpenWizard(event) {
         event.preventDefault();
@@ -1370,7 +1388,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
      * 拖拽事件的总入口
      * 职责：
      * 1. 解析拖拽数据。
-     * 2. 区分是“外来物品”(新建/堆叠) 还是 “内部物品”(排序/移动)。
+     * 2. 区分是"外来物品"(新建/堆叠) 还是 "内部物品"(排序/移动)。
      * 3. 对于外来物品，绝对禁止在此处使用 await 数据库操作，必须直接交给父类。
      */
     async _onDrop(event) {
@@ -1415,85 +1433,68 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         }
 
         // =====================================================
-        // 情况 B：内部物品 (Internal Item)
+        // 情况 B：内部物品拖拽排序（整数重排）
         // =====================================================
 
         // 1. 检查排序开关
-        // 如果没有开启排序模式，直接返回 false 禁止操作。
-        // 这实现了“防止把物品拖到物品栏导致自我复制”的功能。
         if (!this._isSorting) {
             return false;
         }
 
-        // 2. 获取源物品对象 (同步获取)
-        // 因为是内部物品，它一定在 this.actor.items 缓存里，不需要 await。
-        const itemId = data.uuid.split(".").pop(); // 从 UUID 字符串尾部提取 ID
+        // 2. 获取源物品对象
+        const itemId = data.uuid.split(".").pop();
         const sourceItem = this.actor.items.get(itemId);
-
-        // 防御性检查：如果找不到物品，或者还没加载好，终止
         if (!sourceItem) return false;
 
-        // -----------------------------------------------------
-        // 自定义排序逻辑 (Sorting Logic)
-        // -----------------------------------------------------
+        // 3. 找到拖放目标行（间隙中按 Y 吸附最近项）
+        let targetRow = event.target.closest(".wuxue-group");
+        if (!targetRow) {
+            const wuxueList = this.element.querySelector(".wuxue-list");
+            if (wuxueList) targetRow = this._findClosestWuxueGroup(wuxueList, event.clientY);
+        }
+        if (!targetRow) return false;
 
-        // A. 锁定目标位置 (拖到了哪一行？)
-        // 注意：HTML 里的 .wuxue-group 需要有 data-item-id 属性
-        const targetRow = event.target.closest(".wuxue-group");
-        if (!targetRow) return false; // 没拖对位置(比如拖到了空白处)
-
-        // B. 目标检查
         const targetId = targetRow.dataset.itemId;
-        // 如果没有目标ID，或者目标就是自己，不做任何事
         if (!targetId || targetId === sourceItem.id) return false;
 
-        // C. 获取同类兄弟列表 (用于计算新的排序值)
-        // 过滤掉自己，并按当前的 sort 值从小到大排序
-        const siblings = this.actor.itemTypes[sourceItem.type]
-            .filter(i => i.id !== sourceItem.id)
-            .sort((a, b) => (a.sort || 0) - (b.sort || 0));
+        // 4. 获取同类所有兄弟，按 sort 稳定排序（防御 NaN/undefined → 视为 0）
+        const normalize = (s) => { const n = Number(s); return Number.isFinite(n) ? n : 0; };
+        const siblings = [...this.actor.itemTypes[sourceItem.type]]
+            .sort((a, b) => normalize(a.sort) - normalize(b.sort));
 
-        // D. 找到目标在兄弟列表中的索引
-        const targetIndex = siblings.findIndex(i => i.id === targetId);
-        if (targetIndex === -1) return; // 目标不在列表里（比如跨类型拖拽了，把内功拖到了武学里）
+        // 5. 确定插入位置
+        const srcIdx = siblings.findIndex(i => i.id === sourceItem.id);
+        const tgtIdx = siblings.findIndex(i => i.id === targetId);
+        if (srcIdx === -1 || tgtIdx === -1) return;
 
-        // E. 计算是在目标上方还是下方
+        // 清理拖拽视觉状态
+        this._clearDragVisuals();
+
+        // 动态阈值：往下拖时分割线在 25% 处（更容易交换），往上拖时在 75% 处
         const box = targetRow.getBoundingClientRect();
-        const midPoint = box.top + box.height / 2;
-        const isBefore = event.clientY < midPoint;
+        const goingDown = this._dragStartY != null ? event.clientY > this._dragStartY : true;
+        const threshold = goingDown ? 0.25 : 0.75;
+        const insertBefore = event.clientY < (box.top + box.height * threshold);
 
-        let sortBefore, sortAfter;
+        // 6. 构建新顺序：先移除自己，再插入到目标位置
+        const reordered = [...siblings];
+        reordered.splice(srcIdx, 1);
+        let insertAt = reordered.findIndex(i => i.id === targetId);
+        if (!insertBefore) insertAt++;
+        reordered.splice(insertAt, 0, siblings[srcIdx]);
 
-        if (isBefore) {
-            // 放在目标上面：取目标的前一个和目标之间
-            const prevItem = siblings[targetIndex - 1];
-            // 如果没有前一个，就设为极小值
-            sortBefore = prevItem ? prevItem.sort : (siblings[0].sort - 100000);
-            sortAfter = siblings[targetIndex].sort;
-        } else {
-            // 放在目标下面：取目标和目标的后一个之间
-            const nextItem = siblings[targetIndex + 1];
-            sortBefore = siblings[targetIndex].sort;
-            // 如果没有后一个，就设为极大值
-            sortAfter = nextItem ? nextItem.sort : (siblings[siblings.length - 1].sort + 100000);
-        }
-
-        // F. 执行更新 (取平均值)
-        const newSort = (sortBefore + sortAfter) / 2;
-
-        return this.actor.updateEmbeddedDocuments("Item", [{
-            _id: sourceItem.id,
-            sort: newSort
-        }]);
+        // 7. 整数重排：所有 sort = 新索引，一次性批量更新
+        const updates = reordered.map((item, i) => ({ _id: item.id, sort: i }));
+        return this.actor.updateEmbeddedDocuments("Item", updates);
     }
 
     /**
      * @override
      * 物品处理逻辑
      * 职责：
-     * 1. 仅当 _onDrop 判定为“外来物品”并调用 super 时，此方法才会被触发。
-     * 2. 处理“互斥替换”(背景/性格)。
-     * 3. 处理“堆叠数量”(消耗品等)。
+     * 1. 仅当 _onDrop 判定为"外来物品"并调用 super 时，此方法才会被触发。
+     * 2. 处理"互斥替换"(背景/性格)。
+     * 3. 处理"堆叠数量"(消耗品等)。
      * 4. 执行最终的创建逻辑。
      */
     async _onDropItem(event, data) {
@@ -1618,12 +1619,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
      * 处理拖拽开始，打包数据
      */
     _onDragStart(event) {
-        // 1. 停止冒泡
-        // 防止触发外层 .wuxue-group 的排序拖拽逻辑
-        if (this._isSorting && event.target.classList.contains("wuxue-group")) return;
-        event.stopPropagation();
-
         const el = event.currentTarget;
+
+        // 武学分组不阻止冒泡：让 Foundry DragDrop 也能处理，保证兼容性
+        // 其他元素阻止冒泡：避免触发父级 .wuxue-group 的拖拽逻辑
+        if (!el.classList.contains("wuxue-group")) {
+            event.stopPropagation();
+        }
         const itemId = el.dataset.itemId;
 
         // 如果没有 ID，不管
@@ -1655,6 +1657,111 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 25, 25 意味着鼠标指针位于图标中心
             event.dataTransfer.setDragImage(iconImg, 25, 25);
         }
+
+        // 5. 排序模式：源项进入 ghost 态，记录拖拽起点用于方向判定
+        if (el.classList.contains("wuxue-group") && this._isSorting) {
+            el.classList.add("xjzl-drag-ghost");
+            this._dragStartY = event.clientY;
+        }
+    }
+
+    /* -------------------------------------------- */
+    /*  武学拖拽视觉反馈 (事件委托, 轻量 DOM 操作)     */
+    /* -------------------------------------------- */
+
+    /**
+     * 拖拽悬停：计算落点位置并渲染指示器
+     * 使用动态阈值：往下拖时分割线偏上（25%），更容易和上方项交换
+     */
+    _onWuxueDragOver(event) {
+        event.preventDefault();
+        if (!this._isSorting) return;
+
+        const wuxueList = event.currentTarget;
+
+        // 找目标项：优先 closest，鼠标在间隙时按 Y 坐标吸附到最近的非 ghost 项
+        let targetEl = event.target.closest(".wuxue-group");
+        if (!targetEl || targetEl.classList.contains("xjzl-drag-ghost")) {
+            targetEl = this._findClosestWuxueGroup(wuxueList, event.clientY);
+        }
+        if (!targetEl) return;
+
+        // 清除之前的落点指示器和移位
+        wuxueList.querySelectorAll(".xjzl-drop-before, .xjzl-drop-after, .xjzl-drag-shift-down").forEach(el => {
+            el.classList.remove("xjzl-drop-before", "xjzl-drop-after", "xjzl-drag-shift-down");
+        });
+
+        // 动态阈值：往哪个方向拖，分界线就往反方向偏移
+        const box = targetEl.getBoundingClientRect();
+        const goingDown = this._dragStartY != null ? event.clientY > this._dragStartY : true;
+        const threshold = goingDown ? 0.25 : 0.75;
+        const insertBefore = event.clientY < (box.top + box.height * threshold);
+
+        // 渲染落点指示器
+        targetEl.classList.add(insertBefore ? "xjzl-drop-before" : "xjzl-drop-after");
+
+        // 落点以下的项整体向下移位，为插入腾出空间
+        const groups = [...wuxueList.querySelectorAll(".wuxue-group")];
+        const tgtIdx = groups.indexOf(targetEl);
+        const shiftStart = insertBefore ? tgtIdx : tgtIdx + 1;
+        for (let i = shiftStart; i < groups.length; i++) {
+            if (!groups[i].classList.contains("xjzl-drag-ghost")) {
+                groups[i].classList.add("xjzl-drag-shift-down");
+            }
+        }
+    }
+
+    /**
+     * 按鼠标 Y 坐标找最近的武学分组（用于间隙吸附）
+     * 无视 ghost 项，按垂直中心点距离排序
+     */
+    _findClosestWuxueGroup(wuxueList, mouseY) {
+        const groups = [...wuxueList.querySelectorAll(".wuxue-group")];
+        let closest = null;
+        let minDist = Infinity;
+        for (const g of groups) {
+            if (g.classList.contains("xjzl-drag-ghost")) continue;
+            const box = g.getBoundingClientRect();
+            const center = box.top + box.height / 2;
+            const dist = Math.abs(mouseY - center);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = g;
+            }
+        }
+        return closest;
+    }
+
+    /**
+     * 拖拽离开某个武学项：清除该项上的指示器
+     * 注意过滤子元素间的 dragleave 事件（经典坑）
+     */
+    _onWuxueDragLeave(event) {
+        if (!this._isSorting) return;
+        const item = event.target.closest(".wuxue-group");
+        if (!item) return;
+        // 忽略进入子元素时触发的伪 leave
+        if (event.relatedTarget && item.contains(event.relatedTarget)) return;
+        item.classList.remove("xjzl-drop-before", "xjzl-drop-after");
+    }
+
+    /**
+     * 拖拽结束（兜底清理）：移除所有拖拽视觉状态
+     */
+    _onWuxueDragEnd(_event) {
+        this._clearDragVisuals();
+        this._dragStartY = null;
+    }
+
+    /**
+     * 清除所有拖拽相关 CSS 类
+     */
+    _clearDragVisuals() {
+        const html = this.element;
+        if (!html) return;
+        html.querySelectorAll(".xjzl-drag-ghost, .xjzl-drop-before, .xjzl-drop-after, .xjzl-drag-shift-down").forEach(el => {
+            el.classList.remove("xjzl-drag-ghost", "xjzl-drop-before", "xjzl-drop-after", "xjzl-drag-shift-down");
+        });
     }
 
     /* -------------------------------------------- */
