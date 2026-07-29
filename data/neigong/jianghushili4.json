@@ -497,7 +497,7 @@
         "effects": []
     },
     {
-        "name": "《噬神录》",
+        "name": "《噬神录》（旧版）",
         "type": "neigong",
         "img": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
         "system": {
@@ -588,7 +588,7 @@
                         {
                             "label": "噬神录-满层吸血",
                             "trigger": "hit",
-                            "script": "const shiyuan = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shiyuan\");\nif (shiyuan && shiyuan.getFlag(\"xjzl-system\", \"stacks\") >= 5) {\n    const heal = Math.floor(args.baseDamage * 0.2);\n    if (heal > 0) {\n        await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n        ui.notifications.info(\"噬神录：吸取气血\");\n    }\n}",
+                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst shiyuan = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shiyuan\");\nif (shiyuan && shiyuan.getFlag(\"xjzl-system\", \"stacks\") >= 5) {\n    const heal = Math.floor(args.baseDamage * 0.2);\n    if (heal > 0) {\n        await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n        ui.notifications.info(\"噬神录：吸取气血\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -632,6 +632,132 @@
                                 "label": "噬元-濒死回血",
                                 "trigger": "dying",
                                 "script": "const heal = Math.floor(S.resources.hp.max * 0.1 * thisEffect.stacks);\nconst stacks = thisEffect.stacks;\n// 1. 先发送剧情卡片\nconst content = `<div class=\"xjzl-chat-card item-card\">\n    <header class=\"card-header\" style=\"border-left: 4px solid #8e44ad; background: rgba(0,0,0,0.05); padding: 5px; display: flex; align-items: center; gap: 10px;\">\n        <img src=\"${thisEffect.img}\" style=\"border:none; width: 36px; height: 36px; object-fit: cover;\" />\n        <div style=\"flex: 1;\">\n            <h3 style=\"margin: 0; color: #333;\">噬元护体</h3>\n            <div style=\"font-size: 0.8em; color: #666;\">被动触发</div>\n        </div>\n    </header>\n    <div class=\"card-content-wrapper\" style=\"padding: 10px; font-size: 0.9em; color: #444;\">\n        <p><strong>${actor.name}</strong> 受到致命伤害，噬元真气自动护主！</p>\n        <div style=\"margin-top:5px; padding:5px; background:#f3e5f5; border-radius:4px; color:#8e44ad;\">\n            <i class=\"fas fa-shield-alt\"></i> 消耗 <b>${stacks}</b> 层，从濒死恢复。\n        </div>\n    </div>\n</div>`;\n\nawait ChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: content\n});\n\n// 2. 再执行治疗 (会自动发送回血卡并处理濒死移除)\nawait actor.applyHealing({ healer: actor,  amount: heal, type: 'hp', showScrolling: true });\n\n// 3. 删除特效\nawait thisEffect.delete();",
+                                "active": true
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
+    },
+    {
+        "name": "《噬神录》",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+        "system": {
+            "tier": 3,
+            "element": "taiji",
+            "sect": "jianghushili",
+            "subSect": "hehuanpai",
+            "description": "<p>魔道秘典，合欢派大乘功法。此功诡谲，令真气交融，阴阳相噬，更以正派内家罡气为养分。大成后，如修罗临世，欲念不绝，取人精元补己身，乃魔道巅峰邪功。<br>注意：此功圆满后，每月需以一对童男童女祭养，血为媒，魂为引，否则阴阳二气反噬暴毙而亡。</p>",
+            "requirement": "悟性11",
+            "automationNote": "完全自动化。出招自动获得噬元，濒死自动消耗噬元回血，满层出招自动回血。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 20,
+                        "shenfa": 14,
+                        "tipo": 18,
+                        "neixi": 35,
+                        "qigan": 15,
+                        "shencai": 18
+                    },
+                    "description": "<p>领悟运功特效：每次出招后获得一层“噬元”，至多两层，持续到陷入濒死。<br>噬元：当你气血归零并残疾检定后，移除所有噬元，每层为你回复100气血。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "噬神录-获得噬元",
+                            "trigger": "attack",
+                            "script": "const effectData = thisItem.effects.getName(\"噬元\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.maxStacks\", 2);\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 30,
+                        "shenfa": 28,
+                        "tipo": 36,
+                        "neixi": 80,
+                        "qigan": 30,
+                        "shencai": 36
+                    },
+                    "description": "<p>小成运功特效：每次出招后获得一层“噬元”，至多三层，持续到陷入濒死。<br>噬元：当你气血归零并残疾检定后，移除所有噬元，每层为你回复100气血。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "噬神录-获得噬元",
+                            "trigger": "attack",
+                            "script": "const effectData = thisItem.effects.getName(\"噬元\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.maxStacks\", 3);\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
+                            "active": true
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 40,
+                        "shenfa": 40,
+                        "tipo": 56,
+                        "neixi": 120,
+                        "qigan": 50,
+                        "shencai": 54
+                    },
+                    "description": "<p>修满特效：修满[永久]：气血+60，内力+60，神采+10。<br>圆满运功特效：每次出招后获得一层“噬元”，至多五层，持续到陷入濒死。<br>噬元：当你气血归零并残疾检定后，移除所有噬元，每层为你回复100气血。<br>·当你拥有五层“噬元”后，你每次出招后立即回复100点气血。</p>",
+                    "xpCostRatio": 1,
+                    "scripts": [
+                        {
+                            "label": "噬神录-获得噬元",
+                            "trigger": "attack",
+                            "script": "const effectData = thisItem.effects.getName(\"噬元\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.maxStacks\", 5);\nawait game.xjzl.api.effects.addEffect(actor, effectData);",
+                            "active": true
+                        },
+                        {
+                            "label": "噬神录-满层回血",
+                            "trigger": "attack",
+                            "script": "const shiyuan = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shiyuan\");\nif (shiyuan && (shiyuan.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 5) {\n    await actor.applyHealing({ healer: actor, amount: 100, type: \"hp\", showScrolling: true });\n    actor.showFloatyText(\"噬元反哺\", { fill: \"#00FF00\", fontSize: 32 });\n}",
+                            "active": true
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 60
+                },
+                {
+                    "key": "stats.shencai.mod",
+                    "value": 10
+                }
+            ],
+            "xpInvested": 0,
+            "active": false,
+            "sourceBreakdown": {
+                "general": 0,
+                "specific": 0
+            }
+        },
+        "effects": [
+            {
+                "name": "噬元",
+                "img": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+                "description": "濒死时每层回复100气血并移除。",
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shiyuan",
+                        "stackable": true,
+                        "maxStacks": 5,
+                        "scripts": [
+                            {
+                                "label": "噬元-濒死回血",
+                                "trigger": "dying",
+                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst stacks = thisEffect.stacks || 1;\nconst heal = 100 * stacks;\n\n// 1. 先发送剧情卡片\nconst content = `<div class=\"xjzl-chat-card item-card\">\n    <header class=\"card-header\" style=\"border-left: 4px solid #8e44ad; background: rgba(0,0,0,0.05); padding: 5px; display: flex; align-items: center; gap: 10px;\">\n        <img src=\"${thisEffect.img}\" style=\"border:none; width: 36px; height: 36px; object-fit: cover;\" />\n        <div style=\"flex: 1;\">\n            <h3 style=\"margin: 0; color: #333;\">噬元护体</h3>\n            <div style=\"font-size: 0.8em; color: #666;\">被动触发</div>\n        </div>\n    </header>\n    <div class=\"card-content-wrapper\" style=\"padding: 10px; font-size: 0.9em; color: #444;\">\n        <p><strong>${actor.name}</strong> 受到致命伤害，噬元真气自动护主！</p>\n        <div style=\"margin-top:5px; padding:5px; background:#f3e5f5; border-radius:4px; color:#8e44ad;\">\n            <i class=\"fas fa-shield-alt\"></i> 消耗 <b>${stacks}</b> 层，从濒死恢复。\n        </div>\n    </div>\n</div>`;\n\nawait ChatMessage.create({\n    user: game.user.id,\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: content\n});\n\n// 2. 再执行治疗 (会自动发送回血卡并处理濒死恢复)\nawait actor.applyHealing({ healer: actor, amount: heal, type: 'hp', showScrolling: true });\n\n// 3. 删除特效\nawait thisEffect.delete();",
                                 "active": true
                             }
                         ]
