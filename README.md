@@ -1213,6 +1213,17 @@ if (currentStacks > 0 && currentMpCost > 0) {
 
 > **🎨 素材声明**：系统内包含的大部分图像素材由 AI 生成（非AI生成素材由侠界之旅官方提供）。
 
+<details>
+<summary><strong>🔊 音频素材来源 (Audio Credits)</strong></summary>
+
+- **合集包抽取演出配乐**：基于 nene 创作的 [New Sunrise](https://opengameart.org/content/new-sunrise) V2 修改，采用 [Creative Commons Zero v1.0 Universal（CC0）](https://creativecommons.org/publicdomain/zero/1.0/) 许可。
+- **合集包抽取演出音效**：由项目作者使用 ElevenLabs Sound Effects 生成。
+- 文件对应关系与具体处理方式见 [`assets/sounds/compendium-draw/SOURCES.md`](assets/sounds/compendium-draw/SOURCES.md)。
+
+以上音频素材按各自来源及许可条款使用，不因本项目代码采用 MIT License 而改变其许可条件。
+
+</details>
+
 ## 📄 协议 (License)
 
 本项目采用 [MIT License](LICENSE) 开源。
