@@ -619,6 +619,91 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
+     * 创建抽取演出的本地分层音轨。
+     * 使用 interface 音频通道，尊重 Foundry 的界面音量设置；音轨只在当前客户端播放。
+     */
+    _createDrawAudio({ reducedMotion = false } = {}) {
+        const Sound = foundry.audio?.Sound;
+        const context = game.audio?.interface;
+        if (!Sound || !context || reducedMotion) {
+            return {
+                preload: async () => {},
+                play: async () => {},
+                stop: () => {}
+            };
+        }
+
+        const definitions = {
+            bed: {
+                src: "systems/xjzl-system/assets/sounds/compendium-draw/draw-cinematic-score.wav",
+                volume: 0.26,
+                delay: 0
+            },
+            meteor: {
+                src: "systems/xjzl-system/assets/sounds/compendium-draw/draw-meteor-flight.wav",
+                volume: 0.42,
+                delay: 0
+            },
+            rarity: {
+                src: "systems/xjzl-system/assets/sounds/compendium-draw/draw-rarity-bloom.wav",
+                volume: 0.62,
+                delay: 0
+            },
+            reveal: {
+                src: "systems/xjzl-system/assets/sounds/compendium-draw/draw-reveal-stinger.wav",
+                volume: 0.52,
+                delay: 0.32
+            }
+        };
+        const sounds = new Map();
+        const played = new Set();
+        let stopped = false;
+        let preloadPromise;
+
+        const preload = () => {
+            preloadPromise ??= Promise.all(Object.entries(definitions).map(async ([key, definition]) => {
+                const sound = new Sound(definition.src, { context, forceBuffer: true });
+                sounds.set(key, sound);
+                try {
+                    await sound.load();
+                } catch (error) {
+                    console.warn(`XJZL | 抽取音效加载失败：${definition.src}`, error);
+                }
+            }));
+            return preloadPromise;
+        };
+
+        const play = async key => {
+            if (stopped || played.has(key) || !definitions[key]) return;
+            played.add(key);
+            await preload();
+            const sound = sounds.get(key);
+            if (stopped || !sound?.loaded || sound.failed) return;
+            try {
+                await sound.play({
+                    volume: definitions[key].volume,
+                    delay: definitions[key].delay
+                });
+            } catch (error) {
+                console.warn(`XJZL | 抽取音效播放失败：${definitions[key].src}`, error);
+            }
+        };
+
+        const stop = ({ fade = 160 } = {}) => {
+            if (stopped) return;
+            stopped = true;
+            for (const sound of sounds.values()) {
+                if (!sound.playing) continue;
+                sound.stop({ fade }).catch(error => {
+                    console.warn(`XJZL | 抽取音效停止失败：${sound.src}`, error);
+                });
+            }
+        };
+
+        return { preload, play, stop };
+    }
+
+    /**
      * 创建抽取演出的实时流星。
      * Canvas 负责星核、尾迹历史与碎片物理；素材只作为云气和碎片纹理参与合成。
      */
@@ -1289,6 +1374,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const stage = shell.firstElementChild;
         if (!stage) return;
 
+        const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+        const drawAudio = this._createDrawAudio({ reducedMotion });
+        await drawAudio.preload();
+
         this._drawOverlay = stage;
         document.body.append(stage);
 
@@ -1299,7 +1388,6 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             let sequenceTimer;
             let teardownTimer;
             let finished = false;
-            const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
             const phaseTimers = [];
             const showcaseItems = Array.from(stage.querySelectorAll("[data-showcase-index]"));
             const actionControls = Array.from(stage.querySelectorAll("[data-draw-action]"));
@@ -1313,6 +1401,9 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             const setPhase = phase => {
                 stage.dataset.phase = phase;
                 meteorAnimation.setPhase(phase);
+                if (phase === "meteor") void drawAudio.play("meteor");
+                if (phase === "ignite") void drawAudio.play("rarity");
+                if (phase === "burst") void drawAudio.play("reveal");
             };
 
             const closeDetail = () => {
@@ -1387,6 +1478,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 clearTimeout(sequenceTimer);
                 phaseTimers.forEach(clearTimeout);
                 meteorAnimation.stop();
+                drawAudio.stop({ fade: reducedMotion ? 0 : 180 });
                 stage.dataset.rarity = highest.drawClass;
                 stage.classList.remove("is-showcase");
                 stage.classList.add("is-revealed", "is-summary");
@@ -1430,6 +1522,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 clearTimeout(sequenceTimer);
                 phaseTimers.forEach(clearTimeout);
                 meteorAnimation.stop();
+                drawAudio.stop();
                 stage.classList.add("is-showcase");
                 setPhase("showcase");
                 activateShowcaseItem(0);
@@ -1448,6 +1541,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 clearTimeout(teardownTimer);
                 phaseTimers.forEach(clearTimeout);
                 meteorAnimation.stop();
+                drawAudio.stop({ fade: immediate ? 0 : 120 });
                 document.removeEventListener("keydown", onKeyDown);
                 actionControls.forEach(control => control.removeEventListener("click", onActionClick));
                 resultCards.forEach(card => card.removeEventListener("click", onCardClick));
@@ -1490,6 +1584,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             requestAnimationFrame(() => {
                 stage.classList.add("is-active");
                 stage.focus({ preventScroll: true });
+                void drawAudio.play("bed");
             });
 
             if (reducedMotion) {
@@ -1503,7 +1598,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 phaseTimers.push(setTimeout(() => setPhase("meteor"), 4550));
                 phaseTimers.push(setTimeout(() => setPhase("ignite"), 6900));
                 phaseTimers.push(setTimeout(() => setPhase("burst"), 7900));
-                sequenceTimer = setTimeout(useShowcase ? beginShowcase : showSummary, 9000);
+                sequenceTimer = setTimeout(useShowcase ? beginShowcase : showSummary, 9300);
             }
         });
     }
