@@ -1,52 +1,182 @@
-<div class="xjzl-effect-picker">
+<div class="xjzl-effect-picker" data-active-category="{{activeCategory}}">
 
-    {{!-- 搜索栏 --}}
-    <div class="picker-search">
-        <i class="fas fa-search"></i>
-        <input type="text" name="filter" placeholder="搜索状态、来源..." autocomplete="off">
-    </div>
-
-    <div class="picker-scroll">
-        {{!-- 1. 通用状态 --}}
-        <div class="section-header">通用状态 (Universal)</div>
-        <div class="effect-grid">
-            {{#each statusEffects}}
-            <button type="button" class="effect-btn" data-action="applyStatus" data-slug="{{this.id}}"
-                data-tooltip="{{this.richTooltip}}" data-tooltip-class="xjzl-tooltip">
-                <img src="{{this.img}}" />
-                <span class="effect-name">{{this.name}}</span>
-            </button>
-            {{/each}}
+    <header class="dial-hero">
+        {{#if hasTarget}}
+        {{#if targetActor}}
+        <div class="target-portrait-frame">
+            <img src="{{targetActor.img}}" class="target-portrait">
         </div>
-
-        {{!-- 2. 场景特效 (按 Actor 分组) --}}
-        {{#if sceneGroups.length}}
-        <div class="section-header">场景特效 (Scene Context)</div>
-
-        {{#each sceneGroups}}
-        <div class="actor-group">
-            {{!-- 分组标题保持不变 --}}
-            <div class="group-title">
-                <i class="fas fa-user"></i> {{this.actorName}}
-            </div>
-
-            {{!-- 这里改用 effect-grid，结构与上面完全一致 --}}
-            <div class="effect-grid" style="padding: 5px;">
-                {{#each this.effects}}
-                <button type="button" class="effect-btn" data-action="applyItemEffect" data-uuid="{{this.uuid}}"
-                    data-tooltip="{{this.richTooltip}}">
-                    <img src="{{this.img}}" />
-                    <span class="effect-name">{{this.name}}</span>
-                </button>
-                {{/each}}
-            </div>
+        <div class="target-copy">
+            <div class="target-label">当前目标</div>
+            <div class="target-name">{{targetActor.name}}</div>
+            <div class="target-hint">左键添加/加层，右键减层，已有状态可直接管理</div>
         </div>
-        {{/each}}
-
+        <div class="target-count">
+            <span>{{currentEffects.length}}</span>
+            <label>状态</label>
+        </div>
         {{else}}
-        <div style="text-align: center; color: #999; margin-top: 20px;">
-            当前场景无可用特效
+        <div class="target-portrait-frame multi"><i class="fas fa-users"></i></div>
+        <div class="target-copy">
+            <div class="target-label">批量模式</div>
+            <div class="target-name">{{targetActors.length}} 个目标</div>
+            <div class="target-hint">批量模式仅处理添加与减层，不展示个体差异</div>
+        </div>
+        <div class="target-count muted">
+            <span>{{targetActors.length}}</span>
+            <label>目标</label>
         </div>
         {{/if}}
+        {{else}}
+        <div class="target-portrait-frame empty"><i class="fas fa-crosshairs"></i></div>
+        <div class="target-copy">
+            <div class="target-label">未选择目标</div>
+            <div class="target-name">选择一个 Token 后再操作状态</div>
+            <div class="target-hint">也可以从角色卡状态栏直接打开状态盘</div>
+        </div>
+        {{/if}}
+    </header>
+
+    <div class="dial-layout">
+        <nav class="category-tabs">
+            {{#each categories as |category|}}
+            <button type="button" class="category-tab {{#if category.active}}active{{/if}}"
+                data-category="{{category.id}}">
+                <i class="{{category.icon}}"></i>
+                <span>{{category.label}}</span>
+                <b>{{category.count}}</b>
+            </button>
+            {{/each}}
+        </nav>
+
+        <main class="dial-main">
+            <section class="current-effects-panel">
+                <div class="panel-title">
+                    <span><i class="fas fa-fingerprint"></i> 身上状态</span>
+                    {{#if targetActor}}<small>左键加层/设时长，右键减层</small>{{/if}}
+                </div>
+
+                {{#if targetActor}}
+                {{#if currentEffects.length}}
+                <div class="current-effects-list">
+                    {{#each currentEffects as |effect|}}
+                    <div class="current-effect interactive-effect {{#if effect.isStackable}}stackable{{/if}}"
+                        data-action="adjustEffect" data-id="{{effect.id}}" data-effect-id="{{effect.id}}" data-tooltip="
+                            <div style='text-align:left;'>
+                                <b>{{effect.name}}</b>
+                                {{#if (gt effect.stacks 1)}} <span style='color:#f1c40f'>(x{{effect.stacks}})</span>{{/if}}
+                                {{#if effect.durationLabel}} <span style='color:#aaa; margin-left:5px;'><i class='far fa-clock'></i> {{effect.durationLabel}}</span>{{/if}}
+                                <hr style='margin:4px 0; border-color:#555;'>
+                                <div style='color:#aaa; margin-bottom:4px;'>来源: {{effect.sourceName}}</div>
+                                {{#if effect.description}}{{effect.description}}<br><br>{{/if}}
+                                {{#if effect.isStackable}}
+                                <span style='color:#2ecc71'>左键: 增加层数</span><br>
+                                <span style='color:#e74c3c'>右键: 减少层数</span>
+                                {{else}}
+                                <span style='color:#2ecc71'>左键: 设置持续时间</span>
+                                {{/if}}
+                            </div>
+                        ">
+                        <img src="{{effect.img}}">
+                        <span class="current-effect-name">{{effect.name}}</span>
+                        {{#if (gt effect.stacks 1)}}<span class="chip-badge stacks">x{{effect.stacks}}</span>{{/if}}
+                        {{#if effect.durationLabel}}<span class="chip-badge rounds">{{effect.durationLabel}}</span>{{/if}}
+                        <a class="effect-delete" data-action="deleteEffect" data-id="{{effect.id}}" data-tooltip="移除状态">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                    {{/each}}
+                </div>
+                {{else}}
+                <div class="empty-current">暂无临时状态</div>
+                {{/if}}
+                {{else}}
+                <div class="empty-current">批量模式下不显示当前状态详情</div>
+                {{/if}}
+            </section>
+
+            <div class="picker-search">
+                <i class="fas fa-search"></i>
+                <input type="text" name="filter" placeholder="搜索状态、来源..." autocomplete="off">
+            </div>
+
+            <div class="recent-actions">
+                <span><i class="fas fa-clock-rotate-left"></i> 最近最多保留 12 个，按使用时间排序</span>
+                <button type="button" data-action="clearRecent">
+                    <i class="fas fa-broom"></i> 清空最近
+                </button>
+            </div>
+
+            <div class="favorite-actions">
+                <span><i class="fas fa-star"></i> 常用由星标维护，可在任意分类点星标加入</span>
+                <button type="button" data-action="resetFavorites">
+                    <i class="fas fa-rotate-left"></i> 重置常用
+                </button>
+            </div>
+
+            <div class="picker-scroll">
+                <div class="effect-grid">
+                    {{#each statusEffects}}
+                    <div role="button" tabindex="0"
+                        class="effect-btn {{#if this.isActive}}active{{/if}} {{#if this.isStackable}}stackable{{/if}} {{#if this.isRecent}}recent{{/if}} {{#if this.isFavorite}}favorite{{/if}}"
+                        data-action="applyStatus" data-slug="{{this.id}}" data-categories="{{this.categoryString}}"
+                        data-search="{{this.name}} {{this.id}}" data-tooltip="{{this.richTooltip}}"
+                        data-tooltip-class="xjzl-tooltip">
+                        <a class="favorite-pin {{#if this.isFavorite}}pinned{{/if}}" data-action="toggleFavorite"
+                            data-slug="{{this.id}}" data-tooltip="{{#if this.isFavorite}}从常用中移除{{else}}加入常用{{/if}}">
+                            <i class="{{#if this.isFavorite}}fas{{else}}far{{/if}} fa-star"></i>
+                        </a>
+                        <span class="effect-icon-frame"><img src="{{this.img}}" /></span>
+                        <span class="effect-name">{{this.name}}</span>
+                        {{#if this.isStackable}}<span class="stack-mark"><i class="fas fa-layer-group"></i></span>{{/if}}
+                        {{#if this.isRecent}}
+                        <a class="recent-remove" data-action="removeRecent" data-slug="{{this.id}}"
+                            data-tooltip="从最近中移除">
+                            <i class="fas fa-times"></i>
+                            <span>移出最近</span>
+                        </a>
+                        {{/if}}
+                        {{#if this.isFavorite}}
+                        <a class="favorite-remove" data-action="toggleFavorite" data-slug="{{this.id}}"
+                            data-tooltip="从常用中移除">
+                            <i class="fas fa-star"></i>
+                            <span>移出常用</span>
+                        </a>
+                        {{/if}}
+                    </div>
+                    {{/each}}
+                </div>
+                <div class="status-empty">
+                    当前分类没有可显示的状态
+                </div>
+
+                {{#if sceneGroups.length}}
+                <div class="scene-effects">
+                    {{#each sceneGroups}}
+                    <div class="actor-group">
+                        <div class="group-title">
+                            <i class="fas fa-user"></i> {{this.actorName}}
+                        </div>
+                        <div class="effect-grid compact">
+                            {{#each this.effects}}
+                            <div role="button" tabindex="0" class="effect-btn scene" data-action="applyItemEffect"
+                                data-uuid="{{this.uuid}}" data-search="{{this.name}} {{this.itemName}} {{this.actorName}}"
+                                data-tooltip="{{this.richTooltip}}">
+                                <span class="effect-icon-frame"><img src="{{this.img}}" /></span>
+                                <span class="effect-name">{{this.name}}</span>
+                                <small>{{this.itemName}}</small>
+                            </div>
+                            {{/each}}
+                        </div>
+                    </div>
+                    {{/each}}
+                </div>
+                {{else}}
+                <div class="scene-empty">
+                    当前场上无可用特效
+                </div>
+                {{/if}}
+            </div>
+        </main>
     </div>
 </div>

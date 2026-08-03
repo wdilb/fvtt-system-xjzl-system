@@ -13,6 +13,7 @@ import { prepareEffects, onEffectAction, promptEffectDuration, onDeleteEffect } 
 import { xjzlSocket } from "../socket.mjs";
 import { XJZLCharacterPreviewApp } from "../applications/character-preview.mjs";
 import { XJZLCharacterWizardApp } from "../applications/character-wizard.mjs";
+import { EffectSelectionDialog } from "../applications/effect-selection-dialog.mjs";
 
 const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
@@ -74,6 +75,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // --- 其他 ---
             //删除状态
             deleteEffect: XJZLCharacterSheet.prototype._onDeleteEffect,
+            openStatusPicker: XJZLCharacterSheet.prototype._onOpenStatusPicker,
 
             //切换经脉显示
             toggleJingmaiAttemptMode: XJZLCharacterSheet.prototype._onToggleJingmaiAttemptMode,
@@ -1084,6 +1086,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             effectsContainer.addEventListener("click", (event) => this._onEffectAction(event, 1));
             // 右键委托
             effectsContainer.addEventListener("contextmenu", (event) => this._onEffectAction(event, -1));
+            this._activateEffectRibbonScroll(effectsContainer);
         }
 
         // 1. 绑定即时搜索 (Live Search)
@@ -2185,6 +2188,117 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     async _onDeleteEffect(event, target) {
         return onDeleteEffect(this, event, target);
+    }
+
+    async _onOpenStatusPicker(event, target) {
+        event.preventDefault();
+        EffectSelectionDialog.openForActor(this.document);
+    }
+
+    _activateEffectRibbonScroll(row) {
+        if (!row || row.dataset.xjzlRibbonScrollBound) return;
+        row.dataset.xjzlRibbonScrollBound = "true";
+
+        let pointerX = 0;
+        let frameId = null;
+        let lastFrameTime = 0;
+        let isHovering = false;
+        let autoDirection = 1;
+        let resizeObserver = null;
+        const edgeSize = 86;
+        const autoSpeed = 44;
+        const maxManualSpeed = 620;
+
+        const hasOverflow = () => row.scrollWidth > row.clientWidth + 2;
+
+        const start = () => {
+            if (!frameId) frameId = requestAnimationFrame(tick);
+        };
+
+        const stop = () => {
+            if (frameId) cancelAnimationFrame(frameId);
+            frameId = null;
+            lastFrameTime = 0;
+        };
+
+        const tick = (time) => {
+            if (!row.isConnected) {
+                resizeObserver?.disconnect();
+                frameId = null;
+                lastFrameTime = 0;
+                return;
+            }
+
+            if (!hasOverflow()) {
+                frameId = null;
+                lastFrameTime = 0;
+                return;
+            }
+
+            const dt = lastFrameTime ? Math.min(48, time - lastFrameTime) / 1000 : 0.016;
+            lastFrameTime = time;
+            const maxScroll = row.scrollWidth - row.clientWidth;
+            const rect = row.getBoundingClientRect();
+            let speed = isHovering ? 0 : autoSpeed * autoDirection;
+
+            if (isHovering) {
+                if (pointerX < rect.left + edgeSize) {
+                    speed = -maxManualSpeed * (1 - Math.max(0, pointerX - rect.left) / edgeSize);
+                } else if (pointerX > rect.right - edgeSize) {
+                    speed = maxManualSpeed * (1 - Math.max(0, rect.right - pointerX) / edgeSize);
+                }
+            }
+
+            if (speed) {
+                row.scrollLeft += speed * dt;
+                if (!isHovering) {
+                    if (row.scrollLeft >= maxScroll - 1) autoDirection = -1;
+                    else if (row.scrollLeft <= 1) autoDirection = 1;
+                }
+            }
+
+            frameId = requestAnimationFrame(tick);
+        };
+
+        row.addEventListener("mouseenter", (event) => {
+            isHovering = true;
+            pointerX = event.clientX;
+            start();
+        });
+
+        row.addEventListener("mousemove", (event) => {
+            pointerX = event.clientX;
+        });
+
+        row.addEventListener("mouseleave", () => {
+            isHovering = false;
+            start();
+        });
+
+        row.addEventListener("wheel", (event) => {
+            if (!hasOverflow()) return;
+            const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY;
+            if (!delta) return;
+            row.scrollLeft += delta;
+            event.preventDefault();
+        }, { passive: false });
+
+        const ensureStarted = () => {
+            if (hasOverflow()) start();
+            else stop();
+        };
+
+        row.querySelectorAll("img").forEach(img => {
+            if (!img.complete) img.addEventListener("load", ensureStarted, { once: true });
+        });
+
+        const ResizeObserverClass = globalThis.ResizeObserver;
+        if (ResizeObserverClass) {
+            resizeObserver = new ResizeObserverClass(ensureStarted);
+            resizeObserver.observe(row);
+        }
+
+        for (const delay of [0, 80, 240, 600]) setTimeout(ensureStarted, delay);
     }
 
     /**

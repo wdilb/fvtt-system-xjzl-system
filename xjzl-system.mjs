@@ -780,6 +780,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
         );
 
         if (existingApp) {
+          existingApp.actor = null;
           existingApp.render(true, { focus: true });
         } else {
           // 这里不再需要传 actor 参数，因为它是全局的
