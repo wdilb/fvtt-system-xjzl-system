@@ -87,6 +87,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const currentEffects = targetActor ? this._prepareCurrentEffects(targetActor) : [];
         const activeEffectSlugs = new Set(currentEffects.map(e => e.slug).filter(Boolean));
         const recentIds = await this._getRecentStatusIds();
+        const recentSceneEffectUuids = await this._getRecentSceneEffectUuids();
+        const recentSceneEffectSet = new Set(recentSceneEffectUuids);
         const favoriteIds = await this._getFavoriteStatusIds();
 
         // ===========================================
@@ -173,6 +175,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                             img: effect.img || item.img, // 优先用特效图标，没有则用物品图标
                             itemName: item.name,
                             actorName: token.name,
+                            isRecent: recentSceneEffectSet.has(effect.uuid),
                             richTooltip: itemTooltip // 传给模板
                         });
                     }
@@ -189,6 +192,12 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
 
         const sceneCategory = categories.find(c => c.id === "scene");
         if (sceneCategory) sceneCategory.count = sceneGroups.reduce((total, group) => total + group.effects.length, 0);
+        const recentCategory = categories.find(c => c.id === "recent");
+        if (recentCategory) {
+            recentCategory.count += sceneGroups.reduce((total, group) => {
+                return total + group.effects.filter(effect => effect.isRecent).length;
+            }, 0);
+        }
 
         return {
             targetMode,
@@ -263,6 +272,12 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         return savedIds.filter(id => existingIds.has(id)).slice(0, RECENT_STATUS_LIMIT);
     }
 
+    async _getRecentSceneEffectUuids() {
+        const savedUuids = await game.user.getFlag("xjzl-system", "recentSceneEffectPickerUuids") || [];
+        if (!Array.isArray(savedUuids)) return [];
+        return savedUuids.filter(Boolean).slice(0, RECENT_STATUS_LIMIT);
+    }
+
     async _getFavoriteStatusIds() {
         const existingIds = new Set(CONFIG.statusEffects.map(e => e.id));
         const savedIds = await game.user.getFlag("xjzl-system", "favoriteStatusPickerIds");
@@ -300,6 +315,20 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const current = await this._getRecentStatusIds();
         const next = current.filter(id => id !== statusId);
         await game.user.setFlag("xjzl-system", "recentStatusPickerIds", next);
+    }
+
+    async _rememberSceneEffect(uuid) {
+        if (!uuid) return;
+        const current = await this._getRecentSceneEffectUuids();
+        const next = [uuid, ...current.filter(id => id !== uuid)].slice(0, RECENT_STATUS_LIMIT);
+        await game.user.setFlag("xjzl-system", "recentSceneEffectPickerUuids", next);
+    }
+
+    async _forgetSceneEffect(uuid) {
+        if (!uuid) return;
+        const current = await this._getRecentSceneEffectUuids();
+        const next = current.filter(id => id !== uuid);
+        await game.user.setFlag("xjzl-system", "recentSceneEffectPickerUuids", next);
     }
 
     async _toggleFavoriteStatus(statusId) {
@@ -360,6 +389,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             await game.xjzl.api.effects.addEffect(actor, effectData);
         }
 
+        await this._rememberSceneEffect(uuid);
         ui.notifications.info(`已对 ${actors.length} 个目标应用 [${sourceEffect.name}]`);
         this.render();
     }
@@ -392,7 +422,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     async _onRemoveRecent(event, target) {
         event.preventDefault();
         event.stopPropagation();
-        await this._forgetStatus(target.dataset.slug);
+        if (target.dataset.recentType === "scene") await this._forgetSceneEffect(target.dataset.uuid);
+        else await this._forgetStatus(target.dataset.slug);
         this.render();
     }
 
@@ -400,6 +431,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         event.preventDefault();
         event.stopPropagation();
         await game.user.setFlag("xjzl-system", "recentStatusPickerIds", []);
+        await game.user.setFlag("xjzl-system", "recentSceneEffectPickerUuids", []);
         this.render();
     }
 
@@ -435,6 +467,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             categoryButtons.forEach(btn => btn.classList.toggle("active", btn.dataset.category === activeCategory));
 
             let visibleStatusCount = 0;
+            let visibleSceneCount = 0;
             html.querySelectorAll(".effect-btn[data-action='applyStatus']").forEach(btn => {
                 const text = (btn.textContent + (btn.dataset.tooltip || "") + (btn.dataset.search || "")).toLowerCase();
                 const isCategoryMatch = activeCategory === "all" || (btn.dataset.categories || "").split(" ").includes(activeCategory);
@@ -447,19 +480,20 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                 let visibleCount = 0;
                 group.querySelectorAll(".effect-btn[data-action='applyItemEffect']").forEach(btn => {
                     const text = (btn.textContent + (btn.dataset.tooltip || "") + (btn.dataset.search || "")).toLowerCase();
-                    const isCategoryMatch = activeCategory === "scene";
+                    const isCategoryMatch = activeCategory === "scene" || (activeCategory === "recent" && btn.dataset.recent === "true");
                     const isMatch = isCategoryMatch && text.includes(query);
                     btn.hidden = !isMatch;
                     if (isMatch) visibleCount++;
                 });
-                group.hidden = activeCategory !== "scene" || visibleCount === 0;
+                group.hidden = !["scene", "recent"].includes(activeCategory) || visibleCount === 0;
+                visibleSceneCount += visibleCount;
             });
 
             const sceneEmpty = html.querySelector(".scene-empty");
             if (sceneEmpty) sceneEmpty.hidden = activeCategory !== "scene";
 
             const statusEmpty = html.querySelector(".status-empty");
-            if (statusEmpty) statusEmpty.hidden = activeCategory === "scene" || visibleStatusCount > 0;
+            if (statusEmpty) statusEmpty.hidden = activeCategory === "scene" || (visibleStatusCount + visibleSceneCount) > 0;
         };
 
         categoryButtons.forEach(btn => {
@@ -483,7 +517,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         // =====================================================
 
         // 获取所有带有 data-action 的按钮
-        const actionButtons = html.querySelectorAll('[data-action]');
+        const actionButtons = html.querySelectorAll('[data-action="applyStatus"], [data-action="applyItemEffect"], [data-action="adjustEffect"]');
 
         actionButtons.forEach(btn => {
             btn.addEventListener('contextmenu', async (event) => {
