@@ -51,7 +51,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             removeRecent: EffectSelectionDialog.prototype._onRemoveRecent,
             clearRecent: EffectSelectionDialog.prototype._onClearRecent,
             toggleFavorite: EffectSelectionDialog.prototype._onToggleFavorite,
-            resetFavorites: EffectSelectionDialog.prototype._onResetFavorites
+            resetFavorites: EffectSelectionDialog.prototype._onResetFavorites,
+            toggleGroupCollapse: EffectSelectionDialog.prototype._onToggleGroupCollapse
         }
     };
 
@@ -63,10 +64,18 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
 
     constructor(options = {}) {
         super(options);
+        // 目标 Actor：从角色卡打开状态盘时直接传入；为 null 时由 _getTargetActors 取当前选中的 Token
         this.actor = options.actor || null;
+        // 当前激活的分类 tab id（"common" | "recent" | "scene" 等）
         this._activeCategory = "common";
+        // 已折叠的「场上特效」角色分组（按 token.id 记录），保证切换分类/搜索重渲染后折叠状态不丢失
+        this._collapsedActors = new Set();
     }
 
+    /**
+     * 静态入口：为指定 Actor 打开状态盘
+     * 窗口已存在则复用并切换目标（避免重复弹窗），否则新建实例
+     */
     static openForActor(actor) {
         const existingApp = Object.values(ui.windows).find(app => app.options.id === "xjzl-effect-picker");
         if (existingApp) {
@@ -184,7 +193,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
 
             if (actorEffects.length > 0) {
                 sceneGroups.push({
+                    actorId: token.id, // 以 token.id 唯一标识分组，作为折叠状态的 key（同名角色可区分）
                     actorName: token.name, // 使用 Token 名字 (可能和 Actor 名字不同)
+                    collapsed: this._collapsedActors.has(token.id), // 该角色当前是否处于折叠状态
                     effects: actorEffects
                 });
             }
@@ -212,6 +223,10 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         };
     }
 
+    /**
+     * 汇总选中目标身上当前生效的状态，供「身上状态」面板展示
+     * 附带来源、堆叠层数、剩余回合数等展示信息
+     */
     _prepareCurrentEffects(actor) {
         return actor.effects
             .filter(e => !e.disabled)
@@ -246,6 +261,13 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             });
     }
 
+    /**
+     * 计算一个通用状态归属于哪些分类（供分类 tab 计数与搜索过滤匹配）
+     * @param {string} statusId 状态 id
+     * @param {string[]} recentIds 最近使用过的状态 id
+     * @param {string[]} favoriteIds 收藏（常用）状态 id
+     * @returns {string[]} 分类 id 列表（至少含 "all"）
+     */
     _getStatusCategories(statusId, recentIds = [], favoriteIds = []) {
         const categories = [];
         for (const category of STATUS_CATEGORIES) {
@@ -258,6 +280,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         return categories;
     }
 
+    /**
+     * 统计每个分类下各有多少个状态，用于分类 tab 上的数量角标
+     */
     _countCategories(statusEffects) {
         const counts = {};
         for (const status of statusEffects) {
@@ -266,18 +291,27 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         return counts;
     }
 
+    /**
+     * 读取用户最近使用过的通用状态 id（存在 user flag，按使用时间倒序，过滤已失效的配置）
+     */
     async _getRecentStatusIds() {
         const existingIds = new Set(CONFIG.statusEffects.map(e => e.id));
         const savedIds = await game.user.getFlag("xjzl-system", "recentStatusPickerIds") || [];
         return savedIds.filter(id => existingIds.has(id)).slice(0, RECENT_STATUS_LIMIT);
     }
 
+    /**
+     * 读取用户最近使用过的「场上特效」uuid（同样存在 user flag）
+     */
     async _getRecentSceneEffectUuids() {
         const savedUuids = await game.user.getFlag("xjzl-system", "recentSceneEffectPickerUuids") || [];
         if (!Array.isArray(savedUuids)) return [];
         return savedUuids.filter(Boolean).slice(0, RECENT_STATUS_LIMIT);
     }
 
+    /**
+     * 读取用户收藏的「常用」状态 id；从未设置时回退到默认列表 DEFAULT_FAVORITE_STATUS_IDS
+     */
     async _getFavoriteStatusIds() {
         const existingIds = new Set(CONFIG.statusEffects.map(e => e.id));
         const savedIds = await game.user.getFlag("xjzl-system", "favoriteStatusPickerIds");
@@ -299,10 +333,16 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         return targets;
     }
 
+    /**
+     * 对外封装：获取应用当前的目标 Actor 列表（供各类动作处理复用）
+     */
     static getControlledActors(app, options = {}) {
         return app._getTargetActors(options);
     }
 
+    /**
+     * 把某个通用状态记入「最近」列表（去重后置顶，超出上限裁掉最旧的）
+     */
     async _rememberStatus(statusId) {
         if (!statusId) return;
         const current = await this._getRecentStatusIds();
@@ -310,6 +350,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         await game.user.setFlag("xjzl-system", "recentStatusPickerIds", next);
     }
 
+    /**
+     * 从「最近」列表中移除某个通用状态
+     */
     async _forgetStatus(statusId) {
         if (!statusId) return;
         const current = await this._getRecentStatusIds();
@@ -317,6 +360,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         await game.user.setFlag("xjzl-system", "recentStatusPickerIds", next);
     }
 
+    /**
+     * 把某个「场上特效」uuid 记入「最近」列表（去重后置顶）
+     */
     async _rememberSceneEffect(uuid) {
         if (!uuid) return;
         const current = await this._getRecentSceneEffectUuids();
@@ -324,6 +370,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         await game.user.setFlag("xjzl-system", "recentSceneEffectPickerUuids", next);
     }
 
+    /**
+     * 从「最近」列表中移除某个「场上特效」uuid
+     */
     async _forgetSceneEffect(uuid) {
         if (!uuid) return;
         const current = await this._getRecentSceneEffectUuids();
@@ -331,6 +380,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         await game.user.setFlag("xjzl-system", "recentSceneEffectPickerUuids", next);
     }
 
+    /**
+     * 切换某个通用状态的收藏状态（在「常用」中加入/移出）
+     */
     async _toggleFavoriteStatus(statusId) {
         if (!statusId) return;
         const current = await this._getFavoriteStatusIds();
@@ -394,6 +446,10 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
+    /**
+     * 动作：调整目标身上已有的状态
+     * 可堆叠状态左键加一层；不可堆叠则弹出持续时间设置窗口
+     */
     async _onAdjustEffect(event, target) {
         const actors = EffectSelectionDialog.getControlledActors(this, { notify: true });
         if (actors.length !== 1) return ui.notifications.warn("调整已有状态时请只选择一个目标。");
@@ -407,6 +463,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
+    /**
+     * 动作：删除目标身上的一个状态（「身上状态」面板的 × 按钮）
+     */
     async _onDeleteEffect(event, target) {
         const actors = EffectSelectionDialog.getControlledActors(this, { notify: true });
         if (actors.length !== 1) return ui.notifications.warn("移除已有状态时请只选择一个目标。");
@@ -419,6 +478,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
+    /**
+     * 动作：从「最近」列表中移除单个条目（通用状态或场上特效，由 recentType 区分）
+     */
     async _onRemoveRecent(event, target) {
         event.preventDefault();
         event.stopPropagation();
@@ -427,6 +489,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
+    /**
+     * 动作：一键清空全部「最近」记录（通用状态 + 场上特效）
+     */
     async _onClearRecent(event, target) {
         event.preventDefault();
         event.stopPropagation();
@@ -435,6 +500,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
+    /**
+     * 动作：切换某个状态的「常用」收藏（点星标）
+     */
     async _onToggleFavorite(event, target) {
         event.preventDefault();
         event.stopPropagation();
@@ -442,6 +510,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
+    /**
+     * 动作：把「常用」重置为默认列表（删除用户 flag）
+     */
     async _onResetFavorites(event, target) {
         event.preventDefault();
         event.stopPropagation();
@@ -449,8 +520,28 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this.render();
     }
 
-    // --- 搜索过滤逻辑 (可选优化) ---
-    // 如果想实现实时搜索，可以监听 keyup 事件
+    /**
+     * 动作：折叠/展开某个角色的「场上特效」分组
+     * 点击角色姓名（组标题）触发；折叠状态记入 _collapsedActors，重渲染后仍保持
+     */
+    _onToggleGroupCollapse(event, target) {
+        event.preventDefault();
+        const group = target.closest(".actor-group");
+        if (!group) return;
+        const actorId = group.dataset.actorId;
+        // 记录折叠状态（key 为 token.id）
+        if (this._collapsedActors.has(actorId)) this._collapsedActors.delete(actorId);
+        else this._collapsedActors.add(actorId);
+        // 直接切换类名即时折叠/展开，无需整窗重渲染
+        group.classList.toggle("collapsed");
+    }
+
+    /**
+     * 渲染完成后的钩子：
+     * 1) 绑定分类切换、实时搜索、右键减层等交互；
+     * 2) 依据「当前分类 + 搜索词」统一过滤状态按钮与场上特效分组。
+     * 每次 render() 后 DOM 均为全新元素，直接绑定事件即可，无需先解绑。
+     */
     _onRender(context, options) {
         super._onRender(context, options);
 
@@ -459,6 +550,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const categoryButtons = html.querySelectorAll(".category-tab");
         const pickerRoot = html.matches?.(".xjzl-effect-picker") ? html : html.querySelector(".xjzl-effect-picker");
 
+        /**
+         * 统一过滤函数：根据当前分类与搜索词，决定每个状态/场上特效按钮及分组是否显示
+         */
         const applyFilters = () => {
             const query = (searchInput?.value || "").toLowerCase().trim();
             const activeCategory = this._activeCategory;
