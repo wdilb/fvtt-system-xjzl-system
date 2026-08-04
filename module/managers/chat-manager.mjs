@@ -26,13 +26,16 @@ export class ChatCardManager {
 
         if (!content) return;
 
-        // 1. 绑定功能按钮点击事件 (应用伤害、虚招对抗等)
+        // 1. 根据当前用户权限配置受保护详情；GM 解锁按钮也在此处注入。
+        ChatCardManager._configureProtectedDetails(message, content);
+
+        // 2. 绑定功能按钮点击事件 (应用伤害、虚招对抗等)
         const buttons = content.querySelectorAll("button[data-action]");
         buttons.forEach(btn => {
             btn.addEventListener("click", (ev) => ChatCardManager._onChatCardAction(ev, message));
         });
 
-        // 2. 绑定骰子详情展开/折叠
+        // 3. 绑定骰子详情展开/折叠
         const rollHeaders = content.querySelectorAll(".roll-header");
         rollHeaders.forEach(header => {
             header.addEventListener("click", (ev) => {
@@ -46,6 +49,72 @@ export class ChatCardManager {
     }
 
     /**
+     * 配置自动聊天卡片的详情访问状态。
+     * @param {ChatMessage} message 当前消息；锁定状态以消息 flag 为准。
+     * @param {HTMLElement} content 当前卡片根元素，仅修改本次渲染生成的 DOM。
+     */
+    static _configureProtectedDetails(message, content) {
+        const flags = message.flags["xjzl-system"] || {};
+        const access = flags.detailAccess;
+        if (!access || !["locked", "unlocked"].includes(access.state)) return;
+
+        const detailsBlocks = content.querySelectorAll("details.xjzl-protected-details");
+        if (detailsBlocks.length === 0) return;
+
+        const isUnlocked = access.state === "unlocked";
+        const canView = game.user.isGM || isUnlocked;
+
+        detailsBlocks.forEach(details => {
+            const summary = details.querySelector(":scope > summary");
+            const icon = summary?.querySelector("[data-protected-details-icon]");
+            const label = summary?.querySelector("[data-protected-details-label]");
+
+            details.classList.toggle("is-locked", !canView);
+            if (!canView) {
+                details.open = false;
+                summary?.setAttribute("aria-disabled", "true");
+                if (summary) summary.title = game.i18n.localize("XJZL.UI.Chat.ProtectedDetails.LockedHint");
+                if (label) label.textContent = game.i18n.localize("XJZL.UI.Chat.ProtectedDetails.Locked");
+                icon?.classList.replace("fa-book-open", "fa-lock");
+
+                // details/summary 是浏览器原生交互，必须阻止默认行为才能真正保持折叠。
+                summary?.addEventListener("click", event => {
+                    event.preventDefault();
+                    event.stopImmediatePropagation();
+                });
+                return;
+            }
+
+            summary?.removeAttribute("aria-disabled");
+            if (summary) summary.title = "";
+            if (label) {
+                label.textContent = game.i18n.localize(
+                    game.user.isGM && !isUnlocked
+                        ? "XJZL.UI.Chat.ProtectedDetails.GMOnly"
+                        : "XJZL.UI.Chat.ProtectedDetails.Show"
+                );
+            }
+            icon?.classList.replace("fa-lock", "fa-book-open");
+
+            // 架招原本默认展开；锁定只改变玩家权限，不改变 GM 的既有查看体验。
+            if (flags.moveType === "stance") details.open = true;
+        });
+
+        if (!game.user.isGM || isUnlocked || content.querySelector(".xjzl-detail-unlock-controls")) return;
+
+        const controls = document.createElement("div");
+        controls.className = "xjzl-detail-unlock-controls";
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.action = "unlockDetails";
+        button.className = "xjzl-detail-unlock";
+        button.innerHTML = `<i class="fas fa-lock-open"></i> ${game.i18n.localize("XJZL.UI.Chat.ProtectedDetails.Unlock")}`;
+        controls.append(button);
+        detailsBlocks[detailsBlocks.length - 1].insertAdjacentElement("afterend", controls);
+    }
+
+    /**
      * 统一点击处理分发
      */
     static async _onChatCardAction(event, message) {
@@ -56,6 +125,12 @@ export class ChatCardManager {
 
         // 捕获 Shift 按键状态
         const isShiftPressed = event.shiftKey;
+
+        // 解锁只允许 GM 直接更新消息，不进入通用角色、物品和目标解析流程。
+        if (action === "unlockDetails") {
+            await ChatCardManager._onUnlockDetails(message);
+            return;
+        }
 
         // 优先拦截撤回请求
         if (action === "refundCost") {
@@ -221,6 +296,23 @@ export class ChatCardManager {
                 await ChatCardManager._rollDeathSave(attacker);
                 break;
         }
+    }
+
+    /**
+     * 将单条自动卡片的详情永久解锁给所有可见用户。
+     * @param {ChatMessage} message 需要解锁的聊天消息；调用者必须是 GM。
+     */
+    static async _onUnlockDetails(message) {
+        if (!game.user.isGM) {
+            ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.ProtectedDetails.GMOnlyUnlock"));
+            return;
+        }
+
+        const access = message.flags["xjzl-system"]?.detailAccess;
+        if (access?.state !== "locked") return;
+
+        await message.update({ "flags.xjzl-system.detailAccess.state": "unlocked" });
+        ui.notifications.info(game.i18n.localize("XJZL.UI.Chat.ProtectedDetails.UnlockedNotice"));
     }
 
     /* -------------------------------------------- */

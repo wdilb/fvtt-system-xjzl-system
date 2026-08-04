@@ -412,6 +412,17 @@ Hooks.once("init", async function () {
   // ==========================================
   //  6.注册 配置菜单
   // ==========================================
+  // 是否隐藏敌对阵营自动发送卡片中的规则详情
+  game.settings.register("xjzl-system", "hideHostileChatDetails", {
+    name: game.i18n.localize("XJZL.Settings.HideHostileChatDetails.Name"),
+    hint: game.i18n.localize("XJZL.Settings.HideHostileChatDetails.Hint"),
+    scope: "world",
+    config: true,
+    type: Boolean,
+    default: true,
+    requiresReload: false
+  });
+
   // 是否允许玩家使用伤害工具
   game.settings.register("xjzl-system", "allowPlayerDamageTool", {
     name: "允许玩家使用伤害工具",

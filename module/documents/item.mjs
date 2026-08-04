@@ -1,6 +1,7 @@
 import { XJZL } from "../config.mjs";
 import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
+import { createAutomaticDetailAccess } from "../utils/chat-detail-access.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { xjzlSocket } from "../socket.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
@@ -278,12 +279,15 @@ export class XJZLItem extends Item {
     // =====================================================
     // 4. 发送聊天卡片 (动态文案)
     // =====================================================
+    const speaker = ChatMessage.getSpeaker({ actor: owner });
+    const detailAccess = createAutomaticDetailAccess(owner, speaker);
     const templateData = {
       item: this,
       tags: tags,
       resultText: resultLines.join("，"),
       scriptOutput: scriptOutput,
-      automationNote: config.automationNote
+      automationNote: config.automationNote,
+      detailsLocked: Boolean(detailAccess)
     };
 
     const content = await renderTemplate(
@@ -298,9 +302,10 @@ export class XJZLItem extends Item {
 
     ChatMessage.create({
       user: game.user.id,
-      speaker: ChatMessage.getSpeaker({ actor: owner }),
+      speaker: speaker,
       flavor: flavorText,
-      content: content
+      content: content,
+      ...(detailAccess ? { flags: { "xjzl-system": { detailAccess } } } : {})
     });
 
     // =====================================================
@@ -350,18 +355,22 @@ export class XJZLItem extends Item {
     await this.actor.createEmbeddedDocuments("Item", [itemData]);
 
     // 4. 发送聊天卡片
+    const speaker = ChatMessage.getSpeaker({ actor: this.actor });
+    const detailAccess = createAutomaticDetailAccess(this.actor, speaker);
     const content = await renderTemplate(
       "systems/xjzl-system/templates/chat/item-card.hbs", {
       item: this,
       tags: ["秘籍", targetItem.type === "neigong" ? "内功" : "武学"],
-      resultText: `领悟了 <b>[${targetItem.name}]</b>`
+      resultText: `领悟了 <b>[${targetItem.name}]</b>`,
+      detailsLocked: Boolean(detailAccess)
     });
 
     ChatMessage.create({
       user: game.user.id,
-      speaker: ChatMessage.getSpeaker({ actor: this.actor }),
+      speaker: speaker,
       flavor: `${this.actor.name} 阅读了 ${this.name}`,
-      content: content
+      content: content,
+      ...(detailAccess ? { flags: { "xjzl-system": { detailAccess } } } : {})
     });
 
     // 5. 消耗
@@ -1989,6 +1998,8 @@ export class XJZLItem extends Item {
 
         // 2. 准备模板数据 (架招比较简单，不需要计算伤害和检定)
         // 这里的 finalCost 是在上面第4步就已经算好的
+        const speaker = ChatMessage.getSpeaker({ actor: actor });
+        const detailAccess = createAutomaticDetailAccess(actor, speaker);
         const templateData = {
           actor: actor,
           item: this,
@@ -1996,7 +2007,8 @@ export class XJZLItem extends Item {
           cost: finalCost,
           system: this.system,
           isStance: true, // [NEW] 标记为架招，供模板变色
-          hasTargets: false
+          hasTargets: false,
+          detailsLocked: Boolean(detailAccess)
         };
 
         const content = await renderTemplate("systems/xjzl-system/templates/chat/move-card.hbs", templateData);
@@ -2004,7 +2016,7 @@ export class XJZLItem extends Item {
         // 3. 发送卡片
         ChatMessage.create({
           user: game.user.id,
-          speaker: ChatMessage.getSpeaker({ actor: actor }),
+          speaker: speaker,
           flavor: `开启架招: ${move.name}`,
           content: content,
           flags: {
@@ -2013,7 +2025,8 @@ export class XJZLItem extends Item {
               moveType: "stance",
               itemId: this.id,
               moveId: move.id,
-              costConsumed: costConsumed // 架招也要记录消耗
+              costConsumed: costConsumed, // 架招也要记录消耗
+              ...(detailAccess ? { detailAccess } : {}) // 随消息持久化，刷新后仍保持锁定状态
             }
           }
         });
@@ -2318,6 +2331,8 @@ export class XJZLItem extends Item {
       // 检查是否自动应用
       // 如果脚本里写了 args.flags.autoApplied = true，这里就能读到
       const isAutoApplied = attackContext.flags.autoApplied || false;
+      const speaker = ChatMessage.getSpeaker({ actor: actor });
+      const detailAccess = createAutomaticDetailAccess(actor, speaker);
 
       // 生成聊天卡片 (Chat Card)
       const templateData = {
@@ -2337,7 +2352,8 @@ export class XJZLItem extends Item {
         targetsResults: targetsResults,
         hasTargets: Object.keys(targetsResults).length > 0,
         showFeintBtn: showFeintBtn,
-        autoApplied: isAutoApplied
+        autoApplied: isAutoApplied,
+        detailsLocked: Boolean(detailAccess)
       };
 
       let content = await renderTemplate(
@@ -2356,7 +2372,7 @@ export class XJZLItem extends Item {
       // 发送消息
       const chatData = {
         user: game.user.id,
-        speaker: ChatMessage.getSpeaker({ actor: actor }),
+        speaker: speaker,
         flavor: flavorText || `施展了招式: ${move.name}`,
         content: content,
 
@@ -2369,6 +2385,7 @@ export class XJZLItem extends Item {
             itemId: this.id,           // 武学 Item ID
             moveId: move.id,           // 招式 ID
             moveType: move.type,       // 招式类型
+            ...(detailAccess ? { detailAccess } : {}), // 锁定状态只在发卡时按来源阵营计算一次
             costConsumed: costConsumed,// 记录消耗
             forceHit: isGlobalForceHit, // 存入全局必中状态
             alwaysHit: attackContext.flags.alwaysHit || false,
