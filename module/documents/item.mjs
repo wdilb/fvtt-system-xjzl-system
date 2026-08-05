@@ -14,6 +14,36 @@ export class XJZLItem extends Item {
 
   /**
    * @override
+   * 在 Item 首次写库前补齐依赖初始配置生成的嵌入数据。
+   * @returns {Promise<boolean|void>} 保留父类取消创建的返回值。
+   */
+  async _preCreate(data, options, user) {
+    const allowed = await super._preCreate(data, options, user);
+    if (allowed === false) return false;
+
+    if (this.type === "personality") {
+      const effectData = this.system.buildModifierEffectData();
+
+      // 初始 chosen 不会触发 _onUpdate，因此必须在创建事务中直接嵌入 AE。
+      if (effectData?.changes.length > 0) {
+        const effectSlug = effectData.flags["xjzl-system"].slug;
+        const hasModifier = this.effects.some(
+          effect => effect.getFlag("xjzl-system", "slug") === effectSlug
+        );
+
+        if (!hasModifier) {
+          this.updateSource({
+            effects: [...this.effects.map(effect => effect.toObject()), effectData]
+          });
+        }
+      }
+    }
+
+    return allowed;
+  }
+
+  /**
+   * @override
    * 数据库更新后的逻辑钩子
    * 用于处理“数据变动后的副作用”，例如性格同步 AE、自动计算价格等
    */
@@ -24,8 +54,10 @@ export class XJZLItem extends Item {
     if (game.user.id !== userId) return;
 
     // 2. 逻辑分流：性格 (Personality)
-    // 只有当 'system.chosen' 字段确实发生变化时才触发
-    if (this.type === "personality" && foundry.utils.hasProperty(changed, "system.chosen")) {
+    // 选择或加值强度发生变化时，都要刷新对应 AE。
+    const personalityChanged = foundry.utils.hasProperty(changed, "system.chosen")
+      || foundry.utils.hasProperty(changed, "system.bonus");
+    if (this.type === "personality" && personalityChanged) {
       // 调用 DataModel 中的同步方法
       // 注意：这里不需要 try-catch，让错误暴露出来反而利于调试
       await this.system.syncToEffect();
