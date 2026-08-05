@@ -1,4 +1,5 @@
 import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
+import { EncounterManager } from "./managers/encounter-manager.mjs";
 
 export let xjzlSocket;
 
@@ -18,6 +19,7 @@ export function setupSocket() {
     xjzlSocket.register("recordCombatStat", _socketRecordCombatStat);
     xjzlSocket.register("broadcastCombatStats", _socketBroadcastCombatStats);
     xjzlSocket.register("requestCombatStats", _socketRequestCombatStats);
+    xjzlSocket.register("useEncounterSupport", _socketUseEncounterSupport);
 
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
@@ -217,4 +219,14 @@ async function _socketRunActorScriptWithRegen(actorUuid, trigger, regenTiming) {
     } catch (err) {
         console.error(`XJZL | Socket 路由脚本执行错误 [${actor.name}, ${trigger}]:`, err);
     }
+}
+
+/**
+ * 将玩家的支援请求交给主 GM 串行复核和结算。
+ * @param {object} request 仅包含 Combat、编组、NPC、动作和 Combatant ID
+ */
+async function _socketUseEncounterSupport(request) {
+    if (isNotActiveGM()) return null;
+    // socketlib 会把真实发送者写入调用上下文；覆盖客户端字段，避免伪造 GM 身份绕过编组权限。
+    return EncounterManager.executeSupportAsGM({ ...request, userId: this.socketdata.userId });
 }

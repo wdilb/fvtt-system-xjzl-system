@@ -26,6 +26,7 @@ import { XJZLArtBookData } from "./module/data/item/art-book.mjs";
 import { XJZLPersonalityData } from "./module/data/item/personality.mjs";
 import { XJZLBackgroundData } from "./module/data/item/background.mjs";
 import { XJZLTraitData } from "./module/data/item/trait.mjs";
+import { XJZLEncounterData } from "./module/data/item/encounter.mjs";
 
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
@@ -40,12 +41,14 @@ import { XJZLPersonalitySheet } from "./module/sheets/personality-sheet.mjs";
 import { XJZLBackgroundSheet } from "./module/sheets/background-sheet.mjs";
 import { XJZLActiveEffectConfig } from "./module/sheets/active-effect-config.mjs";
 import { XJZLTraitSheet } from "./module/sheets/trait-sheet.mjs";
+import { XJZLEncounterSheet } from "./module/sheets/encounter-sheet.mjs";
 
 //导入管理器
 import { ChatCardManager } from "./module/managers/chat-manager.mjs";
 import { TargetManager } from "./module/managers/target-manager.mjs";
 import { ActiveEffectManager } from "./module/managers/active-effect-manager.mjs";
 import { CombatStatsManager } from "./module/managers/combat-stats-manager.mjs";
+import { EncounterManager } from "./module/managers/encounter-manager.mjs";
 
 //导入工具
 import { GenericDamageTool } from "./module/applications/damage-tool.mjs";
@@ -62,6 +65,7 @@ import { ToneTracker } from "./module/applications/tone-tracker.mjs";
 import { CombatMeterUI } from "./module/applications/combat-meter-ui.mjs";
 import { xjzlSocket } from "./module/socket.mjs";
 import { parseBackgroundAssets, resolveBackgroundItems, grantAndTrack, revokeBackgroundGrants, grantSectAssets, revokeAllSectGrants } from "./module/utils/background-assets.mjs";
+import { EncounterRuntimeApp } from "./module/applications/encounter-runtime.mjs";
 
 // 导入配置
 import { XJZL } from "./module/config.mjs";
@@ -308,7 +312,8 @@ Hooks.once("init", async function () {
     art_book: XJZLArtBookData,
     personality: XJZLPersonalityData,
     background: XJZLBackgroundData,
-    trait: XJZLTraitData
+    trait: XJZLTraitData,
+    encounter: XJZLEncounterData
   };
 
   // 4. 注册 Sheets (表现层)
@@ -398,6 +403,13 @@ Hooks.once("init", async function () {
     types: ["trait"],
     makeDefault: true,
     label: "XJZL.Sheet.Trait"
+  });
+
+  // 战局使用专用 Sheet，避免通用 Item Sheet 暴露无关字段。
+  Items.registerSheet("xjzl-system", XJZLEncounterSheet, {
+    types: ["encounter"],
+    makeDefault: true,
+    label: "XJZL.Sheet.Encounter"
   });
 
   // ==========================================
@@ -577,6 +589,11 @@ Hooks.once("socketlib.ready", () => {
   setupSocket();
 });
 
+/** 战局 Item 使用统一内部图标，Sheet 不提供图片编辑入口。 */
+Hooks.on("preCreateItem", (item) => {
+  if (item.type === "encounter") item.updateSource({ img: "icons/svg/combat.svg" });
+});
+
 /* -------------------------------------------- */
 /*  Ready Hook (就绪钩子)                        */
 /* -------------------------------------------- */
@@ -606,9 +623,16 @@ Hooks.once("ready", async function () {
     }
   };
 
-  // --- 挂载浏览器到全局对象 ---
+  // 合集浏览器实例供目录入口和宏复用。
   game.xjzl.compendiumBrowser = compendiumBrowser;
-  // 同时也可以把类定义挂载出去，方便宏继承扩展
+  // Socket 引用供系统内需要 GM 权限的客户端请求使用。
+  game.xjzl.socket = xjzlSocket;
+  // 保留 encounters 作为兼容 API，仅暴露战局 HUD 的稳定打开与关联入口。
+  game.xjzl.encounters = {
+    open: (combat = game.combat) => EncounterRuntimeApp.open(combat),
+    link: (combat = game.combat) => EncounterManager.chooseEncounter(combat)
+  };
+  // 对外保留原有可扩展应用类入口。
   game.xjzl.applications = {
     XJZLCompendiumBrowser
   };
@@ -1081,54 +1105,82 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
  * 统一的战斗状态流转监听(将战斗开始、回合开始、回合结束统一监听，避免竞争执行产生的错误)
  */
 Hooks.on("updateCombat", async (combat, updateData, options, userId) => {
+  // 战局副本、轮次或回合位置变化都会影响 HUD 的实时状态，所有客户端先行刷新显示。
+  const shouldRefreshEncounter = ("round" in updateData)
+    || ("turn" in updateData)
+    || ("flags.xjzl-system.encounter" in updateData)
+    || foundry.utils.hasProperty(updateData, "flags.xjzl-system.encounter");
+  if (shouldRefreshEncounter) {
+    Hooks.callAll("xjzl.encounterUpdated", combat);
+  }
+
   // 1. 仅限主 GM 执行，防止多 GM 重复触发
   if (!game.users.activeGM?.isSelf) return;
 
   const isCombatStart = updateData.hasOwnProperty("round") && updateData.round === 1 && combat.previous.round === 0;
   const isTurnChange = ("turn" in updateData) || ("round" in updateData);
+  const transition = {
+    previousCombatantId: combat.previous.combatantId,
+    currentCombatantId: combat.current.combatantId,
+    previousRound: Number(combat.previous.round) || 0,
+    currentRound: Number(combat.round) || 0,
+    previousTurn: combat.previous.turn,
+    currentTurn: combat.turn
+  };
 
   // 如果既不是战斗开始，也不是轮次流转，直接返回
   if (!isCombatStart && !isTurnChange) return;
 
-  // 2. 如果是战斗正式开始，必须先执行并“完全等待”进战脚本结束
-  if (isCombatStart) {
-    console.log("XJZL | 战斗正式开始！正在触发所有参战者脚本...");
-    // await 会阻塞后续代码，直到所有 Actor 的进战 AE 成功写入数据库
-    await triggerCombatStartScripts(combat.combatants);
-  }
+  // Combat 更新 Hook 可能在快速切换回合时重入；按 Combat 串行化可保证六阶段顺序。
+  await EncounterManager.queueCombatUpdate(combat, updateData, async () => {
+    if (isCombatStart && !EncounterManager.getState(combat)) {
+      await EncounterManager.chooseEncounter(combat);
+    }
 
-  // 3. 处理回合流转逻辑
-  if (isTurnChange) {
-    const prevId = combat.previous.combatantId;
-    const currId = combat.current.combatantId;
+    // 第 1 轮先完成系统进战，再结算战局 combatStart。
+    if (isCombatStart) {
+      console.log("XJZL | 战斗正式开始！正在触发所有参战者脚本...");
+      await triggerCombatStartScripts(combat.combatants);
+      await EncounterManager.runFieldTrigger(combat, "combatStart", { round: 1, turn: transition.currentTurn });
+    }
 
-    // --- A. 处理回合结束 (Turn End) ---
-    // 规避边界情况：如果是战斗刚开始的第一轮，不需要触发上一个人的回合结束脚本
-    if (prevId && !isCombatStart) {
-      const prevCombatant = combat.combatants.get(prevId);
-      const prevActor = prevCombatant?.actor;
-      if (prevActor) {
-        await _routeActorTurnScript(prevActor, "turnEnd", "TurnEnd");
+    if (isTurnChange) {
+      const prevId = transition.previousCombatantId;
+      const currId = transition.currentCombatantId;
+      const previousRound = transition.previousRound;
+      const currentRound = transition.currentRound;
+      const isNewRound = currentRound > previousRound;
+
+      // 1-2. 上一个角色的系统与战局回合结束。
+      if (prevId && !isCombatStart) {
+        const prevCombatant = combat.combatants.get(prevId);
+        if (prevCombatant?.actor) await _routeActorTurnScript(prevCombatant.actor, "turnEnd", "TurnEnd");
+        await EncounterManager.runFieldTrigger(combat, "combatantTurnEnd", { combatant: prevCombatant, round: previousRound, turn: transition.previousTurn });
+      }
+
+      // 3. 只有自然进入下一轮时才结算上一轮结束。
+      if (isNewRound && previousRound > 0) {
+        await EncounterManager.runFieldTrigger(combat, "roundEnd", { round: previousRound, turn: transition.previousTurn });
+      }
+
+      // 4. 新轮开始先刷新支援额度，再按 Item 顺序混合结算三类轮初效果。
+      if (isCombatStart || isNewRound) {
+        await EncounterManager.resetRoundSupport(combat);
+        await EncounterManager.runRoundStartTriggers(combat, { round: currentRound, turn: transition.currentTurn });
+      }
+
+      // 5-6. 当前角色的系统与战局回合开始。
+      if (currId) {
+        const currCombatant = combat.combatants.get(currId);
+        if (currCombatant?.actor) await _routeActorTurnScript(currCombatant.actor, "turnStart", "TurnStart");
+        await EncounterManager.runFieldTrigger(combat, "combatantTurnStart", { combatant: currCombatant, round: currentRound, turn: transition.currentTurn });
       }
     }
 
-    // --- B. 处理回合开始 (Turn Start) ---
-    // 此时如果是第一轮第一个人，由于上面 isCombatStart 已经 await 完毕，可以放心执行
-    if (currId) {
-      const currCombatant = combat.combatants.get(currId);
-      const currActor = currCombatant?.actor;
-      if (currActor) {
-        await _routeActorTurnScript(currActor, "turnStart", "TurnStart");
-      }
+    for (const combatant of combat.combatants) {
+      if (combatant.actor) await ActiveEffectManager.cleanExpiredEffects(combatant.actor);
     }
-  }
-
-  // 4. 遍历战斗中所有战斗人员，清除过期 AE 效果
-  for (const combatant of combat.combatants) {
-    if (combatant.actor) {
-      await ActiveEffectManager.cleanExpiredEffects(combatant.actor);
-    }
-  }
+  });
 });
 
 /**
@@ -1146,6 +1198,54 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
     console.log(`XJZL | 检测到中途加入战斗: ${combatant.name}`);
     await triggerCombatStartScripts([combatant]);
   }
+});
+
+/**
+ * 在 V13 战斗追踪器中渲染紧凑入口：已关联时打开 HUD；存在战局 Item 且未开战时才允许 GM 关联。
+ */
+function renderEncounterTrackerControls(app, html) {
+  const root = html instanceof HTMLElement ? html : html?.[0];
+  const combat = app.viewed ?? game.combat;
+  if (!root || !combat || root.querySelector(".xjzl-encounter-tracker-controls")) return;
+  const state = EncounterManager.getState(combat);
+  const controls = document.createElement("div");
+  controls.className = "xjzl-encounter-tracker-controls";
+  if (state?.status === "linked") {
+    const battle = document.createElement("button");
+    battle.type = "button";
+    battle.className = "encounter-linked";
+    battle.innerHTML = `<i class="fas fa-shield-halved"></i> ${game.i18n.localize("XJZL.Encounter.BattleSituation")}`;
+    battle.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      EncounterRuntimeApp.open(combat);
+    });
+    controls.append(battle);
+  } else if (game.user.isGM && (combat.round ?? 0) <= 0 && game.items.some(item => item.type === "encounter")) {
+    const link = document.createElement("button");
+    link.type = "button";
+    link.innerHTML = `<i class="fas fa-link"></i> ${game.i18n.localize("XJZL.Encounter.LinkEncounter")}`;
+    link.addEventListener("click", async event => {
+      event.preventDefault();
+      event.stopPropagation();
+      await EncounterManager.chooseEncounter(combat);
+      app.render({ force: true });
+    });
+    controls.append(link);
+  }
+  if (!controls.childElementCount) return;
+  const anchor = root.querySelector(".combat-tracker-header, header");
+  if (anchor) anchor.insertAdjacentElement("afterend", controls);
+  else root.prepend(controls);
+}
+
+Hooks.on("renderCombatTracker", renderEncounterTrackerControls);
+Hooks.on("renderCombatTrackerHTML", renderEncounterTrackerControls);
+Hooks.on("updateCombatant", combatant => {
+  if (combatant.combat) Hooks.callAll("xjzl.encounterUpdated", combatant.combat);
+});
+Hooks.on("deleteCombatant", combatant => {
+  if (combatant.combat) Hooks.callAll("xjzl.encounterUpdated", combatant.combat);
 });
 
 /**
@@ -1256,9 +1356,17 @@ async function _routeActorTurnScript(actor, trigger, regenTiming) {
 // });
 
 /**
- * 监听 Token 移动，处理“粘性”模板
+ * 统一处理 Token 更新：名称/阵营变化刷新战局目标，位置变化同步“粘性”模板。
  */
 Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
+  if (("name" in change) || ("disposition" in change)) {
+    for (const combat of game.combats) {
+      if (combat.scene?.id === tokenDoc.parent?.id && combat.combatants.some(combatant => combatant.tokenId === tokenDoc.id)) {
+        Hooks.callAll("xjzl.encounterUpdated", combat);
+      }
+    }
+  }
+
   // 1. 没有位移、非当前用户、场景未准备好，直接退出
   if (!canvas.ready) return;
   if (!change.x && !change.y) return;
@@ -1317,10 +1425,12 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
 });
 
 /**
- * 监听战斗结束 (脱战)
- * 作用：自动清空所有参战角色的怒气
+ * 战斗删除后的统一收尾：先清理客户端战局 HUD/队列，再由删除发起者重置参战角色怒气。
  */
 Hooks.on("deleteCombat", async (combat, options, userId) => {
+  EncounterRuntimeApp.closeForCombat(combat);
+  EncounterManager.cleanupCombat(combat);
+
   // 这里确保只让“触发删除操作的用户（通常是GM）”来执行数据库写操作，防止并发冲突。
   if (game.user.id !== userId) return;
 
@@ -1709,6 +1819,13 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/item/background/tab-effects.hbs",
     "systems/xjzl-system/templates/item/personality/header.hbs",
     "systems/xjzl-system/templates/item/personality/details.hbs",
+    // 战局 Item 与聊天卡片
+    "systems/xjzl-system/templates/item/encounter/header.hbs",
+    "systems/xjzl-system/templates/item/encounter/tabs.hbs",
+    "systems/xjzl-system/templates/item/encounter/tab-overview.hbs",
+    "systems/xjzl-system/templates/item/encounter/tab-fields.hbs",
+    "systems/xjzl-system/templates/item/encounter/tab-support.hbs",
+    "systems/xjzl-system/templates/chat/encounter-card.hbs",
     //聊天卡片
     "systems/xjzl-system/templates/chat/item-card.hbs", //物品使用
     "systems/xjzl-system/templates/chat/move-card.hbs", //招式使用
@@ -1736,6 +1853,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/action-tracker.hbs",//动作计数器
     "systems/xjzl-system/templates/apps/combat-meter.hbs",//数据统计
     "systems/xjzl-system/templates/apps/combat-score.hbs",//数据评分
+    "systems/xjzl-system/templates/apps/encounter-runtime.hbs", // 战局运行 HUD
     // 向导界面
     "systems/xjzl-system/templates/apps/character-wizard/sidebar.hbs",
     "systems/xjzl-system/templates/apps/character-wizard/main.hbs",

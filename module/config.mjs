@@ -1285,6 +1285,40 @@ XJZL.statusEffects = [
   }
 ];
 
+// 战局功能的枚举配置是 Sheet、运行面板与聊天卡的共同单一事实源。
+XJZL.encounter = {
+  fieldTriggers: {
+    combatStart: "XJZL.Encounter.Triggers.CombatStart",
+    roundStart: "XJZL.Encounter.Triggers.RoundStart",
+    roundEnd: "XJZL.Encounter.Triggers.RoundEnd",
+    specificRoundStart: "XJZL.Encounter.Triggers.SpecificRoundStart",
+    intervalRoundStart: "XJZL.Encounter.Triggers.IntervalRoundStart",
+    combatantTurnStart: "XJZL.Encounter.Triggers.CombatantTurnStart",
+    combatantTurnEnd: "XJZL.Encounter.Triggers.CombatantTurnEnd"
+  },
+  fieldTargets: {
+    friendly: "XJZL.Encounter.TargetModes.Friendly",
+    hostile: "XJZL.Encounter.TargetModes.Hostile",
+    custom: "XJZL.Encounter.TargetModes.Custom"
+  },
+  actionTargets: {
+    selected: "XJZL.Encounter.TargetModes.Selected",
+    friendlyAll: "XJZL.Encounter.TargetModes.FriendlyAll",
+    hostileAll: "XJZL.Encounter.TargetModes.HostileAll",
+    none: "XJZL.Encounter.TargetModes.None"
+  },
+  automationTypes: {
+    damage: "XJZL.Encounter.AutomationTypes.Damage",
+    healing: "XJZL.Encounter.AutomationTypes.Healing",
+    rage: "XJZL.Encounter.AutomationTypes.Rage",
+    description: "XJZL.Encounter.AutomationTypes.Description"
+  },
+  supportPermissions: {
+    gm: "XJZL.Encounter.PermissionGm",
+    players: "XJZL.Encounter.PermissionPlayers"
+  }
+};
+
 //暂停用侠界笑话
 XJZL.pauseFlavorText = [
   "全荒山寨的杀孽加起来没有过来的神风帮弟子一个人多，而神风弟子是十八正道",

@@ -1,0 +1,102 @@
+<section class="tab encounter-page {{#if (eq tabs.primary 'fields')}}active{{/if}}" data-tab="fields" data-group="primary" data-application-part="fields">
+  <div class="encounter-toolbar">
+    <div>
+      <span>{{localize "XJZL.Encounter.FieldOrder"}}</span>
+      <h2>{{localize "XJZL.Encounter.FieldEffects"}}</h2>
+      <p>{{localize "XJZL.Encounter.ConfigFlowHint"}}</p>
+    </div>
+    <button type="button" class="encounter-primary-action" data-action="addFieldEffect">
+      <i class="fas fa-plus"></i>{{localize "XJZL.Encounter.AddFieldEffect"}}
+    </button>
+  </div>
+
+  <div class="encounter-stack">
+    {{#each system.fieldEffects as |effect|}}
+    <article class="encounter-entry field-effect-card {{#unless effect.enabled}}is-disabled{{/unless}}" data-encounter-entry>
+      <header class="entry-command">
+        <span class="encounter-order">{{effect.displayOrder}}</span>
+        <div class="entry-title">
+          <span>{{localize "XJZL.Encounter.FieldEffect"}}</span>
+          <input type="text" name="system.fieldEffects.{{effect.index}}.name" value="{{effect.name}}" aria-label="{{localize 'XJZL.Encounter.Name'}}">
+        </div>
+        <label class="encounter-switch">
+          <input type="checkbox" name="system.fieldEffects.{{effect.index}}.enabled" {{checked effect.enabled}}>
+          <span>{{localize "XJZL.Encounter.Enabled"}}</span>
+        </label>
+        <div class="entry-actions">
+          <button type="button" data-action="moveFieldEffect" data-index="{{effect.index}}" data-direction="-1" title="{{localize 'XJZL.Encounter.MoveUp'}}"><i class="fas fa-chevron-up"></i></button>
+          <button type="button" data-action="moveFieldEffect" data-index="{{effect.index}}" data-direction="1" title="{{localize 'XJZL.Encounter.MoveDown'}}"><i class="fas fa-chevron-down"></i></button>
+          <button type="button" data-action="copyFieldEffect" data-index="{{effect.index}}" title="{{localize 'XJZL.Encounter.Copy'}}"><i class="fas fa-copy"></i></button>
+          <button type="button" class="danger" data-action="deleteFieldEffect" data-index="{{effect.index}}" title="{{localize 'XJZL.UI.Delete'}}"><i class="fas fa-trash"></i></button>
+        </div>
+      </header>
+
+      <input type="hidden" name="system.fieldEffects.{{effect.index}}.id" value="{{effect.id}}">
+      <div class="encounter-rule-flow">
+        <section class="rule-stage">
+          <div class="stage-heading"><b>01</b><span>{{localize "XJZL.Encounter.TimingStage"}}</span></div>
+          <label class="encounter-field">
+            <span>{{localize "XJZL.Encounter.Trigger"}}</span>
+            <select data-trigger-control name="system.fieldEffects.{{effect.index}}.trigger">
+              {{selectOptions ../choices.fieldTriggers selected=effect.trigger}}
+            </select>
+            <small>{{localize "XJZL.Encounter.TriggerHint"}}</small>
+          </label>
+          <label class="encounter-field" data-show-trigger="specificRoundStart intervalRoundStart" {{#unless effect.showTriggerValue}}hidden{{/unless}}>
+            <span>{{localize "XJZL.Encounter.TriggerValue"}}</span>
+            <input type="number" min="1" step="1" name="system.fieldEffects.{{effect.index}}.triggerValue" value="{{effect.triggerValue}}">
+            <small data-show-trigger="specificRoundStart" {{#unless (eq effect.trigger 'specificRoundStart')}}hidden{{/unless}}>{{localize "XJZL.Encounter.SpecificRoundHint"}}</small>
+            <small data-show-trigger="intervalRoundStart" {{#unless (eq effect.trigger 'intervalRoundStart')}}hidden{{/unless}}>{{localize "XJZL.Encounter.IntervalRoundHint"}}</small>
+          </label>
+        </section>
+
+        <section class="rule-stage">
+          <div class="stage-heading"><b>02</b><span>{{localize "XJZL.Encounter.TargetStage"}}</span></div>
+          <label class="encounter-field">
+            <span>{{localize "XJZL.Encounter.TargetMode"}}</span>
+            <select name="system.fieldEffects.{{effect.index}}.targetMode">
+              {{selectOptions ../choices.fieldTargets selected=effect.targetMode}}
+            </select>
+            <small>{{localize "XJZL.Encounter.FieldTargetHint"}}</small>
+          </label>
+        </section>
+
+        <section class="rule-stage settlement-stage">
+          <div class="stage-heading"><b>03</b><span>{{localize "XJZL.Encounter.SettlementStage"}}</span></div>
+          <label class="encounter-field">
+            <span>{{localize "XJZL.Encounter.AutomationType"}}</span>
+            <select data-automation-control name="system.fieldEffects.{{effect.index}}.automationType">
+              {{selectOptions ../choices.automationTypes selected=effect.automationType}}
+            </select>
+            <small>{{localize "XJZL.Encounter.AutomationTypeHint"}}</small>
+          </label>
+          <label class="encounter-field" data-show-automation="damage healing rage" {{#unless effect.showAmount}}hidden{{/unless}}>
+            <span>{{localize "XJZL.Encounter.AmountFormula"}}</span>
+            <input data-encounter-formula type="text" name="system.fieldEffects.{{effect.index}}.amountFormula" value="{{effect.amountFormula}}" class="{{#if effect.formulaError}}is-invalid{{/if}}">
+            <small>{{#if effect.formulaError}}{{effect.formulaError}}{{else}}{{localize "XJZL.Encounter.FormulaHint"}}{{/if}}</small>
+          </label>
+          <label class="encounter-field" data-show-automation="damage" {{#unless effect.showDamageType}}hidden{{/unless}}>
+            <span>{{localize "XJZL.Encounter.DamageType"}}</span>
+            <select name="system.fieldEffects.{{effect.index}}.damageType">
+              {{selectOptions ../choices.damageTypes selected=effect.damageType}}
+            </select>
+            <small>{{localize "XJZL.Encounter.DamageTypeHint"}}</small>
+          </label>
+        </section>
+      </div>
+
+      <label class="encounter-field encounter-description">
+        <span>{{localize "XJZL.Encounter.Description"}}</span>
+        <textarea name="system.fieldEffects.{{effect.index}}.description">{{effect.description}}</textarea>
+        <small>{{localize "XJZL.Encounter.FieldDescriptionHint"}}</small>
+      </label>
+    </article>
+    {{else}}
+    <div class="encounter-empty">
+      <i class="fas fa-wind"></i>
+      <b>{{localize "XJZL.Encounter.NoFieldEffects"}}</b>
+      <span>{{localize "XJZL.Encounter.NoFieldEffectsHint"}}</span>
+    </div>
+    {{/each}}
+  </div>
+</section>
