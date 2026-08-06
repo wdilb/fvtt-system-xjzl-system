@@ -579,11 +579,15 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
                 );
                 let txt = tokenized.replace(/<[^>]*>?/gm, '');
                 const truncated = txt.length > 120;
+                // 先按正文截断、后转义引号：先转义会让 &quot; 膨胀计入长度导致过早截断，
+                // 截断还可能切断实体留下字面乱码。tooltip 会嵌入 data-tooltip="..." 属性，
+                // 未转义的引号会提前截断属性，触发 "must render a single HTML element"。
                 txt = txt.substring(0, 120);
+                txt = txt.replace(/"/g, "&quot;").replace(/'/g, "&apos;");
                 for (const [index, result] of formulaResults.entries()) {
                     txt = txt.replace(
                         String.fromCharCode(0xE000 + index),
-                        `<span class="xjzl-level-formula-result">${result}</span>`
+                        `<span class='xjzl-level-formula-result'>${result}</span>`
                     );
                 }
                 return truncated ? txt + "..." : txt;
