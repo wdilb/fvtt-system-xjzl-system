@@ -18,6 +18,9 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
   // 记录用户主动关闭时对应的关联时间；重新关联后 linkedAt 改变，HUD 会再次自动出现。
   static dismissedLinks = new Map();
   static launcherId = "xjzl-battle-hud-launcher";
+  // 默认避开左侧队列 HUD；打开态与关闭态沿用同一位置，减少视线跳动。
+  static hudPosition = { left: 492, top: 84 };
+  static launcherPosition = { left: 492, top: 84 };
 
   static DEFAULT_OPTIONS = {
     id: "xjzl-encounter-runtime",
@@ -56,6 +59,16 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
 
   get title() { return game.i18n.localize("XJZL.Encounter.BattleSituation"); }
 
+  /** 将悬浮控件限制在当前视口内；position 只接受有限数值坐标。 */
+  static _fitPosition(position, { width, height }) {
+    const left = Number.isFinite(position?.left) ? position.left : this.hudPosition.left;
+    const top = Number.isFinite(position?.top) ? position.top : this.hudPosition.top;
+    return {
+      left: Math.max(16, Math.min(left, window.innerWidth - width - 16)),
+      top: Math.max(16, Math.min(top, window.innerHeight - height - 16))
+    };
+  }
+
   /**
    * 打开指定战斗的单例 HUD。
    * 自动模式会尊重用户对当前关联副本的主动关闭，手动打开则清除该记录。
@@ -67,12 +80,13 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     if (!automatic) this.dismissedLinks.delete(combat.id);
     let app = this.instances.get(combat.id);
     if (!app) {
+      const position = this._fitPosition(this.hudPosition, { width: 600, height: 62 });
       app = new this({
         combatId: combat.id,
         position: {
           // 预留详细模式的展开宽度，避免从极简态切换时窗体越出画布右侧。
-          left: Math.max(16, window.innerWidth - 650),
-          top: 72
+          left: position.left,
+          top: position.top
         }
       });
       this.instances.set(combat.id, app);
@@ -101,8 +115,59 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     launcher.innerHTML = `<span aria-hidden="true">局</span><i></i>`;
     launcher.title = game.i18n.localize("XJZL.Encounter.OpenBattleHud");
     launcher.setAttribute("aria-label", launcher.title);
-    launcher.addEventListener("click", () => this.open(combat));
+    const position = this._fitPosition(this.launcherPosition, { width: 48, height: 48 });
+    Object.assign(launcher.style, { left: `${position.left}px`, top: `${position.top}px` });
+    this.launcherPosition = position;
+    this._makeLauncherDraggable(launcher);
+    launcher.addEventListener("click", event => {
+      if (launcher.dataset.dragged === "true") {
+        event.preventDefault();
+        delete launcher.dataset.dragged;
+        return;
+      }
+      this.hudPosition = { ...this.launcherPosition };
+      this.open(combat);
+    });
     document.body.appendChild(launcher);
+  }
+
+  /** 允许关闭态启动器拖动，并在本次客户端会话中记住位置。 */
+  static _makeLauncherDraggable(launcher) {
+    let pointerId = null;
+    let startPointer = null;
+    let startPosition = null;
+    let moved = false;
+    const finish = event => {
+      if (event.pointerId !== pointerId) return;
+      if (launcher.hasPointerCapture(pointerId)) launcher.releasePointerCapture(pointerId);
+      launcher.classList.remove("is-dragging");
+      if (moved) {
+        launcher.dataset.dragged = "true";
+        setTimeout(() => delete launcher.dataset.dragged, 0);
+      }
+      pointerId = null;
+    };
+    launcher.addEventListener("pointerdown", event => {
+      if (event.button !== 0) return;
+      pointerId = event.pointerId;
+      startPointer = { x: event.clientX, y: event.clientY };
+      startPosition = { ...this.launcherPosition };
+      moved = false;
+      launcher.setPointerCapture(pointerId);
+      launcher.classList.add("is-dragging");
+    });
+    launcher.addEventListener("pointermove", event => {
+      if (event.pointerId !== pointerId) return;
+      const dx = event.clientX - startPointer.x;
+      const dy = event.clientY - startPointer.y;
+      if (!moved && Math.hypot(dx, dy) < 4) return;
+      moved = true;
+      const position = this._fitPosition({ left: startPosition.left + dx, top: startPosition.top + dy }, { width: 48, height: 48 });
+      Object.assign(launcher.style, { left: `${position.left}px`, top: `${position.top}px` });
+      this.launcherPosition = position;
+    });
+    launcher.addEventListener("pointerup", finish);
+    launcher.addEventListener("pointercancel", finish);
   }
 
   /**
@@ -118,6 +183,9 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
   get combat() { return game.combats.get(this.combatId); }
 
   async close(options = {}) {
+    const position = this.constructor._fitPosition(this.position, { width: 600, height: 62 });
+    this.constructor.hudPosition = position;
+    this.constructor.launcherPosition = { ...position };
     if (!options.encounterCleanup) {
       const linkedAt = EncounterManager.getState(this.combat)?.linkedAt;
       if (linkedAt) this.constructor.dismissedLinks.set(this.combatId, linkedAt);

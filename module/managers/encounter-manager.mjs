@@ -80,10 +80,7 @@ export class EncounterManager {
   static async chooseEncounter(combat) {
     if (!game.user.isGM || !combat) return false;
     const encounters = game.items.filter(item => item.type === "encounter").sort((a, b) => a.name.localeCompare(b.name, "zh-CN"));
-    if (!encounters.length) {
-      ui.notifications.warn(game.i18n.localize("XJZL.Encounter.NoBattlePlansAvailable"));
-      return false;
-    }
+    if (!encounters.length) return false;
     const formId = `battle-plan-picker-${foundry.utils.randomID()}`;
     const options = encounters.map(item => `<option value="${item.uuid}">${html(item.name)}</option>`).join("");
     const content = `

@@ -35,7 +35,8 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
       addAction: XJZLEncounterSheet.prototype._onAddAction,
       deleteAction: XJZLEncounterSheet.prototype._onDeleteAction,
       copyAction: XJZLEncounterSheet.prototype._onCopyAction,
-      moveAction: XJZLEncounterSheet.prototype._onMoveAction
+      moveAction: XJZLEncounterSheet.prototype._onMoveAction,
+      toggleEntry: XJZLEncounterSheet.prototype._onToggleEntry
     }
   };
 
@@ -48,10 +49,13 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
   };
 
   tabGroups = { primary: "overview" };
+  collapsedEntries = new Set();
+  collapseStateInitialized = false;
 
   async _prepareContext(options) {
     const context = await super._prepareContext(options);
     const source = this.document.system.toObject();
+    this._initializeCollapseState(source);
     // 第一版曾使用富文本编辑器；转为短摘要时剥离旧标记，避免在 textarea 中暴露 HTML 源码。
     const summaryElement = document.createElement("div");
     summaryElement.innerHTML = source.description || "";
@@ -66,22 +70,32 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
       supportPermissions: choiceMap(CONFIG.XJZL.encounter.supportPermissions),
       damageTypes: choiceMap(Object.fromEntries(Object.entries(CONFIG.XJZL.damageTypes).filter(([key]) => key !== "none")))
     };
-    context.system.fieldEffects = source.fieldEffects.map((effect, index) => ({
-      ...effect,
-      index,
-      displayOrder: String(index + 1).padStart(2, "0"),
-      showTriggerValue: ["specificRoundStart", "intervalRoundStart"].includes(effect.trigger),
-      showAmount: effect.automationType !== "description",
-      showDamageType: effect.automationType === "damage",
-      formulaError: this._validateFormula(effect)
-    }));
-    context.system.support.groups = source.support.groups.map((group, groupIndex) => ({
-      ...group,
-      groupIndex,
-      displayOrder: String(groupIndex + 1).padStart(2, "0"),
-      displayName: group.name || game.i18n.format("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
-      npcs: group.npcs.map((npc, npcIndex) => this._prepareNpc(npc, groupIndex, npcIndex))
-    }));
+    context.system.fieldEffects = source.fieldEffects.map((effect, index) => {
+      const collapseKey = `field:${effect.id}`;
+      return {
+        ...effect,
+        index,
+        collapseKey,
+        collapsed: this.collapsedEntries.has(collapseKey),
+        displayOrder: String(index + 1).padStart(2, "0"),
+        showTriggerValue: ["specificRoundStart", "intervalRoundStart"].includes(effect.trigger),
+        showAmount: effect.automationType !== "description",
+        showDamageType: effect.automationType === "damage",
+        formulaError: this._validateFormula(effect)
+      };
+    });
+    context.system.support.groups = source.support.groups.map((group, groupIndex) => {
+      const collapseKey = `group:${group.id}`;
+      return {
+        ...group,
+        groupIndex,
+        collapseKey,
+        collapsed: this.collapsedEntries.has(collapseKey),
+        displayOrder: String(groupIndex + 1).padStart(2, "0"),
+        displayName: group.name || game.i18n.format("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
+        npcs: group.npcs.map((npc, npcIndex) => this._prepareNpc(npc, groupIndex, npcIndex))
+      };
+    });
     const groups = context.system.support.groups;
     context.summary = {
       enabledFieldCount: context.system.fieldEffects.filter(effect => effect.enabled).length,
@@ -98,23 +112,45 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
   _prepareNpc(npc, groupIndex, npcIndex) {
     const resolved = npc.sourceActorUuid ? fromUuidSync(npc.sourceActorUuid) : null;
     const actor = resolved instanceof Actor && resolved.pack == null && resolved.parent == null ? resolved : null;
+    const collapseKey = `npc:${npc.id}`;
     return {
       ...npc,
       groupIndex,
       npcIndex,
+      collapseKey,
+      collapsed: this.collapsedEntries.has(collapseKey),
       actorName: actor?.name || "",
       actorImg: actor?.img || "",
       actorMissing: Boolean(npc.sourceActorUuid && !actor),
-      actions: npc.actions.map((action, actionIndex) => ({
-        ...action,
-        actionIndex,
-        displayOrder: String(actionIndex + 1).padStart(2, "0"),
-        showMaxTargets: action.targetMode === "selected",
-        showAmount: action.automationType !== "description",
-        showDamageType: action.automationType === "damage",
-        formulaError: this._validateFormula(action)
-      }))
+      actions: npc.actions.map((action, actionIndex) => {
+        const actionCollapseKey = `action:${action.id}`;
+        return {
+          ...action,
+          actionIndex,
+          collapseKey: actionCollapseKey,
+          collapsed: this.collapsedEntries.has(actionCollapseKey),
+          displayOrder: String(actionIndex + 1).padStart(2, "0"),
+          showMaxTargets: action.targetMode === "selected",
+          showAmount: action.automationType !== "description",
+          showDamageType: action.automationType === "damage",
+          formulaError: this._validateFormula(action)
+        };
+      })
     };
+  }
+
+  /** 首次打开 Sheet 时收起已有配置；后续新增或复制的条目保持展开，便于立即编辑。 */
+  _initializeCollapseState(source) {
+    if (this.collapseStateInitialized) return;
+    for (const effect of source.fieldEffects) this.collapsedEntries.add(`field:${effect.id}`);
+    for (const group of source.support.groups) {
+      this.collapsedEntries.add(`group:${group.id}`);
+      for (const npc of group.npcs) {
+        this.collapsedEntries.add(`npc:${npc.id}`);
+        for (const action of npc.actions) this.collapsedEntries.add(`action:${action.id}`);
+      }
+    }
+    this.collapseStateInitialized = true;
   }
 
   _attachPartListeners(partId, htmlElement, options) {
@@ -144,6 +180,28 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
       automation?.addEventListener("change", validate);
       validate();
     }
+  }
+
+  /** 切换单个配置条目的详情区，并保持状态跨表单重渲染。 */
+  _onToggleEntry(event, target) {
+    event.preventDefault();
+    const key = target.dataset.collapseKey;
+    if (!key) return;
+    const collapsed = !this.collapsedEntries.has(key);
+    if (collapsed) this.collapsedEntries.add(key);
+    else this.collapsedEntries.delete(key);
+
+    const entry = target.closest("[data-collapse-entry]");
+    entry?.classList.toggle("is-collapsed", collapsed);
+    const body = entry?.querySelector(":scope > [data-collapse-body]");
+    if (body) body.hidden = collapsed;
+    const label = game.i18n.localize(collapsed ? "XJZL.Encounter.ExpandEntry" : "XJZL.Encounter.CollapseEntry");
+    target.title = label;
+    target.setAttribute("aria-label", label);
+    target.setAttribute("aria-expanded", String(!collapsed));
+    const icon = target.querySelector("i");
+    icon?.classList.toggle("fa-chevron-right", collapsed);
+    icon?.classList.toggle("fa-chevron-down", !collapsed);
   }
 
   /**

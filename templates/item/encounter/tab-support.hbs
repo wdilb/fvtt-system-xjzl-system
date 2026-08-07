@@ -10,12 +10,13 @@
 
   <div class="support-group-stack">
     {{#each system.support.groups as |group|}}
-    <article class="support-group-card {{#unless group.enabled}}is-disabled{{/unless}}">
+    <article class="support-group-card {{#unless group.enabled}}is-disabled{{/unless}} {{#if group.collapsed}}is-collapsed{{/if}}" data-collapse-entry>
       <header class="support-group-command">
         <span class="encounter-order">{{group.displayOrder}}</span>
         <div><span>{{localize "XJZL.Encounter.SupportGroup"}}</span><h3>{{group.displayName}}</h3></div>
         <label class="encounter-switch"><input type="checkbox" name="system.support.groups.{{group.groupIndex}}.enabled" {{checked group.enabled}}><span>{{localize "XJZL.Encounter.Enabled"}}</span></label>
         <div class="entry-actions">
+          <button type="button" class="entry-collapse-toggle" data-action="toggleEntry" data-collapse-key="{{group.collapseKey}}" aria-expanded="{{#if group.collapsed}}false{{else}}true{{/if}}" title="{{#if group.collapsed}}{{localize 'XJZL.Encounter.ExpandEntry'}}{{else}}{{localize 'XJZL.Encounter.CollapseEntry'}}{{/if}}"><i class="fas {{#if group.collapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}}"></i></button>
           <button type="button" data-action="moveGroup" data-group-index="{{group.groupIndex}}" data-direction="-1" title="{{localize 'XJZL.Encounter.MoveUp'}}"><i class="fas fa-chevron-up"></i></button>
           <button type="button" data-action="moveGroup" data-group-index="{{group.groupIndex}}" data-direction="1" title="{{localize 'XJZL.Encounter.MoveDown'}}"><i class="fas fa-chevron-down"></i></button>
           <button type="button" data-action="copyGroup" data-group-index="{{group.groupIndex}}" title="{{localize 'XJZL.Encounter.Copy'}}"><i class="fas fa-copy"></i></button>
@@ -23,6 +24,7 @@
         </div>
       </header>
 
+      <div class="encounter-collapse-body" data-collapse-body {{#if group.collapsed}}hidden{{/if}}>
       <input type="hidden" name="system.support.groups.{{group.groupIndex}}.id" value="{{group.id}}">
       <section class="support-policy">
         <div class="policy-heading"><i class="fas fa-diagram-project"></i><div><b>{{localize "XJZL.Encounter.GroupProtocol"}}</b><small>{{localize "XJZL.Encounter.GroupProtocolHint"}}</small></div></div>
@@ -45,12 +47,13 @@
 
       <div class="encounter-stack group-npc-stack">
         {{#each group.npcs as |npc|}}
-        <article class="encounter-entry support-npc {{#unless npc.enabled}}is-disabled{{/unless}}">
+        <article class="encounter-entry support-npc {{#unless npc.enabled}}is-disabled{{/unless}} {{#if npc.collapsed}}is-collapsed{{/if}}" data-collapse-entry>
           <header class="entry-command npc-command">
             {{#if npc.actorImg}}<img src="{{npc.actorImg}}" alt="">{{else}}<span class="npc-sigil" aria-hidden="true"><i class="fas fa-user"></i></span>{{/if}}
             <div class="npc-heading"><span>{{#if npc.actorName}}{{localize "XJZL.Encounter.LinkedActor"}}{{else}}{{localize "XJZL.Encounter.UnlinkedActor"}}{{/if}}</span><strong>{{#if npc.actorName}}{{npc.actorName}}{{else}}{{npc.manualName}}{{/if}}</strong>{{#if npc.actorMissing}}<small class="warning"><i class="fas fa-triangle-exclamation"></i>{{localize "XJZL.Encounter.ActorMissing"}}</small>{{/if}}</div>
             <label class="encounter-switch"><input type="checkbox" name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.enabled" {{checked npc.enabled}}><span>{{localize "XJZL.Encounter.Enabled"}}</span></label>
             <div class="entry-actions">
+              <button type="button" class="entry-collapse-toggle" data-action="toggleEntry" data-collapse-key="{{npc.collapseKey}}" aria-expanded="{{#if npc.collapsed}}false{{else}}true{{/if}}" title="{{#if npc.collapsed}}{{localize 'XJZL.Encounter.ExpandEntry'}}{{else}}{{localize 'XJZL.Encounter.CollapseEntry'}}{{/if}}"><i class="fas {{#if npc.collapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}}"></i></button>
               <button type="button" data-action="moveNpc" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}" data-direction="-1" title="{{localize 'XJZL.Encounter.MoveUp'}}"><i class="fas fa-chevron-up"></i></button>
               <button type="button" data-action="moveNpc" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}" data-direction="1" title="{{localize 'XJZL.Encounter.MoveDown'}}"><i class="fas fa-chevron-down"></i></button>
               <button type="button" data-action="copyNpc" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}" title="{{localize 'XJZL.Encounter.Copy'}}"><i class="fas fa-copy"></i></button>
@@ -58,6 +61,7 @@
             </div>
           </header>
 
+          <div class="encounter-collapse-body" data-collapse-body {{#if npc.collapsed}}hidden{{/if}}>
           <input type="hidden" name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.id" value="{{npc.id}}">
           <input type="hidden" name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.sourceActorUuid" value="{{npc.sourceActorUuid}}">
           <div class="npc-identity-grid">
@@ -70,19 +74,21 @@
           <div class="action-heading"><div><span>{{localize "XJZL.Encounter.ActionProtocol"}}</span><b>{{localize "XJZL.Encounter.SupportActions"}}</b></div><button type="button" data-action="addAction" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}"><i class="fas fa-plus"></i>{{localize "XJZL.Encounter.AddAction"}}</button></div>
           <div class="support-action-stack">
             {{#each npc.actions as |action|}}
-            <section class="support-action {{#unless action.enabled}}is-disabled{{/unless}}" data-encounter-entry>
+            <section class="support-action {{#unless action.enabled}}is-disabled{{/unless}} {{#if action.collapsed}}is-collapsed{{/if}}" data-encounter-entry data-collapse-entry>
               <div class="action-title">
                 <span class="action-order">{{action.displayOrder}}</span>
                 <input type="hidden" name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.actions.{{action.actionIndex}}.id" value="{{action.id}}">
                 <input type="text" name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.actions.{{action.actionIndex}}.name" value="{{action.name}}" aria-label="{{localize 'XJZL.Encounter.Name'}}">
                 <label class="encounter-switch"><input type="checkbox" name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.actions.{{action.actionIndex}}.enabled" {{checked action.enabled}}><span>{{localize "XJZL.Encounter.Enabled"}}</span></label>
                 <div class="entry-actions">
+                  <button type="button" class="entry-collapse-toggle" data-action="toggleEntry" data-collapse-key="{{action.collapseKey}}" aria-expanded="{{#if action.collapsed}}false{{else}}true{{/if}}" title="{{#if action.collapsed}}{{localize 'XJZL.Encounter.ExpandEntry'}}{{else}}{{localize 'XJZL.Encounter.CollapseEntry'}}{{/if}}"><i class="fas {{#if action.collapsed}}fa-chevron-right{{else}}fa-chevron-down{{/if}}"></i></button>
                   <button type="button" data-action="moveAction" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}" data-action-index="{{action.actionIndex}}" data-direction="-1" title="{{localize 'XJZL.Encounter.MoveUp'}}"><i class="fas fa-chevron-up"></i></button>
                   <button type="button" data-action="moveAction" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}" data-action-index="{{action.actionIndex}}" data-direction="1" title="{{localize 'XJZL.Encounter.MoveDown'}}"><i class="fas fa-chevron-down"></i></button>
                   <button type="button" data-action="copyAction" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}" data-action-index="{{action.actionIndex}}" title="{{localize 'XJZL.Encounter.Copy'}}"><i class="fas fa-copy"></i></button>
                   <button type="button" class="danger" data-action="deleteAction" data-group-index="{{group.groupIndex}}" data-npc-index="{{npc.npcIndex}}" data-action-index="{{action.actionIndex}}" title="{{localize 'XJZL.UI.Delete'}}"><i class="fas fa-trash"></i></button>
                 </div>
               </div>
+              <div class="encounter-collapse-body" data-collapse-body {{#if action.collapsed}}hidden{{/if}}>
               <div class="action-rule-grid">
                 <label class="encounter-field"><span>{{localize "XJZL.Encounter.TargetMode"}}</span><select data-target-control name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.actions.{{action.actionIndex}}.targetMode">{{selectOptions @root.choices.actionTargets selected=action.targetMode}}</select><small>{{localize "XJZL.Encounter.ActionTargetHint"}}</small></label>
                 <label class="encounter-field" data-show-target="selected" {{#unless action.showMaxTargets}}hidden{{/unless}}><span>{{localize "XJZL.Encounter.MaxTargets"}}</span><input type="number" min="0" step="1" name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.actions.{{action.actionIndex}}.maxTargets" value="{{action.maxTargets}}"><small>{{localize "XJZL.Encounter.MaxTargetsHint"}}</small></label>
@@ -91,11 +97,14 @@
                 <label class="encounter-field" data-show-automation="damage" {{#unless action.showDamageType}}hidden{{/unless}}><span>{{localize "XJZL.Encounter.DamageType"}}</span><select name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.actions.{{action.actionIndex}}.damageType">{{selectOptions @root.choices.damageTypes selected=action.damageType}}</select><small>{{localize "XJZL.Encounter.DamageTypeHint"}}</small></label>
               </div>
               <label class="encounter-field encounter-description compact"><span>{{localize "XJZL.Encounter.Description"}}</span><textarea name="system.support.groups.{{group.groupIndex}}.npcs.{{npc.npcIndex}}.actions.{{action.actionIndex}}.description">{{action.description}}</textarea><small>{{localize "XJZL.Encounter.ActionDescriptionHint"}}</small></label>
+              </div>
             </section>
             {{else}}<div class="action-empty">{{localize "XJZL.Encounter.NoActions"}}</div>{{/each}}
           </div>
+          </div>
         </article>
         {{else}}<div class="group-empty"><i class="fas fa-user-plus"></i><b>{{localize "XJZL.Encounter.NoGroupNpcs"}}</b><span>{{localize "XJZL.Encounter.NoGroupNpcsHint"}}</span></div>{{/each}}
+      </div>
       </div>
     </article>
     {{else}}

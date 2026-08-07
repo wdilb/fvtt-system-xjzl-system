@@ -1241,6 +1241,15 @@ function renderEncounterTrackerControls(app, html) {
 
 Hooks.on("renderCombatTracker", renderEncounterTrackerControls);
 Hooks.on("renderCombatTrackerHTML", renderEncounterTrackerControls);
+// 未关联入口依赖世界级战局 Item；删除最后一个时立即清理，避免留下失效按钮。
+Hooks.on("deleteItem", item => {
+  if (item.type !== "encounter" || item.parent) return;
+  const hasRemainingEncounter = game.items.some(entry => entry.type === "encounter" && entry.id !== item.id);
+  if (hasRemainingEncounter) return;
+  for (const controls of document.querySelectorAll(".xjzl-encounter-tracker-controls")) {
+    if (!controls.querySelector(".encounter-linked")) controls.remove();
+  }
+});
 Hooks.on("updateCombatant", combatant => {
   if (combatant.combat) Hooks.callAll("xjzl.encounterUpdated", combatant.combat);
 });
