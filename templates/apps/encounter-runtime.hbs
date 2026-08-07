@@ -1,7 +1,7 @@
 <div class="encounter-hud-shell {{#if compact}}is-compact{{else}}is-detailed{{/if}}" data-application-part="main">
   {{#if linked}}
   <header class="hud-command-deck">
-    <div class="hud-crest" aria-hidden="true">局</div>
+    {{#unless compact}}<div class="hud-crest" aria-hidden="true">局</div>{{/unless}}
     <div class="hud-identity"><span>{{combat.name}}</span><h1>{{state.name}}</h1></div>
     <div class="hud-round"><i></i><span>{{localize "XJZL.Encounter.Round"}}</span><b>{{combat.round}}</b></div>
     <button type="button" class="hud-mode-toggle" data-action="toggleViewMode" title="{{#if compact}}{{localize 'XJZL.Encounter.SwitchDetailed'}}{{else}}{{localize 'XJZL.Encounter.SwitchCompact'}}{{/if}}"><i class="fas {{#if compact}}fa-sliders{{else}}fa-compress{{/if}}"></i></button>
@@ -16,20 +16,47 @@
   </header>
 
   {{#if compact}}
-  <main class="encounter-runtime-body compact-runtime-body tactical-ribbon" aria-live="polite">
+  <main class="encounter-runtime-body compact-runtime-body meridian-layout" aria-live="polite">
     {{#if state.fieldEffects.length}}
-    <section class="tactical-band field-orbit"><span class="band-mark"><i class="fas fa-mountain"></i></span><div class="effect-orbit-list">
-      {{#each state.fieldEffects as |effect|}}<span class="tactical-orb-wrap {{#unless effect.enabled}}is-disabled{{/unless}}"><button type="button" class="tactical-orb field-orb" data-action="{{#if ../isGM}}executeEffect{{else}}viewDescription{{/if}}" data-effect-id="{{effect.id}}" aria-label="{{effect.name}}"><i class="fas {{effect.iconClass}}"></i><span class="orb-lamp"></span></button><span class="tactical-popover field-popover"><em>{{effect.triggerLabel}}</em><b>{{effect.name}}</b><small>{{effect.nextTrigger}}</small><p>{{effect.descriptionText}}</p><span>{{effect.targetNames}} · {{effect.automationLabel}}{{#if effect.damageTypeLabel}} · {{effect.damageTypeLabel}}{{/if}}</span>{{#if effect.hasAmount}}<strong>{{effect.currentAmount}}</strong>{{/if}}</span></span>{{/each}}
-    </div></section>
+    <section class="meridian-rail field-meridian" aria-label="{{localize 'XJZL.Encounter.FieldEffects'}}">
+      <div class="meridian-nodes effect-orbit-list">
+        {{#each state.fieldEffects as |effect|}}
+        <span class="tactical-orb-wrap {{#unless effect.enabled}}is-disabled{{/unless}}">
+          <button type="button" class="tactical-orb field-orb" data-action="{{#if ../isGM}}executeEffect{{else}}viewDescription{{/if}}" data-effect-id="{{effect.id}}" aria-label="{{effect.name}}">
+            <i class="fas {{effect.iconClass}}"></i><span class="orb-lamp"></span>
+          </button>
+          <span class="tactical-popover field-popover"><em>{{effect.triggerLabel}}</em><b>{{effect.name}}</b><small>{{effect.nextTrigger}}</small><p>{{effect.descriptionText}}</p><span>{{effect.targetNames}} · {{effect.automationLabel}}{{#if effect.damageTypeLabel}} · {{effect.damageTypeLabel}}{{/if}}</span>{{#if effect.hasAmount}}<strong>{{effect.currentAmount}}</strong>{{/if}}</span>
+        </span>
+        {{/each}}
+      </div>
+    </section>
     {{/if}}
 
     {{#if canUseSupport}}
-    <section class="support-dock">
-      {{#each state.support.groups as |group|}}<div class="support-dock-group"><header><span>{{group.displayName}}</span><small>{{group.availableCount}} / {{group.npcs.length}}</small></header><div class="support-pod-list">
-        {{#each group.npcs as |npc|}}<article class="support-pod {{#if npc.available}}is-available{{else}}is-unavailable{{/if}}"><span class="pod-portrait">{{#if npc.snapshotImg}}<img src="{{npc.snapshotImg}}" alt="">{{else}}<i class="fas fa-user"></i>{{/if}}<i class="pod-lamp"></i><span class="npc-popover tactical-popover"><em>{{group.displayName}}</em><b>{{npc.snapshotName}}</b><small>{{npc.availabilityLabel}}</small><span>{{npc.descriptionText}}</span></span></span><div class="pod-command"><b>{{npc.snapshotName}}</b><div class="pod-action-row">
-          {{#each npc.actions as |action|}}<span class="action-orb-wrap"><button type="button" class="action-orb {{#if action.usable}}is-ready{{else}}is-locked{{/if}}" data-action="useSupport" data-quick-use="true" data-group-id="{{group.id}}" data-npc-id="{{npc.id}}" data-action-id="{{action.id}}" aria-label="{{action.name}}" {{#unless action.usable}}disabled{{/unless}}><i class="fas {{action.iconClass}}"></i></button><span class="action-popover tactical-popover"><em>{{action.automationLabel}} · {{action.targetLabel}}</em><b>{{action.name}}</b><small>{{action.availabilityLabel}}</small><span>{{action.descriptionText}}</span></span></span>{{else}}<i class="no-action-mark fas fa-minus"></i>{{/each}}
-        </div></div></article>{{/each}}
-      </div></div>{{/each}}
+    <section class="meridian-rail support-meridian" aria-label="{{localize 'XJZL.Encounter.SupportEffects'}}">
+      <div class="meridian-nodes support-pod-list">
+        {{#each state.support.groups as |group|}}
+        <div class="support-meridian-group">
+          {{#each group.npcs as |npc|}}
+          <article class="support-pod {{#if npc.available}}is-available{{else}}is-unavailable{{/if}}">
+            <span class="pod-portrait" tabindex="0" role="group" aria-label="{{npc.snapshotName}}">
+              <span class="pod-image-frame">{{#if npc.snapshotImg}}<img src="{{npc.snapshotImg}}" alt="">{{else}}<i class="fas fa-user"></i>{{/if}}</span><i class="pod-lamp"></i>
+              <span class="npc-popover tactical-popover">
+                <em>{{group.displayName}} · {{group.availableCount}} / {{group.npcs.length}}</em><b>{{npc.snapshotName}}</b><small>{{npc.availabilityLabel}}</small><span>{{npc.descriptionText}}</span>
+                <span class="npc-hover-actions">
+                  {{#each npc.actions as |action|}}
+                  <button type="button" class="npc-hover-action {{#if action.usable}}is-ready{{else}}is-locked{{/if}}" data-action="useSupport" data-quick-use="true" data-group-id="{{group.id}}" data-npc-id="{{npc.id}}" data-action-id="{{action.id}}" title="{{action.availabilityLabel}}" {{#unless action.usable}}disabled{{/unless}}>
+                    <i class="fas {{action.iconClass}}"></i><span><b>{{action.name}}</b><small>{{action.automationLabel}} · {{action.targetLabel}}</small>{{#if action.descriptionText}}<em>{{action.descriptionText}}</em>{{/if}}</span>
+                  </button>
+                  {{else}}<i class="no-action-mark fas fa-minus"></i>{{/each}}
+                </span>
+              </span>
+            </span>
+          </article>
+          {{/each}}
+        </div>
+        {{/each}}
+      </div>
     </section>
     {{/if}}
   </main>

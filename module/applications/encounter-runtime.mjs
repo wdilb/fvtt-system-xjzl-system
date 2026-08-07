@@ -23,7 +23,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     id: "xjzl-encounter-runtime",
     tag: "div",
     classes: ["xjzl-encounter-runtime"],
-    position: { width: 450, height: "auto" },
+    position: { width: 132, height: "auto" },
     window: { title: "XJZL.Encounter.BattleSituation", icon: "fas fa-shield", resizable: false, minimizable: false },
     actions: {
       linkEncounter: EncounterRuntimeApp.prototype._onLinkEncounter,
@@ -70,7 +70,8 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
       app = new this({
         combatId: combat.id,
         position: {
-          left: Math.max(16, window.innerWidth - 788),
+          // 预留详细模式的展开宽度，避免从极简态切换时窗体越出画布右侧。
+          left: Math.max(16, window.innerWidth - 650),
           top: 72
         }
       });
@@ -261,7 +262,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
 
   async _onToggleViewMode() {
     this.viewMode = this.viewMode === "compact" ? "detailed" : "compact";
-    const width = this.viewMode === "compact" ? 450 : 600;
+    const width = this.viewMode === "compact" ? 132 : 600;
     this.render({ force: true, position: { width, height: "auto" } });
   }
 
