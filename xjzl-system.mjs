@@ -1201,15 +1201,20 @@ Hooks.on("createCombatant", async (combatant, options, userId) => {
 });
 
 /**
- * 在 V13 战斗追踪器中渲染紧凑入口：已关联时打开 HUD；存在战局 Item 且未开战时才允许 GM 关联。
+ * 在 V13 战斗追踪器中同步紧凑入口：先移除上次插入的控件，再按当前状态判断是否重建。
+ * 每次渲染幂等清理，保证删除战斗、解绑或删除源战局后旧按钮不会残留。
  */
 function renderEncounterTrackerControls(app, html) {
   const root = html instanceof HTMLElement ? html : html?.[0];
+  if (!root) return;
   const combat = app.viewed ?? game.combat;
-  if (!root || !combat || root.querySelector(".xjzl-encounter-tracker-controls")) return;
+  root.querySelectorAll(".xjzl-encounter-tracker-controls").forEach(node => node.remove());
+  if (!combat) return;
   const state = EncounterManager.getState(combat);
   const controls = document.createElement("div");
   controls.className = "xjzl-encounter-tracker-controls";
+  controls.dataset.combatId = combat.id;
+  // 战斗关联的是源 Item 的独立快照副本，因此已关联入口只以 flag 状态为准，不依赖源 Item 是否仍存在。
   if (state?.status === "linked") {
     const battle = document.createElement("button");
     battle.type = "button";
@@ -1241,7 +1246,8 @@ function renderEncounterTrackerControls(app, html) {
 
 Hooks.on("renderCombatTracker", renderEncounterTrackerControls);
 Hooks.on("renderCombatTrackerHTML", renderEncounterTrackerControls);
-// 未关联入口依赖世界级战局 Item；删除最后一个时立即清理，避免留下失效按钮。
+// 删除战局 Item 时只清理“未关联”的失效按钮；已关联战斗持有独立快照副本，不受源 Item 删除影响。
+// 保留 linked 按钮是为了让已关联战斗的战局副本继续可访问、可运行。
 Hooks.on("deleteItem", item => {
   if (item.type !== "encounter" || item.parent) return;
   const hasRemainingEncounter = game.items.some(entry => entry.type === "encounter" && entry.id !== item.id);
@@ -1439,6 +1445,8 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
 Hooks.on("deleteCombat", async (combat, options, userId) => {
   EncounterRuntimeApp.closeForCombat(combat);
   EncounterManager.cleanupCombat(combat);
+  // 主动移除该战斗的追踪器入口，避免依赖 tracker 重渲染导致按钮残留。
+  document.querySelectorAll(`.xjzl-encounter-tracker-controls[data-combat-id="${combat.id}"]`).forEach(node => node.remove());
 
   // 这里确保只让“触发删除操作的用户（通常是GM）”来执行数据库写操作，防止并发冲突。
   if (game.user.id !== userId) return;
