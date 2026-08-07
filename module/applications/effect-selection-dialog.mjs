@@ -20,8 +20,8 @@ const STATUS_CATEGORIES = [
     { id: "control", label: "控制", icon: "fas fa-hand", ids: ["dianxue", "xuanyun", "stun", "root", "fushen", "prone", "zuidao", "blind", "deaf"] },
     { id: "seal", label: "封招", icon: "fas fa-ban", ids: ["jinxu", "jinshi", "jinfan", "jinqi", "jinjue", "fengzhao", "jiaoxie"] },
     { id: "resource", label: "封锁", icon: "fas fa-lock", ids: ["bunu", "jinliao", "qizhi", "poyi", "fatigue", "hunger"] },
-    { id: "buff", label: "增益", icon: "fas fa-arrow-trend-up", ids: ["yangxue", "juqi", "chengfeng", "gangjin", "mianjin", "panshi", "hushen", "xujin", "yanli", "qingling", "jinli", "wuqishi", "jinqi_stack", "wutong"] },
-    { id: "debuff", label: "减益", icon: "fas fa-arrow-trend-down", ids: ["qixu", "tuoli", "cuoluan", "youyu", "yudun", "shizhun", "benzhuo", "fali", "chanshou", "yishang", "unstable", "chizhi", "rage", "zibi"] },
+    { id: "buff", label: "增益", icon: "fas fa-arrow-trend-up", ids: ["yangxue", "juqi", "chengfeng", "gangjin", "mianjin", "panshi", "hushen", "xujin", "yanli", "qingling", "jinli", "wuqishi", "jinqi_stack", "wutong", "lianji", "yanzhan"] },
+    { id: "debuff", label: "减益", icon: "fas fa-arrow-trend-down", ids: ["qixu", "tuoli", "cuoluan", "youyu", "yudun", "shizhun", "benzhuo", "fali", "chanshou", "yishang", "pojia", "unstable", "chizhi", "rage", "zibi"] },
     { id: "scene", label: "场上特效", icon: "fas fa-location-dot", ids: [] },
     { id: "all", label: "全部", icon: "fas fa-border-all", ids: [] }
 ];
