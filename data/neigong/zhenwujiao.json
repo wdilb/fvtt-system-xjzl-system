@@ -771,7 +771,7 @@
             "sect": "zhenwujiao",
             "description": "正一道顶级功法，阐述“正以治邪，一以统万”，以道家玄学思想包罗万象，为张天师所创。此功法注重内炼，需静存元神，采日、月、星三光之气纳入己身，炼至大成时天地感召，长生不老。",
             "requirement": "悟性 11",
-            "automationNote": "部分自动化。耗内回血完全自动化；“正一”状态需玩家在气血低于50%时手动开启（已内置AE），开启后属性加成与命中施加迟滞完全自动。",
+            "automationNote": "部分自动化。系统按本次实际内力消耗自动回血；“正一”状态需玩家在气血低于50%时手动开启（已内置AE），开启后属性加成与命中施加一回合迟滞自动。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -789,7 +789,7 @@
                             "label": "耗内回血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 估算净消耗：招式消耗 - 减耗\nconst cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\n// 只有确实产生了消耗才回血\nif (cost > 0) {\n    await actor.applyHealing({ healer: actor,  amount: 5, type: 'hp' });\n}"
+                            "script": "// costConsumed 是资源流水线记录的实际扣除值，可覆盖动态消耗与免消耗情况。\nif ((args.costConsumed?.mp || 0) > 0) {\n    await actor.applyHealing({ healer: actor, amount: 5, type: 'hp' });\n}"
                         }
                     ]
                 },
@@ -809,7 +809,7 @@
                             "label": "耗内回血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ healer: actor,  amount: 10, type: 'hp' });\n}"
+                            "script": "if ((args.costConsumed?.mp || 0) > 0) {\n    await actor.applyHealing({ healer: actor, amount: 10, type: 'hp' });\n}"
                         }
                     ]
                 },
@@ -829,7 +829,7 @@
                             "label": "耗内回血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const cost = Math.max(0, (args.move.currentCost?.mp || 0) - (S.combat.costs.neili.total || 0));\nif (cost > 0) {\n    await actor.applyHealing({ healer: actor,  amount: 20, type: 'hp' });\n}"
+                            "script": "if ((args.costConsumed?.mp || 0) > 0) {\n    await actor.applyHealing({ healer: actor, amount: 20, type: 'hp' });\n}"
                         }
                     ]
                 }
@@ -860,6 +860,7 @@
             {
                 "name": "正一",
                 "icon": "systems/xjzl-system/assets/icons/neigong/真武.png",
+                "transfer": true,
                 "disabled": true,
                 "description": "格挡值和招式伤害提高10点；出招命中目标后，还会为其添加一回合“迟滞”。",
                 "changes": [
@@ -876,12 +877,14 @@
                 ],
                 "flags": {
                     "xjzl-system": {
+                        "slug": "neigong_zhengyi",
+                        "stackable": false,
                         "scripts": [
                             {
                                 "label": "正一·迟滞",
                                 "trigger": "hit",
                                 "active": true,
-                                "script": "// 必须是攻击且命中\nif (args.actionType === 'attack' && args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"chizhi\", true);\n    ui.notifications.info(`${actor.name} 正一显威，使目标迟滞！`);\n}"
+                                "script": "if (args.actionType !== 'attack' || !args.isHit || !args.target) return;\nconst source = CONFIG.statusEffects.find(e => e.id === 'chizhi');\nif (!source) return;\nconst effect = foundry.utils.deepClone(source);\neffect.duration = { rounds: 1 };\neffect.origin = thisEffect.origin || actor.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, effect);\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #4f6d9a;\"><b>正一：</b>${args.target.name} 获得一回合【迟滞】。</div></div>`\n});"
                             }
                         ]
                     }
