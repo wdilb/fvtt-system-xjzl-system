@@ -268,6 +268,8 @@ await Macros.requestSave({
         *   `mp` (Number): 预计消耗的内力（不能小于0）。
         *   `hp` (Number): 预计消耗的气血（不能小于0）。
         *   `rage` (Number): 预计消耗的怒气（不能小于0）。
+    *   `abort` (Bool, **可修改**): 设为 `true` 时，在余额检查、资源及动作扣除前安全中止本次出招。
+    *   `abortReason` (String, **可修改**): 中止时仅向操作者显示的提示文本；留空则静默取消。
 
 #### 🎯 `check` (检定修正/比对)
 *   **时机**: 掷骰前，针对**每一个目标**分别运行。
@@ -575,7 +577,9 @@ await Macros.requestSave({
 | `onFail` / `onSuccess` | String/Object/Array | **(可选)** 失败/成功时自动应用的状态。支持系统预设 ID (如 `"dianxue"`) 或自定义 AE 数据对象。 |
 | `damageOnFail` / `damageOnSuccess` | Object | **(可选)** 失败/成功时的后果。结构: `{ value: 10, type: "..." }`。<br>• 若 `type` 为资源 (`"hp"`, `"mp"`, `"tili"`)：**直接流失**，无视护甲抗性。<br>• 若 `type` 为伤害 (`"poison"`, `"waigong"`)：**造成伤害**，正常计算目标抗性和护体抵扣。 |
 | `successText` / `failureText` | String | **(可选)** 成功/失败时的自定义战报提示文本。 |
-| `removeStanceOnSuccess` / `removeStanceOnFail` | Boolean | **(可选)** 在对应检定结果出现时解除检定者当前架招。 |
+| `removeStanceOnSuccess` / `removeStanceOnFail` | Boolean | **(可选)** 在对应检定结果出现时通过 `actor.stopStance()` 解除检定者当前架招，并清理其 `tiedToStance` AE。默认 `false`。 |
+
+自动后果的执行顺序为：应用 `onSuccess` / `onFail` 状态 → 结算对应伤害或资源流失 → 解除架招。角色当时没有开启架招时，解除参数不会产生额外效果。
 
 **示例: 剧毒陷阱 (失败中毒，成功伤害减半)**:
 ```javascript
@@ -596,6 +600,19 @@ await Macros.requestSave({
     // 成功后果：抵抗了毒素状态，仅受到一半毒伤
     damageOnSuccess: { value: 10, type: "poison" },
     successText: "屏气凝神，抵挡了大部分毒气。"
+});
+```
+
+**示例：检定失败后解除架招**
+```javascript
+await Macros.requestSave({
+    target: args.target,
+    attacker: actor,
+    type: "renxing",
+    dc: 15,
+    label: "击破架招检定",
+    removeStanceOnFail: true,
+    failureText: "韧性检定失败，当前架招解除。"
 });
 ```
 
