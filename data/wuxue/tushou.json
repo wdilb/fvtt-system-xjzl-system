@@ -9803,7 +9803,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>手指轻拂目标双眼，对目标造成伤害。命中无架招目标时，还会使毒侵入敌人双眼，使对方获得“青花毒”，持续三回合。</p><p><strong>青花毒：</strong>命中-5。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "完全自动化。命中无架招目标自动施加3回合青花毒。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -9818,14 +9818,15 @@
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
                             "label": "施加青花毒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"青花毒\").toObject();\n    eff.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"青花毒\").toObject();\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
                             "active": true
                         }
                     ]
@@ -9840,7 +9841,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>身形若隐若现，开启架招，并且进入“离人”状态，持续到战斗脱离或者被破架招。</p><p><strong>离人：</strong>若敌人有“青花毒”且在你周围 1 米中结束回合，则按照以下三个阶段，向下叠加该敌人身上“青花毒”的效果。</p><p>入体：待一回合，初始阶段，无效果。</p><p>入肌：待二回合，“青花毒”的效果翻倍。</p><p>入骨：待三回合，攻击未命中时，使自身陷入“目盲”状态，持续两回合。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "开启获离人自动。毒素进阶判定需手动。",
+                    "automationNote": "开启获离人自动，被破架招自动移除。毒素进阶判定等复杂环境判定需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -9849,20 +9850,15 @@
                         "mp": [
                             2,
                             4,
-                            6
+                            6,
+                            8
                         ]
                     },
                     "scripts": [
                         {
                             "label": "获得离人",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"离人\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
-                            "active": true
-                        },
-                        {
-                            "label": "移除离人(被破)",
-                            "trigger": "damaged",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.removeEffect(actor, \"liren\");\n}",
+                            "script": "const eff = thisItem.effects.getName(\"离人\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -9878,7 +9874,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>真气凝成针线，刺在伤患各处穴道，回复目标气血（无法造成暴击），场上每有一个人处于“青花毒”状态，该招式可以指定的目标就多一个。</p><p>·此招中的内息是施展本招式者的内息属性。</p><p>·每有 1 级[疗伤]，提高 1 点气血回复。</p><p><strong>升级：</strong>气血回复+10，内力消耗+4。</p>",
-                    "automationNote": "治疗计算自动。多目标选择需手动。",
+                    "automationNote": "治疗与疗伤加成全自动。根据场上青花毒数量选择多目标需玩家手动操作。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -9893,7 +9889,8 @@
                         "mp": [
                             4,
                             8,
-                            12
+                            12,
+                            16
                         ]
                     },
                     "scripts": [
@@ -9916,7 +9913,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>旧愁未去，新恨上心头，对周围敌人造成伤害，并且为其添加“青花毒”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "施加青花毒自动。",
+                    "automationNote": "完全自动化。命中自动施加并覆盖为永久（持续到战斗脱离）的青花毒。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -9931,19 +9928,21 @@
                         "mp": [
                             8,
                             16,
-                            24
+                            24,
+                            32
                         ],
                         "rage": [
                             7,
                             6,
-                            5
+                            5,
+                            4
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "施加青花毒",
+                            "label": "施加永久青花毒",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"青花毒\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"青花毒\").toObject();\n    eff.origin = thisItem.uuid;\n    eff.duration = {}; // 清空持续时间，作为战斗脱离(永久)覆盖原有状态\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
                             "active": true
                         }
                     ]
@@ -9977,12 +9976,13 @@
                 {
                     "name": "离人",
                     "icon": "icons/magic/perception/silhouette-stealth-shadow.webp",
-                    "description": "加速青花毒效果。",
+                    "description": "加速周围敌人青花毒发作。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "liren",
-                            "stackable": false
+                            "stackable": false,
+                            "tiedToStance": true
                         }
                     }
                 }
