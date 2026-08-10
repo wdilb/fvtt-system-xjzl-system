@@ -3116,7 +3116,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，以独特调息心法，将气血和内力按比例互换。可流失当前内力的至多 30%，回复消耗内力值*3 的气血值。</p><p><strong>升级：</strong>可流失的内力上限提高 20%。</p>",
-                    "automationNote": "内力流失上限随等级自动计算。出招时弹窗询问消耗量，确认后自动扣除内力并回复气血。",
+                    "automationNote": "内力流失上限随等级自动计算。出招前弹窗询问消耗量，确认后由统一资源流水线扣除内力并自动回复气血，可正确触发《正一心诀》。",
                     "costs": {
                         "mp": [
                             0,
@@ -3141,10 +3141,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "确定转换消耗",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst limitRatio = Math.min(1, 0.3 + (lvl - 1) * 0.2);\nconst maxDrain = Math.floor(actor.system.resources.mp.value * limitRatio);\nif (maxDrain < 1) {\n    args.abort = true;\n    args.abortReason = '当前内力不足以进行转换。';\n    return;\n}\nconst selected = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '凝神调血' },\n    content: `<div style=\"padding:5px;\"><div class=\"form-group\"><label>流失内力（最多 ${maxDrain}）</label><input type=\"number\" name=\"cost\" min=\"1\" max=\"${maxDrain}\" step=\"1\" value=\"${maxDrain}\" style=\"text-align:center;\"></div></div>`,\n    ok: { label: '确认转换', callback: (event, button) => new FormData(button.form).get('cost') },\n    rejectClose: false\n});\nconst cost = Number.parseInt(selected, 10);\nif (!Number.isInteger(cost) || cost < 1 || cost > maxDrain) {\n    args.abort = true;\n    args.abortReason = selected == null ? '' : `请输入 1 至 ${maxDrain} 的整数。`;\n    return;\n}\n// 动态流失作为本次实际消耗交由统一流水线扣除，内功可从 costConsumed 可靠获知。\nargs.costConfig.mp = cost;\nargs.move.wuxueNingshenDrain = cost;"
+                        },
+                        {
                             "label": "内力化血",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst limitRatio = Math.min(1.0, 0.3 + (lvl - 1) * 0.2);\nconst maxDrain = Math.floor(actor.system.resources.mp.value * limitRatio);\n\nif (maxDrain < 1) {\n    ui.notifications.warn(\"当前内力不足以进行转换。\");\n    args.flags.abort = true;\n    return;\n}\n\nconst dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"凝神调血\" },\n    content: `<div class=\"form-group\"><label>消耗内力 (最大 ${maxDrain})</label><input type=\"number\" name=\"cost\" min=\"1\" max=\"${maxDrain}\" value=\"${maxDrain}\" style=\"text-align:center\"></div>`,\n    ok: { callback: (e, b) => b.form.elements.cost.value }\n});\n\nconst cost = parseInt(dialog) || 0;\nif (cost > 0 && cost <= maxDrain) {\n    const totalHeal = cost * 3;\n    // 扣除内力 (走流失逻辑自带飘字)\n    await actor.applyHealing({ healer: actor,  amount: -cost, type: \"mp\" });\n    // 回复气血\n    await actor.applyHealing({ healer: actor,  amount: totalHeal, type: \"hp\" });\n    \n    // 在卡片上追加显示转换详情\n    args.flags.damageResult.breakdown = `消耗内力: ${cost}\\n回复气血: ${totalHeal}`;\n    // 隐藏后续的“应用效果”按钮\n    args.flags.autoApplied = true;\n} else if (cost > maxDrain) {\n    ui.notifications.warn(`输入的内力超过上限 (${maxDrain})，操作取消。`);\n    args.flags.abort = true;\n} else {\n    ui.notifications.warn(\"操作取消。\");\n    args.flags.abort = true;\n}"
+                            "script": "const cost = args.costConsumed?.mp || args.move.wuxueNingshenDrain || 0;\nif (cost < 1) return;\nconst totalHeal = cost * 3;\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: 'hp' });\nargs.flags.damageResult.breakdown = `流失内力: ${cost}\\n回复气血: ${totalHeal}`;\nargs.flags.autoApplied = true;"
                         }
                     ]
                 }
