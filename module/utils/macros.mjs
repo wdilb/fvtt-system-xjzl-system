@@ -26,8 +26,10 @@ export class XJZLMacros {
      * @param {Number} options.bonus     预设加减值
      * @param {String} [options.successText] 成功时的提示文本
      * @param {String} [options.failureText] 失败时的提示文本
+     * @param {Boolean} [options.removeStanceOnSuccess] 成功时解除检定者的架招
+     * @param {Boolean} [options.removeStanceOnFail] 失败时解除检定者的架招
      */
-    static async requestSave({ target, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText }) {
+    static async requestSave({ target, type, dc, label, onFail, damageOnFail, onSuccess, damageOnSuccess, attacker, level = 0, bonus = 0, successText, failureText, removeStanceOnSuccess = false, removeStanceOnFail = false }) {
         if (!target) return ui.notifications.error("requestSave: 缺少目标 (target)");
         if (!type) return ui.notifications.error("requestSave: 缺少属性类型 (type)");
 
@@ -82,7 +84,9 @@ export class XJZLMacros {
             level: level, //优势劣势等级
             bonus: bonus,
             successText: successText || null,
-            failureText: failureText || null
+            failureText: failureText || null,
+            removeStanceOnSuccess: Boolean(removeStanceOnSuccess),
+            removeStanceOnFail: Boolean(removeStanceOnFail)
         };
 
         // 4. 发送消息

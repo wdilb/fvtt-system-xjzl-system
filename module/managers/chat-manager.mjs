@@ -2096,7 +2096,7 @@ export class ChatCardManager {
         // ==========================================================
         // 内部辅助函数：统一处理 AE 的施加与 伤害/资源的扣除
         // ==========================================================
-        const processEffectsAndDamage = async (effectsConfig, damageConfig) => {
+        const processEffectsAndDamage = async (effectsConfig, damageConfig, removeStance = false) => {
             let html = "";
 
             // --- A. 应用状态 (Effects) ---
@@ -2204,6 +2204,13 @@ export class ChatCardManager {
                     }
                 }
             }
+
+            if (removeStance && actor.system.martial?.stanceActive) {
+                await actor.stopStance();
+                html += `<div style="font-size:0.8em; margin-top:5px; padding:2px; background:rgba(192,57,43,0.1); color:#8b0000; border-radius:4px;">
+                    <i class="fas fa-shield-halved"></i> 架招已解除
+                </div>`;
+            }
             return html;
         };
 
@@ -2227,7 +2234,7 @@ export class ChatCardManager {
                 </div>`;
             }
             // 执行成功的 Effect 与 伤害
-            resultHtml += await processEffectsAndDamage(flags.onSuccess, flags.damageOnSuccess);
+            resultHtml += await processEffectsAndDamage(flags.onSuccess, flags.damageOnSuccess, flags.removeStanceOnSuccess);
 
         } else {
             color = "#c0392b"; // Red
@@ -2245,7 +2252,7 @@ export class ChatCardManager {
                 </div>`;
             }
             // 执行失败的 Effect 与 伤害
-            resultHtml += await processEffectsAndDamage(flags.onFail, flags.damageOnFail);
+            resultHtml += await processEffectsAndDamage(flags.onFail, flags.damageOnFail, flags.removeStanceOnFail);
         }
 
         // 5. 更新卡片 (禁用按钮，显示结果)
