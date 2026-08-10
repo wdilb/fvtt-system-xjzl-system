@@ -1846,11 +1846,17 @@ export class XJZLItem extends Item {
         move: move,
         item: this,
         attacker: actor,
-        costConfig: finalCost // 传入引用，脚本内修改 args.costConfig 即可生效
+        costConfig: finalCost, // 传入引用，脚本内修改 args.costConfig 即可生效
+        abort: false,
+        abortReason: ""
       };
 
       // 异步执行
       await actor.runScripts(SCRIPT_TRIGGERS.PRE_ATTACK, preAttackContext, move);
+      if (preAttackContext.abort) {
+        if (preAttackContext.abortReason) ui.notifications.warn(preAttackContext.abortReason);
+        return;
+      }
       // =====================================================
 
       // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
