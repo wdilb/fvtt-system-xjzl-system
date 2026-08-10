@@ -603,8 +603,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
-                    "description": "<p>当有敌方角色在你的回合对你出招攻击时，你可以消耗蓄力动作，刀如鬼魅，迅速斩出两刀，后发先至，压制目标招式并对目标造成0.7力量点外功伤害，并使目标获得X层“颤手”。<br>·出招后，你可以消耗1层“绵劲”，若如此，你出招后额外获得一个次要动作。（仅可获得一个）<br>·出招后，你可以消耗3层“绵劲”，若如此，你出招后额外获得一个主要动作。（仅可获得一个）<br>颤手：满五层后，手持武器脱手落地（需花费主要动作拾起），并陷入“缴械”一回合，然后移除所有颤手。<br><strong>升级：</strong>施加颤手层数+1，招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "施加颤手自动。获得额外动作手动。",
+                    "description": "<p>当敌人在你的回合对你出招攻击时，你可以消耗蓄力动作，刀如鬼魅，迅速斩出，后发先至，可对目标造成 0.7 力量点外功伤害，同时使他手持的武器脱手落地（需花费主要动作拾起）。</p><p>·出招后，你可以消耗 1 层“绵劲”，若如此，你额外获得一个次要动作（仅可获得一个）。</p><p>·出招后，你可以消耗 3 层“绵劲”，若如此，你额外获得一个主要动作（仅可获得一个）。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "命中结算后发送武器脱手卡片；若有绵劲，弹窗选择消耗1层、3层或4层，自动扣层并在动作追踪器启用时恢复相应动作。拾取武器手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -629,9 +629,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加颤手",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const stacks = 1 + (lvl - 1);\n    const eff = CONFIG.statusEffects.find(e => e.id === 'chanshou');\n    if (eff) await game.xjzl.api.effects.addEffect(args.target, eff, stacks);\n    \n    // 绵劲检测\n    const mianjin = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'mianjin');\n    if (mianjin) {\n        ChatMessage.create({\n            content: `<div class='xjzl-chat-card'><div style='padding:5px;'><b>绵劲追击：</b><br>可消耗 1 层绵劲获得次要动作。<br>可消耗 3 层绵劲获得主要动作。</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
+                            "label": "脱手与绵劲选择",
+                            "trigger": "hit_once",
+                            "script": "if ((args.hitCount || 0) < 1) return;\nconst targetName = args.targets?.[0]?.target?.name || '目标';\nconst mianjin = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'mianjin');\nconst stacks = mianjin ? (mianjin.getFlag('xjzl-system', 'stacks') || 1) : 0;\nlet cost = 0;\nif (stacks > 0) {\n    const options = [`<option value=\"0\">不消耗绵劲</option>`];\n    if (stacks >= 1) options.push(`<option value=\"1\">消耗1层：获得一个次要动作</option>`);\n    if (stacks >= 3) options.push(`<option value=\"3\">消耗3层：获得一个主要动作</option>`);\n    if (stacks >= 4) options.push(`<option value=\"4\">消耗4层：同时获得主要与次要动作</option>`);\n    const selected = await foundry.applications.api.DialogV2.prompt({ window: { title: '双江天堑·绵劲' }, content: `<div style=\"padding:5px;\"><p>当前有 ${stacks} 层【绵劲】，请选择出招后消耗：</p><select name=\"cost\" style=\"width:100%;\">${options.join('')}</select></div>`, ok: { label: '确认', callback: (event, button) => new FormData(button.form).get('cost') }, rejectClose: false });\n    cost = Number.parseInt(selected, 10) || 0;\n}\nif (cost > 0) {\n    await game.xjzl.api.effects.removeEffect(actor, 'mianjin', cost);\n    if (game.settings.get('xjzl-system', 'enableActionTracker')) {\n        if (cost === 1 || cost === 4) await actor.setFlag('xjzl-system', 'actions.minor', true);\n        if (cost === 3 || cost === 4) await actor.setFlag('xjzl-system', 'actions.major', true);\n    }\n}\nconst actionText = cost === 4 ? '，并获得一个主要动作和一个次要动作' : cost === 3 ? '，并获得一个主要动作' : cost === 1 ? '，并获得一个次要动作' : '';\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #34495e;\"><b>双江天堑：</b>${targetName} 手持的武器脱手落地，需花费主要动作拾起${cost > 0 ? `；${actor.name} 消耗 ${cost} 层【绵劲】${actionText}` : ''}。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -668,7 +668,7 @@
                         {
                             "label": "连招提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const mianjin = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'mianjin');\n    if (mianjin) {\n        ui.notifications.info(\"击破且有绵劲！可消耗1层绵劲，飞跃并消耗反应再次施展！\");\n    }\n}",
+                            "script": "if (!args.isBroken) return;\nconst mianjin = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'mianjin');\nif (!mianjin) return;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #34495e;\"><b>绿江流虹：</b>击破架招且持有【绵劲】，可消耗 1 层【绵劲】，飞跃并消耗反应动作再次施展。</div></div>` });",
                             "active": true
                         }
                     ]
