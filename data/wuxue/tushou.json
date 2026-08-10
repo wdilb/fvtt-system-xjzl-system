@@ -9036,7 +9036,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>高呼奉天，开启架招，进入“承运”状态，持续到被击破架招。</p><p><strong>承运：</strong>当你的一个投掷具有优势时，你可以选择消耗承运状态，使此次投掷结果取 20。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "description": "<p>次要动作，高呼奉天，开启架招，进入“承运”状态，持续到被击破架招。</p><p><strong>承运：</strong>当你的一个投掷具有优势时，你可以选择消耗承运状态，使此次投掷结果取 20。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
                     "automationNote": "开启架招获得承运自动。消耗承运改投掷结果需手动。",
                     "calculation": {
                         "base": 0,
@@ -9055,12 +9055,6 @@
                             "trigger": "attack",
                             "script": "const eff = thisItem.effects.getName(\"承运\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
-                        },
-                        {
-                            "label": "移除承运(被破)",
-                            "trigger": "damaged",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.removeEffect(actor, \"chengyun\");\n}",
-                            "active": true
                         }
                     ]
                 },
@@ -9073,7 +9067,7 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>单掌拍出，内力震入敌人体内，造成伤害，击中无架招敌人，代天而行，使其陷入缚身状态，持续一回合。当你处于“承运”状态，你此招的命中具有优势。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "description": "<p>主要动作，单掌拍出，内力震入敌人体内，造成 0.5 内息点内功伤害，击中无架招敌人，代天而行，使其陷入缚身状态，持续一回合。当你处于“承运”状态，你此招的命中具有优势。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
                     "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
@@ -9102,7 +9096,7 @@
                         {
                             "label": "施加缚身",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 陷入缚身！`);\n    }\n}",
+                            "script": "if (!args.isHit || args.target.system.martial.stanceActive) return;\nconst source = CONFIG.statusEffects.find(e => e.id === 'fushen');\nif (!source) return;\nconst effect = foundry.utils.deepClone(source);\neffect.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, effect);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #6b5b95;\"><b>代天行伐：</b>${args.target.name} 陷入一回合【缚身】。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -9141,8 +9135,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破敌人虚招时，可消耗反应动作施展此招，压制对方虚招，拳摆出手，击倒目标，并对其造成伤害，你可以选择不造成伤害，改为对目标进行[点穴]检定，此次检定具有优势。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>当你看破敌人虚招时，可消耗反应动作施展此招，压制对方虚招，拳摆出手，击倒目标，并对其造成 0.6 内息点内功伤害，你可以选择不造成伤害，改为对目标进行[点穴]检定，此次检定具有优势。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击倒自动。命中结算时弹窗选择伤害或优势点穴；点穴检定自动发起，成功后的【点穴】状态由玩家按检定结果手动添加。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -9164,19 +9158,13 @@
                         {
                             "label": "击倒",
                             "trigger": "hit",
-                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"prone\");\nif(eff) await game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "if (!args.isHit) return;\nconst effect = CONFIG.statusEffects.find(e => e.id === 'prone');\nif (effect) await game.xjzl.api.effects.addEffect(args.target, effect);",
                             "active": true
                         },
                         {
                             "label": "点穴选择",
-                            "trigger": "attack",
-                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"臣服万物\" },\n    content: \"<p>是否放弃伤害，改为进行优势[点穴]检定？</p>\",\n    yes: { label: \"改为点穴\" },\n    no: { label: \"造成伤害\" }\n});\n\nif (confirm) {\n    args.flags.damageResult.damage = 0;\n    args.flags.damageResult.breakdown += \"\\n(放弃伤害，转为点穴)\";\n    // 临时标记，供hit阶段读取\n    thisItem.temp_isDianxue = true;\n} else {\n    thisItem.temp_isDianxue = false;\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "执行点穴",
-                            "trigger": "hit",
-                            "script": "if (thisItem.temp_isDianxue) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dianxue\",\n        dc: 15,\n        label: \"臣服万物-点穴\",\n        level: 1,\n        onFail: \"stun\"\n    });\n    thisItem.temp_isDianxue = false; // 重置\n}",
+                            "trigger": "preDamage",
+                            "script": "if (!args.outcome.isHit) return;\nconst usePointStrike = await foundry.applications.api.DialogV2.confirm({\n    window: { title: '臣服万物' },\n    content: `<div style=\"padding:5px;\"><p>是否放弃对 <b>${args.target.name}</b> 造成伤害，改为进行一次具有优势的【点穴】检定？</p></div>`,\n    yes: { label: '放弃伤害，点穴' },\n    no: { label: '正常造成伤害' },\n    rejectClose: false\n});\nif (!usePointStrike) return;\nargs.config.amount = 0;\nawait actor.rollAttributeTest('dianxue', { level: 1 });\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({ actor: actor }),\n    content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #8e44ad;\"><b>臣服万物·点穴：</b>已放弃对 ${args.target.name} 的伤害并进行优势【点穴】检定；请按检定结果手动添加【点穴】状态。</div></div>`\n});",
                             "active": true
                         }
                     ]
@@ -9191,8 +9179,8 @@
                     "range": "4米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>飞身而起（处于半空中），内劲轰击地面，对周围敌人造成伤害，并且击倒所有敌人。</p><p>·若自身处于“承运”状态，你可以选择消耗“承运”状态，获得 2 点怒气。</p><p><strong>升级：</strong>造成伤害+20，内力消耗+8，怒气消耗-1。</p>",
-                    "automationNote": "击倒自动。消耗承运回怒需手动。",
+                    "description": "<p>蓄力动作，飞身而起（处于半空中），内劲轰击地面，对周围敌人造成 0.5 内息点内功伤害，并且击倒所有敌人。</p><p>·若自身处于“承运”状态，你可以选择消耗“承运”状态，获得 2 点怒气。</p><p><strong>升级：</strong>造成伤害+20，内力消耗+8，怒气消耗-1。</p>",
+                    "automationNote": "击倒自动。结算后若有承运，弹窗询问是否消耗并自动回复2怒气。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -9223,9 +9211,9 @@
                             "active": true
                         },
                         {
-                            "label": "提示回怒",
+                            "label": "承运回怒",
                             "trigger": "hit_once",
-                            "script": "const hasStatus = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengyun\");\nif (hasStatus) {\n    ui.notifications.info(\"提示：若消耗 [承运] 状态，请手动增加 2 点怒气。\");\n}",
+                            "script": "const effect = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'chengyun');\nif (!effect) return;\nconst consume = await foundry.applications.api.DialogV2.confirm({ window: { title: '取天代神' }, content: '<p>是否消耗【承运】，获得 2 点怒气？</p>', yes: { label: '消耗并回怒' }, no: { label: '保留承运' }, rejectClose: false });\nif (!consume) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'chengyun');\nawait actor.applyHealing({ healer: actor, amount: 2, type: 'rage' });\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #d4a017;\"><b>取天代神：</b>${actor.name} 消耗【承运】，获得 2 点怒气。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -9240,7 +9228,8 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "chengyun",
-                            "stackable": false
+                            "stackable": false,
+                            "tiedToStance": true
                         }
                     }
                 }
@@ -9267,8 +9256,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>以血气凝恶神于天干，掌风猎猎，对目标造成伤害，若击破架招，你可以给予目标“枭神”状态，持续到战斗脱离。</p><p><strong>枭神：</strong>你的[韧性]检定具有劣势，你受到毒素伤害时伤害额外提高 10 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>主要动作，以血气凝恶神于天干，掌风猎猎，对目标造成 0.4 力量点外功伤害，若击破架招，你可以给予目标“枭神”状态，持续到战斗脱离。</p><p><strong>枭神：</strong>你的[韧性]检定具有劣势，你受到毒素伤害时伤害额外提高 10 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "击破架招后弹窗询问是否施加枭神。韧性劣势与毒素伤害额外提高10点自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -9295,7 +9284,7 @@
                         {
                             "label": "施加枭神",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"枭神\").toObject();\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "if (!args.isBroken) return;\nconst apply = await foundry.applications.api.DialogV2.confirm({ window: { title: '枭神现天干' }, content: `<p>是否给予 ${args.target.name}【枭神】状态？</p>`, yes: { label: '施加枭神' }, no: { label: '不施加' }, rejectClose: false });\nif (!apply) return;\nconst effect = thisItem.effects.getName('枭神').toObject();\nawait game.xjzl.api.effects.addEffect(args.target, effect);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #6a1b9a;\"><b>枭神现天干：</b>${args.target.name} 获得【枭神】。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -9309,7 +9298,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>掌中现血煞，直击心脉，对目标造成伤害。若目标受到此招后气血不足最大气血的 10%，他需要进行一次伤残检定。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "description": "<p>主要动作，掌中现血煞，直击心脉，对目标造成 0.5 力量点外功伤害。若目标受到此招后气血不足最大气血的 10%，他需要进行一次伤残检定。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
                     "automationNote": "伤残检定提示自动。",
                     "calculation": {
                         "base": 0,
@@ -9337,7 +9326,7 @@
                         {
                             "label": "伤残检测",
                             "trigger": "hit",
-                            "script": "const targetHp = args.target.system.resources.hp.value;\nconst targetMax = args.target.system.resources.hp.max;\nif (targetHp < (targetMax * 0.1)) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><p><b>${args.target.name}</b> 气血低于 10%，需进行伤残检定！</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "const targetHp = args.target.system.resources.hp.value;\nconst targetMax = args.target.system.resources.hp.max;\nif (targetHp < targetMax * 0.1) {\n    ChatMessage.create({ content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #8b0000;\"><b>${args.target.name}</b> 气血低于最大气血的 10%，需进行伤残检定。</div></div>`, speaker: ChatMessage.getSpeaker({ actor: actor }) });\n}",
                             "active": true
                         }
                     ]
@@ -9352,7 +9341,7 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>将自身血气化于掌中，双掌齐出，对目标造成伤害，根据目标所运行的内功属性，附加不同的效果。</p><p>阴柔：进行[韧性]检定（难度 @{15 + @up * 2|15}），失败则解除架招。</p><p>阳刚：招式可以攻击目标及其周围 2 米内所有敌人。</p><p>太极：命中后招式伤害变为毒素伤害。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，[韧性]检定难度+2，内力消耗+4。</p>",
+                    "description": "<p>主要动作，将自身血气化于掌中，双掌齐出，对目标造成 0.7 力量点外功伤害，根据目标所运行的内功属性，附加不同的效果。</p><p>阴柔：进行[韧性]检定（难度 @{15 + @up * 2|15}），失败则解除架招。</p><p>阳刚：招式可以攻击目标及其周围 2 米内所有敌人。</p><p>太极：命中后招式伤害变为毒素伤害。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，[韧性]检定难度+2，内力消耗+4。</p>",
                     "automationNote": "太极转毒自动。阴柔检定自动。阳刚AOE手动。",
                     "calculation": {
                         "base": 0,
@@ -9385,13 +9374,13 @@
                         {
                             "label": "太极转毒",
                             "trigger": "preDamage",
-                            "script": "const activeNeigongId = args.target.system.martial.active_neigong;\nif (activeNeigongId) {\n    const neigong = args.target.items.get(activeNeigongId);\n    if (neigong && neigong.system.element === \"taiji\") {\n        args.config.type = \"poison\";\n        ui.notifications.info(\"目标运行太极内功，伤害转为毒素！\");\n    }\n}",
+                            "script": "const activeNeigongId = args.target.system.martial.active_neigong;\nconst neigong = activeNeigongId ? args.target.items.get(activeNeigongId) : null;\nif (neigong?.system.element !== 'taiji') return;\nargs.config.type = 'poison';\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #2e7d32;\"><b>七杀灭生·太极：</b>对 ${args.target.name} 的本次招式伤害转为毒素伤害。</div></div>` });",
                             "active": true
                         },
                         {
                             "label": "属性效果",
                             "trigger": "hit",
-                            "script": "const activeNeigongId = args.target.system.martial.active_neigong;\nif (activeNeigongId) {\n    const neigong = args.target.items.get(activeNeigongId);\n    const elem = neigong ? neigong.system.element : \"none\";\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1) * 2;\n\n    if (elem === \"yin\") {\n        await Macros.requestSave({\n            target: args.target,\n            attacker: actor,\n            type: \"renxing\",\n            dc: dc,\n            label: \"七杀灭生-破架\",\n            onFail: {\n                name: \"架招崩解\",\n                changes: [{ key: \"system.martial.stanceActive\", mode: 5, value: \"false\" }]\n            }\n        });\n    } else if (elem === \"yang\") {\n        ui.notifications.info(\"目标运行阳刚内功，请手动结算周围 2 米 AOE。\");\n    }\n}",
+                            "script": "const activeNeigongId = args.target.system.martial.active_neigong;\nconst neigong = activeNeigongId ? args.target.items.get(activeNeigongId) : null;\nconst elem = neigong?.system.element || 'none';\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst dc = 15 + (lvl - 1) * 2;\nif (['yin', 'rou'].includes(elem)) {\n    await Macros.requestSave({ target: args.target, attacker: actor, type: 'renxing', dc, label: '七杀灭生·解除架招', removeStanceOnFail: true, failureText: '韧性检定失败，当前架招解除。' });\n} else if (['yang', 'gang'].includes(elem)) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #c0392b;\"><b>七杀灭生·阳刚：</b>本招还可攻击 ${args.target.name} 周围 2 米内的所有敌人，请手动补充目标并结算。</div></div>` });\n}",
                             "active": true
                         }
                     ]
@@ -9401,7 +9390,7 @@
                 {
                     "name": "枭神",
                     "icon": "icons/magic/death/skull-horned-goat-purple.webp",
-                    "description": "韧性检定劣势，受毒素伤害+10。",
+                    "description": "你的[韧性]检定具有劣势；受到毒素伤害时伤害额外提高 10 点。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -9410,8 +9399,8 @@
                             "scripts": [
                                 {
                                     "label": "毒素易伤",
-                                    "trigger": "preDefense",
-                                    "script": "if (args.type === \"poison\") {\n    args.baseDamage += 10;\n    ui.notifications.info(`${actor.name} 枭神生效：毒素伤害+10`);\n}",
+                                    "trigger": "preTake",
+                                    "script": "if (args.type !== 'poison') return;\nargs.output.damage += 10;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #6a1b9a;\"><b>枭神：</b>${actor.name} 本次受到的毒素伤害额外提高 10 点。</div></div>` });",
                                     "active": true
                                 }
                             ]
@@ -10730,7 +10719,7 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>双拳高举，挥动如风，舞动成云，对目标造成伤害，若击中无架招的角色，则将自己的“跃龙关”状态，转化为“狴犴”状态，持续到战斗脱离。</p><p><strong>狴犴：</strong>施展《跃龙关》招式时伤害提升 15 点。</p><p><strong>升级：</strong>招式伤害+10，狴犴伤害+5，内力消耗+4。</p>",
+                    "description": "<p>主要动作，双拳高举，挥动如风，舞动成云，对目标造成 0.4 力量+0.3 内息点外功伤害，若击中无架招的角色，则将自己的“跃龙关”状态，转化为“狴犴”状态，持续到战斗脱离。</p><p><strong>狴犴：</strong>施展《跃龙关》招式时伤害提升 @{15 + @up * 5|15} 点。</p><p><strong>升级：</strong>招式伤害+10，狴犴伤害+5，内力消耗+4。</p>",
                     "automationNote": "状态转化自动。伤害加成自动。",
                     "calculation": {
                         "base": 0,
@@ -10756,15 +10745,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "狴犴加成",
-                            "trigger": "calc",
-                            "script": "const bian = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bian\");\nif (bian) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = 15 + (lvl - 1) * 5;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`狴犴加伤 +${bonus}`);\n}",
-                            "active": true
-                        },
-                        {
                             "label": "转化狴犴",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.removeEffect(actor, \"yuelongguan\");\n    await game.xjzl.api.effects.removeEffect(actor, \"yazi\");\n    await game.xjzl.api.effects.removeEffect(actor, \"chiwen\");\n    await game.xjzl.api.effects.removeEffect(actor, \"baxia\");\n    const eff = thisItem.effects.getName(\"狴犴\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (!args.isHit || args.target.system.martial.stanceActive) return;\nconst baseState = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuelongguan');\nif (!baseState) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'yuelongguan');\nconst effect = thisItem.effects.getName('狴犴').toObject();\neffect.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\neffect.flags['xjzl-system'].damageBonus = 15 + (lvl - 1) * 5;\nawait game.xjzl.api.effects.addEffect(actor, effect);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #a66a2c;\"><b>跃龙化形·狴犴：</b>施展《跃龙关》招式时伤害提高 ${effect.flags['xjzl-system'].damageBonus} 点。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -10779,7 +10762,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，兵刃闪现睚眦花纹，以牙还牙，对目标造成相当于对方虚招伤害的外功伤害，并将自己的“跃龙关”状态，转化为“睚眦”状态，持续@{2 + @up|两}回合。</p><p><strong>睚眦：</strong>手持拳套武器伤害+15，格挡值+15。</p><p><strong>升级：</strong>“睚眦”状态持续回合+1，内力消耗+4。</p>",
-                    "automationNote": "伤害手动。状态转化自动。",
+                    "automationNote": "招式基础伤害为0，请在出招弹窗的伤害修正中填写对方虚招伤害。狴犴加伤与跃龙关转化自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -10800,9 +10783,15 @@
                             "active": true
                         },
                         {
+                            "label": "狴犴加伤",
+                            "trigger": "attack",
+                            "script": "const bian = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'bian');\nif (!bian) return;\nconst bonus = bian.getFlag('xjzl-system', 'damageBonus') || 15;\nargs.flags.damageResult.damage += bonus;\nargs.flags.damageResult.breakdown += `\\n+ 狴犴: ${bonus}`;",
+                            "active": true
+                        },
+                        {
                             "label": "转化睚眦",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"yuelongguan\");\nawait game.xjzl.api.effects.removeEffect(actor, \"bian\");\nawait game.xjzl.api.effects.removeEffect(actor, \"chiwen\");\nawait game.xjzl.api.effects.removeEffect(actor, \"baxia\");\n\nconst eff = thisItem.effects.getName(\"睚眦\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.duration = { rounds: 2 + (lvl - 1) };\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const baseState = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuelongguan');\nif (!baseState) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'yuelongguan');\nconst effect = thisItem.effects.getName('睚眦').toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\neffect.duration = { rounds: 2 + (lvl - 1) };\neffect.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effect);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #8b3a3a;\"><b>跃龙化形·睚眦：</b>拳套武器伤害与格挡值各提高 15 点，持续 ${2 + (lvl - 1)} 回合。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -10816,7 +10805,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>犹饕餮般吸收敌人攻入之内力，纵使会伤到己身，也要加以利用，开启架招，格挡成功时，获得“跃龙关”状态，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
+                    "description": "<p>次要动作，犹饕餮般吸收敌人攻入之内力，纵使会伤到己身，也要加以利用，开启架招，格挡成功时，获得“跃龙关”状态，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
                     "automationNote": "格挡获跃龙关自动。",
                     "calculation": {
                         "base": 0,
@@ -10834,7 +10823,7 @@
                         {
                             "label": "格挡获状态",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const eff = thisItem.effects.getName(\"跃龙关\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nfor (const slug of ['bian', 'yazi', 'chiwen', 'baxia']) {\n    await game.xjzl.api.effects.removeEffect(actor, slug);\n}\nconst effect = thisItem.effects.getName('跃龙关').toObject();\neffect.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effect);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #3b7a57;\"><b>饕餮贪形：</b>格挡成功，${actor.name} 获得【跃龙关】。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -10848,8 +10837,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>身如游龙，出掌连拍，造成伤害。击破架招后，将自己的“跃龙关”状态，转化为“鸱吻”，持续到脱战。</p><p><strong>鸱吻：</strong>《跃龙关》套路的施展距离+@{2 + @up|2}。</p><p><strong>升级：</strong>招式伤害+10，鸱吻施展距离+1，消耗+4。</p>",
-                    "automationNote": "状态转化自动。距离增加手动。",
+                    "description": "<p>主要动作，身如游龙，出掌连拍，造成 0.3 力量+0.3 内息点外功伤害。击破架招后，将自己的“跃龙关”状态，转化为“鸱吻”，持续到脱战。</p><p><strong>鸱吻：</strong>《跃龙关》套路的施展距离+@{2 + @up|2}。</p><p><strong>升级：</strong>招式伤害+10，鸱吻施展距离+1，消耗+4。</p>",
+                    "automationNote": "有跃龙关时击破架招自动转化鸱吻，并发送卡片提醒当前距离加成；实际距离手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -10876,7 +10865,7 @@
                         {
                             "label": "转化鸱吻",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.removeEffect(actor, \"yuelongguan\");\n    await game.xjzl.api.effects.removeEffect(actor, \"bian\");\n    await game.xjzl.api.effects.removeEffect(actor, \"yazi\");\n    await game.xjzl.api.effects.removeEffect(actor, \"baxia\");\n    \n    const eff = thisItem.effects.getName(\"鸱吻\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (!args.isBroken) return;\nconst baseState = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuelongguan');\nif (!baseState) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'yuelongguan');\nconst effect = thisItem.effects.getName('鸱吻').toObject();\neffect.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effect);\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rangeBonus = 2 + (lvl - 1);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #287a8c;\"><b>跃龙化形·鸱吻：</b>《跃龙关》套路施展距离 +${rangeBonus} 米，请手动计入距离。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -10891,8 +10880,8 @@
                     "range": "2米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>内力涌动，汇为山岳之型，打出一掌，力道磅礴，刚不可当，对目标造成伤害。将自己的“跃龙关”状态，转化为“霸下”状态，持续到战斗脱离。</p><p><strong>霸下：</strong>你不会被位移效果影响，若此期间架招被击破，则你可以选择失去反应动作，使你的格挡值继续生效。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "状态转化自动。霸下效果手动。",
+                    "description": "<p>主要动作，内力涌动，汇为山岳之型，打出一掌，力道磅礴，刚不可当，对目标造成 0.6 力量+0.5 内息点外功伤害。将自己的“跃龙关”状态，转化为“霸下”状态，持续到战斗脱离。</p><p><strong>霸下：</strong>你不会被位移效果影响，若此期间架招被击破，则你可以选择失去反应动作，使你的格挡值继续生效。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "有跃龙关时自动转化霸下并发送卡片。防位移手动；架招被击破并失去反应后，手动开启武学内默认关闭的“霸下·格挡生效”AE，启用系统被动格挡标记。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -10925,7 +10914,7 @@
                         {
                             "label": "转化霸下",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.removeEffect(actor, \"yuelongguan\");\nawait game.xjzl.api.effects.removeEffect(actor, \"bian\");\nawait game.xjzl.api.effects.removeEffect(actor, \"yazi\");\nawait game.xjzl.api.effects.removeEffect(actor, \"chiwen\");\n\nconst eff = thisItem.effects.getName(\"霸下\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const baseState = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yuelongguan');\nif (!baseState) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'yuelongguan');\nconst effect = thisItem.effects.getName('霸下').toObject();\neffect.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effect);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #566573;\"><b>跃龙化形·霸下：</b>防位移请手动处理。架招被击破时，可失去反应动作并手动开启武学内【霸下·格挡生效】AE，使无架招格挡继续生效。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -10952,7 +10941,16 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "bian",
-                            "stackable": false
+                            "stackable": false,
+                            "damageBonus": 15,
+                            "scripts": [
+                                {
+                                    "label": "狴犴套路加伤",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "if (args.item?.name !== '跃龙关') return;\nconst bonus = thisEffect.getFlag('xjzl-system', 'damageBonus') || 15;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`狴犴 +${bonus}`);"
+                                }
+                            ]
                         }
                     }
                 },
@@ -11003,6 +11001,28 @@
                             "stackable": false
                         }
                     }
+                },
+                {
+                    "name": "霸下·格挡生效",
+                    "icon": "icons/svg/shield.svg",
+                    "description": "仅在霸下期间架招被击破，且你选择失去反应动作后手动开启；启用系统的被动格挡标记，使无架招时基础格挡值依然生效。条件结束后请手动关闭。",
+                    "transfer": true,
+                    "disabled": true,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "baxia_block_active",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "启用被动格挡",
+                                    "trigger": "passive",
+                                    "active": true,
+                                    "script": "if (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'baxia')) {\n    actor.xjzlStatuses.passiveBlock = true;\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }
