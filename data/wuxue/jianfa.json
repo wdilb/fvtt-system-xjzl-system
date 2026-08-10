@@ -79,7 +79,7 @@
                         {
                             "label": "效果提示",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasBagua = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bagua\");\n    if (hasBagua) {\n        ui.notifications.info(`[八卦]生效：若目标在空中，可将其击倒。`);\n    } else if (!args.target.system.martial.stanceActive) {\n        ui.notifications.info(`命中无架招：击飞 1 米。`);\n    }\n}",
+                            "script": "if (!args.isHit) return;\nconst hasBagua = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'bagua');\nlet result = '';\nif (hasBagua) {\n    result = `【八卦】生效：若 ${args.target.name} 处于半空中，可将其击倒。`;\n} else if (!args.target.system.martial.stanceActive) {\n    result = `${args.target.name} 被击飞 1 米，请手动移动。`;\n}\nif (result) ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #607d8b;\"><b>青龙返首：</b>${result}</div></div>` });",
                             "active": true
                         }
                     ]
@@ -94,7 +94,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>架剑平置，剑刃向上托起，开启架招。格挡成功后，若敌人在 2 米范围内，还会出剑抹敌手腕，使其流失 5 气血。</p><p>·若自身具有“八卦”，还会使对方陷入“下盘不稳”，持续一回合。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "流失气血自动。施加下盘不稳自动。距离判断需手动确认。",
+                    "automationNote": "格挡成功后弹窗询问敌人是否在2米内；确认后自动流失5气血，自身有八卦时自动施加一回合下盘不稳。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -110,7 +110,7 @@
                         {
                             "label": "格挡反击",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\n\n// 提示检测距离\nui.notifications.info(\"格挡成功！自动触发流失，如果距离超过2米请回血！\");\n\n// 流失\nawait args.attacker.applyDamage({amount: 5, type: \"liushi\", attacker: actor});\n\n// 八卦特效\nconst hasBagua = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bagua\");\nif (hasBagua) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, data);\n    }\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst inRange = await foundry.applications.api.DialogV2.confirm({\n    window: { title: '白猿托桃' },\n    content: `<div style=\"padding:5px;\"><p><b>${args.attacker.name}</b> 是否在 2 米范围内？</p><p>选择“是”将自动结算流失与【下盘不稳】。</p></div>`,\n    yes: { label: '是，在2米内' },\n    no: { label: '否，不触发' },\n    rejectClose: false\n});\nif (!inRange) return;\nawait args.attacker.applyHealing({ healer: actor, amount: -5, type: 'hp', showScrolling: true });\nconst hasBagua = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'bagua');\nlet appliedUnstable = false;\nif (hasBagua) {\n    const source = CONFIG.statusEffects.find(e => e.id === 'unstable');\n    if (source) {\n        const effect = foundry.utils.deepClone(source);\n        effect.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.attacker, effect);\n        appliedUnstable = true;\n    }\n}\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #607d8b;\"><b>白猿托桃：</b>${args.attacker.name} 流失 5 点气血${appliedUnstable ? '，并获得一回合【下盘不稳】' : ''}。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -218,7 +218,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>浇油点火，开启架招。自身获得 1 层“火油”，最多 5 层，持续到战斗脱离后。</p><p><strong>升级：</strong>格挡值+5，火油再+1 层，内力消耗+1。</p>",
+                    "description": "<p>次要动作，浇油点火，开启架招。自身获得 1 层“火油”，最多 5 层，持续到战斗脱离后。</p><p><strong>升级：</strong>格挡值+5，火油再+1 层，内力消耗+1。</p>",
                     "automationNote": "获得火油自动。",
                     "calculation": {
                         "base": 0,
@@ -235,7 +235,7 @@
                         {
                             "label": "获得火油",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"火油\").toObject();\neff.origin = thisItem.uuid;\n\n// 升级增加层数\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 1 + (lvl - 1);\n\nfor(let i=0; i<amount; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}\nui.notifications.info(`获得 ${amount} 层火油`);",
+                            "script": "const effect = thisItem.effects.getName('火油').toObject();\neffect.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 1 + (lvl - 1);\nawait game.xjzl.api.effects.addEffect(actor, effect, amount);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #e67e22;\"><b>添油加火：</b>${actor.name} 获得 ${amount} 层【火油】（总层数最多 5）。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -249,8 +249,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>攻其臀部，造成伤害。击破架招时，还可消耗一层火油“引燃”目标。</p><p><strong>引燃：</strong>你在自己的每回合初受到 10 点火焰伤害。每经过五回合，你身上的防具、包裹物品随机损毁一件/套/份。</p><p>·如果你在其他“引燃”的角色身边（距离 1 米）结束自己的回合，你也会被添加“引燃”。</p><p>·你可以花费一个主要动作扑灭身上的火焰。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "击破消耗火油并点燃自动。点燃伤害自动。物品损毁/传火/灭火手动。",
+                    "description": "<p>主要动作，攻其臀部，造成 0.3 内息点内功伤害。击破架招时，还可消耗一层火油“引燃”目标。</p><p><strong>引燃：</strong>你在自己的每回合初受到 10 点火焰伤害。每经过五回合，你身上的防具、包裹物品随机损毁一件/套/份。</p><p>·如果你在其他“引燃”的角色身边（距离 1 米）结束自己的回合，你也会被添加“引燃”。</p><p>·你可以花费一个主要动作扑灭身上的火焰。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击破且有火油时弹窗询问是否消耗一层并引燃。引燃的每回合火焰伤害自动；物品损毁、传火与灭火手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -272,7 +272,7 @@
                         {
                             "label": "引燃",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const oil = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huoyou\");\n    if (oil) {\n        await game.xjzl.api.effects.removeEffect(actor, \"huoyou\", 1);\n        const burn = thisItem.effects.getName(\"引燃\").toObject();\n        burn.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, burn);\n        ui.notifications.info(`消耗火油，引燃了 ${args.target.name}！`);\n    } else {\n        ui.notifications.warn(\"没有火油，无法引燃！\");\n    }\n}",
+                            "script": "if (!args.isBroken) return;\nconst oil = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'huoyou');\nif (!oil) return ui.notifications.warn('没有火油，无法引燃。');\nconst consume = await foundry.applications.api.DialogV2.confirm({ window: { title: '火烧屁股' }, content: `<p>是否消耗 1 层【火油】引燃 ${args.target.name}？</p>`, yes: { label: '消耗并引燃' }, no: { label: '保留火油' }, rejectClose: false });\nif (!consume) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'huoyou', 1);\nconst burn = thisItem.effects.getName('引燃').toObject();\nburn.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, burn);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #e53935;\"><b>火烧屁股：</b>${actor.name} 消耗 1 层【火油】，引燃 ${args.target.name}。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -286,8 +286,8 @@
                     "range": "1米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>横劈火焰之剑，造成伤害。击中无架招敌人可消耗一层火油，“引燃”目标。若击中已经被引燃的无架招目标，可直接烧毁对方随机一件品质银/铜级别的防具。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
-                    "automationNote": "消耗火油点燃自动。烧毁防具手动。",
+                    "description": "<p>主要动作，横劈火焰之剑，造成 0.4 内息点内功伤害。击中无架招敌人可消耗一层火油，“引燃”目标。若击中已经被引燃的无架招目标，可直接烧毁对方随机一件品质银/铜级别的防具。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "击中未引燃的无架招敌人且有火油时弹窗询问是否消耗一层并引燃。已引燃目标的防具损毁发送卡片提醒并手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -309,7 +309,7 @@
                         {
                             "label": "点燃与烧毁",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const isBurning = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinran\");\n    \n    if (isBurning) {\n        // 已点燃 -> 烧装备\n        ui.notifications.info(`[烈火无情] 击中已引燃目标！请手动处理 ${args.target.name} 防具损毁。`);\n    } else {\n        // 未点燃 -> 尝试点燃\n        const oil = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huoyou\");\n        if (oil) {\n            await game.xjzl.api.effects.removeEffect(actor, \"huoyou\", 1);\n            const burn = thisItem.effects.getName(\"引燃\").toObject();\n            burn.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(args.target, burn);\n            ui.notifications.info(`消耗火油，引燃了 ${args.target.name}！`);\n        }\n    }\n}",
+                            "script": "if (!args.isHit || args.target.system.martial.stanceActive) return;\nconst isBurning = args.target.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yinran');\nif (isBurning) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #b71c1c;\"><b>烈火无情：</b>${args.target.name} 已被引燃，请随机烧毁其一件银/铜品质防具。</div></div>` });\n    return;\n}\nconst oil = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'huoyou');\nif (!oil) return ui.notifications.warn('没有火油，无法引燃。');\nconst consume = await foundry.applications.api.DialogV2.confirm({ window: { title: '烈火无情' }, content: `<p>是否消耗 1 层【火油】引燃 ${args.target.name}？</p>`, yes: { label: '消耗并引燃' }, no: { label: '保留火油' }, rejectClose: false });\nif (!consume) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'huoyou', 1);\nconst burn = thisItem.effects.getName('引燃').toObject();\nburn.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, burn);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #e53935;\"><b>烈火无情：</b>${actor.name} 消耗 1 层【火油】，引燃 ${args.target.name}。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -324,8 +324,8 @@
                     "range": "3米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>烧烧烧！转身肆意挥洒剑身火焰！对周围 3 米敌人造成伤害。</p><p>可以消耗剑身火油，每层火油提升 5 点招式伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "预览时自动计算火油加成。出招时询问是否消耗全部火油。",
+                    "description": "<p>蓄力动作，烧烧烧！转身肆意挥洒剑身火焰！对周围 3 米敌人造成 0.6 内息点内功伤害。</p><p>可以消耗剑身火油，每层火油提升 5 点招式伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
+                    "automationNote": "预览按全部火油显示最高加成；出招时弹窗选择实际消耗层数，自动扣层并回滚未消耗层数的预览加成。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -358,7 +358,7 @@
                         {
                             "label": "消耗火油",
                             "trigger": "attack",
-                            "script": "const oil = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huoyou\");\nif (oil) {\n    const stacks = oil.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 5;\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"大火熊熊\" },\n        content: `<p>当前有 ${stacks} 层火油，预计算伤害已包含 <b>+${bonus}</b> 加成。</p><p>是否消耗全部火油？</p>`,\n        yes: { label: \"消耗 (保留加成)\", icon: \"fas fa-fire\" },\n        no: { label: \"不消耗 (移除加成)\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        await oil.delete();\n        ui.notifications.info(`已消耗全部火油，火力全开！`);\n    } else {\n        args.flags.damageResult.damage -= bonus;\n        args.flags.damageResult.breakdown += `\\n- 未消耗火油：移除加成 (-${bonus})`;\n    }\n}",
+                            "script": "const oil = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'huoyou');\nif (!oil) return;\nconst stacks = oil.getFlag('xjzl-system', 'stacks') || 1;\nconst selected = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '大火熊熊' },\n    content: `<div style=\"padding:5px;\"><p>当前有 ${stacks} 层【火油】，每消耗一层伤害 +5。</p><div class=\"form-group\"><label>消耗层数</label><input type=\"number\" name=\"amount\" min=\"0\" max=\"${stacks}\" step=\"1\" value=\"${stacks}\" style=\"text-align:center;\"></div></div>`,\n    ok: { label: '确认', callback: (event, button) => new FormData(button.form).get('amount') },\n    rejectClose: false\n});\nconst parsed = Number.parseInt(selected, 10);\nconst amount = Number.isInteger(parsed) ? Math.max(0, Math.min(stacks, parsed)) : 0;\nconst removedBonus = (stacks - amount) * 5;\nif (removedBonus > 0) {\n    args.flags.damageResult.damage -= removedBonus;\n    args.flags.damageResult.breakdown += `\\n- 未消耗火油：${removedBonus}`;\n}\nif (amount < 1) return;\nawait game.xjzl.api.effects.removeEffect(actor, 'huoyou', amount);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px 8px; border-left:3px solid #ff6f00;\"><b>大火熊熊：</b>${actor.name} 消耗 ${amount} 层【火油】，本招伤害提高 ${amount * 5} 点。</div></div>` });",
                             "active": true
                         }
                     ]
@@ -382,21 +382,23 @@
                 {
                     "name": "引燃",
                     "icon": "icons/magic/fire/flame-burning-skeleton-orange.webp",
-                    "description": "每回合流失气血，可能损毁物品。",
+                    "description": "每回合初受到 10 点火焰伤害；每五回合的物品损毁、相邻传火与主要动作灭火需手动处理。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "yinran",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "引燃伤害",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "const sourceItem = thisEffect.origin ? await fromUuid(thisEffect.origin) : null;\nconst attacker = sourceItem?.actor || sourceItem?.parent || null;\nawait actor.applyDamage({ amount: 10, type: 'fire', attacker, isHit: true, ignoreMinDamage: true, source: 'dot' });"
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenHpTurnStart",
-                            "mode": 2,
-                            "value": "-10"
-                        }
-                    ]
+                    "changes": []
                 }
             ]
         }
