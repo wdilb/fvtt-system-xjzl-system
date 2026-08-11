@@ -1864,7 +1864,9 @@ export class XJZLItem extends Item {
         ui.notifications.warn("内力不足！");
         return;
       }
-      if (actor.system.resources.rage.value < finalCost.rage) {
+      // 仅当招式确实消耗怒气时，才判断怒气是否足够。
+      // 怒气可能因"借贷"机制为负（如千道万法无岁月的 -10），此时不消耗怒气的招式应正常施展。
+      if (finalCost.rage > 0 && actor.system.resources.rage.value < finalCost.rage) {
         ui.notifications.warn("怒气不足！");
         return;
       }
