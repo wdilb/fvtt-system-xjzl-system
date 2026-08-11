@@ -135,6 +135,10 @@ const processMoves = (rawMoves, bookReqs = "", defaultTier = null) => {
             actionType: m.actionType || "buff", // 气招类型 (heal/attack/buff)
             tier: m.tier ?? defaultTier ?? null,  // null 代表继承书本品阶,优先取招式tier -> 其次取书本tier (defaultTier) -> 最后 null,如果后面想修改，可以去掉读取wuxue的品级的代码重新导入
 
+            // 双虚招配置 (默认关闭，保持原有单轮对抗行为)
+            doubleFeint: m.doubleFeint || false,
+            doubleFeintMode: m.doubleFeintMode || "both",
+
             // 4. 成长数据 (初始化)
             level: 1,
             xpInvested: 0,

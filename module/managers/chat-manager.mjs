@@ -754,6 +754,10 @@ export class ChatCardManager {
         // 如果返回 null，说明在补骰阶段玩家点击了取消，中断流程
         if (!hitResults) return;
 
+        // 1.5 双虚招探测: 仅当招式带 doubleFeint 标记时执行两轮对抗，其余招式保持原有单轮逻辑不变
+        const feintMove = item?.system?.moves?.find(m => m.id === flags.moveId);
+        const isDoubleFeint = feintMove?.doubleFeint === true;
+
         // const feintVal = flags.feint || 0; //每个人可能有不同的虚招，不读取这里的全局值了
         const alreadyRequested = flags.feintRequestSent || [];
         // 临时存储预筛选出来的有效目标，避免直接循环时无法判断是否需要投骰子
@@ -819,78 +823,87 @@ export class ChatCardManager {
         let newlyRequested = [];
 
         if (validTargetsToRequest.length > 0) {
-            let d1 = 0;
-            let d2 = null;
-            if (needsTwoDice) {
-                // 优势或劣势：一次性投 2d20，生成合并动画
-                const r = await new Roll("2d20").evaluate();
-                if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
+            // 双虚招: 两轮各自独立投骰并各发一张看破请求卡 (单轮时保持原有逻辑，只投一次、发一张)
+            const contestCount = isDoubleFeint ? 2 : 1;
+            for (let contestIdx = 1; contestIdx <= contestCount; contestIdx++) {
+                let d1 = 0;
+                let d2 = null;
+                if (needsTwoDice) {
+                    // 优势或劣势：一次性投 2d20，生成合并动画
+                    const r = await new Roll("2d20").evaluate();
+                    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
 
-                // 提取结果
-                d1 = r.terms[0].results[0].result;
-                d2 = r.terms[0].results[1].result;
-            } else {
-                // 普通：投 1d20
-                const r = await new Roll("1d20").evaluate();
-                if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
+                    // 提取结果
+                    d1 = r.terms[0].results[0].result;
+                    d2 = r.terms[0].results[1].result;
+                } else {
+                    // 普通：投 1d20
+                    const r = await new Roll("1d20").evaluate();
+                    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);
 
-                d1 = r.total;
-                d2 = null;
-            }
-
-            // 3. 遍历有效目标发送请求
-            for (const tData of validTargetsToRequest) {
-                const { uuid, actor: targetActor, target, displayName, feintState, finalFeintVal } = tData;
-
-                // 计算针对该目标的最终点数
-                let finalDie = d1;
-                let rollDisplay = `${d1}`;
-
-                if (feintState === 1 && d2 !== null) {
-                    finalDie = Math.max(d1, d2);
-                    rollDisplay = `优势(${d1}, ${d2}) ➔ <b>${finalDie}</b>`;
-                } else if (feintState === -1 && d2 !== null) {
-                    finalDie = Math.min(d1, d2);
-                    rollDisplay = `劣势(${d1}, ${d2}) ➔ <b>${finalDie}</b>`;
+                    d1 = r.total;
+                    d2 = null;
                 }
 
-                const attackTotal = finalDie + finalFeintVal;
+                // 3. 遍历有效目标发送请求
+                for (const tData of validTargetsToRequest) {
+                    const { uuid, actor: targetActor, target, displayName, feintState, finalFeintVal } = tData;
 
-                // 获取头像
-                const imgPath = targetActor.img || target.texture?.src;
+                    // 计算针对该目标的最终点数
+                    let finalDie = d1;
+                    let rollDisplay = `${d1}`;
 
-                // D. 渲染并发送防御请求卡
-                const templateData = {
-                    attackerName: attacker.name,
-                    targetName: displayName,
-                    targetImg: imgPath,
-                    rollTotal: rollDisplay,
-                    feintVal: finalFeintVal,
-                    attackTotal: attackTotal,
-                    targetUuid: uuid,
-                    originMessageId: message.id
-                };
-
-                const content = await renderTemplate(
-                    "systems/xjzl-system/templates/chat/request-defense.hbs",
-                    templateData
-                );
-
-                ChatMessage.create({
-                    user: game.user.id,
-                    speaker: ChatMessage.getSpeaker({ actor: targetActor }),
-                    content: content,
-                    flags: {
-                        "xjzl-system": {
-                            type: "defense-request",
-                            targetUuid: uuid,
-                            attackTotal: attackTotal,
-                            originMessageId: message.id
-                        }
+                    if (feintState === 1 && d2 !== null) {
+                        finalDie = Math.max(d1, d2);
+                        rollDisplay = `优势(${d1}, ${d2}) ➔ <b>${finalDie}</b>`;
+                    } else if (feintState === -1 && d2 !== null) {
+                        finalDie = Math.min(d1, d2);
+                        rollDisplay = `劣势(${d1}, ${d2}) ➔ <b>${finalDie}</b>`;
                     }
-                });
 
-                newlyRequested.push(uuid);
+                    const attackTotal = finalDie + finalFeintVal;
+
+                    // 获取头像
+                    const imgPath = targetActor.img || target.texture?.src;
+
+                    // D. 渲染并发送防御请求卡
+                    const templateData = {
+                        attackerName: attacker.name,
+                        targetName: displayName,
+                        targetImg: imgPath,
+                        rollTotal: rollDisplay,
+                        feintVal: finalFeintVal,
+                        attackTotal: attackTotal,
+                        targetUuid: uuid,
+                        originMessageId: message.id,
+                        // 双虚招时标注第几轮，供请求卡显示 (单轮不传，保持旧卡片结构)
+                        ...(isDoubleFeint ? { contestIndex: contestIdx } : {})
+                    };
+
+                    const content = await renderTemplate(
+                        "systems/xjzl-system/templates/chat/request-defense.hbs",
+                        templateData
+                    );
+
+                    ChatMessage.create({
+                        user: game.user.id,
+                        speaker: ChatMessage.getSpeaker({ actor: targetActor }),
+                        content: content,
+                        flags: {
+                            "xjzl-system": {
+                                type: "defense-request",
+                                targetUuid: uuid,
+                                attackTotal: attackTotal,
+                                originMessageId: message.id,
+                                // 双虚招标记: 供结果回写时按轮次存储与防重 (单轮不传，保持旧行为)
+                                ...(isDoubleFeint ? { contestIndex: contestIdx, doubleFeint: true } : {})
+                            }
+                        }
+                    });
+
+                    // 每个目标只记录一次"已请求"，避免双虚招重复入列
+                    if (contestIdx === 1) newlyRequested.push(uuid);
+                }
             }
         }
         // 4. 发送“忽略名单”汇总卡片 (公开消息)
@@ -959,6 +972,8 @@ export class ChatCardManager {
         const displayName = targetDoc.name || targetActor.name;
         // 将 UUID 中的点号替换为下划线，防止 update 时被解析为嵌套对象路径
         const safeKey = flags.targetUuid.replaceAll(".", "_");
+        // 双虚招时的轮次序号 (1/2)；单轮对抗无此字段
+        const contestIndex = flags.contestIndex;
 
         // =====================================================
         // 2. 防重复/状态校验 (Anti-Spam & State Check)
@@ -970,8 +985,12 @@ export class ChatCardManager {
             // 读取原始攻击消息中的结果记录
             const currentResults = originMsg.flags["xjzl-system"]?.feintResults || {};
 
-            // 如果该目标的 UUID 已经在结果列表中，说明已经处理过了
-            if (currentResults[safeKey]) {
+            // 如果该目标的 (本轮) 对抗结果已存在，说明已经处理过了
+            // 双虚招时结果按轮次存为 { 1: "broken", 2: "resisted" }，须按轮次判断，避免第一轮写完就误锁第二轮
+            const alreadyResolved = contestIndex
+                ? currentResults[safeKey]?.[contestIndex]
+                : currentResults[safeKey];
+            if (alreadyResolved) {
                 // [UX优化] 为了视觉同步，尝试将当前卡片的按钮置灰 (即使逻辑上已拦截)
                 const div = document.createElement("div");
                 div.innerHTML = message.content;
@@ -1133,9 +1152,10 @@ export class ChatCardManager {
         // 6. 状态变更与视觉反馈 (State Updates & VFX)
         // =====================================================
         // 把击破架招放到应用伤害里，避免aoe虚招有一个人反击了
-        if (!isBroken) {
+        if (!isBroken && !flags.doubleFeint) {
             // A. 判定成功：架招维持
             // B. 视觉反馈 (飘字: 绿色)
+            // 双虚招时单轮看破不代表最终结果，抑制飘字避免误导，最终结果在应用伤害时统一反馈
             if (targetActor.showFloatyText) {
                 targetActor.showFloatyText("看破！", { fill: "#00ff00" });
             }
@@ -1180,8 +1200,12 @@ export class ChatCardManager {
         // 将结果写入原始攻击消息的 Flags 中
         // 这样后续应用伤害时，就能查到 "broken" 或 "resisted" 状态
         const resultValue = isBroken ? "broken" : "resisted";
+        // 双虚招时按轮次写入子槽位 (feintResults.<safeKey>.1/.2)，单轮对抗保持写入原槽位不变
+        const resultPath = contestIndex
+            ? `flags.xjzl-system.feintResults.${safeKey}.${contestIndex}`
+            : `flags.xjzl-system.feintResults.${safeKey}`;
         await ChatCardManager._safeUpdateMessage(originMsg, {
-            [`flags.xjzl-system.feintResults.${safeKey}`]: resultValue
+            [resultPath]: resultValue
         });
 
         // =====================================================
@@ -1230,6 +1254,8 @@ export class ChatCardManager {
         const moveElement = move ? (move.element || "none") : "none";
         const feintResults = flags.feintResults || {};
         const isFeintMove = move?.type === "feint";
+        // 双虚招: 两轮对抗都须完成才算"已对抗"，否则视为漏网，防止只打一轮就应用伤害
+        const isDoubleFeint = move?.doubleFeint === true;
         let missingDefense = false;
 
         if (isFeintMove) {
@@ -1238,7 +1264,9 @@ export class ChatCardManager {
                 // 必须用 target.uuid (Token UUID) 来查表
                 // 我们储存的时候把uuid的.替换成下划线来避免被视为嵌套对象，读取的时候也必须这样读取
                 const safeKey = target.uuid.replaceAll(".", "_");
-                const hasResult = feintResults[safeKey];
+                const hasResult = isDoubleFeint
+                    ? Boolean(feintResults[safeKey]?.[1] && feintResults[safeKey]?.[2])
+                    : Boolean(feintResults[safeKey]);
                 const stanceActive = targetActor.system?.martial?.stanceActive;
                 const res = hitResults[target.uuid];
                 // 如果没命中，不需要对抗，自然也不算漏网
@@ -1331,7 +1359,19 @@ export class ChatCardManager {
             // 我们储存的时候把uuid的.替换成下划线来避免被视为嵌套对象，读取的时候也必须这样读取
             const safeKey = uuid.replaceAll(".", "_");
             const feintStatus = feintResults[safeKey];
-            const isBroken = (feintStatus === "broken");
+            // 双虚招: 结果按轮次存为对象，按招式配置的模式合并判定；单轮对抗保持原有字符串判定
+            let isBroken = false;
+            if (isDoubleFeint && feintStatus && typeof feintStatus === "object") {
+                const doubleMode = move?.doubleFeintMode || "both";
+                const statuses = Object.values(feintStatus);
+                if (doubleMode === "any") {
+                    isBroken = statuses.includes("broken");
+                } else {
+                    isBroken = statuses.length >= 2 && statuses.every(s => s === "broken");
+                }
+            } else {
+                isBroken = (feintStatus === "broken");
+            }
             if (isHit) {
                 const currentStance = targetActor.system.martial.stanceActive;
                 // 如果没有开架招、击破了、或者忽略了才算是有效的回怒目标

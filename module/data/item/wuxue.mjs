@@ -72,6 +72,14 @@ export class XJZLWuxueData extends foundry.abstract.TypeDataModel {
       }),
       // 新增绝招标记，把绝招从招式类别中分离出来，因为存在即是绝招也是气招的东西，哎
       isUltimate: new fields.BooleanField({ initial: false, label: "XJZL.Wuxue.Moves.IsUltimate" }),
+      // 双虚招标记: 仅当为 true 时虚招对抗执行两轮；false(默认) 走原有单轮逻辑，保证兼容
+      doubleFeint: new fields.BooleanField({ initial: false, label: "XJZL.Wuxue.Moves.DoubleFeint" }),
+      // 双虚招的破架判定模式: "both"=两轮都胜才击破(默认), "any"=任意一轮获胜即击破
+      doubleFeintMode: new fields.StringField({
+        initial: "both",
+        choices: ["both", "any"],
+        label: "XJZL.Wuxue.Moves.DoubleFeintMode"
+      }),
 
       // 武器限制 (移动到招式层级)
       // 对应 Character.system.combat.weaponRanks 中的 key (sword, blade...)
