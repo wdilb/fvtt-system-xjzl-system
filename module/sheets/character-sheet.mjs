@@ -1615,7 +1615,26 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 逻辑 C. 默认逻辑 (创建新物品)
         // =====================================================
         // 如果上面都没拦截，就执行 Foundry 默认的创建流程
-        return super._onDropItem(event, data);
+        const created = await super._onDropItem(event, data);
+
+        // 新拖入的武学默认排到列表最下方
+        // 原因：武学拖拽排序会把 sort 压缩成 0,1,2...，而 Foundry 新建物品默认 sort=0，
+        // 若不补 sort 会导致新书跑到顶部。这里把新书 sort 补到当前最大值之后。
+        if (created) {
+            const createdArr = Array.isArray(created) ? created : [created];
+            if (createdArr.length > 0 && createdArr[0].type === "wuxue") {
+                const createdIds = new Set(createdArr.map(doc => doc.id));
+                const maxSort = this.actor.itemTypes.wuxue.reduce(
+                    (mx, item) => (createdIds.has(item.id) ? mx : Math.max(mx, Number(item.sort) || 0)),
+                    0
+                );
+                await this.actor.updateEmbeddedDocuments("Item",
+                    createdArr.map((doc, i) => ({ _id: doc.id, sort: maxSort + i + 1 }))
+                );
+            }
+        }
+
+        return created;
     }
 
     /**
