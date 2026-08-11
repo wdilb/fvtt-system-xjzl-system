@@ -1901,17 +1901,26 @@ export class XJZLActor extends Actor {
      * [核心] 治疗处理函数
      * @param {Object} data
      * @param {number} data.amount - 治疗数值 (正数=回复, 负数=流失)
-     * @param {string} data.type - 类型: "hp" | "neili" | "mp" | "huti"
+     * @param {string} data.type - 类型: "hp" | "neili" | "mp" | "huti" | "tili"
      * @param {boolean} [data.showScrolling=true] - 是否显示飘字
      * @param {Actor} [data.healer] - 施加治疗/流失的源头 Actor。传入此参数有助于底层脚本引擎精准溯源该效果是由哪件装备/Buff触发的（用于战斗统计）。
      * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
      */
   async applyHealing(data) {
     // [权限拦截]
-    if (!this.isOwner) return await xjzlSocket.executeAsGM("applyHealing", this.uuid, data);
+    if (!this.isOwner) {
+      const socketData = { ...data };
+      if (data.healer) {
+        socketData.healerUuid = data.healer.uuid;
+        delete socketData.healer;
+      }
+      return await xjzlSocket.executeAsGM("applyHealing", this.uuid, socketData);
+    }
     // --- 容器无法治疗 ---
     if (this.type === "container") return { actualHeal: 0 };
 
+    // 显式传入 null 表示环境/系统治疗；完全省略 healer 才表示角色自身的被动恢复。
+    const hasExplicitHealer = Object.prototype.hasOwnProperty.call(data, "healer");
     const { amount = 0, type = "hp", showScrolling = true, move = null, item = null, source = "extra", healer = null } = data;
 
     // 允许负数，只拦截 0
@@ -1935,6 +1944,7 @@ export class XJZLActor extends Actor {
       // 禁疗只阻止正向回复 (amount > 0)，不阻止扣血 (amount < 0)
       if (amount > 0 && this.xjzlStatuses.noRecoverHP) {
         actualHeal = 0;
+        newVal = current;
       } else {
         // 兼容正负数逻辑
         // 如果是回复(>0): 限制不超过 max
@@ -1970,6 +1980,7 @@ export class XJZLActor extends Actor {
       // 气滞只阻止回复
       if (amount > 0 && this.xjzlStatuses.noRecoverNeili) {
         actualHeal = 0;
+        newVal = current;
       } else {
         // 兼容正负数逻辑
         if (amount > 0) {
@@ -2008,6 +2019,24 @@ export class XJZLActor extends Actor {
       color = "#00FFFF"; // 青色/天蓝
     }
 
+    // D. 野兽体力 (Tili)
+    else if (type === "tili") {
+      const resource = this.system.resources.tili;
+      // 非野兽没有体力字段；保持旧有的安全无操作语义，避免通用资源脚本误传类型时崩溃。
+      if (!resource) {
+        return { actualHeal: 0, type, overflow: amount, isBlocked: false, oldVal: null, newVal: null };
+      }
+      const current = resource.value;
+      const max = resource.max;
+      oldVal = current;
+      newVal = amount > 0 ? Math.min(max, current + amount) : Math.max(0, current + amount);
+      actualHeal = newVal - current;
+
+      if (actualHeal !== 0) updates["system.resources.tili.value"] = newVal;
+      label = `体力 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
+      color = "#82C96F";
+    }
+
     // 执行更新
     // 注意：如果 updates 为空（被 Flag 拦截导致 actualHeal=0），这里就不会执行
     if (!foundry.utils.isEmpty(updates)) {
@@ -2040,17 +2069,23 @@ export class XJZLActor extends Actor {
       }
     }
     // 返回详细结果供调用者使用
+    const isBlocked = amount > 0 && (
+      (type === "hp" && !!this.xjzlStatuses.noRecoverHP)
+      || ((type === "mp" || type === "neili") && !!this.xjzlStatuses.noRecoverNeili)
+    );
     const finalHealResult = {
       actualHeal: actualHeal,
       type: type,
       overflow: amount - actualHeal, // 溢出/被浪费的治疗量
-      isBlocked: (actualHeal === 0 && amount !== 0 && newVal === oldVal) // 是否完全无效
+      isBlocked: isBlocked,
+      oldVal: oldVal,
+      newVal: newVal
     };
     // 针对脚本触发治疗的隐式溯源 Hook,用于后续的数据统计功能
     // 获取施法源：优先看有没有传入 healer，没有则默认是自己 (this) 身上挂的 Buff 触发的
-    const actualHealer = healer || this; // 如果没传，才算作自身被动
+    const actualHealer = hasExplicitHealer ? healer : this;
     let isScriptHealing = false; // 防重复拦截锁
-    if (game.settings.get("xjzl-system", "enableCombatStats") && actualHealer._scriptContextStack?.length > 0) {
+    if (game.settings.get("xjzl-system", "enableCombatStats") && actualHealer?._scriptContextStack?.length > 0) {
       isScriptHealing = true;
       const ctx = actualHealer._scriptContextStack[actualHealer._scriptContextStack.length - 1];
       // 兼容招式透传过来的 item

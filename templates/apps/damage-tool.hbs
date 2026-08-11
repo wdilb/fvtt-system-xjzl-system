@@ -1,96 +1,220 @@
-<div class="xjzl-dt-root">
+<div class="xjzl-dt-root" data-mode="{{mode}}">
+    <header class="xjzl-dt-targets {{#unless hasTargets}}is-empty{{/unless}}">
+        <div class="xjzl-dt-target-heading">
+            <span class="xjzl-dt-kicker">
+                <i class="fas fa-vector-square"></i>
+                {{localize "XJZL.UI.DamageTool.ControlledTargets"}}
+            </span>
+            {{#if hasTargets}}
+            <button type="button" class="xjzl-dt-clear" data-action="clearTargets">
+                <i class="fas fa-xmark"></i> {{localize "XJZL.UI.DamageTool.ClearTargets"}}
+            </button>
+            {{/if}}
+        </div>
 
-    <!-- Header: 类型与来源 -->
-    <div class="xjzl-dt-header-grid">
-        <div class="xjzl-dt-field">
-            <label class="xjzl-dt-label">
-                <i class="fas fa-biohazard"></i> {{localize "XJZL.UI.DamageTool.Type"}}
-            </label>
-            <select name="type" class="xjzl-dt-select">
-                {{#each damageTypes as |label key|}}
-                <option value="{{key}}" {{#if (eq key ../defaultType)}}selected{{/if}}>{{label}}</option>
+        {{#if hasTargets}}
+        <div class="xjzl-dt-target-summary">
+            <strong>{{targetCount}}</strong>
+            <span>{{localize "XJZL.UI.DamageTool.SelectedCount"}}</span>
+            {{#if duplicateTargetCount}}
+            <em>
+                <i class="fas fa-link"></i>
+                {{localize "XJZL.UI.DamageTool.Deduplicated" count=duplicateTargetCount}}
+            </em>
+            {{/if}}
+        </div>
+        <div class="xjzl-dt-target-list">
+            {{#each targets}}
+            <div class="xjzl-dt-target-chip" title="{{name}}">
+                <img src="{{img}}" alt="">
+                <span>{{name}}</span>
+                <button type="button" data-action="removeTarget" data-token-id="{{tokenId}}" data-actor-uuid="{{actorUuid}}"
+                    aria-label="{{localize 'XJZL.UI.DamageTool.RemoveTarget' name=name}}">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            {{/each}}
+        </div>
+        {{else}}
+        <div class="xjzl-dt-target-empty">
+            <span class="xjzl-dt-target-reticle"><i class="fas fa-expand"></i></span>
+            <div>
+                <strong>{{localize "XJZL.UI.DamageTool.NoTargetTitle"}}</strong>
+                <p>{{localize "XJZL.UI.DamageTool.NoTargetHint"}}</p>
+            </div>
+        </div>
+        {{/if}}
+    </header>
+
+    <nav class="xjzl-dt-mode-switch" aria-label="{{localize 'XJZL.UI.DamageTool.Mode'}}">
+        <button type="button" data-action="setMode" data-mode="damage" class="{{#if modeDamage}}active{{/if}}">
+            <i class="fas fa-burst"></i>
+            <span>{{localize "XJZL.UI.DamageTool.DamageMode"}}</span>
+            <small>{{localize "XJZL.UI.DamageTool.DamageModeHint"}}</small>
+        </button>
+        <button type="button" data-action="setMode" data-mode="healing" class="{{#if modeHealing}}active{{/if}}">
+            <i class="fas fa-hand-holding-medical"></i>
+            <span>{{localize "XJZL.UI.DamageTool.HealingMode"}}</span>
+            <small>{{localize "XJZL.UI.DamageTool.HealingModeHint"}}</small>
+        </button>
+    </nav>
+
+    <main class="xjzl-dt-workbench">
+        <section class="xjzl-dt-amount-section">
+            <span class="xjzl-dt-section-label">
+                {{localize "XJZL.UI.DamageTool.AmountLabel"}}
+            </span>
+            <div class="xjzl-dt-amount-control">
+                <button type="button" data-action="stepAmount" data-step="-5" aria-label="-5">−5</button>
+                <input type="number" name="amount" value="{{amount}}" min="1" step="1"
+                    aria-label="{{localize 'XJZL.UI.DamageTool.AmountLabel'}}">
+                <button type="button" data-action="stepAmount" data-step="5" aria-label="+5">+5</button>
+            </div>
+        </section>
+
+        {{#if modeDamage}}
+        <section class="xjzl-dt-type-section">
+            <span class="xjzl-dt-section-label">{{localize "XJZL.UI.DamageTool.DamageType"}}</span>
+            <div class="xjzl-dt-type-grid damage-types">
+                {{#each damageTypes}}
+                <button type="button" data-action="selectDamageType" data-type="{{key}}"
+                    class="{{#if active}}active{{/if}}">
+                    {{label}}
+                </button>
                 {{/each}}
-            </select>
-        </div>
+            </div>
+        </section>
 
-        <div class="xjzl-dt-field">
-            <label class="xjzl-dt-label">
-                <i class="fas fa-comment-alt"></i> {{localize "XJZL.UI.DamageTool.Source"}}
-            </label>
-            <input type="text" name="reason" value="{{defaultReason}}"
-                placeholder="{{localize 'XJZL.UI.DamageTool.SourcePlaceholder'}}" class="xjzl-dt-input-text" />
-        </div>
+        <section class="xjzl-dt-crit-section">
+            <span class="xjzl-dt-section-label">{{localize "XJZL.UI.DamageTool.CritMode"}}</span>
+            <div class="xjzl-dt-crit-options">
+                <button type="button" data-action="setCritMode" data-crit-mode="normal"
+                    class="{{#if critNormal}}active{{/if}}">
+                    {{localize "XJZL.UI.DamageTool.CritNormal"}}
+                </button>
+                <button type="button" data-action="setCritMode" data-crit-mode="critical"
+                    class="{{#if critCritical}}active{{/if}}">
+                    <i class="fas fa-bolt"></i> {{localize "XJZL.UI.DamageTool.CritDouble"}}
+                </button>
+                <button type="button" data-action="setCritMode" data-crit-mode="effectOnly"
+                    class="{{#if critEffectOnly}}active{{/if}}">
+                    {{localize "XJZL.UI.DamageTool.CritEffectOnly"}}
+                </button>
+            </div>
+        </section>
 
-        <!-- === 伤害来源 (Attacker) === -->
-        <div class="xjzl-dt-field" style="grid-column: span 2;">
-            <label class="xjzl-dt-label">
-                <i class="fas fa-user-ninja"></i> 伤害来源 (Attacker)
-            </label>
-            <select name="attackerId" class="xjzl-dt-select">
-                <option value="none">环境/陷阱/系统 (无实体来源)</option>
-                {{#each combatants as |c|}}
-                <option value="{{c.id}}">{{c.name}}</option>
+        <section class="xjzl-dt-advanced">
+            <header class="xjzl-dt-advanced-heading">
+                <span><i class="fas fa-sliders"></i> {{localize "XJZL.UI.DamageTool.AdvancedRules"}}</span>
+                {{#unless isPhysicalDamage}}
+                <small>{{localize "XJZL.UI.DamageTool.AdvancedUnavailable"}}</small>
+                {{/unless}}
+            </header>
+            <div class="xjzl-dt-rule-grid {{#unless isPhysicalDamage}}is-disabled{{/unless}}">
+                <label>
+                    <input type="checkbox" name="ignoreDefense" {{#if ignoreDefense}}checked{{/if}}
+                        {{#unless isPhysicalDamage}}disabled{{/unless}}>
+                    <span><b>{{localize "XJZL.UI.DamageTool.IgnoreDefense"}}</b><small>{{localize
+                            "XJZL.UI.DamageTool.TrueDamageHint"}}</small></span>
+                </label>
+                <label>
+                    <input type="checkbox" name="ignoreBlock" {{#if ignoreBlock}}checked{{/if}}
+                        {{#unless isPhysicalDamage}}disabled{{/unless}}>
+                    <span><b>{{localize "XJZL.UI.DamageTool.IgnoreBlock"}}</b><small>{{localize
+                            "XJZL.UI.DamageTool.IgnoreBlockHint"}}</small></span>
+                </label>
+                <label>
+                    <input type="checkbox" name="ignoreStance" {{#if ignoreStance}}checked{{/if}}
+                        {{#unless isPhysicalDamage}}disabled{{/unless}}>
+                    <span><b>{{localize "XJZL.UI.DamageTool.IgnoreStance"}}</b><small>{{localize
+                            "XJZL.UI.DamageTool.BreakStanceHint"}}</small></span>
+                </label>
+                <label>
+                    <input type="checkbox" name="isSkill" {{#if isSkill}}checked{{/if}}
+                        {{#unless isPhysicalDamage}}disabled{{/unless}}>
+                    <span><b>{{localize "XJZL.UI.DamageTool.IsSkill"}}</b><small>{{localize
+                            "XJZL.UI.DamageTool.SkillResHint"}}</small></span>
+                </label>
+            </div>
+        </section>
+        {{else}}
+        <section class="xjzl-dt-type-section healing-section">
+            <span class="xjzl-dt-section-label">{{localize "XJZL.UI.DamageTool.HealingType"}}</span>
+            <div class="xjzl-dt-type-grid healing-types">
+                {{#each healingTypes}}
+                <button type="button" data-action="selectHealingType" data-type="{{key}}"
+                    class="{{#if active}}active{{/if}}">
+                    <i class="{{icon}}"></i> {{label}}
+                </button>
                 {{/each}}
-            </select>
-        </div>
+            </div>
+            <p class="xjzl-dt-healing-note">
+                <i class="fas fa-circle-info"></i> {{localize "XJZL.UI.DamageTool.HealingRuleHint"}}
+            </p>
+        </section>
+        {{/if}}
+
+        <section class="xjzl-dt-source-grid">
+            <label>
+                <span class="xjzl-dt-section-label">
+                    {{#if modeDamage}}{{localize "XJZL.UI.DamageTool.Attacker"}}{{else}}{{localize
+                    "XJZL.UI.DamageTool.Healer"}}{{/if}}
+                </span>
+                <select name="sourceUuid">
+                    <option value="none" {{#if (eq sourceUuid "none")}}selected{{/if}}>
+                        {{#if modeDamage}}{{localize "XJZL.UI.DamageTool.EnvironmentSource"}}{{else}}{{localize
+                        "XJZL.UI.DamageTool.SystemHealingSource"}}{{/if}}
+                    </option>
+                    {{#each sourceActors}}
+                    <option value="{{uuid}}" {{#if (eq uuid ../sourceUuid)}}selected{{/if}}>{{name}}</option>
+                    {{/each}}
+                </select>
+            </label>
+            <label>
+                <span class="xjzl-dt-section-label">{{localize "XJZL.UI.DamageTool.Source"}}</span>
+                <input type="text" name="reason" value="{{reason}}"
+                    placeholder="{{localize 'XJZL.UI.DamageTool.SourcePlaceholder'}}" autocomplete="off">
+            </label>
+        </section>
+    </main>
+
+    {{#if lastResult}}
+    <div class="xjzl-dt-result {{#if lastResult.complete}}success{{else}}partial{{/if}}" role="status">
+        <i class="fas {{#if lastResult.complete}}fa-circle-check{{else}}fa-triangle-exclamation{{/if}}"></i>
+        <span>
+            {{#if lastResult.complete}}
+            {{localize "XJZL.UI.DamageTool.InlineSuccess" count=lastResult.successCount}}
+            {{else}}
+            {{localize "XJZL.UI.DamageTool.InlinePartial" success=lastResult.successCount
+            failure=lastResult.failureCount names=lastResult.failureNames}}
+            {{/if}}
+        </span>
     </div>
+    {{/if}}
 
-    <!-- Main Number: 伤害数值 -->
-    <div class="xjzl-dt-amount-box">
-        <label class="xjzl-dt-label">{{localize "XJZL.UI.DamageTool.AmountLabel"}}</label>
-        <input type="number" name="amount" value="10" min="1" step="1" class="xjzl-dt-input-large" />
-    </div>
-
-    <!-- Options: 开关 -->
-    <div class="xjzl-dt-options-grid">
-        <!-- 无视防御 -->
-        <label class="xjzl-dt-checkbox-row">
-            <input type="checkbox" name="ignoreDefense" class="xjzl-dt-checkbox">
-            <span>{{localize "XJZL.UI.DamageTool.IgnoreDefense"}} <span class="xjzl-dt-hint">{{localize
-                    "XJZL.UI.DamageTool.TrueDamageHint"}}</span></span>
-        </label>
-
-        <!-- 无视格挡 -->
-        <label class="xjzl-dt-checkbox-row">
-            <input type="checkbox" name="ignoreBlock" class="xjzl-dt-checkbox">
-            <span>{{localize "XJZL.UI.DamageTool.IgnoreBlock"}}</span>
-        </label>
-
-        <!-- 无视架招 (新增) -->
-        <label class="xjzl-dt-checkbox-row">
-            <input type="checkbox" name="ignoreStance" class="xjzl-dt-checkbox">
-            <span>{{localize "XJZL.UI.DamageTool.IgnoreStance"}} <span class="xjzl-dt-hint">{{localize
-                    "XJZL.UI.DamageTool.BreakStanceHint"}}</span></span>
-        </label>
-
-        <!-- 是否为招式 (新增) -->
-        <label class="xjzl-dt-checkbox-row">
-            <input type="checkbox" name="isSkill" class="xjzl-dt-checkbox" checked> {{!-- 默认勾选，因为 GM 手动造成伤害通常是某种技能 --}}
-            <span>{{localize "XJZL.UI.DamageTool.IsSkill"}} <span class="xjzl-dt-hint">{{localize
-                    "XJZL.UI.DamageTool.SkillResHint"}}</span></span>
-        </label>
-
-        <!-- 触发暴击特效 (原 Force Crit) -->
-        <label class="xjzl-dt-checkbox-row">
-            <input type="checkbox" name="isCrit" class="xjzl-dt-checkbox">
-            <span>{{localize "XJZL.UI.DamageTool.IsCrit"}}</span>
-        </label>
-
-        <!-- 应用暴击伤害 (新增) -->
-        <label class="xjzl-dt-checkbox-row">
-            <input type="checkbox" name="applyCritDamage" class="xjzl-dt-checkbox" checked>
-            <span>{{localize "XJZL.UI.DamageTool.ApplyCritDamage"}} <span class="xjzl-dt-hint">{{localize
-                    "XJZL.UI.DamageTool.CritDmgHint"}}</span></span>
-        </label>
-    </div>
-
-    <!-- Footer -->
-    <button type="button" data-action="apply" class="xjzl-dt-btn">
-        <i class="fas fa-skull-crossbones"></i>
-        <span>{{localize "XJZL.UI.DamageTool.ApplyBtn"}}</span>
-    </button>
-
-    <p class="xjzl-dt-note">
-        {{localize "XJZL.UI.DamageTool.TargetNote"}}
-    </p>
+    <footer class="xjzl-dt-footer">
+        <button type="button" data-action="apply" class="xjzl-dt-apply" {{#unless canApply}}disabled{{/unless}}>
+            <span class="xjzl-dt-apply-icon">
+                <i class="fas {{#if modeDamage}}fa-hand-fist{{else}}fa-hand-holding-heart{{/if}}"></i>
+            </span>
+            <span class="xjzl-dt-apply-copy">
+                {{#if isApplying}}
+                <b>{{localize "XJZL.UI.DamageTool.Applying"}}</b>
+                {{else if hasTargets}}
+                <b data-action-summary>{{actionSummary}}</b>
+                <small>{{localize "XJZL.UI.DamageTool.ShortcutHint"}}</small>
+                {{else}}
+                <b>{{localize "XJZL.UI.DamageTool.SelectBeforeApply"}}</b>
+                <small>{{localize "XJZL.UI.DamageTool.NoTargetHint"}}</small>
+                {{/if}}
+            </span>
+            {{#if hasTargets}}<span class="xjzl-dt-apply-count">{{targetCount}}</span>{{/if}}
+        </button>
+        <button type="button" data-action="createMacro" class="xjzl-dt-macro"
+            title="{{localize 'XJZL.UI.DamageTool.CreateMacroHint'}}"
+            aria-label="{{localize 'XJZL.UI.DamageTool.CreateMacro'}}">
+            <i class="fas fa-wand-magic-sparkles"></i>
+            <span>{{localize "XJZL.UI.DamageTool.CreateMacro"}}</span>
+        </button>
+    </footer>
 </div>

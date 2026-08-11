@@ -53,6 +53,7 @@ async function _socketApplyHealing(targetUuid, data) {
     if (isNotActiveGM()) return null;
     const target = await fromUuid(targetUuid);
     if (!target) return { actualHeal: 0 };
+    if (data.healerUuid) data.healer = await fromUuid(data.healerUuid);
     return await target.applyHealing(data);
 }
 

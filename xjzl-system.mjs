@@ -435,10 +435,10 @@ Hooks.once("init", async function () {
     requiresReload: false
   });
 
-  // 是否允许玩家使用伤害工具
+  // 是否允许玩家使用伤害与治疗工具
   game.settings.register("xjzl-system", "allowPlayerDamageTool", {
-    name: "允许玩家使用伤害工具",
-    hint: "如果开启，玩家也能在左侧 Token 工具栏看到并使用【通用伤害工具】。通常仅供 GM 或可信赖的助手使用。",
+    name: "允许玩家使用伤害与治疗工具",
+    hint: "如果开启，玩家也能在左侧 Token 工具栏看到并使用【通用伤害与治疗工具】。通常仅供 GM 或可信赖的助手使用。",
     scope: "world",      // 这是一个世界级设置，所有客户端同步
     config: true,        // 显示在设置菜单中
     type: Boolean,
@@ -635,6 +635,11 @@ Hooks.once("ready", async function () {
   // 对外保留原有可扩展应用类入口。
   game.xjzl.applications = {
     XJZLCompendiumBrowser
+  };
+
+  // 伤害工具宏只依赖稳定的纯数据入口，不暴露窗口实例或内部状态。
+  game.xjzl.damageTool = {
+    executePreset: preset => GenericDamageTool.executePreset(preset)
   };
 
   game.xjzl.Macros = XJZLMacros;

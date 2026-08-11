@@ -1,234 +1,1388 @@
-/* styles/apps/_damage-tool.css */
-/* 
-   🎯 核心穿透：强制修改 Foundry 窗口容器样式 
-   使用 #xjzl-damage-tool ID 来精准锁定通用伤害工具窗口
-*/
-
-/* 1. 移除核心内容区域的背景和边距 */
-#xjzl-damage-tool .window-content {
-    background: #2b2b2b !important;
-    /* 强制背景为深灰色 */
-    padding: 0 !important;
-    /* 移除默认内边距，让内容填满 */
-    border: none !important;
-    /* 移除内部边框 */
+/* 伤害工具采用“黑漆剑匣”视觉，避免与状态选取器的金红机关盘重复。 */
+#xjzl-damage-tool {
+    --dt-ink: #070b0b;
+    --dt-ink-soft: #0b1211;
+    --dt-lacquer: #101918;
+    --dt-lacquer-light: #172321;
+    --dt-paper: #e9e1ce;
+    --dt-paper-dim: #b8b09f;
+    --dt-jade: #8bc7b2;
+    --dt-jade-deep: #315f55;
+    --dt-bronze: #8b7655;
+    --dt-line: rgba(174, 201, 186, 0.18);
+    --dt-line-strong: rgba(174, 201, 186, 0.36);
+    --dt-damage: #d95d4d;
+    --dt-damage-bright: #ff8a72;
+    --dt-damage-soft: rgba(217, 93, 77, 0.16);
+    --dt-heal: #65c69b;
+    --dt-heal-bright: #a6f0ca;
+    --dt-heal-soft: rgba(101, 198, 155, 0.15);
+    --dt-font-display: "FZKai-Z03", "STKaiti", "KaiTi", serif;
+    --dt-font-body: "Microsoft YaHei UI", var(--font-primary);
+    --dt-font-data: "FangSong", "STFangsong", serif;
 }
 
-/* 2. 修改窗口标题栏颜色，使其更统一 */
 #xjzl-damage-tool .window-header {
-    background: #1a1a1a !important;
-    /* 标题栏用纯黑色 */
-    color: #fff !important;
-    /* 标题文字用白色 */
-    border-bottom: 1px solid #444 !important;
+    min-height: 34px;
+    color: var(--dt-paper);
+    background:
+        linear-gradient(90deg, rgba(139, 199, 178, 0.1), transparent 36%),
+        linear-gradient(180deg, #111a18, #080d0c);
+    border-bottom: 1px solid rgba(139, 199, 178, 0.26);
+    box-shadow:
+        inset 0 -1px 0 rgba(0, 0, 0, 0.82),
+        0 3px 14px rgba(0, 0, 0, 0.48);
 }
 
-/* 3. 调整关闭按钮颜色 */
+#xjzl-damage-tool .window-title {
+    color: var(--dt-paper);
+    font-family: var(--dt-font-display);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-shadow: 0 1px 8px rgba(139, 199, 178, 0.22);
+}
+
+#xjzl-damage-tool .window-icon {
+    color: var(--dt-jade);
+    filter: drop-shadow(0 0 5px rgba(139, 199, 178, 0.42));
+}
+
 #xjzl-damage-tool .window-header .header-control {
-    color: #fff !important;
+    color: var(--dt-paper-dim);
 }
 
-/* 
-   4. 修改内部根容器样式 
-   因为父级 padding 设为 0 了，我们在这里控制边距 
-*/
+#xjzl-damage-tool .window-header .header-control:hover {
+    color: var(--dt-paper);
+    background: rgba(139, 199, 178, 0.12);
+}
+
+#xjzl-damage-tool .window-content {
+    position: relative;
+    padding: 0;
+    color: var(--dt-paper);
+    background:
+        radial-gradient(circle at 10% 14%, rgba(139, 199, 178, 0.075), transparent 28%),
+        radial-gradient(circle at 88% 78%, rgba(139, 118, 85, 0.055), transparent 26%),
+        var(--dt-ink);
+    overflow: hidden;
+}
+
+/* 墨纹只作为低对比环境层，交互信息始终保持在其上方。 */
+#xjzl-damage-tool .window-content::before,
+#xjzl-damage-tool .window-content::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+#xjzl-damage-tool .window-content::before {
+    inset: -28% -18%;
+    z-index: 0;
+    opacity: 0.52;
+    background:
+        radial-gradient(ellipse at 32% 46%, transparent 0 18%, rgba(139, 199, 178, 0.045) 19%, transparent 22%),
+        radial-gradient(ellipse at 68% 52%, transparent 0 24%, rgba(233, 225, 206, 0.028) 25%, transparent 29%);
+    transform: rotate(-8deg) scale(1.1);
+    animation: xjzl-dt-ink-drift 18s ease-in-out infinite alternate;
+}
+
+#xjzl-damage-tool .window-content::after {
+    top: 0;
+    bottom: 0;
+    left: 17px;
+    z-index: 0;
+    width: 1px;
+    background: linear-gradient(transparent, rgba(139, 199, 178, 0.22) 12%, rgba(139, 199, 178, 0.08) 82%, transparent);
+    box-shadow: 3px 0 14px rgba(139, 199, 178, 0.08);
+}
 
 .xjzl-dt-root {
-    padding: 10px;
-    font-size: 13px;
-    /* 【核心修正】强制深色背景 + 浅色文字，确保高对比度 */
-    background-color: #2b2b2b;
-    color: #f0f0f0;
-
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    cursor: default;
-
-    /* 稍微加个圆角，使其看起来像嵌在窗口里的卡片 */
-    border-radius: 4px;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
-}
-
-/* --- 第一部分：头部信息 --- */
-.xjzl-dt-header-grid {
+    --dt-accent: var(--dt-damage);
+    --dt-accent-bright: var(--dt-damage-bright);
+    --dt-accent-soft: var(--dt-damage-soft);
+    position: relative;
+    z-index: 1;
     display: grid;
-    grid-template-columns: 1fr 1.5fr;
-    gap: 10px;
+    grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+    gap: 8px;
+    height: 100%;
+    min-height: 0;
+    padding: 11px 11px 11px 25px;
+    color: var(--dt-paper);
+    font-family: var(--dt-font-body);
 }
 
-.xjzl-dt-field {
+.xjzl-dt-root[data-mode="healing"] {
+    --dt-accent: var(--dt-heal);
+    --dt-accent-bright: var(--dt-heal-bright);
+    --dt-accent-soft: var(--dt-heal-soft);
+}
+
+.xjzl-dt-root button,
+.xjzl-dt-root input,
+.xjzl-dt-root select {
+    font-family: inherit;
+}
+
+.xjzl-dt-root button:focus-visible,
+.xjzl-dt-root input:focus-visible,
+.xjzl-dt-root select:focus-visible {
+    outline: 1px solid var(--dt-accent-bright);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px var(--dt-accent-soft);
+}
+
+/* 目标像名帖置于剑匣上沿，比传统卡片更轻、更横向。 */
+.xjzl-dt-targets {
+    position: relative;
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    grid-template-rows: 24px minmax(48px, auto);
+    min-height: 84px;
+    padding: 8px 11px 8px 13px;
+    background:
+        linear-gradient(92deg, var(--dt-accent-soft), transparent 34%),
+        linear-gradient(180deg, rgba(20, 33, 30, 0.96), rgba(9, 15, 14, 0.97));
+    border: 1px solid var(--dt-line-strong);
+    border-left-color: var(--dt-accent);
+    border-radius: 2px 12px 2px 2px;
+    box-shadow:
+        inset 2px 0 0 color-mix(in srgb, var(--dt-accent) 74%, transparent),
+        inset 0 1px 0 rgba(233, 225, 206, 0.04),
+        0 8px 20px rgba(0, 0, 0, 0.34);
+    overflow: hidden;
+}
+
+.xjzl-dt-targets::before,
+.xjzl-dt-targets::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+.xjzl-dt-targets::before {
+    top: -14px;
+    right: 22px;
+    width: 112px;
+    height: 52px;
+    opacity: 0.42;
+    border-top: 1px solid var(--dt-accent);
+    border-radius: 50%;
+    transform: rotate(-7deg);
+    animation: xjzl-dt-sword-breathe 4.8s ease-in-out infinite;
+}
+
+.xjzl-dt-targets::after {
+    right: -10px;
+    bottom: -17px;
+    width: 54px;
+    height: 54px;
+    opacity: 0.18;
+    border: 1px solid var(--dt-paper-dim);
+    border-radius: 50%;
+    box-shadow: inset 0 0 0 5px var(--dt-ink), inset 0 0 0 6px var(--dt-paper-dim);
+}
+
+.xjzl-dt-target-heading {
+    position: relative;
+    z-index: 3;
+    grid-column: 1 / -1;
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: flex-start;
+    justify-content: space-between;
 }
 
-.xjzl-dt-label {
-    font-weight: bold;
-    color: #e0e0e0;
-    /* 亮灰白 */
-    font-size: 0.9em;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+.xjzl-dt-kicker,
+.xjzl-dt-section-label {
+    color: var(--dt-paper-dim);
+    font-family: var(--dt-font-data);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    line-height: 1.2;
 }
 
-.xjzl-dt-label i {
-    color: #ff6400;
-    /* 图标用橙色点缀 */
+.xjzl-dt-kicker i {
+    margin-right: 5px;
+    color: var(--dt-accent-bright);
+    filter: drop-shadow(0 0 4px var(--dt-accent-soft));
 }
 
-.xjzl-dt-select,
-.xjzl-dt-input-text {
-    width: 100%;
-    height: 32px;
-    /* 深黑背景输入框 */
-    background: #1a1a1a;
-    border: 1px solid #444;
-    color: #fff;
-    border-radius: 4px;
-    padding: 0 8px;
-    transition: border-color 0.2s;
+.xjzl-dt-clear {
+    width: auto;
+    min-height: 21px;
+    margin: -2px 0 0;
+    padding: 1px 8px;
+    color: var(--dt-paper-dim);
+    background: rgba(4, 8, 7, 0.55);
+    border: 1px solid var(--dt-line);
+    border-radius: 10px 2px 10px 2px;
+    font-family: var(--dt-font-display);
+    font-size: 11px;
+    transition: color 150ms ease, border-color 150ms ease, background 150ms ease;
 }
 
-.xjzl-dt-select:focus,
-.xjzl-dt-input-text:focus {
-    border-color: #ff6400;
-    box-shadow: 0 0 5px rgba(255, 100, 0, 0.3);
-    outline: none;
+.xjzl-dt-clear:hover {
+    color: var(--dt-paper);
+    background: var(--dt-accent-soft);
+    border-color: var(--dt-accent);
 }
 
-/* --- 第二部分：大数字输入框 --- */
-.xjzl-dt-amount-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    background: #1a1a1a;
-    /* 深黑底色 */
-    border: 1px solid #444;
-    border-radius: 6px;
-    padding: 15px;
-    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
-}
-
-.xjzl-dt-input-large {
-    width: 100%;
-    font-size: 3.5em;
-    font-weight: 900;
+.xjzl-dt-target-summary {
+    position: relative;
+    z-index: 2;
+    grid-column: 1;
+    display: grid;
+    place-content: center;
+    padding-right: 9px;
+    border-right: 1px solid var(--dt-line);
     text-align: center;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid #555;
-    color: #fff;
-    font-family: "Courier New", monospace;
-    height: 70px;
-    text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
-    transition: all 0.3s;
 }
 
-.xjzl-dt-input-large:focus {
-    outline: none;
-    border-bottom-color: #ff6400;
-    text-shadow: 0 0 15px rgba(255, 100, 0, 0.5);
+.xjzl-dt-target-summary strong {
+    color: var(--dt-accent-bright);
+    font-family: var(--dt-font-display);
+    font-size: 29px;
+    font-weight: 700;
+    line-height: 0.9;
+    text-shadow: 0 0 13px var(--dt-accent-soft);
 }
 
-/* --- 第三部分：选项开关 --- */
-.xjzl-dt-options-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    background: rgba(0, 0, 0, 0.2);
-    padding: 8px;
-    border-radius: 4px;
-    border: 1px solid #444;
+.xjzl-dt-target-summary > span {
+    margin-top: 4px;
+    color: var(--dt-paper-dim);
+    font-family: var(--dt-font-data);
+    font-size: 8px;
+    letter-spacing: 0.08em;
 }
 
-.xjzl-dt-checkbox-row {
+.xjzl-dt-target-summary em {
+    margin-top: 2px;
+    color: var(--dt-accent);
+    font-size: 7px;
+    font-style: normal;
+}
+
+.xjzl-dt-target-list {
+    position: relative;
+    z-index: 2;
+    grid-column: 2;
     display: flex;
     align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    padding: 6px;
-    border-radius: 3px;
-    transition: background 0.2s;
-    color: #ccc;
-    user-select: none;
+    gap: 6px;
+    min-width: 0;
+    padding: 2px 0 3px 10px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--dt-accent) rgba(255, 255, 255, 0.025);
 }
 
-.xjzl-dt-checkbox-row:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
+.xjzl-dt-target-chip {
+    position: relative;
+    display: grid;
+    grid-template-columns: 27px minmax(38px, auto) 18px;
+    align-items: center;
+    flex: 0 0 auto;
+    min-width: 91px;
+    height: 34px;
+    color: var(--dt-paper);
+    background:
+        linear-gradient(90deg, rgba(139, 199, 178, 0.08), transparent 68%),
+        rgba(4, 9, 8, 0.76);
+    border: 1px solid var(--dt-line);
+    border-radius: 1px 9px 1px 1px;
+    overflow: hidden;
+    animation: xjzl-dt-target-arrive 340ms both;
+    transition: transform 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
-.xjzl-dt-checkbox {
-    width: 16px;
-    height: 16px;
-    accent-color: #ff6400;
-    margin: 0;
-    cursor: pointer;
-    filter: invert(1) hue-rotate(180deg);
-    /* 尝试适配某些浏览器的暗色复选框 */
+.xjzl-dt-target-chip:nth-child(2) { animation-delay: 45ms; }
+.xjzl-dt-target-chip:nth-child(3) { animation-delay: 90ms; }
+.xjzl-dt-target-chip:nth-child(4) { animation-delay: 135ms; }
+.xjzl-dt-target-chip:nth-child(5) { animation-delay: 180ms; }
+.xjzl-dt-target-chip:nth-child(6) { animation-delay: 225ms; }
+
+.xjzl-dt-target-chip:hover {
+    transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--dt-accent) 68%, var(--dt-line-strong));
+    box-shadow: 0 5px 12px rgba(0, 0, 0, 0.3), 0 0 10px var(--dt-accent-soft);
 }
 
-.xjzl-dt-hint {
-    font-size: 0.8em;
-    color: #888;
+.xjzl-dt-target-chip img {
+    width: 25px;
+    height: 30px;
     margin-left: 2px;
-    font-weight: normal;
+    object-fit: cover;
+    border: 0;
+    border-right: 1px solid var(--dt-accent);
+    filter: saturate(0.78) contrast(1.08);
 }
 
-/* --- 第四部分：按钮 --- */
-.xjzl-dt-btn {
-    width: 100%;
-    padding: 12px;
-    /* 经典的深红按钮，在深色背景下依然醒目 */
-    background: linear-gradient(180deg, #a00000 0%, #600000 100%);
-    border: 1px solid #ff0000;
-    color: #fff;
-    font-weight: bold;
-    font-size: 1.2em;
-    border-radius: 4px;
-    cursor: pointer;
+.xjzl-dt-target-chip > span {
+    min-width: 0;
+    padding: 0 6px;
+    overflow: hidden;
+    font-family: var(--dt-font-display);
+    font-size: 12px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.xjzl-dt-target-chip button {
+    width: 17px;
+    height: 26px;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    color: rgba(233, 225, 206, 0.52);
+    background: transparent;
+    border: 0;
+    border-left: 1px solid var(--dt-line);
+    border-radius: 0;
+    font-size: 11px;
+}
+
+.xjzl-dt-target-chip button:hover {
+    color: var(--dt-accent-bright);
+    background: var(--dt-accent-soft);
+}
+
+.xjzl-dt-targets.is-empty {
+    grid-template-columns: 1fr;
+    min-height: 82px;
+}
+
+.xjzl-dt-target-empty {
+    position: relative;
+    z-index: 2;
+    grid-column: 1 / -1;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    transition: all 0.2s;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.5);
-    text-shadow: 0 1px 2px #000;
+    gap: 12px;
+    min-height: 46px;
 }
 
-.xjzl-dt-btn:hover {
-    background: linear-gradient(180deg, #c00000 0%, #800000 100%);
-    box-shadow: 0 0 10px rgba(255, 0, 0, 0.3);
+.xjzl-dt-target-reticle {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 33px;
+    height: 33px;
+    color: var(--dt-accent);
+    border: 1px solid var(--dt-accent);
+    border-radius: 50%;
+    box-shadow: 0 0 16px var(--dt-accent-soft);
+    animation: xjzl-dt-seal-pulse 2.8s ease-in-out infinite;
+}
+
+.xjzl-dt-target-reticle::after {
+    content: "";
+    position: absolute;
+    inset: 4px;
+    border: 1px dashed color-mix(in srgb, var(--dt-accent) 52%, transparent);
+    border-radius: 50%;
+    animation: xjzl-dt-seal-turn 8s linear infinite;
+}
+
+.xjzl-dt-target-empty strong {
+    display: block;
+    color: var(--dt-paper);
+    font-family: var(--dt-font-display);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+}
+
+.xjzl-dt-target-empty p {
+    margin: 2px 0 0;
+    color: var(--dt-paper-dim);
+    font-size: 9px;
+}
+
+/* 两种法门沿同一剑脊展开，高亮只在文字下方铺开，避免再次压字。 */
+.xjzl-dt-mode-switch {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 56px;
+    padding: 3px;
+    background:
+        linear-gradient(180deg, rgba(20, 32, 29, 0.94), rgba(7, 12, 11, 0.98));
+    border: 1px solid var(--dt-line-strong);
+    border-radius: 11px 2px 11px 2px;
+    box-shadow: inset 0 0 22px rgba(0, 0, 0, 0.42);
+    overflow: hidden;
+}
+
+.xjzl-dt-mode-switch::after {
+    content: "";
+    position: absolute;
+    top: 9px;
+    bottom: 9px;
+    left: 50%;
+    width: 1px;
+    background: linear-gradient(transparent, var(--dt-line-strong), transparent);
+    transform: rotate(12deg);
+}
+
+.xjzl-dt-mode-switch button {
+    position: relative;
+    z-index: 1;
+    display: grid;
+    grid-template-columns: 37px minmax(0, 1fr);
+    grid-template-rows: 20px 15px;
+    align-content: center;
+    align-items: center;
+    min-width: 0;
+    min-height: 48px;
+    margin: 0;
+    padding: 5px 11px;
+    color: rgba(184, 176, 159, 0.72);
+    text-align: left;
+    background: transparent;
+    border: 0;
+    border-radius: 8px 1px 8px 1px;
+    overflow: hidden;
+}
+
+.xjzl-dt-mode-switch button::before,
+.xjzl-dt-mode-switch button::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+.xjzl-dt-mode-switch button::before {
+    inset: 2px;
+    z-index: -1;
+    opacity: 0;
+    background:
+        linear-gradient(95deg, var(--dt-accent-soft), transparent 78%),
+        linear-gradient(180deg, rgba(233, 225, 206, 0.035), transparent);
+    border-left: 2px solid var(--dt-accent);
+    transform: scaleX(0.42);
+    transform-origin: left;
+}
+
+.xjzl-dt-mode-switch button::after {
+    right: 16px;
+    bottom: 4px;
+    left: 48px;
+    z-index: -1;
+    height: 1px;
+    opacity: 0;
+    background: linear-gradient(90deg, var(--dt-accent), transparent);
+    box-shadow: 0 -3px 9px var(--dt-accent-soft);
+}
+
+.xjzl-dt-mode-switch button:hover {
+    color: var(--dt-paper);
+    background: rgba(139, 199, 178, 0.035);
+}
+
+.xjzl-dt-mode-switch button.active {
+    color: var(--dt-paper);
+}
+
+.xjzl-dt-mode-switch button.active::before {
+    opacity: 1;
+    transform: scaleX(1);
+    animation: xjzl-dt-brush-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.xjzl-dt-mode-switch button.active::after {
+    opacity: 0.8;
+    animation: xjzl-dt-qi-flow 2.4s ease-in-out infinite;
+}
+
+.xjzl-dt-mode-switch button > i {
+    position: relative;
+    z-index: 2;
+    grid-row: 1 / 3;
+    display: grid;
+    place-items: center;
+    width: 27px;
+    height: 32px;
+    color: rgba(184, 176, 159, 0.58);
+    border: 1px solid var(--dt-line);
+    border-radius: 50% 46% 52% 44%;
+    font-size: 14px;
+    transform: rotate(-5deg);
+    transition: color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.xjzl-dt-mode-switch button.active > i {
+    color: var(--dt-accent-bright);
+    border-color: var(--dt-accent);
+    box-shadow: inset 0 0 9px var(--dt-accent-soft), 0 0 11px var(--dt-accent-soft);
+    transform: rotate(0deg) scale(1.04);
+}
+
+.xjzl-dt-mode-switch button span,
+.xjzl-dt-mode-switch button small {
+    position: relative;
+    z-index: 2;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.xjzl-dt-mode-switch button span {
+    align-self: end;
+    font-family: var(--dt-font-display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+}
+
+.xjzl-dt-mode-switch button small {
+    align-self: start;
+    color: rgba(184, 176, 159, 0.56);
+    font-family: var(--dt-font-data);
+    font-size: 8px;
+}
+
+.xjzl-dt-mode-switch button.active small {
+    color: var(--dt-paper-dim);
+}
+
+/* 中央布局借用剑匣内衬：数值为剑身，其余规则沿右侧陈列。 */
+.xjzl-dt-workbench {
+    position: relative;
+    display: grid;
+    grid-template-columns: 148px minmax(0, 1fr);
+    grid-auto-rows: min-content;
+    align-content: start;
+    gap: 9px 11px;
+    min-height: 0;
+    padding: 11px;
+    background:
+        linear-gradient(112deg, rgba(139, 199, 178, 0.045), transparent 34%),
+        rgba(7, 13, 12, 0.88);
+    border: 1px solid var(--dt-line);
+    border-radius: 2px 12px 2px 12px;
+    box-shadow: inset 0 0 32px rgba(0, 0, 0, 0.32);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--dt-accent) rgba(255, 255, 255, 0.025);
+}
+
+.xjzl-dt-workbench::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 16px;
+    left: 16px;
+    height: 1px;
+    opacity: 0.44;
+    background: linear-gradient(90deg, transparent, var(--dt-jade), transparent);
+    animation: xjzl-dt-qi-flow 3.6s ease-in-out infinite;
+}
+
+.xjzl-dt-amount-section {
+    position: relative;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    display: flex;
+    flex-direction: column;
+    min-height: 145px;
+    padding: 11px;
+    background:
+        radial-gradient(ellipse at 50% 44%, var(--dt-accent-soft), transparent 58%),
+        linear-gradient(180deg, rgba(23, 36, 33, 0.92), rgba(7, 13, 12, 0.98));
+    border: 1px solid var(--dt-line-strong);
+    border-radius: 50% 50% 3px 3px / 11px 11px 3px 3px;
+    box-shadow:
+        inset 0 0 22px rgba(0, 0, 0, 0.42),
+        inset 0 -2px 0 var(--dt-accent);
+    overflow: hidden;
+}
+
+.xjzl-dt-amount-section::before,
+.xjzl-dt-amount-section::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    pointer-events: none;
+}
+
+.xjzl-dt-amount-section::before {
+    display: none;
+}
+
+.xjzl-dt-amount-section::after {
+    bottom: 29px;
+    width: 68px;
+    height: 1px;
+    opacity: 0.3;
+    background: linear-gradient(90deg, transparent, var(--dt-paper-dim), transparent);
+    transform: translateX(-50%);
+}
+
+.xjzl-dt-amount-section > .xjzl-dt-section-label {
+    position: relative;
+    z-index: 2;
+    color: var(--dt-accent-bright);
+    font-family: var(--dt-font-display);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-align: center;
+}
+
+.xjzl-dt-amount-control {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: minmax(73px, 1fr) 27px;
+    flex: 1;
+    margin-top: 5px;
+}
+
+.xjzl-dt-amount-control input {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    width: 100%;
+    height: 100%;
+    padding: 0 6px;
+    color: var(--dt-paper);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    font-family: var(--dt-font-display);
+    font-size: 52px;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    text-shadow: 0 2px 0 #000, 0 0 18px var(--dt-accent-soft);
+    appearance: textfield;
+}
+
+.xjzl-dt-amount-control input::-webkit-inner-spin-button,
+.xjzl-dt-amount-control input::-webkit-outer-spin-button {
+    margin: 0;
+    appearance: none;
+}
+
+.xjzl-dt-amount-control button {
+    grid-row: 2;
+    min-height: 27px;
+    margin: 0;
+    padding: 0;
+    color: var(--dt-paper-dim);
+    background: rgba(3, 7, 6, 0.7);
+    border: 1px solid var(--dt-line);
+    border-radius: 0;
+    font-family: var(--dt-font-data);
+    font-size: 11px;
+    transition: color 130ms ease, background 130ms ease, border-color 130ms ease;
+}
+
+.xjzl-dt-amount-control button:first-of-type {
+    border-radius: 8px 0 0 2px;
+}
+
+.xjzl-dt-amount-control button:last-of-type {
+    margin-left: -1px;
+    border-radius: 0 8px 2px 0;
+}
+
+.xjzl-dt-amount-control button:hover {
+    color: var(--dt-accent-bright);
+    background: var(--dt-accent-soft);
+    border-color: var(--dt-accent);
+}
+
+.xjzl-dt-type-section,
+.xjzl-dt-crit-section {
+    grid-column: 2;
+    min-width: 0;
+}
+
+.xjzl-dt-section-label {
+    display: block;
+    margin: 0 0 6px 1px;
+}
+
+.xjzl-dt-type-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+}
+
+.xjzl-dt-type-grid button,
+.xjzl-dt-crit-options button {
+    position: relative;
+    min-width: 0;
+    min-height: 31px;
+    margin: 0;
+    padding: 4px 5px;
+    color: rgba(184, 176, 159, 0.78);
+    background:
+        linear-gradient(180deg, rgba(23, 35, 32, 0.78), rgba(7, 12, 11, 0.88));
+    border: 1px solid var(--dt-line);
+    border-radius: 7px 1px 7px 1px;
+    font-family: var(--dt-font-display);
+    font-size: 11px;
+    font-weight: 700;
+    overflow: hidden;
+    transition: color 150ms ease, border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.xjzl-dt-type-grid button::after,
+.xjzl-dt-crit-options button::after {
+    content: "";
+    position: absolute;
+    top: -70%;
+    bottom: -70%;
+    left: -46%;
+    width: 24%;
+    opacity: 0;
+    background: linear-gradient(90deg, transparent, rgba(233, 225, 206, 0.42), transparent);
+    transform: rotate(18deg);
+}
+
+.xjzl-dt-type-grid button:hover,
+.xjzl-dt-crit-options button:hover {
+    z-index: 1;
+    color: var(--dt-paper);
+    border-color: color-mix(in srgb, var(--dt-accent) 64%, var(--dt-line-strong));
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.xjzl-dt-type-grid button:hover::after,
+.xjzl-dt-crit-options button:hover::after {
+    opacity: 1;
+    animation: xjzl-dt-glint 620ms ease-out both;
+}
+
+.xjzl-dt-type-grid button.active,
+.xjzl-dt-crit-options button.active {
+    color: var(--dt-paper);
+    background:
+        linear-gradient(115deg, var(--dt-accent-soft), transparent 82%),
+        linear-gradient(180deg, rgba(27, 40, 36, 0.95), rgba(8, 14, 13, 0.98));
+    border-color: var(--dt-accent);
+    box-shadow:
+        inset 2px 0 0 var(--dt-accent),
+        inset 0 -1px 0 color-mix(in srgb, var(--dt-accent) 54%, transparent),
+        0 0 12px var(--dt-accent-soft);
+}
+
+.xjzl-dt-type-grid button.active::before,
+.xjzl-dt-crit-options button.active::before {
+    content: "";
+    position: absolute;
+    right: 5px;
+    bottom: 4px;
+    width: 3px;
+    height: 3px;
+    background: var(--dt-accent-bright);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--dt-accent);
+    animation: xjzl-dt-seal-pulse 2s ease-in-out infinite;
+}
+
+.xjzl-dt-crit-options {
+    display: grid;
+    grid-template-columns: 0.8fr 1fr 1.35fr;
+    gap: 5px;
+}
+
+.xjzl-dt-crit-options button i {
+    margin-right: 3px;
+    color: var(--dt-accent-bright);
+}
+
+.xjzl-dt-healing-note {
+    margin: 7px 1px 0;
+    color: var(--dt-paper-dim);
+    font-family: var(--dt-font-data);
+    font-size: 9px;
+}
+
+.xjzl-dt-healing-note i {
+    margin-right: 4px;
+    color: var(--dt-heal);
+}
+
+.xjzl-dt-type-grid.healing-types {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.xjzl-dt-type-grid.healing-types button {
+    min-height: 39px;
+    font-size: 12px;
+}
+
+.xjzl-dt-type-grid.healing-types i {
+    margin-right: 5px;
+    color: var(--dt-heal-bright);
+}
+
+/* 高级规则常驻展开，标题只承担分组语义，不再伪装成可点击控件。 */
+.xjzl-dt-advanced {
+    grid-column: 1 / -1;
+    margin: 0;
+    padding: 8px;
+    background:
+        linear-gradient(90deg, rgba(139, 199, 178, 0.045), transparent 48%),
+        rgba(12, 20, 18, 0.78);
+    border: 1px solid var(--dt-line);
+    border-radius: 2px 9px 2px 9px;
+}
+
+.xjzl-dt-advanced-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 21px;
+    margin-bottom: 6px;
+    padding: 0 3px 5px;
+    color: var(--dt-paper-dim);
+    border-bottom: 1px solid var(--dt-line);
+    font-family: var(--dt-font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+}
+
+.xjzl-dt-advanced-heading i {
+    margin-right: 5px;
+    color: var(--dt-jade);
+}
+
+.xjzl-dt-advanced-heading small {
+    color: rgba(184, 176, 159, 0.55);
+    font-family: var(--dt-font-data);
+    font-size: 8px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+.xjzl-dt-rule-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+}
+
+.xjzl-dt-rule-grid label {
+    position: relative;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr);
+    align-items: center;
+    min-width: 0;
+    min-height: 44px;
+    padding: 5px 5px 5px 7px;
+    color: var(--dt-paper-dim);
+    background: rgba(5, 10, 9, 0.62);
+    border: 1px solid var(--dt-line);
+    border-radius: 7px 1px 7px 1px;
+    cursor: pointer;
+    transition: color 150ms ease, background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.xjzl-dt-rule-grid label:hover {
+    color: var(--dt-paper);
+    background: rgba(139, 199, 178, 0.065);
+    border-color: var(--dt-line-strong);
     transform: translateY(-1px);
 }
 
-.xjzl-dt-btn:active {
-    transform: translateY(1px);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-}
-
-.xjzl-dt-note {
-    text-align: center;
-    font-size: 0.8em;
-    color: #666;
+#xjzl-damage-tool .xjzl-dt-rule-grid input[type="checkbox"] {
+    position: relative;
+    flex: 0 0 16px;
+    width: 16px;
+    height: 16px;
     margin: 0;
-    font-style: italic;
-    border-top: 1px solid #333;
-    padding-top: 8px;
-}
-
-/* 移除箭头 */
-.xjzl-dt-root input::-webkit-outer-spin-button,
-.xjzl-dt-root input::-webkit-inner-spin-button {
+    padding: 0;
+    appearance: none;
     -webkit-appearance: none;
-    margin: 0;
+    background: rgba(3, 7, 6, 0.46);
+    border: 1px solid var(--dt-jade-deep);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 2px rgba(3, 7, 6, 0.72);
+    transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
 }
 
-.xjzl-dt-root input[type=number] {
-    -moz-appearance: textfield;
-    appearance: textfield;
+#xjzl-damage-tool .xjzl-dt-rule-grid input[type="checkbox"]::before {
+    content: none;
+}
+
+#xjzl-damage-tool .xjzl-dt-rule-grid input[type="checkbox"]::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    background: var(--dt-accent-bright);
+    border-radius: 50%;
+    opacity: 0;
+    box-shadow: 0 0 7px var(--dt-accent);
+    transform: translate(-50%, -50%) scale(0.2);
+    transition: opacity 130ms ease, transform 180ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+#xjzl-damage-tool .xjzl-dt-rule-grid input[type="checkbox"]:checked {
+    background: var(--dt-accent-soft);
+    border-color: var(--dt-accent);
+    box-shadow: inset 0 0 0 2px rgba(3, 7, 6, 0.72), 0 0 8px var(--dt-accent-soft);
+}
+
+#xjzl-damage-tool .xjzl-dt-rule-grid input[type="checkbox"]:checked::after {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+.xjzl-dt-rule-grid label:has(input:checked) {
+    color: var(--dt-paper);
+    background: linear-gradient(100deg, var(--dt-accent-soft), rgba(5, 10, 9, 0.7) 66%);
+    border-color: color-mix(in srgb, var(--dt-accent) 62%, var(--dt-line));
+}
+
+.xjzl-dt-rule-grid b,
+.xjzl-dt-rule-grid small {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.xjzl-dt-rule-grid b {
+    color: inherit;
+    font-family: var(--dt-font-display);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+}
+
+.xjzl-dt-rule-grid small {
+    margin-top: 2px;
+    color: rgba(184, 176, 159, 0.52);
+    font-size: 7px;
+}
+
+.xjzl-dt-rule-grid.is-disabled {
+    opacity: 0.42;
+}
+
+.xjzl-dt-rule-grid.is-disabled label {
+    cursor: not-allowed;
+    transform: none;
+}
+
+.xjzl-dt-source-grid {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 0.95fr 1.25fr;
+    gap: 8px;
+    padding-top: 1px;
+}
+
+.xjzl-dt-source-grid label {
+    min-width: 0;
+}
+
+.xjzl-dt-source-grid select,
+.xjzl-dt-source-grid input {
+    width: 100%;
+    height: 31px;
+    margin: 0;
+    padding: 0 9px;
+    color: var(--dt-paper);
+    background:
+        linear-gradient(180deg, rgba(18, 29, 26, 0.92), rgba(5, 10, 9, 0.96));
+    border: 1px solid var(--dt-line-strong);
+    border-radius: 7px 1px 7px 1px;
+    font-size: 10px;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.xjzl-dt-source-grid select:hover,
+.xjzl-dt-source-grid input:hover,
+.xjzl-dt-source-grid select:focus,
+.xjzl-dt-source-grid input:focus {
+    border-color: var(--dt-accent);
+    box-shadow: inset 2px 0 0 var(--dt-accent), 0 0 10px var(--dt-accent-soft);
+}
+
+.xjzl-dt-source-grid option {
+    color: var(--dt-paper);
+    background: var(--dt-lacquer);
+}
+
+.xjzl-dt-result {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 28px;
+    padding: 5px 9px;
+    color: var(--dt-paper);
+    background: rgba(12, 20, 18, 0.94);
+    border: 1px solid var(--dt-line);
+    border-left: 2px solid var(--dt-jade);
+    border-radius: 2px 8px 2px 8px;
+    font-size: 9px;
+    animation: xjzl-dt-result-enter 280ms ease-out both;
+}
+
+.xjzl-dt-result.success {
+    border-left-color: var(--dt-heal);
+}
+
+.xjzl-dt-result.success i {
+    color: var(--dt-heal-bright);
+}
+
+.xjzl-dt-result.partial {
+    border-left-color: var(--dt-damage);
+}
+
+.xjzl-dt-result.partial i {
+    color: var(--dt-damage-bright);
+}
+
+/* 执行区像合匣前的一次出剑，流光在内容下方循环，不影响可读性。 */
+.xjzl-dt-footer {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 70px;
+    gap: 7px;
+    min-height: 62px;
+}
+
+.xjzl-dt-apply {
+    position: relative;
+    display: grid;
+    grid-template-columns: 52px minmax(0, 1fr) 48px;
+    align-items: stretch;
+    width: 100%;
+    min-height: 61px;
+    margin: 0;
+    padding: 0;
+    color: var(--dt-paper);
+    text-align: left;
+    background:
+        linear-gradient(96deg, var(--dt-accent-soft), transparent 62%),
+        linear-gradient(180deg, rgba(25, 38, 34, 0.98), rgba(7, 13, 12, 0.99));
+    border: 1px solid color-mix(in srgb, var(--dt-accent) 66%, var(--dt-line-strong));
+    border-radius: 14px 2px 14px 2px;
+    box-shadow:
+        inset 0 1px 0 rgba(233, 225, 206, 0.055),
+        inset 3px 0 0 var(--dt-accent),
+        0 8px 22px rgba(0, 0, 0, 0.34);
+    overflow: hidden;
+    transition: transform 170ms ease, border-color 170ms ease, box-shadow 170ms ease;
+}
+
+.xjzl-dt-apply::before,
+.xjzl-dt-apply::after {
+    content: "";
+    position: absolute;
+    pointer-events: none;
+}
+
+.xjzl-dt-apply::before {
+    top: -90%;
+    bottom: -90%;
+    left: -22%;
+    width: 12%;
+    opacity: 0.36;
+    background: linear-gradient(90deg, transparent, var(--dt-accent-bright), transparent);
+    filter: blur(0.4px);
+    transform: rotate(16deg);
+    animation: xjzl-dt-command-glint 4.2s ease-in-out infinite;
+}
+
+.xjzl-dt-apply::after {
+    right: 51px;
+    bottom: 5px;
+    left: 54px;
+    height: 1px;
+    opacity: 0.65;
+    background: linear-gradient(90deg, var(--dt-accent), transparent 82%);
+    box-shadow: 0 0 9px var(--dt-accent);
+    animation: xjzl-dt-qi-flow 2.6s ease-in-out infinite;
+}
+
+.xjzl-dt-apply:hover:not(:disabled) {
+    color: var(--dt-paper);
+    border-color: var(--dt-accent-bright);
+    transform: translateY(-2px);
+    box-shadow:
+        inset 0 1px 0 rgba(233, 225, 206, 0.09),
+        inset 4px 0 0 var(--dt-accent-bright),
+        0 10px 26px rgba(0, 0, 0, 0.42),
+        0 0 18px var(--dt-accent-soft);
+}
+
+.xjzl-dt-apply:active:not(:disabled) {
+    transform: translateY(0) scale(0.995);
+}
+
+.xjzl-dt-apply:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    filter: saturate(0.5);
+}
+
+.xjzl-dt-apply:disabled::before,
+.xjzl-dt-apply:disabled::after {
+    animation: none;
+}
+
+.xjzl-dt-apply-icon {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    margin: 9px 0 9px 9px;
+    color: var(--dt-accent-bright);
+    border-right: 1px solid var(--dt-line);
+    font-size: 18px;
+    text-shadow: 0 0 11px var(--dt-accent);
+}
+
+.xjzl-dt-apply-icon::before {
+    content: "";
+    position: absolute;
+    width: 31px;
+    height: 31px;
+    opacity: 0.58;
+    border: 1px solid var(--dt-accent);
+    border-radius: 50% 44% 51% 45%;
+    transform: rotate(-9deg);
+    animation: xjzl-dt-seal-pulse 2.3s ease-in-out infinite;
+}
+
+.xjzl-dt-apply-copy {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    padding: 8px 13px;
+}
+
+.xjzl-dt-apply-copy b,
+.xjzl-dt-apply-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.xjzl-dt-apply-copy b {
+    color: var(--dt-paper);
+    font-family: var(--dt-font-display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.xjzl-dt-apply-copy small {
+    margin-top: 4px;
+    color: var(--dt-paper-dim);
+    font-family: var(--dt-font-data);
+    font-size: 8px;
+}
+
+.xjzl-dt-apply-count {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    margin: 8px 7px 8px 0;
+    color: var(--dt-accent-bright);
+    border-left: 1px solid var(--dt-line);
+    font-family: var(--dt-font-display);
+    font-size: 21px;
+    font-weight: 700;
+    text-shadow: 0 0 12px var(--dt-accent-soft);
+}
+
+.xjzl-dt-macro {
+    position: relative;
+    display: grid;
+    grid-template-rows: 1fr auto;
+    place-items: center;
+    min-width: 0;
+    min-height: 61px;
+    margin: 0;
+    padding: 8px 5px 7px;
+    color: var(--dt-paper-dim);
+    background:
+        radial-gradient(circle at 50% 34%, rgba(139, 199, 178, 0.12), transparent 38%),
+        linear-gradient(180deg, rgba(22, 35, 31, 0.98), rgba(7, 13, 12, 0.99));
+    border: 1px solid var(--dt-line-strong);
+    border-radius: 2px 13px 2px 13px;
+    box-shadow: inset 0 1px 0 rgba(233, 225, 206, 0.045), 0 8px 20px rgba(0, 0, 0, 0.28);
+    overflow: hidden;
+    transition: color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.xjzl-dt-macro::before {
+    content: "";
+    position: absolute;
+    inset: 8px 17px 18px;
+    opacity: 0.38;
+    border: 1px solid var(--dt-jade);
+    border-radius: 50% 43% 51% 46%;
+    transform: rotate(8deg);
+    transition: opacity 160ms ease, transform 220ms ease;
+}
+
+.xjzl-dt-macro i,
+.xjzl-dt-macro span {
+    position: relative;
+    z-index: 1;
+}
+
+.xjzl-dt-macro i {
+    align-self: center;
+    color: var(--dt-jade);
+    font-size: 16px;
+    filter: drop-shadow(0 0 5px rgba(139, 199, 178, 0.34));
+}
+
+.xjzl-dt-macro span {
+    font-family: var(--dt-font-display);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    white-space: nowrap;
+}
+
+.xjzl-dt-macro:hover {
+    color: var(--dt-paper);
+    border-color: var(--dt-jade);
+    transform: translateY(-2px);
+    box-shadow: inset 0 1px 0 rgba(233, 225, 206, 0.08), 0 10px 23px rgba(0, 0, 0, 0.36), 0 0 13px rgba(139, 199, 178, 0.1);
+}
+
+.xjzl-dt-macro:hover::before {
+    opacity: 0.72;
+    transform: rotate(-5deg) scale(1.06);
+}
+
+.xjzl-dt-macro:active {
+    transform: translateY(0) scale(0.97);
+}
+
+@keyframes xjzl-dt-ink-drift {
+    0% { transform: rotate(-8deg) translate3d(-1.5%, -1%, 0) scale(1.08); }
+    100% { transform: rotate(-4deg) translate3d(2%, 1.5%, 0) scale(1.14); }
+}
+
+@keyframes xjzl-dt-sword-breathe {
+    0%, 100% { opacity: 0.25; transform: rotate(-7deg) scaleX(0.88); }
+    50% { opacity: 0.64; transform: rotate(-7deg) scaleX(1.05); }
+}
+
+@keyframes xjzl-dt-brush-in {
+    from { opacity: 0; transform: scaleX(0.22) skewX(-9deg); filter: blur(3px); }
+    to { opacity: 1; transform: scaleX(1) skewX(0); filter: blur(0); }
+}
+
+@keyframes xjzl-dt-target-arrive {
+    from { opacity: 0; transform: translateX(12px) rotate(1deg); }
+    to { opacity: 1; transform: translateX(0) rotate(0); }
+}
+
+@keyframes xjzl-dt-qi-flow {
+    0%, 100% { opacity: 0.24; transform: scaleX(0.36); transform-origin: left; }
+    50% { opacity: 0.9; transform: scaleX(1); transform-origin: left; }
+}
+
+@keyframes xjzl-dt-glint {
+    from { left: -46%; }
+    to { left: 132%; }
+}
+
+@keyframes xjzl-dt-command-glint {
+    0%, 58% { left: -22%; opacity: 0; }
+    66% { opacity: 0.45; }
+    82%, 100% { left: 122%; opacity: 0; }
+}
+
+@keyframes xjzl-dt-seal-pulse {
+    0%, 100% { opacity: 0.46; transform: scale(0.96) rotate(-7deg); }
+    50% { opacity: 0.9; transform: scale(1.04) rotate(0deg); }
+}
+
+@keyframes xjzl-dt-seal-turn {
+    to { transform: rotate(360deg); }
+}
+
+@keyframes xjzl-dt-result-enter {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 520px) {
+    .xjzl-dt-root {
+        padding-left: 17px;
+    }
+
+    .xjzl-dt-targets {
+        grid-template-columns: 62px minmax(0, 1fr);
+    }
+
+    .xjzl-dt-workbench {
+        grid-template-columns: 128px minmax(0, 1fr);
+    }
+
+    .xjzl-dt-type-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .xjzl-dt-rule-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 430px) {
+    .xjzl-dt-mode-switch button {
+        grid-template-columns: 29px minmax(0, 1fr);
+        padding-inline: 7px;
+    }
+
+    .xjzl-dt-mode-switch button > i {
+        width: 23px;
+    }
+
+    .xjzl-dt-workbench {
+        grid-template-columns: 1fr;
+    }
+
+    .xjzl-dt-amount-section,
+    .xjzl-dt-type-section,
+    .xjzl-dt-crit-section {
+        grid-column: 1;
+        grid-row: auto;
+    }
+
+    .xjzl-dt-amount-section {
+        min-height: 126px;
+    }
+
+    .xjzl-dt-source-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #xjzl-damage-tool *,
+    #xjzl-damage-tool *::before,
+    #xjzl-damage-tool *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }

@@ -32,6 +32,10 @@ export class ChatCardManager {
         // 2. 绑定功能按钮点击事件 (应用伤害、虚招对抗等)
         const buttons = content.querySelectorAll("button[data-action]");
         buttons.forEach(btn => {
+            if (btn.dataset.action === "undoHealing" && !game.user.isGM && !message.isAuthor) {
+                btn.hidden = true;
+                return;
+            }
             btn.addEventListener("click", (ev) => ChatCardManager._onChatCardAction(ev, message));
         });
 
@@ -141,6 +145,11 @@ export class ChatCardManager {
         // 0. 特殊处理：撤销伤害不需要选中任何目标，也不需要攻击者（只需要数据回滚）
         if (action === "undoDamage") {
             await ChatCardManager._undoDamage(message);
+            return;
+        }
+        // 通用治疗工具的卡片同样只依赖消息中的撤销快照，不要求当前选中目标。
+        if (action === "undoHealing") {
+            await ChatCardManager._undoHealing(message);
             return;
         }
         // 0. 特殊处理2：属性判定请求处理 (前置拦截)
@@ -1735,6 +1744,89 @@ export class ChatCardManager {
         }
 
 
+    }
+
+    /**
+     * 撤销通用治疗工具产生的一次有效资源恢复。
+     * @param {ChatMessage} message 带有 targetUuid、资源类型和实际恢复量的治疗卡片。
+     */
+    static async _undoHealing(message) {
+        if (!game.user.isGM && !message.isAuthor) {
+            return ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.HealCard.UndoForbidden"));
+        }
+        const flags = message.flags["xjzl-system"] || {};
+        const undoData = flags.undoData;
+        if (!undoData) return ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.HealCard.NoUndoData"));
+        if (flags.isUndone) return ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.HealCard.AlreadyUndone"));
+
+        const doc = await fromUuid(undoData.targetUuid);
+        const actor = doc?.actor || doc;
+        if (!actor?.system) return ui.notifications.error(game.i18n.localize("XJZL.UI.Chat.HealCard.TargetMissing"));
+
+        const amount = Math.max(0, Number(undoData.amount) || 0);
+        const type = undoData.type;
+        if (amount <= 0 || !["hp", "mp", "huti", "tili"].includes(type)) {
+            return ui.notifications.warn(game.i18n.localize("XJZL.UI.Chat.HealCard.InvalidUndoData"));
+        }
+
+        const resourceLabel = game.i18n.localize({
+            hp: "XJZL.Resources.HP",
+            mp: "XJZL.Resources.MP",
+            huti: "XJZL.Resources.Huti",
+            tili: "XJZL.Creature.Tili"
+        }[type]);
+        const displayName = doc.name || actor.name;
+        const safeName = foundry.utils.escapeHTML(String(displayName ?? ""));
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: {
+                title: game.i18n.format("XJZL.UI.Chat.HealCard.UndoTitle", { name: displayName }),
+                icon: "fas fa-undo"
+            },
+            content: `<p>${game.i18n.format("XJZL.UI.Chat.HealCard.UndoConfirm", {
+                name: `<strong>${safeName}</strong>`,
+                amount,
+                type: foundry.utils.escapeHTML(resourceLabel)
+            })}</p>`,
+            ok: { label: game.i18n.localize("XJZL.UI.Chat.HealCard.Undo") }
+        });
+        if (!confirmed) return;
+
+        const updates = {};
+        if (type === "hp") {
+            updates["system.resources.hp.value"] = Math.max(0, actor.system.resources.hp.value - amount);
+        } else if (type === "mp") {
+            updates["system.resources.mp.value"] = Math.max(0, actor.system.resources.mp.value - amount);
+        } else if (type === "tili") {
+            updates["system.resources.tili.value"] = Math.max(0, actor.system.resources.tili.value - amount);
+        } else {
+            const huti = actor.system.resources.huti;
+            const current = Number(typeof huti === "object" ? huti?.value : huti) || 0;
+            const path = typeof huti === "object" ? "system.resources.huti.value" : "system.resources.huti";
+            updates[path] = Math.max(0, current - amount);
+        }
+
+        if (actor.isOwner) await actor.update(updates);
+        else await xjzlSocket.executeAsGM("updateDocument", actor.uuid, updates);
+
+        const div = document.createElement("div");
+        div.innerHTML = message.content;
+        const undoButton = div.querySelector('button[data-action="undoHealing"]');
+        if (undoButton) {
+            const replacement = document.createElement("div");
+            replacement.style.cssText = "text-align:center; color:#888; border:1px solid #ccc; padding:5px; background:#eee; font-size:0.85em; margin-top:5px;";
+            replacement.innerHTML = `<i class="fas fa-history"></i> ${game.i18n.localize("XJZL.UI.Chat.HealCard.Undone")}`;
+            undoButton.replaceWith(replacement);
+        }
+
+        await ChatCardManager._safeUpdateMessage(message, {
+            content: div.innerHTML,
+            "flags.xjzl-system.isUndone": true
+        });
+        ui.notifications.info(game.i18n.format("XJZL.UI.Chat.HealCard.UndoSuccess", {
+            name: displayName,
+            amount,
+            type: resourceLabel
+        }));
     }
 
     /**

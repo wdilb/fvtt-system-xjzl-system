@@ -329,8 +329,8 @@ export class CombatStatsManager {
             // 确保特效的名称始终带上前缀，直接截断不再拼接冗长后缀
             finalName = `[特效] ${finalName}`;
         } else if (source === "extra" || source === "dot" || !moveId) {
-            if (["hp", "mp", "neili", "rage", "huti"].includes(damageType)) {
-                const labelMap = { hp: "气血", mp: "内力", neili: "内力", rage: "怒气", huti: "护体" };
+            if (["hp", "mp", "neili", "rage", "huti", "tili"].includes(damageType)) {
+                const labelMap = { hp: "气血", mp: "内力", neili: "内力", rage: "怒气", huti: "护体", tili: "体力" };
                 finalName = `基础恢复/消耗 (${labelMap[damageType] || damageType.toUpperCase()})`;
             } else {
                 const typeLabel = game.i18n.localize(CONFIG.XJZL.damageTypes?.[damageType]) || damageType;
@@ -561,7 +561,8 @@ export class CombatStatsManager {
             none: "#7f8c8d", // 灰色 (无/气招)
             hp: "#2ecc71", // 亮绿 (治疗气血)
             mp: "#3498db", // 亮蓝 (回复内力)
-            huti: "#00ffff"  // 青色 (护体)
+            huti: "#00ffff", // 青色 (护体)
+            tili: "#82c96f"  // 草绿 (野兽体力)
         };
         return colors[damageType] || "#95a5a6"; // 兜底灰色
     }
