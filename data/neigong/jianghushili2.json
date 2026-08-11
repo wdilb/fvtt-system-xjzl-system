@@ -896,7 +896,7 @@
             "sect": "jianghushili",
             "description": "<p>唐代道门真君赵惠宗所作，“生我于虚，置我于无，至精为神，元气为躯”，修炼真道养神之法，大成后气度不凡，如一方尊王。</p>",
             "requirement": "悟性15",
-            "automationNote": "1. 自身加成：完全自动化（脚本实现）。\n2. 友方光环：内置了“天帝威仪”AE，请玩家手动施加给队友。",
+            "automationNote": "自身加成：完全自动化。\n2. 友方光环：已提供模板 AE，需玩家手动将 AE 拖给队友并修改数值。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -911,10 +911,10 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "神采增伤",
-                            "trigger": "calc",
+                            "label": "天帝·神采增伤",
+                            "trigger": "passive",
                             "active": true,
-                            "script": "const bonus = actor.system.skills.jiaoyi.base; // 神采等级\nargs.output.damage += bonus;"
+                            "script": "// 1. 读取神采总值并计算等级 (向下取整)\nconst shencaiLvl = Math.floor(S.stats.shencai.total / 10);\n// 2. 注入全局伤害加成池\nS.combat.damages.global.mod += shencaiLvl;"
                         }
                     ]
                 },
@@ -931,16 +931,10 @@
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "神采增益II",
-                            "trigger": "calc",
+                            "label": "天帝·神采攻势",
+                            "trigger": "passive",
                             "active": true,
-                            "script": "const bonus = actor.system.skills.jiaoyi.base; \nargs.output.damage += bonus;"
-                        },
-                        {
-                            "label": "神采命中II",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const bonus = actor.system.skills.jiaoyi.base;\nargs.flags.bonusHit += bonus;"
+                            "script": "const shencaiLvl = Math.floor(S.stats.shencai.total / 10);\n// 注入全局伤害\nS.combat.damages.global.mod += shencaiLvl;\n// 注入全局命中 (内外功均加)\nS.combat.hit_waigong += shencaiLvl;\nS.combat.hit_neigong += shencaiLvl;"
                         }
                     ]
                 },
@@ -953,20 +947,14 @@
                         "qigan": 54,
                         "shencai": 90
                     },
-                    "description": "<p>圆满运功特效：你和你周围20米的其他友方获得等同于你神采等级的伤害、命中加值。</p><p>修满特效：修满[永久]：气血+80，内力+40，神采+10。</p>",
+                    "description": "<p>圆满运功特效：你和你周围20米的其他友方获得等同于你神采等级的伤害、命中加值。</p>",
                     "xpCostRatio": 1,
                     "scripts": [
                         {
-                            "label": "神采增益III",
-                            "trigger": "calc",
+                            "label": "天帝·神采攻势(圆满)",
+                            "trigger": "passive",
                             "active": true,
-                            "script": "const bonus = actor.system.skills.jiaoyi.base; \nargs.output.damage += bonus;"
-                        },
-                        {
-                            "label": "神采命中III",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "const bonus = actor.system.skills.jiaoyi.base;\nargs.flags.bonusHit += bonus;"
+                            "script": "const shencaiLvl = Math.floor(S.stats.shencai.total / 10);\nS.combat.damages.global.mod += shencaiLvl;\nS.combat.hit_waigong += shencaiLvl;\nS.combat.hit_neigong += shencaiLvl;"
                         }
                     ]
                 }
@@ -997,7 +985,7 @@
             {
                 "name": "天帝威仪(友方)",
                 "icon": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
-                "description": "受到天帝遗简光环加持，获得伤害和命中加值（具体数值需自行调整Changes）。",
+                "description": "受到天帝遗简光环加持，获得伤害和命中加值（请手动修改数值等于内功运行者的神采等级）。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
@@ -1013,6 +1001,11 @@
                     },
                     {
                         "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "0"
+                    },
+                    {
+                        "key": "system.combat.hit_neigong",
                         "mode": 2,
                         "value": "0"
                     }
