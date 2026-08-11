@@ -1187,11 +1187,11 @@
                     "element": "yang",
                     "damageType": "none",
                     "weaponType": "none",
-                    "range": "自身",
+                    "range": "5米",
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
-                    "description": "<p>每次濒死时，将自身毁灭重生，可以消除自身一个不想要的buff，每消除一个buff对周围目标造成50点火焰伤害。（包括除了濒死、丹田破碎、破防以外的特殊状态，但不可消除天级状态）</p><p><strong>升级：</strong>额外清除一个buff，内力消耗+10。</p>",
-                    "automationNote": "请对自己释放气招获取状态，之后濒死时会自动发卡片提醒您手动消除不利Buff。",
+                    "description": "<p>濒死后，可将自身毁灭重生，回复自身@{50 * @level|50}气血并清除自身至多@{1 + @up|一}个不想要的状态，每清除一个状态对周围目标造成50点火焰伤害。（包括除了濒死、丹田破碎、破防以外的特殊状态，但不可清除天级状态）</p><p><strong>升级：</strong>额外回复50气血，清除状态上限+1，内力消耗+10，怒气消耗-1。</p>",
+                    "automationNote": "请对自己释放气招获取状态，之后濒死时会自动发卡片提醒您手动回复气血、清除不利Buff并结算火焰伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1200,16 +1200,21 @@
                         "mp": [
                             10,
                             20,
-                            30,
-                            40
-                        ]
+                            30
+                        ],
+                        "rage": [
+                            5,
+                            4,
+                            3
+                        ],
+                        "hp": []
                     },
                     "scripts": [
                         {
                             "label": "获得邪凤涅槃",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"邪凤涅槃\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态设置可消除的数量\nconst lvl = Math.max(1, move.computedLevel || 1);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.removeCount\", lvl);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"凤凰加护\");"
+                            "script": "const eff = thisItem.effects.getName(\"邪凤涅槃\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 动态设置可消除的数量与回复量\nconst lvl = Math.max(1, move.computedLevel || 1);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.removeCount\", lvl);\nfoundry.utils.setProperty(eff, \"flags.xjzl-system.healAmount\", lvl * 50);\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"凤凰加护\");"
                         }
                     ]
                 }
@@ -1230,7 +1235,7 @@
                                 "label": "濒死提醒",
                                 "trigger": "dying",
                                 "active": true,
-                                "script": "const removeCount = thisEffect.getFlag(\"xjzl-system\", \"removeCount\") || 1;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; margin-left: 5px; border-left:4px solid #ff4500; background:rgba(255,69,0,0.1);\">\n            <div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-fire\"></i> 邪凤涅槃触发！</div>\n            <div style=\"font-size:0.9em; margin-top:3px;\">你进入了濒死状态。请手动消除自身 <b>${removeCount}</b> 个不利状态。</div>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                                "script": "const removeCount = thisEffect.getFlag(\"xjzl-system\", \"removeCount\") || 1;\nconst healAmount = thisEffect.getFlag(\"xjzl-system\", \"healAmount\") || (removeCount * 50);\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; margin-left: 5px; border-left:4px solid #ff4500; background:rgba(255,69,0,0.1);\">\n            <div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-fire\"></i> 邪凤涅槃触发！</div>\n            <div style=\"font-size:0.9em; margin-top:3px;\">你进入了濒死状态，可毁灭重生：请手动回复自身 <b>${healAmount}</b> 点气血，并清除自身至多 <b>${removeCount}</b> 个不利状态；每清除一个状态，对周围目标造成 50 点火焰伤害。</div>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
                             }
                         ]
                     }
@@ -4596,5 +4601,373 @@
                 }
             ]
         }
+    },
+    {
+        "name": "八荒无极剑",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>上古剑法，取八荒六合归于无极之意。</p><p><strong>需求：</strong>单剑 <strong>属性：</strong>阳</p>",
+            "requirements": "单剑",
+            "moves": [
+                {
+                    "name": "混沌初开",
+                    "type": "stance",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，剑挽三花，脚踏星罗步，开启招架，格挡成功后，使自己进入“无极”状态，持续一回合。</p><p><strong>无极：</strong>你无法被实招指定为目标。</p><p><strong>升级：</strong>格挡值+10，内力消耗+10。</p>",
+                    "automationNote": "无法被实招选中需手动，仅实现了免疫实招伤害。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "开启提醒",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #9b59b6; background:rgba(155,89,182,0.06); margin-left:4px;\">\\n  <div style=\"font-weight:bold; color:#6c3483;\"><i class=\"fas fa-dice-d6\"></i> 混沌初开</div>\\n  <div style=\"font-size:0.85em; color:#555;\">开启架招。格挡成功后进入【无极】状态，<b>无法被实招指定为目标</b>（已自动化，被实招攻击时伤害免疫并提示）。</div>\\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });"
+                        },
+                        {
+                            "label": "格挡获无极",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"无极\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nactor.showFloatyText(\"无极！\", { fill: \"#9b59b6\" });"
+                        }
+                    ]
+                },
+                {
+                    "name": "日月同天",
+                    "type": "feint",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "doubleFeint": true,
+                    "doubleFeintMode": "both",
+                    "range": "4米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，斩出两道剑气，一明一暗，一正一辅，与目标进行两次虚招对抗，你需要两次对抗成功才能击破招架，目标需要两次对抗成功才能施展反击压制此招。对目标造成0.6内息点内功伤害，击破招架时，使目标陷入“封招”状态，持续一回合。若你处于“无极”状态，则你的虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，虚招值+1，内力消耗+10。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "两次对抗规则说明",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.06); margin-left:4px;\">\n  <div style=\"font-weight:bold; color:#6c3483;\"><i class=\"fas fa-dice-d6\"></i> 日月同天 · 两次虚招对抗</div>\n  <div style=\"font-size:0.85em; color:#555;\">将进行<b>两次</b>虚招对抗：<br>· <b>两次都击破</b>才算击破架招，并使目标陷入【封招】；<br>· <b>两次都被看破</b>时，目标才可消耗反应施展反击压制此招；<br>· 一胜一负则招架未破、也无法反击。</div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });"
+                        },
+                        {
+                            "label": "虚招值加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst upgradeBonus = lvl - 1;\nconst inWuji = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bahuang_wuji\");\nconst recorded = actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_wuji\") || [];\nlet bonus = upgradeBonus + recorded.length;\nif (inWuji) bonus += 1;\nif (bonus > 0) {\n  args.output.feint += bonus;\n  if (upgradeBonus > 0) args.output.feintBonusDesc.push(`升级虚招 +${upgradeBonus}`);\n  if (recorded.length > 0) args.output.feintBonusDesc.push(`收归无极虚招 +${recorded.length}`);\n  if (inWuji) args.output.feintBonusDesc.push(\"无极·虚招 +1\");\n}"
+                        },
+                        {
+                            "label": "击破封招",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (args.isBroken) {\n  const fz = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n  if (fz) {\n    const eff = { ...fz, name: game.i18n.localize(fz.name), description: game.i18n.localize(fz.description), duration: { rounds: 1 }, origin: thisItem.uuid };\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    actor.showFloatyText(\"封招！\", { fill: \"#8e44ad\" });\n  }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "剑挑星辰",
+                    "type": "real",
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "6米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，飞身（在空中）一跃，刺向目标，对目标造成0.7内息点内功伤害，若自身处于“无极”状态，则你的身形模糊难测，施展此招时不可被选中。</p><p>当有角色处于半空中时，你可以消耗反应动作，飞身击敌。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+10。</p>",
+                    "automationNote": "出招时若处于【无极】自动发送不可被选中提示。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "无极不可选中提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bahuang_wuji\")) {\n  const html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #9b59b6; background:rgba(155,89,182,0.06); margin-left:4px;\">\\n  <div style=\"font-weight:bold; color:#6c3483;\"><i class=\"fas fa-dice-d6\"></i> 剑挑星辰</div>\\n  <div style=\"font-size:0.85em; color:#555;\">处于【无极】状态，身形模糊难测，施展此招时<b>不可被选中</b>。</div>\\n</div>`;\n  ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });\n  actor.showFloatyText(\"身形模糊·不可被选中\", { fill: \"#9b59b6\" });\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "剑凌绝顶",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "@{3 + @up|3}米",
+                    "targetInfo": "范围内所有角色",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，举起长剑，剑意冲霄，压服众生，与范围内所有角色进行一次定力对抗，使所有对抗失败的角色陷入“压服”状态，持续到你的回合结束。</p><p>·<strong>压服：</strong>兵器被剑意压制，无法使用兵器出招。</p><p><strong>升级：</strong>招式距离+1，内力消耗-10。</p>",
+                    "automationNote": "神采对抗自动；对抗失败方需手动判定“直到施展者回合结束无法使用兵器出招”。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            50,
+                            40,
+                            30,
+                            20
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "定力压服对抗",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "await Macros.requestContest({\n  attacker: actor,\n  defender: args.target,\n  type: \"dingli\",\n  label: \"剑凌绝顶 - 神采压制\",\n  outcome: {\n    win: { text: \"剑意冲霄，目标被压服！<b>直到你的回合结束，目标无法使用兵器出招。</b>\" },\n    lose: { text: \"目标抵抗了剑意压服。\" }\n  }\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "六合八荒归无极",
+                    "type": "counter",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "@{1 + @up|1}米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>看破虚招时消耗反应动作施展，持剑扫下，将此招攻击归于无极，压制目标虚招，并且将此招的虚招效果加入你的【日月同天】中，持续到战斗结束。</p><p>你每将一种虚招招式收归无极，你的[日月同天]虚招值额外+1。</p><p><strong>升级：</strong>压制距离+1，内力消耗+10。</p>",
+                    "automationNote": "命中后自动扫描目标已学会的虚招并弹窗选择收归（记录效果、日月同天虚招值+1，重复不叠加）；收归记录可通过【归藏·无极】招式展示与清空。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "收归虚招",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 扫描目标所有已学会(已入门)的虚招，去重后供玩家选择收归\nconst targetActor = args.target;\nconst feintMoves = [];\nfor (const wuxueItem of targetActor.itemTypes.wuxue || []) {\n  for (const mv of wuxueItem.system.moves || []) {\n    if (mv.type === \"feint\" && (mv.computedLevel || 0) > 0) {\n      feintMoves.push({ name: mv.name, desc: mv.description || \"\" });\n    }\n  }\n}\nconst seen = new Set();\nconst unique = feintMoves.filter(fm => (seen.has(fm.name) ? false : (seen.add(fm.name), true)));\nconst recorded = actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_wuji\") || [];\nconst recordedNames = new Set(recorded.map(r => r.name));\nconst available = unique.filter(fm => !recordedNames.has(fm.name));\nif (available.length === 0) {\n  ui.notifications.info(`${targetActor.name} 没有可收归的虚招。`);\n  return;\n}\nconst formId = \"bahuang-feint-\" + foundry.utils.randomID();\nconst options = available.map((fm, i) => `<option value=\"${i}\">${fm.name}</option>`).join(\"\");\nconst result = await foundry.applications.api.DialogV2.wait({\n  window: { title: \"六合八荒归无极 - 收归虚招\", icon: \"fas fa-dice-d6\" },\n  content: `<p>从 <b>${targetActor.name}</b> 的虚招中选择一种收归无极（每种的【日月同天】虚招值+1，重复不叠加）：</p><select id=\"${formId}\" style=\"width:100%;padding:4px;\">${options}</select>`,\n  buttons: [{\n    action: \"ok\", label: \"收归\", icon: \"fas fa-check\", default: true,\n    callback: () => { const sel = document.getElementById(formId); return sel ? Number(sel.value) : 0; }\n  }],\n  rejectClose: false,\n  close: () => null\n});\nif (result === null) return;\nconst picked = available[result];\nconst newRecord = { name: picked.name, desc: picked.desc };\nawait actor.setFlag(\"xjzl-system\", \"wuxue_bahuang_wuji\", [...recorded, newRecord]);\nconst html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #9b59b6; background:rgba(155,89,182,0.06); margin-left:4px;\">\\n  <div style=\"font-weight:bold; color:#6c3483;\"><i class=\"fas fa-dice-d6\"></i> 收归无极</div>\\n  <div style=\"font-size:0.85em; color:#555;\">已将 <b>${picked.name}</b> 收归无极，其效果加入【日月同天】（虚招值+1）。</div>\\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });\nactor.showFloatyText(`收归: ${picked.name}`, { fill: \"#9b59b6\" });"
+                        }
+                    ]
+                },
+                {
+                    "name": "归藏·无极",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "yang",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>展示已收归无极的虚招记录，应用后清空记录。</p><p><strong>注：</strong>此招为系统辅助招式，用于呈现【六合八荒归无极】收归的虚招，非规则书招式。</p>",
+                    "automationNote": "施展时直接发送卡片展示已收归的虚招；点击【应用】后清空记录。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0,
+                            0
+                        ],
+                        "rage": [],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "展示记录",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const recorded = actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_wuji\") || [];\nlet body;\nif (recorded.length === 0) {\n  body = `<div style=\"font-size:0.85em; color:#555;\">当前没有已收归无极的虚招。</div>`;\n} else {\n  const itemsHtml = recorded.map((r, i) => `<div style=\"margin:6px 0; padding:6px 8px; border-left:3px solid #9b59b6; background:rgba(155,89,182,0.06); border-radius:4px;\">\\n  <div style=\"font-weight:bold; color:#6c3483;\">${i + 1}. ${r.name}</div>\\n  <div style=\"font-size:0.85em; color:#555; margin-top:2px;\">${r.desc}</div>\\n</div>`).join(\"\");\n  body = `${itemsHtml}\\n  <div style=\"font-size:0.8em; color:#888; margin-top:6px;\">以上 ${recorded.length} 种虚招已记入【日月同天】，每种的虚招值+1。点击本招式的【应用】后清空记录。</div>`;\n}\nconst html = `<div class=\"xjzl-chat-card\" style=\"padding:8px; border-left:4px solid #9b59b6; background:rgba(0,0,0,0.02); margin-left:4px;\">\\n  <header class=\"card-header\" style=\"border-bottom:1px solid #9b59b6; padding-bottom:4px; margin-bottom:6px;\">\\n    <h3 style=\"margin:0; color:#6c3483;\"><i class=\"fas fa-dice-d6\"></i> 收归无极的虚招</h3>\\n  </header>\\n  ${body}\\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });"
+                        },
+                        {
+                            "label": "应用清空",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "const recorded = actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_wuji\") || [];\nif (recorded.length > 0) {\n  await actor.unsetFlag(\"xjzl-system\", \"wuxue_bahuang_wuji\");\n  ui.notifications.info(`已清空收归无极的虚招记录（${recorded.length} 种）。`);\n  actor.showFloatyText(\"记录已清空\", { fill: \"#9b59b6\" });\n} else {\n  ui.notifications.info(\"当前没有已收归无极的虚招记录。\");\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "千道万法无岁月",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "yang",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，挥剑一斩，仿佛万千剑光从四面八方席卷而来，对目标造成1.0内息点内功伤害，若自身处于“无极”状态，则下一次施展【千道万法无岁月】的怒气消耗-4。</p><p>当你进入战斗后的第一个回合，你可以不消耗怒气，直接施展此招，跨越时空击敌，若如此做，你的怒气值变为-10，视为怒气被过去借走。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+20。</p>",
+                    "automationNote": "完全自动化。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "neixi",
+                                "ratio": 1.0
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            20,
+                            40,
+                            60,
+                            80
+                        ],
+                        "rage": [
+                            10,
+                            9,
+                            8,
+                            7
+                        ],
+                        "hp": []
+                    },
+                    "scripts": [
+                        {
+                            "label": "无极减怒",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bahuang_wuji\")) {\n  const eff = thisItem.effects.getName(\"千道·借势\").toObject();\n  delete eff._id;\n  eff.origin = thisItem.uuid;\n  await game.xjzl.api.effects.addEffect(actor, eff);\n  actor.showFloatyText(\"千道·借势（下次怒气-4）\", { fill: \"#9b59b6\" });\n}"
+                        },
+                        {
+                            "label": "第一回合免费",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (game.combat?.round === 1 && !actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_free\")) {\n  const yes = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"千道万法无岁月\", icon: \"fas fa-hourglass-half\" },\n    content: \"<p>处于战斗<b>第一个回合</b>，你可以<b>不消耗怒气</b>直接施展此招。<br>若如此做，你的怒气值变为 <b>-10</b>，视为怒气被过去借走。</p>\",\n    yes: { label: \"不消耗怒气\", icon: \"fas fa-bolt\" },\n    no: { label: \"正常施展\", icon: \"fas fa-times\" }\n  });\n  if (yes) {\n    args.costConfig.rage = 0;\n    await actor.setFlag(\"xjzl-system\", \"wuxue_bahuang_free\", true);\n  }\n}"
+                        },
+                        {
+                            "label": "怒气借贷",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "if (actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_free\")) {\n  await actor.unsetFlag(\"xjzl-system\", \"wuxue_bahuang_free\");\n  await actor.update({ \"system.resources.rage.value\": -10 });\n  const html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #e74c3c; background:rgba(231,76,60,0.06); margin-left:4px;\">\\n  <div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-hourglass-half\"></i> 怒气被过去借走</div>\\n  <div style=\"font-size:0.85em; color:#555;\">跨越时空击敌，怒气值变为 <b>-10</b>。此后每次受击回怒 +1 都将用于还债，攒满 10 点怒气即还清。</div>\\n</div>`;\n  ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });\n  actor.showFloatyText(\"怒气-10·借走\", { fill: \"#e74c3c\" });\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "无极",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "你无法被实招指定为目标。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 1
+                },
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_bahuang_wuji",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "无极·实招免疫",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "if (move?.type === \"real\") {\n  args.output.abort = true;\n  actor.showFloatyText(\"无极·无法被实招选中\", { fill: \"#9b59b6\" });\n  const html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #9b59b6; background:rgba(155,89,182,0.06); margin-left:4px;\">\\n  <div style=\"font-weight:bold; color:#6c3483;\"><i class=\"fas fa-dice-d6\"></i> 无极</div>\\n  <div style=\"font-size:0.85em; color:#555;\">${actor.name} 处于【无极】状态，无法被实招指定为目标，本次实招被免疫。</div>\\n</div>`;\n  await ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });\n}"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "千道·借势",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "下一次施展【千道万法无岁月】的怒气消耗-4，触发一次后消失。",
+                "transfer": false,
+                "changes": [],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_bahuang_rage_down",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "千道万法无岁月减怒",
+                                "trigger": "preAttack",
+                                "active": true,
+                                "script": "if (move?.name === \"千道万法无岁月\") {\n  args.costConfig.rage = Math.max(0, (args.costConfig.rage || 0) - 4);\n  await thisEffect.delete();\n  ui.notifications.info(\"千道·借势：千道万法无岁月怒气消耗-4。\");\n}"
+                            }
+                        ]
+                    }
+                }
+            }
+        ]
     }
 ]
