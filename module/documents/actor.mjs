@@ -1901,7 +1901,7 @@ export class XJZLActor extends Actor {
      * [核心] 治疗处理函数
      * @param {Object} data
      * @param {number} data.amount - 治疗数值 (正数=回复, 负数=流失)
-     * @param {string} data.type - 类型: "hp" | "neili" | "mp" | "huti" | "tili"
+     * @param {string} data.type - 类型: "hp" | "neili" | "mp" | "huti" | "tili" | "rage"
      * @param {boolean} [data.showScrolling=true] - 是否显示飘字
      * @param {Actor} [data.healer] - 施加治疗/流失的源头 Actor。传入此参数有助于底层脚本引擎精准溯源该效果是由哪件装备/Buff触发的（用于战斗统计）。
      * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
@@ -2037,6 +2037,29 @@ export class XJZLActor extends Actor {
       color = "#82C96F";
     }
 
+    // E. 怒气 (Rage)
+    else if (type === "rage") {
+      const current = this.system.resources.rage.value;
+      const max = this.system.resources.rage.max;
+      oldVal = current;
+
+      // 不怒 (怒气锁定) 只阻止获得怒气，不阻止扣除
+      if (amount > 0 && this.xjzlStatuses.noRecoverRage) {
+        actualHeal = 0;
+        newVal = current;
+      } else {
+        // 回复不超过上限，扣除不低于 0
+        newVal = amount > 0 ? Math.min(max, current + amount) : Math.max(0, current + amount);
+        actualHeal = newVal - current;
+        if (actualHeal !== 0) {
+          updates["system.resources.rage.value"] = newVal;
+        }
+      }
+
+      label = `怒气 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
+      color = "#e67e22"; // 橙
+    }
+
     // 执行更新
     // 注意：如果 updates 为空（被 Flag 拦截导致 actualHeal=0），这里就不会执行
     if (!foundry.utils.isEmpty(updates)) {
@@ -2061,6 +2084,7 @@ export class XJZLActor extends Actor {
         if (amount > 0) {
           if (type === "hp" && this.xjzlStatuses.noRecoverHP) blockLabel = "禁疗";
           if ((type === "mp" || type === "neili") && this.xjzlStatuses.noRecoverNeili) blockLabel = "气滞";
+          if (type === "rage" && this.xjzlStatuses.noRecoverRage) blockLabel = "怒气锁定";
         }
 
         if (blockLabel) {
@@ -2072,6 +2096,7 @@ export class XJZLActor extends Actor {
     const isBlocked = amount > 0 && (
       (type === "hp" && !!this.xjzlStatuses.noRecoverHP)
       || ((type === "mp" || type === "neili") && !!this.xjzlStatuses.noRecoverNeili)
+      || (type === "rage" && !!this.xjzlStatuses.noRecoverRage)
     );
     const finalHealResult = {
       actualHeal: actualHeal,
