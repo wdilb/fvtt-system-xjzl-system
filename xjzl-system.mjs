@@ -1482,8 +1482,11 @@ Hooks.on("deleteCombat", async (combat, options, userId) => {
     if (actor && actor.system.resources?.rage?.value > 0) {
 
       // 执行更新
-      await actor.update({
+      await actor.changeResources({
         "system.resources.rage.value": 0
+      }, {
+        cause: "combatEnd",
+        sourceActor: actor
       });
       hasUpdated = true;
     }

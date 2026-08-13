@@ -484,7 +484,11 @@ export class XJZLItem extends Item {
     actorUpdates["system.resources.rage.value"] = 0;
 
     if (!foundry.utils.isEmpty(actorUpdates)) {
-      await actor.update(actorUpdates);
+      await actor.changeResources(actorUpdates, {
+        cause: "neigongToggle",
+        sourceActor: actor,
+        item: this
+      });
     }
 
     // === 3. 提示信息 ===
@@ -1910,7 +1914,12 @@ export class XJZLItem extends Item {
       }
 
       if (!foundry.utils.isEmpty(resourceUpdates)) {
-        await actor.update(resourceUpdates);
+        await actor.changeResources(resourceUpdates, {
+          cause: "moveCost",
+          sourceActor: actor,
+          item: this,
+          move
+        });
       }
 
       // 读取招式配置的 actionCost (比如 "主要动作")

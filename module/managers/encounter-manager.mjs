@@ -353,7 +353,10 @@ export class EncounterManager {
         const configuredMax = Number(resource.max);
         const max = Number.isFinite(configuredMax) ? Math.max(0, configuredMax) : 10;
         const newValue = Math.max(0, Math.min(max, oldValue + amount));
-        await actor.update({ "system.resources.rage.value": newValue });
+        await actor.changeResources({ "system.resources.rage.value": newValue }, {
+          cause: "encounter",
+          sourceActor: actor
+        });
         results.push(`${target.name}：${newValue - oldValue >= 0 ? "+" : ""}${newValue - oldValue}`);
       }
     }

@@ -1642,7 +1642,12 @@ export class ChatCardManager {
 
             if (isValidType && attRage.value < attRage.max && !attNoRecover) {
                 // 执行更新
-                await attacker.update({ "system.resources.rage.value": attRage.value + 1 });
+                await attacker.changeResources({ "system.resources.rage.value": attRage.value + 1 }, {
+                    cause: "hitRage",
+                    sourceActor: attacker,
+                    item,
+                    move
+                });
             }
         }
 
@@ -1738,11 +1743,10 @@ export class ChatCardManager {
 
         // 应用数值更新
         if (!foundry.utils.isEmpty(updates)) {
-            if (actor.isOwner) {
-                await actor.update(updates);
-            } else {
-                await xjzlSocket.executeAsGM("updateDocument", actor.uuid, updates);
-            }
+            await actor.changeResources(updates, {
+                cause: "damageUndo",
+                target: actor
+            });
         }
 
         // =====================================================
@@ -1845,8 +1849,10 @@ export class ChatCardManager {
             updates[path] = Math.max(0, current - amount);
         }
 
-        if (actor.isOwner) await actor.update(updates);
-        else await xjzlSocket.executeAsGM("updateDocument", actor.uuid, updates);
+        await actor.changeResources(updates, {
+            cause: "healingUndo",
+            target: actor
+        });
 
         const div = document.createElement("div");
         div.innerHTML = message.content;
@@ -2084,7 +2090,12 @@ export class ChatCardManager {
             const isValidType = ["waigong", "neigong"].includes(flags.damageType);
 
             if (isValidType && attRage.value < attRage.max && !attNoRecover) {
-                await attacker.update({ "system.resources.rage.value": attRage.value + 1 });
+                await attacker.changeResources({ "system.resources.rage.value": attRage.value + 1 }, {
+                    cause: "hitRage",
+                    sourceActor: attacker,
+                    item,
+                    move
+                });
             }
         }
 
@@ -3024,7 +3035,10 @@ export class ChatCardManager {
 
         // 提交更新
         if (!foundry.utils.isEmpty(updates)) {
-            await actor.update(updates);
+            await actor.changeResources(updates, {
+                cause: "moveCostRefund",
+                sourceActor: actor
+            });
             ui.notifications.info(`${actor.name} 的出招消耗已返还（特殊的buff与执行的脚本无法回退）。`);
         }
 

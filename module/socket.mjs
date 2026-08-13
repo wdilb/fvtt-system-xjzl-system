@@ -9,6 +9,7 @@ export function setupSocket() {
     // 注册所有需要 GM 权限的方法
     xjzlSocket.register("applyDamage", _socketApplyDamage);
     xjzlSocket.register("applyHealing", _socketApplyHealing);
+    xjzlSocket.register("changeResources", _socketChangeResources);
     xjzlSocket.register("addEffect", _socketAddEffect);
     xjzlSocket.register("removeEffect", _socketRemoveEffect);
     xjzlSocket.register("updateDocument", _socketUpdateDocument);
@@ -55,6 +56,25 @@ async function _socketApplyHealing(targetUuid, data) {
     if (!target) return { actualHeal: 0 };
     if (data.healerUuid) data.healer = await fromUuid(data.healerUuid);
     return await target.applyHealing(data);
+}
+
+/** 在主 GM 端恢复资源上下文中的文档引用，并执行统一资源事务。 */
+async function _socketChangeResources(targetUuid, updates, context = {}) {
+    if (isNotActiveGM()) return null;
+    context = context || {};
+    const target = await fromUuid(targetUuid);
+    if (!target) return null;
+    if (context.itemUuid) context.item = await fromUuid(context.itemUuid);
+    if (context.sourceActorUuid) context.sourceActor = await fromUuid(context.sourceActorUuid);
+    if (context.targetUuid) context.target = await fromUuid(context.targetUuid);
+    if (context.attackerUuid) context.attacker = await fromUuid(context.attackerUuid);
+    if (context.healerUuid) context.healer = await fromUuid(context.healerUuid);
+    delete context.itemUuid;
+    delete context.sourceActorUuid;
+    delete context.targetUuid;
+    delete context.attackerUuid;
+    delete context.healerUuid;
+    return await target.changeResources(updates, context);
 }
 
 async function _socketAddEffect(targetUuid, effectData, count) {

@@ -24,6 +24,7 @@ export const SCRIPT_TRIGGERS = {
   TURN_START: "turnStart",  // [异步] 回合开始
   TURN_END: "turnEnd",      // [异步] 回合结束
   COMBAT_START: "combatStart", // [异步] 战斗开始
+  RESOURCE_CHANGED: "resourceChanged", // [异步] 资源实际变动后
   // EQUIP: "equip",           // [异步] 装备/卸下时 (特殊逻辑)
 };
 
@@ -46,6 +47,7 @@ export const TRIGGER_CHOICES = {
   [SCRIPT_TRIGGERS.TURN_START]: "XJZL.Triggers.TurnStart",
   [SCRIPT_TRIGGERS.TURN_END]: "XJZL.Triggers.TurnEnd",
   [SCRIPT_TRIGGERS.COMBAT_START]: "XJZL.Triggers.CombatStart",
+  [SCRIPT_TRIGGERS.RESOURCE_CHANGED]: "XJZL.Triggers.ResourceChanged",
   // [SCRIPT_TRIGGERS.EQUIP]: "XJZL.Triggers.Equip"
 };
 
