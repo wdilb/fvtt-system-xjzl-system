@@ -583,7 +583,7 @@ await Macros.requestSave({
 | `bonus` | Number | **(可选)** 预设检定数值修正。默认 `0`。 |
 | `attacker`| Actor | **(可选)** 发起者。用于在卡片上显示名字，及作为伤害来源以便计算反伤/受击特效。 |
 | `onFail` / `onSuccess` | String/Object/Array | **(可选)** 失败/成功时自动应用的状态。支持系统预设 ID (如 `"dianxue"`) 或自定义 AE 数据对象。 |
-| `damageOnFail` / `damageOnSuccess` | Object | **(可选)** 失败/成功时的后果。结构: `{ value: 10, type: "..." }`。<br>• 若 `type` 为资源 (`"hp"`, `"mp"`, `"tili"`)：**直接流失**，无视护甲抗性。<br>• 若 `type` 为伤害 (`"poison"`, `"waigong"`)：**造成伤害**，正常计算目标抗性和护体抵扣。 |
+| `damageOnFail` / `damageOnSuccess` | Object | **(可选)** 失败/成功时的后果。结构: `{ value: 10, type: "..." }`。<br>• 若 `type` 为资源 (`"hp"`, `"mp"`, `"tili"`, `"rage"`)：**直接流失**，无视护甲抗性。<br>• 若 `type` 为伤害 (`"poison"`, `"waigong"`)：**造成伤害**，正常计算目标抗性和护体抵扣。 |
 | `successText` / `failureText` | String | **(可选)** 成功/失败时的自定义战报提示文本。 |
 | `removeStanceOnSuccess` / `removeStanceOnFail` | Boolean | **(可选)** 在对应检定结果出现时通过 `actor.stopStance()` 解除检定者当前架招，并清理其 `tiedToStance` AE。默认 `false`。 |
 
