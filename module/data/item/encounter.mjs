@@ -18,7 +18,7 @@ const actionSchema = () => new fields.SchemaField({
   automationType: new fields.StringField({ initial: "description", choices: AUTOMATION_TYPES }),
   amountFormula: new fields.StringField({ initial: "0" }),
   damageType: new fields.StringField({ initial: "waigong", choices: DAMAGE_TYPES }),
-  minRound: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+  minRound: new fields.NumberField({ initial: 1, min: 1, integer: true }),
   cooldownRounds: new fields.NumberField({ initial: 0, min: 0, integer: true })
 });
 
@@ -57,20 +57,28 @@ export class XJZLEncounterData extends foundry.abstract.TypeDataModel {
   static migrateData(source) {
     super.migrateData(source);
     const support = source.support;
-    if (!support || Array.isArray(support.groups)) return source;
-    const hasLegacyData = Array.isArray(support.npcs)
-      || ["permission", "encounterLimit", "roundLimit", "oncePerNpcPerRound"].some(key => key in support);
-    support.groups = hasLegacyData ? [{
-      id: "legacy-support",
-      name: "",
-      description: "",
-      enabled: true,
-      permission: support.permission ?? "gm",
-      encounterLimit: support.encounterLimit ?? 0,
-      roundLimit: support.roundLimit ?? 0,
-      oncePerNpcPerRound: support.oncePerNpcPerRound ?? true,
-      npcs: support.npcs ?? []
-    }] : [];
+    if (!support) return source;
+    if (!Array.isArray(support.groups)) {
+      const hasLegacyData = Array.isArray(support.npcs)
+        || ["permission", "encounterLimit", "roundLimit", "oncePerNpcPerRound"].some(key => key in support);
+      support.groups = hasLegacyData ? [{
+        id: "legacy-support",
+        name: "",
+        description: "",
+        enabled: true,
+        permission: support.permission ?? "gm",
+        encounterLimit: support.encounterLimit ?? 0,
+        roundLimit: support.roundLimit ?? 0,
+        oncePerNpcPerRound: support.oncePerNpcPerRound ?? true,
+        npcs: support.npcs ?? []
+      }] : [];
+    }
+    // 旧数据中的 0 与第 1 回合语义相同，统一收敛为用户可见的最小值 1。
+    for (const group of support.groups) {
+      for (const npc of group.npcs ?? []) {
+        for (const action of npc.actions ?? []) action.minRound = Math.max(1, Math.trunc(Number(action.minRound) || 1));
+      }
+    }
     return source;
   }
 

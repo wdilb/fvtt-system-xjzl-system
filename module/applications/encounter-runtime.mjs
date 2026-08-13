@@ -26,7 +26,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     id: "xjzl-encounter-runtime",
     tag: "div",
     classes: ["xjzl-encounter-runtime"],
-    position: { width: 132, height: "auto" },
+    position: { width: 190, height: "auto" },
     window: { title: "XJZL.Encounter.BattleSituation", icon: "fas fa-shield", resizable: false, minimizable: false },
     actions: {
       linkEncounter: EncounterRuntimeApp.prototype._onLinkEncounter,
@@ -206,7 +206,10 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     const state = raw ? foundry.utils.deepClone(raw) : null;
     const isGM = game.user.isGM;
     const accessibleGroups = state?.support?.groups?.filter(group => isGM || group.permission === "players") ?? [];
+    // 详细战术视图是 GM 的管理面，必须保留停用对象；紧凑 HUD 另建一份只含启用链路的展示副本。
     const canUseSupport = accessibleGroups.length > 0;
+    let compactSupportGroups = [];
+    let hasCompactSupport = false;
     if (!canUseSupport && this.activeSection === "support") this.activeSection = "fields";
     if (state?.status === "linked") {
       state.fieldEffects = state.fieldEffects.map(effect => {
@@ -271,6 +274,18 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
           npcs
         };
       });
+      compactSupportGroups = state.support.groups
+        .filter(group => group.enabled !== false)
+        .map(group => ({
+          ...group,
+          npcs: group.npcs
+            .filter(npc => npc.enabled !== false)
+            .map(npc => ({ ...npc, actions: npc.actions.filter(action => action.enabled !== false) }))
+            .filter(npc => npc.actions.length > 0)
+        }))
+        .filter(group => group.npcs.length > 0);
+      hasCompactSupport = compactSupportGroups.length > 0;
+      if (!hasCompactSupport && this.viewMode === "compact" && this.activeSection === "support") this.activeSection = "fields";
       state.pendingItems = state.pendingItems.filter(item => !item.resolved).map(item => ({
         ...item,
         triggerLabel: game.i18n.localize(CONFIG.XJZL.encounter.fieldTriggers[item.trigger] || "XJZL.Encounter.SupportUse")
@@ -286,7 +301,9 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
       canUseSupport,
       activeSection: this.activeSection,
       compact: this.viewMode === "compact",
-      detailed: this.viewMode === "detailed"
+      detailed: this.viewMode === "detailed",
+      compactSupportGroups,
+      hasCompactSupport
     };
   }
 
@@ -299,6 +316,32 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
         this.render({ force: true, position: { width: 600, height: "auto" } });
       });
     }
+    this._bindCompactDescriptionScroll(element);
+  }
+
+  /** 为紧凑 HUD 的超长说明计算可视差值；真正的往返动画交给 CSS，避免持续计时器占用战斗 HUD。 */
+  _bindCompactDescriptionScroll(root) {
+    const update = () => {
+      for (const viewport of root.querySelectorAll("[data-auto-scroll]")) {
+        const track = viewport.firstElementChild;
+        if (!track) continue;
+        const distance = Math.max(0, track.scrollHeight - viewport.clientHeight);
+        // 只忽略亚像素级误差；只要有一行被裁切，就必须启动滚动。
+        const shouldScroll = distance > 2;
+        viewport.classList.toggle("has-auto-scroll", shouldScroll);
+        if (!shouldScroll) {
+          viewport.style.removeProperty("--description-scroll-distance");
+          viewport.style.removeProperty("--description-scroll-duration");
+          continue;
+        }
+        viewport.style.setProperty("--description-scroll-distance", `${distance}px`);
+        // 以固定像素速度计算周期，文字越长只会多花时间，不会被最大时长压缩得更快。
+        viewport.style.setProperty("--description-scroll-duration", `${Math.max(3, distance / 10)}s`);
+      }
+    };
+    update();
+    // 字体加载和首帧布局可能改变换行高度；补一次测量，避免首屏把长文本误判为短文本。
+    requestAnimationFrame(update);
   }
 
   _remainingLabel(value) {
@@ -331,7 +374,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
 
   async _onToggleViewMode() {
     this.viewMode = this.viewMode === "compact" ? "detailed" : "compact";
-    const width = this.viewMode === "compact" ? 132 : 600;
+    const width = this.viewMode === "compact" ? 190 : 600;
     this.render({ force: true, position: { width, height: "auto" } });
   }
 
@@ -352,7 +395,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     const effect = this._findEffect(target.dataset.effectId);
     if (!effect) return;
     await DialogV2.prompt({
-      classes: ["xjzl-battle-dialog"],
+      classes: ["xjzl-battle-dialog", "xjzl-rule-viewer-dialog"],
       position: { width: 420, height: "auto" },
       window: { title: effect.name },
       content: `<div class="xjzl-encounter-rule-dialog">${effect.description || game.i18n.localize("XJZL.Encounter.NoDescription")}</div>`,
@@ -366,7 +409,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     const action = npc?.actions.find(entry => entry.id === target.dataset.actionId);
     if (!action) return;
     await DialogV2.prompt({
-      classes: ["xjzl-battle-dialog"],
+      classes: ["xjzl-battle-dialog", "xjzl-rule-viewer-dialog"],
       position: { width: 520, height: "auto" },
       window: { title: `${npc.snapshotName} · ${action.name}` },
       content: `<div class="xjzl-encounter-rule-dialog">${action.description || game.i18n.localize("XJZL.Encounter.NoDescription")}</div>`,
@@ -563,7 +606,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
         <div class="form-grid">
           <label>${game.i18n.localize("XJZL.Encounter.TargetMode")}<select name="targetMode">${this._choiceOptions(CONFIG.XJZL.encounter.actionTargets, action.targetMode)}</select><small>${game.i18n.localize("XJZL.Encounter.ActionTargetHint")}</small></label>
           <label data-max-targets>${game.i18n.localize("XJZL.Encounter.MaxTargets")}<input type="number" min="0" name="maxTargets" value="${action.maxTargets}"><small>${game.i18n.localize("XJZL.Encounter.MaxTargetsHint")}</small></label>
-          <label>${game.i18n.localize("XJZL.Encounter.MinRound")}<input type="number" min="0" name="minRound" value="${action.minRound ?? 0}"><small>${game.i18n.localize("XJZL.Encounter.MinRoundHint")}</small></label>
+          <label>${game.i18n.localize("XJZL.Encounter.MinRound")}<input type="number" min="1" name="minRound" value="${action.minRound ?? 1}"><small>${game.i18n.localize("XJZL.Encounter.MinRoundHint")}</small></label>
           <label>${game.i18n.localize("XJZL.Encounter.CooldownRounds")}<input type="number" min="0" name="cooldownRounds" value="${action.cooldownRounds ?? 0}"><small>${game.i18n.localize("XJZL.Encounter.CooldownRoundsHint")}</small></label>
           <label>${game.i18n.localize("XJZL.Encounter.AutomationType")}<select name="automationType">${this._choiceOptions(CONFIG.XJZL.encounter.automationTypes, action.automationType)}</select><small>${game.i18n.localize("XJZL.Encounter.AutomationTypeHint")}</small></label>
           <label data-amount-formula>${game.i18n.localize("XJZL.Encounter.AmountFormula")}<input name="amountFormula" value="${html(action.amountFormula)}"><small>${game.i18n.localize("XJZL.Encounter.FormulaHint")}</small></label>
@@ -594,7 +637,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
               enabled: form.elements.enabled.checked,
               targetMode: form.elements.targetMode.value,
               maxTargets: Math.max(0, Math.trunc(Number(form.elements.maxTargets.value) || 0)),
-              minRound: Math.max(0, Math.trunc(Number(form.elements.minRound.value) || 0)),
+              minRound: Math.max(1, Math.trunc(Number(form.elements.minRound.value) || 1)),
               cooldownRounds: Math.max(0, Math.trunc(Number(form.elements.cooldownRounds.value) || 0)),
               automationType: form.elements.automationType.value,
               amountFormula: form.elements.amountFormula.value,

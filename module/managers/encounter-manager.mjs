@@ -446,8 +446,8 @@ export class EncounterManager {
     if (!npc || !action) return game.i18n.localize("XJZL.Encounter.SupportMissing");
     if (!group.enabled || !npc.enabled || !action.enabled) return game.i18n.localize("XJZL.Encounter.SupportDisabled");
     // 时间门槛优先于次数额度：未到解锁回合、或仍处于冷却期内，都先报时间原因。
-    const minRound = Math.max(0, Math.trunc(Number(action.minRound) || 0));
-    if (minRound > 0 && round < minRound) return game.i18n.format("XJZL.Encounter.NotUnlockedYet", { round: minRound });
+    const minRound = Math.max(1, Math.trunc(Number(action.minRound) || 1));
+    if (round < minRound) return game.i18n.format("XJZL.Encounter.NotUnlockedYet", { round: minRound });
     const cooldownRounds = Math.max(0, Math.trunc(Number(action.cooldownRounds) || 0));
     const lastUsedRound = Number(action.lastUsedRound);
     if (cooldownRounds > 0 && action.lastUsedRound != null && Number.isFinite(lastUsedRound)) {
