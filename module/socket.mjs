@@ -55,6 +55,9 @@ async function _socketApplyHealing(targetUuid, data) {
     const target = await fromUuid(targetUuid);
     if (!target) return { actualHeal: 0 };
     if (data.healerUuid) data.healer = await fromUuid(data.healerUuid);
+    if (data.itemUuid) data.item = await fromUuid(data.itemUuid);
+    delete data.healerUuid;
+    delete data.itemUuid;
     return await target.applyHealing(data);
 }
 

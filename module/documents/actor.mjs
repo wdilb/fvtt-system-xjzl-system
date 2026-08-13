@@ -24,6 +24,15 @@ const RESOURCE_FIELDS = Object.freeze([
 ]);
 const RESOURCE_SCRIPT_MAX_DEPTH = 8;
 const EMPTY_RESOURCE_CONTEXT = Object.freeze({});
+// 只有这些阶段代表角色正在施展招式；回合与受击脚本即使归属于某招式，也不能冒充“出招来源”。
+const MOVE_ACTION_RESOURCE_TRIGGERS = new Set([
+  SCRIPT_TRIGGERS.PRE_ATTACK,
+  SCRIPT_TRIGGERS.ATTACK,
+  SCRIPT_TRIGGERS.CHECK,
+  SCRIPT_TRIGGERS.PRE_DAMAGE,
+  SCRIPT_TRIGGERS.HIT,
+  SCRIPT_TRIGGERS.HIT_ONCE
+]);
 const RESOURCE_TRANSACTION_OPTIONS = new Set([
   "xjzlResourceContext",
   "xjzlResourceTransaction"
@@ -58,7 +67,7 @@ function inheritResourceChain(context = null, inheritedContext = null) {
 }
 
 /**
- * 从当前脚本调用栈补齐资源来源，使旧招式直接 update/applyHealing 时仍能识别当前招式。
+ * 从当前脚本调用栈补齐资源来源，使旧招式直接 update/applyHealing 时仍能识别当前动作。
  */
 function inheritScriptResourceContext(actor, context = {}) {
   const stack = actor?._scriptContextStack;
@@ -67,10 +76,11 @@ function inheritScriptResourceContext(actor, context = {}) {
 
   const inherited = { ...(context || EMPTY_RESOURCE_CONTEXT) };
   if (!inherited.sourceActor) inherited.sourceActor = actor;
+  if (!inherited.item && current.actionItem instanceof Item) inherited.item = current.actionItem;
   if (!inherited.item && current.item instanceof Item) inherited.item = current.item;
-  if (!inherited.move && current.contextData) inherited.move = current.contextData;
+  if (!inherited.move && current.actionMove) inherited.move = current.actionMove;
   if (!inherited.cause) inherited.cause = "script";
-  if (!inherited.source && inherited.move) inherited.source = "move";
+  if (!inherited.source && current.actionSource) inherited.source = current.actionSource;
   return inherited;
 }
 
@@ -1061,6 +1071,15 @@ export class XJZLActor extends Actor {
     const scriptsToRun = this.collectScripts(trigger, contextItem);
     if (!scriptsToRun.length) return;
 
+    // 固定本次运行的动作上下文，避免后续为被动脚本注入的 contextData 被误判为正在出招。
+    const actionContext = MOVE_ACTION_RESOURCE_TRIGGERS.has(trigger) && context?.move
+      ? {
+        item: context.item instanceof Item ? context.item : null,
+        move: context.move,
+        source: "move"
+      }
+      : null;
+
     // 2. 准备基础沙盒变量
     const sandbox = {
       ...context,           // 展开传入的上下文
@@ -1084,16 +1103,19 @@ export class XJZLActor extends Actor {
     const isSync = [SCRIPT_TRIGGERS.PASSIVE, SCRIPT_TRIGGERS.CALC].includes(trigger);
 
     if (isSync) {
-      this._runScriptsSync(scriptsToRun, sandbox);
+      this._runScriptsSync(scriptsToRun, sandbox, actionContext);
     } else {
-      await this._runScriptsAsync(scriptsToRun, sandbox);
+      await this._runScriptsAsync(scriptsToRun, sandbox, actionContext);
     }
   }
 
   /**
    * [内部] 同步执行 (用于 Passive, Calc)
+   * @param {Object[]} scripts - 已收集并按顺序执行的脚本条目
+   * @param {Object} sandbox - 本次触发共享的脚本沙盒
+   * @param {Object|null} actionContext - 仅在主动招式阶段存在的资源来源上下文
    */
-  _runScriptsSync(scripts, sandbox) {
+  _runScriptsSync(scripts, sandbox, actionContext = null) {
     // 初始化执行上下文栈
     if (!this._scriptContextStack) this._scriptContextStack = [];
     for (const entry of scripts) {
@@ -1131,7 +1153,10 @@ export class XJZLActor extends Actor {
           item: thisItem,
           effect: thisEffect,
           label: entry.label,
-          contextData: entry.contextData || null
+          contextData: entry.contextData || null,
+          actionItem: actionContext?.item || null,
+          actionMove: actionContext?.move || null,
+          actionSource: actionContext?.source || null
         });
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
@@ -1154,8 +1179,11 @@ export class XJZLActor extends Actor {
 
   /**
    * [内部] 异步执行 (用于 Attack, Hit, TurnStart...)
+   * @param {Object[]} scripts - 已收集并按顺序执行的脚本条目
+   * @param {Object} sandbox - 本次触发共享的脚本沙盒
+   * @param {Object|null} actionContext - 仅在主动招式阶段存在的资源来源上下文
    */
-  async _runScriptsAsync(scripts, sandbox) {
+  async _runScriptsAsync(scripts, sandbox, actionContext = null) {
     // 初始化执行上下文栈
     if (!this._scriptContextStack) this._scriptContextStack = [];
 
@@ -1189,7 +1217,10 @@ export class XJZLActor extends Actor {
           item: thisItem,
           effect: thisEffect,
           label: entry.label,
-          contextData: entry.contextData || null
+          contextData: entry.contextData || null,
+          actionItem: actionContext?.item || null,
+          actionMove: actionContext?.move || null,
+          actionSource: actionContext?.source || null
         });
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -2310,24 +2341,17 @@ export class XJZLActor extends Actor {
      * @param {string} data.type - 类型: "hp" | "neili" | "mp" | "huti" | "tili" | "rage"
      * @param {boolean} [data.showScrolling=true] - 是否显示飘字
      * @param {Actor} [data.healer] - 施加治疗/流失的源头 Actor。传入此参数有助于底层脚本引擎精准溯源该效果是由哪件装备/Buff触发的（用于战斗统计）。
+     * @param {Object} [data.move] - 当前招式；脚本内省略时会从正在执行的动作继承
+     * @param {Item} [data.item] - 当前招式所属物品；脚本内省略时会从正在执行的动作继承
+     * @param {string} [data.source="extra"] - 资源来源标识
      * @returns {Promise<Object>} 返回结果 { actualHeal, type, oldVal, newVal }
      */
   async applyHealing(data) {
-    // [权限拦截]
-    if (!this.isOwner) {
-      const socketData = { ...data };
-      if (data.healer) {
-        socketData.healerUuid = data.healer.uuid;
-        delete socketData.healer;
-      }
-      return await xjzlSocket.executeAsGM("applyHealing", this.uuid, socketData);
-    }
-    // --- 容器无法治疗 ---
-    if (this.type === "container") return { actualHeal: 0 };
-
-    // 显式传入 null 表示环境/系统治疗；完全省略 healer 才表示角色自身的被动恢复。
+    // 在权限路由前固化来源，否则目标交由 GM 处理后，调用者的脚本栈已经不可见。
     const hasExplicitHealer = Object.prototype.hasOwnProperty.call(data, "healer");
-    const scriptContext = inheritScriptResourceContext(this, {});
+    const inputHealer = data.healer ?? null;
+    const scriptOwner = inputHealer instanceof Actor ? inputHealer : this;
+    const scriptContext = inheritScriptResourceContext(scriptOwner, {});
     const {
       amount = 0,
       type = "hp",
@@ -2341,6 +2365,26 @@ export class XJZLActor extends Actor {
     const resourceItem = item || scriptContext.item || null;
     const resourceSource = source === "extra" ? (scriptContext.source || source) : source;
     const resourceHealer = hasExplicitHealer ? healer : (scriptContext.sourceActor || this);
+
+    // [权限拦截]
+    if (!this.isOwner) {
+      const socketData = {
+        ...data,
+        move: resourceMove,
+        source: resourceSource
+      };
+      if (resourceItem?.uuid) {
+        socketData.itemUuid = resourceItem.uuid;
+        delete socketData.item;
+      }
+      if (resourceHealer?.uuid) {
+        socketData.healerUuid = resourceHealer.uuid;
+        delete socketData.healer;
+      }
+      return await xjzlSocket.executeAsGM("applyHealing", this.uuid, socketData);
+    }
+    // --- 容器无法治疗 ---
+    if (this.type === "container") return { actualHeal: 0 };
 
     // 允许负数，只拦截 0
     if (amount === 0) return { actualHeal: 0 };
@@ -2481,17 +2525,18 @@ export class XJZLActor extends Actor {
 
     // 执行更新
     // 注意：如果 updates 为空（被 Flag 拦截导致 actualHeal=0），这里就不会执行
+    const resourceContext = {
+      cause: amount > 0 ? "healing" : "resourceLoss",
+      healer: resourceHealer,
+      target: this,
+      type,
+      move: resourceMove,
+      item: resourceItem,
+      source: resourceSource
+    };
     let resourceTransaction = { result: null, changes: [] };
     if (!foundry.utils.isEmpty(updates)) {
-      resourceTransaction = await this._commitResourceChanges(updates, {
-        cause: amount > 0 ? "healing" : "resourceLoss",
-        healer: resourceHealer,
-        target: this,
-        type,
-        move: resourceMove,
-        item: resourceItem,
-        source: resourceSource
-      });
+      resourceTransaction = await this._commitResourceChanges(updates, resourceContext);
     }
 
     // 视觉效果
@@ -2536,13 +2581,13 @@ export class XJZLActor extends Actor {
     };
     // 针对脚本触发治疗的隐式溯源 Hook,用于后续的数据统计功能
     // 获取施法源：优先看有没有传入 healer，没有则默认是自己 (this) 身上挂的 Buff 触发的
-    const actualHealer = hasExplicitHealer ? healer : this;
+    const actualHealer = resourceHealer;
     let isScriptHealing = false; // 防重复拦截锁
     if (game.settings.get("xjzl-system", "enableCombatStats") && actualHealer?._scriptContextStack?.length > 0) {
       isScriptHealing = true;
       const ctx = actualHealer._scriptContextStack[actualHealer._scriptContextStack.length - 1];
       // 兼容招式透传过来的 item
-      const sourceItem = ctx.item || ctx.effect || item || null;
+      const sourceItem = ctx.item || ctx.effect || resourceItem || null;
       const sourceName = sourceItem ? sourceItem.name : ctx.label;
 
       Hooks.callAll("xjzl.scriptHealingApplied", {
@@ -2553,8 +2598,8 @@ export class XJZLActor extends Actor {
         sourceItem: sourceItem,
         sourceName: sourceName,
         result: finalHealResult,
-        move: move || ctx.contextData || null,
-        item: item || sourceItem
+        move: resourceMove || ctx.contextData || null,
+        item: resourceItem || sourceItem
       });
     }
 
@@ -2568,21 +2613,13 @@ export class XJZLActor extends Actor {
         amount: actualHeal,
         overflow: amount - actualHeal,
         isBlocked: finalHealResult.isBlocked,
-        move: move,     // 透传招式对象
-        item: item,     // 透传物品对象
-        source: source  // 透传来源 (move/script/extra)
+        move: resourceMove,     // 透传招式对象
+        item: resourceItem,     // 透传物品对象
+        source: resourceSource  // 透传来源 (move/script/extra)
       });
     }
 
-    await this._dispatchResourceChanges(resourceTransaction.changes, {
-      cause: amount > 0 ? "healing" : "resourceLoss",
-      healer: actualHealer,
-      target: this,
-      type,
-      move,
-      item,
-      source
-    });
+    await this._dispatchResourceChanges(resourceTransaction.changes, resourceContext);
 
     return finalHealResult;
   }
