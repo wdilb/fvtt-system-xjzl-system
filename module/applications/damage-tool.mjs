@@ -134,13 +134,24 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       if (this.rendered && !this._isApplying) this.render({ force: true });
     }, 60);
     this._hookIds = [
-      ["controlToken", Hooks.on("controlToken", () => this._refreshTargets())],
-      // targetToken 会为所有用户的瞄准变化触发（含其他玩家经 socket 同步的），只关心本客户端的瞄准
+      // 只监听与当前目标模式相关的变化，避免与模式无关的重绘
+      ["controlToken", Hooks.on("controlToken", () => {
+        if (this._state.targetMode === "controlled") this._refreshTargets();
+      })],
+      // targetToken 会为所有用户的瞄准变化触发（含其他玩家经 socket 同步的），只关心本客户端且处于瞄准模式时
       ["targetToken", Hooks.on("targetToken", (user) => {
-        if (user === game.user) this._refreshTargets();
+        if (user === game.user && this._state.targetMode === "targeted") this._refreshTargets();
       })],
       ["canvasReady", Hooks.on("canvasReady", () => this._refreshTargets())],
-      ["deleteToken", Hooks.on("deleteToken", () => this._refreshTargets())]
+      ["deleteToken", Hooks.on("deleteToken", () => this._refreshTargets())],
+      // 与状态盘共享同一份目标模式偏好：别处（含另一工具窗口）切换时，本窗口保持同步
+      ["clientSettingChanged", Hooks.on("clientSettingChanged", (key, value) => {
+        if (key !== "xjzl-system.targetSelectionMode") return;
+        const mode = value === "targeted" ? "targeted" : "controlled";
+        if (mode === this._state.targetMode) return;
+        this._state.targetMode = mode;
+        this.render({ force: true });
+      })]
     ];
   }
 
@@ -352,7 +363,8 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     const mode = target.dataset.targetMode;
     if (!["controlled", "targeted"].includes(mode) || mode === this._state.targetMode) return;
     this._state.targetMode = mode;
-    game.settings.set("xjzl-system", "targetSelectionMode", mode);
+    game.settings.set("xjzl-system", "targetSelectionMode", mode)
+      .catch(error => console.error("XJZL | 保存目标选择模式失败:", error));
     this.render({ force: true });
   }
 

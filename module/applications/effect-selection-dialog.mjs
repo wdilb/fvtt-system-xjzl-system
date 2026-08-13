@@ -53,7 +53,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             toggleFavorite: EffectSelectionDialog.prototype._onToggleFavorite,
             resetFavorites: EffectSelectionDialog.prototype._onResetFavorites,
             toggleGroupCollapse: EffectSelectionDialog.prototype._onToggleGroupCollapse,
-            setTargetMode: EffectSelectionDialog.prototype._onSetTargetMode
+            setTargetMode: EffectSelectionDialog.prototype._onSetTargetMode,
+            clearTargets: EffectSelectionDialog.prototype._onClearTargets
         }
     };
 
@@ -92,10 +93,21 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                 .catch(error => console.error("XJZL | 状态盘目标刷新重渲染失败:", error));
         }, 60);
         this._hookIds = [
-            ["controlToken", Hooks.on("controlToken", () => this._refreshTargets())],
-            // targetToken 会为所有用户的瞄准变化触发（含其他玩家经 socket 同步的），只关心本客户端的瞄准
+            // 只监听与当前目标模式相关的变化，避免整窗重绘干扰搜索框焦点与滚动
+            ["controlToken", Hooks.on("controlToken", () => {
+                if (this._targetMode === "controlled") this._refreshTargets();
+            })],
+            // targetToken 会为所有用户的瞄准变化触发（含其他玩家经 socket 同步的），只关心本客户端且处于瞄准模式时
             ["targetToken", Hooks.on("targetToken", (user) => {
-                if (user === game.user) this._refreshTargets();
+                if (user === game.user && this._targetMode === "targeted") this._refreshTargets();
+            })],
+            // 与伤害工具共享同一份目标模式偏好：别处（含另一工具窗口）切换时，本窗口保持同步
+            ["clientSettingChanged", Hooks.on("clientSettingChanged", (key, value) => {
+                if (key !== "xjzl-system.targetSelectionMode") return;
+                const mode = value === "targeted" ? "targeted" : "controlled";
+                if (mode === this._targetMode) return;
+                this._targetMode = mode;
+                this.render();
             })]
         ];
     }
@@ -271,18 +283,12 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
-     * 构建多目标模式下头部展示的头像列表（按 Actor 去重）
-     * @param {Actor[]} actors 当前目标 Actor 列表（可能含同一 Actor 的多个 Token）
+     * 构建多目标模式下头部展示的头像列表；入参已由 _getTargetActors 按 Actor UUID 去重。
+     * @param {Actor[]} actors 当前目标 Actor 列表（去重后）。
      * @returns {{avatars: Array<{img: string, name: string}>, total: number}}
      */
     _buildTargetAvatars(actors) {
-        const seen = new Set();
-        const avatars = [];
-        for (const actor of actors) {
-            if (!actor?.uuid || seen.has(actor.uuid)) continue;
-            seen.add(actor.uuid);
-            avatars.push({ img: actor.img, name: actor.name, uuid: actor.uuid });
-        }
+        const avatars = actors.map(actor => ({ img: actor.img, name: actor.name, uuid: actor.uuid }));
         return { avatars, total: avatars.length };
     }
 
@@ -385,6 +391,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     /**
      * 辅助：获取当前选中的目标
      * 若从角色卡打开（this.actor 已指定）则固定为该角色；否则按当前目标模式读取框选或瞄准的 Token。
+     * 统一按 Actor UUID 去重，让头部头像、目标计数与各项操作共用同一列表（同一 Actor 的多个 Token 只算一次）。
      */
     _getTargetActors({ notify = false } = {}) {
         if (this.actor) return [this.actor].filter(Boolean);
@@ -392,7 +399,14 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const tokens = this._targetMode === "targeted"
             ? Array.from(game.user.targets || [])
             : (canvas?.tokens?.controlled || []);
-        const targets = tokens.map(t => t.actor).filter(Boolean);
+        const seen = new Set();
+        const targets = [];
+        for (const token of tokens) {
+            const actor = token.actor;
+            if (!actor?.uuid || seen.has(actor.uuid)) continue;
+            seen.add(actor.uuid);
+            targets.push(actor);
+        }
         if (targets.length === 0) {
             if (notify) ui.notifications.warn("请先选择一个 Token 作为目标！");
             return [];
@@ -595,7 +609,25 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const mode = target.dataset.targetMode;
         if (!["controlled", "targeted"].includes(mode) || mode === this._targetMode) return;
         this._targetMode = mode;
-        game.settings.set("xjzl-system", "targetSelectionMode", mode);
+        game.settings.set("xjzl-system", "targetSelectionMode", mode)
+            .catch(error => console.error("XJZL | 保存目标选择模式失败:", error));
+        this.render();
+    }
+
+    /**
+     * 动作：清空当前目标模式下选中的全部目标
+     * 框选模式释放画布选中的 Token；瞄准模式取消全部瞄准。
+     */
+    _onClearTargets(event, target) {
+        event.preventDefault();
+        if (this.actor) return; // 从角色卡打开时目标固定，无需清空
+        const tokens = this._targetMode === "targeted"
+            ? Array.from(game.user.targets || [])
+            : [...(canvas?.tokens?.controlled || [])];
+        for (const token of tokens) {
+            if (this._targetMode === "targeted") token.setTarget(false, { releaseOthers: false });
+            else token.release();
+        }
         this.render();
     }
 
