@@ -1,6 +1,7 @@
 /**
  * 通用伤害与治疗工具。
- * 目标始终来自当前画布框选的 Token；窗口保持打开时会实时同步框选结果，并按 Actor UUID 去重结算。
+ * 目标读取支持两种模式（工具内可切换）：框选 = 画布当前选中的 Token；瞄准 = Alt+左键 瞄准的 Token。
+ * 窗口保持打开时会实时同步目标变化，并按 Actor UUID 去重结算。
  */
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -37,6 +38,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     actions: {
       apply: GenericDamageTool.prototype._onApply,
       setMode: GenericDamageTool.prototype._onSetMode,
+      setTargetMode: GenericDamageTool.prototype._onSetTargetMode,
       selectDamageType: GenericDamageTool.prototype._onSelectDamageType,
       selectHealingType: GenericDamageTool.prototype._onSelectHealingType,
       setCritMode: GenericDamageTool.prototype._onSetCritMode,
@@ -122,18 +124,23 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       ignoreBlock: false,
       ignoreStance: false,
       isSkill: true,
+      targetMode: game.settings.get("xjzl-system", "targetSelectionMode") === "targeted" ? "targeted" : "controlled",
       lastResult: null
     };
     this._isApplying = false;
     this._fixedTargets = null;
     this._renderListenerController = null;
-    this._refreshControlledTargets = foundry.utils.debounce(() => {
+    this._refreshTargets = foundry.utils.debounce(() => {
       if (this.rendered && !this._isApplying) this.render({ force: true });
     }, 60);
     this._hookIds = [
-      ["controlToken", Hooks.on("controlToken", () => this._refreshControlledTargets())],
-      ["canvasReady", Hooks.on("canvasReady", () => this._refreshControlledTargets())],
-      ["deleteToken", Hooks.on("deleteToken", () => this._refreshControlledTargets())]
+      ["controlToken", Hooks.on("controlToken", () => this._refreshTargets())],
+      // targetToken 会为所有用户的瞄准变化触发（含其他玩家经 socket 同步的），只关心本客户端的瞄准
+      ["targetToken", Hooks.on("targetToken", (user) => {
+        if (user === game.user) this._refreshTargets();
+      })],
+      ["canvasReady", Hooks.on("canvasReady", () => this._refreshTargets())],
+      ["deleteToken", Hooks.on("deleteToken", () => this._refreshTargets())]
     ];
   }
 
@@ -162,7 +169,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
   async _prepareContext(options) {
     this._ensureDefaultReasons();
 
-    const controlled = this._getControlledTargets();
+    const resolved = this._getResolvedTargets();
     const sourceActors = this._getSourceActors();
     if (this._state.sourceUuid !== "none" && !sourceActors.some(entry => entry.uuid === this._state.sourceUuid)) {
       this._state.sourceUuid = "none";
@@ -185,6 +192,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     const typeLabel = mode === "damage"
       ? damageTypes.find(type => type.active)?.label
       : healingTypes.find(type => type.active)?.label;
+    const targetModeTargeted = this._state.targetMode === "targeted";
 
     return {
       mode,
@@ -204,22 +212,24 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       ignoreStance: this._state.ignoreStance,
       isSkill: this._state.isSkill,
       isPhysicalDamage,
-      targets: controlled.targets.map(target => ({
+      targetModeControlled: !targetModeTargeted,
+      targetModeTargeted,
+      targets: resolved.targets.map(target => ({
         tokenId: target.token.id,
         actorUuid: target.actor.uuid,
         name: target.name,
         img: target.img
       })),
-      targetCount: controlled.targets.length,
-      duplicateTargetCount: controlled.duplicateCount,
-      hasTargets: controlled.targets.length > 0,
+      targetCount: resolved.targets.length,
+      duplicateTargetCount: resolved.duplicateCount,
+      hasTargets: resolved.targets.length > 0,
       isApplying: this._isApplying,
-      canApply: controlled.targets.length > 0 && !this._isApplying,
+      canApply: resolved.targets.length > 0 && !this._isApplying,
       typeLabel,
       actionSummary: game.i18n.format(mode === "damage"
         ? "XJZL.UI.DamageTool.ApplyDamageSummary"
         : "XJZL.UI.DamageTool.ApplyHealingSummary", {
-        count: controlled.targets.length,
+        count: resolved.targets.length,
         amount,
         type: typeLabel
       }),
@@ -246,11 +256,23 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
   }
 
   /**
-   * 读取当前画布框选目标，并按 Actor UUID 去重。
+   * 按当前目标模式读取结算目标，并按 Actor UUID 去重。
+   * 框选模式读取画布选中的 Token；瞄准模式读取 Alt+左键 瞄准的 Token。
    * @returns {{targets: Array<object>, duplicateCount: number}} 结算目标快照。
    */
-  _getControlledTargets() {
-    const tokens = canvas?.tokens?.controlled || [];
+  _getResolvedTargets() {
+    const tokens = this._state.targetMode === "targeted"
+      ? Array.from(game.user.targets || [])
+      : (canvas?.tokens?.controlled || []);
+    return this._dedupeTargets(tokens);
+  }
+
+  /**
+   * 把一组 Token 归一化为按 Actor UUID 去重的目标快照。
+   * @param {Array<Token>} tokens 框选或瞄准的 Token 列表。
+   * @returns {{targets: Array<object>, duplicateCount: number}} 结算目标快照。
+   */
+  _dedupeTargets(tokens) {
     const uniqueActors = new Map();
 
     for (const token of tokens) {
@@ -325,6 +347,15 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
     this.render({ force: true });
   }
 
+  /** @param {Event} event 目标模式按钮事件。 @param {HTMLElement} target 触发按钮。 */
+  _onSetTargetMode(event, target) {
+    const mode = target.dataset.targetMode;
+    if (!["controlled", "targeted"].includes(mode) || mode === this._state.targetMode) return;
+    this._state.targetMode = mode;
+    game.settings.set("xjzl-system", "targetSelectionMode", mode);
+    this.render({ force: true });
+  }
+
   /** @param {Event} event 伤害类型按钮事件。 @param {HTMLElement} target 触发按钮。 */
   _onSelectDamageType(event, target) {
     if (!(target.dataset.type in CONFIG.XJZL.damageTypes)) return;
@@ -360,14 +391,27 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
 
   /** @param {Event} event 移除目标按钮事件。 @param {HTMLElement} target 触发按钮。 */
   _onRemoveTarget(event, target) {
-    for (const token of [...(canvas?.tokens?.controlled || [])]) {
-      if (token.actor?.uuid === target.dataset.actorUuid) token.release();
+    for (const token of this._getModeTokens()) {
+      if (token.actor?.uuid === target.dataset.actorUuid) this._releaseModeToken(token);
     }
   }
 
-  /** 清空当前画布框选的全部 Token。 */
+  /** 清空当前目标模式下选中的全部 Token。 */
   _onClearTargets() {
-    for (const token of [...(canvas?.tokens?.controlled || [])]) token.release();
+    for (const token of this._getModeTokens()) this._releaseModeToken(token);
+  }
+
+  /** @returns {Array<Token>} 当前目标模式对应的 Token 列表。 */
+  _getModeTokens() {
+    return this._state.targetMode === "targeted"
+      ? Array.from(game.user.targets || [])
+      : [...(canvas?.tokens?.controlled || [])];
+  }
+
+  /** 按当前目标模式释放单个 Token（框选 = release，瞄准 = 取消瞄准）。 */
+  _releaseModeToken(token) {
+    if (this._state.targetMode === "targeted") token.setTarget(false, { releaseOthers: false });
+    else token.release();
   }
 
   /**
@@ -401,7 +445,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
       ui.notifications.warn(game.i18n.localize("XJZL.UI.DamageTool.InvalidAmount"));
       return null;
     }
-    const snapshot = this._getControlledTargets();
+    const snapshot = this._getResolvedTargets();
     if (snapshot.targets.length === 0) {
       ui.notifications.warn(game.i18n.localize("XJZL.UI.DamageTool.NoTargets"));
       return null;
@@ -436,7 +480,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     summaryNode.textContent = game.i18n.format(mode === "damage"
       ? "XJZL.UI.DamageTool.ApplyDamageSummary"
       : "XJZL.UI.DamageTool.ApplyHealingSummary", {
-      count: this._getControlledTargets().targets.length,
+      count: this._getResolvedTargets().targets.length,
       amount: amount || 0,
       type: typeLabel
     });
@@ -447,7 +491,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     this._isApplying = applying;
     const button = this.element?.querySelector('[data-action="apply"]');
     if (!button) return;
-    button.disabled = applying || this._getControlledTargets().targets.length === 0;
+    button.disabled = applying || this._getResolvedTargets().targets.length === 0;
     button.classList.toggle("is-applying", applying);
   }
 
@@ -467,7 +511,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
 
     const snapshot = this._fixedTargets
       ? { targets: this._fixedTargets, duplicateCount: 0 }
-      : this._getControlledTargets();
+      : this._getResolvedTargets();
     if (snapshot.targets.length === 0) {
       return ui.notifications.warn(game.i18n.localize("XJZL.UI.DamageTool.NoTargets"));
     }

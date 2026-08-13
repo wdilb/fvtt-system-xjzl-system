@@ -52,7 +52,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             clearRecent: EffectSelectionDialog.prototype._onClearRecent,
             toggleFavorite: EffectSelectionDialog.prototype._onToggleFavorite,
             resetFavorites: EffectSelectionDialog.prototype._onResetFavorites,
-            toggleGroupCollapse: EffectSelectionDialog.prototype._onToggleGroupCollapse
+            toggleGroupCollapse: EffectSelectionDialog.prototype._onToggleGroupCollapse,
+            setTargetMode: EffectSelectionDialog.prototype._onSetTargetMode
         }
     };
 
@@ -70,6 +71,44 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         this._activeCategory = "common";
         // 已折叠的「场上特效」角色分组（按 token.id 记录），保证切换分类/搜索重渲染后折叠状态不丢失
         this._collapsedActors = new Set();
+        // 目标读取模式：controlled = 画布框选，targeted = Alt+左键瞄准（持久化到客户端设置）
+        this._targetMode = game.settings.get("xjzl-system", "targetSelectionMode") === "targeted" ? "targeted" : "controlled";
+        // 搜索词保存到实例，避免框选/瞄准变化触发重渲染时清空用户输入
+        this._filterQuery = "";
+        // 框选或瞄准变化时刷新头部目标显示；重渲染前记住滚动位置，避免状态列表被拉回顶部
+        this._refreshTargets = foundry.utils.debounce(() => {
+            if (!this.rendered) return;
+            const scrollEl = this.element.querySelector(".picker-scroll");
+            const tabEl = this.element.querySelector(".category-tabs");
+            const scrollTop = scrollEl?.scrollTop ?? 0;
+            const tabTop = tabEl?.scrollTop ?? 0;
+            this.render({ force: true })
+                .then(() => {
+                    const nextScroll = this.element.querySelector(".picker-scroll");
+                    const nextTab = this.element.querySelector(".category-tabs");
+                    if (nextScroll) nextScroll.scrollTop = scrollTop;
+                    if (nextTab) nextTab.scrollTop = tabTop;
+                })
+                .catch(error => console.error("XJZL | 状态盘目标刷新重渲染失败:", error));
+        }, 60);
+        this._hookIds = [
+            ["controlToken", Hooks.on("controlToken", () => this._refreshTargets())],
+            // targetToken 会为所有用户的瞄准变化触发（含其他玩家经 socket 同步的），只关心本客户端的瞄准
+            ["targetToken", Hooks.on("targetToken", (user) => {
+                if (user === game.user) this._refreshTargets();
+            })]
+        ];
+    }
+
+    /**
+     * 关闭窗口时注销仅服务本工具的 Hooks，避免实例复用或反复开关后累积监听器。
+     * @param {object} options ApplicationV2 关闭选项。
+     * @returns {Promise<EffectSelectionDialog>} Foundry 的关闭结果。
+     */
+    async close(options = {}) {
+        for (const [hook, id] of this._hookIds) Hooks.off(hook, id);
+        this._hookIds = [];
+        return super.close(options);
     }
 
     /**
@@ -93,6 +132,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const targetActors = this._getTargetActors();
         const targetMode = targetActors.length === 0 ? "none" : (targetActors.length === 1 ? "single" : "multiple");
         const targetActor = targetMode === "single" ? targetActors[0] : null;
+        const targetAvatarInfo = targetMode === "multiple" ? this._buildTargetAvatars(targetActors) : null;
         const currentEffects = targetActor ? this._prepareCurrentEffects(targetActor) : [];
         const activeEffectSlugs = new Set(currentEffects.map(e => e.slug).filter(Boolean));
         const recentIds = await this._getRecentStatusIds();
@@ -217,10 +257,33 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             currentEffects,
             hasTarget: targetActors.length > 0,
             activeCategory: this._activeCategory,
+            isActorBound: !!this.actor,
+            boundActorName: this.actor?.name || "",
+            targetModeControlled: this._targetMode !== "targeted",
+            targetModeTargeted: this._targetMode === "targeted",
+            targetAvatars: targetAvatarInfo?.avatars || [],
+            targetAvatarTotal: targetAvatarInfo?.total || 0,
+            filter: this._filterQuery,
             categories,
             statusEffects,
             sceneGroups
         };
+    }
+
+    /**
+     * 构建多目标模式下头部展示的头像列表（按 Actor 去重）
+     * @param {Actor[]} actors 当前目标 Actor 列表（可能含同一 Actor 的多个 Token）
+     * @returns {{avatars: Array<{img: string, name: string}>, total: number}}
+     */
+    _buildTargetAvatars(actors) {
+        const seen = new Set();
+        const avatars = [];
+        for (const actor of actors) {
+            if (!actor?.uuid || seen.has(actor.uuid)) continue;
+            seen.add(actor.uuid);
+            avatars.push({ img: actor.img, name: actor.name, uuid: actor.uuid });
+        }
+        return { avatars, total: avatars.length };
     }
 
     /**
@@ -321,11 +384,15 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
 
     /**
      * 辅助：获取当前选中的目标
+     * 若从角色卡打开（this.actor 已指定）则固定为该角色；否则按当前目标模式读取框选或瞄准的 Token。
      */
     _getTargetActors({ notify = false } = {}) {
         if (this.actor) return [this.actor].filter(Boolean);
 
-        const targets = (canvas?.tokens?.controlled || []).map(t => t.actor).filter(Boolean);
+        const tokens = this._targetMode === "targeted"
+            ? Array.from(game.user.targets || [])
+            : (canvas?.tokens?.controlled || []);
+        const targets = tokens.map(t => t.actor).filter(Boolean);
         if (targets.length === 0) {
             if (notify) ui.notifications.warn("请先选择一个 Token 作为目标！");
             return [];
@@ -521,6 +588,18 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     }
 
     /**
+     * 动作：切换目标读取模式（框选 / 瞄准），并持久化到客户端设置
+     */
+    _onSetTargetMode(event, target) {
+        event.preventDefault();
+        const mode = target.dataset.targetMode;
+        if (!["controlled", "targeted"].includes(mode) || mode === this._targetMode) return;
+        this._targetMode = mode;
+        game.settings.set("xjzl-system", "targetSelectionMode", mode);
+        this.render();
+    }
+
+    /**
      * 动作：折叠/展开某个角色的「场上特效」分组
      * 点击角色姓名（组标题）触发；折叠状态记入 _collapsedActors，重渲染后仍保持
      */
@@ -599,8 +678,9 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             });
         });
 
-        // 定义搜索处理函数
+        // 定义搜索处理函数：同步保存搜索词，供框选/瞄准变化触发重渲染时恢复输入
         const handleSearch = (e) => {
+            this._filterQuery = searchInput?.value || "";
             applyFilters();
         };
 

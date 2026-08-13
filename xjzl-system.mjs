@@ -457,6 +457,21 @@ Hooks.once("init", async function () {
     requiresReload: false // 不需要刷新，即改即生效
   });
 
+  // 伤害工具与状态盘读取目标的方式：框选（画布选中）还是瞄准（Alt+左键）
+  game.settings.register("xjzl-system", "targetSelectionMode", {
+    name: "目标选择模式",
+    hint: "通用伤害工具与状态盘读取目标的方式：框选 = 读取画布当前选中的 Token；瞄准 = 读取 Alt+左键 瞄准的目标。可在工具窗口内直接切换。",
+    scope: "client",     // 每个玩家可以自己决定习惯的目标选取方式
+    config: false,       // 仅在工具窗口内切换，不暴露到设置菜单
+    type: String,
+    choices: {
+      controlled: "框选（画布选中）",
+      targeted: "瞄准（Alt+左键）"
+    },
+    default: "controlled",
+    requiresReload: false
+  });
+
   // 是否播放江湖万卷阁的抽取演出
   game.settings.register("xjzl-system", "enableCompendiumDrawAnimation", {
     name: "启用江湖万卷阁抽取动画",
