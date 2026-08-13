@@ -38,6 +38,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
       editSupport: EncounterRuntimeApp.prototype._onEditSupport,
       toggleNpc: EncounterRuntimeApp.prototype._onToggleNpc,
       editAction: EncounterRuntimeApp.prototype._onEditAction,
+      viewSupportDescription: EncounterRuntimeApp.prototype._onViewSupportDescription,
       useSupport: EncounterRuntimeApp.prototype._onUseSupport,
       adjustCounter: EncounterRuntimeApp.prototype._onAdjustCounter,
       resolvePending: EncounterRuntimeApp.prototype._onResolvePending,
@@ -359,6 +360,20 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
     });
   }
 
+  /** 打开支援动作的完整规则说明；长文本在独立弹窗中阅读，避免撑高战斗 HUD。 */
+  async _onViewSupportDescription(event, target) {
+    const npc = this._findNpc(target.dataset.groupId, target.dataset.npcId);
+    const action = npc?.actions.find(entry => entry.id === target.dataset.actionId);
+    if (!action) return;
+    await DialogV2.prompt({
+      classes: ["xjzl-battle-dialog"],
+      position: { width: 520, height: "auto" },
+      window: { title: `${npc.snapshotName} · ${action.name}` },
+      content: `<div class="xjzl-encounter-rule-dialog">${action.description || game.i18n.localize("XJZL.Encounter.NoDescription")}</div>`,
+      ok: { label: game.i18n.localize("XJZL.UI.Close") }
+    });
+  }
+
   /** 打开运行态场地效果编辑器，并在保存前复核公式与自定义目标。 */
   async _onEditEffect(event, target) {
     const effect = foundry.utils.deepClone(this._findEffect(target.dataset.effectId));
@@ -548,6 +563,8 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
         <div class="form-grid">
           <label>${game.i18n.localize("XJZL.Encounter.TargetMode")}<select name="targetMode">${this._choiceOptions(CONFIG.XJZL.encounter.actionTargets, action.targetMode)}</select><small>${game.i18n.localize("XJZL.Encounter.ActionTargetHint")}</small></label>
           <label data-max-targets>${game.i18n.localize("XJZL.Encounter.MaxTargets")}<input type="number" min="0" name="maxTargets" value="${action.maxTargets}"><small>${game.i18n.localize("XJZL.Encounter.MaxTargetsHint")}</small></label>
+          <label>${game.i18n.localize("XJZL.Encounter.MinRound")}<input type="number" min="0" name="minRound" value="${action.minRound ?? 0}"><small>${game.i18n.localize("XJZL.Encounter.MinRoundHint")}</small></label>
+          <label>${game.i18n.localize("XJZL.Encounter.CooldownRounds")}<input type="number" min="0" name="cooldownRounds" value="${action.cooldownRounds ?? 0}"><small>${game.i18n.localize("XJZL.Encounter.CooldownRoundsHint")}</small></label>
           <label>${game.i18n.localize("XJZL.Encounter.AutomationType")}<select name="automationType">${this._choiceOptions(CONFIG.XJZL.encounter.automationTypes, action.automationType)}</select><small>${game.i18n.localize("XJZL.Encounter.AutomationTypeHint")}</small></label>
           <label data-amount-formula>${game.i18n.localize("XJZL.Encounter.AmountFormula")}<input name="amountFormula" value="${html(action.amountFormula)}"><small>${game.i18n.localize("XJZL.Encounter.FormulaHint")}</small></label>
           <label data-damage-type>${game.i18n.localize("XJZL.Encounter.DamageType")}<select name="damageType">${this._choiceOptions(damageTypes, action.damageType)}</select><small>${game.i18n.localize("XJZL.Encounter.DamageTypeHint")}</small></label>
@@ -577,6 +594,8 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
               enabled: form.elements.enabled.checked,
               targetMode: form.elements.targetMode.value,
               maxTargets: Math.max(0, Math.trunc(Number(form.elements.maxTargets.value) || 0)),
+              minRound: Math.max(0, Math.trunc(Number(form.elements.minRound.value) || 0)),
+              cooldownRounds: Math.max(0, Math.trunc(Number(form.elements.cooldownRounds.value) || 0)),
               automationType: form.elements.automationType.value,
               amountFormula: form.elements.amountFormula.value,
               damageType: form.elements.damageType.value

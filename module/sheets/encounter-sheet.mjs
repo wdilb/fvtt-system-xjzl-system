@@ -259,7 +259,7 @@ export class XJZLEncounterSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
 
   /** 创建带稳定 ID 的默认援助动作。 */
   _newAction(number) {
-    return { id: foundry.utils.randomID(), name: `${game.i18n.localize("XJZL.Encounter.SupportAction")} ${number}`, description: "", enabled: true, targetMode: "selected", maxTargets: 1, automationType: "description", amountFormula: "0", damageType: "waigong" };
+    return { id: foundry.utils.randomID(), name: `${game.i18n.localize("XJZL.Encounter.SupportAction")} ${number}`, description: "", enabled: true, targetMode: "selected", maxTargets: 1, automationType: "description", amountFormula: "0", damageType: "waigong", minRound: 0, cooldownRounds: 0 };
   }
 
   /** 创建一名尚未关联世界 Actor 的默认支援 NPC。 */

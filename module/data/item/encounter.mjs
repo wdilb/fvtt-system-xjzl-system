@@ -17,7 +17,9 @@ const actionSchema = () => new fields.SchemaField({
   maxTargets: new fields.NumberField({ initial: 1, min: 0, integer: true }),
   automationType: new fields.StringField({ initial: "description", choices: AUTOMATION_TYPES }),
   amountFormula: new fields.StringField({ initial: "0" }),
-  damageType: new fields.StringField({ initial: "waigong", choices: DAMAGE_TYPES })
+  damageType: new fields.StringField({ initial: "waigong", choices: DAMAGE_TYPES }),
+  minRound: new fields.NumberField({ initial: 0, min: 0, integer: true }),
+  cooldownRounds: new fields.NumberField({ initial: 0, min: 0, integer: true })
 });
 
 /** 支援 NPC 配置；Actor UUID 只用于关联时生成名称和头像快照。 */

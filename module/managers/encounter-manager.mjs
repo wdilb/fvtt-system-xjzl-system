@@ -404,18 +404,22 @@ export class EncounterManager {
     const combat = game.combats.get(request.combatId);
     const state = foundry.utils.deepClone(this.getState(combat));
     if (!combat || state?.status !== "linked") return { ok: false, error: game.i18n.localize("XJZL.Encounter.NotLinked") };
+    // 结算期间可能发生轮次推进；本次请求的校验、公式与冷却必须始终使用进入串行区时的轮次。
+    const executionRound = Number(combat.round) || 0;
     const requester = game.users.get(request.userId);
     const group = state.support.groups.find(entry => entry.id === request.groupId);
     if (!requester?.active || (!requester.isGM && group?.permission !== "players")) return { ok: false, error: game.i18n.localize("XJZL.Encounter.NoPermission") };
     const npc = group?.npcs.find(entry => entry.id === request.npcId);
     const action = npc?.actions.find(entry => entry.id === request.actionId);
-    const error = this.supportAvailabilityError(combat, group, npc, action);
+    const error = executionRound < 1
+      ? game.i18n.localize("XJZL.Encounter.CombatNotStarted")
+      : this._supportAvailabilityError(group, npc, action, executionRound);
     if (error) return { ok: false, error };
     let targets;
     try { targets = this.resolveSupportTargets(combat, action, request.targetCombatantIds || []); }
     catch (targetError) { return { ok: false, error: targetError.message }; }
     try {
-      await this._executeEntry(combat, action, targets, { kind: "support", trigger: "supportUse", manual: false, title: `${npc.snapshotName} · ${action.name}`, sourceName: state.name });
+      await this._executeEntry(combat, action, targets, { kind: "support", trigger: "supportUse", manual: false, round: executionRound, title: `${npc.snapshotName} · ${action.name}`, sourceName: state.name });
     } catch (executionError) {
       console.error(`XJZL | 战局支援执行失败 [${action.name}]:`, executionError);
       return { ok: false, error: executionError.message };
@@ -429,14 +433,28 @@ export class EncounterManager {
     if (freshGroup.roundRemaining !== null) freshGroup.roundRemaining--;
     if (freshNpc.encounterRemaining !== null) freshNpc.encounterRemaining--;
     if (freshGroup.oncePerNpcPerRound && !freshGroup.npcUsedThisRound.includes(freshNpc.id)) freshGroup.npcUsedThisRound.push(freshNpc.id);
+    // 记录动作最后一次成功使用的轮次，供冷却判定使用；结算失败则不会走到这里，不产生冷却。
+    const freshAction = freshNpc.actions.find(entry => entry.id === request.actionId);
+    if (freshAction) freshAction.lastUsedRound = executionRound;
     await combat.setFlag(SYSTEM_ID, FLAG_KEY, fresh);
     return { ok: true };
   }
 
-  static _supportAvailabilityError(group, npc, action) {
+  /** 按指定轮次检查支援配置、冷却与额度；返回空字符串表示可以调用。 */
+  static _supportAvailabilityError(group, npc, action, round) {
     if (!group) return game.i18n.localize("XJZL.Encounter.SupportMissing");
     if (!npc || !action) return game.i18n.localize("XJZL.Encounter.SupportMissing");
     if (!group.enabled || !npc.enabled || !action.enabled) return game.i18n.localize("XJZL.Encounter.SupportDisabled");
+    // 时间门槛优先于次数额度：未到解锁回合、或仍处于冷却期内，都先报时间原因。
+    const minRound = Math.max(0, Math.trunc(Number(action.minRound) || 0));
+    if (minRound > 0 && round < minRound) return game.i18n.format("XJZL.Encounter.NotUnlockedYet", { round: minRound });
+    const cooldownRounds = Math.max(0, Math.trunc(Number(action.cooldownRounds) || 0));
+    const lastUsedRound = Number(action.lastUsedRound);
+    if (cooldownRounds > 0 && action.lastUsedRound != null && Number.isFinite(lastUsedRound)) {
+      // “冷却 X 回合”表示完整跳过后续 X 个回合，因此要到使用轮次 + X + 1 才恢复。
+      const cooldownUntil = lastUsedRound + cooldownRounds + 1;
+      if (round < cooldownUntil) return game.i18n.format("XJZL.Encounter.CooldownUntil", { round: cooldownUntil });
+    }
     if (group.encounterRemaining !== null && group.encounterRemaining <= 0) return game.i18n.localize("XJZL.Encounter.EncounterLimitReached");
     if (group.roundRemaining !== null && group.roundRemaining <= 0) return game.i18n.localize("XJZL.Encounter.RoundLimitReached");
     if (npc.encounterRemaining !== null && npc.encounterRemaining <= 0) return game.i18n.localize("XJZL.Encounter.NpcLimitReached");
@@ -450,7 +468,7 @@ export class EncounterManager {
    */
   static supportAvailabilityError(combat, group, npc, action) {
     if ((combat?.round ?? 0) < 1) return game.i18n.localize("XJZL.Encounter.CombatNotStarted");
-    return this._supportAvailabilityError(group, npc, action);
+    return this._supportAvailabilityError(group, npc, action, combat.round);
   }
 
   /**
