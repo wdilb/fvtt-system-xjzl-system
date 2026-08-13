@@ -57,6 +57,23 @@ function inheritResourceChain(context = null, inheritedContext = null) {
   return normalized;
 }
 
+/**
+ * 从当前脚本调用栈补齐资源来源，使旧招式直接 update/applyHealing 时仍能识别当前招式。
+ */
+function inheritScriptResourceContext(actor, context = {}) {
+  const stack = actor?._scriptContextStack;
+  const current = stack?.[stack.length - 1];
+  if (!current) return context || EMPTY_RESOURCE_CONTEXT;
+
+  const inherited = { ...(context || EMPTY_RESOURCE_CONTEXT) };
+  if (!inherited.sourceActor) inherited.sourceActor = actor;
+  if (!inherited.item && current.item instanceof Item) inherited.item = current.item;
+  if (!inherited.move && current.contextData) inherited.move = current.contextData;
+  if (!inherited.cause) inherited.cause = "script";
+  if (!inherited.source && inherited.move) inherited.source = "move";
+  return inherited;
+}
+
 /** 移除资源事务的内部选项；普通 update 直接复用原对象，保持 Foundry 原生调用语义。 */
 function getDatabaseOperation(operation = {}) {
   if (operation?.xjzlResourceContext === undefined
@@ -105,7 +122,7 @@ export class XJZLActor extends Actor {
    * @returns {Promise<Document|null|undefined>} 原始 Actor 更新结果或 socket 空结果
    */
   async changeResources(updates = {}, context = null) {
-    context = inheritResourceChain(context, this._resourceEventContext);
+    context = inheritScriptResourceContext(this, inheritResourceChain(context, this._resourceEventContext));
     if (!this.isOwner) {
       return await xjzlSocket.executeAsGM(
         "changeResources",
@@ -127,7 +144,10 @@ export class XJZLActor extends Actor {
    * 无资源字段或当前没有脚本时直接走父类更新，不创建快照、不构建沙盒。
    */
   async update(changes = {}, operation = {}) {
-    const context = inheritResourceChain(operation?.xjzlResourceContext, this._resourceEventContext);
+    const context = inheritScriptResourceContext(
+      this,
+      inheritResourceChain(operation?.xjzlResourceContext, this._resourceEventContext)
+    );
     const contextItem = context.move || context.contextItem || null;
     const contextScripts = contextItem?.scripts;
     const contextHasResourceScript = Array.isArray(contextScripts) && contextScripts.some(script =>
@@ -1110,7 +1130,8 @@ export class XJZLActor extends Actor {
         this._scriptContextStack.push({
           item: thisItem,
           effect: thisEffect,
-          label: entry.label
+          label: entry.label,
+          contextData: entry.contextData || null
         });
         // 构建函数: new Function("变量名1", ..., "脚本内容")
         const paramNames = Object.keys(sandbox);
@@ -1167,7 +1188,8 @@ export class XJZLActor extends Actor {
         this._scriptContextStack.push({
           item: thisItem,
           effect: thisEffect,
-          label: entry.label
+          label: entry.label,
+          contextData: entry.contextData || null
         });
         const paramNames = Object.keys(sandbox);
         const paramValues = Object.values(sandbox);
@@ -2305,7 +2327,20 @@ export class XJZLActor extends Actor {
 
     // 显式传入 null 表示环境/系统治疗；完全省略 healer 才表示角色自身的被动恢复。
     const hasExplicitHealer = Object.prototype.hasOwnProperty.call(data, "healer");
-    const { amount = 0, type = "hp", showScrolling = true, move = null, item = null, source = "extra", healer = null } = data;
+    const scriptContext = inheritScriptResourceContext(this, {});
+    const {
+      amount = 0,
+      type = "hp",
+      showScrolling = true,
+      move = null,
+      item = null,
+      source = "extra",
+      healer = null
+    } = data;
+    const resourceMove = move || scriptContext.move || null;
+    const resourceItem = item || scriptContext.item || null;
+    const resourceSource = source === "extra" ? (scriptContext.source || source) : source;
+    const resourceHealer = hasExplicitHealer ? healer : (scriptContext.sourceActor || this);
 
     // 允许负数，只拦截 0
     if (amount === 0) return { actualHeal: 0 };
@@ -2450,12 +2485,12 @@ export class XJZLActor extends Actor {
     if (!foundry.utils.isEmpty(updates)) {
       resourceTransaction = await this._commitResourceChanges(updates, {
         cause: amount > 0 ? "healing" : "resourceLoss",
-        healer: hasExplicitHealer ? healer : this,
+        healer: resourceHealer,
         target: this,
         type,
-        move,
-        item,
-        source
+        move: resourceMove,
+        item: resourceItem,
+        source: resourceSource
       });
     }
 
@@ -3952,17 +3987,18 @@ export class XJZLActor extends Actor {
         // 劫持 update
         value.update = async (data, context) => {
           const operation = { ...(context || {}) };
-          if (this._resourceEventContext) {
-            operation.xjzlResourceContext = serializeResourceContext(inheritResourceChain(
-              operation.xjzlResourceContext,
-              this._resourceEventContext
-            ));
-          }
+          operation.xjzlResourceContext = serializeResourceContext(inheritScriptResourceContext(
+            this,
+            inheritResourceChain(operation.xjzlResourceContext, this._resourceEventContext)
+          ));
           return await xjzlSocket.executeAsGM("updateDocument", value.uuid, data, operation);
         };
         // 资源事务也必须保持同一套“提交后触发”语义，不能退化为裸 update。
         value.changeResources = async (data, context) => {
-          const resourceContext = inheritResourceChain(context, this._resourceEventContext);
+          const resourceContext = inheritScriptResourceContext(
+            this,
+            inheritResourceChain(context, this._resourceEventContext)
+          );
           return await xjzlSocket.executeAsGM(
             "changeResources",
             value.uuid,
