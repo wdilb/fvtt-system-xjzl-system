@@ -572,7 +572,7 @@
             "sect": "zhenwujiao",
             "description": "传说中道家独门不传之秘，武学之源。以“道生一，一生二，二生三，三生万物”的理念激发潜能，凝聚先天真气，祛百病、调虚实、治内伤，内劲周而复始生生不息，步入深不可测之化境。",
             "requirement": "悟性 25",
-            "automationNote": "部分自动化。免疫毒素完全自动；1-2阶段的概率双倍治疗需玩家自行投骰判定后手动修改；圆满阶段双倍治疗完全自动（治疗结算时自动追加一次同等治疗）。",
+            "automationNote": "完全自动化。免疫毒素、出招回血后的实际双倍治疗及1-2阶段D20判定均自动处理。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -591,6 +591,12 @@
                             "trigger": "preTake",
                             "active": true,
                             "script": "if (args.type === 'poison') {\n    args.output.abort = true;\n    ui.notifications.info(`${actor.name} 先天真气护体，百毒不侵！`);\n}"
+                        },
+                        {
+                            "label": "概率双倍治疗",
+                            "trigger": "resourceChanged",
+                            "active": true,
+                            "script": "const healAmount = args.byResource?.hp?.delta || 0;\nconst selfMove = args.source === 'move' && (args.healer?.uuid === actor.uuid || args.sourceActor?.uuid === actor.uuid);\nif (!selfMove || healAmount <= 0) return;\n\nconst roll = await new Roll('1d20').evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\nif (roll.total > 10) return;\n\nui.notifications.info('先天诀生效，真气流转生生不息！');\nawait actor.applyHealing({ healer: actor, amount: healAmount, type: 'hp', showScrolling: true, source: 'xiantian' });"
                         }
                     ]
                 },
@@ -611,6 +617,12 @@
                             "trigger": "preTake",
                             "active": true,
                             "script": "if (args.type === 'poison') {\n    args.output.abort = true;\n    ui.notifications.info(`${actor.name} 先天真气护体，百毒不侵！`);\n}"
+                        },
+                        {
+                            "label": "概率双倍治疗",
+                            "trigger": "resourceChanged",
+                            "active": true,
+                            "script": "const healAmount = args.byResource?.hp?.delta || 0;\nconst selfMove = args.source === 'move' && (args.healer?.uuid === actor.uuid || args.sourceActor?.uuid === actor.uuid);\nif (!selfMove || healAmount <= 0) return;\n\nconst roll = await new Roll('1d20').evaluate();\nif (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\nif (roll.total > 15) return;\n\nui.notifications.info('先天诀生效，真气流转生生不息！');\nawait actor.applyHealing({ healer: actor, amount: healAmount, type: 'hp', showScrolling: true, source: 'xiantian' });"
                         }
                     ]
                 },
@@ -634,9 +646,9 @@
                         },
                         {
                             "label": "稳定双倍治疗",
-                            "trigger": "hit",
+                            "trigger": "resourceChanged",
                             "active": true,
-                            "script": "// 仅在应用治疗且数值大于0时触发\nif (args.actionType === 'heal' && args.finalAmount > 0) {\n    ui.notifications.info(\"先天诀生效，真气流转生生不息！\");\n    // 再次应用一次同等数值的治疗\n    await args.target.applyHealing({ healer: actor,  amount: args.finalAmount, type: 'hp' });\n}"
+                            "script": "const healAmount = args.byResource?.hp?.delta || 0;\nconst selfMove = args.source === 'move' && (args.healer?.uuid === actor.uuid || args.sourceActor?.uuid === actor.uuid);\nif (!selfMove || healAmount <= 0) return;\n\nui.notifications.info('先天诀生效，真气流转生生不息！');\nawait actor.applyHealing({ healer: actor, amount: healAmount, type: 'hp', showScrolling: true, source: 'xiantian' });"
                         }
                     ]
                 }
