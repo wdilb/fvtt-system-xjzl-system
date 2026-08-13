@@ -107,7 +107,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                 const mode = value === "targeted" ? "targeted" : "controlled";
                 if (mode === this._targetMode) return;
                 this._targetMode = mode;
-                this.render();
+                if (this.rendered) this.render();
             })]
         ];
     }
@@ -617,6 +617,8 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
     /**
      * 动作：清空当前目标模式下选中的全部目标
      * 框选模式释放画布选中的 Token；瞄准模式取消全部瞄准。
+     * 释放/取消瞄准会同步触发 controlToken / targetToken 钩子，统一由防抖的 _refreshTargets 重绘，
+     * 这里不再显式 render()，避免同一操作触发两次全量扫描。
      */
     _onClearTargets(event, target) {
         event.preventDefault();
@@ -628,7 +630,6 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             if (this._targetMode === "targeted") token.setTarget(false, { releaseOthers: false });
             else token.release();
         }
-        this.render();
     }
 
     /**

@@ -150,7 +150,8 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
         const mode = value === "targeted" ? "targeted" : "controlled";
         if (mode === this._state.targetMode) return;
         this._state.targetMode = mode;
-        this.render({ force: true });
+        // 宏执行的幕后实例不渲染界面（rendered 为 false），强制渲染会把它弹到前台；已渲染的窗口才刷新
+        if (this.rendered) this.render({ force: true });
       })]
     ];
   }
