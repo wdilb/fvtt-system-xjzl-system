@@ -3134,7 +3134,7 @@
             "subSect": "yanwanglou",
             "description": "传说中的江湖邪功。至阴至邪，修炼者以心魔催动心法，追崇“心魔如念，大功可期”，越是愤怒，威力越强，乃至掌控生死。",
             "requirement": "悟性 15",
-            "automationNote": "半自动化。怒气变化无法自动监听，请玩家根据怒气值手动管理‘邪’的层数。伤害加成已自动化。",
+            "automationNote": "大部分自动化。怒气变动自动管理‘邪’层数；圆满阶段失去怒气时自动移除层数并恢复气血内力。战斗结束请手动移除‘邪’。伤害加成已自动化。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -3147,7 +3147,14 @@
                     },
                     "description": "领悟特效：每获得1点怒气，获得一层“邪”，持续到战斗脱离。\n邪：每层使你的招式伤害提升5点。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "怒气变动管理邪",
+                            "trigger": "resourceChanged",
+                            "active": true,
+                            "script": "const rageDelta = args.byResource?.rage?.delta || 0;\nif (rageDelta <= 0) return;\nconst sourceEffect = thisItem.effects.getName('邪');\nif (!sourceEffect) return;\n\nconst effectData = sourceEffect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData, rageDelta);"
+                        }
+                    ]
                 },
                 "stage2": {
                     "stats": {
@@ -3160,7 +3167,14 @@
                     },
                     "description": "小成特效：每获得1点怒气，获得一层“邪”，持续到战斗脱离。\n邪：每层使你的招式伤害提升10点。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "怒气变动管理邪",
+                            "trigger": "resourceChanged",
+                            "active": true,
+                            "script": "const rageDelta = args.byResource?.rage?.delta || 0;\nif (rageDelta <= 0) return;\nconst sourceEffect = thisItem.effects.getName('邪');\nif (!sourceEffect) return;\n\nconst effectData = sourceEffect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData, rageDelta);"
+                        }
+                    ]
                 },
                 "stage3": {
                     "stats": {
@@ -3173,7 +3187,14 @@
                     },
                     "description": "圆满特效：每获得1点怒气，获得一层“邪”，持续到战斗脱离。\n邪：每层使你的招式伤害提升10点。\n·每失去1点怒气，“邪”移除一层，每移除一层，你回复20点气血内力。\n修满特效：修满[永久]：气血+80，内力+40，格挡值+10。",
                     "xpCostRatio": 1,
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "怒气变动管理邪",
+                            "trigger": "resourceChanged",
+                            "active": true,
+                            "script": "if (args.cause === 'combatEnd') return;\n\nconst rageDelta = args.byResource?.rage?.delta || 0;\nconst xie = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'xie');\n\nif (rageDelta > 0) {\n    const sourceEffect = thisItem.effects.getName('邪');\n    if (!sourceEffect) return;\n\n    const effectData = sourceEffect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData, rageDelta);\n    return;\n}\n\nif (rageDelta >= 0 || !xie) return;\nconst currentStacks = xie.getFlag('xjzl-system', 'stacks') || 0;\nconst removedStacks = Math.min(currentStacks, Math.abs(rageDelta));\nif (removedStacks <= 0) return;\n\nawait game.xjzl.api.effects.removeEffect(actor, 'xie', removedStacks);\nconst recovery = removedStacks * 20;\nawait actor.applyHealing({ healer: actor, amount: recovery, type: 'hp', showScrolling: true, source: 'xie' });\nawait actor.applyHealing({ healer: actor, amount: recovery, type: 'mp', showScrolling: true, source: 'xie' });"
+                        }
+                    ]
                 }
             },
             "masteryEffect": "",
