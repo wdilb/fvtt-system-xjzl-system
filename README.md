@@ -257,6 +257,19 @@ await Macros.requestSave({
 ### B. 战斗决策与交互 (异步阶段)
 > ✅ **提示**: 此阶段及后续阶段**可以使用** `await`。
 
+#### `resourceChanged` (资源实际变动后)
+*   **时机**: 资源更新提交成功，并完成上限、禁疗等实际裁剪后。
+*   **用途**: 实现“消耗怒气时”“实际回血时”等依赖资源差值的效果。
+*   **生效范围**: 激活内功、已装备物品、特性、当前架招、Active Effect，以及本次出招的当前招式。普通武学中的其他招式不会作为全局被动遍历。
+*   **参数 (`args`)**:
+    *   `changes` (Array): 本次事务实际变化的资源列表，每项包含 `resource`、`oldValue`、`newValue`、`delta`。
+    *   `byResource` (Object): 按资源名索引的同一批变化，例如 `args.byResource.rage.delta`。
+    *   `cause` (String): 变动来源，例如 `moveCost`、`damage`、`healing`、`resourceLoss`、`regen`、`shortRest`、`longRest`、`combatEnd`、`update`。
+    *   `item` / `move` / `sourceActor` / `attacker` / `healer` / `target`: 可选的触发来源；不同业务入口只提供其能够确定的对象。
+    *   `chainId` / `depth`: 连锁资源事务标识与深度，系统限制最大递归深度。
+*   **支持资源**: `hp`、`mp`、`rage`、`huti`、`tili`、`morale`。银两、休息次数等非战斗数据不触发。
+*   **注意**: 实际值没有变化（满血治疗、禁疗拦截、已经达到上限）时不会触发。脚本内继续修改资源会形成连锁事务，应始终 `await` 更新并避免无条件循环。
+
 #### ⏳ `preAttack` (出招前置/减耗)
 *   **时机**: 点击招式按钮并计算出基础消耗后 -> **检查余额与实际扣除资源之前**。
 *   **用途**: 动态修改出招消耗（如“消耗状态层数使怒气消耗-1”）、基于特殊资源的自定义拦截。
