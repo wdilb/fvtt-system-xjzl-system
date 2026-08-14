@@ -1,12 +1,12 @@
 # 脚本引擎手册
 
-本手册面向物品、招式、特性和 Active Effect（AE）脚本作者，描述当前系统公开的脚本契约。本手册只描述运行时脚本契约；源数据录入还需遵循项目内部的录入规范。
+本手册面向物品、招式、特性和 Active Effect（AE）脚本作者，描述当前系统公开的脚本契约。本手册只描述运行时脚本契约；源数据录入还需遵循项目内部的录入规范。下文列出的字段是可依赖的公开接口，未列出的内部变量不要作为 API 使用。
 
 ## 事实源与兼容边界
 
 文档与代码不一致时，以以下实现为准：
 
-- 触发器和脚本字段：`module/data/common.mjs`
+- 触发器和脚本字段：`module/data/common.mjs`（`SCRIPT_TRIGGERS`、`TRIGGER_CHOICES`、`makeScriptEffectSchema`）
 - 脚本来源、执行顺序和沙盒：`module/documents/actor.mjs`
 - 招式前置流程：`module/documents/item.mjs`
 - 攻击卡、治疗卡和命中后流程：`module/managers/chat-manager.mjs`
@@ -27,6 +27,13 @@
   "active": true
 }
 ```
+
+| 字段 | 类型/默认值 | 说明 |
+|---|---|---|
+| `label` | `string`，默认“新特效” | 管理和报错时显示的名称。 |
+| `trigger` | `string`，默认 `passive` | 必须是下文列出的触发器。 |
+| `script` | `string`，默认空字符串 | JavaScript 源码；可信数据才可以执行。 |
+| `active` | `boolean`，默认 `true` | 是否参与收集和执行。 |
 
 - 武器、防具、奇珍和特性的脚本位于 `system.scripts`。
 - 武学脚本位于具体招式的 `system.moves[].scripts`。
@@ -84,6 +91,8 @@
 | `game`、`ui`、`console` | Foundry 游戏对象、通知对象和控制台。 |
 
 `args` 的字段也会展开成同名顶层变量，但只有对应触发器传入的字段才存在。推荐业务代码从 `args` 读取条件字段，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
+
+同一次触发收集到的脚本共享同一个 `args` 引用；修改文档或公共 API 时使用 `await`，修改上下文标记时使用命名空间明确的字段，避免与其他脚本冲突。
 
 后台武学或架招脚本会按来源临时注入 `move`。这不代表角色正在出招；只有 `preAttack`、`attack`、`check`、`preDamage`、`hit`、`hit_once` 属于主动招式资源溯源阶段。
 
@@ -146,15 +155,19 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 
 `check` 的主要 `flags`：`grantLevel`、`grantFeintLevel`、`grantHit`、`grantFeint`、`critThresholdMod`、`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`forceHit`、`alwaysHit`。
 
+`preAttack` 的完整上下文是 `move`、`item`、`attacker`、`costConfig`、`abort`、`abortReason`；`costConfig` 可修改，`abort` 设为 `true` 会阻止出招。`attack` 还提供 `actionType`、`damageType`、`type`、`element`、`costConsumed` 和 `flags.autoApplied`；`flags.damageResult` 可修改当前面板的 `damage`、`feint`、`breakdown`。
+
 ### 攻击者结算
 
 | 触发器 | 时机 | 主要上下文和可写字段 |
 |---|---|---|
-| `preDamage` | 命中、暴击和破架确定后，调用目标 `applyDamage()` 前 | 只读 `outcome.isHit/isCrit/isBroken`；修改 `config.amount/type/element/ignoreBlock/ignoreDefense/ignoreStance/applyCritDamage/ignoreMinDamage`。 |
-| `hit` | 每个目标结算后；攻击未命中时也执行 | `target`、`isHit`、`isCrit`、`isBroken`、`finalDamage`、各资源实际损失、`damageResult`；治疗/Buff 另有 `baseAmount`、`finalAmount`、`healAmount`。 |
+| `preDamage` | 命中、暴击和破架确定后，调用目标 `applyDamage()` 前 | `attacker`、`target`、`item`、`move`、`element`、只读 `outcome`；修改 `config.amount/type/element/ignoreBlock/ignoreDefense/ignoreStance/applyCritDamage/ignoreMinDamage`。 |
+| `hit` | 每个目标结算后；攻击未命中时也执行 | 攻击提供 `attacker`、`target`、`item`、`move`、`actionType`、`damageType/type`、`element`、`isHit/isCrit/isBroken`、`finalDamage`、`hpLost/mpLost/hutiLost`、`isDying/isDead`；手动结算另有 `isManual`。治疗/Buff 另有 `baseAmount`、`finalAmount`、`healAmount`、`isHeal/isBuff/isBuffOnly`。 |
 | `hit_once` | 全部目标完成后执行一次 | `targets` 汇总、`hitCount`、`attacker`、`item`、`move`、`actionType`、`costConsumed`；攻击提供 `hasCrit`，治疗提供 `totalHealAmount`。 |
 
 `hit` 的 `damageType/type` 当前保留招式原始伤害类型；如果 `preDamage` 改写了单个目标的 `config.type`，需要最终类型时从具体结算上下文自行确认，不要假设这两个字段已经同步改写。
+
+`hit_once.targets` 是每个目标的汇总数组；每项包含 `target`、`isHit`、`isCrit`、`isBroken`、`baseDamage`、`finalDamage`、`hpLost`、`hutiLost`、`mpLost`、`isDying`、`isDead` 和原始 `damageResult`。
 
 ### 防御者结算
 
@@ -225,7 +238,21 @@ const result = await args.target.applyDamage({
 });
 ```
 
-常用输入包括 `amount`、`type`、`element`、`attacker`、`isHit`、`isCrit`、`applyCritDamage`、`isBroken`、`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`ignoreMinDamage`、`item`、`move`、`source`。返回值包含 `finalDamage`、`hpLost`、`mpLost`、`hutiLost`、`tiliLost`、`isDying`、`isDead`、`rageGained`、`isHit`。
+| 参数 | 类型/默认值 | 说明 |
+|---|---|---|
+| `amount` | `number` | 原始面板伤害。 |
+| `type` | `string`，默认 `waigong` | 伤害类型；以 `CONFIG.XJZL.damageTypes` 为准。 |
+| `element` | `string`，默认 `none` | 伤害属性。 |
+| `attacker` | `Actor`，默认 `null` | 攻击来源；能确定时应传入。 |
+| `isHit` / `isCrit` / `isBroken` | `boolean`，默认 `true` / `false` / `false` | 命中、暴击和破防状态。未命中只触发 `avoided`。 |
+| `applyCritDamage` | `boolean`，默认 `true` | 是否应用暴击倍率；不影响 `isCrit` 标记。 |
+| `ignoreBlock` / `ignoreDefense` / `ignoreStance` / `ignoreMinDamage` | `boolean`，默认 `false` | 穿透格挡、防御、架招和最低 1 点伤害。 |
+| `targetKanpo` | `number`，默认 `0` | 战斗统计使用的看破值。 |
+| `isSkill` | `boolean`，默认 `true` | 是否按招式伤害计入技能抗性。 |
+| `move` / `item` | `Object` / `Item`，默认 `null` | 资源溯源上下文。 |
+| `source` | `string`，默认 `extra` | 常用值：`move`、`basic`、`both`、`dot`、`extra`；影响部分后效。 |
+
+返回 `Promise<object>`，常规结果包含 `finalDamage`、`hpLost`、`hutiLost`、`mpLost`、`tiliLost`、`isDying`、`isDead`、`rageGained`、`isHit`；未命中或免疫时可能只返回部分字段。容器 Actor 不受伤害。
 
 伤害类型以 `CONFIG.XJZL.damageTypes` 为准。环境伤害可以把 `attacker` 设为 `null`；能确定来源时必须传入，以保留统计和反伤语义。
 
@@ -243,7 +270,16 @@ const result = await args.target.applyHealing({
 });
 ```
 
-`type` 支持 `hp`、`mp`/`neili`、`huti`、`tili`、`rage`。正数恢复，负数直接流失。返回值包含 `actualHeal`、`overflow`、`isBlocked`、`oldVal`、`newVal`。
+| 参数 | 类型/默认值 | 说明 |
+|---|---|---|
+| `amount` | `number`，默认 `0` | 正数恢复，负数直接流失，`0` 不产生变化。 |
+| `type` | `string`，默认 `hp` | `hp`、`mp`/`neili`、`huti`、`tili`、`rage`。 |
+| `showScrolling` | `boolean`，默认 `true` | 是否显示飘字。 |
+| `healer` | `Actor`，默认继承当前脚本来源 | 治疗/流失来源，用于溯源和统计。 |
+| `move` / `item` | `Object` / `Item`，默认继承当前动作 | 来源招式和物品。 |
+| `source` | `string`，默认 `extra` | 资源来源标识。 |
+
+返回 `Promise<object>`，包含 `actualHeal`、`type`、`oldVal`、`newVal`、`overflow`、`isBlocked`。正向治疗可能受满值、禁疗或上限影响；负数是直接资源流失。
 
 ### 资源事务
 
@@ -262,7 +298,7 @@ await actor.changeResources({
 });
 ```
 
-`changeResources()` 会串行提交同一 Actor 的资源事务，并按实际差值派发 `resourceChanged`。不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
+`changeResources(updates, context)` 的 `updates` 是 Foundry 更新路径到绝对值的对象；`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。返回底层 Actor 更新结果。它会串行提交同一 Actor 的事务，并按实际差值派发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
 
 ## 状态 API
 
@@ -273,7 +309,7 @@ await game.xjzl.api.effects.addEffect(args.target, "prone");
 await game.xjzl.api.effects.removeEffect(args.target, "prone", 1);
 ```
 
-`addEffect(actor, effectDataOrId, count = 1)` 接受系统状态 ID 或 AE 数据，负责权限委托、本地化、slug 匹配、叠层和刷新。`removeEffect(actor, effectIdOrSlug, amount = 1)` 按文档 ID 或 slug 移除/减层。
+`addEffect(actor, effectDataOrId, count = 1)` 接受系统状态 ID 或 AE 数据，负责权限委托、本地化、slug 匹配、叠层和刷新，返回 `Promise<ActiveEffect|undefined>`。`removeEffect(actor, effectIdOrSlug, amount = 1)` 按文档 ID 或 slug 移除/减层；成功删除时返回删除结果，减层时通常返回 `undefined`。
 
 从来源 Item 复制 AE 时先转为普通对象并清除 `_id`：
 
@@ -327,19 +363,21 @@ await Macros.requestSave({
 });
 ```
 
-`requestSave(options)` 的主要参数：
+`requestSave(options)` 的参数：
 
-| 参数 | 含义 |
-|---|---|
-| `target`、`type`、`dc` | 目标、属性/技能/技艺键和难度。`target`、`type` 必填。 |
-| `attacker`、`label` | 来源 Actor 和卡片标题。 |
-| `level`、`bonus` | 临时优劣势层级和数值修正。 |
-| `onSuccess` / `onFail` | 系统状态 ID、AE 数据或数组。函数会被拒绝。 |
-| `damageOnSuccess` / `damageOnFail` | `{ value, type }`。伤害类型走 `applyDamage`；资源类型走直接流失。 |
-| `successText` / `failureText` | 结果说明。 |
-| `removeStanceOnSuccess` / `removeStanceOnFail` | 对应结果出现时解除检定者架招。 |
+| 参数 | 类型/默认值 | 说明 |
+|---|---|---|
+| `target` | `Actor`，必填 | 接受检定的目标。 |
+| `type` | `string`，必填 | 属性、技能、技艺或武器类型键。 |
+| `dc` | `number` | 难度。 |
+| `attacker` / `label` | `Actor` / `string`，可选 | 来源 Actor 和卡片标题。 |
+| `level` / `bonus` | `number`，默认 `0` | 临时优劣势层级和数值修正。 |
+| `onSuccess` / `onFail` | 状态 ID、AE 数据或数组，可选 | 结果状态；不能传函数，函数会被忽略并警告。 |
+| `damageOnSuccess` / `damageOnFail` | `{ value, type }`，可选 | 伤害类型走 `applyDamage`；资源类型走直接流失。 |
+| `successText` / `failureText` | `string`，可选 | 结果说明。 |
+| `removeStanceOnSuccess` / `removeStanceOnFail` | `boolean`，默认 `false` | 对应结果出现时解除检定者架招。 |
 
-结果执行顺序为：状态 → 伤害或资源变化 → 解除架招。
+返回创建聊天卡片的 `Promise<ChatMessage>`。结果执行顺序为：状态 → 伤害或资源变化 → 解除架招。
 
 ### 双方对抗
 
@@ -357,7 +395,7 @@ await Macros.requestContest({
 });
 ```
 
-`requestContest(options)` 还支持 `attBonus`、`defBonus`、`winText`、`loseText`。`outcome.win/lose` 从发起者视角定义，可使用 `text`、`selfEffect`、`targetEffect`、`selfRecovery`、`selfDamage`、`targetDamage`。双方平局时当前实现判发起者获胜。
+`requestContest(options)` 的参数为 `attacker`、`defender`、`type`（前三项必填）、`defType`（默认等于 `type`）、`label`、`attBonus`/`defBonus`（默认 `0`）、`winText`/`loseText` 和 `outcome`。`outcome.win/lose` 从发起者视角定义，可使用 `text`、`selfEffect`、`targetEffect`、`selfRecovery`、`selfDamage`、`targetDamage`；`winText`/`loseText` 会覆盖对应结果文本。返回创建聊天卡片的 `Promise<ChatMessage>`，平局当前判发起者获胜。
 
 ### 架招判断
 
