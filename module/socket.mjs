@@ -120,7 +120,9 @@ async function _socketRemoveEffect(targetUuid, targetId, amount) {
     return await game.xjzl.api.effects.removeEffect(target, targetId, amount);
 }
 
-// 供脚本代理使用的底层文档操作
+// 供脚本代理使用的底层文档操作。
+// 注意：若通过本通道更新 Actor 资源，调用端必须用 unwrapResourceSocketResult() 解包，
+// 否则资源事务专用错误信封会被误当成成功结果。
 async function _socketUpdateDocument(uuid, data, context) {
     // 在此拦截：如果有多个GM 在线，只有 1 个会通过这个判断
     if (isNotActiveGM()) return null;
