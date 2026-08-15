@@ -840,7 +840,7 @@
                         {
                             "label": "额外回怒",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await actor.update({ \"system.resources.rage.value\": actor.system.resources.rage.value + 1 });\n    ui.notifications.info(\"击中无架招，额外怒气 +1\");\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await actor.changeResources({ \"system.resources.rage.value\": actor.system.resources.rage.value + 1 }, { cause: \"hitRage\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"击中无架招，额外怒气 +1\");\n}",
                             "active": true
                         }
                     ]
@@ -3491,7 +3491,7 @@
                         {
                             "label": "无尘心境",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"无尘\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\n// 动态获得怒气\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rageGain = 8 - (lvl - 1);\nconst current = actor.system.resources.rage.value;\nconst max = actor.system.resources.rage.max;\nawait actor.update({ \"system.resources.rage.value\": Math.min(max, current + rageGain) });\nui.notifications.info(`进入无尘心境，获得 ${rageGain} 怒气。`);",
+                            "script": "const eff = thisItem.effects.getName(\"无尘\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\n// 动态获得怒气\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rageGain = 8 - (lvl - 1);\nconst current = actor.system.resources.rage.value;\nconst max = actor.system.resources.rage.max;\nawait actor.changeResources({ \"system.resources.rage.value\": Math.min(max, current + rageGain) }, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nui.notifications.info(`进入无尘心境，获得 ${rageGain} 怒气。`);",
                             "active": true
                         }
                     ]
@@ -3529,7 +3529,7 @@
                         {
                             "label": "屏蔽受伤回怒",
                             "trigger": "damaged",
-                            "script": "if (args.rageGained) {\n    // 系统在 damaged 后已经加了怒气，这里我们把它扣回去\n    const current = actor.system.resources.rage.value;\n    if (current > 0) {\n        await actor.update({ \"system.resources.rage.value\": current - 1 });\n    }\n}",
+                            "script": "if (args.rageGained) {\n    // 系统在 damaged 后已经加了怒气，这里我们把它扣回去\n    const current = actor.system.resources.rage.value;\n    if (current > 0) {\n        await actor.changeResources({ \"system.resources.rage.value\": current - 1 }, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3573,7 +3573,7 @@
                         {
                             "label": "减少怒气",
                             "trigger": "hit",
-                            "script": "const current = actor.system.resources.rage.value;\nconst reduce = 2;\nconst newVal = Math.max(0, current - reduce);\nif (newVal !== current) {\n    await actor.update({ \"system.resources.rage.value\": newVal });\n    ui.notifications.info(`怒气减少 ${reduce} 点`);\n}",
+                            "script": "const current = actor.system.resources.rage.value;\nconst reduce = 2;\nconst newVal = Math.max(0, current - reduce);\nif (newVal !== current) {\n    await actor.changeResources({ \"system.resources.rage.value\": newVal }, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(`怒气减少 ${reduce} 点`);\n}",
                             "active": true
                         }
                     ]
@@ -3617,7 +3617,7 @@
                         {
                             "label": "减少怒气与封招",
                             "trigger": "hit",
-                            "script": "// 减怒\nconst current = actor.system.resources.rage.value;\nconst reduce = 3;\nconst newVal = Math.max(0, current - reduce);\nif (newVal !== current) {\n    await actor.update({ \"system.resources.rage.value\": newVal });\n}\n\n// 封招\nif (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "// 减怒\nconst current = actor.system.resources.rage.value;\nconst reduce = 3;\nconst newVal = Math.max(0, current - reduce);\nif (newVal !== current) {\n    await actor.changeResources({ \"system.resources.rage.value\": newVal }, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}\n\n// 封招\nif (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3662,7 +3662,7 @@
                         {
                             "label": "增加怒气与精神伤害",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 8 - (lvl - 1);\nconst current = actor.system.resources.rage.value;\nconst max = actor.system.resources.rage.max;\nawait actor.update({ \"system.resources.rage.value\": Math.min(max, current + gain) });\n\n// 额外精神伤害\nconst shencai = args.target.system.stats.shencai.total || 0;\nif (shencai > 0) {\n    await args.target.applyDamage({\n        amount: shencai,\n        type: \"mental\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><b>无我无道</b><br>造成 ${shencai} 点精神伤害（基于目标神采）。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 8 - (lvl - 1);\nconst current = actor.system.resources.rage.value;\nconst max = actor.system.resources.rage.max;\nawait actor.changeResources({ \"system.resources.rage.value\": Math.min(max, current + gain) }, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n\n// 额外精神伤害\nconst shencai = args.target.system.stats.shencai.total || 0;\nif (shencai > 0) {\n    await args.target.applyDamage({\n        amount: shencai,\n        type: \"mental\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><b>无我无道</b><br>造成 ${shencai} 点精神伤害（基于目标神采）。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -3845,7 +3845,7 @@
                         {
                             "label": "减少怒气",
                             "trigger": "hit",
-                            "script": "const current = args.target.system.resources.rage.value;\nif (current > 0) {\n    const newVal = Math.max(0, current - 2);\n    await args.target.update({ \"system.resources.rage.value\": newVal });\n}",
+                            "script": "const current = args.target.system.resources.rage.value;\nif (current > 0) {\n    const newVal = Math.max(0, current - 2);\n    await args.target.changeResources({ \"system.resources.rage.value\": newVal }, { cause: \"script\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}",
                             "active": true
                         }
                     ]
@@ -4210,7 +4210,7 @@
                                     "label": "冷心回合末",
                                     "trigger": "turnEnd",
                                     "active": true,
-                                    "script": "const hasManual = actor.items.some(i => i.name === \"雪饮六诀\" && i.type === \"wuxue\");\nif (hasManual) {\n    const eff = thisItem.effects.getName(\"冰心\").toObject();\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.maxStacks\", 10);\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"冷心：获得1层 [冰心]\");\n} else {\n    // 获得怒气\n    const current = actor.system.resources.rage.value;\n    const max = actor.system.resources.rage.max;\n    if (current < max) {\n        await actor.update({\"system.resources.rage.value\": current + 1});\n        ui.notifications.info(\"冷心：获得1点怒气\");\n    }\n}"
+                                    "script": "const hasManual = actor.items.some(i => i.name === \"雪饮六诀\" && i.type === \"wuxue\");\nif (hasManual) {\n    const eff = thisItem.effects.getName(\"冰心\").toObject();\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.maxStacks\", 10);\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"冷心：获得1层 [冰心]\");\n} else {\n    // 获得怒气\n    const current = actor.system.resources.rage.value;\n    const max = actor.system.resources.rage.max;\n    if (current < max) {\n        await actor.changeResources({\"system.resources.rage.value\": current + 1}, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        ui.notifications.info(\"冷心：获得1点怒气\");\n    }\n}"
                                 }
                             ]
                         }
@@ -4928,7 +4928,7 @@
                             "label": "大荒回怒",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const hasDahuang = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dahuang\");\nif (hasDahuang && args.hitCount > 0) {\n    const current = actor.system.resources.rage.value;\n    const max = actor.system.resources.rage.max;\n    const gain = args.hitCount;\n    const newVal = Math.min(max, current + gain);\n    if (newVal > current) {\n        await actor.update({\"system.resources.rage.value\": newVal});\n        ui.notifications.info(`唯我洪荒：大荒回怒 +${gain}`);\n    }\n}"
+                            "script": "const hasDahuang = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dahuang\");\nif (hasDahuang && args.hitCount > 0) {\n    const current = actor.system.resources.rage.value;\n    const max = actor.system.resources.rage.max;\n    const gain = args.hitCount;\n    const newVal = Math.min(max, current + gain);\n    if (newVal > current) {\n        await actor.changeResources({\"system.resources.rage.value\": newVal}, { cause: \"hitRage\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        ui.notifications.info(`唯我洪荒：大荒回怒 +${gain}`);\n    }\n}"
                         }
                     ]
                 }

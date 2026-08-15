@@ -2427,7 +2427,7 @@
                         {
                             "label": "蓄势",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"指尖天风\" },\n        content: \"<p>是否消耗 10 点内力，使下次【惊天动地】怒气消耗 -1？</p>\",\n        ok: { label: \"消耗\" }\n    });\n    if (confirm) {\n        if (actor.system.resources.mp.value >= 10) {\n            await actor.update({ \"system.resources.mp.value\": actor.system.resources.mp.value - 10 });\n            const buff = thisItem.effects.find(e => e.name === \"惊天动地·蓄势\");\n            if (buff) await game.xjzl.api.effects.addEffect(actor, buff.toObject());\n        } else {\n            ui.notifications.warn(\"内力不足！\");\n        }\n    }\n}"
+                            "script": "if (args.isHit) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"指尖天风\" },\n        content: \"<p>是否消耗 10 点内力，使下次【惊天动地】怒气消耗 -1？</p>\",\n        ok: { label: \"消耗\" }\n    });\n    if (confirm) {\n        if (actor.system.resources.mp.value >= 10) {\n            await actor.changeResources({ \"system.resources.mp.value\": actor.system.resources.mp.value - 10 }, { cause: \"moveCost\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n            const buff = thisItem.effects.find(e => e.name === \"惊天动地·蓄势\");\n            if (buff) await game.xjzl.api.effects.addEffect(actor, buff.toObject());\n        } else {\n            ui.notifications.warn(\"内力不足！\");\n        }\n    }\n}"
                         }
                     ],
                     "weaponType": "unarmed"
@@ -2468,7 +2468,7 @@
                         {
                             "label": "怒气减免检测",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_damoke_xushi\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.update({\"system.resources.rage.value\": Math.min(10, actor.system.resources.rage.value + stacks)});\n    ui.notifications.info(`蓄势生效，返还 ${stacks} 点怒气。`);\n    await buff.delete();\n}\nargs.flags.bonusHit += 999; // 必中"
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_damoke_xushi\");\nif (buff) {\n    const stacks = buff.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await actor.changeResources({\"system.resources.rage.value\": Math.min(10, actor.system.resources.rage.value + stacks)}, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(`蓄势生效，返还 ${stacks} 点怒气。`);\n    await buff.delete();\n}\nargs.flags.bonusHit += 999; // 必中"
                         },
                         {
                             "label": "施加愚钝",
@@ -3414,7 +3414,7 @@
                         {
                             "label": "架招：渡化",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    // 兼容 Token 和 Actor 实例\n    const targetActor = args.attacker.actor || args.attacker;\n    const currentRage = targetActor.system.resources.rage.value || 0;\n    if (currentRage > 0) {\n        await targetActor.update({ \"system.resources.rage.value\": currentRage - 1 });\n        ui.notifications.info(\"相如满月：化解了对手 1 点怒气。\");\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    // 兼容 Token 和 Actor 实例\n    const targetActor = args.attacker.actor || args.attacker;\n    const currentRage = targetActor.system.resources.rage.value || 0;\n    if (currentRage > 0) {\n        await targetActor.changeResources({ \"system.resources.rage.value\": currentRage - 1 }, { cause: \"script\", sourceActor: actor, attacker: targetActor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        ui.notifications.info(\"相如满月：化解了对手 1 点怒气。\");\n    }\n}"
                         }
                     ],
                     "weaponType": "unarmed"
@@ -3449,7 +3449,7 @@
                         {
                             "label": "扣除怒气",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const r = args.target.system.resources.rage.value || 0;\n    if (r > 0) await args.target.update({ \"system.resources.rage.value\": r - 1 });\n}"
+                            "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const r = args.target.system.resources.rage.value || 0;\n    if (r > 0) await args.target.changeResources({ \"system.resources.rage.value\": r - 1 }, { cause: \"script\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}"
                         }
                     ],
                     "weaponType": "unarmed"
@@ -3484,7 +3484,7 @@
                         {
                             "label": "扣除怒气",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const r = args.target.system.resources.rage.value || 0;\n    if (r > 0) await args.target.update({ \"system.resources.rage.value\": r - 1 });\n}"
+                            "script": "if (args.isHit) {\n    const r = args.target.system.resources.rage.value || 0;\n    if (r > 0) await args.target.changeResources({ \"system.resources.rage.value\": r - 1 }, { cause: \"script\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}"
                         }
                     ],
                     "weaponType": "unarmed"
@@ -3566,7 +3566,7 @@
                         {
                             "label": "架招：增怒",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const r = args.attacker.system.resources.rage.value || 0;\n    const max = args.attacker.system.resources.rage.max || 10;\n    if (r < max) {\n        await args.attacker.update({ \"system.resources.rage.value\": r + 1 });\n        ui.notifications.info(`${args.attacker.name} 攻击被断烦刀法架住，怒气 +1`);\n    }\n}"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) {\n    const r = args.attacker.system.resources.rage.value || 0;\n    const max = args.attacker.system.resources.rage.max || 10;\n    if (r < max) {\n        await args.attacker.changeResources({ \"system.resources.rage.value\": r + 1 }, { cause: \"hitRage\", sourceActor: actor, attacker: args.attacker, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        ui.notifications.info(`${args.attacker.name} 攻击被断烦刀法架住，怒气 +1`);\n    }\n}"
                         }
                     ],
                     "weaponType": "blade"
@@ -5150,7 +5150,7 @@
                             "label": "如来加成与献祭",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 如来加成\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}\n\n// 献祭判定\nconst hp = actor.system.resources.hp.value;\nconst mp = actor.system.resources.mp.value;\n// 计算需求: 基础500, 每级-100\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst req = Math.max(100, 500 - (lvl - 1) * 100);\n\nif (hp + mp < req) {\n    ui.notifications.warn(`气血内力总和不足 ${req}，无法施展`);\n    args.flags.abort = true;\n    return;\n}\n\nawait actor.update({'system.resources.hp.value': 0, 'system.resources.mp.value': 0});\nawait ChatCardManager._rollDeathSave(actor);"
+                            "script": "// 如来加成\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'wanfosi_rulai')) {\n    args.flags.bonusHit += 5;\n}\n\n// 献祭判定\nconst hp = actor.system.resources.hp.value;\nconst mp = actor.system.resources.mp.value;\n// 计算需求: 基础500, 每级-100\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst req = Math.max(100, 500 - (lvl - 1) * 100);\n\nif (hp + mp < req) {\n    ui.notifications.warn(`气血内力总和不足 ${req}，无法施展`);\n    args.flags.abort = true;\n    return;\n}\n\nawait actor.changeResources({'system.resources.hp.value': 0, 'system.resources.mp.value': 0}, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nawait ChatCardManager._rollDeathSave(actor);"
                         },
                         {
                             "label": "如来加伤",
@@ -5444,7 +5444,7 @@
                             "label": "开启回怒",
                             "trigger": "attack",
                             "active": true,
-                            "script": "await actor.update({'system.resources.rage.value': Math.min(10, actor.system.resources.rage.value + 2)});"
+                            "script": "await actor.changeResources({'system.resources.rage.value': Math.min(10, actor.system.resources.rage.value + 2)}, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });"
                         }
                     ]
                 },

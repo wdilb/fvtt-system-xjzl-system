@@ -4149,7 +4149,7 @@
                         {
                             "label": "动态扣蓝",
                             "trigger": "attack",
-                            "script": "const currentMp = actor.system.resources.mp.value;\nconst cost = Math.max(200, Math.floor(currentMp / 2));\nif (currentMp < cost) {\n    args.flags.abort = true;\n    args.flags.abortReason = `内力不足（需至少 ${cost}），无法施展九宫归元！`;\n    return;\n}\nawait actor.update({\"system.resources.mp.value\": currentMp - cost});\nargs.costConsumed.mp = cost;",
+                            "script": "const currentMp = actor.system.resources.mp.value;\nconst cost = Math.max(200, Math.floor(currentMp / 2));\nif (currentMp < cost) {\n    args.flags.abort = true;\n    args.flags.abortReason = `内力不足（需至少 ${cost}），无法施展九宫归元！`;\n    return;\n}\nawait actor.changeResources({\"system.resources.mp.value\": currentMp - cost}, { cause: \"moveCost\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nargs.costConsumed.mp = cost;",
                             "active": true
                         },
                         {
@@ -4259,7 +4259,7 @@
                                     "label": "免死复活",
                                     "trigger": "dying",
                                     "active": true,
-                                    "script": "args.preventDying = true;\nawait actor.update({\n    \"system.resources.hp.value\": 1,\n    \"system.resources.mp.value\": 1\n});\nactor.showFloatyText(\"起死回生！\", { fill: \"#f1c40f\", fontSize: 40 });\nthisEffect.delete();"
+                                    "script": "args.preventDying = true;\nawait actor.changeResources({\n    \"system.resources.hp.value\": 1,\n    \"system.resources.mp.value\": 1\n}, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nactor.showFloatyText(\"起死回生！\", { fill: \"#f1c40f\", fontSize: 40 });\nthisEffect.delete();"
                                 }
                             ]
                         }
@@ -4917,7 +4917,7 @@
                             "label": "怒气借贷",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "if (actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_free\")) {\n  await actor.unsetFlag(\"xjzl-system\", \"wuxue_bahuang_free\");\n  await actor.update({ \"system.resources.rage.value\": -10 });\n  const html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #e74c3c; background:rgba(231,76,60,0.06); margin-left:4px;\">\\n  <div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-hourglass-half\"></i> 怒气被过去借走</div>\\n  <div style=\"font-size:0.85em; color:#555;\">跨越时空击敌，怒气值变为 <b>-10</b>。此后每次受击回怒 +1 都将用于还债，攒满 10 点怒气即还清。</div>\\n</div>`;\n  ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });\n  actor.showFloatyText(\"怒气-10·借走\", { fill: \"#e74c3c\" });\n}"
+                            "script": "if (actor.getFlag(\"xjzl-system\", \"wuxue_bahuang_free\")) {\n  await actor.unsetFlag(\"xjzl-system\", \"wuxue_bahuang_free\");\n  await actor.changeResources({ \"system.resources.rage.value\": -10 }, { cause: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n  const html = `<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #e74c3c; background:rgba(231,76,60,0.06); margin-left:4px;\">\\n  <div style=\"font-weight:bold; color:#c0392b;\"><i class=\"fas fa-hourglass-half\"></i> 怒气被过去借走</div>\\n  <div style=\"font-size:0.85em; color:#555;\">跨越时空击敌，怒气值变为 <b>-10</b>。此后每次受击回怒 +1 都将用于还债，攒满 10 点怒气即还清。</div>\\n</div>`;\n  ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor }), content: html });\n  actor.showFloatyText(\"怒气-10·借走\", { fill: \"#e74c3c\" });\n}"
                         }
                     ]
                 }
