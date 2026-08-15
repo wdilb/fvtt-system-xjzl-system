@@ -195,7 +195,7 @@ await Macros.requestSave({
 - `passive` 和 `calc` 同步执行，脚本内禁止 `await`、Dialog 和文档写入；其余触发器异步执行。
 - `actor` 是当前脚本的宿主。攻击侧通常是攻击者，`preDefense`、`preTake`、`damaged` 等防御侧触发器中是受击者。
 - 条件变量并非始终存在。优先从 `args` 读取，并检查 `target`、`attacker`、`move`、`item` 是否为空。
-- 正常伤害使用 `applyDamage()`，治疗或直接资源增减使用 `applyHealing()`，绝对资源事务使用 `changeResources()`。`hp`、`mp`、`rage`、`huti`、`tili`、`morale` 这 6 类资源不要直接 `actor.update()` / `args.target.update()` 修改。
+- 正常伤害使用 `applyDamage()`，治疗或直接资源增减使用 `applyHealing()`，绝对资源事务使用 `changeResources()`。
 - 状态使用 `game.xjzl.api.effects` 管理，检定与对抗优先使用 `Macros`。
 - 脚本可执行可信 JavaScript，不是面向不可信代码的安全隔离环境。
 
