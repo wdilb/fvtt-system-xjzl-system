@@ -3646,9 +3646,6 @@ export class XJZLActor extends Actor {
     breakdownText += `+ 其他增伤: ${flatBonus}`;
     if (isOpportunity) {
       breakdownText += ` (含招式加成)`; // 提示文本
-      if (sys.resources.morale?.value > 0) {
-        breakdownText += ` (含士气 ${sys.resources.morale.value})`;
-      }
       if (cxBonus > 0) {
         breakdownText += `\n+ 趁虚而入升级加成: ${cxBonus}`;
       }

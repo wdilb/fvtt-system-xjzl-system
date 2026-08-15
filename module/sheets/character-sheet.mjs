@@ -655,6 +655,112 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             weaponRanks: [], resistances: {}, damages: {}
         };
 
+        // --- 普通攻击 / 趁虚而入 预计伤害 Tooltip ---
+        // 体量较小且只在本处使用，直接构建标记，避免为单一组件增加模板预加载依赖。
+        const buildBasicAttackPreview = (mode, title) => {
+            try {
+                const weapon = actor.itemTypes.weapon.find(i => i.system.equipped);
+                const weaponType = weapon ? weapon.system.type : "unarmed";
+                const weaponName = weapon ? weapon.name : "徒手";
+                const baseDamage = weapon ? (weapon.system.damage || 0) : 0;
+                const isOpportunity = mode === "opportunity";
+                const moraleSpent = isOpportunity ? (system.resources.morale?.value || 0) : 0;
+
+                const buildPreview = (damageType) => {
+                    const move = {
+                        id: isOpportunity ? "opportunity-attack" : "basic-attack",
+                        name: `${title} (${weaponName})`,
+                        type: "basic",
+                        damageType,
+                        weaponType,
+                        isUltimate: false,
+                        img: isOpportunity
+                            ? "icons/skills/melee/strike-dagger-blood-red.webp"
+                            : (weapon ? weapon.img : "icons/skills/melee/unarmed-punch-fist.webp"),
+                        currentCost: { mp: 0, rage: 0, hp: 0 },
+                        description: isOpportunity ? "发起一次趁虚而入。" : "发起一次基础攻击。"
+                    };
+                    const item = {
+                        id: "basic",
+                        uuid: "Virtual.BasicAttackPreview",
+                        name: title,
+                        type: "basic",
+                        img: move.img,
+                        actor: actor,
+                        system: { description: "", moves: [move] },
+                        getFlag: () => null,
+                        flags: {}
+                    };
+                    return actor._calculateBasicAttackDamage(move, baseDamage, { bonusDamage: 0 }, mode, moraleSpent, item);
+                };
+
+                return {
+                    title,
+                    weaponName,
+                    isOpportunity,
+                    waigong: buildPreview("waigong") || { damage: 0, breakdown: "" },
+                    neigong: buildPreview("neigong") || { damage: 0, breakdown: "" }
+                };
+            } catch (err) {
+                console.error("XJZL | 普攻伤害预览计算失败", err);
+                return null;
+            }
+        };
+
+        /**
+         * 构建普攻预览 Tooltip；动态名称与脚本拆解必须转义后才能进入 HTML。
+         * @param {"basic"|"opportunity"} mode - 攻击模式。
+         * @param {string} title - 已本地化的攻击名称。
+         * @returns {string} 可供 Foundry Tooltip 使用的 HTML；计算失败时为空字符串。
+         */
+        const buildBasicAttackTooltip = (mode, title) => {
+            const preview = buildBasicAttackPreview(mode, title);
+            if (!preview) return "";
+            const escape = value => foundry.utils.escapeHTML(String(value ?? ""));
+            const previewLabel = game.i18n.localize("XJZL.Combat.DmgPreview");
+            const waigongLabel = game.i18n.localize("XJZL.Combat.Dmg.Waigong");
+            const neigongLabel = game.i18n.localize("XJZL.Combat.Dmg.Neigong");
+            const mitigationKey = preview.isOpportunity
+                ? "XJZL.Combat.BasicAttackTooltip.OpportunityMitigationNote"
+                : "XJZL.Combat.BasicAttackTooltip.MitigationNote";
+            const mitigationNote = game.i18n.localize(mitigationKey);
+            const modeClass = preview.isOpportunity ? " xjzl-basic-attack-tooltip__content--opportunity" : "";
+
+            return `
+                <div class="xjzl-basic-attack-tooltip__content${modeClass}">
+                    <div class="xjzl-basic-attack-tooltip__header">
+                        <div class="xjzl-basic-attack-tooltip__heading">
+                            <span class="xjzl-basic-attack-tooltip__eyebrow">${escape(previewLabel)}</span>
+                            <span class="xjzl-basic-attack-tooltip__title">${escape(preview.title)}</span>
+                        </div>
+                        <span class="xjzl-basic-attack-tooltip__weapon">${escape(preview.weaponName)}</span>
+                    </div>
+                    <div class="xjzl-basic-attack-tooltip__channels">
+                        <div class="xjzl-basic-attack-tooltip__channel xjzl-basic-attack-tooltip__channel--waigong">
+                            <div class="xjzl-basic-attack-tooltip__channel-head">
+                                <span class="xjzl-basic-attack-tooltip__label">${escape(waigongLabel)}</span>
+                                <span class="xjzl-basic-attack-tooltip__value">${escape(preview.waigong.damage)}</span>
+                            </div>
+                            <div class="xjzl-basic-attack-tooltip__breakdown">${escape(preview.waigong.breakdown)}</div>
+                        </div>
+                        <div class="xjzl-basic-attack-tooltip__channel xjzl-basic-attack-tooltip__channel--neigong">
+                            <div class="xjzl-basic-attack-tooltip__channel-head">
+                                <span class="xjzl-basic-attack-tooltip__label">${escape(neigongLabel)}</span>
+                                <span class="xjzl-basic-attack-tooltip__value">${escape(preview.neigong.damage)}</span>
+                            </div>
+                            <div class="xjzl-basic-attack-tooltip__breakdown">${escape(preview.neigong.breakdown)}</div>
+                        </div>
+                    </div>
+                    <div class="xjzl-basic-attack-tooltip__note">
+                        <span aria-hidden="true">◇</span>
+                        <span>${escape(mitigationNote)}</span>
+                    </div>
+                </div>`;
+        };
+
+        context.basicAttackTooltip = buildBasicAttackTooltip("basic", game.i18n.localize("XJZL.Combat.BasicAttack"));
+        context.opportunityAttackTooltip = buildBasicAttackTooltip("opportunity", game.i18n.localize("XJZL.Combat.OpportunityAttack"));
+
         // --- 填充属性与悟性 (Attributes) ---
         const statsSchema = system.schema.fields.stats.fields;
         const attrKeys = ["liliang", "shenfa", "tipo", "wuxing", "neixi", "qigan", "shencai"];
