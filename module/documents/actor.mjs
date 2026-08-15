@@ -46,7 +46,7 @@ const RESOURCE_TRANSACTION_OPTIONS = new Set([
 function serializeResourceContext(context = {}) {
   context = context || {};
   const { item, sourceActor, target, attacker, healer, ...plainContext } = context;
-  return {
+  const serialized = {
     ...plainContext,
     itemUuid: item?.uuid || context.itemUuid || null,
     sourceActorUuid: sourceActor?.uuid || context.sourceActorUuid || null,
@@ -54,6 +54,9 @@ function serializeResourceContext(context = {}) {
     attackerUuid: attacker?.uuid || context.attackerUuid || null,
     healerUuid: healer?.uuid || context.healerUuid || null
   };
+  // 普通对象（如普通攻击的虚拟 item）没有 uuid，不能按 UUID 还原；保留原样跨 Socket 传输。
+  if (item && !item.uuid) serialized.item = item;
+  return serialized;
 }
 
 /**
@@ -1722,11 +1725,8 @@ export class XJZLActor extends Actor {
   async applyDamage(data) {
     // [权限拦截]
     if (!this.isOwner) {
-      const socketData = { ...data };
-      if (data.attacker) {
-        socketData.attackerUuid = data.attacker.uuid;
-        delete socketData.attacker; // 剔除复杂对象
-      }
+      // 统一走资源上下文序列化：attacker/item 等 Document 转 UUID，GM 端按 UUID 还原，避免跨 Socket 丢失。
+      const socketData = serializeResourceContext(data);
       return unwrapResourceSocketResult(await xjzlSocket.executeAsGM("applyDamage", this.uuid, socketData));
     }
 
@@ -1747,6 +1747,19 @@ export class XJZLActor extends Actor {
         this.showFloatyText("闪避", { fontSize: 32, fill: "#ffffff" });
         return { finalDamage: 0, isDead: false };
       }
+
+      // 与标准伤害流程保持一致：把来源 item/move/source 一并交给资源事务与 resourceChanged，避免野兽伤害丢失物品溯源。
+      const creatureDamageType = data.type || "waigong";
+      const creatureResourceContext = {
+        cause: "damage",
+        attacker: data.attacker || null,
+        target: this,
+        type: creatureDamageType,
+        damageType: creatureDamageType,
+        move: data.move || null,
+        item: data.item || null,
+        source: data.source || "extra"
+      };
 
       // 2. 获取配置
       const mode = game.settings.get("xjzl-system", "creatureDamageMode");
@@ -1778,7 +1791,7 @@ export class XJZLActor extends Actor {
 
           const resourceTransaction = await this._commitResourceChanges(
             { "system.resources.tili.value": newVal },
-            { cause: "damage", attacker: data.attacker || null, target: this, type: data.type || "waigong" }
+            creatureResourceContext
           );
 
           // 飘字
@@ -1804,12 +1817,7 @@ export class XJZLActor extends Actor {
             }
           }
 
-          await this._dispatchResourceChanges(resourceTransaction.changes, {
-            cause: "damage",
-            attacker: data.attacker || null,
-            target: this,
-            type: data.type || "waigong"
-          });
+          await this._dispatchResourceChanges(resourceTransaction.changes, creatureResourceContext);
         }
       } else {
         // 未破防
@@ -1822,8 +1830,7 @@ export class XJZLActor extends Actor {
       };
 
       // 野兽特化逻辑的溯源 Hook (仅限脚本引擎调用的伤害)，用于后续的数据统计功能
-      // 解构获取 type (因为野兽逻辑前面可能还没解构 type，我们需要从 data 里取一下)
-      const damageType = data.type || "waigong";
+      const damageType = creatureDamageType;
       const attacker = data.attacker || null;
       let isScriptDamage = false; // 防重复拦截锁
 
