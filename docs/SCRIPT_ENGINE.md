@@ -300,6 +300,18 @@ await actor.changeResources({
 
 `changeResources(updates, context)` 的 `updates` 是 Foundry 更新路径到绝对值的对象；`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。返回底层 Actor 更新结果。它会串行提交同一 Actor 的事务，并按实际差值派发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
 
+### 资源事务错误
+
+`changeResources`、`applyDamage`、`applyHealing` 及其跨权限代理在资源事务失败时可能抛出 `XJZLResourceCommitError`。该错误包含 `committed`、`phase`、`cause`、`actorUuid`、`resourceChanges` 和 `originalError`，用于判断能否安全重试：
+
+- `committed: true`：数据库主更新已经提交，禁止自动重试，否则会造成二次伤害、治疗或重复资源变动。
+- `committed: false`：已确认主更新未提交，可以按业务规则重试。
+- `committed: "unknown"`：无法确认是否提交，默认禁止自动重试；需要人工核对 Actor 当前值后再决定。
+- `phase` 标识失败阶段，例如 `database` 或 `resourceIntegrity`。
+- `resourceChanges` 为 `null` 表示失败时未能可靠计算变化数组；它不能用于判断资源是否已经变更。
+
+单个 `resourceChanged` 脚本错误仍由脚本执行器隔离并记录，不会抛出为 `XJZLResourceCommitError`。
+
 ## 状态 API
 
 ### 添加和移除

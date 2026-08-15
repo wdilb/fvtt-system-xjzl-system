@@ -5,6 +5,7 @@ import { SCRIPT_TRIGGERS } from "../data/common.mjs";
 import { XJZLMacros } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
+import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 
 // 尝试突破经脉花费固定为500
 const JINGMAI_ATTEMPT_COST = 500;
@@ -37,22 +38,6 @@ const RESOURCE_TRANSACTION_OPTIONS = new Set([
   "xjzlResourceContext",
   "xjzlResourceTransaction"
 ]);
-
-/**
- * 资源事务提交异常：区分“数据库是否已提交”以及失败阶段，避免调用方盲目重试造成二次结算。
- */
-class XJZLResourceCommitError extends Error {
-  constructor(message, { committed, phase, cause, actorUuid, resourceChanges, originalError } = {}) {
-    super(message);
-    this.name = "XJZLResourceCommitError";
-    this.committed = committed;
-    this.phase = phase;
-    this.cause = cause;
-    this.actorUuid = actorUuid;
-    this.resourceChanges = resourceChanges;
-    this.originalError = originalError;
-  }
-}
 
 /**
  * 将资源触发上下文压缩为可通过 socket 传输的形式。
@@ -150,12 +135,13 @@ export class XJZLActor extends Actor {
   async changeResources(updates = {}, context = null) {
     context = inheritScriptResourceContext(this, inheritResourceChain(context, this._resourceEventContext));
     if (!this.isOwner) {
-      return await xjzlSocket.executeAsGM(
+      const socketResult = await xjzlSocket.executeAsGM(
         "changeResources",
         this.uuid,
         updates,
         serializeResourceContext(context)
       );
+      return unwrapResourceSocketResult(socketResult);
     }
 
     const transaction = await this._commitResourceChanges(updates, context);
@@ -240,10 +226,11 @@ export class XJZLActor extends Actor {
         });
       } catch (err) {
         throw new XJZLResourceCommitError(`XJZL | 资源事务数据库提交失败 [${this.uuid}]`, {
-          committed: false,
+          committed: "unknown",
           phase: "database",
           cause: context.cause,
           actorUuid: this.uuid,
+          resourceChanges: null,
           originalError: err
         });
       }
@@ -257,6 +244,7 @@ export class XJZLActor extends Actor {
           phase: "resourceIntegrity",
           cause: context.cause,
           actorUuid: this.uuid,
+          resourceChanges: null,
           originalError: err
         });
       }
@@ -1739,7 +1727,7 @@ export class XJZLActor extends Actor {
         socketData.attackerUuid = data.attacker.uuid;
         delete socketData.attacker; // 剔除复杂对象
       }
-      return await xjzlSocket.executeAsGM("applyDamage", this.uuid, socketData);
+      return unwrapResourceSocketResult(await xjzlSocket.executeAsGM("applyDamage", this.uuid, socketData));
     }
 
     // --- 容器受到攻击不处理，或者返回0伤害 ---
@@ -2495,7 +2483,7 @@ export class XJZLActor extends Actor {
         socketData.healerUuid = resourceHealer.uuid;
         delete socketData.healer;
       }
-      return await xjzlSocket.executeAsGM("applyHealing", this.uuid, socketData);
+      return unwrapResourceSocketResult(await xjzlSocket.executeAsGM("applyHealing", this.uuid, socketData));
     }
     // --- 容器无法治疗 ---
     if (this.type === "container") return { actualHeal: 0 };
@@ -4155,7 +4143,7 @@ export class XJZLActor extends Actor {
                   host,
                   inheritResourceChain(operation.xjzlResourceContext, host._resourceEventContext)
                 ));
-                return await xjzlSocket.executeAsGM("updateDocument", target.uuid, data, operation);
+                return unwrapResourceSocketResult(await xjzlSocket.executeAsGM("updateDocument", target.uuid, data, operation));
               };
             }
             if (prop === "changeResources" && typeof target.changeResources === "function") {
@@ -4164,12 +4152,12 @@ export class XJZLActor extends Actor {
                   host,
                   inheritResourceChain(context, host._resourceEventContext)
                 );
-                return await xjzlSocket.executeAsGM(
+                return unwrapResourceSocketResult(await xjzlSocket.executeAsGM(
                   "changeResources",
                   target.uuid,
                   data,
                   serializeResourceContext(resourceContext)
-                );
+                ));
               };
             }
             if (prop === "createEmbeddedDocuments") {

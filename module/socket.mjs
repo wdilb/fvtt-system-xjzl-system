@@ -1,5 +1,6 @@
 import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./managers/encounter-manager.mjs";
+import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
 
 export let xjzlSocket;
 
@@ -71,8 +72,12 @@ async function _socketApplyDamage(targetUuid, data) {
     if (isNotActiveGM()) return null;
     const target = await fromUuid(targetUuid);
     if (!target) return null;
-    if (data.attackerUuid) data.attacker = await fromUuid(data.attackerUuid);
-    return await target.applyDamage(data);
+    data = await deserializeResourceContext(data);
+    try {
+        return wrapResourceSocketResult(await target.applyDamage(data));
+    } catch (err) {
+        return wrapResourceSocketError(err);
+    }
 }
 
 async function _socketApplyHealing(targetUuid, data) {
@@ -80,11 +85,12 @@ async function _socketApplyHealing(targetUuid, data) {
     if (isNotActiveGM()) return null;
     const target = await fromUuid(targetUuid);
     if (!target) return { actualHeal: 0 };
-    if (data.healerUuid) data.healer = await fromUuid(data.healerUuid);
-    if (data.itemUuid) data.item = await fromUuid(data.itemUuid);
-    delete data.healerUuid;
-    delete data.itemUuid;
-    return await target.applyHealing(data);
+    data = await deserializeResourceContext(data);
+    try {
+        return wrapResourceSocketResult(await target.applyHealing(data));
+    } catch (err) {
+        return wrapResourceSocketError(err);
+    }
 }
 
 /** 在主 GM 端恢复资源上下文中的文档引用，并执行统一资源事务。 */
@@ -93,7 +99,11 @@ async function _socketChangeResources(targetUuid, updates, context = {}) {
     const target = await fromUuid(targetUuid);
     if (!target) return null;
     context = await deserializeResourceContext(context);
-    return await target.changeResources(updates, context);
+    try {
+        return wrapResourceSocketResult(await target.changeResources(updates, context));
+    } catch (err) {
+        return wrapResourceSocketError(err);
+    }
 }
 
 async function _socketAddEffect(targetUuid, effectData, count) {
@@ -120,7 +130,12 @@ async function _socketUpdateDocument(uuid, data, context) {
     if (operation.xjzlResourceContext) {
         operation.xjzlResourceContext = await deserializeResourceContext(operation.xjzlResourceContext);
     }
-    return await doc?.update(data, operation);
+    try {
+        return await doc?.update(data, operation);
+    } catch (err) {
+        // 仅资源事务错误需要保留 committed/phase 等字段；普通文档更新错误仍走 socketlib 异常通道。
+        return wrapResourceSocketError(err);
+    }
 }
 
 async function _socketCreateEmbedded(parentUuid, type, data, context) {

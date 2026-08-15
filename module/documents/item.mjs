@@ -4,6 +4,7 @@ import { XJZLMacros } from "../utils/macros.mjs";
 import { createAutomaticDetailAccess } from "../utils/chat-detail-access.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { xjzlSocket } from "../socket.mjs";
+import { unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
 
@@ -228,7 +229,8 @@ export class XJZLItem extends Item {
       if (target.isOwner) {
         await target.update(updates);
       } else {
-        await xjzlSocket.executeAsGM("updateDocument", target.uuid, updates);
+        const updateResult = await xjzlSocket.executeAsGM("updateDocument", target.uuid, updates);
+        unwrapResourceSocketResult(updateResult);
       }
     }
 
@@ -288,7 +290,9 @@ export class XJZLItem extends Item {
           scriptTarget = new Proxy(target, {
             get(proxyTarget, prop) {
               if (prop === "update") {
-                return async (data, ctx) => xjzlSocket.executeAsGM("updateDocument", proxyTarget.uuid, data, ctx);
+                return async (data, ctx) => unwrapResourceSocketResult(
+                  await xjzlSocket.executeAsGM("updateDocument", proxyTarget.uuid, data, ctx)
+                );
               }
               if (prop === "createEmbeddedDocuments") {
                 return async (type, data, ctx) => xjzlSocket.executeAsGM("createEmbedded", proxyTarget.uuid, type, data, ctx);
