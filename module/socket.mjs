@@ -40,6 +40,32 @@ function isNotActiveGM() {
     // 如果那个 GM 不是我自己 (.isSelf)，那我就返回 true (表示我不执行)
     return !game.users.activeGM?.isSelf;
 }
+
+/**
+ * 将 socket 传输的资源上下文字段中的 UUID 还原为文档引用。
+ * 先浅拷贝，避免修改 socketlib 传入的对象；UUID 解析失败时对应字段安全置为 null。
+ */
+async function deserializeResourceContext(context = {}) {
+    const restored = { ...(context || {}) };
+    const uuidToDoc = [
+        ["itemUuid", "item"],
+        ["sourceActorUuid", "sourceActor"],
+        ["targetUuid", "target"],
+        ["attackerUuid", "attacker"],
+        ["healerUuid", "healer"]
+    ];
+    for (const [uuidKey, docKey] of uuidToDoc) {
+        const uuid = restored[uuidKey];
+        if (uuid) {
+            const doc = await fromUuid(uuid);
+            if (doc) restored[docKey] = doc;
+            else if (restored[docKey] === undefined) restored[docKey] = null;
+        }
+        delete restored[uuidKey];
+    }
+    return restored;
+}
+
 async function _socketApplyDamage(targetUuid, data) {
     // 在此拦截：如果有多个GM 在线，只有 1 个会通过这个判断
     if (isNotActiveGM()) return null;
@@ -64,19 +90,9 @@ async function _socketApplyHealing(targetUuid, data) {
 /** 在主 GM 端恢复资源上下文中的文档引用，并执行统一资源事务。 */
 async function _socketChangeResources(targetUuid, updates, context = {}) {
     if (isNotActiveGM()) return null;
-    context = context || {};
     const target = await fromUuid(targetUuid);
     if (!target) return null;
-    if (context.itemUuid) context.item = await fromUuid(context.itemUuid);
-    if (context.sourceActorUuid) context.sourceActor = await fromUuid(context.sourceActorUuid);
-    if (context.targetUuid) context.target = await fromUuid(context.targetUuid);
-    if (context.attackerUuid) context.attacker = await fromUuid(context.attackerUuid);
-    if (context.healerUuid) context.healer = await fromUuid(context.healerUuid);
-    delete context.itemUuid;
-    delete context.sourceActorUuid;
-    delete context.targetUuid;
-    delete context.attackerUuid;
-    delete context.healerUuid;
+    context = await deserializeResourceContext(context);
     return await target.changeResources(updates, context);
 }
 
@@ -100,7 +116,11 @@ async function _socketUpdateDocument(uuid, data, context) {
     if (isNotActiveGM()) return null;
     const doc = await fromUuid(uuid);
     // 强制 context 为对象，防止 null 导致核心 update 方法崩溃
-    return await doc?.update(data, context || {});
+    const operation = { ...(context || {}) };
+    if (operation.xjzlResourceContext) {
+        operation.xjzlResourceContext = await deserializeResourceContext(operation.xjzlResourceContext);
+    }
+    return await doc?.update(data, operation);
 }
 
 async function _socketCreateEmbedded(parentUuid, type, data, context) {

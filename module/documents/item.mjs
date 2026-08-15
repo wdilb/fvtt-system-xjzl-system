@@ -282,14 +282,24 @@ export class XJZLItem extends Item {
         const AsyncFunction = Object.getPrototypeOf(async function () { }).constructor;
         const argNames = ["actor", "item", "game", "ui", "Macros"];
 
-        // 权限代理
-        // 如果当前玩家没有目标 target 的所有权，我们临时劫持它的底层数据库操作
-        // 这样即使脚本里写了纯原生的 target.update(...)，也会被拦截并发送给 GM
-        const scriptTarget = target;
+        // 权限代理：仅在本次脚本调用期间把目标 Actor 包成局部 Proxy，不修改原始文档实例。
+        let scriptTarget = target;
         if (!scriptTarget.isOwner) {
-          scriptTarget.update = async (data, ctx) => xjzlSocket.executeAsGM("updateDocument", scriptTarget.uuid, data, ctx);
-          scriptTarget.createEmbeddedDocuments = async (type, data, ctx) => xjzlSocket.executeAsGM("createEmbedded", scriptTarget.uuid, type, data, ctx);
-          scriptTarget.deleteEmbeddedDocuments = async (type, ids, ctx) => xjzlSocket.executeAsGM("deleteEmbedded", scriptTarget.uuid, type, ids, ctx);
+          scriptTarget = new Proxy(target, {
+            get(proxyTarget, prop) {
+              if (prop === "update") {
+                return async (data, ctx) => xjzlSocket.executeAsGM("updateDocument", proxyTarget.uuid, data, ctx);
+              }
+              if (prop === "createEmbeddedDocuments") {
+                return async (type, data, ctx) => xjzlSocket.executeAsGM("createEmbedded", proxyTarget.uuid, type, data, ctx);
+              }
+              if (prop === "deleteEmbeddedDocuments") {
+                return async (type, ids, ctx) => xjzlSocket.executeAsGM("deleteEmbedded", proxyTarget.uuid, type, ids, ctx);
+              }
+              const value = Reflect.get(proxyTarget, prop, proxyTarget);
+              return typeof value === "function" ? value.bind(proxyTarget) : value;
+            }
+          });
         }
 
         const fn = new AsyncFunction(...argNames, config.usageScript);

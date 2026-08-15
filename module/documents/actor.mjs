@@ -39,6 +39,22 @@ const RESOURCE_TRANSACTION_OPTIONS = new Set([
 ]);
 
 /**
+ * 资源事务提交异常：区分“数据库是否已提交”以及失败阶段，避免调用方盲目重试造成二次结算。
+ */
+class XJZLResourceCommitError extends Error {
+  constructor(message, { committed, phase, cause, actorUuid, resourceChanges, originalError } = {}) {
+    super(message);
+    this.name = "XJZLResourceCommitError";
+    this.committed = committed;
+    this.phase = phase;
+    this.cause = cause;
+    this.actorUuid = actorUuid;
+    this.resourceChanges = resourceChanges;
+    this.originalError = originalError;
+  }
+}
+
+/**
  * 将资源触发上下文压缩为可通过 socket 传输的形式。
  * 文档对象由 GM 端按 UUID 恢复，招式数据保持为普通对象。
  */
@@ -158,7 +174,7 @@ export class XJZLActor extends Actor {
       this,
       inheritResourceChain(operation?.xjzlResourceContext, this._resourceEventContext)
     );
-    const contextItem = context.move || context.contextItem || null;
+    const contextItem = context.move || null;
     const contextScripts = contextItem?.scripts;
     const contextHasResourceScript = Array.isArray(contextScripts) && contextScripts.some(script =>
       script.trigger === SCRIPT_TRIGGERS.RESOURCE_CHANGED && script.active
@@ -183,7 +199,7 @@ export class XJZLActor extends Actor {
    * 提交资源更新并计算真实差值；此方法不负责触发脚本，供伤害结算延迟派发。
    */
   async _commitResourceChanges(updates = {}, context = {}, operation = {}) {
-    const contextItem = context.move || context.contextItem || null;
+    const contextItem = context.move || null;
     const contextScripts = contextItem?.scripts;
     const contextHasResourceScript = Array.isArray(contextScripts) && contextScripts.some(script =>
       script.trigger === SCRIPT_TRIGGERS.RESOURCE_CHANGED && script.active
@@ -198,42 +214,54 @@ export class XJZLActor extends Actor {
       return { result, changes: [] };
     }
 
-    const resourceFields = this._getChangedResourceFields(updates);
-    const hasResourceScripts = resourceFields.length > 0
+    const changedFields = this._getChangedResourceFields(updates);
+    const hasResourceScripts = changedFields.length > 0
       && (scriptSourcesChanged || this._hasResourceScripts(contextItem));
     const databaseOptions = getDatabaseOperation(operation);
 
     // 快速路径：没有资源字段，或 Actor 没有该触发器脚本时，行为等同原始 update。
     if (!hasResourceScripts) {
-      const result = this._resourceCommitQueue && resourceFields.length > 0
+      const result = this._resourceCommitQueue && changedFields.length > 0
         ? await this._withResourceCommitLock(() => super.update(updates, databaseOptions))
         : await super.update(updates, databaseOptions);
       return { result, changes: [] };
     }
 
     return await this._withResourceCommitLock(async () => {
-      const before = new Map(resourceFields.map(field => [field.key, this._readResourceValue(field)]));
-      const result = await super.update(updates, {
-        ...databaseOptions,
-        xjzlResourceTransaction: true
-      });
-      // 上限可能因同一更新中的其他字段或派生数据而变化；等待截断完成后再读取真实结果。
-      await this._enforceResourceIntegrity({ resourceTransaction: true });
+      // 快照全部“实际适用且持久化”的资源字段，确保完整性检查额外裁剪的资源也能进入本次 changes。
+      const applicableFields = this._getApplicableResourceFields();
+      const before = this._snapshotResources(applicableFields);
 
-      const changedResources = [];
-      for (const field of resourceFields) {
-        const oldValue = before.get(field.key);
-        const newValue = this._readResourceValue(field);
-        if (oldValue === undefined || newValue === undefined || Object.is(oldValue, newValue)) continue;
-        changedResources.push({
-          resource: field.key,
-          path: field.path,
-          oldValue,
-          newValue,
-          delta: newValue - oldValue
+      let result;
+      try {
+        result = await super.update(updates, {
+          ...databaseOptions,
+          xjzlResourceTransaction: true
+        });
+      } catch (err) {
+        throw new XJZLResourceCommitError(`XJZL | 资源事务数据库提交失败 [${this.uuid}]`, {
+          committed: false,
+          phase: "database",
+          cause: context.cause,
+          actorUuid: this.uuid,
+          originalError: err
         });
       }
-      return { result, changes: changedResources };
+
+      // 上限可能因同一更新中的其他字段或派生数据而变化；等待截断完成后再读取真实结果。
+      try {
+        await this._enforceResourceIntegrity({ resourceTransaction: true });
+      } catch (err) {
+        throw new XJZLResourceCommitError(`XJZL | 资源事务完整性检查失败 [${this.uuid}]`, {
+          committed: true,
+          phase: "resourceIntegrity",
+          cause: context.cause,
+          actorUuid: this.uuid,
+          originalError: err
+        });
+      }
+
+      return { result, changes: this._computeResourceChanges(applicableFields, before) };
     });
   }
 
@@ -264,6 +292,55 @@ export class XJZLActor extends Actor {
     return RESOURCE_FIELDS.filter(field => (field.updatePaths || [field.path]).some(path =>
       foundry.utils.getProperty(changes, path) !== undefined
     ));
+  }
+
+  /**
+   * 返回当前 Actor 实际持久化且适用的资源字段。
+   * 依据 _source 而非派生后的 this.system，避免 creature 的 hp 由 tili 派生导致重复报告。
+   */
+  _getApplicableResourceFields() {
+    if (this.type === "container") return [];
+    const typeKeys = this.type === "creature"
+      ? ["tili", "rage"]
+      : ["hp", "mp", "rage", "huti", "morale"];
+    return RESOURCE_FIELDS.filter(field => typeKeys.includes(field.key)
+      && foundry.utils.getProperty(this._source, field.path) !== undefined);
+  }
+
+  /**
+   * 读取一组资源字段的当前值并生成快照 Map。
+   */
+  _snapshotResources(fields) {
+    return new Map(fields.map(field => [field.key, this._readResourceValue(field)]));
+  }
+
+  /**
+   * 对比快照与当前值，返回有实际差值的资源变化；无效数值跳过并记录警告。
+   */
+  _computeResourceChanges(fields, before) {
+    const changedResources = [];
+    for (const field of fields) {
+      const oldValue = before.get(field.key);
+      const newValue = this._readResourceValue(field);
+      if (!Number.isFinite(oldValue) || !Number.isFinite(newValue)) {
+        console.warn(`XJZL | resourceChanged 跳过资源 [${field.key}]，读取值无效`, {
+          actor: this.uuid,
+          resource: field.key,
+          oldValue,
+          newValue
+        });
+        continue;
+      }
+      if (Object.is(oldValue, newValue)) continue;
+      changedResources.push({
+        resource: field.key,
+        path: field.path,
+        oldValue,
+        newValue,
+        delta: newValue - oldValue
+      });
+    }
+    return changedResources;
   }
 
   /**
@@ -342,6 +419,15 @@ export class XJZLActor extends Actor {
         eventContext,
         eventContext.move || eventContext.item
       );
+    } catch (err) {
+      // 数据库主更新已提交；这里只记录并反馈派发失败，不向上抛出，避免调用方误判为未提交。
+      console.error("XJZL | resourceChanged 派发失败", {
+        actor: this.uuid,
+        cause: eventContext.cause,
+        changes,
+        error: err
+      });
+      ui.notifications.error(`资源变动脚本派发失败：${this.name}`);
     } finally {
       this._resourceEventContext = previousContext;
     }
@@ -1095,18 +1181,49 @@ export class XJZLActor extends Actor {
       Macros: XJZLMacros  // 脚本里可以用 Macros.requestSave(...)
     };
 
-    // 为无权限对象注入 Socket 代理，保证旧脚本完美兼容
-    this._proxifySandbox(sandbox);
+    // 为无权限对象注入本次运行专用的 Document Proxy；runScripts 结束后恢复上下文中的原文档引用。
+    const restoreSandboxDocuments = this._proxifySandbox(sandbox);
 
     // 3. 决定执行模式 (同步/异步)
     // Passive 和 Calc  必须同步运行，不能 await，否则会阻塞数据计算
     const isSync = [SCRIPT_TRIGGERS.PASSIVE, SCRIPT_TRIGGERS.CALC].includes(trigger);
 
-    if (isSync) {
-      this._runScriptsSync(scriptsToRun, sandbox, actionContext);
-    } else {
-      await this._runScriptsAsync(scriptsToRun, sandbox, actionContext);
+    try {
+      if (isSync) {
+        this._runScriptsSync(scriptsToRun, sandbox, actionContext);
+      } else {
+        await this._runScriptsAsync(scriptsToRun, sandbox, actionContext);
+      }
+    } finally {
+      restoreSandboxDocuments?.();
     }
+  }
+
+  /**
+   * 临时把脚本来源招式注入 sandbox.move / args.move，并返回精确恢复函数。
+   * @param {Object} sandbox - 本次触发共享的脚本沙盒
+   * @param {Object} contextData - 来源招式数据
+   * @returns {Function} 恢复函数；未注入时返回 null
+   */
+  _injectContextMove(sandbox, contextData) {
+    if (!contextData) return null;
+    const args = sandbox.args;
+    const moveExisted = Object.prototype.hasOwnProperty.call(sandbox, "move");
+    const argsMoveExisted = args && Object.prototype.hasOwnProperty.call(args, "move");
+    const previousMove = sandbox.move;
+    const previousArgsMove = args?.move;
+
+    sandbox.move = contextData;
+    if (args) args.move = contextData;
+
+    return () => {
+      if (moveExisted) sandbox.move = previousMove;
+      else delete sandbox.move;
+      if (args) {
+        if (argsMoveExisted) args.move = previousArgsMove;
+        else delete args.move;
+      }
+    };
   }
 
   /**
@@ -1119,6 +1236,7 @@ export class XJZLActor extends Actor {
     // 初始化执行上下文栈
     if (!this._scriptContextStack) this._scriptContextStack = [];
     for (const entry of scripts) {
+      let restoreMove = null;
       try {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
@@ -1141,11 +1259,8 @@ export class XJZLActor extends Actor {
         if (!thisItem && sandbox.item instanceof Item) {
           thisItem = sandbox.item;
         }
-        if (entry.contextData) {
-          // 注入 move，让脚本能读到等级、消耗等数据
-          sandbox.move = entry.contextData;
-          sandbox.args.move = entry.contextData;
-        }
+        // 临时注入来源招式，脚本执行后精确恢复，避免污染同一批后续脚本。
+        restoreMove = this._injectContextMove(sandbox, entry.contextData);
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
         // 入栈：记录当前正在执行的脚本来源
@@ -1171,6 +1286,7 @@ export class XJZLActor extends Actor {
         // ui.notifications.error(`脚本错误: ${entry.label}`);
       }
       finally {
+        restoreMove?.();
         // 出栈：无论成功失败，保证栈的清洁
         this._scriptContextStack.pop();
       }
@@ -1188,6 +1304,7 @@ export class XJZLActor extends Actor {
     if (!this._scriptContextStack) this._scriptContextStack = [];
 
     for (const entry of scripts) {
+      let restoreMove = null;
       try {
         // 动态注入 thisItem，指向当前脚本所属的物品
         // 这样脚本里写 thisItem.system.xxx 就能读到自己的数据
@@ -1210,6 +1327,8 @@ export class XJZLActor extends Actor {
         if (!thisItem && sandbox.item instanceof Item) {
           thisItem = sandbox.item;
         }
+        // 临时注入来源招式，脚本执行后精确恢复，避免污染同一批后续脚本。
+        restoreMove = this._injectContextMove(sandbox, entry.contextData);
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
         // 入栈：记录当前正在执行的脚本来源
@@ -1231,6 +1350,7 @@ export class XJZLActor extends Actor {
         console.error(`[XJZL] 异步脚本错误 [${entry.label}]:`, err);
         ui.notifications.error(`特效脚本执行失败: ${entry.label}`);
       } finally {
+        restoreMove?.();
         // 出栈：无论成功失败，保证栈的清洁
         this._scriptContextStack.pop();
       }
@@ -1536,6 +1656,39 @@ export class XJZLActor extends Actor {
   }
 
   /**
+   * 根据当前 _source 与派生上限计算需要截断的资源更新。
+   * 纯计算函数，不读取锁、不提交。
+   */
+  _computeResourceClampUpdates() {
+    const res = this.system.resources;
+    const updates = {};
+    const getSource = (path) => foundry.utils.getProperty(this._source, path) || 0;
+
+    // 怒气是野兽和侠客共有的
+    if (res.rage) {
+      const sourceRage = getSource("system.resources.rage.value");
+      const maxRage = res.rage.max || 10;
+      if (sourceRage > maxRage) updates["system.resources.rage.value"] = maxRage;
+    }
+
+    if (this.type === "creature") {
+      if (res.tili) {
+        const sourceTili = getSource("system.resources.tili.value");
+        const maxTili = res.tili.max;
+        if (sourceTili > maxTili) updates["system.resources.tili.value"] = maxTili;
+      }
+    } else {
+      const sourceHP = getSource("system.resources.hp.value");
+      if (sourceHP > res.hp.max) updates["system.resources.hp.value"] = res.hp.max;
+
+      const sourceMP = getSource("system.resources.mp.value");
+      if (sourceMP > res.mp.max) updates["system.resources.mp.value"] = res.mp.max;
+    }
+
+    return updates;
+  }
+
+  /**
    * 强制资源完整性检查 (Integrity Check)
    * 职责：如果 数据库原值 > 当前计算出的上限，则执行截断写入。
    * 覆盖范围：HP, MP, Tili (野兽), Rage (怒气)
@@ -1545,69 +1698,30 @@ export class XJZLActor extends Actor {
   async _enforceResourceIntegrity({ resourceTransaction = false } = {}) {
     // --- 容器没有这些资源，直接跳过 ---
     if (this.type === "container") return;
-    // 1. 获取计算后的衍生数据 (包含最新的 max)
-    const res = this.system.resources;
 
-    // 准备更新对象
-    const updates = {};
-
-    // 辅助函数：安全获取 Source 数据
-    const getSource = (path) => foundry.utils.getProperty(this._source, path) || 0;
-
-    // =====================================================
-    // A. 通用资源检查 (怒气 Rage)
-    // =====================================================
-    // 怒气是野兽和侠客共有的
-    if (res.rage) {
-      const sourceRage = getSource("system.resources.rage.value");
-      // 怒气上限通常固定为 10，但读取 max 更稳健
-      const maxRage = res.rage.max || 10;
-
-      if (sourceRage > maxRage) {
-        updates["system.resources.rage.value"] = maxRage;
-      }
-    }
-
-    // =====================================================
-    // B. 类型特化检查
-    // =====================================================
-    if (this.type === "creature") {
-      // --- 野兽：检查体力 (Tili) ---
-      if (res.tili) {
-        const sourceTili = getSource("system.resources.tili.value");
-        const maxTili = res.tili.max; // 野兽体力上限通常固定或由 DataModel 决定
-
-        if (sourceTili > maxTili) {
-          updates["system.resources.tili.value"] = maxTili;
-        }
-      }
-    } else {
-      // --- 侠客/NPC：检查气血 (HP) & 内力 (MP) ---
-
-      // 1. 检查 HP
-      const sourceHP = getSource("system.resources.hp.value");
-      if (sourceHP > res.hp.max) {
-        updates["system.resources.hp.value"] = res.hp.max;
-      }
-
-      // 2. 检查 MP
-      const sourceMP = getSource("system.resources.mp.value");
-      if (sourceMP > res.mp.max) {
-        updates["system.resources.mp.value"] = res.mp.max;
-      }
-    }
-
-    // =====================================================
-    // C. 执行更新
-    // =====================================================
-    if (!foundry.utils.isEmpty(updates)) {
-      if (resourceTransaction) {
+    // 事务路径：调用方已经持有资源锁，这里只计算并提交，不再次加锁，也不派发。
+    if (resourceTransaction) {
+      const updates = this._computeResourceClampUpdates();
+      if (!foundry.utils.isEmpty(updates)) {
         await super.update(updates, { xjzlResourceTransaction: true });
-      } else {
-        await this.changeResources(updates, { cause: "resourceClamp" });
       }
-      // 开发调试提示 (可选)
-      // console.log("XJZL | 资源溢出自动截断:", updates);
+      return;
+    }
+
+    // 非事务路径：读取、计算、提交必须处于同一资源锁内，避免等待锁期间值已被其他业务修改。
+    const { changes } = await this._withResourceCommitLock(async () => {
+      const updates = this._computeResourceClampUpdates();
+      if (foundry.utils.isEmpty(updates)) return { changes: [] };
+
+      const applicableFields = this._getApplicableResourceFields();
+      const before = this._snapshotResources(applicableFields);
+      await super.update(updates, { xjzlResourceTransaction: true });
+      return { changes: this._computeResourceChanges(applicableFields, before) };
+    });
+
+    if (changes.length > 0) {
+      const clampContext = inheritScriptResourceContext(this, { cause: "resourceClamp" });
+      await this._dispatchResourceChanges(changes, clampContext);
     }
   }
 
@@ -4018,41 +4132,79 @@ export class XJZLActor extends Actor {
   }
 
   // ======= 添加代理工厂方法 =======
+  /**
+   * 为本次 runScripts 创建局部 Document Proxy，并替换 sandbox / args 中的非 owner 文档别名。
+   * 不修改原始 Document 实例；返回恢复函数，runScripts 结束后还原上下文中的原文档引用。
+   * @returns {Function} 恢复上下文文档引用的函数
+   */
   _proxifySandbox(sandbox) {
-    for (const [key, value] of Object.entries(sandbox)) {
-      if (value instanceof foundry.abstract.Document && !value.isOwner) {
-        // 劫持 update
-        value.update = async (data, context) => {
-          const operation = { ...(context || {}) };
-          operation.xjzlResourceContext = serializeResourceContext(inheritScriptResourceContext(
-            this,
-            inheritResourceChain(operation.xjzlResourceContext, this._resourceEventContext)
-          ));
-          return await xjzlSocket.executeAsGM("updateDocument", value.uuid, data, operation);
-        };
-        // 资源事务也必须保持同一套“提交后触发”语义，不能退化为裸 update。
-        value.changeResources = async (data, context) => {
-          const resourceContext = inheritScriptResourceContext(
-            this,
-            inheritResourceChain(context, this._resourceEventContext)
-          );
-          return await xjzlSocket.executeAsGM(
-            "changeResources",
-            value.uuid,
-            data,
-            serializeResourceContext(resourceContext)
-          );
-        };
-        // 劫持 createEmbeddedDocuments
-        value.createEmbeddedDocuments = async (type, data, context) => {
-          return await xjzlSocket.executeAsGM("createEmbedded", value.uuid, type, data, context);
-        };
-        // 劫持 deleteEmbeddedDocuments
-        value.deleteEmbeddedDocuments = async (type, ids, context) => {
-          return await xjzlSocket.executeAsGM("deleteEmbedded", value.uuid, type, ids, context);
-        };
+    const host = this;
+    const proxies = new WeakMap();
+    const restorations = [];
+
+    const getProxy = (doc) => {
+      let proxy = proxies.get(doc);
+      if (!proxy) {
+        proxy = new Proxy(doc, {
+          get(target, prop) {
+            // 权限委托方法：走 GM socket，并携带当前脚本宿主与资源链。
+            if (prop === "update") {
+              return async (data, context) => {
+                const operation = { ...(context || {}) };
+                operation.xjzlResourceContext = serializeResourceContext(inheritScriptResourceContext(
+                  host,
+                  inheritResourceChain(operation.xjzlResourceContext, host._resourceEventContext)
+                ));
+                return await xjzlSocket.executeAsGM("updateDocument", target.uuid, data, operation);
+              };
+            }
+            if (prop === "changeResources" && typeof target.changeResources === "function") {
+              return async (data, context) => {
+                const resourceContext = inheritScriptResourceContext(
+                  host,
+                  inheritResourceChain(context, host._resourceEventContext)
+                );
+                return await xjzlSocket.executeAsGM(
+                  "changeResources",
+                  target.uuid,
+                  data,
+                  serializeResourceContext(resourceContext)
+                );
+              };
+            }
+            if (prop === "createEmbeddedDocuments") {
+              return async (type, data, context) => xjzlSocket.executeAsGM("createEmbedded", target.uuid, type, data, context);
+            }
+            if (prop === "deleteEmbeddedDocuments") {
+              return async (type, ids, context) => xjzlSocket.executeAsGM("deleteEmbedded", target.uuid, type, ids, context);
+            }
+            // 其他属性和方法转发到原文档，方法绑定到 target，避免 Proxy this 破坏私有字段。
+            const value = Reflect.get(target, prop, target);
+            return typeof value === "function" ? value.bind(target) : value;
+          }
+        });
+        proxies.set(doc, proxy);
       }
-    }
+      return proxy;
+    };
+
+    const replaceDocuments = (obj) => {
+      if (!obj || typeof obj !== "object") return;
+      for (const [key, value] of Object.entries(obj)) {
+        if (value instanceof foundry.abstract.Document && !value.isOwner) {
+          const proxy = getProxy(value);
+          restorations.push(() => { obj[key] = value; });
+          obj[key] = proxy;
+        }
+      }
+    };
+
+    replaceDocuments(sandbox);
+    replaceDocuments(sandbox.args);
+
+    return () => {
+      for (const restore of restorations.reverse()) restore();
+    };
   }
 
   /**
