@@ -272,8 +272,8 @@
                     "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
-                    "description": "<p>（可使用反应动作释放）藏身于雨林植被或瘴气之中，拉弓射箭，箭矢裹挟瘴毒劲射而出，对目标造成 0.5 力量点外功伤害。若目标无架招，为其添加一层“瘴毒”，持续到战斗脱离。若有敌人处于半空中，可消耗反应动作立于原地射箭，招式必中，且额外造成 10 点毒素伤害。</p><p><strong>瘴毒：</strong>每回合初受到10点毒素伤害，速度-1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "命中无架招自动添加瘴毒。半空中反应射击与必中需手动配置，额外毒素伤害请手动应用。",
+                    "description": "<p>（可使用反应动作释放）藏身于雨林植被或瘴气之中，拉弓射箭，箭矢裹挟瘴毒劲射而出，对目标造成 0.5 力量点外功伤害。若目标无架招，为其添加一层“瘴毒”，持续到战斗脱离。若有敌人处于半空中，可消耗反应动作立于原地射箭将其击落倒地，招式必中，且额外造成 10 点毒素伤害。</p><p><strong>瘴毒：</strong>每回合初受到10点毒素伤害，速度-1。</p><p><strong>升级：</strong>招式伤害+10，额外毒素伤害+10，内力消耗+2。</p>",
+                    "automationNote": "命中无架招自动添加瘴毒。半空反应射击需在命中后弹窗确认，确认后自动击落倒地并结算额外毒素伤害（随等级）。必中需手动配置。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -297,7 +297,7 @@
                             "label": "添加瘴毒",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"瘴毒\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                            "script": "if (args.isHit && args.target) {\n    const target = args.target;\n    if (!target.system.martial?.stanceActive) {\n        const eff = thisItem.effects.getName(\"瘴毒\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(target, eff);\n    }\n\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonusPoison = 10 * lvl;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"瘴羽劲射 - 半空反应射击\" },\n        content: \"<p>本次是否为<b>半空反应射击</b>（立于原地射箭击落）？</p><p>确认后将自动：击落倒地 + 额外造成 <b>\" + bonusPoison + \"</b> 点毒素伤害。</p>\",\n        yes: { label: \"是，击落\", icon: \"fas fa-arrow-down\" },\n        no: { label: \"否\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.addEffect(target, \"prone\");\n        await target.applyDamage({\n            amount: bonusPoison,\n            type: \"poison\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true,\n            ignoreBlock: true,\n            ignoreStance: true,\n            source: \"extra\"\n        });\n        const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n            '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-arrow-down\"></i> 瘴羽劲射·半空击落</div>' +\n            '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 被凌空射落，陷入倒地，并额外受到 <b>' + bonusPoison + '</b> 点毒素伤害。</div>' +\n            '</div>';\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n    }\n}"
                         }
                     ]
                 },
@@ -4970,5 +4970,331 @@
                 }
             }
         ]
+    },
+    {
+        "name": "玄冥神掌",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>玄冥二老赖以威震武林的掌法，掌力挟万古阴寒，一经打中，寒毒入髓。</p><p><strong>需求：</strong>徒手-拳掌 <strong>属性：</strong>阴</p>",
+            "requirements": "徒手-拳掌",
+            "moves": [
+                {
+                    "name": "玄冰虚拍",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "范围",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>-虚掌引敌，冻锁经脉-</p><p>蓄力动作，双掌虚晃拍击，寒气漫卷，对范围内目标造成0.4力量+0.5内息点内功伤害，为其添加一层“玄冥寒毒”，命中无架招目标添加两层“玄冥寒毒”。若目标身上已有5层及以上的“玄冥寒毒”，则本次攻击为目标添加“迟滞”一回合。当友方使用【玄冰虚拍】击破架招时，可消耗反应动作释放此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+6。</p>",
+                    "automationNote": "命中自动添加玄冥寒毒（无架招2层，有架招1层）；已有5层及以上自动施加迟滞1回合。玄冥寒毒上限按“初始5层+万鬼寒冥等级提升+目标额外上限flag”自动判断，至阳真经运行者免疫。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.5
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            6,
+                            12,
+                            18,
+                            24
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "寒毒与迟滞",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst target = args.target;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n        return;\n    }\n}\n\nif (oldStacks >= 5) {\n    const chizhi = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n    if (chizhi) {\n        const data = foundry.utils.deepClone(chizhi);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(target, data);\n    }\n}\n\nif (!existing) {\n    const stale = target.getFlag(\"xjzl-system\", key) || 0;\n    if (stale > 0) await target.setFlag(\"xjzl-system\", key, 0);\n}\n\nlet cap = 5;\nconst wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\nif (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\ncap += target.getFlag(\"xjzl-system\", key) || 0;\n\nif (oldStacks >= cap) {\n    ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    return;\n}\nconst count = target.system.martial?.stanceActive ? 1 : 2;\nconst addCount = Math.min(count, cap - oldStacks);\nconst effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\nif (!effTemplate) return;\nconst effData = effTemplate.toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(target, effData, addCount);\nconst newStacks = oldStacks + addCount;\n\nif (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\nif (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "寒锁封脉",
+                    "type": "feint",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>-寒掌扣腕，寒气缠躯-</p><p>主要动作，跨步进身，双掌扣拿对手臂腕，造成0.4力量+0.4内息点内功伤害。击破架招时，为目标附加2层“玄冥寒毒”并禁足两回合。攻击具有“玄冥寒毒”的目标时，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+6，虚招值额外+1。</p>",
+                    "automationNote": "对玄冥寒毒目标虚招+1与升级额外虚招已自动；击破架招自动附加2层玄冥寒毒、禁足2回合，并发送玄冰虚拍连携提醒卡片。玄冥寒毒上限自动判断，至阳真经运行者免疫。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.4
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            6,
+                            12,
+                            18,
+                            24
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "虚招值加成",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "if (!args.target) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst hasPoison = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_handu\");\nconst bonus = (lvl - 1) + (hasPoison ? 1 : 0);\nif (bonus > 0) {\n    args.flags.grantFeint += bonus;\n    actor.showFloatyText(\"寒锁封脉 虚招+\" + bonus, { fill: \"#5dade2\" });\n}"
+                        },
+                        {
+                            "label": "击破附加寒毒与禁足",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isBroken || !args.target) return;\nconst target = args.target;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nlet immune = false;\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        immune = true;\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n    }\n}\n\nif (!immune) {\n    if (!existing) {\n        const stale = target.getFlag(\"xjzl-system\", key) || 0;\n        if (stale > 0) await target.setFlag(\"xjzl-system\", key, 0);\n    }\n\n    let cap = 5;\n    const wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\n    if (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\n    cap += target.getFlag(\"xjzl-system\", key) || 0;\n\n    if (oldStacks >= cap) {\n        ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    } else {\n        const addCount = Math.min(2, cap - oldStacks);\n        const effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\n        if (!effTemplate) return;\n        const effData = effTemplate.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(target, effData, addCount);\n        const newStacks = oldStacks + addCount;\n\n        if (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\n        if (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}\n    }\n}\n\nconst root = CONFIG.statusEffects.find(e => e.id === \"root\");\nif (root) {\n    const data = foundry.utils.deepClone(root);\n    data.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(target, data);\n}\n\nconst html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #3498db; background:rgba(52,152,219,0.06); margin-left:4px;\">' +\n    '<div style=\"font-weight:bold; color:#1f618d;\"><i class=\"fas fa-link\"></i> 寒锁封脉·破架连携</div>' +\n    '<div style=\"font-size:0.85em; color:#555;\">' + actor.name + ' 以【寒锁封脉】击破架招！若友方有【玄冰虚拍】，可消耗<b>反应动作</b>跟进施展。</div>' +\n    '</div>';\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });"
+                        }
+                    ]
+                },
+                {
+                    "name": "寒渊卸力",
+                    "type": "stance",
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>-寒气布身，卸劲纳毒-</p><p>次要动作，双臂交错护于身前，周身阴寒真气流转，开启架招。格挡成功时，为目标添加一层“玄冥寒毒”。</p><p><strong>升级：</strong>格挡值+10，内力消耗+6。</p>",
+                    "automationNote": "格挡成功自动为攻击者添加1层玄冥寒毒。玄冥寒毒上限自动判断，至阳真经运行者免疫。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            6,
+                            12,
+                            18,
+                            24
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "格挡附加寒毒",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker || args.attacker.uuid === actor.uuid) return;\nconst target = args.attacker;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n        return;\n    }\n}\n\nif (!existing) {\n    const stale = target.getFlag(\"xjzl-system\", key) || 0;\n    if (stale > 0) await target.setFlag(\"xjzl-system\", key, 0);\n}\n\nlet cap = 5;\nconst wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\nif (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\ncap += target.getFlag(\"xjzl-system\", key) || 0;\n\nif (oldStacks >= cap) {\n    ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    return;\n}\nconst addCount = Math.min(1, cap - oldStacks);\nconst effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\nif (!effTemplate) return;\nconst effData = effTemplate.toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(target, effData, addCount);\nconst newStacks = oldStacks + addCount;\n\nif (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\nif (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "冥河反噬",
+                    "type": "counter",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>-借敌之力，寒毒回灌-</p><p>当你看破对方虚招时，消耗反应动作释放，压制虚招，寒气猛撞敌身，造成0.4力量+0.6内息点内功伤害。若目标具有“玄冥寒毒”，则立即触发一次“玄冥寒毒”的毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+6。</p>",
+                    "automationNote": "命中时若目标有玄冥寒毒，自动立即触发一次毒素伤害（10×层数）。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.6
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            6,
+                            12,
+                            18,
+                            24
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "寒毒回灌",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst existing = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_handu\");\nif (!existing) return;\nconst stacks = existing.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst poisonDmg = 10 * stacks;\nawait args.target.applyDamage({\n    amount: poisonDmg,\n    type: \"poison\",\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true,\n    ignoreBlock: true,\n    ignoreStance: true,\n    source: \"dot\"\n});\nconst html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.06); margin-left:4px;\">' +\n    '<div style=\"font-weight:bold; color:#6c3483;\"><i class=\"fas fa-undo-alt\"></i> 冥河反噬·寒毒回灌</div>' +\n    '<div style=\"font-size:0.85em; color:#555;\">' + args.target.name + ' 体内玄冥寒毒被引动，立即受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n    '</div>';\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });"
+                        }
+                    ]
+                },
+                {
+                    "name": "万鬼寒冥",
+                    "type": "real",
+                    "element": "yin",
+                    "damageType": "neigong",
+                    "weaponType": "unarmed",
+                    "isUltimate": true,
+                    "range": "5米",
+                    "targetInfo": "范围敌人",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>-寒冥万顷，万鬼噬脉-</p><p>蓄力动作，双掌齐推，滚滚极寒真气汹涌喷发，对范围内所有敌人造成 0.4力量+ 0.7内息点内功伤害，为目标添加一层“玄冥寒毒”并使目标的“玄冥寒毒”上限+2。</p><p>·玄冥寒毒（天）：初始上限5层，每有1层，每次出招受到10点毒素伤害，持续到战斗结束（至阳真经免疫），同时，每有五层触发一次“玄冥寒毒”的毒素伤害。<br>若目标“玄冥寒毒”≥20层，则使其进入“冻脉”，持续到战斗结束。<br>·冻脉（天）：每次出招，流失【2×“玄冥寒毒”层数】点内力。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+10，“玄冥寒毒”上限+1。</p>",
+                    "automationNote": "命中自动提升目标玄冥寒毒额外上限+2并添加1层；玄冥寒毒达到20层自动施加冻脉；上限与冻脉判定自动，至阳真经运行者免疫。额外上限flag记录在目标Actor上，当目标不再有玄冥寒毒状态时，下次施加会自动清零。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [
+                            {
+                                "prop": "liliang",
+                                "ratio": 0.4
+                            },
+                            {
+                                "prop": "neixi",
+                                "ratio": 0.7
+                            }
+                        ]
+                    },
+                    "costs": {
+                        "mp": [
+                            10,
+                            20,
+                            30,
+                            40
+                        ],
+                        "rage": [
+                            8,
+                            7,
+                            6,
+                            5
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "提升上限并添加寒毒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst target = args.target;\nconst slug = \"wuxue_xuanming_handu\";\nconst key = \"wuxue_xuanming_extra_cap\";\n\nconst ngId = target.system.martial?.active_neigong;\nif (ngId) {\n    const ng = target.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") {\n        actor.showFloatyText(target.name + \" 免疫玄冥寒毒\", { fill: \"#f39c12\" });\n        return;\n    }\n}\n\nconst existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nif (!existing) await target.setFlag(\"xjzl-system\", key, 0);\nconst extra = target.getFlag(\"xjzl-system\", key) || 0;\nawait target.setFlag(\"xjzl-system\", key, extra + 2);\n\nconst oldStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nlet cap = 5;\nconst wan = thisItem.system.moves.find(m => m.name === \"万鬼寒冥\");\nif (wan && (wan.computedLevel || 0) > 0) cap += wan.computedLevel - 1;\ncap += target.getFlag(\"xjzl-system\", key) || 0;\n\nif (oldStacks >= cap) {\n    ui.notifications.info(target.name + \" 的玄冥寒毒已达当前上限（\" + cap + \" 层）。\");\n    return;\n}\nconst addCount = Math.min(1, cap - oldStacks);\nconst effTemplate = thisItem.effects.getName(\"玄冥寒毒\");\nif (!effTemplate) return;\nconst effData = effTemplate.toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(target, effData, addCount);\nconst newStacks = oldStacks + addCount;\n\nif (Math.floor(newStacks / 5) > Math.floor(oldStacks / 5)) {\n    const poisonDmg = 10 * newStacks;\n    await target.applyDamage({\n        amount: poisonDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true,\n        ignoreStance: true,\n        source: \"dot\"\n    });\n    const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #2e86c1; background:rgba(46,134,193,0.06); margin-left:4px;\">' +\n        '<div style=\"font-weight:bold; color:#1b4f72;\"><i class=\"fas fa-snowflake\"></i> 玄冥寒毒爆发</div>' +\n        '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 体内寒毒达到 <b>' + newStacks + '</b> 层，猛然爆发，受到 <b>' + poisonDmg + '</b> 点毒素伤害。</div>' +\n        '</div>';\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n}\n\nif (newStacks >= 20) {\n    const hasDongmai = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_dongmai\");\n    if (!hasDongmai) {\n        const dmTemplate = thisItem.effects.getName(\"冻脉\");\n        if (dmTemplate) {\n            const dmData = dmTemplate.toObject();\n            delete dmData._id;\n            dmData.origin = thisItem.uuid;\n            await game.xjzl.api.effects.addEffect(target, dmData);\n            const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #1abc9c; background:rgba(26,188,156,0.06); margin-left:4px;\">' +\n                '<div style=\"font-weight:bold; color:#0e6251;\"><i class=\"fas fa-icicles\"></i> 冻脉</div>' +\n                '<div style=\"font-size:0.85em; color:#555;\">' + target.name + ' 玄冥寒毒已深重入髓，经脉冻结，进入 <b>冻脉</b> 状态，持续到战斗结束！</div>' +\n                '</div>';\n            ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });\n        }\n    }\n}"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "玄冥寒毒",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "<p>初始上限5层。每有1层，每次出招受到10点毒素伤害，持续到战斗结束（至阳真经免疫）。同时，每有五层触发一次“玄冥寒毒”的毒素伤害。若目标“玄冥寒毒”≥20层，则使其进入“冻脉”，持续到战斗结束。</p>",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_xuanming_handu",
+                        "stackable": true,
+                        "scripts": [
+                            {
+                                "label": "出招寒毒发作",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst ngId = actor.system.martial?.active_neigong;\nif (ngId) {\n    const ng = actor.items.get(ngId);\n    if (ng && ng.name === \"《至阳真经》\") return;\n}\nconst poisonDmg = 10 * stacks;\nawait actor.applyDamage({\n    amount: poisonDmg,\n    type: \"poison\",\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true,\n    ignoreBlock: true,\n    ignoreStance: true,\n    source: \"dot\"\n});\nactor.showFloatyText(\"玄冥寒毒 -\" + poisonDmg, { fill: \"#2e86c1\" });"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "冻脉",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "<p>每次出招，流失【2×“玄冥寒毒”层数】点内力，持续到战斗结束。</p>",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuxue_xuanming_dongmai",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "出招内力流失",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "const poison = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_xuanming_handu\");\nif (!poison) return;\nconst stacks = poison.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst drain = 2 * stacks;\nif (drain > 0) {\n    await actor.applyHealing({ healer: actor, amount: -drain, type: \"mp\", showScrolling: true });\n    actor.showFloatyText(\"冻脉 -\" + drain + \" 内力\", { fill: \"#1abc9c\" });\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
+    },
+    {
+        "name": "玄冥阴阳绞",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+        "system": {
+            "isOfficial": false,
+            "category": "sanshou",
+            "sect": "jianghushili",
+            "tier": 3,
+            "description": "<p>双人合击，一左一右，阴阳寒力绞杀敌人。</p><p><strong>需求：</strong>4000 修为领悟（不可升级）</p>",
+            "requirements": "修为4000",
+            "moves": [
+                {
+                    "name": "玄冥阴阳绞",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "isUltimate": true,
+                    "element": "yin",
+                    "damageType": "none",
+                    "weaponType": "unarmed",
+                    "range": "5米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>-双冥合手，寒绞九州-</p><p>双人合击，一左一右，阴阳寒力绞杀敌人。当一人释放【万鬼寒冥】时，另一人可以消耗反应动作释放【万鬼寒冥】。</p><p>·注：当一人怒气不够释放时，可向另一人借取怒气释放，即二人消耗的怒气足够释放两次【万鬼寒冥】即可。</p><p><strong>需求：</strong>4000 修为领悟（不可升级）</p>",
+                    "automationNote": "本散手仅发送合击说明卡片，不自动结算。请手动处理【万鬼寒冥】的释放、借取怒气与伤害结算。系统会按配置扣除本散手的内力消耗。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            4000
+                        ]
+                    },
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [
+                            30
+                        ]
+                    },
+                    "scripts": [
+                        {
+                            "label": "合击说明卡片",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const html = '<div class=\"xjzl-chat-card\" style=\"padding:6px 8px; border-left:4px solid #8e44ad; background:rgba(142,68,173,0.06); margin-left:4px;\">' +\n    '<div style=\"font-weight:bold; color:#6c3483;\"><i class=\"fas fa-handshake\"></i> 玄冥阴阳绞</div>' +\n    '<div style=\"font-size:0.85em; color:#555;\">双人合击：一人释放【万鬼寒冥】时，另一人可消耗<b>反应动作</b>释放【万鬼寒冥】。<br>若怒气不足，可向另一人借取怒气，二人合计消耗的怒气足够释放两次【万鬼寒冥】即可。</div>' +\n    '</div>';\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: html });"
+                        }
+                    ]
+                }
+            ]
+        }
     }
 ]
