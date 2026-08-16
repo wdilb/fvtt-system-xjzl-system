@@ -158,7 +158,7 @@
             "sect": "jianghushili",
             "requirement": "<p>悟性：4</p>",
             "description": "<p>安南水军功法，原安南澜江宗核心内功，借鉴渔猎之术改良而成，专为水中潜伏、水上突袭而设。功法大成之后，修行者可化身“水鬼”，能长期在水中潜伏活动，水下行动如游鱼般迅捷灵动，是安南水军的独门绝技。</p>",
-            "automationNote": "水中地形免疫需手动。水中的数值加成已写在内功脚本中，请玩家在下水时手动前往该内功的【特效页签】，将“水中加成”脚本设为开启。",
+            "automationNote": "水中/水面环境无法自动检测：请玩家进入水中/水面时，从该内功的【效果页签】将“身处水中”效果手动赋予自己，离开时移除；该效果生效期间，速度加成、不会被趁虚而入、招式伤害提升速度值全部自动生效。免疫水中、水面负面影响需手动。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -180,13 +180,25 @@
                         "qigan": 12,
                         "shencai": 4
                     },
-                    "description": "<p>小成运功特效：身处水中、水面时，速度+2，命中+5，招式伤害提升命中加值（最多15）。</p>",
+                    "description": "<p>小成运功特效：身处水中、水面时，速度+2，不会被趁虚而入，招式伤害提升速度值。</p>",
                     "scripts": [
                         {
-                            "label": "水中加成 (请下水后手动开启)",
+                            "label": "水中速度加成",
                             "trigger": "passive",
-                            "active": false,
-                            "script": "S.combat.speed += 2;\nS.combat.hit_waigong += 5;\nS.combat.hit_neigong += 5;\nS.combat.damages.skill.mod += 5;"
+                            "active": true,
+                            "script": "// 拥有“身处水中”效果时：速度+2\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\nS.combat.speed += 2;"
+                        },
+                        {
+                            "label": "水中伤害加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "// 拥有“身处水中”效果时：招式伤害提升速度值\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\n// 排除普通攻击（保留趁虚而入）\nif (args.move?.type === \"basic\" && args.move?.id !== \"opportunity-attack\") return;\nconst speed = S.combat.speedTotal || 0;\nargs.output.damage += speed;\nargs.output.bonusDesc.push(`乘风破浪功 +${speed}`);"
+                        },
+                        {
+                            "label": "水中免疫趁虚而入",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "// 拥有“身处水中”效果时：不会被趁虚而入\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\nif (args.move && (args.move.id === \"opportunity-attack\" || args.move.id === \"opportunity\")) {\n    args.output.abort = true;\n    ui.notifications.info(`${actor.name} 身处水中，未被趁虚而入！`);\n}"
                         }
                     ]
                 },
@@ -199,13 +211,25 @@
                         "qigan": 18,
                         "shencai": 6
                     },
-                    "description": "<p>圆满运功特效：身处水中、水面时，速度+3，命中+10，招式伤害提升命中加值（最多15）。</p>",
+                    "description": "<p>圆满运功特效：身处水中、水面时，速度+5，不会被趁虚而入，招式伤害提升速度值。</p>",
                     "scripts": [
                         {
-                            "label": "水中加成 (请下水后手动开启)",
+                            "label": "水中速度加成",
                             "trigger": "passive",
-                            "active": false,
-                            "script": "S.combat.speed += 3;\nS.combat.hit_waigong += 10;\nS.combat.hit_neigong += 10;\nS.combat.damages.skill.mod += 10;"
+                            "active": true,
+                            "script": "// 拥有“身处水中”效果时：速度+5\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\nS.combat.speed += 5;"
+                        },
+                        {
+                            "label": "水中伤害加成",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "// 拥有“身处水中”效果时：招式伤害提升速度值\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\n// 排除普通攻击（保留趁虚而入）\nif (args.move?.type === \"basic\" && args.move?.id !== \"opportunity-attack\") return;\nconst speed = S.combat.speedTotal || 0;\nargs.output.damage += speed;\nargs.output.bonusDesc.push(`乘风破浪功 +${speed}`);"
+                        },
+                        {
+                            "label": "水中免疫趁虚而入",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "// 拥有“身处水中”效果时：不会被趁虚而入\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"in_water\")) return;\nif (args.move && (args.move.id === \"opportunity-attack\" || args.move.id === \"opportunity\")) {\n    args.output.abort = true;\n    ui.notifications.info(`${actor.name} 身处水中，未被趁虚而入！`);\n}"
                         }
                     ]
                 }
@@ -225,7 +249,22 @@
                     "value": 2
                 }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "身处水中",
+                "icon": "icons/magic/water/wave-water-blue.webp",
+                "description": "标记：所处环境为水中/水面。乘风破浪功相关效果自动生效。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "in_water",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "撼山动地功",
@@ -237,8 +276,8 @@
             "element": "yang",
             "sect": "jianghushili",
             "requirement": "<p>悟性：4</p>",
-            "description": "<p>安南山地部队功法，原安南云崖派核心内功，专为山地攻坚、近身搏杀而炼。功法走阳刚霸道之路，修炼时需锤炼肉身与内力。大成之后，修行者肉身强横无比，可徒手开山劈石、裂木断铁，作战时气势磅礴，威猛无匹，仅凭肉身力量便可冲破敌军阵型。</p>",
-            "automationNote": "地形免疫手动。暴击骰与招式伤害提升已完全自动化。",
+            "description": "<p>安南山地部队功法，原安南云崖派核心内功，专为山地攻坚、近身搏杀而炼。功法走阳刚霸道之路，修炼时需锤炼肉身与内力。大成之后，修行者肉身强横无比，可徒手开山劈石、裂木断铁，作战时气势磅礴，威猛无比，仅凭肉身力量便可冲破敌军阵形。</p>",
+            "automationNote": "暴击骰与招式伤害提升已完全自动化。免疫山脉、山地负面影响及潜入地下移动需手动处理。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -279,7 +318,7 @@
                         "qigan": 6,
                         "shencai": 8
                     },
-                    "description": "<p>圆满运功特效：你的暴击骰-3，招式伤害+15。</p>",
+                    "description": "<p>圆满运功特效：你的暴击骰-3，招式伤害+15。</p><p>·可潜入地下移动，不受趁虚而入，执行动作、回合结束从地下出来。</p>",
                     "scripts": [
                         {
                             "label": "暴击与伤害加成",
@@ -318,7 +357,7 @@
             "sect": "jianghushili",
             "requirement": "<p>悟性：4</p>",
             "description": "<p>安南弓兵功法，原安南射日宗核心内功，融合安南本土射术与华夏弓法凝练而成。大成之后，修行者目力绝伦、拉弓如满月，箭矢出膛迅疾精准，即便在百步之外，亦能精准命中目标要害。</p>",
-            "automationNote": "攻击距离增加及伤害提升需玩家手动控制（进战时会发卡提示）。目盲免疫请手动豁免。",
+            "automationNote": "攻击距离增加及伤害提升需玩家手动控制（进战时会发卡提示，请自行按攻击距离计算伤害加值并填入弹窗的[额外伤害]中）。目盲免疫请手动豁免。",
             "config": {
                 "stage1": {
                     "stats": {
@@ -340,13 +379,13 @@
                         "qigan": 12,
                         "shencai": 12
                     },
-                    "description": "<p>小成运功特效：攻击距离+2，招式伤害提升攻击距离值（最多15）。</p>",
+                    "description": "<p>小成运功特效：攻击距离+2，招式伤害提升攻击距离值。</p>",
                     "scripts": [
                         {
                             "label": "攻击距离强化提示",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const content = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #d35400; padding-left:10px;\"><b>百步穿杨功：</b><br>你的攻击距离增加 2 米。<br>你的招式伤害增加 2 点。<br><i style=\"color:#888;\">（请在攻击时将伤害加值填入弹窗的[额外伤害]中）</i></div></div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor}), content });"
+                            "script": "const content = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #d35400; padding-left:10px;\"><b>百步穿杨功：</b><br>你的攻击距离增加 2 米。<br>你的招式伤害提升攻击距离值。<br><i style=\"color:#888;\">（请在攻击时自行计算伤害加值，并填入弹窗的[额外伤害]中）</i></div></div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor}), content });"
                         }
                     ]
                 },
@@ -359,13 +398,13 @@
                         "qigan": 18,
                         "shencai": 18
                     },
-                    "description": "<p>圆满运功特效：攻击距离+5，招式伤害提升攻击距离值（最多15）。</p>",
+                    "description": "<p>圆满运功特效：攻击距离+5，招式伤害提升攻击距离值*2。</p>",
                     "scripts": [
                         {
                             "label": "攻击距离强化提示",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const content = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #d35400; padding-left:10px;\"><b>百步穿杨功：</b><br>你的攻击距离增加 5 米。<br>你的招式伤害增加 5 点。<br><i style=\"color:#888;\">（请在攻击时将伤害加值填入弹窗的[额外伤害]中）</i></div></div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor}), content });"
+                            "script": "const content = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #d35400; padding-left:10px;\"><b>百步穿杨功：</b><br>你的攻击距离增加 5 米。<br>你的招式伤害提升攻击距离值*2。<br><i style=\"color:#888;\">（请在攻击时自行计算伤害加值，并填入弹窗的[额外伤害]中）</i></div></div>`;\nChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({actor}), content });"
                         }
                     ]
                 }
@@ -1627,5 +1666,107 @@
                 "changes": []
             }
         ]
+    },
+    {
+        "name": "玄冥神功",
+        "type": "neigong",
+        "img": "systems/xjzl-system/assets/icons/neigong/江湖2.png",
+        "system": {
+            "isOfficial": false,
+            "tier": 3,
+            "element": "yin",
+            "sect": "jianghushili",
+            "requirement": "<p>悟性：25</p>",
+            "description": "<p>玄冥二老修炼之秘传邪功，以寒气浸炼全身经脉，内力一出寒气侵体，寻常内力无法抵抗。修炼者周身常带刺骨寒意，性情阴鸷狠戾。</p>",
+            "automationNote": "减半与额外阴属性伤害已完全自动化：受到阴柔内功运行者的伤害在 preTake 阶段减半；造成招式伤害后在 hit 阶段追加阴属性伤害（以无法抵挡的“流失”类型实现），对至阳真经/至阳神功运行者不生效。",
+            "config": {
+                "stage1": {
+                    "stats": {
+                        "liliang": 20,
+                        "shenfa": 18,
+                        "tipo": 24,
+                        "neixi": 32,
+                        "qigan": 20,
+                        "shencai": 6
+                    },
+                    "description": "<p>领悟运功特效：你受到的阴柔内功运行者的伤害减半。<br>每当你造成招式伤害时，额外造成20点阴属性伤害（无法对至阳神功运行者造成伤害）。<br>·阴属性伤害：属于特殊伤害，无法抵挡。</p>",
+                    "scripts": [
+                        {
+                            "label": "玄冥神功·阴柔减半",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "// 受到阴柔内功运行者的伤害减半\nconst source = args.attacker;\nif (!source) return;\nconst ngId = source.system.martial?.active_neigong;\nif (!ngId) return;\nconst ng = source.items.get(ngId);\nif (!ng || ![\"yin\", \"rou\"].includes(ng.system.element)) return;\nif (args.output?.damage > 0) {\n    args.output.damage = Math.floor(args.output.damage / 2);\n}"
+                        },
+                        {
+                            "label": "玄冥神功·阴寒侵体",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 造成招式伤害后追加阴属性伤害\nif (!args.isHit || !args.target || args.actionType !== \"attack\") return;\nif (![\"waigong\", \"neigong\"].includes(args.damageType)) return;\nif (args.finalDamage <= 0 || args.isDead) return;\n// 排除普通攻击（保留趁虚而入）\nif (args.move?.type === \"basic\" && args.move?.id !== \"opportunity-attack\") return;\n\n// 至阳神功/至阳真经运行者免疫\nconst targetNgId = args.target.system.martial?.active_neigong;\nif (targetNgId) {\n    const targetNg = args.target.items.get(targetNgId);\n    if (targetNg && (targetNg.name?.includes(\"至阳真经\") || targetNg.name?.includes(\"至阳神功\"))) return;\n}\n\nconst result = await args.target.applyDamage({\n    amount: 20,\n    type: \"liushi\",\n    element: \"yin\",\n    attacker: actor,\n    isHit: true,\n    item: args.item,\n    move: args.move,\n    source: \"extra\"\n});\n\nconst lost = (result?.hpLost || 0) + (result?.hutiLost || 0) + (result?.mpLost || 0) + (result?.tiliLost || 0);\nif (lost > 0) {\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; border-left: 3px solid #5dade2; background: rgba(93,173,226,0.08); font-size: 0.9em; color: #555;\">\n        <div style=\"font-weight: bold; color: #2980b9; margin-bottom: 2px;\"><i class=\"fas fa-snowflake\"></i> 玄冥神功·阴寒侵体</div>\n        <div>${args.target.name} 额外受到 <b>${lost}</b> 点阴属性伤害（无法抵挡）。</div>\n    </div>`;\n    await ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content });\n}"
+                        }
+                    ]
+                },
+                "stage2": {
+                    "stats": {
+                        "liliang": 40,
+                        "shenfa": 36,
+                        "tipo": 48,
+                        "neixi": 64,
+                        "qigan": 40,
+                        "shencai": 12
+                    },
+                    "description": "<p>小成运功特效：你受到的阴柔内功运行者的伤害减半。<br>每当你造成招式伤害时，额外造成30点阴属性伤害（无法对至阳神功运行者造成伤害）。<br>·阴属性伤害：属于特殊伤害，无法抵挡。</p>",
+                    "scripts": [
+                        {
+                            "label": "玄冥神功·阴柔减半",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "// 受到阴柔内功运行者的伤害减半\nconst source = args.attacker;\nif (!source) return;\nconst ngId = source.system.martial?.active_neigong;\nif (!ngId) return;\nconst ng = source.items.get(ngId);\nif (!ng || ![\"yin\", \"rou\"].includes(ng.system.element)) return;\nif (args.output?.damage > 0) {\n    args.output.damage = Math.floor(args.output.damage / 2);\n}"
+                        },
+                        {
+                            "label": "玄冥神功·阴寒侵体",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 造成招式伤害后追加阴属性伤害\nif (!args.isHit || !args.target || args.actionType !== \"attack\") return;\nif (![\"waigong\", \"neigong\"].includes(args.damageType)) return;\nif (args.finalDamage <= 0 || args.isDead) return;\n// 排除普通攻击（保留趁虚而入）\nif (args.move?.type === \"basic\" && args.move?.id !== \"opportunity-attack\") return;\n\n// 至阳神功/至阳真经运行者免疫\nconst targetNgId = args.target.system.martial?.active_neigong;\nif (targetNgId) {\n    const targetNg = args.target.items.get(targetNgId);\n    if (targetNg && (targetNg.name?.includes(\"至阳真经\") || targetNg.name?.includes(\"至阳神功\"))) return;\n}\n\nconst result = await args.target.applyDamage({\n    amount: 30,\n    type: \"liushi\",\n    element: \"yin\",\n    attacker: actor,\n    isHit: true,\n    item: args.item,\n    move: args.move,\n    source: \"extra\"\n});\n\nconst lost = (result?.hpLost || 0) + (result?.hutiLost || 0) + (result?.mpLost || 0) + (result?.tiliLost || 0);\nif (lost > 0) {\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; border-left: 3px solid #5dade2; background: rgba(93,173,226,0.08); font-size: 0.9em; color: #555;\">\n        <div style=\"font-weight: bold; color: #2980b9; margin-bottom: 2px;\"><i class=\"fas fa-snowflake\"></i> 玄冥神功·阴寒侵体</div>\n        <div>${args.target.name} 额外受到 <b>${lost}</b> 点阴属性伤害（无法抵挡）。</div>\n    </div>`;\n    await ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content });\n}"
+                        }
+                    ]
+                },
+                "stage3": {
+                    "stats": {
+                        "liliang": 60,
+                        "shenfa": 54,
+                        "tipo": 72,
+                        "neixi": 96,
+                        "qigan": 60,
+                        "shencai": 18
+                    },
+                    "description": "<p>圆满运功特效：你受到的阴柔内功运行者的伤害减半。<br>每当你造成招式伤害时，额外造成50点阴属性伤害（无法对至阳神功运行者造成伤害）。<br>·阴属性伤害：属于特殊伤害，无法抵挡。</p>",
+                    "scripts": [
+                        {
+                            "label": "玄冥神功·阴柔减半",
+                            "trigger": "preTake",
+                            "active": true,
+                            "script": "// 受到阴柔内功运行者的伤害减半\nconst source = args.attacker;\nif (!source) return;\nconst ngId = source.system.martial?.active_neigong;\nif (!ngId) return;\nconst ng = source.items.get(ngId);\nif (!ng || ![\"yin\", \"rou\"].includes(ng.system.element)) return;\nif (args.output?.damage > 0) {\n    args.output.damage = Math.floor(args.output.damage / 2);\n}"
+                        },
+                        {
+                            "label": "玄冥神功·阴寒侵体",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 造成招式伤害后追加阴属性伤害\nif (!args.isHit || !args.target || args.actionType !== \"attack\") return;\nif (![\"waigong\", \"neigong\"].includes(args.damageType)) return;\nif (args.finalDamage <= 0 || args.isDead) return;\n// 排除普通攻击（保留趁虚而入）\nif (args.move?.type === \"basic\" && args.move?.id !== \"opportunity-attack\") return;\n\n// 至阳神功/至阳真经运行者免疫\nconst targetNgId = args.target.system.martial?.active_neigong;\nif (targetNgId) {\n    const targetNg = args.target.items.get(targetNgId);\n    if (targetNg && (targetNg.name?.includes(\"至阳真经\") || targetNg.name?.includes(\"至阳神功\"))) return;\n}\n\nconst result = await args.target.applyDamage({\n    amount: 50,\n    type: \"liushi\",\n    element: \"yin\",\n    attacker: actor,\n    isHit: true,\n    item: args.item,\n    move: args.move,\n    source: \"extra\"\n});\n\nconst lost = (result?.hpLost || 0) + (result?.hutiLost || 0) + (result?.mpLost || 0) + (result?.tiliLost || 0);\nif (lost > 0) {\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding: 4px 8px; border-left: 3px solid #5dade2; background: rgba(93,173,226,0.08); font-size: 0.9em; color: #555;\">\n        <div style=\"font-weight: bold; color: #2980b9; margin-bottom: 2px;\"><i class=\"fas fa-snowflake\"></i> 玄冥神功·阴寒侵体</div>\n        <div>${args.target.name} 额外受到 <b>${lost}</b> 点阴属性伤害（无法抵挡）。</div>\n    </div>`;\n    await ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: actor }), content });\n}"
+                        }
+                    ]
+                }
+            },
+            "masteryEffect": "<p>修满[永久]：气血+100，内力+100。</p>",
+            "masteryChanges": [
+                {
+                    "key": "resources.hp.bonus",
+                    "value": 100
+                },
+                {
+                    "key": "resources.mp.bonus",
+                    "value": 100
+                }
+            ]
+        }
     }
 ]
