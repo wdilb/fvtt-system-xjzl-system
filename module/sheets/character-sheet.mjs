@@ -96,6 +96,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             //手工修正
             addGroup: XJZLCharacterSheet.prototype._onAction,
             deleteGroup: XJZLCharacterSheet.prototype._onAction,
+            copyGroup: XJZLCharacterSheet.prototype._onAction,
+            importGroup: XJZLCharacterSheet.prototype._onAction,
             addChange: XJZLCharacterSheet.prototype._onAction,
             deleteChange: XJZLCharacterSheet.prototype._onAction,
             openModifierPicker: XJZLCharacterSheet.prototype._onOpenModifierPicker,
@@ -1367,6 +1369,31 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             return;
         }
 
+        if (action === "copyGroup") {
+            const index = Number(target.dataset.index);
+            const source = foundry.utils.deepClone(this.document.system.customModifiers[index]);
+            if (!source) return;
+
+            // 只复制必要字段，避免把 DataModel 内部结构写进剪贴板
+            const groupData = {
+                id: source.id,
+                name: source.name,
+                enabled: source.enabled,
+                changes: (source.changes || []).map(change => ({
+                    key: change.key,
+                    value: change.value
+                }))
+            };
+
+            await game.clipboard.copyPlainText(JSON.stringify(groupData, null, 2));
+            ui.notifications.info(game.i18n.localize("XJZL.Modifier.CopySuccess"));
+            return;
+        }
+
+        if (action === "importGroup") {
+            return this._onImportGroup();
+        }
+
         // === 条目操作 (Change Operations) ===
 
         if (action === "addChange") {
@@ -1421,6 +1448,94 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             await this.document.update({ "system.social.relations": relations });
             return;
         }
+    }
+
+    /**
+     * 导入修正组：优先尝试读取剪贴板中的 JSON，也允许用户手动粘贴或输入。
+     * 解析成功后向 customModifiers 追加一个修正组。
+     */
+    async _onImportGroup() {
+        const title = game.i18n.localize("XJZL.Modifier.ImportTitle");
+        const hint = game.i18n.localize("XJZL.Modifier.ImportHint");
+        const confirmLabel = game.i18n.localize("XJZL.UI.Confirm");
+
+        const content = `
+            <form>
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="font-weight: bold;">${title}</label>
+                    <textarea name="importData" rows="8" style="width: 100%; resize: vertical; font-family: Consolas, monospace;"
+                        placeholder='{"name":"导入修正组","enabled":true,"changes":[{"key":"stats.liliang.mod","value":1}]}'></textarea>
+                    <p class="hint" style="font-size: 11px; color: #888; margin-top: 4px;">${hint}</p>
+                </div>
+            </form>
+        `;
+
+        const raw = await foundry.applications.api.DialogV2.prompt({
+            window: { title, icon: "fas fa-file-import" },
+            content,
+            render: (event) => {
+                const html = event.target.element;
+                const textarea = html.querySelector("textarea[name='importData']");
+                if (!textarea || !navigator.clipboard?.readText) return;
+
+                (async () => {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        // 仅在用户尚未输入时自动填入，避免覆盖手动粘贴的内容
+                        if (text && text.trim() && !textarea.value.trim()) textarea.value = text;
+                    } catch (err) {
+                        // 读取失败时保持空输入框，让用户手动粘贴或输入。
+                        console.debug("XJZL | 无法自动读取剪贴板", err);
+                    }
+                })();
+            },
+            ok: {
+                label: confirmLabel,
+                callback: (event, button) => {
+                    const dialogEl = button.closest(".dialog") || document;
+                    const textarea = dialogEl.querySelector("textarea[name='importData']");
+                    return textarea ? textarea.value : "";
+                }
+            }
+        });
+
+        if (!raw || !raw.trim()) return;
+
+        let data;
+        try {
+            data = JSON.parse(raw);
+        } catch (err) {
+            console.warn("XJZL | 导入修正组解析失败", err);
+            ui.notifications.warn(game.i18n.localize("XJZL.Modifier.ImportInvalid"));
+            return;
+        }
+
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+            ui.notifications.warn(game.i18n.localize("XJZL.Modifier.ImportInvalid"));
+            return;
+        }
+
+        const changes = (Array.isArray(data.changes) ? data.changes : [])
+            .filter(change => change && typeof change.key === "string" && change.key.trim())
+            .map(change => ({
+                key: change.key.trim(),
+                value: Number.isFinite(Number(change.value)) ? Number(change.value) : 0
+            }));
+
+        if (!changes.length) {
+            ui.notifications.warn(game.i18n.localize("XJZL.Modifier.ImportNoChanges"));
+            return;
+        }
+
+        const groups = foundry.utils.deepClone(this.document.system.customModifiers);
+        groups.push({
+            name: (typeof data.name === "string" && data.name.trim()) ? data.name.trim() : "导入修正组",
+            enabled: data.enabled !== false,
+            changes
+        });
+
+        await this.document.update({ "system.customModifiers": groups });
+        ui.notifications.info(game.i18n.localize("XJZL.Modifier.ImportSuccess"));
     }
 
     /* -------------------------------------------- */
