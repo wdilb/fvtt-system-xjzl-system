@@ -39,8 +39,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             try { this.browserState[key] = game.settings.get("xjzl-system", setting); }
             catch { /* 设置未就绪时使用默认值 */ }
         }
-        // 防御：旧版本残留的非法值（如已移除的 price-desc）回退默认，避免 UI 与状态错位
-        if (!["name", "quality-desc", "tier-desc"].includes(this.browserState.sortBy)) {
+        // 防御：旧版本残留的非法值（如已移除的 tier-desc/price-desc/none）回退默认，避免 UI 与状态错位
+        if (!["name", "quality-desc", "quality-asc"].includes(this.browserState.sortBy)) {
             this.browserState.sortBy = "name";
         }
         if (!["compact", "grid"].includes(this.browserState.viewMode)) {
@@ -243,7 +243,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         await Promise.all(targetPacks.map(pack => loadPackIndex(pack)));
 
-        // 简单按名称排序，提升浏览体验
+        // 按名称排序，提升浏览体验
         for (const key in tempCache) {
             tempCache[key].sort((a, b) => a.name.localeCompare(b.name, "zh"));
         }
@@ -602,8 +602,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             limitText: game.i18n.format("XJZL.CompendiumBrowser.Stats.LimitReached", { limit: MAX_RENDER }),
             sortLabel: localize("Sort.Label"),
             sortName: localize("Sort.Name"),
-            sortQuality: localize("Sort.QualityDesc"),
-            sortTier: localize("Sort.TierDesc"),
+            sortQualityDesc: localize("Sort.QualityDesc"),
+            sortQualityAsc: localize("Sort.QualityAsc"),
             viewLabel: localize("View.Label"),
             viewCompact: localize("View.Compact"),
             viewGrid: localize("View.Grid"),
@@ -682,27 +682,29 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /*  排序与卡片数据                              */
     /* -------------------------------------------- */
 
+    /** 统一稀有度值：武学/内功按品阶 tier(1-3)，其余按品质 quality(0-4)，统一为"品质"排序概念。 */
+    _rarityValue(item) {
+        const sys = item.system ?? {};
+        if (item.type === "wuxue" || item.type === "neigong") {
+            const tier = Number(sys.tier);
+            return Number.isFinite(tier) ? tier : 1;
+        }
+        const quality = Number(sys.quality);
+        return Number.isFinite(quality) ? quality : 0;
+    }
+
     /**
-     * 按排序偏好排序。默认名称升序即加载时的既有顺序，直接返回原引用；
+     * 按排序偏好排序。默认名称升序即 loadData 的既有顺序，直接返回原引用；
+     * - quality-desc / quality-asc：稀有度降序 / 升序（武学/内功按品阶 tier，其余按品质 quality）
      * 需要排序的档位复制数组排序（JS 稳定排序，同档内保持名称序），不污染缓存。
      */
     _sortItems(items) {
         const sortBy = this.browserState.sortBy;
-        if (sortBy === "quality-desc" || sortBy === "tier-desc") {
-            const primaryTier = sortBy === "tier-desc";
-            const key = item => {
-                const sys = item.system ?? {};
-                const quality = Number.isFinite(Number(sys.quality)) ? Number(sys.quality) : 0;
-                const martial = item.type === "wuxue" || item.type === "neigong";
-                const tier = martial && Number.isFinite(Number(sys.tier)) ? Number(sys.tier) : 0;
-                return primaryTier ? [tier, quality] : [quality, tier];
-            };
-            return [...items].sort((a, b) => {
-                const ka = key(a), kb = key(b);
-                return kb[0] - ka[0] || kb[1] - ka[1];
-            });
+        if (sortBy === "quality-desc" || sortBy === "quality-asc") {
+            const dir = sortBy === "quality-desc" ? -1 : 1;
+            return [...items].sort((a, b) => dir * (this._rarityValue(a) - this._rarityValue(b)));
         }
-        return items;
+        return items; // name：loadData 已按名称序，直接返回原引用
     }
 
     /** 取 CONFIG 映射中的本地化标签；无映射时回退原值（不崩、不显示空）。 */

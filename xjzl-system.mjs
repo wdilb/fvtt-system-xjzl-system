@@ -493,7 +493,7 @@ Hooks.once("init", async function () {
     choices: {
       name: "名称",
       "quality-desc": "品质降序",
-      "tier-desc": "品阶降序"
+      "quality-asc": "品质升序"
     },
     default: "name",
     requiresReload: false
