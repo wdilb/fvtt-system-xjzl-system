@@ -1,30 +1,53 @@
 <div class="xjzl-content-content">
+    {{#unless isLoaded}}
+    <div class="xjzl-cb-loading">
+        <i class="fas fa-spinner fa-pulse"></i>
+        <span>{{loadingText}}</span>
+    </div>
+    {{else}}
     <div class="xjzl-cb-stats-bar">
-        <span>共找到 <strong>{{totalCount}}</strong> 件物品
-            {{#if isClipped}}<span class="warning">(仅显示前 {{displayCount}} 件)</span>{{/if}}
+        <span class="stats-track">{{{statsFound}}}
+            {{#if hasMore}}<span class="xjzl-cb-stats-shown warning">{{statsShown}}</span>{{/if}}
+            {{#if reachedMax}}<span class="warning">{{limitText}}</span>{{/if}}
+        </span>
+        <span class="stats-controls">
+            <label class="sort-control">
+                <i class="fas fa-sort-amount-down" title="{{sortLabel}}"></i>
+                <select name="sortBy" aria-label="{{sortLabel}}">
+                    <option value="name" {{#if (eq sortBy "name")}}selected{{/if}}>{{sortName}}</option>
+                    <option value="quality-desc" {{#if (eq sortBy "quality-desc")}}selected{{/if}}>{{sortQuality}}</option>
+                    <option value="tier-desc" {{#if (eq sortBy "tier-desc")}}selected{{/if}}>{{sortTier}}</option>
+                </select>
+            </label>
+            <div class="view-toggle" role="group" aria-label="{{viewLabel}}">
+                <button type="button" class="view-btn {{#if (eq viewMode "compact")}}active{{/if}}" data-action="toggleView"
+                    data-view="compact" title="{{viewCompact}}" aria-pressed="{{#if (eq viewMode "compact")}}true{{else}}false{{/if}}">
+                    <i class="fas fa-list"></i>
+                </button>
+                <button type="button" class="view-btn {{#if (eq viewMode "grid")}}active{{/if}}" data-action="toggleView"
+                    data-view="grid" title="{{viewGrid}}" aria-pressed="{{#if (eq viewMode "grid")}}true{{else}}false{{/if}}">
+                    <i class="fas fa-th-large"></i>
+                </button>
+            </div>
         </span>
     </div>
 
-    <div class="xjzl-cb-grid">
-        {{#each items}}
-        <div class="xjzl-cb-card" data-uuid="{{this.uuid}}" data-action="openSheet" draggable="true"
-            data-drag-data='{ "type": "Item", "uuid": "{{this.uuid}}" }'
-            data-type="{{this.type}}" data-quality="{{this.system.quality}}" data-tier="{{this.system.tier}}">
-
-            <img src="{{this.img}}" loading="lazy" />
-            <div class="xjzl-cb-card-info">
-                <div class="name">{{this.name}}</div>
-                {{#if this.packLabel}}
-                <div class="source">{{this.packLabel}}</div>
-                {{/if}}
-            </div>
-        </div>
-        {{/each}}
+    <div class="xjzl-cb-grid {{#if (eq viewMode "grid")}}xjzl-cb-grid-wide{{/if}}">
+        {{{cardListHtml}}}
 
         {{#unless totalCount}}
         <div class="no-results">
             <p>没有找到符合条件的物品。</p>
         </div>
+        {{else}}
+        {{#if hasMore}}
+        <div class="xjzl-cb-sentinel">
+            <button type="button" class="load-more-btn" data-action="loadMore">{{loadMoreText}}</button>
+        </div>
+        {{else}}
+        <div class="xjzl-cb-ended">{{#if reachedMax}}{{limitText}}{{else}}{{endedText}}{{/if}}</div>
+        {{/if}}
         {{/unless}}
     </div>
+    {{/unless}}
 </div>

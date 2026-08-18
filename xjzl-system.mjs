@@ -483,6 +483,37 @@ Hooks.once("init", async function () {
     requiresReload: false // 抽取时即时读取，无需刷新
   });
 
+  // 江湖万卷阁：排序偏好（客户端持久化，在浏览器统计条内切换，不进设置菜单）
+  game.settings.register("xjzl-system", "compendiumBrowserSort", {
+    name: "万卷阁排序偏好",
+    hint: "江湖万卷阁卡片列表的排序方式，可在浏览器右上角切换。",
+    scope: "client",
+    config: false,
+    type: String,
+    choices: {
+      name: "名称",
+      "quality-desc": "品质降序",
+      "tier-desc": "品阶降序"
+    },
+    default: "name",
+    requiresReload: false
+  });
+
+  // 江湖万卷阁：视图偏好（紧凑列表 / 图鉴网格，客户端持久化）
+  game.settings.register("xjzl-system", "compendiumBrowserView", {
+    name: "万卷阁视图偏好",
+    hint: "江湖万卷阁卡片列表的呈现形态（简洁列表 / 图鉴网格）。",
+    scope: "client",
+    config: false,
+    type: String,
+    choices: {
+      compact: "简洁列表",
+      grid: "图鉴网格"
+    },
+    default: "compact",
+    requiresReload: false
+  });
+
   // 是否允许玩家使用状态选取器
   game.settings.register("xjzl-system", "allowPlayerEffectPicker", {
     name: "允许玩家使用状态选取器",
@@ -1886,6 +1917,8 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/apps/compendiumbrowser/content.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/compendiumbrowser/navigation.hbs", // 合集浏览器
     "systems/xjzl-system/templates/apps/compendiumbrowser/sidebar.hbs", // 合集浏览器
+    "systems/xjzl-system/templates/apps/compendiumbrowser/card-list.hbs", // 合集浏览器卡片列表（含增量追加）
+    "systems/xjzl-system/templates/apps/compendiumbrowser/random-dialog.hbs", // 合集浏览器随机抽取对话框
     "systems/xjzl-system/templates/apps/compendiumbrowser/draw-reveal.hbs", // 合集浏览器抽取演出
     "systems/xjzl-system/templates/apps/aoe-creator.hbs", // aoe创建器窗口
     "systems/xjzl-system/templates/apps/character-preview.hbs", //角色预览

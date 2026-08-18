@@ -7,6 +7,11 @@
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
 const renderTemplate = foundry.applications.handlebars.renderTemplate;
 
+/** 初屏渲染条数、增量加载步长与 DOM 追加软上限（超出提示用筛选缩小范围）。 */
+const INITIAL_PAGE = 60;
+const PAGE_STEP = 60;
+const MAX_RENDER = 500;
+
 export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(ApplicationV2) {
 
     constructor(options) {
@@ -18,15 +23,65 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         /** @type {boolean} 数据是否加载完毕 */
         this.isLoaded = false;
 
-        /** @type {Object} UI 交互状态 */
+        /** @type {Object} UI 交互状态（筛选/搜索/分页按 Tab 独立，排序/视图全局持久化） */
         this.browserState = {
             activeTab: "weapon",
-            searchQuery: "",
-            filters: {} // 结构: { key: Set<value> }
+            tabs: {},
+            sortBy: "name",
+            viewMode: "compact"
         };
+        // 为每个 Tab 预建独立状态桶：切换分类时各自记住搜索/筛选与已加载页数
+        XJZLCompendiumBrowser.TABS.forEach(t => {
+            this.browserState.tabs[t.id] = { searchQuery: "", filters: {}, visibleCount: INITIAL_PAGE };
+        });
+        // 读取客户端持久化的排序/视图偏好（设置未注册时保持默认）
+        for (const [key, setting] of [["sortBy", "compendiumBrowserSort"], ["viewMode", "compendiumBrowserView"]]) {
+            try { this.browserState[key] = game.settings.get("xjzl-system", setting); }
+            catch { /* 设置未就绪时使用默认值 */ }
+        }
+        // 防御：旧版本残留的非法值（如已移除的 price-desc）回退默认，避免 UI 与状态错位
+        if (!["name", "quality-desc", "tier-desc"].includes(this.browserState.sortBy)) {
+            this.browserState.sortBy = "name";
+        }
+        if (!["compact", "grid"].includes(this.browserState.viewMode)) {
+            this.browserState.viewMode = "compact";
+        }
 
         // 防抖搜索：200ms 延迟，避免输入过快导致频繁计算
         this._debouncedSearch = foundry.utils.debounce(this._performSearch.bind(this), 200);
+    }
+
+    /* -------------------------------------------- */
+    /*  状态访问                                    */
+    /* -------------------------------------------- */
+
+    /**
+     * 当前 Tab 的独立状态桶（懒创建兜底，兼容外部直接写入）。
+     */
+    get _currentTabState() {
+        const { activeTab } = this.browserState;
+        // tabs 桶在构造函数已预建；此处兜底防外部意外覆盖空对象
+        this.browserState.tabs[activeTab] ??= { searchQuery: "", filters: {}, visibleCount: INITIAL_PAGE };
+        return this.browserState.tabs[activeTab];
+    }
+
+    /** 当前 Tab 的筛选集合（{ key: Set<value> }），供过滤引擎与随机抽取读取。 */
+    get _filters() { return this._currentTabState.filters; }
+
+    /** 当前 Tab 的搜索词。 */
+    get _searchQuery() { return this._currentTabState.searchQuery; }
+
+    /**
+     * 供外部（如建卡向导）按 Tab 注入初始筛选并切换到该 Tab。
+     * @param {string} tab Tab id（export 时用 item type）
+     * @param {Object<string, Set>} filters 初始筛选集合
+     */
+    applyTabState(tab, filters) {
+        this.browserState.activeTab = tab;
+        const state = this.browserState.tabs[tab] ??= { searchQuery: "", filters: {}, visibleCount: INITIAL_PAGE };
+        state.filters = filters || {};
+        state.searchQuery = "";
+        state.visibleCount = INITIAL_PAGE;
     }
 
     static DEFAULT_OPTIONS = {
@@ -45,7 +100,9 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             changeTab: XJZLCompendiumBrowser.prototype._onChangeTab,
             openSheet: XJZLCompendiumBrowser.prototype._onOpenSheet,
             resetFilters: XJZLCompendiumBrowser.prototype._onResetFilters,
-            randomize: XJZLCompendiumBrowser.prototype._onRandomizeClick
+            randomize: XJZLCompendiumBrowser.prototype._onRandomizeClick,
+            toggleView: XJZLCompendiumBrowser.prototype._onToggleView,
+            loadMore: XJZLCompendiumBrowser.prototype._loadMore
         }
     };
 
@@ -157,8 +214,22 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                     // 预先将UUID和搜索名称缓存，避免搜索循环中重复计算
                     if (tempCache[entry.type]) {
                         entry.uuid = entry.uuid || `Compendium.${pack.collection}.${entry._id}`;
-                        // 预计算小写名称，搜索性能提升
-                        entry._searchName = (entry.name || "").toLowerCase();
+                        // 预计算组合搜索串：名称 + 来源包名 + 关键字段，武学/内功额外涵盖招式名与属性，
+                        // 让"搜索名称"可以同时命中门派、属性、伤害类型等词，且只在加载时算一次。
+                        const searchParts = [entry.name, pack.metadata.label];
+                        const sys = entry.system ?? {};
+                        for (const key of ["type", "subtype", "sect", "subSect", "element", "category", "artType", "damageType", "weaponType"]) {
+                            if (sys[key]) searchParts.push(sys[key]);
+                        }
+                        if (Array.isArray(sys.moves)) {
+                            for (const move of sys.moves) {
+                                if (move?.name) searchParts.push(move.name);
+                                for (const key of ["element", "damageType", "weaponType"]) {
+                                    if (move[key]) searchParts.push(move[key]);
+                                }
+                            }
+                        }
+                        entry._searchName = searchParts.filter(Boolean).join(" ").toLowerCase();
                         entry.packLabel = pack.metadata.label;
                         if (entry.system) {
                             // 如果底层数据没有 isOfficial，默认视为 true (官方资源)
@@ -197,40 +268,117 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     _onRender(context, options) {
         super._onRender(context, options);
 
-        // 使用自定义标记防止重复绑定
-        // AppV2 可能会替换整个 element，因此每次渲染都需要重新检查并绑定非 actions 事件
-        if (this.element.hasAttribute("data-listeners-ready")) return;
-
         const html = this.element;
 
-        // 1. 搜索框 (Input 事件无法通过 actions 处理)
-        html.addEventListener("input", (event) => {
-            if (event.target.name === "search") this._onSearch(event);
-        });
+        // A. 一次性委托监听（守卫内）：input/change/dragstart/keydown 均为根级委托，
+        //    partial 重渲（content 部分）后依然有效，无需重复绑定。
+        if (!html.hasAttribute("data-listeners-ready")) {
 
-        // 2. 筛选器 (Change 事件)
-        html.addEventListener("change", (event) => {
-            if (event.target.classList.contains("xjzl-filter-checkbox")) this._onFilterChange(event);
-        });
+            // 1. 搜索框 (Input 事件无法通过 actions 处理)
+            html.addEventListener("input", (event) => {
+                if (event.target.name === "search") this._onSearch(event);
+            });
 
-        // 3. 拖拽代理 (Drag Delegation)
-        html.addEventListener("dragstart", (event) => {
-            const card = event.target.closest(".xjzl-cb-card");
-            if (!card?.dataset.dragData) return;
+            // 2. 筛选器与排序下拉 (Change 事件)
+            html.addEventListener("change", (event) => {
+                if (event.target.classList.contains("xjzl-filter-checkbox")) this._onFilterChange(event);
+                else if (event.target.name === "sortBy") this._onSortChange(event);
+            });
 
-            event.dataTransfer.setData("text/plain", card.dataset.dragData);
-            event.dataTransfer.effectAllowed = "copy";
-        });
+            // 3. 拖拽代理 (Drag Delegation)
+            html.addEventListener("dragstart", (event) => {
+                const card = event.target.closest(".xjzl-cb-card");
+                if (!card?.dataset.dragData) return;
 
-        this.element.setAttribute("data-listeners-ready", "true");
+                event.dataTransfer.setData("text/plain", card.dataset.dragData);
+                event.dataTransfer.effectAllowed = "copy";
+            });
+
+            // 4. 卡片键盘导航（方向键移动焦点，Enter/Space 打开）
+            html.addEventListener("keydown", (event) => {
+                if (event.target.classList?.contains("xjzl-cb-card")) this._onCardKeydown(event);
+            });
+
+            html.setAttribute("data-listeners-ready", "true");
+        }
+
+        // B. 每次 content 部分渲染后重新挂载哨兵观察器：
+        //    content 重渲会重建哨兵节点，旧观察器指向的节点已脱离 DOM，必须先断开再观察新哨兵。
+        if (options?.parts === undefined || options.parts.includes("content")) {
+            this._setupSentinelObserver();
+        }
+    }
+
+    /**
+     * 将 IntersectionObserver 挂到当前哨兵节点（若存在）。
+     * 哨兵进入可视区时触发 _loadMore 增量追加。
+     */
+    _setupSentinelObserver() {
+        this._sentinelObserver?.disconnect();
+        this._sentinelObserver = null;
+        const sentinel = this.element.querySelector(".xjzl-cb-sentinel");
+        if (!sentinel || typeof IntersectionObserver === "undefined") return;
+        const root = this.element.querySelector(".xjzl-content-content");
+        this._sentinelObserver = new IntersectionObserver(
+            entries => {
+                if (entries.some(entry => entry.isIntersecting)) this._loadMore();
+            },
+            { root, rootMargin: "160px" }
+        );
+        this._sentinelObserver.observe(sentinel);
+    }
+
+    /**
+     * 卡片键盘导航：方向键在网格内移动焦点，Enter/Space 打开物品。
+     * 不处理 Esc——Esc 留给 Foundry 窗口默认关闭行为，避免拦截破坏关窗。
+     */
+    _onCardKeydown(event) {
+        const card = event.target;
+        const key = event.key;
+
+        if (key === "Enter" || key === " ") {
+            event.preventDefault();
+            this._onOpenSheet(null, card);
+            return;
+        }
+        if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) return;
+        event.preventDefault();
+
+        const grid = card.closest(".xjzl-cb-grid");
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll(".xjzl-cb-card"));
+        const index = cards.indexOf(card);
+        if (index === -1) return;
+
+        if (key === "ArrowLeft" || key === "ArrowRight") {
+            const next = key === "ArrowLeft" ? index - 1 : index + 1;
+            cards[next]?.focus();
+            return;
+        }
+
+        // 上下：在同一行带之外、横向中心距离最近的卡片视为上/下一行邻居
+        const rect = card.getBoundingClientRect();
+        const centerX = rect.left + rect.width / 2;
+        const dir = key === "ArrowDown" ? 1 : -1;
+        let best = null;
+        let bestDist = Infinity;
+        for (const other of cards) {
+            if (other === card) continue;
+            const r = other.getBoundingClientRect();
+            const isAcross = dir === 1 ? r.top >= rect.bottom - 8 : r.bottom <= rect.top + 8;
+            if (!isAcross) continue;
+            const dist = Math.abs((r.left + r.width / 2) - centerX);
+            if (dist < bestDist) { bestDist = dist; best = other; }
+        }
+        best?.focus();
     }
 
     _onChangeTab(event, target) {
         const newTab = target.dataset.tab;
         if (newTab && newTab !== this.browserState.activeTab) {
             this.browserState.activeTab = newTab;
-            this.browserState.filters = {}; // 切换标签时重置筛选
-            this.browserState.searchQuery = ""; // 切换标签时重置搜索
+            // 各 Tab 的筛选/搜索独立保留；仅分页位置回到初屏，保持"进入分类从头浏览"的直觉
+            this._currentTabState.visibleCount = INITIAL_PAGE;
             this.render(); // 全量刷新
         }
     }
@@ -242,15 +390,17 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     }
 
     _performSearch(query) {
-        if (query !== this.browserState.searchQuery) {
-            this.browserState.searchQuery = query;
+        if (query !== this._searchQuery) {
+            const state = this._currentTabState;
+            state.searchQuery = query;
+            state.visibleCount = INITIAL_PAGE; // 搜索变化回到初屏
             // 局部刷新：只更新内容区，保持侧边栏状态和光标
             this.render({ parts: ["content"] });
         }
     }
 
     async _onOpenSheet(event, target) {
-        event.stopPropagation();
+        event?.stopPropagation(); // 键盘触达时无 event
         const item = await fromUuid(target.dataset.uuid);
         if (item) item.sheet.render(true);
     }
@@ -267,24 +417,28 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const filterKey = target.dataset.filter;
         const value = target.value;
         const isChecked = target.checked;
+        const state = this._currentTabState;
 
-        if (!this.browserState.filters[filterKey]) {
-            this.browserState.filters[filterKey] = new Set();
+        if (!state.filters[filterKey]) {
+            state.filters[filterKey] = new Set();
         }
 
-        const filterSet = this.browserState.filters[filterKey];
+        const filterSet = state.filters[filterKey];
         if (isChecked) filterSet.add(value);
         else {
             filterSet.delete(value);
-            if (filterSet.size === 0) delete this.browserState.filters[filterKey];
+            if (filterSet.size === 0) delete state.filters[filterKey];
         }
 
+        state.visibleCount = INITIAL_PAGE;
         this.render({ parts: ["content"] });
     }
 
     _onResetFilters() {
-        this.browserState.searchQuery = "";
-        this.browserState.filters = {};
+        const state = this._currentTabState;
+        state.searchQuery = "";
+        state.filters = {};
+        state.visibleCount = INITIAL_PAGE;
 
         // DOM 操作重置视觉状态
         const input = this.element.querySelector("input[name='search']");
@@ -300,6 +454,106 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         this.render({ parts: ["content"] });
     }
 
+    /**
+     * 排序下拉变化：更新全局排序偏好并持久化（仅本地客户端），重置分页后重渲内容。
+     */
+    _onSortChange(event) {
+        const sortBy = event.target.value;
+        if (sortBy === this.browserState.sortBy) return;
+        this.browserState.sortBy = sortBy;
+        this._currentTabState.visibleCount = INITIAL_PAGE;
+        game.settings.set("xjzl-system", "compendiumBrowserSort", sortBy).catch(err => {
+            console.warn("XJZL | 排序偏好持久化失败", err);
+        });
+        this.render({ parts: ["content"] });
+    }
+
+    /**
+     * 视图切换（compact 简洁列表 / grid 图鉴网格）：更新偏好并持久化，重置分页后重渲内容。
+     */
+    _onToggleView(event, target) {
+        const viewMode = target.dataset.view;
+        if (viewMode === this.browserState.viewMode) return;
+        this.browserState.viewMode = viewMode;
+        this._currentTabState.visibleCount = INITIAL_PAGE;
+        game.settings.set("xjzl-system", "compendiumBrowserView", viewMode).catch(err => {
+            console.warn("XJZL | 视图偏好持久化失败", err);
+        });
+        this.render({ parts: ["content"] });
+    }
+
+    /**
+     * 追加下一页卡片。
+     * 只渲染"新增切片"并插入哨兵之前，避免整块 content 重渲（那样会丢失滚动位置）；
+     * 统计条的"已显示前 N 件"随之就地更新。
+     */
+    async _loadMore() {
+        if (this._loadingMore) return;
+        const tab = this.browserState.activeTab;
+        const state = this._currentTabState;
+        const rawItems = this.cachedData[tab] || [];
+        const sorted = this._sortItems(this._filterItems(rawItems));
+        const current = state.visibleCount;
+        if (current >= sorted.length || current >= MAX_RENDER) return;
+
+        this._loadingMore = true;
+        try {
+            const next = Math.min(current + PAGE_STEP, sorted.length, MAX_RENDER);
+            state.visibleCount = next;
+
+            const slice = sorted.slice(current, next).map(item => this._buildCardData(item));
+            const html = await renderTemplate(
+                "systems/xjzl-system/templates/apps/compendiumbrowser/card-list.hbs",
+                { items: slice, viewMode: this.browserState.viewMode }
+            );
+
+            // 追加渲染期间 Tab/筛选/搜索/排序变化会整块重渲并重置 visibleCount；
+            // 此时旧切片的插入目标已消失，丢弃追加并回滚页数，避免污染新网格。
+            if (this.browserState.activeTab !== tab || state.visibleCount !== next) {
+                state.visibleCount = current;
+                return;
+            }
+
+            const grid = this.element.querySelector(".xjzl-cb-grid");
+            const sentinel = this.element.querySelector(".xjzl-cb-sentinel");
+            if (!grid || !sentinel) return;
+            sentinel.insertAdjacentHTML("beforebegin", html);
+
+            this._updatePagerUI(sorted.length, next);
+        } finally {
+            this._loadingMore = false;
+        }
+    }
+
+    /**
+     * 就地更新统计条"已显示前 N 件"；全部加载或触达软上限时用完成/上限提示替换哨兵。
+     */
+    _updatePagerUI(total, shown) {
+        const statsShown = this.element.querySelector(".xjzl-cb-stats-shown");
+        if (statsShown) statsShown.textContent = game.i18n.format("XJZL.CompendiumBrowser.Stats.Shown", { shown });
+
+        const sentinel = this.element.querySelector(".xjzl-cb-sentinel");
+        if (!sentinel) return;
+        if (shown < total && shown < MAX_RENDER) return; // 仍有更多，哨兵保留
+
+        const note = document.createElement("div");
+        note.className = "xjzl-cb-ended";
+        note.textContent = shown >= MAX_RENDER
+            ? game.i18n.format("XJZL.CompendiumBrowser.Stats.LimitReached", { limit: MAX_RENDER })
+            : game.i18n.format("XJZL.CompendiumBrowser.Stats.Ended", { count: total });
+        sentinel.replaceWith(note);
+        statsShown?.remove();
+        this._sentinelObserver?.disconnect();
+        this._sentinelObserver = null;
+    }
+
+    /** 窗口关闭时清理哨兵观察器，避免残留观测已脱离的节点。 */
+    async close(options) {
+        this._sentinelObserver?.disconnect();
+        this._sentinelObserver = null;
+        return super.close(options);
+    }
+
     /* -------------------------------------------- */
     /*  数据准备 (Context)                          */
     /* -------------------------------------------- */
@@ -307,39 +561,221 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     async _prepareContext(options) {
         const activeTab = this.browserState.activeTab;
         const rawItems = this.cachedData[activeTab] || [];
+        const state = this._currentTabState;
 
-        // 1. 过滤
+        // 1. 过滤（当前筛选 + 当前搜索）
         const filteredItems = this._filterItems(rawItems);
 
-        // 2. 虚拟滚动/分页裁剪 (Render 限制前 100 个以保证打开速度)
-        const displayLimit = 100;
-        const displayItems = filteredItems.slice(0, displayLimit);
+        // 2. 排序
+        const sortedItems = this._sortItems(filteredItems);
 
-        // 3. 构建筛选器 UI 数据
-        const currentFilters = this.browserState.filters;
-        const filterConfigs = this.filterConfig[activeTab] || [];
+        // 3. 分页切片（初屏 + 已加载页）
+        const visibleCount = Math.min(state.visibleCount, sortedItems.length);
+        const displayItems = sortedItems.slice(0, visibleCount);
 
-        // 使用 reduce 或 map 构建 UI 数据
-        const filterList = filterConfigs.map(config => ({
-            ...config,
-            isOpen: config.key !== "subSect", // 只要不是 subSect，就默认展开
-            options: Object.entries(config.options).map(([val, labelKey]) => ({
-                val: val,
-                label: game.i18n.localize(labelKey),
-                checked: currentFilters[config.key]?.has(val.toString()) ?? false
-            }))
-        }));
+        // 4. 构建卡片展示数据（徽标/品阶/tooltip）并预渲染为 HTML 片段。
+        //    不用 Handlebars partial（本项目未引入该机制），而是由 card-list.hbs 独立渲染，
+        //    初屏与 _loadMore 增量追加共用同一模板，保证两处卡片结构一致。
+        const items = displayItems.map(item => this._buildCardData(item));
+        const cardListHtml = await renderTemplate(
+            "systems/xjzl-system/templates/apps/compendiumbrowser/card-list.hbs",
+            { items, viewMode: this.browserState.viewMode }
+        );
+
+        // 5. 构建筛选器 UI 数据（含各选项命中计数）
+        const filterList = this._buildFilterGroups(activeTab, state, rawItems);
+        const totalCount = filteredItems.length;
+
+        const localize = key => game.i18n.localize(`XJZL.CompendiumBrowser.${key}`);
 
         return {
             isLoaded: this.isLoaded,
             tabs: XJZLCompendiumBrowser.TABS,
             activeTab: activeTab,
-            items: displayItems,
-            totalCount: filteredItems.length,
-            displayCount: displayItems.length,
-            isClipped: filteredItems.length > displayLimit,
-            searchQuery: this.browserState.searchQuery,
+            cardListHtml: cardListHtml,
+            totalCount: totalCount,
+            hasMore: visibleCount < sortedItems.length && visibleCount < MAX_RENDER,
+            reachedMax: visibleCount >= MAX_RENDER && visibleCount < sortedItems.length,
+            statsFound: game.i18n.format("XJZL.CompendiumBrowser.Stats.Found", { count: totalCount }),
+            statsShown: game.i18n.format("XJZL.CompendiumBrowser.Stats.Shown", { shown: displayItems.length }),
+            endedText: game.i18n.format("XJZL.CompendiumBrowser.Stats.Ended", { count: totalCount }),
+            limitText: game.i18n.format("XJZL.CompendiumBrowser.Stats.LimitReached", { limit: MAX_RENDER }),
+            sortLabel: localize("Sort.Label"),
+            sortName: localize("Sort.Name"),
+            sortQuality: localize("Sort.QualityDesc"),
+            sortTier: localize("Sort.TierDesc"),
+            viewLabel: localize("View.Label"),
+            viewCompact: localize("View.Compact"),
+            viewGrid: localize("View.Grid"),
+            loadMoreText: localize("Stats.LoadMore"),
+            loadingText: localize("State.Loading"),
+            sortBy: this.browserState.sortBy,
+            viewMode: this.browserState.viewMode,
+            searchQuery: state.searchQuery,
             filterList: filterList
+        };
+    }
+
+    /**
+     * 构建某 Tab 的筛选组 UI 数据，并为每个选项计算命中计数。
+     * 计数 = 在当前搜索 + 其他筛选组生效的前提下，本组取该值时命中的条数；
+     * 自身组内已选选项不计入互斥（让用户在组内点选时仍能看到其余取值的余量）。
+     * 性能：每组只跑一次过滤得基准集，再单次遍历统计各取值计数 O(组数×N)，
+     * 而非每个选项都跑一次完整过滤 O(组数×选项数×N)。
+     */
+    _buildFilterGroups(tab, state, rawItems) {
+        const configs = this.filterConfig[tab] || [];
+        const { searchQuery, filters } = state;
+        const activeEntries = Object.entries(filters).filter(([_, set]) => set?.size > 0);
+        // 武学的 element/damageType/weaponType 落在 moves 数组内，须与 _filterItems 特殊分支保持一致
+        const movesKeys = new Set(["element", "damageType", "weaponType"]);
+
+        return configs.map(config => {
+            // 计数基准：当前搜索 + 其他筛选组（排除本组已选）
+            const baseFilters = {};
+            for (const [key, set] of activeEntries) {
+                if (key !== config.key) baseFilters[key] = set;
+            }
+            const baseItems = this._filterItems(rawItems, baseFilters, searchQuery);
+
+            // 单次遍历统计本组各取值命中数
+            const counts = new Map();
+            const isMovesKey = movesKeys.has(config.key);
+            for (const item of baseItems) {
+                if (isMovesKey && item.type === "wuxue") {
+                    const moves = item.system?.moves;
+                    if (!Array.isArray(moves)) continue;
+                    // 一招符合即算命中；同物品内多招同值只计一次
+                    const seen = new Set();
+                    for (const m of moves) {
+                        const v = m?.[config.key];
+                        if (v != null) seen.add(v.toString());
+                    }
+                    for (const v of seen) counts.set(v, (counts.get(v) || 0) + 1);
+                } else {
+                    const v = item.system?.[config.key];
+                    if (v == null) continue;
+                    const vs = v.toString();
+                    counts.set(vs, (counts.get(vs) || 0) + 1);
+                }
+            }
+
+            return {
+                ...config,
+                isOpen: config.key !== "subSect", // 只要不是 subSect，就默认展开
+                options: Object.entries(config.options).map(([val, labelKey]) => {
+                    const checked = filters[config.key]?.has(val.toString()) ?? false;
+                    const count = counts.get(val.toString()) || 0;
+                    return {
+                        val: val,
+                        label: game.i18n.localize(labelKey),
+                        checked: checked,
+                        count: count,
+                        isZero: count === 0
+                    };
+                })
+            };
+        });
+    }
+
+    /* -------------------------------------------- */
+    /*  排序与卡片数据                              */
+    /* -------------------------------------------- */
+
+    /**
+     * 按排序偏好排序。默认名称升序即加载时的既有顺序，直接返回原引用；
+     * 需要排序的档位复制数组排序（JS 稳定排序，同档内保持名称序），不污染缓存。
+     */
+    _sortItems(items) {
+        const sortBy = this.browserState.sortBy;
+        if (sortBy === "quality-desc" || sortBy === "tier-desc") {
+            const primaryTier = sortBy === "tier-desc";
+            const key = item => {
+                const sys = item.system ?? {};
+                const quality = Number.isFinite(Number(sys.quality)) ? Number(sys.quality) : 0;
+                const martial = item.type === "wuxue" || item.type === "neigong";
+                const tier = martial && Number.isFinite(Number(sys.tier)) ? Number(sys.tier) : 0;
+                return primaryTier ? [tier, quality] : [quality, tier];
+            };
+            return [...items].sort((a, b) => {
+                const ka = key(a), kb = key(b);
+                return kb[0] - ka[0] || kb[1] - ka[1];
+            });
+        }
+        return items;
+    }
+
+    /** 取 CONFIG 映射中的本地化标签；无映射时回退原值（不崩、不显示空）。 */
+    _localizeKey(map, key) {
+        if (!key) return "";
+        const label = map?.[key] ? game.i18n.localize(map[key]) : key;
+        return label || "";
+    }
+
+    /**
+     * 从索引条目构建卡片展示数据（次要信息行 + grid 徽标 + tooltip 摘要）。
+     * 品阶/品质只用左边框颜色表达，不重复文字；价格对玩家无决策价值，不展示。
+     * 徽标与次要信息复用 CONFIG.XJZL 本地化映射，与筛选器同源，避免文案漂移；
+     * 武学/内功的属性集中在 moves 数组内，取第一招作为摘要来源。
+     */
+    _buildCardData(item) {
+        const C = CONFIG.XJZL;
+        const sys = item.system ?? {};
+        const badges = [];
+        const sub = [];
+        const tooltip = [];
+
+        const sectLabel = this._localizeKey(C.sects, sys.sect);
+        const firstMove = Array.isArray(sys.moves) ? sys.moves[0] : null;
+        const element = sys.element ?? firstMove?.element;
+        const elementLabel = element && element !== "none" ? this._localizeKey(C.elements, element) : "";
+
+        // 各类型的主信息：武学=门派·类别（属性）；装备=子类型；技艺/特效=分类
+        if (item.type === "wuxue" || item.type === "neigong") {
+            sub.push(sectLabel);
+            if (item.type === "wuxue") sub.push(this._localizeKey(C.wuxueCategories, sys.category));
+            else sub.push(elementLabel);
+
+            if (sectLabel) badges.push({ label: sectLabel, cls: "b-sect" });
+            if (item.type === "wuxue") {
+                const cat = this._localizeKey(C.wuxueCategories, sys.category);
+                if (cat) badges.push({ label: cat, cls: "b-cat" });
+                const dmg = firstMove?.damageType;
+                if (dmg && dmg !== "none") badges.push({ label: this._localizeKey(C.damageTypes, dmg), cls: "b-dmg" });
+                const wpn = sys.weaponType ?? firstMove?.weaponType;
+                if (wpn && wpn !== "none") badges.push({ label: this._localizeKey(C.weaponTypes, wpn), cls: "b-weap" });
+            } else if (elementLabel) {
+                badges.push({ label: elementLabel, cls: "b-element" });
+            }
+        } else if (item.type === "weapon") {
+            // 武器给子类型优先（种子数据为中文直填，如"弯刀"），无则回退武器类型
+            const typeLabel = sys.subtype || this._localizeKey(C.weaponTypes, sys.type);
+            if (typeLabel) { sub.push(typeLabel); badges.push({ label: typeLabel, cls: "b-weap" }); }
+        } else if (item.type === "armor") {
+            const typeLabel = this._localizeKey(C.armorTypes, sys.type);
+            if (typeLabel) { sub.push(typeLabel); badges.push({ label: typeLabel, cls: "b-armor" }); }
+        } else if (item.type === "consumable") {
+            const typeLabel = this._localizeKey(C.consumableTypes, sys.type);
+            if (typeLabel) { sub.push(typeLabel); badges.push({ label: typeLabel, cls: "b-consum" }); }
+        } else if (item.type === "art_book") {
+            const typeLabel = this._localizeKey(C.arts, sys.artType);
+            if (typeLabel) { sub.push(typeLabel); badges.push({ label: typeLabel, cls: "b-art" }); }
+        } else if (item.type === "trait") {
+            const typeLabel = this._localizeKey(C.traitTypes, sys.type);
+            if (typeLabel) { sub.push(typeLabel); badges.push({ label: typeLabel, cls: "b-trait" }); }
+        }
+        // misc / qizhen 无类型信息，保持单行 + 来源包名
+
+        // tooltip：只放颜色之外的信息（名称/门派/类别/属性/来源），不含品级与价格
+        tooltip.push(item.name, ...sub);
+        if (elementLabel && !sub.includes(elementLabel)) tooltip.push(elementLabel);
+        if (item.packLabel) tooltip.push(item.packLabel);
+
+        return {
+            ...item,
+            badges,
+            sub: sub.filter(Boolean).join(" · "),
+            tooltip: tooltip.filter(Boolean).join(" · ")
         };
     }
 
@@ -349,11 +785,11 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
     /**
      * 高性能内存过滤器
-     * 复杂度优化至 O(N * M)，利用预计算的 _searchName 加速
+     * 复杂度优化至 O(N * M)，利用预计算的 _searchName（组合搜索串）加速
      */
     _filterItems(items, filters = null, query = null) {
-        const activeFilters = filters || this.browserState.filters;
-        const activeQuery = (query !== null ? query : this.browserState.searchQuery).toLowerCase();
+        const activeFilters = filters || this._filters;
+        const activeQuery = (query !== null ? query : this._searchQuery).toLowerCase();
 
         // 预处理筛选器：将 Object 转换为数组，移除空 Set，避免循环内频繁 Object.entries
         const activeFilterEntries = Object.entries(activeFilters).filter(([_, v]) => v && v.size > 0);
@@ -402,7 +838,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
      */
     async randomize(options = {}) {
         const tab = options.tab || this.browserState.activeTab;
-        const filters = options.filters || this.browserState.filters;
+        // 未显式传入 filters 时，回退到指定 Tab 自己的已选筛集（维持 UI 对话框行为）
+        const filters = options.filters || this.browserState.tabs[tab]?.filters || {};
         const amount = options.amount || 1;
         const useWeight = options.weighted ?? true;
         const rawItems = this.cachedData[tab] || [];
@@ -483,48 +920,44 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         const isTier = ["wuxue", "neigong"].includes(activeTab);
 
-        // 动态生成权重 HTML
-        const buildInput = (l, n, v, c) => `
-            <div style="text-align:center;">
-                <label style="font-size:0.8em;color:${c};font-weight:bold;">${l}</label>
-                <input type="number" name="${n}" value="${v}" min="0" style="text-align:center;padding:2px;width:100%;">
-            </div>`;
+        const localize = key => game.i18n.localize(`XJZL.CompendiumBrowser.Random.${key}`);
 
-        let weightHtml;
-        if (isTier) {
-            weightHtml = `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;">
-                ${buildInput("人级", "w_1", 100, "#666")}
-                ${buildInput("地级", "w_2", 20, "#8d6e63")}
-                ${buildInput("天级", "w_3", 5, "#d4af37")}
-            </div>`;
-        } else {
-            weightHtml = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;">
-                ${buildInput("凡", "w_0", 100, "#666")}
-                ${buildInput("铜", "w_1", 60, "#8d6e63")}
-                ${buildInput("银", "w_2", 30, "#95a5a6")}
-                ${buildInput("金", "w_3", 10, "#d4af37")}
-                ${buildInput("玉", "w_4", 2, "#2ecc71")}
-            </div>`;
-        }
+        // 权重行数据驱动模板渲染；input name 保持 w_* 命名，callback 的取值逻辑不变
+        const weightList = isTier
+            ? [
+                { name: "w_1", label: localize("Tier1"), value: 100, color: "#666" },
+                { name: "w_2", label: localize("Tier2"), value: 20, color: "#8d6e63" },
+                { name: "w_3", label: localize("Tier3"), value: 5, color: "#d4af37" }
+            ]
+            : [
+                { name: "w_0", label: localize("Quality0"), value: 100, color: "#666" },
+                { name: "w_1", label: localize("Quality1"), value: 60, color: "#8d6e63" },
+                { name: "w_2", label: localize("Quality2"), value: 30, color: "#95a5a6" },
+                { name: "w_3", label: localize("Quality3"), value: 10, color: "#d4af37" },
+                { name: "w_4", label: localize("Quality4"), value: 2, color: "#2ecc71" }
+            ];
 
-        const content = `
-            <div class="form-group" style="display:flex;gap:10px;margin-bottom:10px;">
-                <label style="flex:1;">数量 <input type="number" name="amount" value="1" min="1" max="50"></label>
-                <label style="flex:2;">发送者 <input type="text" name="alias" value="江湖奇遇"></label>
-            </div>
-            <div style="margin-bottom:10px;"><label>标题 <input type="text" name="title" value="随机结果"></label></div>
-            <fieldset style="border:1px solid #ccc;padding:10px;border-radius:4px;">
-                <legend><i class="fas fa-balance-scale"></i> 权重配置</legend>
-                ${weightHtml}
-            </fieldset>
-            <p style="text-align:center;font-size:0.85em;color:#666;margin-top:10px;">将在 <strong>${currentPool.length}</strong> 个物品中抽取</p>
-        `;
+        const content = await renderTemplate(
+            "systems/xjzl-system/templates/apps/compendiumbrowser/random-dialog.hbs",
+            {
+                amount: 1,
+                alias: "江湖奇遇",
+                title: "随机结果",
+                amountLabel: localize("Amount"),
+                senderLabel: localize("Sender"),
+                titleLabel: localize("TitleField"),
+                weightLegend: localize("WeightTitle"),
+                poolLabel: game.i18n.format("XJZL.CompendiumBrowser.Random.Pool", { count: currentPool.length }),
+                isTier: isTier,
+                weights: weightList
+            }
+        );
 
         const result = await DialogV2.wait({
-            window: { title: "随机战利品", icon: "fas fa-dice-d20", resizable: false },
+            window: { title: localize("Title"), icon: "fas fa-dice-d20", resizable: false },
             content: content,
             buttons: [{
-                action: "ok", label: "抽取", icon: "fas fa-check",
+                action: "ok", label: localize("Draw"), icon: "fas fa-check",
                 callback: (event, button) => {
                     const form = button.form;
                     const w = {};

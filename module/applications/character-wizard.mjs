@@ -527,19 +527,15 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         const cb = game.xjzl?.compendiumBrowser;
         if (!cb) return ui.notifications.warn("江湖万卷阁尚未初始化！");
 
-        // 注入默认配置：锁定官方
-        cb.browserState.activeTab = type;
-        cb.browserState.filters = { isOfficial: new Set(["true"]) };
-
-        // 只有在挑选内功和武学时，才追加“门派”过滤条件
+        // 通过公开的 applyTabState 注入初始筛选：锁定官方，内功/武学追加门派过滤
+        const filters = { isOfficial: new Set(["true"]) };
         if (["neigong", "wuxue"].includes(type)) {
             const currentSect = this.wizardData.info.sect;
             if (currentSect && currentSect !== "none") {
-                cb.browserState.filters.sect = new Set([currentSect]);
+                filters.sect = new Set([currentSect]);
             }
         }
-
-        cb.browserState.searchQuery = "";
+        cb.applyTabState(type, filters);
         cb.render(true);
     }
 

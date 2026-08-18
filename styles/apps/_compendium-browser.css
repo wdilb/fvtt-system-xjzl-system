@@ -339,6 +339,291 @@
 }
 
 /* ==========================================================================
+   3.5 🧹 主窗口交互增强：统计条/排序/视图/增量加载/键盘/徽标/骨架屏
+   ========================================================================== */
+
+/* --- 统计条（原本无样式，此为其定义基础布局与排序/视图控件） --- */
+#xjzl-compendium-browser .xjzl-cb-stats-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 4px 6px 8px;
+    color: var(--xjzl-text-dim);
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+#xjzl-compendium-browser .xjzl-cb-stats-bar .stats-track {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#xjzl-compendium-browser .xjzl-cb-stats-bar .warning {
+    color: #d4a017;
+    margin-left: 6px;
+    font-size: 0.85em;
+}
+
+#xjzl-compendium-browser .xjzl-cb-stats-bar .stats-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+#xjzl-compendium-browser .sort-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--xjzl-text-dim);
+}
+
+#xjzl-compendium-browser .sort-control select {
+    background: var(--xjzl-bg-input);
+    color: var(--xjzl-text-main);
+    border: 1px solid var(--xjzl-border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 0.9em;
+}
+
+#xjzl-compendium-browser .view-toggle {
+    display: inline-flex;
+    gap: 2px;
+    border: 1px solid var(--xjzl-border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+#xjzl-compendium-browser .view-btn {
+    background: transparent;
+    border: none;
+    color: var(--xjzl-text-dim);
+    padding: 3px 8px;
+    cursor: pointer;
+    line-height: 1.2;
+}
+
+#xjzl-compendium-browser .view-btn:hover {
+    color: #ccc;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+#xjzl-compendium-browser .view-btn.active {
+    color: var(--xjzl-primary);
+    background: rgba(255, 100, 0, 0.14);
+}
+
+/* --- 卡片键盘焦点 --- */
+#xjzl-compendium-browser .xjzl-cb-card:focus-visible {
+    outline: 2px solid var(--xjzl-primary);
+    outline-offset: -2px;
+    background: #3e3e3e;
+    box-shadow: 0 0 0 2px rgba(255, 100, 0, 0.35);
+}
+
+/* --- 图鉴网格视图：大图 + 徽标 --- */
+#xjzl-compendium-browser .xjzl-cb-grid-wide {
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    align-items: stretch;
+}
+
+#xjzl-compendium-browser .xjzl-cb-card-grid {
+    height: auto;
+    min-height: 88px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 10px;
+}
+
+#xjzl-compendium-browser .xjzl-cb-card-grid img {
+    width: 64px;
+    height: 64px;
+    border-radius: 6px;
+    align-self: center;
+}
+
+#xjzl-compendium-browser .xjzl-cb-card-grid .xjzl-cb-card-info {
+    width: 100%;
+}
+
+#xjzl-compendium-browser .xjzl-cb-card-grid .name {
+    font-size: 1.05em;
+    margin-bottom: 3px;
+}
+
+#xjzl-compendium-browser .cb-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 2px;
+}
+
+#xjzl-compendium-browser .cb-badge {
+    font-size: 0.72em;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 8px;
+    background: #2a2a2a;
+    border: 1px solid var(--xjzl-border);
+    color: #bbb;
+    white-space: nowrap;
+}
+
+/* 品阶/品质不再用文字徽标（卡片左边框颜色已表达），此处无对应颜色规则 */
+
+/* 来源包名弱化（保留信息但降低视觉权重） */
+#xjzl-compendium-browser .xjzl-cb-card .source {
+    color: #666;
+    opacity: 0.8;
+}
+
+/* --- 骨架屏 / 加载中 --- */
+#xjzl-compendium-browser .xjzl-cb-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    height: 100%;
+    color: var(--xjzl-text-dim);
+    font-size: 1.1em;
+}
+
+/* --- 增量加载：哨兵按钮与底部完成/上限提示 --- */
+#xjzl-compendium-browser .xjzl-cb-sentinel {
+    grid-column: 1 / -1;
+    display: flex;
+    justify-content: center;
+    padding: 14px 0 4px;
+}
+
+#xjzl-compendium-browser .load-more-btn {
+    background: var(--xjzl-bg-input);
+    color: var(--xjzl-text-main);
+    border: 1px solid var(--xjzl-border);
+    border-radius: 16px;
+    padding: 6px 22px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+#xjzl-compendium-browser .load-more-btn:hover {
+    color: var(--xjzl-primary);
+    border-color: var(--xjzl-primary);
+    background: rgba(255, 100, 0, 0.08);
+}
+
+#xjzl-compendium-browser .xjzl-cb-ended {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--xjzl-text-dim);
+    font-size: 0.85em;
+    padding: 12px 0 4px;
+    opacity: 0.7;
+}
+
+#xjzl-compendium-browser .no-results {
+    grid-column: 1 / -1;
+    text-align: center;
+    color: var(--xjzl-text-dim);
+    padding: 40px 0;
+}
+
+/* --- 筛选选项命中计数 --- */
+#xjzl-compendium-browser .checkbox-label .cb-count {
+    font-size: 0.78em;
+    opacity: 0.75;
+    margin-left: 3px;
+}
+
+#xjzl-compendium-browser .checkbox-label .cb-count.is-zero {
+    opacity: 0.3;
+}
+
+/* ==========================================================================
+   3.6 🎲 随机抽取对话框
+   ========================================================================== */
+
+.xjzl-cb-random-dialog .rd-fields {
+    border: none;
+    padding: 0;
+    margin: 0 0 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.xjzl-cb-random-dialog .rd-fields .rd-row {
+    display: flex;
+    gap: 10px;
+}
+
+.xjzl-cb-random-dialog .rd-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #333;
+}
+
+.xjzl-cb-random-dialog .rd-field span {
+    flex-shrink: 0;
+}
+
+.xjzl-cb-random-dialog .rd-field input {
+    flex: 1;
+    min-width: 0;
+}
+
+.xjzl-cb-random-dialog .rd-weights {
+    border: 1px solid #ccc;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 0;
+}
+
+.xjzl-cb-random-dialog .rd-weights legend {
+    padding: 0 6px;
+}
+
+.xjzl-cb-random-dialog .rd-weight-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+}
+
+/* 武学/内功只有三档品阶权重 */
+.xjzl-cb-random-dialog .rd-weight-grid.rd-weight-grid-tier {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.xjzl-cb-random-dialog .rd-weight-grid .rd-weight-input {
+    text-align: center;
+}
+
+.xjzl-cb-random-dialog .rd-weight-label {
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.xjzl-cb-random-dialog .rd-weight-input input {
+    text-align: center;
+    padding: 2px;
+    width: 100%;
+}
+
+.xjzl-cb-random-dialog .rd-pool {
+    text-align: center;
+    font-size: 0.85em;
+    color: #666;
+    margin-top: 10px;
+}
+
+/* ==========================================================================
    4. ✦ 抽取演出：墨卷启封
    ========================================================================== */
 
