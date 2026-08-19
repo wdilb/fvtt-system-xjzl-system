@@ -9,7 +9,7 @@
 >
 > 这是一个专为 **Foundry VTT V13** 开发的武侠跑团系统，基于《侠界之旅》规则集构建。
 
-> [![QQ Group](https://img.shields.io/badge/侠界交流群-753714737-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
+> [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
 > [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
 > <img width="3382" height="1690" alt="image" src="https://github.com/user-attachments/assets/26f7149a-79f9-4fa4-8cdf-c939ced99f25" />
 > <img width="1722" height="1122" alt="image" src="https://github.com/user-attachments/assets/5743f73e-65c7-4f61-8d84-54c7387a26c7" />
@@ -206,7 +206,7 @@ await Macros.requestSave({
     *   **一气长虹**: 提供了核心数据类型设计、计算逻辑参考以及无私的规则指导。
     *   **安迪亚**: 提供了宝贵的界面设计建议与测试反馈。
 *   **联系交流**:
-*   [![QQ Group](https://img.shields.io/badge/侠界交流群-753714737-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
+*   [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
 *   [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
 ---
 
