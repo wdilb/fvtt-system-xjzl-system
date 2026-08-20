@@ -44,7 +44,7 @@ export class XJZLContainerData extends foundry.abstract.TypeDataModel {
         return {
             description: new HTMLField({ required: false, blank: true }),
 
-            // 模式决定玩家工作台的业务动作；节点状态决定是否允许新的业务请求。
+            // 模式决定玩家工作台的业务动作；depleted 表示一次性节点暂时清空，补货后会恢复 active。
             mode: new StringField({ required: true, initial: "loot", choices: CONTAINER_MODES }),
             status: new StringField({ required: true, initial: "active", choices: CONTAINER_STATUSES }),
 

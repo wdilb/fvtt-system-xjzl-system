@@ -1,0 +1,111 @@
+<div class="loot-workbench">
+    <header class="loot-header">
+        <img class="loot-header-image" src="{{actorImg}}" data-action="editImage" alt="{{actorName}}">
+        <div class="loot-heading">
+            <div class="loot-kicker">{{localize "XJZL.Container.NodeTitle"}}</div>
+            <h1>{{actorName}}</h1>
+            <div class="loot-meta">
+                <span class="loot-mode">{{modeLabel}}</span>
+                <span class="loot-status">{{statusLabel}}</span>
+                <span>{{visibleItemCount}} {{localize "XJZL.Container.ItemCount"}}</span>
+            </div>
+        </div>
+        <div class="loot-currency" aria-label="{{localize "XJZL.Container.Currency"}}">
+            <span class="loot-currency-label">{{localize "XJZL.Container.Currency"}}</span>
+            <strong>{{system.currency}}</strong>
+            {{#if isGM}}
+            <button type="button" class="icon-button currency-edit-button" data-action="editCurrency" title="{{localize "XJZL.Container.EditCurrency"}}">
+                <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+            {{/if}}
+        </div>
+    </header>
+
+    <section class="loot-controls" aria-label="{{localize "XJZL.Container.Controls"}}">
+        <label class="participant-field">
+            <span>{{localize "XJZL.Container.Participant"}}</span>
+            <select class="participant-select" {{#unless participants.length}}disabled{{/unless}}>
+                {{#each participants as |participant|}}
+                <option value="{{participant.uuid}}" {{#if (eq participant.uuid ../selectedActor.uuid)}}selected{{/if}}>{{participant.name}}</option>
+                {{else}}
+                <option value="">{{localize "XJZL.Container.NoParticipant"}}</option>
+                {{/each}}
+            </select>
+        </label>
+        <label class="loot-search">
+            <span class="visually-hidden">{{localize "XJZL.Container.Search"}}</span>
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input class="container-search-input" type="search" placeholder="{{localize "XJZL.Container.Search"}}">
+        </label>
+    </section>
+
+    {{#unless isLootMode}}
+    <div class="loot-mode-note">
+        <i class="fas fa-compass-drafting" aria-hidden="true"></i>
+        <span>{{localize "XJZL.Container.ModeUnavailable"}}</span>
+    </div>
+    {{/unless}}
+
+    <main class="loot-scroll">
+        {{#if hasVisibleItems}}
+        {{#each inventory as |section|}}
+        <section class="loot-section">
+            <div class="loot-section-heading">
+                <span>{{localize section.label}}</span>
+                <span class="loot-section-count">{{section.items.length}}</span>
+            </div>
+            <div class="loot-item-list">
+                {{#each section.items as |item|}}
+                <article class="loot-item-row" data-item-id="{{item.id}}">
+                    <img src="{{item.img}}" class="loot-item-image" alt="{{item.name}}">
+                    <div class="loot-item-copy">
+                        <div class="loot-item-name">{{item.name}}</div>
+                        <div class="loot-item-subline">
+                            {{#if item.isStackable}}{{localize "XJZL.Container.Quantity"}}：{{item.quantity}}{{/if}}
+                            {{#if item.hidden}}<span class="loot-hidden-badge"><i class="fas fa-eye-slash"></i>{{localize "XJZL.Container.Hidden"}}</span>{{/if}}
+                        </div>
+                    </div>
+                    <div class="loot-item-actions">
+                        {{#if ../../isGM}}
+                        <button type="button" class="icon-button" data-action="toggleHidden" data-item-id="{{item.id}}" title="{{#if item.hidden}}{{localize "XJZL.Container.Show"}}{{else}}{{localize "XJZL.Container.Hide"}}{{/if}}">
+                            <i class="fas {{#if item.hidden}}fa-eye{{else}}fa-eye-slash{{/if}}" aria-hidden="true"></i>
+                        </button>
+                        {{#if item.isStackable}}
+                        <button type="button" class="icon-button" data-action="editQuantity" data-item-id="{{item.id}}" title="{{localize "XJZL.Container.EditQuantity"}}">
+                            <i class="fas fa-hashtag" aria-hidden="true"></i>
+                        </button>
+                        {{/if}}
+                        <button type="button" class="icon-button danger-button" data-action="deleteItem" data-item-id="{{item.id}}" title="{{localize "XJZL.Container.DeleteItem"}}">
+                            <i class="fas fa-trash" aria-hidden="true"></i>
+                        </button>
+                        {{/if}}
+                        {{#if ../../canLoot}}
+                        <button type="button" class="text-button" data-action="lootItem" data-item-id="{{item.id}}">{{localize "XJZL.Container.Take"}}</button>
+                        {{/if}}
+                    </div>
+                </article>
+                {{/each}}
+            </div>
+        </section>
+        {{/each}}
+        {{else}}
+        <div class="loot-empty">
+            <i class="fas fa-box-open" aria-hidden="true"></i>
+            <p>{{localize "XJZL.Container.Empty"}}</p>
+        </div>
+        {{/if}}
+    </main>
+
+    <footer class="loot-footer">
+        {{#if canTakeCurrency}}
+        <button type="button" class="currency-button" data-action="currencyAction">
+            <i class="fas fa-coins" aria-hidden="true"></i>{{localize "XJZL.Container.TakeCurrency"}}
+        </button>
+        {{/if}}
+        {{#if canLootAll}}
+        <button type="button" class="primary-button" data-action="lootAll" {{#unless hasLootableContent}}disabled{{/unless}}>
+            <i class="fas fa-hand-sparkles" aria-hidden="true"></i>{{localize "XJZL.Container.TakeAll"}}
+        </button>
+        {{/if}}
+    </footer>
+</div>

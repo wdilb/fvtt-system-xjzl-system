@@ -6,6 +6,7 @@
 const locks = new Map();
 const completedOperations = new Map();
 const MAX_COMPLETED_OPERATIONS = 256;
+const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
 
 export class XJZLContainerTransactionError extends Error {
     constructor(code, message, details = {}) {
@@ -50,8 +51,18 @@ export class XJZLContainerTransactionManager {
             switch (normalized.action) {
                 case "inspect":
                     return this.#inspect(lockedNode, normalized.userId);
-                case "currencyTransfer":
-                    return this.#transferCurrency(lockedNode, lockedParticipant, normalized);
+                case "currencyTransfer": {
+                    const result = await this.#transferCurrency(lockedNode, lockedParticipant, normalized);
+                    await this.#updateNodeStatus(lockedNode, normalized.direction);
+                    return result;
+                }
+                case "lootItem": {
+                    const mutation = await this.#lootItem(lockedNode, lockedParticipant, normalized);
+                    await this.#updateNodeStatus(lockedNode, "take");
+                    return mutation.result;
+                }
+                case "lootAll":
+                    return this.#lootAll(lockedNode, lockedParticipant, normalized);
                 default:
                     throw new XJZLContainerTransactionError(
                         "UNSUPPORTED_ACTION",
@@ -92,8 +103,10 @@ export class XJZLContainerTransactionManager {
             userId,
             containerUuid: String(request.containerUuid || ""),
             actorUuid: request.actorUuid ? String(request.actorUuid) : null,
+            itemId: request.itemId ? String(request.itemId) : null,
             direction: request.direction ? String(request.direction) : null,
-            amount: request.amount == null ? null : Number(request.amount)
+            amount: request.amount == null ? null : Number(request.amount),
+            quantity: request.quantity == null ? null : Number(request.quantity)
         };
     }
 
@@ -126,9 +139,14 @@ export class XJZLContainerTransactionManager {
         }
 
         const settings = node.system.settings;
+        if (["lootItem", "lootAll"].includes(action) && node.system.mode !== "loot") {
+            throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以执行拾取操作。");
+        }
         const allowed = {
             inspect: true,
-            currencyTransfer: Boolean(settings.allowTake || settings.allowDeposit || settings.allowWithdraw)
+            currencyTransfer: Boolean(settings.allowTake || settings.allowDeposit || settings.allowWithdraw),
+            lootItem: Boolean(settings.allowTake),
+            lootAll: Boolean(settings.allowTakeAll)
         }[action];
         if (!allowed) {
             throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "这个物资节点不允许当前操作。");
@@ -163,7 +181,216 @@ export class XJZLContainerTransactionManager {
         };
     }
 
-    static async #transferCurrency(node, participant, request) {
+    static async #lootItem(node, participant, request) {
+        if (!participant) {
+            throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "拾取物品需要指定接收角色。");
+        }
+        if (!request.itemId) {
+            throw new XJZLContainerTransactionError("INVALID_ITEM", "缺少要拾取的物品。");
+        }
+
+        const sourceItem = node.items.get(request.itemId);
+        if (!sourceItem) {
+            throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个物品已经被其他人取走了。");
+        }
+        const user = game.users.get(request.userId);
+        if (!user?.isGM && sourceItem.getFlag("xjzl-system", "containerHidden")) {
+            throw new XJZLContainerTransactionError("ITEM_HIDDEN", "这个物品当前不可领取。");
+        }
+
+        const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
+        const sourceQuantity = stackable
+            ? Math.max(1, Number(sourceItem.system.quantity) || 1)
+            : 1;
+        const quantity = request.quantity == null ? 1 : request.quantity;
+        if (!Number.isInteger(quantity) || quantity <= 0 || quantity > sourceQuantity) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "拾取数量超出当前库存。");
+        }
+        if (!stackable && quantity !== 1) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "这个物品不能按数量拆分拾取。");
+        }
+
+        const sourceData = foundry.utils.deepClone(sourceItem.toObject());
+        const stackKey = stackable ? this.#getStackKey(sourceItem) : null;
+        const destinationItem = stackKey
+            ? Array.from(participant.items).find(item => this.#getStackKey(item) === stackKey)
+            : null;
+        const destinationQuantity = destinationItem
+            ? Math.max(1, Number(destinationItem.system.quantity) || 1)
+            : null;
+        let createdItem = null;
+        let sourceRemoved = false;
+
+        try {
+            if (destinationItem) {
+                await destinationItem.update({ "system.quantity": destinationQuantity + quantity });
+            } else {
+                const itemData = foundry.utils.deepClone(sourceData);
+                // 隐藏仅属于节点展示元数据，领取后不能污染角色物品或阻断后续堆叠。
+                itemData.flags?.["xjzl-system"] && delete itemData.flags["xjzl-system"].containerHidden;
+                if (stackable) itemData.system.quantity = quantity;
+                const created = await participant.createEmbeddedDocuments("Item", [itemData]);
+                createdItem = created?.[0] || null;
+                if (!createdItem) throw new Error("未能创建接收物品。");
+            }
+
+            const remaining = stackable ? sourceQuantity - quantity : 0;
+            if (remaining > 0) {
+                await sourceItem.update({ "system.quantity": remaining });
+            } else {
+                await node.deleteEmbeddedDocuments("Item", [sourceItem.id]);
+                sourceRemoved = true;
+            }
+        } catch (err) {
+            await this.#rollbackLootItem({
+                node,
+                participant,
+                sourceItem,
+                sourceData,
+                sourceRemoved,
+                destinationItem,
+                destinationQuantity,
+                createdItem,
+                sourceQuantity
+            });
+            throw err;
+        }
+
+        return {
+            result: {
+                action: "lootItem",
+                containerUuid: node.uuid,
+                actorUuid: participant.uuid,
+                itemId: sourceItem.id,
+                itemName: sourceItem.name,
+                quantity,
+                remaining: stackable ? sourceQuantity - quantity : 0
+            },
+            undo: async () => this.#rollbackLootItem({
+                node,
+                participant,
+                sourceItem,
+                sourceData,
+                sourceRemoved,
+                destinationItem,
+                destinationQuantity,
+                createdItem,
+                sourceQuantity
+            })
+        };
+    }
+
+    static async #lootAll(node, participant, request) {
+        if (!participant) {
+            throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "全部拾取需要指定接收角色。");
+        }
+
+        const mutations = [];
+        const results = [];
+        try {
+            const items = Array.from(node.items).filter(item => {
+                const hidden = item.getFlag("xjzl-system", "containerHidden");
+                return game.users.get(request.userId)?.isGM || !hidden;
+            });
+            for (const item of items) {
+                const mutation = await this.#lootItem(node, participant, {
+                    ...request,
+                    action: "lootItem",
+                    itemId: item.id,
+                    quantity: STACKABLE_ITEM_TYPES.has(item.type)
+                        ? Math.max(1, Number(item.system.quantity) || 1)
+                        : 1
+                });
+                mutations.push(mutation);
+                results.push(mutation.result);
+            }
+
+            if (node.system.currency > 0) {
+                const currencyMutation = await this.#transferCurrency(node, participant, {
+                    ...request,
+                    action: "currencyTransfer",
+                    direction: "take",
+                    amount: node.system.currency
+                }, { returnUndo: true });
+                mutations.push(currencyMutation);
+                results.push(currencyMutation.result);
+            }
+
+            if (results.length === 0) {
+                throw new XJZLContainerTransactionError("NOTHING_TO_LOOT", "这个战利品节点已经没有可领取内容。");
+            }
+
+            await this.#updateNodeStatus(node, "take");
+            return {
+                action: "lootAll",
+                containerUuid: node.uuid,
+                actorUuid: participant.uuid,
+                results,
+                empty: node.system.isEmpty
+            };
+        } catch (err) {
+            for (const mutation of mutations.reverse()) {
+                try {
+                    await mutation.undo();
+                } catch (rollbackError) {
+                    console.error("XJZL | 全部拾取回滚失败:", {
+                        containerUuid: node.uuid,
+                        actorUuid: participant.uuid,
+                        rollbackError
+                    });
+                }
+            }
+            throw err;
+        }
+    }
+
+    static #getStackKey(item) {
+        if (!STACKABLE_ITEM_TYPES.has(item.type)) return null;
+        // 当前物品没有稳定的模板 ID；同类型同名作为堆叠身份，来源 flag 不应制造重复堆。
+        return `${item.type}|${String(item.name || "").trim()}`;
+    }
+
+    /** 根据库存变化维护一次性节点状态；补充任意库存会重新开放节点。 */
+    static async #updateNodeStatus(node, direction) {
+        try {
+            if (node.system.mode !== "loot") return;
+            if (direction === "deposit") {
+                if (node.system.status === "depleted") await node.update({ "system.status": "active" });
+                return;
+            }
+            if (node.system.isEmpty && node.system.status === "active") {
+                await node.update({ "system.status": "depleted" });
+            }
+        } catch (err) {
+            // 状态同步失败不能否定已经完成的库存事务，记录后由下一次打开节点时修正。
+            console.error("XJZL | 物资节点状态同步失败:", { containerUuid: node.uuid, direction, err });
+        }
+    }
+
+    static async #rollbackLootItem({
+        node,
+        participant,
+        sourceItem,
+        sourceData,
+        sourceRemoved,
+        destinationItem,
+        destinationQuantity,
+        createdItem
+    }) {
+        if (createdItem) {
+            await participant.deleteEmbeddedDocuments("Item", [createdItem.id]);
+        } else if (destinationItem && destinationQuantity != null) {
+            await destinationItem.update({ "system.quantity": destinationQuantity });
+        }
+
+        if (sourceRemoved || !node.items.get(sourceItem.id)) {
+            await node.createEmbeddedDocuments("Item", [sourceData]);
+        } else {
+            await sourceItem.update({ "system.quantity": sourceData.system.quantity });
+        }
+    }
+
+    static async #transferCurrency(node, participant, request, { returnUndo = false } = {}) {
         if (!participant) {
             throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "货币操作需要指定角色。");
         }
@@ -244,7 +471,7 @@ export class XJZLContainerTransactionManager {
             }
         }
 
-        return {
+        const result = {
             action: "currencyTransfer",
             direction: request.direction,
             amount: request.amount,
@@ -252,6 +479,36 @@ export class XJZLContainerTransactionManager {
             actorUuid: participant.uuid,
             nodeCurrency: nextNodeSilver,
             actorCurrency: nextActorSilver
+        };
+        if (!returnUndo) return result;
+
+        return {
+            result,
+            undo: async () => {
+                try {
+                    if (isTake) {
+                        await participant.changeResources({ "system.resources.silver": actorSilver }, {
+                            cause: "containerCurrencyRollback",
+                            containerUuid: node.uuid
+                        });
+                        await node.update({ "system.currency": nodeSilver });
+                    } else {
+                        await node.update({ "system.currency": nodeSilver });
+                        await participant.changeResources({ "system.resources.silver": actorSilver }, {
+                            cause: "containerCurrencyRollback",
+                            containerUuid: node.uuid
+                        });
+                    }
+                } catch (rollbackError) {
+                    console.error("XJZL | 物资节点全部拾取的银两回滚失败:", {
+                        containerUuid: node.uuid,
+                        actorUuid: participant.uuid,
+                        amount: request.amount,
+                        rollbackError
+                    });
+                    throw rollbackError;
+                }
+            }
         };
     }
 

@@ -31,7 +31,7 @@ import { XJZLEncounterData } from "./module/data/item/encounter.mjs";
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
 import { XJZLCreatureSheet } from "./module/sheets/creature-sheet.mjs";
-import { XJZLContainerSheet } from "./module/sheets/container-sheet.mjs";
+import { XJZLLootWorkbenchSheet as XJZLContainerSheet } from "./module/sheets/loot-workbench-sheet.mjs";
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
@@ -1853,7 +1853,7 @@ async function preloadHandlebarsTemplates() {
     "systems/xjzl-system/templates/actor/character/manage-xp.hbs",
     // NPC Sheets (未来添加)
     // "systems/xjzl-system/templates/actor/npc/header.hbs",
-    "systems/xjzl-system/templates/actor/container/sheet.hbs",
+    "systems/xjzl-system/templates/actor/container/loot-workbench.hbs",
 
     // 内功
     "systems/xjzl-system/templates/item/neigong/header.hbs",
