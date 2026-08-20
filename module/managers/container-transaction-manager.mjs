@@ -69,6 +69,14 @@ export class XJZLContainerTransactionManager {
                     const mutation = await this.#depositItem(lockedNode, lockedParticipant, normalized);
                     return mutation.result;
                 }
+                case "shopBuyItem": {
+                    const mutation = await this.#shopBuyItem(lockedNode, lockedParticipant, normalized);
+                    return mutation.result;
+                }
+                case "shopSellItem": {
+                    const mutation = await this.#shopSellItem(lockedNode, lockedParticipant, normalized);
+                    return mutation.result;
+                }
                 case "claimXp": {
                     const result = await this.#claimXp(lockedNode, lockedParticipant, normalized);
                     await this.#updateNodeStatus(lockedNode, "take");
@@ -120,7 +128,8 @@ export class XJZLContainerTransactionManager {
             rewardId: request.rewardId ? String(request.rewardId) : null,
             direction: request.direction ? String(request.direction) : null,
             amount: request.amount == null ? null : Number(request.amount),
-            quantity: request.quantity == null ? null : Number(request.quantity)
+            quantity: request.quantity == null ? null : Number(request.quantity),
+            sellDiscount: request.sellDiscount == null ? null : Number(request.sellDiscount)
         };
     }
 
@@ -180,6 +189,13 @@ export class XJZLContainerTransactionManager {
             }
             if (!permissionDocument.testUserPermission(user, "OWNER")) {
                 throw new XJZLContainerTransactionError("NO_STORAGE_PERMISSION", "你必须拥有这个仓库才能存取物品。");
+            }
+            return;
+        }
+
+        if (["shopBuyItem", "shopSellItem"].includes(action)) {
+            if (node.system.mode !== "shop") {
+                throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有商铺节点可以执行商铺交易。");
             }
             return;
         }
@@ -419,6 +435,174 @@ export class XJZLContainerTransactionManager {
                 destinationQuantity,
                 createdItem
             })
+        };
+    }
+
+    /** 玩家从商铺购买库存物品；无限库存只保留商铺样品，不扣减样品数量。 */
+    static async #shopBuyItem(node, participant, request) {
+        if (!participant) throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "购买物品需要指定角色。");
+        const sourceItem = node.items.get(request.itemId);
+        if (!sourceItem) throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个商品已经下架了。");
+        const quantity = request.quantity == null ? 1 : request.quantity;
+        const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
+        const stockQuantity = stackable ? Math.max(1, Number(sourceItem.system.quantity) || 1) : 1;
+        if (!Number.isInteger(quantity) || quantity <= 0 || (!node.system.settings.infiniteStock && quantity > stockQuantity)) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "购买数量超出当前库存。");
+        }
+        if (!stackable && quantity !== 1) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "这个商品不能按数量购买。");
+        }
+
+        const price = this.#getShopBuyPrice(node, sourceItem);
+        const total = price * quantity;
+        const actorSilver = Number(participant.system.resources?.silver) || 0;
+        if (actorSilver < total) {
+            throw new XJZLContainerTransactionError("INSUFFICIENT_ACTOR_CURRENCY", "角色身上的银两不足。");
+        }
+
+        const mutation = await this.#addItemToActor(participant, sourceItem, quantity);
+        const originalNodeCurrency = Number(node.system.currency) || 0;
+        const sourceData = foundry.utils.deepClone(sourceItem.toObject());
+        try {
+            await participant.changeResources({ "system.resources.silver": actorSilver - total }, {
+                cause: "containerShopPurchase",
+                containerUuid: node.uuid
+            });
+            await node.update({ "system.currency": originalNodeCurrency + total });
+            if (!node.system.settings.infiniteStock) {
+                const remaining = stockQuantity - quantity;
+                if (remaining > 0) await sourceItem.update({ "system.quantity": remaining });
+                else await node.deleteEmbeddedDocuments("Item", [sourceItem.id]);
+            }
+        } catch (err) {
+            try {
+                await mutation.undo();
+                if (!node.system.settings.infiniteStock) {
+                    const currentSource = node.items.get(sourceItem.id);
+                    if (!currentSource) await node.createEmbeddedDocuments("Item", [sourceData]);
+                    else if (stackable) await currentSource.update({ "system.quantity": sourceData.system.quantity });
+                }
+                await participant.changeResources({ "system.resources.silver": actorSilver }, {
+                    cause: "containerShopPurchaseRollback",
+                    containerUuid: node.uuid
+                });
+                await node.update({ "system.currency": originalNodeCurrency });
+            } catch (rollbackError) {
+                console.error("XJZL | 商铺购买回滚失败:", { containerUuid: node.uuid, actorUuid: participant.uuid, rollbackError });
+            }
+            throw err;
+        }
+        return {
+            result: {
+                action: "shopBuyItem",
+                containerUuid: node.uuid,
+                actorUuid: participant.uuid,
+                itemId: sourceItem.id,
+                itemName: sourceItem.name,
+                quantity,
+                unitPrice: price,
+                total
+            },
+            undo: async () => mutation.undo()
+        };
+    }
+
+    /** 玩家向商铺出售物品；折扣由玩家在交易时输入，商铺不自动回购进库存。 */
+    static async #shopSellItem(node, participant, request) {
+        if (!participant) throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "出售物品需要指定角色。");
+        const sourceItem = participant.items.get(request.itemId);
+        if (!sourceItem) throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个角色身上已经没有该物品了。");
+        const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
+        const sourceQuantity = stackable ? Math.max(1, Number(sourceItem.system.quantity) || 1) : 1;
+        const quantity = request.quantity == null ? 1 : request.quantity;
+        if (!Number.isInteger(quantity) || quantity <= 0 || quantity > sourceQuantity) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "出售数量超出当前库存。");
+        }
+        if (!stackable && quantity !== 1) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "这个物品不能按数量拆分出售。");
+        }
+        const discount = Number(request.sellDiscount);
+        if (!Number.isFinite(discount) || discount < 0) {
+            throw new XJZLContainerTransactionError("INVALID_DISCOUNT", "收购折扣必须是非负数字。");
+        }
+        const unitPrice = Math.max(0, Number(sourceItem.system.price) || 0);
+        const total = Math.floor(unitPrice * quantity * discount);
+        const wallet = Number(node.system.currency) || 0;
+        if (!node.system.settings.infiniteWallet && wallet < total) {
+            throw new XJZLContainerTransactionError("INSUFFICIENT_SHOP_WALLET", "商铺钱箱中的银两不足。");
+        }
+        const sourceData = foundry.utils.deepClone(sourceItem.toObject());
+        const originalSilver = Number(participant.system.resources?.silver) || 0;
+        try {
+            if (sourceQuantity - quantity > 0) await sourceItem.update({ "system.quantity": sourceQuantity - quantity });
+            else await participant.deleteEmbeddedDocuments("Item", [sourceItem.id]);
+            await participant.changeResources({ "system.resources.silver": originalSilver + total }, {
+                cause: "containerShopSale",
+                containerUuid: node.uuid
+            });
+            if (!node.system.settings.infiniteWallet) await node.update({ "system.currency": wallet - total });
+        } catch (err) {
+            try {
+                if (participant.items.get(sourceItem.id)) await sourceItem.update({ "system.quantity": sourceData.system.quantity });
+                else await participant.createEmbeddedDocuments("Item", [sourceData]);
+                await participant.changeResources({ "system.resources.silver": originalSilver }, {
+                    cause: "containerShopSaleRollback",
+                    containerUuid: node.uuid
+                });
+                if (!node.system.settings.infiniteWallet) await node.update({ "system.currency": wallet });
+            } catch (rollbackError) {
+                console.error("XJZL | 商铺出售回滚失败:", { containerUuid: node.uuid, actorUuid: participant.uuid, rollbackError });
+            }
+            throw err;
+        }
+        return {
+            result: {
+                action: "shopSellItem",
+                containerUuid: node.uuid,
+                actorUuid: participant.uuid,
+                itemId: sourceItem.id,
+                itemName: sourceItem.name,
+                quantity,
+                unitPrice,
+                discount,
+                total
+            }
+        };
+    }
+
+    static #getShopBuyPrice(node, item) {
+        const shopData = item.getFlag("xjzl-system", "shop") || {};
+        if (Number.isInteger(Number(shopData.buyPrice)) && Number(shopData.buyPrice) >= 0) return Number(shopData.buyPrice);
+        const discount = Number.isFinite(Number(shopData.buyDiscount))
+            ? Math.max(0, Number(shopData.buyDiscount))
+            : Math.max(0, Number(node.system.settings.buyDiscount) || 0);
+        return Math.floor(Math.max(0, Number(item.system.price) || 0) * discount);
+    }
+
+    static async #addItemToActor(actor, sourceItem, quantity) {
+        const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
+        const stackKey = stackable ? this.#getStackKey(sourceItem) : null;
+        const destinationItem = stackKey
+            ? Array.from(actor.items).find(item => this.#getStackKey(item) === stackKey)
+            : null;
+        const destinationQuantity = destinationItem
+            ? Math.max(1, Number(destinationItem.system.quantity) || 1)
+            : null;
+        let createdItem = null;
+        if (destinationItem) await destinationItem.update({ "system.quantity": destinationQuantity + quantity });
+        else {
+            const itemData = foundry.utils.deepClone(sourceItem.toObject());
+            itemData.flags?.["xjzl-system"] && delete itemData.flags["xjzl-system"].containerHidden;
+            itemData.flags?.["xjzl-system"] && delete itemData.flags["xjzl-system"].shop;
+            if (stackable) itemData.system.quantity = quantity;
+            createdItem = (await actor.createEmbeddedDocuments("Item", [itemData]))?.[0] || null;
+            if (!createdItem) throw new Error("未能创建购买物品。");
+        }
+        return {
+            undo: async () => {
+                if (createdItem) await actor.deleteEmbeddedDocuments("Item", [createdItem.id]);
+                else if (destinationItem && destinationQuantity != null) await destinationItem.update({ "system.quantity": destinationQuantity });
+            }
         };
     }
 

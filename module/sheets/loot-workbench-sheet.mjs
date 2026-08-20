@@ -21,6 +21,8 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             editImage: XJZLLootWorkbenchSheet.prototype._onEditImage,
             lootItem: XJZLLootWorkbenchSheet.prototype._onLootItem,
             storageWithdrawItem: XJZLLootWorkbenchSheet.prototype._onLootItem,
+            shopBuyItem: XJZLLootWorkbenchSheet.prototype._onShopBuyItem,
+            editShopItem: XJZLLootWorkbenchSheet.prototype._onEditShopItem,
             lootAll: XJZLLootWorkbenchSheet.prototype._onLootAll,
             currencyAction: XJZLLootWorkbenchSheet.prototype._onCurrencyAction,
             editCurrency: XJZLLootWorkbenchSheet.prototype._onEditCurrency,
@@ -63,6 +65,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         const ownsStorage = isGM || permissionActor.testUserPermission(game.user, "OWNER");
         const canWithdraw = isStorageMode && ownsStorage && (isGM || system.isOpen);
         const canDeposit = isStorageMode && ownsStorage && (isGM || system.isOpen);
+        const canShop = isShopMode && (isGM || (system.isOpen && permissionActor.testUserPermission(game.user, "OBSERVER")));
         const storageHintKey = !ownsStorage
             ? "StorageOwnerReadOnlyHint"
             : (canDeposit ? "StorageDropHint" : "StorageReadOnlyHint");
@@ -73,6 +76,14 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             if (hidden && !isGM) continue;
             const type = sections.has(item.type) ? item.type : "misc";
             const quantity = Math.max(1, Number(item.system.quantity) || 1);
+            const shopData = item.getFlag("xjzl-system", "shop") || {};
+            const basePrice = Math.max(0, Number(item.system.price) || 0);
+            const shopDiscount = Number.isFinite(Number(shopData.buyDiscount))
+                ? Math.max(0, Number(shopData.buyDiscount))
+                : Math.max(0, Number(system.settings.buyDiscount) || 0);
+            const shopPrice = Number.isInteger(Number(shopData.buyPrice)) && Number(shopData.buyPrice) >= 0
+                ? Number(shopData.buyPrice)
+                : Math.floor(basePrice * shopDiscount);
             sections.get(type).items.push({
                 id: item.id,
                 name: item.name,
@@ -81,8 +92,10 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
                 quantity,
                 isStackable: STACKABLE_ITEM_TYPES.has(item.type),
                 hidden,
-                action: isStorageMode ? "storageWithdrawItem" : "lootItem",
-                canAction: isStorageMode ? canWithdraw : canLoot
+                action: isStorageMode ? "storageWithdrawItem" : isShopMode ? "shopBuyItem" : "lootItem",
+                canAction: isStorageMode ? canWithdraw : isShopMode ? canShop : canLoot,
+                shopPrice,
+                shopPriceText: String(shopPrice)
             });
         }
         for (const section of sections.values()) {
@@ -129,6 +142,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             canLoot,
             canWithdraw,
             canDeposit,
+            canShop,
             storageHint: game.i18n.localize(`XJZL.Container.${storageHintKey}`),
             canLootAll,
             canTakeCurrency: (isLootMode ? canLoot : canWithdraw) && currency > 0,
@@ -179,7 +193,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         nodeConfig?.addEventListener("change", event => this._onNodeConfigChange(event));
         const dropZone = this.element.querySelector(".loot-scroll");
         dropZone?.addEventListener("dragover", event => {
-            if (game.user.isGM || this.document.system.mode === "storage") event.preventDefault();
+            if (game.user.isGM || ["storage", "shop"].includes(this.document.system.mode)) event.preventDefault();
         });
         dropZone?.addEventListener("drop", event => this._onDrop(event));
     }
@@ -202,7 +216,9 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         if (!field?.dataset?.configPath) return;
         this._nodeConfigOpen = Boolean(field.closest("details")?.open);
         const path = field.dataset.configPath;
-        const value = field.type === "checkbox" ? field.checked : field.value;
+        const value = field.type === "checkbox"
+            ? field.checked
+            : field.type === "number" ? Number(field.value) : field.value;
         const baseActor = this.document.isToken ? this.document.token?.baseActor : this.document;
         if (!baseActor) return this.#notify("error", "XJZL.Container.TransactionFailed");
 
@@ -246,6 +262,88 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         }
         const action = target.dataset.action === "storageWithdrawItem" ? "storageWithdrawItem" : "lootItem";
         await this.#executeTransaction({ action, containerUuid: this.document.uuid, actorUuid: participant.uuid, itemId: item.id, quantity });
+    }
+
+    async _onShopBuyItem(event, target) {
+        event.preventDefault();
+        const participant = this.#selectedActor();
+        if (!participant) return this.#notify("warn", "XJZL.Container.NoSelectedActor");
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return this.#notify("warn", "XJZL.Container.ItemUnavailable");
+        const max = Math.max(1, Number(item.system.quantity) || 1);
+        let quantity = 1;
+        if (STACKABLE_ITEM_TYPES.has(item.type) && max > 1 && !this.document.system.settings.infiniteStock) {
+            quantity = await this.#promptQuantity(max, "XJZL.Container.BuyItem");
+            if (!quantity) return;
+        }
+        await this.#executeTransaction({
+            action: "shopBuyItem",
+            containerUuid: this.document.uuid,
+            actorUuid: participant.uuid,
+            itemId: item.id,
+            quantity
+        });
+    }
+
+    async _onEditShopItem(event, target) {
+        event.preventDefault();
+        if (!game.user.isGM || this.document.system.mode !== "shop") return;
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return;
+        const shopData = item.getFlag("xjzl-system", "shop") || {};
+        const value = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("XJZL.Container.EditShopItem") },
+            content: `<label>${game.i18n.localize("XJZL.Container.ShopPriceOverride")}<input type="number" name="buyPrice" min="0" step="1" value="${Number.isInteger(Number(shopData.buyPrice)) ? Number(shopData.buyPrice) : ""}></label>
+                <label>${game.i18n.localize("XJZL.Container.ShopDiscountOverride")}<input type="number" name="buyDiscount" min="0" step="0.05" value="${Number.isFinite(Number(shopData.buyDiscount)) ? Number(shopData.buyDiscount) : ""}></label>`,
+            ok: {
+                label: game.i18n.localize("XJZL.Container.Save"),
+                callback: (dialogEvent, button) => ({
+                    buyPrice: button.form.elements.buyPrice.value.trim(),
+                    buyDiscount: button.form.elements.buyDiscount.value.trim()
+                })
+            },
+            rejectClose: false
+        });
+        if (!value) return;
+        const shop = {};
+        if (value.buyPrice !== "") {
+            const buyPrice = Number(value.buyPrice);
+            if (!Number.isFinite(buyPrice) || buyPrice < 0) return this.#notify("warn", "XJZL.Container.InvalidShopPrice");
+            shop.buyPrice = Math.floor(buyPrice);
+        }
+        if (value.buyDiscount !== "") {
+            const buyDiscount = Number(value.buyDiscount);
+            if (!Number.isFinite(buyDiscount) || buyDiscount < 0) return this.#notify("warn", "XJZL.Container.InvalidShopDiscount");
+            shop.buyDiscount = buyDiscount;
+        }
+        await item.setFlag("xjzl-system", "shop", shop);
+    }
+
+    async #promptQuantity(max, titleKey) {
+        const value = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize(titleKey) },
+            content: `<label>${game.i18n.localize("XJZL.Container.Quantity")}（1-${max}）</label><input type="number" name="quantity" value="${max}" min="1" max="${max}" step="1" autofocus>`,
+            ok: {
+                label: game.i18n.localize(titleKey),
+                callback: (dialogEvent, button) => button.form.elements.quantity.valueAsNumber
+            },
+            rejectClose: false
+        });
+        return Number.isInteger(value) && value >= 1 && value <= max ? value : null;
+    }
+
+    async #promptShopSellDiscount() {
+        const defaultDiscount = Math.max(0, Number(this.document.system.settings.sellDiscount) || 0.5);
+        const value = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("XJZL.Container.ShopSellItem") },
+            content: `<label>${game.i18n.localize("XJZL.Container.ShopSellDiscount")}<input type="number" name="sellDiscount" value="${defaultDiscount}" min="0" step="0.05" autofocus></label>`,
+            ok: {
+                label: game.i18n.localize("XJZL.Container.ShopSellItem"),
+                callback: (dialogEvent, button) => button.form.elements.sellDiscount.valueAsNumber
+            },
+            rejectClose: false
+        });
+        return Number.isFinite(value) && value >= 0 ? value : null;
     }
 
     async _onLootAll(event) {
@@ -500,6 +598,30 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             return;
         }
 
+        if (this.document.system.mode === "shop" && !game.user.isGM) {
+            if (!(sourceItem?.parent instanceof Actor) || !["character", "npc"].includes(sourceItem.parent.type)) {
+                return this.#notify("warn", "XJZL.Container.ShopDropActorOnly");
+            }
+            const sourceActor = sourceItem.parent;
+            if (!sourceActor.isOwner) return this.#notify("warn", "XJZL.Container.ShopSourceNotOwned");
+            const max = STACKABLE_ITEM_TYPES.has(sourceItem.type)
+                ? Math.max(1, Number(sourceItem.system.quantity) || 1)
+                : 1;
+            const quantity = max > 1 ? await this.#promptQuantity(max, "XJZL.Container.ShopSellItem") : 1;
+            if (!quantity) return;
+            const sellDiscount = await this.#promptShopSellDiscount();
+            if (sellDiscount == null) return;
+            await this.#executeTransaction({
+                action: "shopSellItem",
+                containerUuid: this.document.uuid,
+                actorUuid: sourceActor.uuid,
+                itemId: sourceItem.id,
+                quantity,
+                sellDiscount
+            });
+            return;
+        }
+
         if (!game.user.isGM) return;
 
         const stackable = STACKABLE_ITEM_TYPES.has(itemData.type);
@@ -647,7 +769,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         if (this.isEditable) return;
         const search = this.element.querySelector(".container-search-input");
         if (search) search.disabled = false;
-        if (!context.canLoot) return;
+        if (!(context.canLoot || context.canShop)) return;
 
         const participant = this.element.querySelector(".participant-select");
         if (participant && context.participants.length > 0) participant.disabled = false;
@@ -655,7 +777,8 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             '[data-action="lootItem"]',
             '[data-action="claimXp"]',
             '[data-action="lootAll"]',
-            '[data-action="currencyAction"][data-type="take"]'
+            '[data-action="currencyAction"][data-type="take"]',
+            '[data-action="shopBuyItem"]'
         ];
         for (const control of this.element.querySelectorAll(selectors.join(","))) {
             control.disabled = false;
