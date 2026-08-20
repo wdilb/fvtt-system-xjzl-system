@@ -9,6 +9,13 @@ const pendingNeedRolls = new Map();
 const MAX_COMPLETED_OPERATIONS = 256;
 const NEED_ROLL_TIMEOUT = 30_000;
 const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
+const NON_TRANSFERABLE_ITEM_TYPES = new Map([
+    ["neigong", "内功"],
+    ["wuxue", "武学"],
+    ["art_book", "技艺书籍"],
+    ["background", "身世背景"],
+    ["personality", "性格特质"]
+]);
 
 export class XJZLContainerTransactionError extends Error {
     constructor(code, message, details = {}) {
@@ -28,8 +35,16 @@ export class XJZLContainerTransactionManager {
      */
     static async executeAsGM(request = {}, userId) {
         const normalized = this.#normalizeRequest(request, userId);
-        const cached = completedOperations.get(normalized.operationId);
-        if (cached) return foundry.utils.deepClone(cached);
+        if (completedOperations.has(normalized.operationId)) {
+            const cached = completedOperations.get(normalized.operationId);
+            return cached == null ? null : foundry.utils.deepClone(cached);
+        }
+
+        if (normalized.action === "needTimeout") {
+            const result = await this.#executeNeedTimeout(normalized);
+            this.#cacheCompletedOperation(normalized.operationId, result);
+            return result == null ? null : foundry.utils.deepClone(result);
+        }
 
         const node = await this.#loadContainer(normalized.containerUuid);
         const participant = normalized.actorUuid
@@ -83,8 +98,6 @@ export class XJZLContainerTransactionManager {
                     return this.#needStart(lockedNode, normalized);
                 case "needChoice":
                     return this.#needChoice(lockedNode, lockedParticipant, normalized);
-                case "needTimeout":
-                    return this.#needTimeout(lockedNode, normalized);
                 case "claimXp": {
                     const result = await this.#claimXp(lockedNode, lockedParticipant, normalized);
                     await this.#updateNodeStatus(lockedNode, "take");
@@ -100,11 +113,43 @@ export class XJZLContainerTransactionManager {
             }
         });
 
-        completedOperations.set(normalized.operationId, result);
+        this.#cacheCompletedOperation(normalized.operationId, result);
+        return foundry.utils.deepClone(result);
+    }
+
+    /** 缓存幂等操作结果；空结果也需要缓存，避免重复超时请求反复进入结算。 */
+    static #cacheCompletedOperation(operationId, result) {
+        completedOperations.set(operationId, result);
         while (completedOperations.size > MAX_COMPLETED_OPERATIONS) {
             completedOperations.delete(completedOperations.keys().next().value);
         }
-        return foundry.utils.deepClone(result);
+    }
+
+    /**
+     * 处理活动 GM 内部触发的需求超时；节点已删除时也必须清理内存中的待结算记录。
+     * @param {Object} request - 已规范化的 needTimeout 请求
+     * @returns {Promise<Object|null>} 需求终态；重复或过期请求返回 null
+     */
+    static async #executeNeedTimeout(request) {
+        const user = game.users.get(request.userId);
+        if (!user?.isGM) {
+            throw new XJZLContainerTransactionError("GM_ONLY_ACTION", "只有 GM 可以结束需求结算。");
+        }
+        const initialRoll = pendingNeedRolls.get(request.needId);
+        if (!initialRoll || initialRoll.containerUuid !== request.containerUuid) return null;
+
+        return this.#withLocks([initialRoll.containerUuid], async () => {
+            const roll = pendingNeedRolls.get(request.needId);
+            if (!roll || roll.containerUuid !== request.containerUuid || roll.resolving) return null;
+            let node;
+            try {
+                node = await this.#loadContainer(roll.containerUuid);
+            } catch (err) {
+                if (err?.code !== "INVALID_CONTAINER") throw err;
+                return this.#cancelNeedRoll(roll, "nodeUnavailable");
+            }
+            return this.#needTimeout(node, request);
+        });
     }
 
     static #normalizeRequest(request, userId) {
@@ -168,6 +213,9 @@ export class XJZLContainerTransactionManager {
     static #assertNodeAccess(node, userId, request) {
         const user = game.users.get(userId);
         if (!user) throw new XJZLContainerTransactionError("INVALID_USER", "操作用户不存在或已离线。");
+        if (request.action === "needTimeout" && !user.isGM) {
+            throw new XJZLContainerTransactionError("GM_ONLY_ACTION", "只有 GM 可以结束需求结算。");
+        }
         if (user.isGM) return;
 
         // 未关联 Token 的 Actor 是合成文档，权限来源仍是世界 Actor；直接检查合成 Actor 会误判为无权限。
@@ -217,13 +265,6 @@ export class XJZLContainerTransactionManager {
             return;
         }
 
-        if (action === "needTimeout") {
-            if (node.system.mode !== "loot") {
-                throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以结束需求。");
-            }
-            return;
-        }
-
         if (action === "currencyTransfer") {
             if (node.system.mode === "loot") {
                 if (request.direction !== "take") {
@@ -248,6 +289,23 @@ export class XJZLContainerTransactionManager {
         if (user?.isGM) return;
         if (!actor.testUserPermission(user, "OWNER")) {
             throw new XJZLContainerTransactionError("NO_PARTICIPANT_PERMISSION", "你不能操作这个角色的资源。");
+        }
+    }
+
+    /**
+     * 阻止把装备中或承载角色养成状态的物品移出角色；所有仓库/商铺入口必须在 GM 端调用。
+     * @param {Item} item - 角色拥有的来源物品
+     */
+    static #assertTransferableItem(item) {
+        if (item.system?.equipped) {
+            throw new XJZLContainerTransactionError("ITEM_EQUIPPED", `无法转移已装备的物品：${item.name}。`);
+        }
+        const typeLabel = NON_TRANSFERABLE_ITEM_TYPES.get(item.type);
+        if (typeLabel) {
+            throw new XJZLContainerTransactionError(
+                "ITEM_NOT_TRANSFERABLE",
+                `无法转移${typeLabel}：${item.name}。角色养成数据不能存入仓库或出售。`
+            );
         }
     }
 
@@ -385,6 +443,7 @@ export class XJZLContainerTransactionManager {
         if (!sourceItem) {
             throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个角色身上已经没有该物品了。");
         }
+        this.#assertTransferableItem(sourceItem);
         const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
         const sourceQuantity = stackable ? Math.max(1, Number(sourceItem.system.quantity) || 1) : 1;
         const quantity = request.quantity == null ? 1 : request.quantity;
@@ -536,6 +595,7 @@ export class XJZLContainerTransactionManager {
         if (!participant) throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "出售物品需要指定角色。");
         const sourceItem = participant.items.get(request.itemId);
         if (!sourceItem) throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个角色身上已经没有该物品了。");
+        this.#assertTransferableItem(sourceItem);
         const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
         const sourceQuantity = stackable ? Math.max(1, Number(sourceItem.system.quantity) || 1) : 1;
         const quantity = request.quantity == null ? 1 : request.quantity;
@@ -620,7 +680,8 @@ export class XJZLContainerTransactionManager {
             itemImg: sourceItem.img,
             eligibleUserIds,
             choices: new Map(),
-            timer: null
+            timer: null,
+            resolving: false
         };
         roll.timer = setTimeout(() => Hooks.callAll("xjzl.containerNeedTimeout", {
             needId,
@@ -680,86 +741,114 @@ export class XJZLContainerTransactionManager {
     static async #needTimeout(node, request) {
         const roll = pendingNeedRolls.get(request.needId);
         if (!roll || roll.containerUuid !== node.uuid) return null;
+        if (node.system.mode !== "loot" || !node.system.isOpen) {
+            return this.#cancelNeedRoll(roll, "nodeUnavailable");
+        }
         return this.#finishNeedRoll(node, roll);
     }
 
     static async #finishNeedRoll(node, roll) {
-        if (!pendingNeedRolls.has(roll.needId)) return null;
-        pendingNeedRolls.delete(roll.needId);
+        if (!pendingNeedRolls.has(roll.needId) || roll.resolving) return null;
+        if (node.system.mode !== "loot" || !node.system.isOpen) {
+            return this.#cancelNeedRoll(roll, "nodeUnavailable");
+        }
+        roll.resolving = true;
         if (roll.timer) clearTimeout(roll.timer);
-        const candidates = [...roll.choices.values()].filter(choice => choice.choice === "need");
-        if (candidates.length === 0) {
-            await this.#postNeedChat(`<p><strong>战利品需求结束</strong>：${foundry.utils.escapeHTML(roll.itemName)} 无人选择需求，物品保留在节点中。</p>`);
-            return {
-                action: "needResult",
-                needId: roll.needId,
-                containerUuid: node.uuid,
-                itemId: roll.itemId,
-                itemName: roll.itemName,
-                winnerUserId: null,
-                winnerActorUuid: null,
-                candidateCount: 0
-            };
-        }
-        const rolledCandidates = [];
-        for (const candidate of candidates) {
-            const participant = await this.#loadActor(candidate.actorUuid);
-            const roll = await new Roll("1d100").evaluate();
-            rolledCandidates.push({
-                ...candidate,
-                actorName: participant.name,
-                total: Number(roll.total) || 0,
-                roll,
-                participant
-            });
-        }
-        const highScore = Math.max(...rolledCandidates.map(candidate => candidate.total));
-        const topCandidates = rolledCandidates.filter(candidate => candidate.total === highScore);
-        const winner = topCandidates[Math.floor(Math.random() * topCandidates.length)];
-        await this.#postNeedRollChat(roll.itemName, rolledCandidates);
-        const participant = winner.participant;
-        let mutation;
         try {
-            mutation = await this.#lootItem(node, participant, {
-                userId: winner.userId,
-                itemId: roll.itemId,
-                quantity: 1
+            const candidates = [...roll.choices.values()].filter(choice => choice.choice === "need");
+            if (candidates.length === 0) {
+                await this.#postNeedChat(`<p><strong>战利品需求结束</strong>：${foundry.utils.escapeHTML(roll.itemName)} 无人选择需求，物品保留在节点中。</p>`);
+                return this.#makeNeedResult(roll, "noNeed", { candidateCount: 0 });
+            }
+
+            const rolledCandidates = [];
+            for (const candidate of candidates) {
+                const participant = await this.#loadActor(candidate.actorUuid);
+                const candidateRoll = await new Roll("1d100").evaluate();
+                rolledCandidates.push({
+                    ...candidate,
+                    actorName: participant.name,
+                    total: Number(candidateRoll.total) || 0,
+                    roll: candidateRoll,
+                    participant
+                });
+            }
+            const highScore = Math.max(...rolledCandidates.map(candidate => candidate.total));
+            const topCandidates = rolledCandidates.filter(candidate => candidate.total === highScore);
+            const winner = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+            await this.#postNeedRollChat(roll.itemName, rolledCandidates);
+
+            let mutation;
+            try {
+                mutation = await this.#lootItem(node, winner.participant, {
+                    userId: winner.userId,
+                    itemId: roll.itemId,
+                    quantity: 1
+                });
+            } catch (err) {
+                if (err?.code !== "ITEM_UNAVAILABLE") throw err;
+                await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`);
+                return this.#makeNeedResult(roll, "itemUnavailable", {
+                    candidateCount: candidates.length,
+                    rollResults: rolledCandidates.map(candidate => ({
+                        userId: candidate.userId,
+                        actorUuid: candidate.actorUuid,
+                        actorName: candidate.actorName,
+                        total: candidate.total
+                    }))
+                });
+            }
+
+            await this.#updateNodeStatus(node, "take");
+            await this.#postNeedChat(
+                `<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 由 ${foundry.utils.escapeHTML(winner.actorName)} 获得（${winner.total}）。</p>`
+            );
+            return this.#makeNeedResult(roll, "awarded", {
+                winnerUserId: winner.userId,
+                winnerActorUuid: winner.actorUuid,
+                candidateCount: candidates.length,
+                winnerTotal: winner.total,
+                quantity: mutation.result.quantity
             });
         } catch (err) {
-            if (err?.code !== "ITEM_UNAVAILABLE") throw err;
-            await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`);
-            return {
-                action: "needResult",
+            console.error("XJZL | 战利品需求结算失败:", {
                 needId: roll.needId,
-                containerUuid: node.uuid,
-                itemId: roll.itemId,
-                itemName: roll.itemName,
-                winnerUserId: null,
-                winnerActorUuid: null,
-                candidateCount: candidates.length,
-                rollResults: rolledCandidates.map(candidate => ({
-                    userId: candidate.userId,
-                    actorUuid: candidate.actorUuid,
-                    actorName: candidate.actorName,
-                    total: candidate.total
-                }))
-            };
+                containerUuid: roll.containerUuid,
+                err
+            });
+            await this.#postNeedChat(`<p><strong>需求结算失败</strong>：${foundry.utils.escapeHTML(roll.itemName)} 未发放，请由 GM 检查后重新处理。</p>`);
+            return this.#makeNeedResult(roll, "failed");
+        } finally {
+            pendingNeedRolls.delete(roll.needId);
         }
-        await this.#updateNodeStatus(node, "take");
-        await this.#postNeedChat(
-            `<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 由 ${foundry.utils.escapeHTML(winner.actorName)} 获得（${winner.total}）。</p>`
-        );
+    }
+
+    /** 取消已失去有效节点上下文的需求，并返回可广播的明确终态。 */
+    static async #cancelNeedRoll(roll, reason) {
+        if (!pendingNeedRolls.has(roll.needId) || roll.resolving) return null;
+        roll.resolving = true;
+        if (roll.timer) clearTimeout(roll.timer);
+        try {
+            await this.#postNeedChat(`<p><strong>战利品需求已取消</strong>：${foundry.utils.escapeHTML(roll.itemName)} 所在节点已关闭、切换模式或被删除。</p>`);
+            return this.#makeNeedResult(roll, "cancelled", { reason });
+        } finally {
+            pendingNeedRolls.delete(roll.needId);
+        }
+    }
+
+    /** 构造需求公共终态，避免不同失败分支让客户端误判为“无人需求”。 */
+    static #makeNeedResult(roll, outcome, details = {}) {
         return {
             action: "needResult",
             needId: roll.needId,
-            containerUuid: node.uuid,
+            containerUuid: roll.containerUuid,
             itemId: roll.itemId,
             itemName: roll.itemName,
-            winnerUserId: winner.userId,
-            winnerActorUuid: winner.actorUuid,
-            candidateCount: candidates.length,
-            winnerTotal: winner.total,
-            quantity: mutation.result.quantity
+            outcome,
+            winnerUserId: null,
+            winnerActorUuid: null,
+            candidateCount: 0,
+            ...details
         };
     }
 

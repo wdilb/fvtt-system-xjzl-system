@@ -29,13 +29,17 @@ export function setupSocket() {
 
     Hooks.on("xjzl.containerNeedTimeout", async request => {
         if (!game.user.isGM || !game.users.activeGM?.isSelf) return;
-        const result = await XJZLContainerTransactionManager.executeAsGM({
-            action: "needTimeout",
-            containerUuid: request.containerUuid,
-            needId: request.needId,
-            operationId: foundry.utils.randomID()
-        }, game.user.id);
-        if (result?.action === "needResult") xjzlSocket.executeForEveryone("containerNeedResult", result);
+        try {
+            const result = await XJZLContainerTransactionManager.executeAsGM({
+                action: "needTimeout",
+                containerUuid: request.containerUuid,
+                needId: request.needId,
+                operationId: foundry.utils.randomID()
+            }, game.user.id);
+            if (result?.action === "needResult") xjzlSocket.executeForEveryone("containerNeedResult", result);
+        } catch (err) {
+            console.error("XJZL | 战利品需求超时结算失败:", { request, err });
+        }
     });
 
     // === 视觉类 (所有人执行) ===

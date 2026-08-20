@@ -8,22 +8,37 @@ const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const ITEM_TYPES = ["weapon", "armor", "qizhen", "consumable", "manual", "art_book", "wuxue", "neigong", "misc"];
 const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
+const NON_TRANSFERABLE_ITEM_TYPES = new Set(["neigong", "wuxue", "art_book", "background", "personality"]);
 const XP_POOL_KEYS = ["general", "neigong", "wuxue", "arts"];
 const activeNeedPrompts = new Set();
 
 Hooks.on("xjzl.containerNeedPrompt", payload => {
     if (!payload?.needId || activeNeedPrompts.has(payload.needId)) return;
     activeNeedPrompts.add(payload.needId);
-    showContainerNeedPrompt(payload).finally(() => activeNeedPrompts.delete(payload.needId));
+    showContainerNeedPrompt(payload)
+        .catch(err => {
+            console.error("XJZL | 打开战利品需求界面失败:", { needId: payload.needId, err });
+            ui.notifications.error(game.i18n.localize("XJZL.Container.TransactionFailed"));
+        })
+        .finally(() => activeNeedPrompts.delete(payload.needId));
 });
 
 Hooks.on("xjzl.containerNeedResult", payload => {
     if (!payload?.needId) return;
     const winner = payload.winnerUserId ? game.users.get(payload.winnerUserId) : null;
-    const message = winner
-        ? `${payload.itemName}：${winner.name} 赢得了需求。`
-        : `${payload.itemName}：无人选择需求，物品保留在节点中。`;
-    ui.notifications.info(message);
+    const outcome = payload.outcome || (winner ? "awarded" : "noNeed");
+    const messageKey = {
+        awarded: "XJZL.Container.NeedResultAwarded",
+        noNeed: "XJZL.Container.NeedResultNoNeed",
+        itemUnavailable: "XJZL.Container.NeedResultUnavailable",
+        cancelled: "XJZL.Container.NeedResultCancelled",
+        failed: "XJZL.Container.NeedResultFailed"
+    }[outcome] || "XJZL.Container.NeedResultFailed";
+    const message = game.i18n.format(messageKey, {
+        item: payload.itemName,
+        winner: winner?.name || ""
+    });
+    ui.notifications[outcome === "failed" ? "error" : "info"](message);
     for (const application of Object.values(ui.windows || {})) {
         if (application.document?.uuid === payload.containerUuid) application.render({ force: true });
     }
@@ -55,7 +70,7 @@ async function showContainerNeedPrompt(payload) {
         rejectClose: false
     });
     if (!value) return;
-    await xjzlSocket.executeAsGM("executeContainerTransaction", {
+    const result = await xjzlSocket.executeAsGM("executeContainerTransaction", {
         action: "needChoice",
         containerUuid: payload.containerUuid,
         itemId: payload.itemId,
@@ -64,6 +79,9 @@ async function showContainerNeedPrompt(payload) {
         choice: value.choice,
         operationId: foundry.utils.randomID()
     });
+    if (!result?.ok) {
+        ui.notifications.error(result?.error?.message || game.i18n.localize("XJZL.Container.TransactionFailed"));
+    }
 }
 
 export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
@@ -403,7 +421,8 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
     }
 
     async #promptShopSellDiscount() {
-        const defaultDiscount = Math.max(0, Number(this.document.system.settings.sellDiscount) || 0.5);
+        const configuredDiscount = Number(this.document.system.settings.sellDiscount);
+        const defaultDiscount = Math.max(0, Number.isFinite(configuredDiscount) ? configuredDiscount : 0.5);
         const value = await foundry.applications.api.DialogV2.prompt({
             window: { title: game.i18n.localize("XJZL.Container.ShopSellItem") },
             content: `<label>${game.i18n.localize("XJZL.Container.ShopSellDiscount")}<input type="number" name="sellDiscount" value="${defaultDiscount}" min="0" step="0.05" autofocus></label>`,
@@ -629,6 +648,9 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         if (sourceItem?.parent === this.document) return;
         const itemData = sourceItem?.toObject?.() || data.data;
         if (!itemData?.name || !itemData?.type) return;
+        if (sourceItem?.parent instanceof Actor
+            && ["character", "npc"].includes(sourceItem.parent.type)
+            && !this.#canTransferItem(sourceItem)) return;
 
         if (this.document.system.mode === "storage") {
             const permissionActor = this.document.isToken ? this.document.token?.baseActor || this.document : this.document;
@@ -705,8 +727,13 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         const destinationQuantity = destinationItem ? Math.max(1, Number(destinationItem.system.quantity) || 1) : null;
         const duplicateData = duplicateItems.map(item => foundry.utils.deepClone(item.toObject()));
         const duplicateQuantity = duplicateItems.reduce((total, item) => total + Math.max(1, Number(item.system.quantity) || 1), 0);
+        const sourceParent = sourceItem?.parent instanceof Actor && sourceItem.parent !== this.document
+            ? sourceItem.parent
+            : null;
+        const sourceData = sourceParent ? foundry.utils.deepClone(sourceItem.toObject()) : null;
         let duplicatesRemoved = false;
         let createdItem = null;
+        let sourceRemoved = false;
         try {
             if (destinationItem) {
                 await destinationItem.update({ "system.quantity": destinationQuantity + duplicateQuantity + sourceQuantity });
@@ -720,11 +747,9 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
                 createdItem = (await this.document.createEmbeddedDocuments("Item", [copy]))?.[0] || null;
                 if (!createdItem) throw new Error("未能创建物品。");
             }
-            if (sourceItem?.parent instanceof Actor && sourceItem.parent !== this.document) {
-                await sourceItem.parent.deleteEmbeddedDocuments("Item", [sourceItem.id]);
-            }
-            if (this.document.system.mode === "loot" && this.document.system.status === "depleted") {
-                await this.document.update({ "system.status": "active" });
+            if (sourceParent) {
+                await sourceParent.deleteEmbeddedDocuments("Item", [sourceItem.id]);
+                sourceRemoved = true;
             }
         } catch (err) {
             console.error("XJZL | 放入物品失败:", err);
@@ -749,9 +774,21 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
                     console.error("XJZL | 重复堆叠项回滚失败:", rollbackError);
                 }
             }
+            if (sourceParent && sourceData && (sourceRemoved || !sourceParent.items.get(sourceItem.id))) {
+                try {
+                    await sourceParent.createEmbeddedDocuments("Item", [sourceData]);
+                } catch (rollbackError) {
+                    console.error("XJZL | 来源物品回滚失败:", {
+                        actorUuid: sourceParent.uuid,
+                        itemId: sourceItem.id,
+                        rollbackError
+                    });
+                }
+            }
             this.#notify("error", "XJZL.Container.TransactionFailed");
             return;
         }
+        await this.#reactivateLootNode();
         await this.render({ force: true });
     }
 
@@ -810,6 +847,19 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         return `${item.type}|${String(item.name || "").trim()}`;
     }
 
+    /** 前端提前拦截不允许移出角色的物品；GM 端事务仍会执行同一规则作为最终校验。 */
+    #canTransferItem(item) {
+        if (item.system?.equipped) {
+            this.#notify("warn", "XJZL.Container.ItemEquippedTransferBlocked");
+            return false;
+        }
+        if (NON_TRANSFERABLE_ITEM_TYPES.has(item.type)) {
+            this.#notify("warn", "XJZL.Container.ItemTypeTransferBlocked");
+            return false;
+        }
+        return true;
+    }
+
     #capitalize(value) {
         const text = String(value || "");
         return text.charAt(0).toUpperCase() + text.slice(1);
@@ -826,8 +876,13 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
     }
 
     async #reactivateLootNode() {
-        if (this.document.system.mode === "loot" && this.document.system.status === "depleted") {
-            await this.document.update({ "system.status": "active" });
+        try {
+            if (this.document.system.mode === "loot" && this.document.system.status === "depleted") {
+                await this.document.update({ "system.status": "active" });
+            }
+        } catch (err) {
+            // 状态是库存操作后的派生标记，更新失败不能反向撤销已完成的库存事务。
+            console.error("XJZL | 战利品节点状态恢复失败:", { containerUuid: this.document.uuid, err });
         }
     }
 

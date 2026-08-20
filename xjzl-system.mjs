@@ -31,7 +31,7 @@ import { XJZLEncounterData } from "./module/data/item/encounter.mjs";
 // 导入 Sheets (UI)
 import { XJZLCharacterSheet } from "./module/sheets/character-sheet.mjs";
 import { XJZLCreatureSheet } from "./module/sheets/creature-sheet.mjs";
-import { XJZLLootWorkbenchSheet as XJZLContainerSheet } from "./module/sheets/loot-workbench-sheet.mjs";
+import { XJZLLootWorkbenchSheet } from "./module/sheets/loot-workbench-sheet.mjs";
 import { XJZLNeigongSheet } from "./module/sheets/neigong-sheet.mjs";
 import { XJZLWuxueSheet } from "./module/sheets/wuxue-sheet.mjs";
 import { XJZLEquipmentSheet } from "./module/sheets/equipment-sheet.mjs";
@@ -337,7 +337,7 @@ Hooks.once("init", async function () {
     label: "XJZL.Sheet.Creature"
   });
 
-  Actors.registerSheet("xjzl-system", XJZLContainerSheet, {
+  Actors.registerSheet("xjzl-system", XJZLLootWorkbenchSheet, {
     types: ["container"],
     makeDefault: true,
     label: "XJZL.Sheet.Container"
