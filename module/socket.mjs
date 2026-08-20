@@ -1,5 +1,6 @@
 import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./managers/encounter-manager.mjs";
+import { XJZLContainerTransactionManager } from "./managers/container-transaction-manager.mjs";
 import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
 
 export let xjzlSocket;
@@ -22,6 +23,7 @@ export function setupSocket() {
     xjzlSocket.register("broadcastCombatStats", _socketBroadcastCombatStats);
     xjzlSocket.register("requestCombatStats", _socketRequestCombatStats);
     xjzlSocket.register("useEncounterSupport", _socketUseEncounterSupport);
+    xjzlSocket.register("executeContainerTransaction", _socketExecuteContainerTransaction);
 
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
@@ -290,4 +292,35 @@ async function _socketUseEncounterSupport(request) {
     if (isNotActiveGM()) return null;
     // socketlib 会把真实发送者写入调用上下文；覆盖客户端字段，避免伪造 GM 身份绕过编组权限。
     return EncounterManager.executeSupportAsGM({ ...request, userId: this.socketdata.userId });
+}
+
+/**
+ * 将物资节点请求交给活动 GM 串行复核和执行。
+ * @param {Object} request - 仅包含业务请求数据，用户身份由 socketlib 上下文覆盖
+ * @returns {Promise<Object|null>} 结构化成功或失败结果
+ */
+async function _socketExecuteContainerTransaction(request) {
+    if (isNotActiveGM()) return null;
+
+    try {
+        return {
+            ok: true,
+            data: await XJZLContainerTransactionManager.executeAsGM(
+                request,
+                this.socketdata.userId
+            )
+        };
+    } catch (err) {
+        if (err?.name !== "XJZLContainerTransactionError") {
+            console.error("XJZL | 物资节点交易执行异常:", err);
+        }
+        return {
+            ok: false,
+            error: {
+                code: err?.code || "TRANSACTION_FAILED",
+                message: err?.message || "物资节点交易失败。",
+                details: err?.details || {}
+            }
+        };
+    }
 }
