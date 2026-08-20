@@ -8,6 +8,7 @@ const { ActorSheetV2 } = foundry.applications.sheets;
 const { HandlebarsApplicationMixin } = foundry.applications.api;
 const ITEM_TYPES = ["weapon", "armor", "qizhen", "consumable", "manual", "art_book", "wuxue", "neigong", "misc"];
 const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
+const XP_POOL_KEYS = ["general", "neigong", "wuxue", "arts"];
 
 export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
@@ -24,7 +25,12 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             editCurrency: XJZLLootWorkbenchSheet.prototype._onEditCurrency,
             editQuantity: XJZLLootWorkbenchSheet.prototype._onEditQuantity,
             deleteItem: XJZLLootWorkbenchSheet.prototype._onDeleteItem,
-            toggleHidden: XJZLLootWorkbenchSheet.prototype._onToggleHidden
+            toggleHidden: XJZLLootWorkbenchSheet.prototype._onToggleHidden,
+            claimXp: XJZLLootWorkbenchSheet.prototype._onClaimXp,
+            addXpReward: XJZLLootWorkbenchSheet.prototype._onAddXpReward,
+            editXpReward: XJZLLootWorkbenchSheet.prototype._onEditXpReward,
+            deleteXpReward: XJZLLootWorkbenchSheet.prototype._onDeleteXpReward,
+            toggleRewardHidden: XJZLLootWorkbenchSheet.prototype._onToggleRewardHidden
         }
     };
 
@@ -68,6 +74,23 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
 
         const visibleItems = [...sections.values()].flatMap(section => section.items);
         const isLootMode = system.mode === "loot";
+        const visibleRewards = system.rewards
+            .filter(reward => isGM || !reward.hidden)
+            .map(reward => ({
+                id: reward.id,
+                name: reward.name,
+                amount: reward.amount,
+                poolKey: reward.poolKey,
+                poolLabel: game.i18n.localize(`XJZL.Container.XpPool${this.#capitalize(reward.poolKey)}`),
+                logTitle: reward.logTitle,
+                logReason: reward.logReason,
+                hidden: reward.hidden,
+                claimed: reward.claims.some(claim => claim.userId === game.user.id),
+                canClaim: selectedActor?.type === "character"
+                    && (isGM || (isLootMode && system.isOpen && Boolean(system.settings.allowTake)))
+                    ? !reward.claims.some(claim => claim.userId === game.user.id)
+                    : false
+            }));
         const canLoot = isGM || (isLootMode && system.isOpen && Boolean(system.settings.allowTake));
         const canLootAll = canLoot && (isGM || Boolean(system.settings.allowTakeAll));
         const currency = Math.max(0, Number(system.currency) || 0);
@@ -93,9 +116,18 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             participants,
             selectedActor,
             inventory: [...sections.values()].filter(section => section.items.length > 0),
+            rewards: visibleRewards,
+            xpPoolChoices: XP_POOL_KEYS.map(poolKey => ({
+                value: poolKey,
+                label: game.i18n.localize(`XJZL.Container.XpPool${this.#capitalize(poolKey)}`)
+            })),
             visibleItemCount: visibleItems.length,
+            visibleRewardCount: visibleRewards.length,
             hasVisibleItems: visibleItems.length > 0,
+            hasVisibleRewards: visibleRewards.length > 0,
+            hasClaimableRewards: visibleRewards.some(reward => reward.canClaim),
             hasCurrency: currency > 0,
+            // 全部拾取目前只处理物品和银两；修为必须逐条确认并记录玩家领取身份。
             hasLootableContent: visibleItems.length > 0 || currency > 0
         };
     }
@@ -154,6 +186,110 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         const participant = this.#selectedActor();
         if (!participant) return this.#notify("warn", "XJZL.Container.NoSelectedActor");
         await this.#executeTransaction({ action: "lootAll", containerUuid: this.document.uuid, actorUuid: participant.uuid });
+    }
+
+    async _onClaimXp(event, target) {
+        event.preventDefault();
+        const participant = this.#selectedActor();
+        if (!participant) return this.#notify("warn", "XJZL.Container.NoSelectedActor");
+        await this.#executeTransaction({
+            action: "claimXp",
+            containerUuid: this.document.uuid,
+            actorUuid: participant.uuid,
+            rewardId: target.dataset.rewardId
+        });
+    }
+
+    async _onAddXpReward(event) {
+        event.preventDefault();
+        if (!game.user.isGM || this.document.system.mode !== "loot") return;
+        const reward = await this.#promptXpReward();
+        if (!reward) return;
+        const rewards = foundry.utils.deepClone(this.document.system.rewards);
+        rewards.push({ id: foundry.utils.randomID(), kind: "xp", claims: [], ...reward });
+        await this.document.update({ "system.rewards": rewards });
+        await this.#reactivateLootNode();
+    }
+
+    async _onEditXpReward(event, target) {
+        event.preventDefault();
+        if (!game.user.isGM) return;
+        const reward = this.document.system.rewards.find(entry => entry.id === target.dataset.rewardId);
+        if (!reward) return;
+        const edited = await this.#promptXpReward(reward);
+        if (!edited) return;
+        const rewards = foundry.utils.deepClone(this.document.system.rewards);
+        const index = rewards.findIndex(entry => entry.id === reward.id);
+        if (index < 0) return;
+        rewards[index] = { ...rewards[index], ...edited };
+        await this.document.update({ "system.rewards": rewards });
+        await this.#reactivateLootNode();
+    }
+
+    async _onDeleteXpReward(event, target) {
+        event.preventDefault();
+        if (!game.user.isGM) return;
+        const reward = this.document.system.rewards.find(entry => entry.id === target.dataset.rewardId);
+        if (!reward) return;
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: game.i18n.localize("XJZL.Container.DeleteReward") },
+            content: `<p>${game.i18n.format("XJZL.Container.DeleteRewardConfirm", { name: reward.name })}</p>`,
+            rejectClose: false
+        });
+        if (!confirmed) return;
+        await this.document.update({
+            "system.rewards": this.document.system.rewards.filter(entry => entry.id !== reward.id)
+        });
+    }
+
+    async _onToggleRewardHidden(event, target) {
+        event.preventDefault();
+        if (!game.user.isGM) return;
+        const rewards = foundry.utils.deepClone(this.document.system.rewards);
+        const reward = rewards.find(entry => entry.id === target.dataset.rewardId);
+        if (!reward) return;
+        reward.hidden = !reward.hidden;
+        await this.document.update({ "system.rewards": rewards });
+        if (!reward.hidden) await this.#reactivateLootNode();
+    }
+
+    async #promptXpReward(initial = {}) {
+        const escape = value => this.#escapeHtml(value);
+        const poolOptions = XP_POOL_KEYS.map(poolKey => (
+            `<option value="${poolKey}" ${poolKey === (initial.poolKey || "general") ? "selected" : ""}>${escape(game.i18n.localize(`XJZL.Container.XpPool${this.#capitalize(poolKey)}`))}</option>`
+        )).join("");
+        const content = `
+            <div class="xjzl-reward-form">
+                <label>${game.i18n.localize("XJZL.Container.RewardName")}<input name="name" value="${escape(initial.name || "")}" required autofocus></label>
+                <label>${game.i18n.localize("XJZL.Container.RewardAmount")}<input name="amount" type="number" min="1" step="1" value="${Number(initial.amount) || 1}" required></label>
+                <label>${game.i18n.localize("XJZL.Container.RewardPool")}<select name="poolKey">${poolOptions}</select></label>
+                <label>${game.i18n.localize("XJZL.Container.LogTitle")}<input name="logTitle" value="${escape(initial.logTitle || "")}"></label>
+                <label>${game.i18n.localize("XJZL.Container.LogReason")}<textarea name="logReason">${escape(initial.logReason || "")}</textarea></label>
+                <label><input name="hidden" type="checkbox" ${initial.hidden ? "checked" : ""}>${game.i18n.localize("XJZL.Container.Hidden")}</label>
+            </div>`;
+        const value = await foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize(initial.id ? "XJZL.Container.EditReward" : "XJZL.Container.AddReward") },
+            content,
+            ok: {
+                label: game.i18n.localize("XJZL.Container.Save"),
+                callback: (dialogEvent, button) => {
+                    const form = button.form;
+                    const name = String(form.elements.name.value || "").trim();
+                    const amount = Number(form.elements.amount.value);
+                    if (!name || !Number.isInteger(amount) || amount < 1) return null;
+                    return {
+                        name,
+                        amount,
+                        poolKey: form.elements.poolKey.value,
+                        logTitle: String(form.elements.logTitle.value || "").trim(),
+                        logReason: String(form.elements.logReason.value || "").trim(),
+                        hidden: Boolean(form.elements.hidden.checked)
+                    };
+                }
+            },
+            rejectClose: false
+        });
+        return value || null;
     }
 
     async _onCurrencyAction(event) {
@@ -376,6 +512,22 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
     #capitalize(value) {
         const text = String(value || "");
         return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    #escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>"']/g, character => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        }[character]));
+    }
+
+    async #reactivateLootNode() {
+        if (this.document.system.mode === "loot" && this.document.system.status === "depleted") {
+            await this.document.update({ "system.status": "active" });
+        }
     }
 
     #notify(type, key) {

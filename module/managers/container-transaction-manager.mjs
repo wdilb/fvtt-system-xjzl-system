@@ -61,6 +61,11 @@ export class XJZLContainerTransactionManager {
                     await this.#updateNodeStatus(lockedNode, "take");
                     return mutation.result;
                 }
+                case "claimXp": {
+                    const result = await this.#claimXp(lockedNode, lockedParticipant, normalized);
+                    await this.#updateNodeStatus(lockedNode, "take");
+                    return result;
+                }
                 case "lootAll":
                     return this.#lootAll(lockedNode, lockedParticipant, normalized);
                 default:
@@ -104,6 +109,7 @@ export class XJZLContainerTransactionManager {
             containerUuid: String(request.containerUuid || ""),
             actorUuid: request.actorUuid ? String(request.actorUuid) : null,
             itemId: request.itemId ? String(request.itemId) : null,
+            rewardId: request.rewardId ? String(request.rewardId) : null,
             direction: request.direction ? String(request.direction) : null,
             amount: request.amount == null ? null : Number(request.amount),
             quantity: request.quantity == null ? null : Number(request.quantity)
@@ -139,14 +145,15 @@ export class XJZLContainerTransactionManager {
         }
 
         const settings = node.system.settings;
-        if (["lootItem", "lootAll"].includes(action) && node.system.mode !== "loot") {
+        if (["lootItem", "lootAll", "claimXp"].includes(action) && node.system.mode !== "loot") {
             throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以执行拾取操作。");
         }
         const allowed = {
             inspect: true,
             currencyTransfer: Boolean(settings.allowTake || settings.allowDeposit || settings.allowWithdraw),
             lootItem: Boolean(settings.allowTake),
-            lootAll: Boolean(settings.allowTakeAll)
+            lootAll: Boolean(settings.allowTakeAll),
+            claimXp: Boolean(settings.allowTake)
         }[action];
         if (!allowed) {
             throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "这个物资节点不允许当前操作。");
@@ -277,6 +284,68 @@ export class XJZLContainerTransactionManager {
                 createdItem,
                 sourceQuantity
             })
+        };
+    }
+
+    /** 领取一次性修为奖励，并把玩家身份写入领取记录防止重复领取。 */
+    static async #claimXp(node, participant, request) {
+        if (!participant) {
+            throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "领取修为需要指定接收角色。");
+        }
+        if (participant.type !== "character") {
+            throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "只有角色卡可以领取修为奖励。");
+        }
+        if (!request.rewardId) {
+            throw new XJZLContainerTransactionError("INVALID_REWARD", "缺少要领取的修为奖励。");
+        }
+
+        const reward = node.system.rewards.find(entry => entry.id === request.rewardId);
+        if (!reward) {
+            throw new XJZLContainerTransactionError("REWARD_UNAVAILABLE", "这个修为奖励不存在或已被移除。");
+        }
+        const user = game.users.get(request.userId);
+        if (!user?.isGM && reward.hidden) {
+            throw new XJZLContainerTransactionError("REWARD_HIDDEN", "这个修为奖励当前不可领取。");
+        }
+        if (reward.claims.some(claim => claim.userId === request.userId)) {
+            throw new XJZLContainerTransactionError("REWARD_ALREADY_CLAIMED", "你已经领取过这个修为奖励了。");
+        }
+
+        const claims = foundry.utils.deepClone(reward.claims || []);
+        claims.push({ userId: request.userId, actorUuid: participant.uuid, claimedAt: Date.now() });
+        const rewards = foundry.utils.deepClone(node.system.rewards);
+        const target = rewards.find(entry => entry.id === request.rewardId);
+        target.claims = claims;
+        await node.update({ "system.rewards": rewards });
+
+        try {
+            await participant.manualModifyXP(reward.poolKey, reward.amount, {
+                title: reward.logTitle || reward.name,
+                reason: reward.logReason || `获得战利品：${reward.name}`
+            });
+        } catch (err) {
+            try {
+                await node.update({ "system.rewards": node.system.rewards.map(entry => (
+                    entry.id === request.rewardId ? { ...entry, claims: reward.claims } : entry
+                )) });
+            } catch (rollbackError) {
+                console.error("XJZL | 修为奖励领取记录回滚失败:", {
+                    containerUuid: node.uuid,
+                    rewardId: request.rewardId,
+                    rollbackError
+                });
+            }
+            throw err;
+        }
+
+        return {
+            action: "claimXp",
+            containerUuid: node.uuid,
+            actorUuid: participant.uuid,
+            rewardId: reward.id,
+            rewardName: reward.name,
+            poolKey: reward.poolKey,
+            amount: reward.amount
         };
     }
 
