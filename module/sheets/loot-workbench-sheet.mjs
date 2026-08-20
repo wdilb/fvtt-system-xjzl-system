@@ -9,6 +9,62 @@ const { HandlebarsApplicationMixin } = foundry.applications.api;
 const ITEM_TYPES = ["weapon", "armor", "qizhen", "consumable", "manual", "art_book", "wuxue", "neigong", "misc"];
 const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
 const XP_POOL_KEYS = ["general", "neigong", "wuxue", "arts"];
+const activeNeedPrompts = new Set();
+
+Hooks.on("xjzl.containerNeedPrompt", payload => {
+    if (!payload?.needId || activeNeedPrompts.has(payload.needId)) return;
+    activeNeedPrompts.add(payload.needId);
+    showContainerNeedPrompt(payload).finally(() => activeNeedPrompts.delete(payload.needId));
+});
+
+Hooks.on("xjzl.containerNeedResult", payload => {
+    if (!payload?.needId) return;
+    const winner = payload.winnerUserId ? game.users.get(payload.winnerUserId) : null;
+    const message = winner
+        ? `${payload.itemName}：${winner.name} 赢得了需求。`
+        : `${payload.itemName}：无人选择需求，物品保留在节点中。`;
+    ui.notifications.info(message);
+    for (const application of Object.values(ui.windows || {})) {
+        if (application.document?.uuid === payload.containerUuid) application.render({ force: true });
+    }
+});
+
+async function showContainerNeedPrompt(payload) {
+    if (game.user.isGM) return;
+    const actors = [...game.actors]
+        .filter(actor => ["character", "npc"].includes(actor.type) && actor.isOwner)
+        .sort((a, b) => a.name.localeCompare(b.name, "zh-Hans"));
+    const actorOptions = actors.length > 0
+        ? actors.map(actor => `<option value="${foundry.utils.escapeHTML(actor.uuid)}">${foundry.utils.escapeHTML(actor.name)}</option>`).join("")
+        : `<option value="">${game.i18n.localize("XJZL.Container.NoParticipant")}</option>`;
+    const value = await foundry.applications.api.DialogV2.prompt({
+        window: { title: game.i18n.localize("XJZL.Container.NeedPromptTitle") },
+        content: `<p>${foundry.utils.escapeHTML(payload.itemName)}</p>
+            <label>${game.i18n.localize("XJZL.Container.NeedChoice")}<select name="choice">
+                <option value="need">${game.i18n.localize("XJZL.Container.Need")}</option>
+                <option value="pass">${game.i18n.localize("XJZL.Container.Pass")}</option>
+            </select></label>
+            <label>${game.i18n.localize("XJZL.Container.Participant")}<select name="actorUuid">${actorOptions}</select></label>`,
+        ok: {
+            label: game.i18n.localize("XJZL.Container.SubmitNeed"),
+            callback: (dialogEvent, button) => ({
+                choice: button.form.elements.choice.value,
+                actorUuid: button.form.elements.actorUuid.value || null
+            })
+        },
+        rejectClose: false
+    });
+    if (!value) return;
+    await xjzlSocket.executeAsGM("executeContainerTransaction", {
+        action: "needChoice",
+        containerUuid: payload.containerUuid,
+        itemId: payload.itemId,
+        needId: payload.needId,
+        actorUuid: value.choice === "need" ? value.actorUuid : null,
+        choice: value.choice,
+        operationId: foundry.utils.randomID()
+    });
+}
 
 export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
     static DEFAULT_OPTIONS = {
@@ -21,6 +77,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             editImage: XJZLLootWorkbenchSheet.prototype._onEditImage,
             lootItem: XJZLLootWorkbenchSheet.prototype._onLootItem,
             storageWithdrawItem: XJZLLootWorkbenchSheet.prototype._onLootItem,
+            needStart: XJZLLootWorkbenchSheet.prototype._onNeedStart,
             shopBuyItem: XJZLLootWorkbenchSheet.prototype._onShopBuyItem,
             editShopItem: XJZLLootWorkbenchSheet.prototype._onEditShopItem,
             lootAll: XJZLLootWorkbenchSheet.prototype._onLootAll,
@@ -94,6 +151,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
                 hidden,
                 action: isStorageMode ? "storageWithdrawItem" : isShopMode ? "shopBuyItem" : "lootItem",
                 canAction: isStorageMode ? canWithdraw : isShopMode ? canShop : canLoot,
+                canNeed: isLootMode && canLoot,
                 shopPrice,
                 shopPriceText: String(shopPrice)
             });
@@ -282,6 +340,18 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             actorUuid: participant.uuid,
             itemId: item.id,
             quantity
+        });
+    }
+
+    async _onNeedStart(event, target) {
+        event.preventDefault();
+        if (this.document.system.mode !== "loot") return;
+        const item = this.document.items.get(target.dataset.itemId);
+        if (!item) return this.#notify("warn", "XJZL.Container.ItemUnavailable");
+        await this.#executeTransaction({
+            action: "needStart",
+            containerUuid: this.document.uuid,
+            itemId: item.id
         });
     }
 
@@ -778,7 +848,8 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
             '[data-action="claimXp"]',
             '[data-action="lootAll"]',
             '[data-action="currencyAction"][data-type="take"]',
-            '[data-action="shopBuyItem"]'
+            '[data-action="shopBuyItem"]',
+            '[data-action="needStart"]'
         ];
         for (const control of this.element.querySelectorAll(selectors.join(","))) {
             control.disabled = false;

@@ -24,6 +24,19 @@ export function setupSocket() {
     xjzlSocket.register("requestCombatStats", _socketRequestCombatStats);
     xjzlSocket.register("useEncounterSupport", _socketUseEncounterSupport);
     xjzlSocket.register("executeContainerTransaction", _socketExecuteContainerTransaction);
+    xjzlSocket.register("containerNeedPrompt", _socketContainerNeedPrompt);
+    xjzlSocket.register("containerNeedResult", _socketContainerNeedResult);
+
+    Hooks.on("xjzl.containerNeedTimeout", async request => {
+        if (!game.user.isGM || !game.users.activeGM?.isSelf) return;
+        const result = await XJZLContainerTransactionManager.executeAsGM({
+            action: "needTimeout",
+            containerUuid: request.containerUuid,
+            needId: request.needId,
+            operationId: foundry.utils.randomID()
+        }, game.user.id);
+        if (result?.action === "needResult") xjzlSocket.executeForEveryone("containerNeedResult", result);
+    });
 
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
@@ -294,6 +307,14 @@ async function _socketUseEncounterSupport(request) {
     return EncounterManager.executeSupportAsGM({ ...request, userId: this.socketdata.userId });
 }
 
+function _socketContainerNeedPrompt(payload) {
+    Hooks.callAll("xjzl.containerNeedPrompt", payload);
+}
+
+function _socketContainerNeedResult(payload) {
+    Hooks.callAll("xjzl.containerNeedResult", payload);
+}
+
 /**
  * 将物资节点请求交给活动 GM 串行复核和执行。
  * @param {Object} request - 仅包含业务请求数据，用户身份由 socketlib 上下文覆盖
@@ -303,13 +324,19 @@ async function _socketExecuteContainerTransaction(request) {
     if (isNotActiveGM()) return null;
 
     try {
-        return {
+        const response = {
             ok: true,
             data: await XJZLContainerTransactionManager.executeAsGM(
                 request,
                 this.socketdata.userId
             )
         };
+        if (response.data?.action === "needStart") {
+            xjzlSocket.executeForEveryone("containerNeedPrompt", response.data);
+        } else if (response.data?.action === "needResult") {
+            xjzlSocket.executeForEveryone("containerNeedResult", response.data);
+        }
+        return response;
     } catch (err) {
         if (err?.name !== "XJZLContainerTransactionError") {
             console.error("XJZL | 物资节点交易执行异常:", err);

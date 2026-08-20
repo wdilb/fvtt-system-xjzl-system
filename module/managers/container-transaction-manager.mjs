@@ -5,7 +5,9 @@
 
 const locks = new Map();
 const completedOperations = new Map();
+const pendingNeedRolls = new Map();
 const MAX_COMPLETED_OPERATIONS = 256;
+const NEED_ROLL_TIMEOUT = 30_000;
 const STACKABLE_ITEM_TYPES = new Set(["consumable", "misc", "manual"]);
 
 export class XJZLContainerTransactionError extends Error {
@@ -77,6 +79,12 @@ export class XJZLContainerTransactionManager {
                     const mutation = await this.#shopSellItem(lockedNode, lockedParticipant, normalized);
                     return mutation.result;
                 }
+                case "needStart":
+                    return this.#needStart(lockedNode, normalized);
+                case "needChoice":
+                    return this.#needChoice(lockedNode, lockedParticipant, normalized);
+                case "needTimeout":
+                    return this.#needTimeout(lockedNode, normalized);
                 case "claimXp": {
                     const result = await this.#claimXp(lockedNode, lockedParticipant, normalized);
                     await this.#updateNodeStatus(lockedNode, "take");
@@ -129,7 +137,9 @@ export class XJZLContainerTransactionManager {
             direction: request.direction ? String(request.direction) : null,
             amount: request.amount == null ? null : Number(request.amount),
             quantity: request.quantity == null ? null : Number(request.quantity),
-            sellDiscount: request.sellDiscount == null ? null : Number(request.sellDiscount)
+            sellDiscount: request.sellDiscount == null ? null : Number(request.sellDiscount),
+            choice: request.choice ? String(request.choice) : null,
+            needId: request.needId ? String(request.needId) : null
         };
     }
 
@@ -196,6 +206,20 @@ export class XJZLContainerTransactionManager {
         if (["shopBuyItem", "shopSellItem"].includes(action)) {
             if (node.system.mode !== "shop") {
                 throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有商铺节点可以执行商铺交易。");
+            }
+            return;
+        }
+
+        if (["needStart", "needChoice"].includes(action)) {
+            if (node.system.mode !== "loot") {
+                throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以发起需求。");
+            }
+            return;
+        }
+
+        if (action === "needTimeout") {
+            if (node.system.mode !== "loot") {
+                throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以结束需求。");
             }
             return;
         }
@@ -568,6 +592,202 @@ export class XJZLContainerTransactionManager {
                 total
             }
         };
+    }
+
+    /** 发起一次轻量需求：只在内存中保存短期投票，避免把临时 UI 状态写入节点数据。 */
+    static async #needStart(node, request) {
+        const sourceItem = node.items.get(request.itemId);
+        if (!sourceItem) throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个战利品已经不存在了。");
+        if (sourceItem.getFlag("xjzl-system", "containerHidden")) {
+            throw new XJZLContainerTransactionError("ITEM_HIDDEN", "这个战利品当前不可发起需求。");
+        }
+
+        const existing = [...pendingNeedRolls.values()].find(roll => (
+            roll.containerUuid === node.uuid && roll.itemId === sourceItem.id
+        ));
+        if (existing) return this.#needPromptResult(existing, sourceItem);
+
+        const permissionDocument = node.isToken ? node.token?.baseActor || node : node;
+        const eligibleUserIds = [...game.users]
+            .filter(user => !user.isGM && user.active && permissionDocument.testUserPermission(user, "OBSERVER"))
+            .map(user => user.id);
+        const needId = foundry.utils.randomID();
+        const roll = {
+            needId,
+            containerUuid: node.uuid,
+            itemId: sourceItem.id,
+            itemName: sourceItem.name,
+            itemImg: sourceItem.img,
+            eligibleUserIds,
+            choices: new Map(),
+            timer: null
+        };
+        roll.timer = setTimeout(() => Hooks.callAll("xjzl.containerNeedTimeout", {
+            needId,
+            containerUuid: node.uuid
+        }), NEED_ROLL_TIMEOUT);
+        pendingNeedRolls.set(needId, roll);
+        await this.#postNeedChat(
+            `<p><strong>战利品需求</strong>：${foundry.utils.escapeHTML(sourceItem.name)}</p><p>请有需要的玩家在 ${NEED_ROLL_TIMEOUT / 1000} 秒内打开提示并提交需求。</p>`
+        );
+        return this.#needPromptResult(roll, sourceItem);
+    }
+
+    static #needPromptResult(roll, sourceItem) {
+        return {
+            action: "needStart",
+            needId: roll.needId,
+            containerUuid: roll.containerUuid,
+            itemId: roll.itemId,
+            itemName: sourceItem.name,
+            itemImg: sourceItem.img,
+            expiresIn: NEED_ROLL_TIMEOUT
+        };
+    }
+
+    /** 记录玩家的需求/放弃选择；最后一位玩家提交后立即结算，否则由超时任务结算。 */
+    static async #needChoice(node, participant, request) {
+        const roll = pendingNeedRolls.get(request.needId);
+        if (!roll || roll.containerUuid !== node.uuid || roll.itemId !== request.itemId) {
+            throw new XJZLContainerTransactionError("NEED_EXPIRED", "这次需求已经结束或不存在。");
+        }
+        if (!roll.eligibleUserIds.includes(request.userId)) {
+            throw new XJZLContainerTransactionError("NEED_NOT_ELIGIBLE", "你不能参与这次需求。");
+        }
+        if (roll.choices.has(request.userId)) {
+            throw new XJZLContainerTransactionError("NEED_ALREADY_CHOSEN", "你已经提交过需求选择了。");
+        }
+        if (!["need", "pass"].includes(request.choice)) {
+            throw new XJZLContainerTransactionError("INVALID_NEED_CHOICE", "需求选择无效。");
+        }
+        if (request.choice === "need" && !participant) {
+            throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "选择需求时必须指定接收角色。");
+        }
+        roll.choices.set(request.userId, {
+            userId: request.userId,
+            actorUuid: request.choice === "need" ? participant.uuid : null,
+            choice: request.choice
+        });
+        const complete = roll.eligibleUserIds.every(userId => roll.choices.has(userId));
+        return complete ? this.#finishNeedRoll(node, roll) : {
+            action: "needChoice",
+            needId: roll.needId,
+            containerUuid: node.uuid,
+            accepted: true
+        };
+    }
+
+    static async #needTimeout(node, request) {
+        const roll = pendingNeedRolls.get(request.needId);
+        if (!roll || roll.containerUuid !== node.uuid) return null;
+        return this.#finishNeedRoll(node, roll);
+    }
+
+    static async #finishNeedRoll(node, roll) {
+        if (!pendingNeedRolls.has(roll.needId)) return null;
+        pendingNeedRolls.delete(roll.needId);
+        if (roll.timer) clearTimeout(roll.timer);
+        const candidates = [...roll.choices.values()].filter(choice => choice.choice === "need");
+        if (candidates.length === 0) {
+            await this.#postNeedChat(`<p><strong>战利品需求结束</strong>：${foundry.utils.escapeHTML(roll.itemName)} 无人选择需求，物品保留在节点中。</p>`);
+            return {
+                action: "needResult",
+                needId: roll.needId,
+                containerUuid: node.uuid,
+                itemId: roll.itemId,
+                itemName: roll.itemName,
+                winnerUserId: null,
+                winnerActorUuid: null,
+                candidateCount: 0
+            };
+        }
+        const rolledCandidates = [];
+        for (const candidate of candidates) {
+            const participant = await this.#loadActor(candidate.actorUuid);
+            const roll = await new Roll("1d100").evaluate();
+            rolledCandidates.push({
+                ...candidate,
+                actorName: participant.name,
+                total: Number(roll.total) || 0,
+                roll,
+                participant
+            });
+        }
+        const highScore = Math.max(...rolledCandidates.map(candidate => candidate.total));
+        const topCandidates = rolledCandidates.filter(candidate => candidate.total === highScore);
+        const winner = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+        await this.#postNeedRollChat(roll.itemName, rolledCandidates);
+        const participant = winner.participant;
+        let mutation;
+        try {
+            mutation = await this.#lootItem(node, participant, {
+                userId: winner.userId,
+                itemId: roll.itemId,
+                quantity: 1
+            });
+        } catch (err) {
+            if (err?.code !== "ITEM_UNAVAILABLE") throw err;
+            await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`);
+            return {
+                action: "needResult",
+                needId: roll.needId,
+                containerUuid: node.uuid,
+                itemId: roll.itemId,
+                itemName: roll.itemName,
+                winnerUserId: null,
+                winnerActorUuid: null,
+                candidateCount: candidates.length,
+                rollResults: rolledCandidates.map(candidate => ({
+                    userId: candidate.userId,
+                    actorUuid: candidate.actorUuid,
+                    actorName: candidate.actorName,
+                    total: candidate.total
+                }))
+            };
+        }
+        await this.#updateNodeStatus(node, "take");
+        await this.#postNeedChat(
+            `<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 由 ${foundry.utils.escapeHTML(winner.actorName)} 获得（${winner.total}）。</p>`
+        );
+        return {
+            action: "needResult",
+            needId: roll.needId,
+            containerUuid: node.uuid,
+            itemId: roll.itemId,
+            itemName: roll.itemName,
+            winnerUserId: winner.userId,
+            winnerActorUuid: winner.actorUuid,
+            candidateCount: candidates.length,
+            winnerTotal: winner.total,
+            quantity: mutation.result.quantity
+        };
+    }
+
+    /** 需求流程的聊天栏消息只由活动 GM 创建，避免多个客户端重复发言。 */
+    static async #postNeedChat(content, rolls = []) {
+        try {
+            const chatData = {
+                user: game.user.id,
+                speaker: { alias: "战利品需求" },
+                content,
+                rolls
+            };
+            // 需求是队伍公共流程，不能受 GM 的私聊/盲骰默认设置影响。
+            ChatMessage.applyRollMode(chatData, "publicroll");
+            await ChatMessage.create(chatData);
+        } catch (err) {
+            console.error("XJZL | 发布战利品需求聊天消息失败:", { err });
+        }
+    }
+
+    static async #postNeedRollChat(itemName, candidates) {
+        const rollSummary = candidates
+            .map(candidate => `${foundry.utils.escapeHTML(candidate.actorName)}：${candidate.total}`)
+            .join("、");
+        await this.#postNeedChat(
+            `<p><strong>需求投骰</strong>：${foundry.utils.escapeHTML(itemName)}</p><p>${rollSummary}</p>`,
+            candidates.map(candidate => candidate.roll)
+        );
     }
 
     static #getShopBuyPrice(node, item) {
