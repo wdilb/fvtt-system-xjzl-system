@@ -34,7 +34,7 @@ export class XJZLContainerTransactionManager {
             ? await this.#loadActor(normalized.actorUuid)
             : null;
 
-        this.#assertNodeAccess(node, normalized.userId, normalized.action);
+        this.#assertNodeAccess(node, normalized.userId, normalized);
         if (participant) this.#assertParticipantAccess(participant, normalized.userId);
 
         const lockKeys = [node.uuid, participant?.uuid].filter(Boolean);
@@ -45,7 +45,7 @@ export class XJZLContainerTransactionManager {
                 ? await this.#loadActor(normalized.actorUuid)
                 : null;
 
-            this.#assertNodeAccess(lockedNode, normalized.userId, normalized.action);
+            this.#assertNodeAccess(lockedNode, normalized.userId, normalized);
             if (lockedParticipant) this.#assertParticipantAccess(lockedParticipant, normalized.userId);
 
             switch (normalized.action) {
@@ -59,6 +59,14 @@ export class XJZLContainerTransactionManager {
                 case "lootItem": {
                     const mutation = await this.#lootItem(lockedNode, lockedParticipant, normalized);
                     await this.#updateNodeStatus(lockedNode, "take");
+                    return mutation.result;
+                }
+                case "storageWithdrawItem": {
+                    const mutation = await this.#lootItem(lockedNode, lockedParticipant, normalized);
+                    return { ...mutation.result, action: "storageWithdrawItem" };
+                }
+                case "storageDepositItem": {
+                    const mutation = await this.#depositItem(lockedNode, lockedParticipant, normalized);
                     return mutation.result;
                 }
                 case "claimXp": {
@@ -132,32 +140,67 @@ export class XJZLContainerTransactionManager {
         return actor;
     }
 
-    static #assertNodeAccess(node, userId, action) {
+    /**
+     * 按节点模式校验请求权限：战利品允许观察者领取，仓库存取必须拥有节点。
+     * @param {Actor} node - 被操作的物资节点
+     * @param {string} userId - socketlib 提供的真实用户 ID
+     * @param {Object} request - 已规范化的事务请求
+     */
+    static #assertNodeAccess(node, userId, request) {
         const user = game.users.get(userId);
         if (!user) throw new XJZLContainerTransactionError("INVALID_USER", "操作用户不存在或已离线。");
         if (user.isGM) return;
 
-        if (!node.testUserPermission(user, "OBSERVER")) {
+        // 未关联 Token 的 Actor 是合成文档，权限来源仍是世界 Actor；直接检查合成 Actor 会误判为无权限。
+        const permissionDocument = node.isToken ? node.token?.baseActor || node : node;
+        if (!permissionDocument.testUserPermission(user, "OBSERVER")) {
             throw new XJZLContainerTransactionError("NO_VIEW_PERMISSION", "你没有查看这个物资节点的权限。");
         }
         if (!node.system.isOpen) {
             throw new XJZLContainerTransactionError("NODE_CLOSED", "这个物资节点当前未开放。");
         }
 
+        const action = request.action;
         const settings = node.system.settings;
-        if (["lootItem", "lootAll", "claimXp"].includes(action) && node.system.mode !== "loot") {
-            throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以执行拾取操作。");
+        if (action === "inspect") return;
+
+        if (["lootItem", "lootAll", "claimXp"].includes(action)) {
+            if (node.system.mode !== "loot") {
+                throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有战利品节点可以执行拾取操作。");
+            }
+            if (action === "lootAll" && !settings.allowTakeAll) {
+                throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "这个战利品节点不允许全部拾取。");
+            }
+            return;
         }
-        const allowed = {
-            inspect: true,
-            currencyTransfer: Boolean(settings.allowTake || settings.allowDeposit || settings.allowWithdraw),
-            lootItem: Boolean(settings.allowTake),
-            lootAll: Boolean(settings.allowTakeAll),
-            claimXp: Boolean(settings.allowTake)
-        }[action];
-        if (!allowed) {
-            throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "这个物资节点不允许当前操作。");
+
+        if (["storageWithdrawItem", "storageDepositItem"].includes(action)) {
+            if (node.system.mode !== "storage") {
+                throw new XJZLContainerTransactionError("INVALID_NODE_MODE", "只有仓库节点可以执行仓储操作。");
+            }
+            if (!permissionDocument.testUserPermission(user, "OWNER")) {
+                throw new XJZLContainerTransactionError("NO_STORAGE_PERMISSION", "你必须拥有这个仓库才能存取物品。");
+            }
+            return;
         }
+
+        if (action === "currencyTransfer") {
+            if (node.system.mode === "loot") {
+                if (request.direction !== "take") {
+                    throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "玩家不能向战利品节点存入银两。");
+                }
+                return;
+            }
+            if (node.system.mode === "storage") {
+                if (!permissionDocument.testUserPermission(user, "OWNER")) {
+                    throw new XJZLContainerTransactionError("NO_STORAGE_PERMISSION", "你必须拥有这个仓库才能存取银两。");
+                }
+                return;
+            }
+            throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "商铺交易功能尚未开放。");
+        }
+
+        throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "这个物资节点不允许当前操作。");
     }
 
     static #assertParticipantAccess(actor, userId) {
@@ -172,9 +215,11 @@ export class XJZLContainerTransactionManager {
         const user = game.users.get(userId);
         const canSeeHidden = Boolean(user?.isGM);
         const visibleItems = Array.from(node.items).filter(item => (
-            canSeeHidden || !item.getFlag("xjzl-system", "containerHidden")
+            canSeeHidden || node.system.mode !== "loot" || !item.getFlag("xjzl-system", "containerHidden")
         ));
-        const visibleRewards = node.system.rewards.filter(reward => canSeeHidden || !reward.hidden);
+        const visibleRewards = node.system.mode === "loot"
+            ? node.system.rewards.filter(reward => canSeeHidden || !reward.hidden)
+            : [];
 
         return {
             action: "inspect",
@@ -201,7 +246,7 @@ export class XJZLContainerTransactionManager {
             throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个物品已经被其他人取走了。");
         }
         const user = game.users.get(request.userId);
-        if (!user?.isGM && sourceItem.getFlag("xjzl-system", "containerHidden")) {
+        if (!user?.isGM && node.system.mode === "loot" && sourceItem.getFlag("xjzl-system", "containerHidden")) {
             throw new XJZLContainerTransactionError("ITEM_HIDDEN", "这个物品当前不可领取。");
         }
 
@@ -285,6 +330,119 @@ export class XJZLContainerTransactionManager {
                 sourceQuantity
             })
         };
+    }
+
+    /** 将角色物品存入仓库；可堆叠物按类型和名称合并，失败时恢复双方库存。 */
+    static async #depositItem(node, participant, request) {
+        if (!participant) {
+            throw new XJZLContainerTransactionError("INVALID_PARTICIPANT", "存入物品需要指定来源角色。");
+        }
+        if (!request.itemId) {
+            throw new XJZLContainerTransactionError("INVALID_ITEM", "缺少要存入的物品。");
+        }
+
+        const sourceItem = participant.items.get(request.itemId);
+        if (!sourceItem) {
+            throw new XJZLContainerTransactionError("ITEM_UNAVAILABLE", "这个角色身上已经没有该物品了。");
+        }
+        const stackable = STACKABLE_ITEM_TYPES.has(sourceItem.type);
+        const sourceQuantity = stackable ? Math.max(1, Number(sourceItem.system.quantity) || 1) : 1;
+        const quantity = request.quantity == null ? 1 : request.quantity;
+        if (!Number.isInteger(quantity) || quantity <= 0 || quantity > sourceQuantity) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "存入数量超出当前库存。");
+        }
+        if (!stackable && quantity !== 1) {
+            throw new XJZLContainerTransactionError("INVALID_QUANTITY", "这个物品不能按数量拆分存入。");
+        }
+
+        const sourceData = foundry.utils.deepClone(sourceItem.toObject());
+        const stackKey = stackable ? this.#getStackKey(sourceItem) : null;
+        const destinationItem = stackKey
+            ? Array.from(node.items).find(item => this.#getStackKey(item) === stackKey)
+            : null;
+        const destinationQuantity = destinationItem
+            ? Math.max(1, Number(destinationItem.system.quantity) || 1)
+            : null;
+        let createdItem = null;
+        let sourceRemoved = false;
+
+        try {
+            if (destinationItem) {
+                await destinationItem.update({ "system.quantity": destinationQuantity + quantity });
+            } else {
+                const itemData = foundry.utils.deepClone(sourceData);
+                itemData.flags?.["xjzl-system"] && delete itemData.flags["xjzl-system"].containerHidden;
+                if (stackable) itemData.system.quantity = quantity;
+                const created = await node.createEmbeddedDocuments("Item", [itemData]);
+                createdItem = created?.[0] || null;
+                if (!createdItem) throw new Error("未能创建仓库物品。");
+            }
+
+            const remaining = stackable ? sourceQuantity - quantity : 0;
+            if (remaining > 0) {
+                await sourceItem.update({ "system.quantity": remaining });
+            } else {
+                await participant.deleteEmbeddedDocuments("Item", [sourceItem.id]);
+                sourceRemoved = true;
+            }
+        } catch (err) {
+            await this.#rollbackDepositItem({
+                node,
+                participant,
+                sourceItem,
+                sourceData,
+                sourceRemoved,
+                destinationItem,
+                destinationQuantity,
+                createdItem
+            });
+            throw err;
+        }
+
+        return {
+            result: {
+                action: "storageDepositItem",
+                containerUuid: node.uuid,
+                actorUuid: participant.uuid,
+                itemId: sourceItem.id,
+                itemName: sourceItem.name,
+                quantity,
+                remaining: stackable ? sourceQuantity - quantity : 0
+            },
+            undo: async () => this.#rollbackDepositItem({
+                node,
+                participant,
+                sourceItem,
+                sourceData,
+                sourceRemoved,
+                destinationItem,
+                destinationQuantity,
+                createdItem
+            })
+        };
+    }
+
+    static async #rollbackDepositItem({
+        node,
+        participant,
+        sourceItem,
+        sourceData,
+        sourceRemoved,
+        destinationItem,
+        destinationQuantity,
+        createdItem
+    }) {
+        if (createdItem) {
+            await node.deleteEmbeddedDocuments("Item", [createdItem.id]);
+        } else if (destinationItem && destinationQuantity != null) {
+            await destinationItem.update({ "system.quantity": destinationQuantity });
+        }
+
+        if (sourceRemoved || !participant.items.get(sourceItem.id)) {
+            await participant.createEmbeddedDocuments("Item", [sourceData]);
+        } else {
+            await sourceItem.update({ "system.quantity": sourceData.system.quantity });
+        }
     }
 
     /** 领取一次性修为奖励，并把玩家身份写入领取记录防止重复领取。 */
@@ -470,21 +628,9 @@ export class XJZLContainerTransactionManager {
             throw new XJZLContainerTransactionError("INVALID_DIRECTION", "银两操作方向无效。");
         }
 
-        const settings = node.system.settings;
         const actorSilver = Number(participant.system.resources?.silver) || 0;
         const nodeSilver = Number(node.system.currency) || 0;
         const isTake = request.direction === "take";
-        const isGM = game.users.get(request.userId)?.isGM;
-
-        const canTake = node.system.mode === "storage"
-            ? settings.allowWithdraw
-            : settings.allowTake;
-        if (isTake && !canTake && !isGM) {
-            throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "这个物资节点不允许取出银两。");
-        }
-        if (!isTake && !settings.allowDeposit && !isGM) {
-            throw new XJZLContainerTransactionError("ACTION_NOT_ALLOWED", "这个物资节点不允许存入银两。");
-        }
         if (isTake && request.amount > nodeSilver) {
             throw new XJZLContainerTransactionError("INSUFFICIENT_NODE_CURRENCY", "物资节点中的银两不足。");
         }

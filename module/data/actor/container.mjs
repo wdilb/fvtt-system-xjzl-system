@@ -51,12 +51,9 @@ export class XJZLContainerData extends foundry.abstract.TypeDataModel {
             // 节点钱箱只保存银两余额；角色银两仍由角色自身的资源事务维护。
             currency: new NumberField({ required: true, initial: 0, min: 0, integer: true }),
 
-            // 这些是业务能力开关，不替代 Foundry 的文档可见性/管理权限。
+            // 战利品只保留“全部拾取”开关；仓库存取直接由 Foundry Actor 所有权决定。
             settings: new SchemaField({
-                allowTake: new BooleanField({ required: true, initial: true }),
                 allowTakeAll: new BooleanField({ required: true, initial: true }),
-                allowDeposit: new BooleanField({ required: true, initial: false }),
-                allowWithdraw: new BooleanField({ required: true, initial: false }),
                 buyDiscount: new NumberField({ required: true, initial: 1, min: 0 }),
                 sellDiscount: new NumberField({ required: true, initial: 0.5, min: 0 }),
                 infiniteStock: new BooleanField({ required: true, initial: false }),
@@ -71,7 +68,8 @@ export class XJZLContainerData extends foundry.abstract.TypeDataModel {
     get isEmpty() {
         return this.parent.items.size === 0
             && this.currency === 0
-            && this.rewards.every(reward => reward.hidden || reward.claims.length > 0);
+            // 修为按玩家独立领取，任意一人的领取记录不能让共享节点全局耗尽。
+            && this.rewards.every(reward => reward.hidden);
     }
 
     get isOpen() {

@@ -39,12 +39,52 @@
         </label>
     </section>
 
+    {{#if isGM}}
+    <details class="node-config" {{#if nodeConfigOpen}}open{{/if}}>
+        <summary><i class="fas fa-sliders" aria-hidden="true"></i>{{localize "XJZL.Container.NodeConfig"}}</summary>
+        <div class="node-config-grid">
+            <label>
+                <span>{{localize "XJZL.Container.Mode"}}</span>
+                <select data-config-path="mode">
+                    {{#each modeChoices as |choice|}}
+                    <option value="{{choice.value}}" {{#if (eq choice.value ../system.mode)}}selected{{/if}}>{{choice.label}}</option>
+                    {{/each}}
+                </select>
+            </label>
+            <label>
+                <span>{{localize "XJZL.Container.Status"}}</span>
+                <select data-config-path="status">
+                    {{#each statusChoices as |choice|}}
+                    <option value="{{choice.value}}" {{#if (eq choice.value ../system.status)}}selected{{/if}}>{{choice.label}}</option>
+                    {{/each}}
+                </select>
+            </label>
+            {{#if isLootMode}}
+            <label class="node-config-check"><input type="checkbox" data-config-path="settings.allowTakeAll" {{checked system.settings.allowTakeAll}}>{{localize "XJZL.Container.AllowTakeAll"}}</label>
+            {{/if}}
+            {{#if isStorageMode}}
+            <p class="node-config-note">{{localize "XJZL.Container.StoragePermissionNote"}}</p>
+            {{/if}}
+            {{#if isShopMode}}
+            <p class="node-config-note">{{localize "XJZL.Container.ShopConfigPending"}}</p>
+            {{/if}}
+        </div>
+    </details>
+    {{/if}}
+
+    {{#if isStorageMode}}
+    <div class="loot-mode-note">
+        <i class="fas fa-boxes-stacked" aria-hidden="true"></i>
+        <span>{{storageHint}}</span>
+    </div>
+    {{else}}
     {{#unless isLootMode}}
     <div class="loot-mode-note">
         <i class="fas fa-compass-drafting" aria-hidden="true"></i>
         <span>{{localize "XJZL.Container.ModeUnavailable"}}</span>
     </div>
     {{/unless}}
+    {{/if}}
 
     <main class="loot-scroll">
         {{#if hasVisibleItems}}
@@ -67,9 +107,11 @@
                     </div>
                     <div class="loot-item-actions">
                         {{#if ../../isGM}}
+                        {{#if ../../isLootMode}}
                         <button type="button" class="icon-button" data-action="toggleHidden" data-item-id="{{item.id}}" title="{{#if item.hidden}}{{localize "XJZL.Container.Show"}}{{else}}{{localize "XJZL.Container.Hide"}}{{/if}}">
                             <i class="fas {{#if item.hidden}}fa-eye{{else}}fa-eye-slash{{/if}}" aria-hidden="true"></i>
                         </button>
+                        {{/if}}
                         {{#if item.isStackable}}
                         <button type="button" class="icon-button" data-action="editQuantity" data-item-id="{{item.id}}" title="{{localize "XJZL.Container.EditQuantity"}}">
                             <i class="fas fa-hashtag" aria-hidden="true"></i>
@@ -79,8 +121,8 @@
                             <i class="fas fa-trash" aria-hidden="true"></i>
                         </button>
                         {{/if}}
-                        {{#if ../../canLoot}}
-                        <button type="button" class="text-button" data-action="lootItem" data-item-id="{{item.id}}">{{localize "XJZL.Container.Take"}}</button>
+                        {{#if item.canAction}}
+                        <button type="button" class="text-button" data-action="{{item.action}}" data-item-id="{{item.id}}">{{#if ../../isStorageMode}}{{localize "XJZL.Container.WithdrawItem"}}{{else}}{{localize "XJZL.Container.Take"}}{{/if}}</button>
                         {{/if}}
                     </div>
                 </article>
@@ -92,8 +134,8 @@
         <div class="loot-empty">
             <i class="fas fa-box-open" aria-hidden="true"></i>
             <p>{{localize "XJZL.Container.Empty"}}</p>
-        </div>
-        {{/if}}
+    </div>
+    {{/if}}
 
         {{#if hasVisibleRewards}}
         <section class="loot-section loot-reward-section">
@@ -141,9 +183,14 @@
     </main>
 
     <footer class="loot-footer">
+        {{#if canDepositCurrency}}
+        <button type="button" class="currency-button" data-action="currencyAction" data-type="deposit">
+            <i class="fas fa-piggy-bank" aria-hidden="true"></i>{{localize "XJZL.Container.DepositCurrency"}}
+        </button>
+        {{/if}}
         {{#if canTakeCurrency}}
-        <button type="button" class="currency-button" data-action="currencyAction">
-            <i class="fas fa-coins" aria-hidden="true"></i>{{localize "XJZL.Container.TakeCurrency"}}
+        <button type="button" class="currency-button" data-action="currencyAction" data-type="take">
+            <i class="fas fa-coins" aria-hidden="true"></i>{{#if isStorageMode}}{{localize "XJZL.Container.WithdrawCurrency"}}{{else}}{{localize "XJZL.Container.TakeCurrency"}}{{/if}}
         </button>
         {{/if}}
         {{#if canLootAll}}

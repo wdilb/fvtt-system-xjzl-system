@@ -617,9 +617,9 @@ export class XJZLActor extends Actor {
       // 2. Token 设置：
       // - 敌对状态：中立 (0)
       // - 显示名字：总是显示 (或者悬停显示)
-      // - 链接：默认不链接 (actorLink=false)，这意味着拖出来的每一个宝箱都是独立的，互不影响。
-      //   如果你想要“公共仓库”(所有宝箱通向同一个空间)，则需要手动勾选“链接角色数据”。
-      prototypeToken.actorLink = false;
+      // - 战利品 Token 各自保存库存；仓库/商铺 Token 关联世界 Actor，共享同一份持久库存。
+      //   工作台切换模式时只同步原型；已经放置到场景中的 Token 保持原有关联状态。
+      prototypeToken.actorLink = data.system?.mode ? data.system.mode !== "loot" : false;
       prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
       prototypeToken.displayName = CONST.TOKEN_DISPLAY_MODES.HOVER;
 
