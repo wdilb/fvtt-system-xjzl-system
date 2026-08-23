@@ -1,5 +1,6 @@
 import { CombatStatsManager } from "./managers/combat-stats-manager.mjs";
 import { EncounterManager } from "./managers/encounter-manager.mjs";
+import { XJZLContainerTransactionManager } from "./managers/container-transaction-manager.mjs";
 import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resource-commit-error.mjs";
 
 export let xjzlSocket;
@@ -22,6 +23,24 @@ export function setupSocket() {
     xjzlSocket.register("broadcastCombatStats", _socketBroadcastCombatStats);
     xjzlSocket.register("requestCombatStats", _socketRequestCombatStats);
     xjzlSocket.register("useEncounterSupport", _socketUseEncounterSupport);
+    xjzlSocket.register("executeContainerTransaction", _socketExecuteContainerTransaction);
+    xjzlSocket.register("containerNeedPrompt", _socketContainerNeedPrompt);
+    xjzlSocket.register("containerNeedResult", _socketContainerNeedResult);
+
+    Hooks.on("xjzl.containerNeedTimeout", async request => {
+        if (!game.user.isGM || !game.users.activeGM?.isSelf) return;
+        try {
+            const result = await XJZLContainerTransactionManager.executeAsGM({
+                action: "needTimeout",
+                containerUuid: request.containerUuid,
+                needId: request.needId,
+                operationId: foundry.utils.randomID()
+            }, game.user.id);
+            if (result?.action === "needResult") xjzlSocket.executeForEveryone("containerNeedResult", result);
+        } catch (err) {
+            console.error("XJZL | 战利品需求超时结算失败:", { request, err });
+        }
+    });
 
     // === 视觉类 (所有人执行) ===
     // 注册飘字广播
@@ -290,4 +309,49 @@ async function _socketUseEncounterSupport(request) {
     if (isNotActiveGM()) return null;
     // socketlib 会把真实发送者写入调用上下文；覆盖客户端字段，避免伪造 GM 身份绕过编组权限。
     return EncounterManager.executeSupportAsGM({ ...request, userId: this.socketdata.userId });
+}
+
+function _socketContainerNeedPrompt(payload) {
+    Hooks.callAll("xjzl.containerNeedPrompt", payload);
+}
+
+function _socketContainerNeedResult(payload) {
+    Hooks.callAll("xjzl.containerNeedResult", payload);
+}
+
+/**
+ * 将物资节点请求交给活动 GM 串行复核和执行。
+ * @param {Object} request - 仅包含业务请求数据，用户身份由 socketlib 上下文覆盖
+ * @returns {Promise<Object|null>} 结构化成功或失败结果
+ */
+async function _socketExecuteContainerTransaction(request) {
+    if (isNotActiveGM()) return null;
+
+    try {
+        const response = {
+            ok: true,
+            data: await XJZLContainerTransactionManager.executeAsGM(
+                request,
+                this.socketdata.userId
+            )
+        };
+        if (response.data?.action === "needStart") {
+            xjzlSocket.executeForEveryone("containerNeedPrompt", response.data);
+        } else if (response.data?.action === "needResult") {
+            xjzlSocket.executeForEveryone("containerNeedResult", response.data);
+        }
+        return response;
+    } catch (err) {
+        if (err?.name !== "XJZLContainerTransactionError") {
+            console.error("XJZL | 物资节点交易执行异常:", err);
+        }
+        return {
+            ok: false,
+            error: {
+                code: err?.code || "TRANSACTION_FAILED",
+                message: err?.message || "物资节点交易失败。",
+                details: err?.details || {}
+            }
+        };
+    }
 }

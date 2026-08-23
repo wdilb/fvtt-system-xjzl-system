@@ -1,0 +1,244 @@
+<div class="loot-workbench loot-mode-{{system.mode}} loot-status-{{system.status}}">
+    <header class="loot-header">
+        <div class="loot-state-visual">
+            <div class="loot-state-aura" aria-hidden="true"></div>
+            <img class="loot-header-image" src="{{actorImg}}" alt="{{actorName}}" {{#if isGM}}data-action="{{headerImageAction}}" data-image-state="{{stateImageKey}}" title="{{headerImageTitle}}"{{/if}}>
+            <div class="loot-state-seal">
+                <span class="loot-status-dot" aria-hidden="true"></span>
+                <span>{{statusLabel}}</span>
+            </div>
+        </div>
+
+        <div class="loot-heading">
+            <div class="loot-kicker"><i class="fas {{modeIcon}}" aria-hidden="true"></i>{{localize "XJZL.Container.NodeTitle"}}</div>
+            <h1>{{actorName}}</h1>
+            <div class="loot-meta">
+                <span class="loot-mode">{{modeLabel}}</span>
+                <span>{{visibleItemCount}} {{localize "XJZL.Container.ItemCount"}}</span>
+                {{#if hasVisibleRewards}}<span>{{visibleRewardCount}} {{localize "XJZL.Container.XpRewards"}}</span>{{/if}}
+            </div>
+        </div>
+
+        <aside class="loot-currency" aria-label="{{localize "XJZL.Container.Currency"}}">
+            <div class="loot-currency-emblem"><i class="fas fa-coins" aria-hidden="true"></i></div>
+            <div class="loot-currency-copy">
+                <span class="loot-currency-label">{{localize "XJZL.Container.Currency"}}</span>
+                <strong>{{system.currency}}</strong>
+            </div>
+            {{#if isGM}}
+            <button type="button" class="icon-button currency-edit-button" data-action="editCurrency" title="{{localize "XJZL.Container.EditCurrency"}}">
+                <i class="fas fa-pen" aria-hidden="true"></i>
+            </button>
+            {{/if}}
+        </aside>
+    </header>
+
+    <section class="loot-controls" aria-label="{{localize "XJZL.Container.Controls"}}">
+        <label class="participant-field">
+            <span class="control-label"><i class="fas fa-user-ninja" aria-hidden="true"></i>{{localize "XJZL.Container.Participant"}}</span>
+            <select class="participant-select" {{#unless participants.length}}disabled{{/unless}}>
+                {{#each participants as |participant|}}
+                <option value="{{participant.uuid}}" {{#if (eq participant.uuid ../selectedActor.uuid)}}selected{{/if}}>{{participant.name}}</option>
+                {{else}}
+                <option value="">{{localize "XJZL.Container.NoParticipant"}}</option>
+                {{/each}}
+            </select>
+        </label>
+        <label class="loot-search">
+            <span class="visually-hidden">{{localize "XJZL.Container.Search"}}</span>
+            <i class="fas fa-search" aria-hidden="true"></i>
+            <input class="container-search-input" type="search" placeholder="{{localize "XJZL.Container.Search"}}">
+        </label>
+    </section>
+
+    {{#if isGM}}
+    <details class="node-config" {{#if nodeConfigOpen}}open{{/if}}>
+        <summary>
+            <span><i class="fas fa-gears" aria-hidden="true"></i>{{localize "XJZL.Container.NodeConfig"}}</span>
+            <i class="fas fa-chevron-down node-config-chevron" aria-hidden="true"></i>
+        </summary>
+        <div class="node-config-grid">
+            <label class="node-config-field">
+                <span>{{localize "XJZL.Container.Mode"}}</span>
+                <select data-config-path="mode">
+                    {{#each modeChoices as |choice|}}
+                    <option value="{{choice.value}}" {{#if (eq choice.value ../system.mode)}}selected{{/if}}>{{choice.label}}</option>
+                    {{/each}}
+                </select>
+            </label>
+            <label class="node-config-field">
+                <span>{{localize "XJZL.Container.Status"}}</span>
+                <select data-config-path="status">
+                    {{#each statusChoices as |choice|}}
+                    <option value="{{choice.value}}" {{#if (eq choice.value ../system.status)}}selected{{/if}}>{{choice.label}}</option>
+                    {{/each}}
+                </select>
+            </label>
+
+            {{#if isLootMode}}
+            <div class="node-appearance-config">
+                <span class="node-config-label">{{localize "XJZL.Container.StateImages"}}</span>
+                <div class="node-state-images">
+                    <button type="button" class="node-state-image {{#if (eq stateImageKey "active")}}is-current{{/if}}" data-action="editStateImage" data-image-state="active" title="{{localize "XJZL.Container.EditStateImage"}}">
+                        <img src="{{activeImg}}" alt="{{localize "XJZL.Container.ActiveImage"}}">
+                        <span>{{localize "XJZL.Container.ActiveImage"}}</span>
+                    </button>
+                    <button type="button" class="node-state-image {{#if (eq stateImageKey "depleted")}}is-current{{/if}}" data-action="editStateImage" data-image-state="depleted" title="{{localize "XJZL.Container.EditStateImage"}}">
+                        <img src="{{depletedImg}}" alt="{{localize "XJZL.Container.DepletedImage"}}">
+                        <span>{{localize "XJZL.Container.DepletedImage"}}</span>
+                    </button>
+                </div>
+            </div>
+            <label class="node-config-check"><input type="checkbox" data-config-path="settings.allowTakeAll" {{checked system.settings.allowTakeAll}}><span>{{localize "XJZL.Container.AllowTakeAll"}}</span></label>
+            {{/if}}
+            {{#if isStorageMode}}
+            <p class="node-config-note"><i class="fas fa-shield-halved" aria-hidden="true"></i>{{localize "XJZL.Container.StoragePermissionNote"}}</p>
+            {{/if}}
+            {{#if isShopMode}}
+            <label class="node-config-field">
+                <span>{{localize "XJZL.Container.BuyDiscount"}}</span>
+                <input type="number" data-config-path="settings.buyDiscount" min="0" step="0.05" value="{{system.settings.buyDiscount}}">
+            </label>
+            <label class="node-config-field">
+                <span>{{localize "XJZL.Container.SellDiscount"}}</span>
+                <input type="number" data-config-path="settings.sellDiscount" min="0" step="0.05" value="{{system.settings.sellDiscount}}">
+            </label>
+            <label class="node-config-check"><input type="checkbox" data-config-path="settings.infiniteStock" {{checked system.settings.infiniteStock}}><span>{{localize "XJZL.Container.InfiniteStock"}}</span></label>
+            <label class="node-config-check"><input type="checkbox" data-config-path="settings.infiniteWallet" {{checked system.settings.infiniteWallet}}><span>{{localize "XJZL.Container.InfiniteWallet"}}</span></label>
+            <p class="node-config-note"><i class="fas fa-circle-info" aria-hidden="true"></i>{{localize "XJZL.Container.ShopConfigNote"}}</p>
+            {{/if}}
+        </div>
+    </details>
+    {{/if}}
+
+    {{#if isStorageMode}}
+    <div class="loot-mode-note">
+        <i class="fas fa-boxes-stacked" aria-hidden="true"></i>
+        <span>{{storageHint}}</span>
+    </div>
+    {{else if isShopMode}}
+    <div class="loot-mode-note">
+        <i class="fas fa-store" aria-hidden="true"></i>
+        <span>{{localize "XJZL.Container.ShopDropHint"}}</span>
+    </div>
+    {{/if}}
+
+    <main class="loot-scroll">
+        {{#if hasVisibleItems}}
+        {{#each inventory as |section|}}
+        <section class="loot-section">
+            <header class="loot-category-tab">
+                <h2>{{localize section.label}}</h2>
+                <span>{{section.items.length}}</span>
+            </header>
+            <div class="loot-item-grid">
+                {{#each section.items as |item|}}
+                <article class="loot-item-card {{#if item.hidden}}is-hidden{{/if}}" data-item-id="{{item.id}}" data-tooltip="{{item.tooltip}}" data-tooltip-class="xjzl-loot-item-tooltip">
+                    <div class="loot-slot-visual">
+                        <img src="{{item.img}}" class="loot-slot-image" alt="{{item.name}}">
+                        {{#if item.isStackable}}<span class="loot-slot-quantity">{{item.quantity}}</span>{{/if}}
+
+                        {{#if item.hidden}}<span class="loot-slot-hidden" data-tooltip="{{localize "XJZL.Container.HiddenTooltip"}}" data-tooltip-class="xjzl-loot-hidden-tooltip"><i class="fas fa-eye-slash" aria-hidden="true"></i></span>{{/if}}
+                        {{#if ../../isGM}}
+                        <div class="loot-slot-tools">
+                            {{#if ../../isLootMode}}
+                            <button type="button" class="slot-tool" data-action="toggleHidden" data-item-id="{{item.id}}" data-tooltip="{{#if item.hidden}}{{localize "XJZL.Container.ShowTooltip"}}{{else}}{{localize "XJZL.Container.HideTooltip"}}{{/if}}" data-tooltip-class="{{#if item.hidden}}xjzl-loot-action-tooltip{{else}}xjzl-loot-hidden-tooltip{{/if}}"><i class="fas {{#if item.hidden}}fa-eye{{else}}fa-eye-slash{{/if}}" aria-hidden="true"></i></button>
+                            {{/if}}
+                            {{#if ../../isShopMode}}
+                            <button type="button" class="slot-tool" data-action="editShopItem" data-item-id="{{item.id}}" data-tooltip="{{localize "XJZL.Container.EditShopItem"}}" data-tooltip-class="xjzl-loot-action-tooltip"><i class="fas fa-tag" aria-hidden="true"></i></button>
+                            {{/if}}
+                            {{#if item.isStackable}}
+                            <button type="button" class="slot-tool" data-action="editQuantity" data-item-id="{{item.id}}" data-tooltip="{{localize "XJZL.Container.EditQuantity"}}" data-tooltip-class="xjzl-loot-action-tooltip"><i class="fas fa-hashtag" aria-hidden="true"></i></button>
+                            {{/if}}
+                            <button type="button" class="slot-tool is-danger" data-action="deleteItem" data-item-id="{{item.id}}" data-tooltip="{{localize "XJZL.Container.DeleteItem"}}" data-tooltip-class="xjzl-loot-action-tooltip"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                        </div>
+                        {{/if}}
+                    </div>
+                    <div class="loot-slot-caption">
+                        <b>{{item.name}}</b>
+                        {{#if ../../isShopMode}}
+                        <span class="shop-price-line"><i class="fas fa-coins" aria-hidden="true"></i>{{item.shopPriceText}}</span>
+                        {{else}}
+                        <span>{{localize section.label}}</span>
+                        {{/if}}
+                    </div>
+                    {{#if (or item.canNeed item.canAction)}}
+                    <div class="loot-slot-actions">
+                        {{#if item.canNeed}}
+                        <button type="button" class="slot-action is-need" data-action="needStart" data-item-id="{{item.id}}" data-tooltip="{{localize "XJZL.Container.NeedTooltip"}}" data-tooltip-class="xjzl-loot-action-tooltip"><i class="fas fa-dice-d20" aria-hidden="true"></i>{{localize "XJZL.Container.Need"}}</button>
+                        {{/if}}
+                        {{#if item.canAction}}
+                        <button type="button" class="slot-action is-primary" data-action="{{item.action}}" data-item-id="{{item.id}}" data-tooltip="{{#if ../../isStorageMode}}{{localize "XJZL.Container.WithdrawTooltip"}}{{else if ../../isShopMode}}{{localize "XJZL.Container.BuyTooltip"}}{{else}}{{localize "XJZL.Container.TakeTooltip"}}{{/if}}" data-tooltip-class="xjzl-loot-action-tooltip"><i class="fas fa-hand" aria-hidden="true"></i>{{#if ../../isStorageMode}}{{localize "XJZL.Container.WithdrawItem"}}{{else if ../../isShopMode}}{{localize "XJZL.Container.BuyItem"}}{{else}}{{localize "XJZL.Container.Take"}}{{/if}}</button>
+                        {{/if}}
+                    </div>
+                    {{/if}}
+                </article>
+                {{/each}}
+            </div>
+        </section>
+        {{/each}}
+        {{else}}
+        <div class="loot-empty {{#if hasVisibleRewards}}is-compact{{/if}}">
+            <div class="loot-empty-emblem"><i class="fas {{modeIcon}}" aria-hidden="true"></i></div>
+            <p>{{localize "XJZL.Container.Empty"}}</p>
+        </div>
+        {{/if}}
+
+        {{#if hasVisibleRewards}}
+        <section class="loot-section loot-reward-section">
+            <header class="loot-category-tab">
+                <h2>{{localize "XJZL.Container.XpRewards"}}</h2>
+                <span>{{visibleRewardCount}}</span>
+                {{#if isGM}}<button type="button" class="category-action" data-action="addXpReward"><i class="fas fa-plus" aria-hidden="true"></i>{{localize "XJZL.Container.AddReward"}}</button>{{/if}}
+            </header>
+            <div class="loot-item-grid">
+                {{#each rewards as |reward|}}
+                <article class="loot-item-card loot-reward-card {{#if reward.hidden}}is-hidden{{/if}}" data-reward-id="{{reward.id}}" data-tooltip="{{reward.tooltip}}" data-tooltip-class="xjzl-loot-xp-tooltip">
+                    <div class="loot-slot-visual loot-reward-visual">
+                        <i class="fas fa-yin-yang" aria-hidden="true"></i>
+                        <span class="loot-slot-quantity reward-value">+{{reward.amount}}</span>
+                        {{#if reward.hidden}}<span class="loot-slot-hidden" data-tooltip="{{localize "XJZL.Container.HiddenTooltip"}}" data-tooltip-class="xjzl-loot-hidden-tooltip"><i class="fas fa-eye-slash" aria-hidden="true"></i></span>{{/if}}
+                        {{#if ../isGM}}
+                        <div class="loot-slot-tools">
+                            <button type="button" class="slot-tool" data-action="toggleRewardHidden" data-reward-id="{{reward.id}}" data-tooltip="{{#if reward.hidden}}{{localize "XJZL.Container.ShowTooltip"}}{{else}}{{localize "XJZL.Container.HideTooltip"}}{{/if}}" data-tooltip-class="{{#if reward.hidden}}xjzl-loot-action-tooltip{{else}}xjzl-loot-hidden-tooltip{{/if}}"><i class="fas {{#if reward.hidden}}fa-eye{{else}}fa-eye-slash{{/if}}" aria-hidden="true"></i></button>
+                            <button type="button" class="slot-tool" data-action="editXpReward" data-reward-id="{{reward.id}}" data-tooltip="{{localize "XJZL.Container.EditReward"}}" data-tooltip-class="xjzl-loot-action-tooltip"><i class="fas fa-pen" aria-hidden="true"></i></button>
+                            <button type="button" class="slot-tool is-danger" data-action="deleteXpReward" data-reward-id="{{reward.id}}" data-tooltip="{{localize "XJZL.Container.DeleteReward"}}" data-tooltip-class="xjzl-loot-action-tooltip"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                        </div>
+                        {{/if}}
+                    </div>
+                    <div class="loot-slot-caption"><b>{{reward.name}}</b><span>{{reward.poolLabel}}</span></div>
+                    <div class="loot-slot-actions">
+                        {{#if reward.canClaim}}
+                        <button type="button" class="slot-action is-primary" data-action="claimXp" data-reward-id="{{reward.id}}"><i class="fas fa-yin-yang" aria-hidden="true"></i>{{localize "XJZL.Container.ClaimReward"}}</button>
+                        {{else if reward.claimed}}
+                        <span class="loot-slot-claimed"><i class="fas fa-check" aria-hidden="true"></i>{{localize "XJZL.Container.Claimed"}}</span>
+                        {{/if}}
+                    </div>
+                </article>
+                {{/each}}
+            </div>
+        </section>
+        {{else if (and isGM isLootMode)}}
+        <section class="loot-section loot-reward-empty">
+            <header class="loot-category-tab">
+                <h2>{{localize "XJZL.Container.XpRewards"}}</h2>
+                <button type="button" class="category-action" data-action="addXpReward"><i class="fas fa-plus" aria-hidden="true"></i>{{localize "XJZL.Container.AddReward"}}</button>
+            </header>
+        </section>
+        {{/if}}
+    </main>
+    <footer class="loot-footer">
+        <div class="loot-footer-mark"><i class="fas {{modeIcon}}" aria-hidden="true"></i><span>{{modeLabel}}</span></div>
+        <div class="loot-footer-actions">
+            {{#if canDepositCurrency}}
+            <button type="button" class="currency-button" data-action="currencyAction" data-type="deposit"><i class="fas fa-piggy-bank" aria-hidden="true"></i>{{localize "XJZL.Container.DepositCurrency"}}</button>
+            {{/if}}
+            {{#if canTakeCurrency}}
+            <button type="button" class="currency-button" data-action="currencyAction" data-type="take"><i class="fas fa-coins" aria-hidden="true"></i>{{#if isStorageMode}}{{localize "XJZL.Container.WithdrawCurrency"}}{{else}}{{localize "XJZL.Container.TakeCurrency"}}{{/if}}</button>
+            {{/if}}
+            {{#if canLootAll}}
+            <button type="button" class="primary-button" data-action="lootAll" {{#unless hasLootableContent}}disabled{{/unless}}><i class="fas fa-hand-sparkles" aria-hidden="true"></i>{{localize "XJZL.Container.TakeAll"}}</button>
+            {{/if}}
+        </div>
+    </footer>
+</div>

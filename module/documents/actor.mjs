@@ -6,6 +6,7 @@ import { XJZLMacros } from "../utils/macros.mjs";
 import { xjzlSocket } from "../socket.mjs";
 import { ActionTracker } from "../applications/action-tracker.mjs";
 import { XJZLResourceCommitError, unwrapResourceSocketResult } from "../utils/resource-commit-error.mjs";
+import { DEFAULT_CONTAINER_IMAGES } from "../data/actor/container.mjs";
 
 // 尝试突破经脉花费固定为500
 const JINGMAI_ATTEMPT_COST = 500;
@@ -592,6 +593,44 @@ export class XJZLActor extends Actor {
     }
   }
 
+  /**
+   * 将物资节点当前状态图同步到原型 Token，并按需更新已放置的关联 Token。
+   * @param {Object} options - 同步选项
+   * @param {boolean} options.includeLinkedTokens - 是否更新场景中已关联的 Token；模式切换时应为 false
+   */
+  async syncContainerAppearance({ includeLinkedTokens = false } = {}) {
+    if (this.type !== "container") return;
+    const isLoot = this.system.mode === "loot";
+    const image = isLoot
+      ? (this.system.status === "depleted"
+        ? this.system.appearance?.depletedImg || DEFAULT_CONTAINER_IMAGES.depleted
+        : this.system.appearance?.activeImg || DEFAULT_CONTAINER_IMAGES.active)
+      : this.img;
+    if (!image) return;
+
+    const syncOptions = { xjzlContainerAppearanceSync: true };
+    if (this.isToken) {
+      if (this.token?.texture?.src !== image) {
+        await this.token.update({ "texture.src": image }, syncOptions);
+      }
+      return;
+    }
+
+    if (this.prototypeToken?.texture?.src !== image) {
+      await this.update({ "prototypeToken.texture.src": image }, syncOptions);
+    }
+    if (!includeLinkedTokens) return;
+
+    for (const scene of game.scenes) {
+      const updates = scene.tokens
+        .filter(token => token.actorId === this.id && token.actorLink && token.texture.src !== image)
+        .map(token => ({ _id: token.id, "texture.src": image }));
+      if (updates.length > 0) {
+        await scene.updateEmbeddedDocuments("Token", updates, syncOptions);
+      }
+    }
+  }
+
 
   /** 
    * @override 
@@ -617,14 +656,22 @@ export class XJZLActor extends Actor {
       // 2. Token 设置：
       // - 敌对状态：中立 (0)
       // - 显示名字：总是显示 (或者悬停显示)
-      // - 链接：默认不链接 (actorLink=false)，这意味着拖出来的每一个宝箱都是独立的，互不影响。
-      //   如果你想要“公共仓库”(所有宝箱通向同一个空间)，则需要手动勾选“链接角色数据”。
-      prototypeToken.actorLink = false;
+      // - 战利品 Token 各自保存库存；仓库/商铺 Token 关联世界 Actor，共享同一份持久库存。
+      //   工作台切换模式时只同步原型；已经放置到场景中的 Token 保持原有关联状态。
+      const mode = data.system?.mode || "loot";
+      const actorImg = !data.img || data.img === "icons/svg/mystery-man.svg"
+        ? DEFAULT_CONTAINER_IMAGES.active
+        : data.img;
+      const activeImg = data.system?.appearance?.activeImg || DEFAULT_CONTAINER_IMAGES.active;
+      const depletedImg = data.system?.appearance?.depletedImg || DEFAULT_CONTAINER_IMAGES.depleted;
+      const statusImg = data.system?.status === "depleted" ? depletedImg : activeImg;
+      prototypeToken.actorLink = mode !== "loot";
       prototypeToken.disposition = CONST.TOKEN_DISPOSITIONS.NEUTRAL;
       prototypeToken.displayName = CONST.TOKEN_DISPLAY_MODES.HOVER;
+      prototypeToken.texture = { src: mode === "loot" ? statusImg : actorImg };
 
       // 应用 Token 设置
-      this.updateSource({ prototypeToken });
+      this.updateSource({ img: actorImg, prototypeToken });
 
       // 容器处理完毕，直接退出，不走下面角色的逻辑
       return;
