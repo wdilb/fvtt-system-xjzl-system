@@ -751,7 +751,30 @@ Hooks.once("ready", async function () {
   // 8·门派赠品自动化 — 监听角色门派变更
   Hooks.on("updateActor", async (actor, changes, options, userId) => {
     if (userId !== game.user.id) return;
-    if (actor.type === "container" || actor.type === "creature") return;
+    if (actor.type === "container") {
+      if (options?.xjzlContainerAppearanceSync) return;
+      const hasChange = path => Object.hasOwn(changes, path)
+        || foundry.utils.getProperty(changes, path) !== undefined;
+      const statusChanged = hasChange("system.status");
+      const appearanceChanged = hasChange("system.appearance")
+        || hasChange("system.appearance.activeImg")
+        || hasChange("system.appearance.depletedImg");
+      const modeChanged = hasChange("system.mode");
+      const actorImageChanged = hasChange("img");
+      if (statusChanged || appearanceChanged || modeChanged || actorImageChanged) {
+        try {
+          await actor.syncContainerAppearance({
+            includeLinkedTokens: statusChanged
+              || appearanceChanged
+              || (actorImageChanged && actor.system.mode !== "loot")
+          });
+        } catch (err) {
+          console.error("XJZL | 同步物资节点状态外观失败:", { actorUuid: actor.uuid, err });
+        }
+      }
+      return;
+    }
+    if (actor.type === "creature") return;
 
     const newSect = foundry.utils.getProperty(changes, "system.info.sect");
     if (newSect === undefined) return;  // 门派未变更

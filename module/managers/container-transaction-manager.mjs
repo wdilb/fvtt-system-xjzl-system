@@ -223,11 +223,14 @@ export class XJZLContainerTransactionManager {
         if (!permissionDocument.testUserPermission(user, "OBSERVER")) {
             throw new XJZLContainerTransactionError("NO_VIEW_PERMISSION", "你没有查看这个物资节点的权限。");
         }
-        if (!node.system.isOpen) {
+        const action = request.action;
+        // depleted 只表示共享物品与银两已取尽；尚未领取的个人修为仍可结算。
+        const canClaimFromDepleted = action === "claimXp"
+            && node.system.mode === "loot"
+            && node.system.status === "depleted";
+        if (!node.system.isOpen && !canClaimFromDepleted) {
             throw new XJZLContainerTransactionError("NODE_CLOSED", "这个物资节点当前未开放。");
         }
-
-        const action = request.action;
         const settings = node.system.settings;
         if (action === "inspect") return;
 
@@ -678,9 +681,11 @@ export class XJZLContainerTransactionManager {
             itemId: sourceItem.id,
             itemName: sourceItem.name,
             itemImg: sourceItem.img,
+            itemDescription: String(sourceItem.system.description || ""),
             eligibleUserIds,
             choices: new Map(),
             timer: null,
+            expiresAt: Date.now() + NEED_ROLL_TIMEOUT,
             resolving: false
         };
         roll.timer = setTimeout(() => Hooks.callAll("xjzl.containerNeedTimeout", {
@@ -689,8 +694,8 @@ export class XJZLContainerTransactionManager {
         }), NEED_ROLL_TIMEOUT);
         pendingNeedRolls.set(needId, roll);
         await this.#postNeedChat(
-            `<p><strong>战利品需求</strong>：${foundry.utils.escapeHTML(sourceItem.name)}</p><p>请有需要的玩家在 ${NEED_ROLL_TIMEOUT / 1000} 秒内打开提示并提交需求。</p>`
-        );
+            `<p><strong>战利品需求</strong>：${foundry.utils.escapeHTML(sourceItem.name)}</p><p>请有需要的玩家在 ${NEED_ROLL_TIMEOUT / 1000} 秒内打开提示并提交需求。</p>`,
+            [], "start");
         return this.#needPromptResult(roll, sourceItem);
     }
 
@@ -702,7 +707,8 @@ export class XJZLContainerTransactionManager {
             itemId: roll.itemId,
             itemName: sourceItem.name,
             itemImg: sourceItem.img,
-            expiresIn: NEED_ROLL_TIMEOUT
+            itemDescription: String(sourceItem.system.description || ""),
+            expiresIn: Math.max(0, (roll.expiresAt || Date.now()) - Date.now())
         };
     }
 
@@ -757,7 +763,7 @@ export class XJZLContainerTransactionManager {
         try {
             const candidates = [...roll.choices.values()].filter(choice => choice.choice === "need");
             if (candidates.length === 0) {
-                await this.#postNeedChat(`<p><strong>战利品需求结束</strong>：${foundry.utils.escapeHTML(roll.itemName)} 无人选择需求，物品保留在节点中。</p>`);
+                await this.#postNeedChat(`<p><strong>战利品需求结束</strong>：${foundry.utils.escapeHTML(roll.itemName)} 无人选择需求，物品保留在节点中。</p>`, [], "end");
                 return this.#makeNeedResult(roll, "noNeed", { candidateCount: 0 });
             }
 
@@ -787,7 +793,7 @@ export class XJZLContainerTransactionManager {
                 });
             } catch (err) {
                 if (err?.code !== "ITEM_UNAVAILABLE") throw err;
-                await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`);
+                await this.#postNeedChat(`<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 已被其他操作取走，本次需求不发放物品。</p>`, [], "result");
                 return this.#makeNeedResult(roll, "itemUnavailable", {
                     candidateCount: candidates.length,
                     rollResults: rolledCandidates.map(candidate => ({
@@ -801,7 +807,9 @@ export class XJZLContainerTransactionManager {
 
             await this.#updateNodeStatus(node, "take");
             await this.#postNeedChat(
-                `<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 由 ${foundry.utils.escapeHTML(winner.actorName)} 获得（${winner.total}）。</p>`
+                `<p><strong>需求结果</strong>：${foundry.utils.escapeHTML(roll.itemName)} 由 ${foundry.utils.escapeHTML(winner.actorName)} 获得（${winner.total}）。</p>`,
+                [],
+                "result"
             );
             return this.#makeNeedResult(roll, "awarded", {
                 winnerUserId: winner.userId,
@@ -816,7 +824,7 @@ export class XJZLContainerTransactionManager {
                 containerUuid: roll.containerUuid,
                 err
             });
-            await this.#postNeedChat(`<p><strong>需求结算失败</strong>：${foundry.utils.escapeHTML(roll.itemName)} 未发放，请由 GM 检查后重新处理。</p>`);
+            await this.#postNeedChat(`<p><strong>需求结算失败</strong>：${foundry.utils.escapeHTML(roll.itemName)} 未发放，请由 GM 检查后重新处理。</p>`, [], "end");
             return this.#makeNeedResult(roll, "failed");
         } finally {
             pendingNeedRolls.delete(roll.needId);
@@ -829,7 +837,7 @@ export class XJZLContainerTransactionManager {
         roll.resolving = true;
         if (roll.timer) clearTimeout(roll.timer);
         try {
-            await this.#postNeedChat(`<p><strong>战利品需求已取消</strong>：${foundry.utils.escapeHTML(roll.itemName)} 所在节点已关闭、切换模式或被删除。</p>`);
+            await this.#postNeedChat(`<p><strong>战利品需求已取消</strong>：${foundry.utils.escapeHTML(roll.itemName)} 所在节点已关闭、切换模式或被删除。</p>`, [], "end");
             return this.#makeNeedResult(roll, "cancelled", { reason });
         } finally {
             pendingNeedRolls.delete(roll.needId);
@@ -853,12 +861,12 @@ export class XJZLContainerTransactionManager {
     }
 
     /** 需求流程的聊天栏消息只由活动 GM 创建，避免多个客户端重复发言。 */
-    static async #postNeedChat(content, rolls = []) {
+    static async #postNeedChat(content, rolls = [], variant = "event") {
         try {
             const chatData = {
                 user: game.user.id,
                 speaker: { alias: "战利品需求" },
-                content,
+                content: `<div class="xjzl-loot-roll-chat is-${variant}">${content}</div>`,
                 rolls
             };
             // 需求是队伍公共流程，不能受 GM 的私聊/盲骰默认设置影响。
@@ -875,7 +883,8 @@ export class XJZLContainerTransactionManager {
             .join("、");
         await this.#postNeedChat(
             `<p><strong>需求投骰</strong>：${foundry.utils.escapeHTML(itemName)}</p><p>${rollSummary}</p>`,
-            candidates.map(candidate => candidate.roll)
+            candidates.map(candidate => candidate.roll),
+            "roll"
         );
     }
 

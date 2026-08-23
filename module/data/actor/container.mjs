@@ -16,6 +16,10 @@ const {
 export const CONTAINER_MODES = Object.freeze(["loot", "storage", "shop"]);
 export const CONTAINER_STATUSES = Object.freeze(["active", "closed", "depleted"]);
 export const CONTAINER_XP_POOLS = Object.freeze(["general", "neigong", "wuxue", "arts"]);
+export const DEFAULT_CONTAINER_IMAGES = Object.freeze({
+    active: "systems/xjzl-system/assets/ui/container/wuxia-chest-closed.webp",
+    depleted: "systems/xjzl-system/assets/ui/container/wuxia-chest-open.webp"
+});
 
 function makeClaimSchema() {
     return new SchemaField({
@@ -48,6 +52,12 @@ export class XJZLContainerData extends foundry.abstract.TypeDataModel {
             mode: new StringField({ required: true, initial: "loot", choices: CONTAINER_MODES }),
             status: new StringField({ required: true, initial: "active", choices: CONTAINER_STATUSES }),
 
+            // Actor.img 仍作为资料图；战利品使用独立状态图驱动工作台和 Token 外观。
+            appearance: new SchemaField({
+                activeImg: new StringField({ required: true, initial: DEFAULT_CONTAINER_IMAGES.active }),
+                depletedImg: new StringField({ required: true, initial: DEFAULT_CONTAINER_IMAGES.depleted })
+            }),
+
             // 节点钱箱只保存银两余额；角色银两仍由角色自身的资源事务维护。
             currency: new NumberField({ required: true, initial: 0, min: 0, integer: true }),
 
@@ -65,11 +75,9 @@ export class XJZLContainerData extends foundry.abstract.TypeDataModel {
         };
     }
 
+    /** 共享物资是否已经取尽；个人修为奖励不参与节点耗尽判定。 */
     get isEmpty() {
-        return this.parent.items.size === 0
-            && this.currency === 0
-            // 修为按玩家独立领取，任意一人的领取记录不能让共享节点全局耗尽。
-            && this.rewards.every(reward => reward.hidden);
+        return this.parent.items.size === 0 && this.currency === 0;
     }
 
     get isOpen() {
