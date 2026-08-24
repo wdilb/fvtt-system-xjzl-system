@@ -43,6 +43,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // --- 核心切换 ---
             toggleNeigong: XJZLCharacterSheet.prototype._onToggleNeigong,
             toggleSubTab: XJZLCharacterSheet.prototype._onToggleSubTab,
+            selectCultivationEntry: XJZLCharacterSheet.prototype._onSelectCultivationEntry,
+            clearCultivationSearch: XJZLCharacterSheet.prototype._onClearCultivationSearch,
 
             // --- 物品基础操作 ---
             editItem: XJZLCharacterSheet.prototype._onEditItem,
@@ -295,10 +297,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // =====================================================
         // ✦ 4. 属性技能面板 (Attributes & Skills Tab)
         // -----------------------------------------------------
-        if (!["neigong", "wuxue", "arts"].includes(this._cultivationSubTab)) {
+        if (!["neigong", "wuxue", "arts", "traits"].includes(this._cultivationSubTab)) {
             this._cultivationSubTab = "neigong";
         }
         context.cultivationSubTab = this._cultivationSubTab;
+        context.cultivationSearchTerm = this._cultivationSearchTerm || "";
 
         const allSkillGroups = [
             { key: "wuxing", label: "XJZL.Stats.Wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] },
@@ -351,6 +354,8 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             const sys = item.system;
             const tier = sys.tier;
             const config = sys.config;
+            item.elementLabel = game.i18n.localize(XJZL.elements[sys.element] || XJZL.elements.none);
+            item.tierLabel = game.i18n.localize(XJZL.tiers[tier] || XJZL.tiers[1]);
 
             const r1 = config.stage1?.xpCostRatio ?? 1;
             const r2 = config.stage2?.xpCostRatio ?? 1;
@@ -405,6 +410,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             const currentStage = Math.max(1, sys.stage || 0);
             const stageConfig = config[`stage${currentStage}`];
             const stageLabels = { 1: "领悟", 2: "小成", 3: "圆满" };
+            item.stageLabel = stageLabels[currentStage] || "境界";
 
             if (stageConfig && stageConfig.description) {
                 html += `<div style='margin-top:8px; background:rgba(255,255,255,0.05); padding:6px; border-radius:4px; border-left:2px solid var(--c-highlight);'>
@@ -526,6 +532,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
                 if (!move.progress) move.progress = {};
                 move.progress.currentMax = absoluteMax;
+                move.progress.percent = absoluteMax > 0 ? Math.min(100, Math.max(0, Math.round((xp / absoluteMax) * 100))) : 100;
 
                 // 3. 构建招式 Tooltip
                 // 注意：这里应用了 white-space: pre-wrap 和 max-width
@@ -1102,6 +1109,43 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             return trait;
         });
 
+        // =====================================================
+        // 修为工作区状态：只记录当前分类与选中条目，不改变任何业务数据。
+        // =====================================================
+        if (!this._cultivationSelection || typeof this._cultivationSelection !== "object") {
+            this._cultivationSelection = {};
+        }
+
+        const ensureSelection = (key, items) => {
+            const current = this._cultivationSelection[key];
+            if (current && items.some(item => item?.id === current)) return current;
+            const next = items[0]?.id || "";
+            this._cultivationSelection[key] = next;
+            return next;
+        };
+
+        // 默认优先选中当前运行内功，让角色卡打开后直接落在最重要的状态上。
+        if (!this._cultivationSelection.neigong && context.activeNeigong?.id) {
+            this._cultivationSelection.neigong = context.activeNeigong.id;
+        }
+
+        const selectedNeigongId = ensureSelection("neigong", context.neigongs);
+        const selectedWuxueId = ensureSelection("wuxue", context.wuxues);
+        const selectedArtBookId = ensureSelection("arts", context.artBooks);
+        const selectedTraitId = ensureSelection("traits", context.traits);
+
+        context.selectedNeigong = context.neigongs.find(item => item.id === selectedNeigongId) || null;
+        context.selectedWuxue = context.wuxues.find(item => item.id === selectedWuxueId) || null;
+        context.selectedArtBook = context.artBooks.find(item => item.id === selectedArtBookId) || null;
+        context.selectedTrait = context.traits.find(item => item.id === selectedTraitId) || null;
+
+        context.cultivationCategories = [
+            { key: "neigong", label: "XJZL.Cultivation.SectionNeigong", count: context.neigongs.length, icon: "fa-yin-yang" },
+            { key: "wuxue", label: "XJZL.Cultivation.SectionWuxue", count: context.wuxues.length, icon: "fa-khanda" },
+            { key: "arts", label: "XJZL.Cultivation.Workbench.Categories.Arts", count: context.artBooks.length, icon: "fa-book-open" },
+            { key: "traits", label: "XJZL.Cultivation.Workbench.Categories.Traits", count: context.traits.length, icon: "fa-seal" }
+        ];
+
 
         // [特效计算]
         this._prepareEffects(context);
@@ -1221,9 +1265,15 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 3· 修练界面搜索
         const cultSearch = this.element.querySelector(".cultivation-search-input");
         if (cultSearch) {
-            cultSearch.addEventListener("input", (event) => {
-                this._onSearchCultivation(event, event.target);
-            });
+            if (!cultSearch.dataset.xjzlSearchBound) {
+                cultSearch.dataset.xjzlSearchBound = "true";
+                cultSearch.addEventListener("input", (event) => {
+                    this._onSearchCultivation(event, event.target);
+                });
+            }
+            if (this._cultivationSearchTerm) {
+                this._onSearchCultivation({ target: cultSearch }, cultSearch);
+            }
         }
 
         // =====================================================
@@ -1240,6 +1290,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         ];
 
         // 2. 遍历并绑定
+        this._boundDragStart ??= this._onDragStart.bind(this);
         dragSelectors.forEach(selector => {
             const elements = html.querySelectorAll(selector);
             elements.forEach(el => {
@@ -1247,11 +1298,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 el.setAttribute("draggable", "true");
 
                 // 移除旧的监听器 (防止重绘多次绑定，虽说 AppV2 重绘是替换节点，但好习惯)
-                el.removeEventListener("dragstart", this._onDragStart);
+                el.removeEventListener("dragstart", this._boundDragStart);
 
                 // 绑定我们自己的处理函数
                 // bind(this) 确保在 _onDragStart 里能用 this.actor
-                el.addEventListener("dragstart", this._onDragStart.bind(this));
+                el.addEventListener("dragstart", this._boundDragStart);
             });
         });
 
@@ -1671,10 +1722,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         if (!sourceItem) return false;
 
         // 3. 找到拖放目标行（间隙中按 Y 吸附最近项）
+        const wuxueList = this.element.querySelector(".wuxue-list");
         let targetRow = event.target.closest(".wuxue-group");
-        if (!targetRow) {
-            const wuxueList = this.element.querySelector(".wuxue-list");
-            if (wuxueList) targetRow = this._findClosestWuxueGroup(wuxueList, event.clientY);
+        const markedTargetId = wuxueList?.dataset.xjzlDropItemId;
+        if (markedTargetId && wuxueList) {
+            targetRow = [...wuxueList.querySelectorAll(".wuxue-group")].find(row => row.dataset.itemId === markedTargetId) || targetRow;
+        } else if (!targetRow && wuxueList) {
+            targetRow = this._findClosestWuxueGroup(wuxueList, event.clientY);
         }
         if (!targetRow) return false;
 
@@ -1691,14 +1745,14 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         const tgtIdx = siblings.findIndex(i => i.id === targetId);
         if (srcIdx === -1 || tgtIdx === -1) return;
 
-        // 清理拖拽视觉状态
-        this._clearDragVisuals();
-
-        // 动态阈值：往下拖时分割线在 25% 处（更容易交换），往上拖时在 75% 处
+        // 优先采用 dragover 已稳定计算的落点；只有没有视觉落点时才按中线兜底。
+        const markedPosition = wuxueList?.dataset.xjzlDropPosition;
         const box = targetRow.getBoundingClientRect();
-        const goingDown = this._dragStartY != null ? event.clientY > this._dragStartY : true;
-        const threshold = goingDown ? 0.25 : 0.75;
-        const insertBefore = event.clientY < (box.top + box.height * threshold);
+        const insertBefore = markedPosition === "before" ? true : markedPosition === "after" ? false : event.clientY < (box.top + box.height * 0.5);
+
+        // 确认落点后再清理拖拽视觉状态。
+        this._clearDragVisuals();
+        this._wuxueDragSnapshot = null;
 
         // 6. 构建新顺序：先移除自己，再插入到目标位置
         const reordered = [...siblings];
@@ -1901,10 +1955,30 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             event.dataTransfer.setDragImage(iconImg, 25, 25);
         }
 
-        // 5. 排序模式：源项进入 ghost 态，记录拖拽起点用于方向判定
+        // 5. 排序模式：先记录未变形布局，再让源项进入 ghost 态。
         if (el.classList.contains("wuxue-group") && this._isSorting) {
+            const wuxueList = el.closest(".wuxue-list");
+            if (wuxueList) {
+                // 搜索可能暂时隐藏部分秘籍；排序快照只纳入实际可见的行，
+                // 避免 display:none 的零尺寸元素干扰落点判定与让位动画。
+                const groups = [...wuxueList.querySelectorAll(".wuxue-group:not([hidden])")];
+                const listStyle = getComputedStyle(wuxueList);
+                const gap = Number.parseFloat(listStyle.rowGap || listStyle.gap) || 0;
+                const listRect = wuxueList.getBoundingClientRect();
+                const entries = groups.map(group => {
+                    const rect = group.getBoundingClientRect();
+                    return { group, center: rect.top - listRect.top + wuxueList.scrollTop + rect.height / 2, height: rect.height };
+                });
+                const sourceEntry = entries.find(entry => entry.group === el);
+                this._wuxueDragSnapshot = {
+                    list: wuxueList,
+                    source: el,
+                    sourceIndex: groups.indexOf(el),
+                    entries
+                };
+                wuxueList.style.setProperty("--xjzl-sort-shift", `${(sourceEntry?.height || 59) + gap}px`);
+            }
             el.classList.add("xjzl-drag-ghost");
-            this._dragStartY = event.clientY;
         }
     }
 
@@ -1914,44 +1988,55 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
 
     /**
      * 拖拽悬停：计算落点位置并渲染指示器
-     * 使用动态阈值：往下拖时分割线偏上（25%），更容易和上方项交换
+     * 使用稳定的中线阈值，避免拖拽反馈改变布局后反复穿越落点。
      */
     _onWuxueDragOver(event) {
         event.preventDefault();
         if (!this._isSorting) return;
 
         const wuxueList = event.currentTarget;
+        if (this._wuxueDragSnapshot?.source) this._wuxueDragSnapshot.source.classList.add("xjzl-drag-ghost");
 
-        // 找目标项：优先 closest，鼠标在间隙时按 Y 坐标吸附到最近的非 ghost 项
-        let targetEl = event.target.closest(".wuxue-group");
-        if (!targetEl || targetEl.classList.contains("xjzl-drag-ghost")) {
-            targetEl = this._findClosestWuxueGroup(wuxueList, event.clientY);
-        }
+        // 始终基于拖拽开始时记录的静态位置找落点；让位动画不会反过来改变判定区域。
+        const targetEl = this._findClosestWuxueGroup(wuxueList, event.clientY);
         if (!targetEl) return;
 
-        // 清除之前的落点指示器和移位
-        wuxueList.querySelectorAll(".xjzl-drop-before, .xjzl-drop-after, .xjzl-drag-shift-down").forEach(el => {
-            el.classList.remove("xjzl-drop-before", "xjzl-drop-after", "xjzl-drag-shift-down");
-        });
+        const snapshot = this._wuxueDragSnapshot?.list === wuxueList ? this._wuxueDragSnapshot : null;
+        const targetEntry = snapshot?.entries.find(entry => entry.group === targetEl);
+        const pointerY = (() => {
+            const listRect = wuxueList.getBoundingClientRect();
+            return event.clientY - listRect.top + wuxueList.scrollTop;
+        })();
+        const targetCenter = targetEntry?.center ?? (() => {
+            const box = targetEl.getBoundingClientRect();
+            const listRect = wuxueList.getBoundingClientRect();
+            return box.top - listRect.top + wuxueList.scrollTop + box.height * 0.5;
+        })();
+        const insertBefore = pointerY < targetCenter;
+        const marker = insertBefore ? "xjzl-drop-before" : "xjzl-drop-after";
 
-        // 动态阈值：往哪个方向拖，分界线就往反方向偏移
-        const box = targetEl.getBoundingClientRect();
-        const goingDown = this._dragStartY != null ? event.clientY > this._dragStartY : true;
-        const threshold = goingDown ? 0.25 : 0.75;
-        const insertBefore = event.clientY < (box.top + box.height * threshold);
+        if (wuxueList.dataset.xjzlDropItemId !== targetEl.dataset.itemId || wuxueList.dataset.xjzlDropPosition !== (insertBefore ? "before" : "after")) {
+            wuxueList.querySelectorAll(".xjzl-drop-before, .xjzl-drop-after, .xjzl-drag-shift-up, .xjzl-drag-shift-down").forEach(group => {
+                group.classList.remove("xjzl-drop-before", "xjzl-drop-after", "xjzl-drag-shift-up", "xjzl-drag-shift-down");
+            });
+            targetEl.classList.add(marker);
+            wuxueList.dataset.xjzlDropItemId = targetEl.dataset.itemId || "";
+            wuxueList.dataset.xjzlDropPosition = insertBefore ? "before" : "after";
 
-        // 渲染落点指示器
-        targetEl.classList.add(insertBefore ? "xjzl-drop-before" : "xjzl-drop-after");
-
-        // 落点以下的项整体向下移位，为插入腾出空间
-        const groups = [...wuxueList.querySelectorAll(".wuxue-group")];
-        const tgtIdx = groups.indexOf(targetEl);
-        const shiftStart = insertBefore ? tgtIdx : tgtIdx + 1;
-        for (let i = shiftStart; i < groups.length; i++) {
-            if (!groups[i].classList.contains("xjzl-drag-ghost")) {
-                groups[i].classList.add("xjzl-drag-shift-down");
+            // 恢复原先的自动让位感，但只移动源项与落点之间的条目。
+            const groups = [...wuxueList.querySelectorAll(".wuxue-group:not([hidden])")];
+            const sourceIndex = snapshot?.sourceIndex ?? groups.findIndex(group => group.classList.contains("xjzl-drag-ghost"));
+            const targetIndex = groups.indexOf(targetEl);
+            const insertionIndex = targetIndex + (insertBefore ? 0 : 1);
+            if (sourceIndex >= 0) {
+                if (insertionIndex <= sourceIndex) {
+                    for (let index = insertionIndex; index < sourceIndex; index++) groups[index]?.classList.add("xjzl-drag-shift-down");
+                } else if (insertionIndex > sourceIndex + 1) {
+                    for (let index = sourceIndex + 1; index < insertionIndex; index++) groups[index]?.classList.add("xjzl-drag-shift-up");
+                }
             }
         }
+
     }
 
     /**
@@ -1959,7 +2044,24 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
      * 无视 ghost 项，按垂直中心点距离排序
      */
     _findClosestWuxueGroup(wuxueList, mouseY) {
-        const groups = [...wuxueList.querySelectorAll(".wuxue-group")];
+        const snapshot = this._wuxueDragSnapshot?.list === wuxueList ? this._wuxueDragSnapshot : null;
+        if (snapshot) {
+            const listRect = wuxueList.getBoundingClientRect();
+            const pointerY = mouseY - listRect.top + wuxueList.scrollTop;
+            let closestEntry = null;
+            let minDistance = Infinity;
+            for (const entry of snapshot.entries) {
+                if (entry.group === snapshot.source) continue;
+                const distance = Math.abs(pointerY - entry.center);
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closestEntry = entry;
+                }
+            }
+            return closestEntry?.group || null;
+        }
+
+        const groups = [...wuxueList.querySelectorAll(".wuxue-group:not([hidden])")];
         let closest = null;
         let minDist = Infinity;
         for (const g of groups) {
@@ -1981,11 +2083,11 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
      */
     _onWuxueDragLeave(event) {
         if (!this._isSorting) return;
-        const item = event.target.closest(".wuxue-group");
-        if (!item) return;
-        // 忽略进入子元素时触发的伪 leave
-        if (event.relatedTarget && item.contains(event.relatedTarget)) return;
-        item.classList.remove("xjzl-drop-before", "xjzl-drop-after");
+        const wuxueList = event.currentTarget;
+        if (event.relatedTarget && wuxueList.contains(event.relatedTarget)) return;
+        const rect = wuxueList.getBoundingClientRect();
+        const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+        if (!inside) this._clearDragVisuals();
     }
 
     /**
@@ -1993,7 +2095,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
      */
     _onWuxueDragEnd(_event) {
         this._clearDragVisuals();
-        this._dragStartY = null;
+        this._wuxueDragSnapshot = null;
     }
 
     /**
@@ -2002,8 +2104,13 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     _clearDragVisuals() {
         const html = this.element;
         if (!html) return;
-        html.querySelectorAll(".xjzl-drag-ghost, .xjzl-drop-before, .xjzl-drop-after, .xjzl-drag-shift-down").forEach(el => {
-            el.classList.remove("xjzl-drag-ghost", "xjzl-drop-before", "xjzl-drop-after", "xjzl-drag-shift-down");
+        html.querySelectorAll(".xjzl-drag-ghost, .xjzl-drop-before, .xjzl-drop-after, .xjzl-drag-shift-up, .xjzl-drag-shift-down").forEach(el => {
+            el.classList.remove("xjzl-drag-ghost", "xjzl-drop-before", "xjzl-drop-after", "xjzl-drag-shift-up", "xjzl-drag-shift-down");
+        });
+        html.querySelectorAll(".wuxue-list").forEach(list => {
+            delete list.dataset.xjzlDropItemId;
+            delete list.dataset.xjzlDropPosition;
+            list.style.removeProperty("--xjzl-sort-shift");
         });
     }
 
@@ -2025,63 +2132,67 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         breakdown = { general: 0, specific: 0 }
     }) {
         const isInvest = mode === "invest";
-        const targetLabel = isInvest ? "距离圆满还需" : "可取回总额";
-        const targetValue = isInvest ? (maxXP - currentInvested) : currentInvested;
+        const remainingXP = Math.max(0, maxXP - currentInvested);
+        const isComplete = isInvest && remainingXP <= 0;
+        const targetLabel = isComplete ? "修炼已圆满" : (isInvest ? "距离圆满还需" : "可取回总额");
+        const targetValue = isInvest ? remainingXP : currentInvested;
         const confirmIcon = isInvest ? "fas fa-arrow-up" : "fas fa-undo";
-        const confirmLabel = isInvest ? "投入" : "取回";
-
-        const inputStyle = "width:100%; font-size:1.5em; color:white; background:rgba(0,0,0,0.5); border:1px solid var(--xjzl-gold); text-align:center; border-radius:4px;";
-        const labelStyle = "font-weight:bold; color:#ccc; margin-bottom:5px; display:block;";
-        const infoStyle = "font-size:0.9em; color:#aaa; display:flex; justify-content:space-around; background:rgba(255,255,255,0.05); padding:8px; border-radius:4px; border:1px solid #444;";
+        const confirmLabel = isComplete ? "已圆满" : (isInvest ? "投入" : "取回");
+        const fieldId = foundry.utils.randomID(8);
 
         const content = `
-        <div class="xjzl-invest-dialog" style="padding: 5px;">
-            <div style="text-align:center; margin-bottom:15px; border-bottom: 1px solid #444; padding-bottom: 10px;">
-                <p style="font-size:1.2em; margin-bottom:8px; color:#fff;">${targetLabel}: <b style="color:#ff4444; font-size:1.4em;">${targetValue}</b></p>
-                
-                <div style="${infoStyle}">
-                    ${isInvest ? `
-                        <span>通用池: <b style="color:white;">${poolGeneral}</b></span>
-                        <span>专属池: <b style="color:var(--xjzl-gold);">${poolSpecific}</b></span>
-                    ` : `
-                        <span>含通用: <b style="color:white;">${breakdown.general}</b></span>
-                        <span>含专属: <b style="color:var(--xjzl-gold);">${breakdown.specific}</b></span>
-                    `}
+        <div class="xjzl-invest-dialog">
+            <div class="invest-hero">
+                <div class="invest-kicker"><span><i class="fas fa-yin-yang"></i> ${isInvest ? "修炼进度" : "修为回溯"}</span><span class="invest-state ${isComplete ? "is-complete" : ""}">${isComplete ? "已圆满" : (isInvest ? "可继续投入" : "可取回")}</span></div>
+                <div class="invest-summary">
+                    <div class="invest-target"><span>${targetLabel}</span><strong>${targetValue}</strong><em>点修为</em><div class="invest-target-rule" aria-hidden="true"></div></div>
+                    <div class="invest-pools">
+                        ${isInvest ? `
+                            <div class="invest-pool pool-general"><span><i class="fas fa-circle"></i> 通用修为</span><strong>${poolGeneral}</strong><small>可自由分配</small></div>
+                            <div class="invest-pool pool-specific"><span><i class="fas fa-star"></i> 专属修为</span><strong>${poolSpecific}</strong><small>优先投入</small></div>
+                        ` : `
+                            <div class="invest-pool pool-general"><span><i class="fas fa-circle"></i> 通用修为</span><strong>${breakdown.general}</strong><small>可返还</small></div>
+                            <div class="invest-pool pool-specific"><span><i class="fas fa-star"></i> 专属修为</span><strong>${breakdown.specific}</strong><small>优先返还</small></div>
+                        `}
+                    </div>
                 </div>
             </div>
 
-            <form>
-                <div class="form-group" style="margin-bottom:15px; justify-content:center; gap:20px; color:#ddd;">
-                    <label style="font-weight:bold; color:#fff;">分配模式:</label>
-                    <div class="radio-group" style="display:flex; gap:15px;">
-                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <input type="radio" name="mode" value="auto" checked> 自动
+            <form class="invest-form">
+                <div class="invest-mode-block">
+                    <span class="invest-field-label">分配方式</span>
+                    <div class="invest-mode-switch">
+                        <label class="invest-mode-option">
+                            <input type="radio" name="mode" value="auto" checked>
+                            <span><i class="fas fa-wand-magic-sparkles"></i> 自动分配</span>
                         </label>
-                        <label style="cursor:pointer; display:flex; align-items:center; gap:5px;">
-                            <input type="radio" name="mode" value="manual"> 手动
+                        <label class="invest-mode-option">
+                            <input type="radio" name="mode" value="manual">
+                            <span><i class="fas fa-sliders"></i> 手动分配</span>
                         </label>
                     </div>
                 </div>
 
                 <div class="auto-mode-container">
-                    <label style="${labelStyle}">
-                        ${isInvest ? "投入总数 (优先扣除专属)" : "取回总数 (优先取回通用)"}
+                    <label class="invest-field-label" for="xjzl-invest-total-${fieldId}">
+                        <span>${isInvest ? "投入总数" : "取回总数"}</span><small>${isInvest ? "优先扣除专属修为" : "优先取回通用修为"}</small>
                     </label>
-                    <input type="number" name="totalAmount" value="${targetValue}" autofocus class="xjzl-input" style="${inputStyle}"/>
+                    <div class="invest-number-field"><input id="xjzl-invest-total-${fieldId}" type="number" name="totalAmount" value="${targetValue}" autofocus class="xjzl-input"/><span>修为</span></div>
                 </div>
 
                 <div class="manual-mode-container" style="display:none;">
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                        <div>
-                            <label style="${labelStyle}">通用部分</label>
-                            <input type="number" name="manualGeneral" value="0" class="xjzl-input" style="${inputStyle} font-size:1.2em;"/>
+                    <div class="invest-manual-grid">
+                        <div class="invest-manual-field">
+                            <label class="invest-field-label" for="xjzl-invest-general-${fieldId}">通用部分</label>
+                            <div class="invest-number-field"><input id="xjzl-invest-general-${fieldId}" type="number" name="manualGeneral" value="0" class="xjzl-input"/><span>修为</span></div>
                         </div>
-                        <div>
-                            <label style="${labelStyle} color:var(--xjzl-gold);">专属部分</label>
-                            <input type="number" name="manualSpecific" value="0" class="xjzl-input" style="${inputStyle} font-size:1.2em; border-color:var(--xjzl-gold);"/>
+                        <div class="invest-manual-field is-specific">
+                            <label class="invest-field-label" for="xjzl-invest-specific-${fieldId}">专属部分</label>
+                            <div class="invest-number-field"><input id="xjzl-invest-specific-${fieldId}" type="number" name="manualSpecific" value="0" class="xjzl-input"/><span>修为</span></div>
                         </div>
                     </div>
                 </div>
+                <p class="invest-form-hint"><i class="fas fa-info-circle"></i> ${isInvest ? "自动分配会优先消耗专属修为，再使用通用修为。" : "自动取回会优先返还通用修为，再返还专属修为。"}</p>
             </form>
         </div>
       `;
@@ -2093,6 +2204,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
             // 参数只有一个 event，DOM 元素是 event.target
             render: (event) => {
                 const html = event.target.element; // 获取弹窗的根 DOM 元素
+                html.classList.add("xjzl-invest-window");
 
                 const autoDiv = html.querySelector(".auto-mode-container");
                 const manualDiv = html.querySelector(".manual-mode-container");
@@ -2130,6 +2242,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 label: confirmLabel,
                 icon: confirmIcon,
                 callback: (event, button) => {
+                    if (isComplete) return null;
                     const form = button.closest(".window-content")?.querySelector("form") || button.form;
                     if (!form) return null;
 
@@ -2407,8 +2520,37 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     // --- 其他 ---
 
     async _onToggleSubTab(event, target) {
-        this._cultivationSubTab = target.dataset.target;
+        const next = target.dataset.target;
+        if (!["neigong", "wuxue", "arts", "traits"].includes(next)) return;
+        this._cultivationSubTab = next;
         this.render();
+    }
+
+    /**
+     * 修为工作区目录选中：只改变当前界面焦点，物品名称/图标仍由 editItem 打开编辑器。
+     */
+    _onSelectCultivationEntry(event, target) {
+        event.preventDefault();
+        event.stopPropagation();
+        const category = target.dataset.category;
+        const itemId = target.dataset.itemId;
+        if (!category || !itemId) return;
+
+        if (!this._cultivationSelection || typeof this._cultivationSelection !== "object") {
+            this._cultivationSelection = {};
+        }
+        this._cultivationSelection[category] = itemId;
+        this._cultivationSubTab = category;
+        this.render();
+    }
+
+    _onClearCultivationSearch(event, target) {
+        event.preventDefault();
+        this._cultivationSearchTerm = "";
+        const input = this.element?.querySelector(".cultivation-search-input");
+        if (input) input.value = "";
+        this._onSearchCultivation({ target: input || { value: "" } }, input || { value: "" });
+        target?.remove();
     }
 
     async _onRollMove(event, target) {
@@ -2698,85 +2840,57 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         new XJZLAuditLog({ actor: this.document }).render(true);
     }
     /**
-     * 修练列表即时搜索 (内功、武学、技艺书籍)
+     * 修炼工作区即时搜索（内功、武学/招式、技艺书、特性）
      */
-    _onSearchCultivation(event, target) {
-        const query = target.value.toLowerCase().trim();
+    _onSearchCultivation(_event, target) {
+        const rawQuery = String(target?.value ?? "");
+        const query = rawQuery.toLowerCase().trim();
+        this._cultivationSearchTerm = rawQuery;
         const html = this.element;
+        if (!html) return;
 
-        // -----------------------------------------------------
-        // 1. 搜索内功 (Neigong)
-        // -----------------------------------------------------
-        const neigongs = html.querySelectorAll(".neigong-card"); // 修正了类名，之前是 .neigong-item
-        neigongs.forEach(item => {
-            // 通过查找内部的 .ng-name 来获取名字，比 dataset 更可靠
-            const nameEl = item.querySelector(".ng-name");
-            const name = nameEl ? nameEl.innerText.toLowerCase() : "";
+        const contains = (value) => String(value || "").toLowerCase().includes(query);
+        const candidates = [
+            { key: "neigong", items: this.document.itemTypes.neigong || [], match: item => contains(item.name) },
+            { key: "wuxue", items: this.document.itemTypes.wuxue || [], match: item => contains(item.name) || (item.system.moves || []).some(move => contains(move.name)) },
+            { key: "arts", items: this.document.itemTypes.art_book || [], match: item => contains(item.name) },
+            { key: "traits", items: this.document.itemTypes.trait || [], match: item => contains(item.name) }
+        ];
 
-            // 如果搜索词为空，显示所有；否则根据名字匹配
-            item.style.display = name.includes(query) ? "flex" : "none";
+        // 工作区只渲染当前分类；搜索命中其他分类时自动切换卷签并定位首个结果。
+        if (query) {
+            const current = candidates.find(group => group.key === this._cultivationSubTab);
+            const destination = current?.items.some(current.match)
+                ? current
+                : candidates.find(group => group.items.some(group.match));
+            const selectedId = this._cultivationSelection?.[destination?.key];
+            const selected = destination?.items.find(item => item.id === selectedId);
+            const selectedMatches = selected ? destination.match(selected) : false;
+            const firstMatch = destination?.items.find(destination.match);
+
+            if (destination && firstMatch && (destination.key !== this._cultivationSubTab || !selectedMatches)) {
+                if (!this._cultivationSelection || typeof this._cultivationSelection !== "object") this._cultivationSelection = {};
+                this._cultivationSubTab = destination.key;
+                this._cultivationSelection[destination.key] = firstMatch.id;
+                this.render();
+                return;
+            }
+        }
+
+        const current = candidates.find(group => group.key === this._cultivationSubTab);
+        const visibleIds = new Set((current?.items || []).filter(item => !query || current.match(item)).map(item => item.id));
+        html.querySelectorAll(".directory-entry[data-category]").forEach(entry => {
+            entry.hidden = query ? !visibleIds.has(entry.dataset.itemId) : false;
         });
 
-        // -----------------------------------------------------
-        // 2. 搜索武学 (Wuxue)
-        // -----------------------------------------------------
-        const wuxueGroups = html.querySelectorAll(".wuxue-group");
-        wuxueGroups.forEach(group => {
-            const wuxueName = group.dataset.name?.toLowerCase() || "";
-            const moves = group.querySelectorAll(".move-card"); // 内部招式
-
-            let hasVisibleMove = false;
-
-            // 先搜招式
-            moves.forEach(move => {
-                const moveName = move.dataset.name?.toLowerCase() || "";
-
-                // 匹配逻辑：搜到招式名 OR 搜到武学名
-                const isMatch = moveName.includes(query) || wuxueName.includes(query);
-
-                move.style.display = isMatch ? "flex" : "none";
-                if (isMatch) hasVisibleMove = true;
+        // 武学详情独立于目录，按当前秘籍名称或招式名称过滤招式行。
+        if (this._cultivationSubTab === "wuxue") {
+            const selectedWuxue = this.document.items.get(this._cultivationSelection?.wuxue);
+            const bookMatches = !query || contains(selectedWuxue?.name);
+            html.querySelectorAll(".workbench-moves-grid .move-record").forEach(move => {
+                move.hidden = !bookMatches && !contains(move.dataset.name);
             });
-
-            // 决定武学组容器是否显示
-            if (wuxueName.includes(query) || hasVisibleMove) {
-                group.style.display = "block";
-                // 体验优化：如果正在搜索且有内容，确保 details 展开
-                if (query.length > 0) {
-                    const details = group.querySelector("details");
-                    if (details) details.open = true;
-                }
-            } else {
-                group.style.display = "none";
-            }
-        });
-
-        // -----------------------------------------------------
-        // 3. 搜索技艺书籍 (Art Books) - [新增部分]
-        // -----------------------------------------------------
-        const artBooks = html.querySelectorAll(".art-book-card");
-        artBooks.forEach(book => {
-            // 获取书籍名称
-            const titleEl = book.querySelector(".book-title");
-            const bookName = titleEl ? titleEl.innerText.toLowerCase() : "";
-
-            // 匹配逻辑
-            if (bookName.includes(query)) {
-                book.style.display = "flex"; // 根据你的CSS，可能是 flex 或 grid
-            } else {
-                book.style.display = "none";
-            }
-        });
-
-        // -----------------------------------------------------
-        // 4. 搜索特效 (Traits)
-        // -----------------------------------------------------
-        const traits = html.querySelectorAll(".trait-card");
-        traits.forEach(trait => {
-            const titleEl = trait.querySelector(".trait-title");
-            const traitName = titleEl ? titleEl.innerText.toLowerCase() : "";
-            trait.style.display = traitName.includes(query) ? "flex" : "none";
-        });
+        }
     }
 
 
