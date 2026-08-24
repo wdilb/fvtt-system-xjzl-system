@@ -120,12 +120,26 @@
 
 ## 🚀 安装指南 (Installation)
 
-本系统支持通过 Releases 下载安装，也支持手动安装。
+本系统仅验证兼容 Foundry VTT V13。推荐通过 Manifest URL 安装，以便 Foundry 自动检测后续更新。
 
-### 📦 方式一：Releases 下载安装
+### ✅ 方式一：Manifest URL 安装（推荐）
 
-1. **获取安装包**：前往本项目的 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) 页面。
-2. **下载资源**：下载最新版本（Latest）中名为 `system.zip`（或类似名称）的压缩包。
+1. 打开 Foundry VTT 的 **Setup** 页面，进入 **Game Systems**。
+2. 点击 **Install System**，在底部的 **Manifest URL** 输入框粘贴：
+
+   ```text
+   https://raw.githubusercontent.com/wdilb/fvtt-system-xjzl-system/master/system.json
+   ```
+
+3. 点击 **Install** 完成安装。
+4. 后续可在 **Game Systems** 页面使用 **Check for Update** 或 **Update All** 检测并安装更新。
+
+### 📦 方式二：Release ZIP 手动安装
+
+Manifest 安装不可用时，可手动安装已发布版本：
+
+1. 前往本项目的 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) 页面。
+2. 下载最新版本中名为 `xjzl-system.zip` 的压缩包。
 3. **解压部署**：
    - 解压下载的压缩包。
    - **【关键】** 确保解压后的文件夹名为 `xjzl-system`（必须与 `system.json` 中的 `id` 一致）。
@@ -133,9 +147,11 @@
      `.../Data/systems/xjzl-system`
 4. **启动系统**：重启 Foundry VTT，在创建世界时即可选择 `xjzl-system`。
 
-### 📂 方式二：手动安装
+> 手动解压安装不会通过官方包列表发现本系统；建议首次安装优先使用 Manifest URL。
 
-如果你无法通过上述方式安装，或者需要测试最新版，可以尝试手动部署：
+### 📂 方式三：从源码手动安装
+
+如果需要测试尚未发布的 `master` 分支，可以手动部署源码：
 
 1. 在本项目 GitHub 页面点击绿色的 **Code** 按钮，选择 **Download ZIP**。
 2. 解压下载的压缩包。
@@ -202,7 +218,7 @@ await Macros.requestSave({
 
 ## 👥 贡献与鸣谢 (Credits)
 
-*   **系统作者**: Tiwelee
+*   **系统作者**: [Tiwelee](https://github.com/wdilb)
 *   **特别感谢**:
     *   **一气长虹**: 提供了核心数据类型设计、计算逻辑参考以及无私的规则指导。
     *   **安迪亚**: 提供了宝贵的界面设计建议与测试反馈。
