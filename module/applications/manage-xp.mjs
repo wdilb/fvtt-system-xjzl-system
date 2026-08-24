@@ -12,7 +12,7 @@ export class XJZLManageXPDialog extends HandlebarsApplicationMixin(ApplicationV2
         id: "xjzl-manage-xp",
         classes: ["xjzl-window", "xjzl-manage-xp", "theme-dark"], 
         window: {
-            title: "修为管理",
+            title: "XJZL.UI.ManageXP.Title",
             icon: "fas fa-coins",
             resizable: false,
             width: 420,
@@ -42,17 +42,17 @@ export class XJZLManageXPDialog extends HandlebarsApplicationMixin(ApplicationV2
         
         // 构造选项列表，方便模板渲染
         const poolChoices = {
-            general: `通用修为 (当前: ${cult.general})`,
-            neigong: `内功修为 (当前: ${cult.neigong})`,
-            wuxue:   `武学修为 (当前: ${cult.wuxue})`,
-            arts:    `技艺修为 (当前: ${cult.arts})`
+            general: game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.General"), value: cult.general }),
+            neigong: game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Neigong"), value: cult.neigong }),
+            wuxue:   game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Wuxue"), value: cult.wuxue }),
+            arts:    game.i18n.format("XJZL.UI.ManageXP.PoolChoice", { label: game.i18n.localize("XJZL.Cultivation.Arts"), value: cult.arts })
         };
 
         return {
             actor: this.actor,
             cult: cult,
             poolChoices: poolChoices,
-            defaultTitle: "手动调整"
+            defaultTitle: game.i18n.localize("XJZL.UI.ManageXP.DefaultTitle")
         };
     }
 
@@ -66,7 +66,7 @@ export class XJZLManageXPDialog extends HandlebarsApplicationMixin(ApplicationV2
         // 数据校验
         const amount = parseInt(data.amount);
         if (isNaN(amount) || amount === 0) {
-            ui.notifications.warn("变动数值不能为 0 或空。");
+            ui.notifications.warn(game.i18n.localize("XJZL.UI.ManageXP.InvalidAmount"));
             return;
         }
 

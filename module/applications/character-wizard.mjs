@@ -67,7 +67,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         classes: ["xjzl-window", "theme-dark", "character-wizard-app"],
         position: { width: 1200, height: 750 },
         window: {
-            title: "侠界之旅 - 角色建卡向导",
+            title: "XJZL.Wizard.Common.WindowTitle",
             icon: "fas fa-hat-wizard",
             resizable: false
         },
@@ -196,7 +196,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
 
         // 弹出确认框
         const confirmed = await foundry.applications.api.DialogV2.confirm({
-            window: { title: "放弃建卡？", icon: "fas fa-exclamation-triangle" },
+                window: { title: game.i18n.localize("XJZL.Wizard.Common.AbandonTitle"), icon: "fas fa-exclamation-triangle" },
             content: "<p>你确定要关闭向导吗？<strong style='color:#e74c3c;'>所有未保存的建卡进度将会丢失！</strong></p>",
             rejectClose: false
         });
@@ -941,13 +941,13 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         if (!actor) return;
 
         const confirmed = await foundry.applications.api.DialogV2.confirm({
-            window: { title: "初入江湖", icon: "fas fa-check-circle" },
-            content: `<p>所有的命运馈赠已计算完毕。</p><p>点击确认，角色将正式降生于江湖之中。此操作不可逆！</p>`,
+            window: { title: game.i18n.localize("XJZL.Wizard.Common.BirthTitle"), icon: "fas fa-check-circle" },
+            content: `<p>${game.i18n.localize("XJZL.Wizard.Common.BirthConfirm")}</p><p>${game.i18n.localize("XJZL.Wizard.Common.BirthConfirmHint")}</p>`,
             rejectClose: false
         });
 
         if (!confirmed) return;
-        ui.notifications.info("正在重塑角色躯体...");
+        ui.notifications.info(game.i18n.localize("XJZL.Wizard.Common.Rebuilding"));
 
         // 洗号：清除原有的全部物品
         const oldItemIds = actor.items.map(i => i.id);
@@ -1139,7 +1139,7 @@ export class XJZLCharacterWizardApp extends HandlebarsApplicationMixin(Applicati
         }
         await actor.unsetFlag("xjzl-system", "_wizardActive");
 
-        ui.notifications.success(`${actor.name} 降生成功！`);
+        ui.notifications.success(game.i18n.format("XJZL.Wizard.Common.BirthSuccess", { name: actor.name }));
         // 强制关闭，跳过确认弹窗
         this.close({ force: true });
         actor.sheet.render(true);

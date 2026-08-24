@@ -13,7 +13,7 @@ export class XJZLSectSelectorApp extends HandlebarsApplicationMixin(ApplicationV
         tag: "div",
         position: { width: 1000, height: 650 },
         window: {
-            title: "选择门派",
+            title: "XJZL.UI.SectSelector.Title",
             icon: "fas fa-yin-yang",
             resizable: false
         },

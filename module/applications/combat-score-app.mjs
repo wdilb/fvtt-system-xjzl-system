@@ -22,7 +22,7 @@ export class CombatScoreUI extends HandlebarsApplicationMixin(ApplicationV2) {
         classes: ["xjzl-score-system"],
         tag: "div",
         window: {
-            title: "战绩评分系统 (MVP)",
+            title: "XJZL.UI.CombatScore.Title",
             icon: "fas fa-medal",
             minimizable: true,
             resizable: true,
@@ -91,7 +91,7 @@ export class CombatScoreUI extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async _onReportScoreToChat() {
         const actorsData = CombatStatsManager.getScoringData();
-        if (!actorsData.length) return ui.notifications.warn("风平浪静，没有数据可发送！");
+        if (!actorsData.length) return ui.notifications.warn(game.i18n.localize("XJZL.UI.CombatScore.NoData"));
 
         let content = "";
 
@@ -108,7 +108,7 @@ export class CombatScoreUI extends HandlebarsApplicationMixin(ApplicationV2) {
 
             content = `
                 <div class="xjzl-score-chat-card">
-                    <header>🏆 战斗表现评分</header>
+                    <header>🏆 ${game.i18n.localize("XJZL.UI.CombatScore.ChatPerformance")}</header>
                     <div class="chat-list">${listHtml}</div>
                 </div>
             `;
@@ -119,13 +119,13 @@ export class CombatScoreUI extends HandlebarsApplicationMixin(ApplicationV2) {
 
             content = `
                 <div class="xjzl-score-chat-card">
-                    <header>📊 战术分析: ${detail.name} <span class="grade grade-${detail.grade}">${detail.grade}</span></header>
-                    <div class="chat-detail-pts">综合评分: <strong class="val">${detail.score}</strong> PTS</div>
+                    <header>📊 ${game.i18n.localize("XJZL.UI.CombatScore.ChatAnalysis")}: ${detail.name} <span class="grade grade-${detail.grade}">${detail.grade}</span></header>
+                    <div class="chat-detail-pts">${game.i18n.localize("XJZL.UI.CombatScore.ChatTotal")}: <strong class="val">${detail.score}</strong> PTS</div>
                     <div class="chat-detail-grid">
-                        <div class="stat"><i class="fas fa-fire" style="color:#ff3c00"></i> 输出: ${detail.raw.damage}</div>
-                        <div class="stat"><i class="fas fa-heart" style="color:#2ecc71"></i> 治疗: ${detail.raw.healing}</div>
-                        <div class="stat"><i class="fas fa-shield-alt" style="color:#3498db"></i> 承伤: ${detail.raw.taken}</div>
-                        <div class="stat"><i class="fas fa-hammer" style="color:#f1c40f"></i> 破架: ${detail.raw.broken}</div>
+                        <div class="stat"><i class="fas fa-fire" style="color:#ff3c00"></i> ${game.i18n.localize("XJZL.UI.CombatScore.Output")}: ${detail.raw.damage}</div>
+                        <div class="stat"><i class="fas fa-heart" style="color:#2ecc71"></i> ${game.i18n.localize("XJZL.UI.CombatScore.Healing")}: ${detail.raw.healing}</div>
+                        <div class="stat"><i class="fas fa-shield-alt" style="color:#3498db"></i> ${game.i18n.localize("XJZL.UI.CombatScore.Taken")}: ${detail.raw.taken}</div>
+                        <div class="stat"><i class="fas fa-hammer" style="color:#f1c40f"></i> ${game.i18n.localize("XJZL.UI.CombatScore.Broken")}: ${detail.raw.broken}</div>
                     </div>
                 </div>
             `;

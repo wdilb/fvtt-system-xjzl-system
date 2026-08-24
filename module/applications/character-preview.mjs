@@ -30,7 +30,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         if (options.actor) {
             options.id = `character-preview-${options.actor.id}`;
             options.window = options.window || {};
-            options.window.title = `【${options.actor.name}】 - 角色卡预览模块`;
+            options.window.title = game.i18n.format("XJZL.UI.CharacterPreview.WindowTitle", { name: options.actor.name });
         }
         super(options);
         this.actor = options.actor;
@@ -45,7 +45,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         // 长图导出按钮
         controls.unshift({
             action: "exportImage",
-            label: "导出长图",
+            label: game.i18n.localize("XJZL.UI.CharacterPreview.ExportLong"),
             icon: "fas fa-image",
             onClick: this._onExportImage.bind(this)
         });
@@ -53,7 +53,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         // A4分页图册导出按钮
         controls.unshift({
             action: "exportA4Image",
-            label: "导出A4图",
+            label: game.i18n.localize("XJZL.UI.CharacterPreview.ExportA4"),
             icon: "fas fa-file-invoice",
             onClick: this._onExportA4Image.bind(this)
         });
@@ -76,7 +76,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         const selectedPixelRatio = dpiSelector ? parseFloat(dpiSelector.value) : 1.0;
 
         await this._loadExportEngines(true); // 加载截图与ZIP引擎
-        ui.notifications.info("正在排版高清A4图，请稍候...");
+        ui.notifications.info(game.i18n.localize("XJZL.UI.CharacterPreview.ExportingA4"));
 
         // 克隆并清理 DOM
         const sourceElement = this.element.querySelector(".xjzl-preview-content");
@@ -166,7 +166,9 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                     filter: (node) => node.tagName !== 'SCRIPT'
                 });
 
-                const fileName = totalPages > 1 ? `${this.actor.name}-A4图-第${i + 1}页.png` : `${this.actor.name}-A4图.png`;
+                const fileName = totalPages > 1
+                    ? game.i18n.format("XJZL.UI.CharacterPreview.A4PageFileName", { name: this.actor.name, page: i + 1 })
+                    : game.i18n.format("XJZL.UI.CharacterPreview.A4SingleFileName", { name: this.actor.name });
                 zip.file(fileName, dataUrl.split(',')[1], { base64: true });
             }
 
@@ -174,27 +176,27 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             const objectUrl = URL.createObjectURL(zipBlob);
 
             new Dialog({
-                title: "✅ A4图制作完成",
+                title: game.i18n.localize("XJZL.UI.CharacterPreview.A4CompleteTitle"),
                 content: `
                     <div style="padding: 10px; text-align: center;">
-                        <p style="font-size: 1.1em; margin-bottom: 5px;">角色 <strong>${this.actor.name}</strong> 的A4图已印制打包！</p>
-                        <p>本次合成了 <strong>${totalPages}</strong> 页实体A4图。</p>
+                        <p style="font-size: 1.1em; margin-bottom: 5px;">${game.i18n.format("XJZL.UI.CharacterPreview.A4CompleteMessage", { name: `<strong>${this.actor.name}</strong>` })}</p>
+                        <p>${game.i18n.format("XJZL.UI.CharacterPreview.A4PageCount", { count: `<strong>${totalPages}</strong>` })}</p>
                     </div>
                 `,
                 buttons: {
                     download: {
-                        label: "下载 ZIP",
+                        label: game.i18n.localize("XJZL.UI.CharacterPreview.DownloadZip"),
                         icon: '<i class="fas fa-file-download"></i>',
                         callback: () => {
                             const link = document.createElement("a");
-                            link.download = `${this.actor.name}-高清A4图.zip`;
+                            link.download = game.i18n.format("XJZL.UI.CharacterPreview.A4FileName", { name: this.actor.name });
                             link.href = objectUrl;
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
 
                             setTimeout(() => URL.revokeObjectURL(objectUrl), 10000);
-                            ui.notifications.info("下载已开始！");
+                            ui.notifications.info(game.i18n.localize("XJZL.UI.CharacterPreview.DownloadStarted"));
                         }
                     }
                 },
@@ -203,7 +205,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
 
         } catch (err) {
             console.error("A4印制失败:", err);
-            ui.notifications.error("打包失败！请查阅控制台。");
+            ui.notifications.error(game.i18n.localize("XJZL.UI.CharacterPreview.A4BuildFailed"));
         } finally {
             offScreenContainer.remove();
         }
@@ -220,7 +222,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         const selectedPixelRatio = dpiSelector ? parseFloat(dpiSelector.value) : 1.0;
 
         await this._loadExportEngines(false); // 仅需截图引擎
-        ui.notifications.info("正在印制长图，请稍候...");
+        ui.notifications.info(game.i18n.localize("XJZL.UI.CharacterPreview.ExportingLong"));
 
         const sourceElement = this.element.querySelector(".xjzl-preview-content");
         const cloneElement = sourceElement.cloneNode(true);
@@ -278,15 +280,15 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
 
             // 触发图片下载
             const link = document.createElement("a");
-            link.download = `${this.actor.name}-档案长图.png`;
+            link.download = game.i18n.format("XJZL.UI.CharacterPreview.LongImageFileName", { name: this.actor.name });
             link.href = dataUrl;
             link.click();
 
-            ui.notifications.info("长图导出成功！");
+            ui.notifications.info(game.i18n.localize("XJZL.UI.CharacterPreview.LongExportSuccess"));
 
         } catch (err) {
             console.error("生成图片失败:", err);
-            ui.notifications.error("图片生成失败！请按 F12 查看控制台。");
+            ui.notifications.error(game.i18n.localize("XJZL.UI.CharacterPreview.ImageBuildFailed"));
         } finally {
             // 销毁离屏容器，释放内存
             offScreenContainer.remove();
@@ -404,29 +406,32 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         const system = actor.system;
 
         // 1. 门派与境界
-        let sectKey = system.info.sect || "无门派";
+        let sectKey = system.info.sect || "none";
         let sectDisplay = sectKey;
         if (CONFIG.XJZL?.sects?.[sectKey]) sectDisplay = game.i18n.localize(CONFIG.XJZL.sects[sectKey]);
         else {
-            const locTry = game.i18n.localize(`XJZL.Sects.${this._capitalize(sectKey)}`);
-            sectDisplay = !locTry.startsWith("XJZL") ? locTry : game.i18n.localize(sectKey);
+            const translated = game.i18n.localize(sectKey);
+            sectDisplay = translated === sectKey ? game.i18n.localize("XJZL.Sect.None") : translated;
         }
 
-        const realmMap = { 0: "未入门", 1: "不堪一击", 2: "初窥门径", 3: "略有小成", 4: "融会贯通", 5: "炉火纯青", 6: "登峰造极", 7: "撼天动地" };
+        const realmLevel = Number(system.cultivation.realmLevel || 0);
+        const localizeOr = (key, fallback) => {
+            const translated = game.i18n.localize(key);
+            return translated === key ? fallback : translated;
+        };
         const getAttitude = (val) => {
-            if (!val || val === "none") return "无视";
-            const fallback = { "zhonshi": "重视", "wushi": "无视" };
+            if (!val || val === "none") return game.i18n.localize("XJZL.Social.Attitude.Disdain");
             let locKey = CONFIG.XJZL?.attitudes?.[val] || `XJZL.Attitudes.${this._capitalize(val)}`;
             let translated = game.i18n.localize(locKey);
-            return (!translated.startsWith("XJZL")) ? translated : (fallback[val] || val);
+            return !translated.startsWith("XJZL") ? translated : val;
         };
 
         // 2. 基础档案组装
         context.basic = {
             name: actor.name, img: actor.img, sect: sectDisplay,
-            realmLevel: realmMap[system.cultivation.realmLevel || 0] || `境界 ${system.cultivation.realmLevel || 0}`,
-            background: actor.itemTypes.background?.[0]?.name || "无",
-            personality: actor.itemTypes.personality?.[0]?.name || "无",
+            realmLevel: localizeOr(`XJZL.Realm.${realmLevel}`, game.i18n.format("XJZL.UI.CharacterPreview.RealmFallback", { level: realmLevel })),
+            background: actor.itemTypes.background?.[0]?.name || game.i18n.localize("XJZL.Wizard.Common.None"),
+            personality: actor.itemTypes.personality?.[0]?.name || game.i18n.localize("XJZL.Wizard.Common.None"),
             xiayi: system.social.xiayi || 0, exing: system.social.exing || 0,
             shalu: system.resources.shalu?.value || 0, shanie: system.resources.shanie || 0,
             repWulin: system.social.rep_wulin || 0, repChaoting: system.social.rep_chaoting || 0,
@@ -448,7 +453,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         try {
             const weapon = actor.itemTypes.weapon.find(i => i.system.equipped);
             const calcRes = actor._calculateBasicAttackDamage(
-                { name: "普通攻击", type: "basic", damageType: "waigong", weaponType: weapon ? weapon.system.type : "unarmed" },
+                { name: game.i18n.localize("XJZL.Combat.BasicAttack"), type: "basic", damageType: "waigong", weaponType: weapon ? weapon.system.type : "unarmed" },
                 weapon ? (weapon.system.damage || 0) : 0,
                 { bonusDamage: 0 }, "basic", 0, { id: "basic", flags: {} }
             );
@@ -456,26 +461,26 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
         } catch (e) { }
 
         context.combat = [
-            { label: "移动速度", value: system.combat.speedTotal }, { label: "先攻", value: system.combat.initiativeTotal },
-            { label: "闪避", value: system.combat.dodgeTotal }, { label: "格挡", value: system.combat.blockTotal },
-            { label: "外功命中", value: system.combat.hitWaigongTotal }, { label: "外功防御", value: system.combat.defWaigongTotal },
-            { label: "外功暴击", value: system.combat.critWaigongTotal }, { label: "看破", value: system.combat.kanpoTotal },
-            { label: "内功命中", value: system.combat.hitNeigongTotal }, { label: "内功防御", value: system.combat.defNeigongTotal },
-            { label: "内功暴击", value: system.combat.critNeigongTotal }, { label: "普攻伤害", value: basicAttackDamage }
+            { label: game.i18n.localize("XJZL.Combat.Speed"), value: system.combat.speedTotal }, { label: game.i18n.localize("XJZL.Combat.Initiative"), value: system.combat.initiativeTotal },
+            { label: game.i18n.localize("XJZL.Combat.Dodge"), value: system.combat.dodgeTotal }, { label: game.i18n.localize("XJZL.Combat.Block"), value: system.combat.blockTotal },
+            { label: game.i18n.localize("XJZL.Combat.HitWaigong"), value: system.combat.hitWaigongTotal }, { label: game.i18n.localize("XJZL.Combat.DefWaigong"), value: system.combat.defWaigongTotal },
+            { label: game.i18n.localize("XJZL.Combat.CritWaigong"), value: system.combat.critWaigongTotal }, { label: game.i18n.localize("XJZL.Combat.Kanpo"), value: system.combat.kanpoTotal },
+            { label: game.i18n.localize("XJZL.Combat.HitNeigong"), value: system.combat.hitNeigongTotal }, { label: game.i18n.localize("XJZL.Combat.DefNeigong"), value: system.combat.defNeigongTotal },
+            { label: game.i18n.localize("XJZL.Combat.CritNeigong"), value: system.combat.critNeigongTotal }, { label: game.i18n.localize("XJZL.Combat.Dmg.Normal"), value: basicAttackDamage }
         ];
 
         // 5. 江湖技能
         const allSkillGroups = [
-            { key: "wuxing", label: "悟性", skills: ["wuxue", "jianding", "bagua", "shili"] },
-            { key: "liliang", label: "力量", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
-            { key: "shenfa", label: "身法", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
-            { key: "tipo", label: "体魄", skills: ["renxing", "biqi", "rennai", "ningxue"] },
-            { key: "neixi", label: "内息", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
-            { key: "qigan", label: "气感", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
-            { key: "shencai", label: "神采", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
+            { key: "wuxing", skills: ["wuxue", "jianding", "bagua", "shili"] },
+            { key: "liliang", skills: ["jiaoli", "zhengtuo", "paozhi", "qinbao"] },
+            { key: "shenfa", skills: ["qianxing", "qiaoshou", "qinggong", "mashu"] },
+            { key: "tipo", skills: ["renxing", "biqi", "rennai", "ningxue"] },
+            { key: "neixi", skills: ["liaoshang", "chongxue", "lianxi", "duqi"] },
+            { key: "qigan", skills: ["dianxue", "zhuizong", "tancha", "dongcha"] },
+            { key: "shencai", skills: ["jiaoyi", "qiman", "shuofu", "dingli"] }
         ];
         context.skillGroups = allSkillGroups.map(g => ({
-            label: g.label,
+            label: game.i18n.localize(CONFIG.XJZL.attributes[g.key]),
             skills: g.skills.map(sk => ({ name: game.i18n.localize(CONFIG.XJZL.skills[sk] || sk), value: system.skills[sk]?.total || 0 }))
         }));
 
@@ -492,14 +497,13 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             if (ng) {
                 const stageConf = ng.system.config[`stage${Math.max(1, ng.system.stage || 0)}`];
                 // 智能应用书名号
-                context.activeNeigong = { name: formatTitle(ng.name), effect: this._cleanRichText(stageConf?.description) || "暂无特效" };
+                context.activeNeigong = { name: formatTitle(ng.name), effect: this._cleanRichText(stageConf?.description) || game.i18n.localize("XJZL.UI.CharacterPreview.NoEffect") };
             }
         }
 
         // 7. 常用武学与招式组装
         const pinnedSet = new Set(actor.getFlag("xjzl-system", "pinnedMoves") || []);
-        const levelNames = ["未入门", "领悟", "掌握", "精通", "合一"];
-        const tierMap = { 1: "人级", 2: "地级", 3: "天级" };
+        const levelNames = [0, 1, 2, 3, 4].map(level => game.i18n.localize(`XJZL.Wuxue.Moves.Levels.${level}`));
 
         context.wuxueGroups = [];
         for (const wuxue of (actor.itemTypes.wuxue || [])) {
@@ -512,7 +516,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
             context.wuxueGroups.push({
                 // 智能应用书名号
                 name: formatTitle(wuxue.name), category: catDisplay,
-                tierName: tierMap[wuxue.system.tier] || `${wuxue.system.tier}级`,
+                tierName: localizeOr(`XJZL.Tiers.${wuxue.system.tier}`, game.i18n.format("XJZL.UI.CharacterPreview.TierFallback", { tier: wuxue.system.tier })),
                 moves: pinnedMoves.map(m => {
                     const derived = wuxue.calculateMoveDamage(m.id) || { damage: 0 };
                     const lvl = Math.max(1, m.computedLevel || 1);
@@ -528,10 +532,10 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
 
                     return {
                         name: m.name,
-                        tierName: tierMap[mTier] || `${mTier}级`,
+                        tierName: localizeOr(`XJZL.Tiers.${mTier}`, game.i18n.format("XJZL.UI.CharacterPreview.TierFallback", { tier: mTier })),
                         levelName: levelNames[Math.min(4, Math.max(0, m.effectiveStage ?? m.computedLevel ?? 0))],
                         type: m.type, typeLabel: game.i18n.localize(`XJZL.Wuxue.Type.${m.type}`),
-                        isUltimate: m.isUltimate, actionCost: m.actionCost || "主要动作", range: m.range,
+                        isUltimate: m.isUltimate, actionCost: m.actionCost || game.i18n.localize("XJZL.UI.ActionTracker.Major"), range: m.range,
                         formulaFields: m.formulaFields,
                         isStance: m.type === "stance", isFeint: m.type === "feint",
                         blockValue, feintValue, damage: (() => {
@@ -540,7 +544,7 @@ export class XJZLCharacterPreviewApp extends HandlebarsApplicationMixin(Applicat
                                 return `${baseDmg}/${baseDmg * 2}`;
                             }
                             return derived.damage || 0;
-                        })(), description: this._cleanRichText(m.description) || "暂无描述",
+                        })(), description: this._cleanRichText(m.description) || game.i18n.localize("XJZL.UI.CharacterPreview.NoDescription"),
                         cost: {
                             hp: m.costs.hp?.[Math.max(0, m.computedLevel - 1)] || 0,
                             mp: m.costs.mp?.[Math.max(0, m.computedLevel - 1)] || 0,

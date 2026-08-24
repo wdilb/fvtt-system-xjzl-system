@@ -13,11 +13,11 @@ export class ToneTracker extends HandlebarsApplicationMixin(ApplicationV2) {
 
     // --- 五音基础配置 ---
     static TONE_MAP = {
-        gong: { key: "gong", label: "宫", color: "#e8c971", shadow: "rgba(232, 201, 113, 0.6)" },
-        shang: { key: "shang", label: "商", color: "#e0e0e0", shadow: "rgba(224, 224, 224, 0.6)" },
-        jue: { key: "jue", label: "角", color: "#74b592", shadow: "rgba(116, 181, 146, 0.6)" },
-        zhi: { key: "zhi", label: "徵", color: "#db5a5a", shadow: "rgba(219, 90, 90, 0.6)" },
-        yu: { key: "yu", label: "羽", color: "#5c799e", shadow: "rgba(92, 121, 158, 0.6)" }
+        gong: { key: "gong", labelKey: "XJZL.UI.ToneTracker.Gong", color: "#e8c971", shadow: "rgba(232, 201, 113, 0.6)" },
+        shang: { key: "shang", labelKey: "XJZL.UI.ToneTracker.Shang", color: "#e0e0e0", shadow: "rgba(224, 224, 224, 0.6)" },
+        jue: { key: "jue", labelKey: "XJZL.UI.ToneTracker.Jue", color: "#74b592", shadow: "rgba(116, 181, 146, 0.6)" },
+        zhi: { key: "zhi", labelKey: "XJZL.UI.ToneTracker.Zhi", color: "#db5a5a", shadow: "rgba(219, 90, 90, 0.6)" },
+        yu: { key: "yu", labelKey: "XJZL.UI.ToneTracker.Yu", color: "#5c799e", shadow: "rgba(92, 121, 158, 0.6)" }
     };
 
     // 音阶轮换顺序
@@ -29,7 +29,7 @@ export class ToneTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         classes: ["xjzl-tone-tracker-window"],
         tag: "div",
         window: {
-            title: "五声音阶",
+            title: "XJZL.UI.ToneTracker.Title",
             minimizable: false, // 禁用系统默认最小化，使用自建逻辑
             resizable: false,
             frame: false        // 关闭系统默认边框，使用无边框
@@ -118,7 +118,8 @@ export class ToneTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         const slots = currentTones.map((toneKey, index) => {
             let baseData = { index, isEmpty: true };
             if (toneKey && ToneTracker.TONE_MAP[toneKey]) {
-                baseData = { index, isEmpty: false, ...ToneTracker.TONE_MAP[toneKey] };
+                const tone = ToneTracker.TONE_MAP[toneKey];
+                baseData = { index, isEmpty: false, ...tone, label: game.i18n.localize(tone.labelKey) };
             }
 
             // 动画核心逻辑：
@@ -136,7 +137,7 @@ export class ToneTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         return {
             isExpanded: this.isExpanded,
             slots: slots,
-            buttons: Object.values(ToneTracker.TONE_MAP),
+            buttons: Object.values(ToneTracker.TONE_MAP).map(tone => ({ ...tone, label: game.i18n.localize(tone.labelKey) })),
             hasTones: hasTones
         };
     }

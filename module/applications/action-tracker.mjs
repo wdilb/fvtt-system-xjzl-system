@@ -11,7 +11,7 @@ export class ActionTracker extends HandlebarsApplicationMixin(ApplicationV2) {
         classes: ["xjzl-action-tracker-window"], // 挂上专属的 class
         tag: "div",
         window: {
-            title: "动作状态", // 留一个小标题，方便拖拽时知道这是啥
+            title: "XJZL.UI.ActionTracker.Title",
             icon: "",
             minimizable: false,
             resizable: false,

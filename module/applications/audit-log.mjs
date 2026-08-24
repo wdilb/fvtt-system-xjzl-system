@@ -7,7 +7,7 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
         id: "xjzl-audit-log",
         classes: ["xjzl-window", "xjzl-audit-window", "theme-dark"],
         window: {
-            title: "生平经历与审计",
+            title: "XJZL.History.WindowTitle",
             icon: "fas fa-history",
             resizable: true,
             width: 500,
@@ -150,7 +150,7 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
             const currentPoolBalance = this.actor.system.cultivation[targetPoolKey] || 0;
 
             const choice = await DialogV2.wait({
-                window: { title: "删除审计记录", icon: "fas fa-exclamation-triangle" },
+                window: { title: game.i18n.localize("XJZL.History.DeleteTitle"), icon: "fas fa-exclamation-triangle" },
                 content: `
                     <div style="margin-bottom:10px;">你要删除的记录【${targetEntry.title}】包含了修为变动 (${targetEntry.delta})。</div>
                     <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:4px; border:1px solid #555;">
@@ -202,7 +202,7 @@ export class XJZLAuditLog extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async _executeNormalDelete(index, entry) {
         const confirm = await DialogV2.confirm({
-            window: { title: "确认删除", icon: "fas fa-trash" },
+            window: { title: game.i18n.localize("XJZL.History.ConfirmDeleteTitle"), icon: "fas fa-trash" },
             content: `<p>确定要删除记录【${entry.title}】吗？删除后不可恢复。</p>`,
             rejectClose: false
         });

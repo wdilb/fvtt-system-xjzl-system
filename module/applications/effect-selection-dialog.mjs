@@ -11,19 +11,19 @@ const DEFAULT_FAVORITE_STATUS_IDS = ["prone", "root", "unstable", "blind", "blee
 const STATUS_CATEGORIES = [
     {
         id: "common",
-        label: "常用",
+        label: "XJZL.UI.EffectPicker.Category.Common",
         icon: "fas fa-star",
         ids: []
     },
-    { id: "recent", label: "最近", icon: "fas fa-clock-rotate-left", ids: [] },
-    { id: "injury", label: "伤势", icon: "fas fa-droplet", ids: ["sielie", "bleed_stack", "endless_bleed", "pain", "bloodloss", "pofang", "cuogu", "dying", "dead", "unconscious"] },
-    { id: "control", label: "控制", icon: "fas fa-hand", ids: ["dianxue", "xuanyun", "stun", "root", "fushen", "prone", "zuidao", "blind", "deaf"] },
-    { id: "seal", label: "封招", icon: "fas fa-ban", ids: ["jinxu", "jinshi", "jinfan", "jinqi", "jinjue", "fengzhao", "jiaoxie"] },
-    { id: "resource", label: "封锁", icon: "fas fa-lock", ids: ["bunu", "jinliao", "qizhi", "poyi", "fatigue", "hunger"] },
-    { id: "buff", label: "增益", icon: "fas fa-arrow-trend-up", ids: ["yangxue", "juqi", "chengfeng", "gangjin", "mianjin", "panshi", "hushen", "xujin", "yanli", "qingling", "jinli", "wuqishi", "jinqi_stack", "wutong", "lianji", "yanzhan"] },
-    { id: "debuff", label: "减益", icon: "fas fa-arrow-trend-down", ids: ["qixu", "tuoli", "cuoluan", "youyu", "yudun", "shizhun", "benzhuo", "fali", "chanshou", "yishang", "pojia", "unstable", "chizhi", "rage", "zibi"] },
-    { id: "scene", label: "场上特效", icon: "fas fa-location-dot", ids: [] },
-    { id: "all", label: "全部", icon: "fas fa-border-all", ids: [] }
+    { id: "recent", label: "XJZL.UI.EffectPicker.Category.Recent", icon: "fas fa-clock-rotate-left", ids: [] },
+    { id: "injury", label: "XJZL.UI.EffectPicker.Category.Injury", icon: "fas fa-droplet", ids: ["sielie", "bleed_stack", "endless_bleed", "pain", "bloodloss", "pofang", "cuogu", "dying", "dead", "unconscious"] },
+    { id: "control", label: "XJZL.UI.EffectPicker.Category.Control", icon: "fas fa-hand", ids: ["dianxue", "xuanyun", "stun", "root", "fushen", "prone", "zuidao", "blind", "deaf"] },
+    { id: "seal", label: "XJZL.UI.EffectPicker.Category.Seal", icon: "fas fa-ban", ids: ["jinxu", "jinshi", "jinfan", "jinqi", "jinjue", "fengzhao", "jiaoxie"] },
+    { id: "resource", label: "XJZL.UI.EffectPicker.Category.Resource", icon: "fas fa-lock", ids: ["bunu", "jinliao", "qizhi", "poyi", "fatigue", "hunger"] },
+    { id: "buff", label: "XJZL.UI.EffectPicker.Category.Buff", icon: "fas fa-arrow-trend-up", ids: ["yangxue", "juqi", "chengfeng", "gangjin", "mianjin", "panshi", "hushen", "xujin", "yanli", "qingling", "jinli", "wuqishi", "jinqi_stack", "wutong", "lianji", "yanzhan"] },
+    { id: "debuff", label: "XJZL.UI.EffectPicker.Category.Debuff", icon: "fas fa-arrow-trend-down", ids: ["qixu", "tuoli", "cuoluan", "youyu", "yudun", "shizhun", "benzhuo", "fali", "chanshou", "yishang", "pojia", "unstable", "chizhi", "rage", "zibi"] },
+    { id: "scene", label: "XJZL.UI.EffectPicker.Category.Scene", icon: "fas fa-location-dot", ids: [] },
+    { id: "all", label: "XJZL.UI.EffectPicker.Category.All", icon: "fas fa-border-all", ids: [] }
 ];
 
 export class EffectSelectionDialog extends HandlebarsApplicationMixin(ApplicationV2) {
@@ -33,7 +33,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         id: "xjzl-effect-picker",
         classes: ["xjzl-effect-picker-window", "theme-dark"],
         window: {
-            title: "侠界状态盘",
+            title: "XJZL.UI.EffectPicker.Title",
             icon: "fas fa-hand-sparkles",
             width: 760,
             height: 700,
@@ -190,6 +190,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const categoryCounts = this._countCategories(statusEffects);
         const categories = STATUS_CATEGORIES.map(c => ({
             ...c,
+            label: game.i18n.localize(c.label),
             count: c.id === "scene" ? 0 : (categoryCounts[c.id] || 0),
             active: c.id === this._activeCategory
         }));
@@ -408,7 +409,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
             targets.push(actor);
         }
         if (targets.length === 0) {
-            if (notify) ui.notifications.warn("请先选择一个 Token 作为目标！");
+            if (notify) ui.notifications.warn(game.i18n.localize("XJZL.UI.EffectPicker.NoTargetSelected"));
             return [];
         }
         return targets;
@@ -493,7 +494,10 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
 
         await this._rememberStatus(statusData.id);
-        ui.notifications.info(`已对 ${actors.length} 个目标应用 [${game.i18n.localize(statusData.name)}]`);
+        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+            count: actors.length,
+            name: game.i18n.localize(statusData.name)
+        }));
         this.render();
     }
 
@@ -523,7 +527,10 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
 
         await this._rememberSceneEffect(uuid);
-        ui.notifications.info(`已对 ${actors.length} 个目标应用 [${sourceEffect.name}]`);
+        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+            count: actors.length,
+            name: sourceEffect.name
+        }));
         this.render();
     }
 
@@ -533,7 +540,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      */
     async _onAdjustEffect(event, target) {
         const actors = EffectSelectionDialog.getControlledActors(this, { notify: true });
-        if (actors.length !== 1) return ui.notifications.warn("调整已有状态时请只选择一个目标。");
+        if (actors.length !== 1) return ui.notifications.warn(game.i18n.localize("XJZL.UI.EffectPicker.SingleTargetAdjust"));
 
         const effect = actors[0].effects.get(target.dataset.id);
         if (!effect) return;
@@ -549,13 +556,13 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      */
     async _onDeleteEffect(event, target) {
         const actors = EffectSelectionDialog.getControlledActors(this, { notify: true });
-        if (actors.length !== 1) return ui.notifications.warn("移除已有状态时请只选择一个目标。");
+        if (actors.length !== 1) return ui.notifications.warn(game.i18n.localize("XJZL.UI.EffectPicker.SingleTargetRemove"));
 
         const effect = actors[0].effects.get(target.dataset.id);
         if (!effect) return;
 
         await effect.delete();
-        ui.notifications.info(`已移除状态: ${effect.name}`);
+        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.RemovedStatus", { name: effect.name }));
         this.render();
     }
 
@@ -745,7 +752,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                     for (const actor of actors) {
                         await game.xjzl.api.effects.removeEffect(actor, slug, 1);
                     }
-                    ui.notifications.info(`已对选中目标执行移除/减层操作。`);
+                    ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.RemovedOrReduced"));
                     this.render();
                 }
 
@@ -763,18 +770,18 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                     for (const actor of actors) {
                         await game.xjzl.api.effects.removeEffect(actor, targetSlug, 1);
                     }
-                    ui.notifications.info(`已对选中目标执行移除/减层操作。`);
+                    ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.RemovedOrReduced"));
                     this.render();
                 }
 
                 else if (action === "adjustEffect") {
-                    if (actors.length !== 1) return ui.notifications.warn("减少已有状态时请只选择一个目标。");
+                    if (actors.length !== 1) return ui.notifications.warn(game.i18n.localize("XJZL.UI.EffectPicker.SingleTargetReduce"));
                     const effect = actors[0].effects.get(btn.dataset.id);
                     if (!effect) return;
                     if (!effect.isStackable) return;
                     const currentStacks = effect.stacks || 1;
                     if (currentStacks > 1) await ActiveEffectManager.removeEffect(actors[0], effect.id, 1);
-                    else ui.notifications.info(`"${effect.name}" 当前只有 1 层。如需移除请点击删除按钮。`);
+                    else ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.OneStackLeft", { name: effect.name }));
                     this.render();
                 }
             });

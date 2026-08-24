@@ -878,7 +878,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
   if (isGM || allowPicker) {
     const effectPickerBtn = {
       name: "effect-picker",
-      title: "状态选取器 (Effect Picker)",
+      title: game.i18n.localize("XJZL.UI.Toolbar.EffectPicker"),
       icon: "fas fa-hand-sparkles", // 找一个好看的图标
       visible: true,
       button: true,
@@ -920,7 +920,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
   if (game.settings.get("xjzl-system", "enableCombatStats")) {
     const meterBtn = {
       name: "combat-meter",
-      title: "战斗统计 (Details)",
+      title: game.i18n.localize("XJZL.UI.Toolbar.CombatMeter"),
       icon: "fas fa-chart-bar", // 柱状图图标
       visible: true,
       button: true, // 点击型按钮
@@ -968,7 +968,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
   if (templateLayer) {
     const aoeBtn = {
       name: "xjzl-aoe",
-      title: "创建效果区域（距离计算按照侠界之旅规则）",
+      title: game.i18n.localize("XJZL.UI.Toolbar.AoeCreator"),
       icon: "fas fa-bullseye",
       visible: true,
       button: true, // 关键：这是点击型按钮
@@ -1065,7 +1065,7 @@ Hooks.on("renderItemDirectory", (app, html, data) => {
   button.className = "xjzl-browser-btn";
   // 直接写内联样式，或者你在 css 文件里写类名
   button.style.cssText = "min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;";
-  button.innerHTML = '<i class="fas fa-book-open"></i> 江湖万卷阁';
+  button.innerHTML = `<i class="fas fa-book-open"></i> ${game.i18n.localize("XJZL.UI.Toolbar.Compendium")}`;
 
   // 4. 绑定点击事件
   button.addEventListener("click", (ev) => {
@@ -1074,7 +1074,7 @@ Hooks.on("renderItemDirectory", (app, html, data) => {
     if (game.xjzl?.compendiumBrowser) {
       game.xjzl.compendiumBrowser.render(true);
     } else {
-      ui.notifications.warn("江湖万卷阁尚未初始化，请稍候...");
+      ui.notifications.warn(game.i18n.localize("XJZL.UI.Toolbar.CompendiumNotReady"));
     }
   });
 
@@ -1095,14 +1095,14 @@ Hooks.on("renderCompendiumDirectory", (app, html, data) => {
   button.type = "button";
   button.className = "xjzl-browser-btn";
   button.style.cssText = "min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;";
-  button.innerHTML = '<i class="fas fa-book-open"></i> 江湖万卷阁';
+  button.innerHTML = `<i class="fas fa-book-open"></i> ${game.i18n.localize("XJZL.UI.Toolbar.Compendium")}`;
 
   button.addEventListener("click", (ev) => {
     ev.preventDefault();
     if (game.xjzl?.compendiumBrowser) {
       game.xjzl.compendiumBrowser.render(true);
     } else {
-      ui.notifications.warn("江湖万卷阁尚未初始化，请稍候...");
+      ui.notifications.warn(game.i18n.localize("XJZL.UI.Toolbar.CompendiumNotReady"));
     }
   });
 
@@ -1548,7 +1548,7 @@ Hooks.on("deleteCombat", async (combat, options, userId) => {
 
   // 给予 GM 视觉反馈
   if (hasUpdated) {
-    ui.notifications.info("脱离战斗：所有参战角色的怒气已自动清零。");
+    ui.notifications.info(game.i18n.localize("XJZL.UI.Combat.RageClearedOnCombatEnd"));
   }
 });
 
@@ -1618,11 +1618,11 @@ async function handleSystemMacro(data, slot) {
       command = `
 // 招式宏: ${name}
 const item = await fromUuid("${uuid}");
-if (!item) return ui.notifications.warn("原物品已丢失");
+if (!item) return ui.notifications.warn(game.i18n.localize("XJZL.UI.Macro.ItemMissing"));
 if (typeof item.roll === "function") {
     await item.roll("${data.moveId}");
 } else {
-    ui.notifications.error("该物品无法执行招式，请检查系统版本或重新创建宏。");
+    ui.notifications.error(game.i18n.localize("XJZL.UI.Macro.MoveUnavailable"));
 }
 `;
     }
@@ -1632,11 +1632,11 @@ if (typeof item.roll === "function") {
       command = `
 // 物品宏: ${name}
 const item = await fromUuid("${uuid}");
-if (!item) return ui.notifications.warn("原物品已丢失");
+if (!item) return ui.notifications.warn(game.i18n.localize("XJZL.UI.Macro.ItemMissing"));
 if (typeof item.use === "function") {
     await item.use();
 } else {
-    ui.notifications.error("该物品无法执行招式，请检查系统版本或重新创建宏。");
+    ui.notifications.error(game.i18n.localize("XJZL.UI.Macro.MoveUnavailable"));
 }
 `;
     }
@@ -1674,7 +1674,7 @@ if (item) item.postToChat();
 
   } catch (err) {
     console.error("XJZL | 宏创建失败:", err);
-    ui.notifications.error("宏创建失败，请按F12查看控制台报错");
+    ui.notifications.error(game.i18n.localize("XJZL.UI.Macro.CreateFailed"));
   }
 }
 

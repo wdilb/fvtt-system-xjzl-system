@@ -8,7 +8,7 @@ export class XJZLModifierPicker extends HandlebarsApplicationMixin(ApplicationV2
         classes: ["xjzl-picker-window", "theme-dark"],
         position: { width: 400, height: 600 },
         window: {
-            title: "选择属性修正",
+            title: "XJZL.UI.ModifierPicker.Title",
             icon: "fas fa-list-ul",
             resizable: true
         },

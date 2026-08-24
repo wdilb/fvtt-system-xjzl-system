@@ -22,7 +22,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         classes: ["xjzl-combat-meter"],
         tag: "div",
         window: {
-            title: "战斗统计 (Details)",
+            title: "XJZL.UI.CombatMeter.Title",
             icon: "fas fa-chart-bar",
             minimizable: true,
             resizable: true,
@@ -70,14 +70,14 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         if (CombatStatsManager._activeStats) {
             sessions.push({
                 id: "current",
-                name: `[进行中] ${CombatStatsManager._activeStats.name}`,
+                name: `[${game.i18n.localize("XJZL.UI.CombatMeter.CurrentSession")}] ${CombatStatsManager._activeStats.name}`,
                 selected: CombatStatsManager._viewingId === "current"
             });
         }
         CombatStatsManager._history.forEach(h => {
             sessions.push({
                 id: h.id,
-                name: `[历史] ${h.name}`,
+                name: `[${game.i18n.localize("XJZL.UI.CombatMeter.HistorySession")}] ${h.name}`,
                 selected: CombatStatsManager._viewingId === h.id
             });
         });
@@ -85,14 +85,14 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         if (this.viewState.level === 1) {
             rows = CombatStatsManager.getMeterData(this.currentMetric) || [];
             totalValue = rows.reduce((acc, r) => acc + r.value, 0);
-            viewTitle = "全局排行";
+            viewTitle = game.i18n.localize("XJZL.UI.CombatMeter.GlobalRanking");
         }
         else if (this.viewState.level === 2) {
             const skillData = CombatStatsManager.getActorSkillsData(this.viewState.actorUuid, this.currentMetric);
             if (skillData) {
                 rows = skillData.rows;
                 totalValue = rows.reduce((acc, r) => acc + r.value, 0);
-                viewTitle = `${skillData.actorName} 的明细`;
+                viewTitle = game.i18n.format("XJZL.UI.CombatMeter.ActorDetails", { name: skillData.actorName });
             } else {
                 this.viewState.level = 1;
                 return this._prepareContext(options);
@@ -108,7 +108,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
                 skillDetails = details;
                 rows = details.targets;
                 totalValue = rows.reduce((acc, r) => acc + (r.displayVal || r.value), 0);
-                viewTitle = `技能详情: ${details.skillName}`;
+                viewTitle = game.i18n.format("XJZL.UI.CombatMeter.SkillDetails", { name: details.skillName });
             } else {
                 this.viewState.level = 2;
                 return this._prepareContext(options);
@@ -133,11 +133,11 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
 
     _getMetricLabel(metric) {
         const map = {
-            damageDealt: "造成伤害", healingDealt: "造成治疗", damageTaken: "承受伤害",
-            brokenStanceDealt: "破架次数", mpSpent: "内力消耗", rageSpent: "怒气消耗", castsDealt: "出招次数",
-            dyingTaken: "濒死次数"
+            damageDealt: "XJZL.UI.CombatMeter.DamageDealt", healingDealt: "XJZL.UI.CombatMeter.HealingDealt", damageTaken: "XJZL.UI.CombatMeter.DamageTaken",
+            brokenStanceDealt: "XJZL.UI.CombatMeter.BrokenStanceDealt", mpSpent: "XJZL.UI.CombatMeter.MpSpent", rageSpent: "XJZL.UI.CombatMeter.RageSpent", castsDealt: "XJZL.UI.CombatMeter.CastsDealt",
+            dyingTaken: "XJZL.UI.CombatMeter.DyingTaken"
         };
-        return map[metric] || metric;
+        return game.i18n.localize(map[metric] || metric);
     }
 
     _attachPartListeners(partId, htmlElement, options) {
@@ -226,8 +226,8 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
     // 清除数据
     async _onClearData() {
         const confirm = await foundry.applications.api.DialogV2.confirm({
-            window: { title: "清空数据" },
-            content: "<p>确定要清空包含历史记录在内的所有战斗统计数据吗？</p>",
+            window: { title: game.i18n.localize("XJZL.UI.CombatMeter.ClearTitle") },
+            content: `<p>${game.i18n.localize("XJZL.UI.CombatMeter.ClearConfirm")}</p>`,
             rejectClose: false
         });
         if (confirm) CombatStatsManager.clearData();
@@ -243,19 +243,19 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
         // 根据当前层级获取数据
         if (this.viewState.level === 1) {
             rows = CombatStatsManager.getMeterData(this.currentMetric) || [];
-            title = `【战斗统计】${metricLabel}`;
+            title = game.i18n.format("XJZL.UI.CombatMeter.ReportTitle", { metric: metricLabel });
             total = rows.reduce((acc, r) => acc + r.value, 0);
         } else if (this.viewState.level === 2) {
             const skillData = CombatStatsManager.getActorSkillsData(this.viewState.actorUuid, this.currentMetric);
-            if (!skillData) return ui.notifications.warn("暂无数据可发送");
+            if (!skillData) return ui.notifications.warn(game.i18n.localize("XJZL.UI.CombatMeter.NoSkillData"));
             rows = skillData.rows;
-            title = `【战斗统计】${skillData.actorName} - ${metricLabel}`;
+            title = `${game.i18n.localize("XJZL.UI.CombatMeter.Title")} · ${skillData.actorName} - ${metricLabel}`;
             total = rows.reduce((acc, r) => acc + r.value, 0);
         } else {
             return; // Level 3 暂不提供一键发送
         }
 
-        if (rows.length === 0) return ui.notifications.warn("当前风平浪静，没有数据可以发送！");
+        if (rows.length === 0) return ui.notifications.warn(game.i18n.localize("XJZL.UI.CombatMeter.NoReportData"));
 
         // 为了防止聊天框被刷屏，截取前 10 条
         const MAX_ROWS = 10;
@@ -266,7 +266,7 @@ export class CombatMeterUI extends HandlebarsApplicationMixin(ApplicationV2) {
     <div class="xjzl-combat-meter-chat-card">
         <header class="chat-card-header">
             <div class="card-title"><i class="fas fa-chart-bar"></i> ${title}</div>
-            <div class="card-total">总计: <span>${total}</span></div>
+            <div class="card-total">${game.i18n.localize("XJZL.UI.CombatMeter.ReportTotal")}: <span>${total}</span></div>
         </header>
         <ul class="chat-card-list">
     `;

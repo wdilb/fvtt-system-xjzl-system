@@ -90,7 +90,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         classes: ["compendium-browser", "theme-dark"],
         position: { width: 950, height: 750 },
         window: {
-            title: "江湖万卷阁",
+            title: "XJZL.CompendiumBrowser.Draw.CinematicBrand",
             icon: "fas fa-book-open",
             resizable: true
         },
@@ -119,15 +119,15 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     };
 
     static TABS = [
-        { id: "weapon", label: "武器", icon: "fas fa-sword" },
-        { id: "armor", label: "防具", icon: "fas fa-tshirt" },
-        { id: "consumable", label: "消耗品", icon: "fas fa-flask" },
-        { id: "misc", label: "杂物", icon: "fas fa-box-open" },
-        { id: "qizhen", label: "奇珍", icon: "fas fa-gem" },
-        { id: "wuxue", label: "武学", icon: "fas fa-fist-raised" },
-        { id: "neigong", label: "内功", icon: "fas fa-yin-yang" },
-        { id: "art_book", label: "技艺", icon: "fas fa-book" },
-        { id: "trait", label: "特效", icon: "fas fa-seedling" },
+        { id: "weapon", label: "TYPES.Item.weapon", icon: "fas fa-sword" },
+        { id: "armor", label: "TYPES.Item.armor", icon: "fas fa-tshirt" },
+        { id: "consumable", label: "TYPES.Item.consumable", icon: "fas fa-flask" },
+        { id: "misc", label: "TYPES.Item.misc", icon: "fas fa-box-open" },
+        { id: "qizhen", label: "TYPES.Item.qizhen", icon: "fas fa-gem" },
+        { id: "wuxue", label: "TYPES.Item.wuxue", icon: "fas fa-fist-raised" },
+        { id: "neigong", label: "TYPES.Item.neigong", icon: "fas fa-yin-yang" },
+        { id: "art_book", label: "TYPES.Item.art_book", icon: "fas fa-book" },
+        { id: "trait", label: "TYPES.Item.trait", icon: "fas fa-seedling" },
     ];
 
     static INDEX_FIELDS = [
@@ -143,49 +143,63 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
      */
     get filterConfig() {
         const C = CONFIG.XJZL;
-        const elemOpts = { taiji: "太极", yin: "阴", yang: "阳", gang: "刚", rou: "柔", none: "无" };
-        const neigongOpts = { taiji: "太极", yin: "阴柔", yang: "阳刚" };
-        const officialOpts = { "true": "是", "false": "否" };
+        const elemOpts = {
+            taiji: "XJZL.CompendiumBrowser.Filter.ElementTaiji",
+            yin: "XJZL.CompendiumBrowser.Filter.ElementYin",
+            yang: "XJZL.CompendiumBrowser.Filter.ElementYang",
+            gang: "XJZL.CompendiumBrowser.Filter.ElementGang",
+            rou: "XJZL.CompendiumBrowser.Filter.ElementRou",
+            none: "XJZL.CompendiumBrowser.Filter.ElementNone"
+        };
+        const neigongOpts = {
+            taiji: "XJZL.CompendiumBrowser.Filter.ElementTaiji",
+            yin: "XJZL.CompendiumBrowser.Filter.NeigongYin",
+            yang: "XJZL.CompendiumBrowser.Filter.NeigongYang"
+        };
+        const officialOpts = {
+            "true": "XJZL.CompendiumBrowser.Filter.OfficialYes",
+            "false": "XJZL.CompendiumBrowser.Filter.OfficialNo"
+        };
         const config = {
             weapon: [
-                { key: "type", label: "武器类型", type: "checkbox", options: C.weaponTypes },
-                { key: "quality", label: "品质", type: "checkbox", options: C.qualities },
+                { key: "type", label: "XJZL.CompendiumBrowser.Filter.WeaponType", type: "checkbox", options: C.weaponTypes },
+                { key: "quality", label: "XJZL.Qualities.Label", type: "checkbox", options: C.qualities },
             ],
             armor: [
-                { key: "type", label: "防具部位", type: "checkbox", options: C.armorTypes },
-                { key: "quality", label: "品质", type: "checkbox", options: C.qualities }
+                { key: "type", label: "XJZL.CompendiumBrowser.Filter.ArmorType", type: "checkbox", options: C.armorTypes },
+                { key: "quality", label: "XJZL.Qualities.Label", type: "checkbox", options: C.qualities }
             ],
             consumable: [
-                { key: "type", label: "分类", type: "checkbox", options: C.consumableTypes },
-                { key: "quality", label: "品质", type: "checkbox", options: C.qualities }
+                { key: "type", label: "XJZL.CompendiumBrowser.Filter.Category", type: "checkbox", options: C.consumableTypes },
+                { key: "quality", label: "XJZL.Qualities.Label", type: "checkbox", options: C.qualities }
             ],
-            misc: [{ key: "quality", label: "品质", type: "checkbox", options: C.qualities }],
-            qizhen: [{ key: "quality", label: "品质", type: "checkbox", options: C.qualities }],
+            misc: [{ key: "quality", label: "XJZL.Qualities.Label", type: "checkbox", options: C.qualities }],
+            qizhen: [{ key: "quality", label: "XJZL.Qualities.Label", type: "checkbox", options: C.qualities }],
             wuxue: [
-                { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
-                { key: "subSect", label: "江湖势力分支", type: "checkbox", options: C.subSects },
-                { key: "category", label: "武学类别", type: "checkbox", options: C.wuxueCategories },
-                { key: "tier", label: "武学品阶", type: "checkbox", options: C.tiers },
-                { key: "element", label: "武学属性", type: "checkbox", options: elemOpts },
-                { key: "damageType", label: "伤害类型", type: "checkbox", options: C.damageTypes },
-                { key: "weaponType", label: "兵器要求", type: "checkbox", options: C.weaponTypes }
+                { key: "sect", label: "XJZL.CompendiumBrowser.Filter.Sect", type: "checkbox", options: C.sects },
+                { key: "subSect", label: "XJZL.CompendiumBrowser.Filter.SubSect", type: "checkbox", options: C.subSects },
+                { key: "category", label: "XJZL.CompendiumBrowser.Filter.WuxueCategory", type: "checkbox", options: C.wuxueCategories },
+                { key: "tier", label: "XJZL.CompendiumBrowser.Filter.WuxueTier", type: "checkbox", options: C.tiers },
+                { key: "element", label: "XJZL.CompendiumBrowser.Filter.WuxueElement", type: "checkbox", options: elemOpts },
+                { key: "damageType", label: "XJZL.CompendiumBrowser.Filter.DamageType", type: "checkbox", options: C.damageTypes },
+                { key: "weaponType", label: "XJZL.CompendiumBrowser.Filter.WeaponRequirement", type: "checkbox", options: C.weaponTypes }
             ],
             neigong: [
-                { key: "sect", label: "所属门派", type: "checkbox", options: C.sects },
-                { key: "subSect", label: "江湖势力分支", type: "checkbox", options: C.subSects },
-                { key: "tier", label: "内功品阶", type: "checkbox", options: C.tiers },
-                { key: "element", label: "内功属性", type: "checkbox", options: neigongOpts }
+                { key: "sect", label: "XJZL.CompendiumBrowser.Filter.Sect", type: "checkbox", options: C.sects },
+                { key: "subSect", label: "XJZL.CompendiumBrowser.Filter.SubSect", type: "checkbox", options: C.subSects },
+                { key: "tier", label: "XJZL.CompendiumBrowser.Filter.NeigongTier", type: "checkbox", options: C.tiers },
+                { key: "element", label: "XJZL.CompendiumBrowser.Filter.NeigongElement", type: "checkbox", options: neigongOpts }
             ],
-            art_book: [{ key: "artType", label: "技艺类型", type: "checkbox", options: C.arts }],
+            art_book: [{ key: "artType", label: "XJZL.CompendiumBrowser.Filter.ArtType", type: "checkbox", options: C.arts }],
             trait: [
-                { key: "type", label: "特效分类", type: "checkbox", options: C.traitTypes }
+                { key: "type", label: "XJZL.CompendiumBrowser.Filter.TraitType", type: "checkbox", options: C.traitTypes }
             ]
         };
 
         for (const tab in config) {
             config[tab].unshift({
                 key: "isOfficial",
-                label: "官方资源",
+                label: "XJZL.CompendiumBrowser.Filter.Official",
                 type: "checkbox",
                 options: officialOpts
             });
@@ -199,7 +213,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /* -------------------------------------------- */
 
     async loadData() {
-        ui.notifications.info("正在编纂江湖图谱...");
+        ui.notifications.info(game.i18n.localize("XJZL.CompendiumBrowser.State.Loading"));
 
         // 重置缓存
         const tempCache = {};
@@ -250,7 +264,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         this.cachedData = tempCache;
         this.isLoaded = true;
-        ui.notifications.info("图谱编纂完成。");
+        ui.notifications.info(game.i18n.localize("XJZL.CompendiumBrowser.State.LoadComplete"));
 
         if (this.rendered) this.render();
     }
@@ -590,7 +604,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         return {
             isLoaded: this.isLoaded,
-            tabs: XJZLCompendiumBrowser.TABS,
+            tabs: XJZLCompendiumBrowser.TABS.map(tab => ({ ...tab, label: game.i18n.localize(tab.label) })),
             activeTab: activeTab,
             cardListHtml: cardListHtml,
             totalCount: totalCount,
@@ -662,6 +676,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
             return {
                 ...config,
+                label: game.i18n.localize(config.label),
                 isOpen: config.key !== "subSect", // 只要不是 subSect，就默认展开
                 options: Object.entries(config.options).map(([val, labelKey]) => {
                     const checked = filters[config.key]?.has(val.toString()) ?? false;
@@ -849,7 +864,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         // 1. 获取候选池
         const pool = this._filterItems(rawItems, filters, ""); // 忽略搜索词进行随机
         if (pool.length === 0) {
-            ui.notifications.warn(`分类 [${tab}] 下无符合筛选的物品。`);
+            ui.notifications.warn(game.i18n.format("XJZL.CompendiumBrowser.State.NoFilteredItems", { tab }));
             return [];
         }
 
@@ -918,7 +933,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const activeTab = this.browserState.activeTab;
         const currentPool = this._filterItems(this.cachedData[activeTab] || [], undefined, "");
 
-        if (currentPool.length === 0) return ui.notifications.warn("列表为空，无法抽取。");
+        if (currentPool.length === 0) return ui.notifications.warn(game.i18n.localize("XJZL.CompendiumBrowser.State.EmptyPool"));
 
         const isTier = ["wuxue", "neigong"].includes(activeTab);
 
@@ -943,8 +958,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             "systems/xjzl-system/templates/apps/compendiumbrowser/random-dialog.hbs",
             {
                 amount: 1,
-                alias: "江湖奇遇",
-                title: "随机结果",
+                alias: game.i18n.localize("XJZL.CompendiumBrowser.Random.DefaultAlias"),
+                title: game.i18n.localize("XJZL.CompendiumBrowser.Random.Title"),
                 amountLabel: localize("Amount"),
                 senderLabel: localize("Sender"),
                 titleLabel: localize("TitleField"),
@@ -968,8 +983,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
                     return {
                         amount: parseInt(form.elements.amount.value) || 1,
-                        alias: form.elements.alias.value || "江湖奇遇",
-                        title: form.elements.title.value || "随机结果",
+                        alias: form.elements.alias.value || game.i18n.localize("XJZL.CompendiumBrowser.Random.DefaultAlias"),
+                        title: form.elements.title.value || game.i18n.localize("XJZL.CompendiumBrowser.Random.Title"),
                         weights: w
                     };
                 }
@@ -1000,15 +1015,15 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             const tier = Number.isFinite(rawTier) ? Math.min(3, Math.max(1, rawTier)) : 1;
             const tiers = {
                 1: {
-                    colorClass: "tier-1", drawClass: "tier-1", label: "人",
+                    colorClass: "tier-1", drawClass: "tier-1", label: game.i18n.localize("XJZL.Tiers.1").substring(0, 1),
                     nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Tier1", power: 1
                 },
                 2: {
-                    colorClass: "tier-2", drawClass: "tier-2", label: "地",
+                    colorClass: "tier-2", drawClass: "tier-2", label: game.i18n.localize("XJZL.Tiers.2").substring(0, 1),
                     nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Tier2", power: 4
                 },
                 3: {
-                    colorClass: "tier-3", drawClass: "tier-3", label: "天",
+                    colorClass: "tier-3", drawClass: "tier-3", label: game.i18n.localize("XJZL.Tiers.3").substring(0, 1),
                     nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Tier3", power: 6
                 }
             };
@@ -1020,7 +1035,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             return {
                 colorClass: "rank-jin",
                 drawClass: "trait",
-                label: typeKey ? game.i18n.localize(typeKey).substring(0, 2) : "特质",
+                label: typeKey ? game.i18n.localize(typeKey).substring(0, 2) : game.i18n.localize("XJZL.Trait").substring(0, 2),
                 nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Trait",
                 power: 4
             };
@@ -1030,23 +1045,23 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const quality = Number.isFinite(rawQuality) ? Math.min(4, Math.max(0, rawQuality)) : 0;
         const qualities = {
             0: {
-                colorClass: "quality-0", drawClass: "quality-0", label: "凡",
+                colorClass: "quality-0", drawClass: "quality-0", label: game.i18n.localize("XJZL.Qualities.0").substring(0, 1),
                 nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality0", power: 0
             },
             1: {
-                colorClass: "quality-1", drawClass: "quality-1", label: "铜",
+                colorClass: "quality-1", drawClass: "quality-1", label: game.i18n.localize("XJZL.Qualities.1").substring(0, 1),
                 nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality1", power: 1
             },
             2: {
-                colorClass: "quality-2", drawClass: "quality-2", label: "银",
+                colorClass: "quality-2", drawClass: "quality-2", label: game.i18n.localize("XJZL.Qualities.2").substring(0, 1),
                 nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality2", power: 2
             },
             3: {
-                colorClass: "quality-3", drawClass: "quality-3", label: "金",
+                colorClass: "quality-3", drawClass: "quality-3", label: game.i18n.localize("XJZL.Qualities.3").substring(0, 1),
                 nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality3", power: 4
             },
             4: {
-                colorClass: "quality-4", drawClass: "quality-4", label: "玉",
+                colorClass: "quality-4", drawClass: "quality-4", label: game.i18n.localize("XJZL.Qualities.4").substring(0, 1),
                 nameKey: "XJZL.CompendiumBrowser.Draw.Rarity.Quality4", power: 5
             }
         };

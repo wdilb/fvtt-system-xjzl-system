@@ -21,7 +21,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
             height: "auto"
         },
         window: {
-            title: "创建效果区域",
+            title: "XJZL.UI.AoeCreator.Title",
             icon: "fas fa-bullseye",
             resizable: false
         },
@@ -56,7 +56,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
         const defaultToken = controlled || targeted;
 
         return {
-            label: "新效果区域",
+            label: game.i18n.localize("XJZL.UI.AoeCreator.NewLabel"),
             distance: 3,
             color: "#FF0000",
             defaultMode: defaultToken ? "follow" : "static",
@@ -67,8 +67,8 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
             selectedTokenId: defaultToken?.id || "",
 
             modes: {
-                static: "静态放置 (屏幕视野中心)", // 改个文案
-                follow: "跟随指定 Token"
+                static: game.i18n.localize("XJZL.UI.AoeCreator.StaticMode"),
+                follow: game.i18n.localize("XJZL.UI.AoeCreator.FollowMode")
             }
         };
     }
@@ -88,7 +88,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
         if (!scene) return;
 
         // 获取基础数据
-        const label = formData.get("label") || "未命名区域";
+        const label = formData.get("label") || game.i18n.localize("XJZL.UI.AoeCreator.Unlabeled");
         const rawDistance = parseFloat(formData.get("distance")) || 1;
         const finalDistance = rawDistance * (canvas.dimensions.distance || 1);
         const color = formData.get("color");
@@ -109,7 +109,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
             const targetToken = scene.tokens.get(selectedTokenId)?.object;
 
             if (!targetToken) {
-                return ui.notifications.warn("请选择一个有效的 Token 进行跟随。");
+                return ui.notifications.warn(game.i18n.localize("XJZL.UI.AoeCreator.InvalidToken"));
             }
 
             const { center } = targetToken;
@@ -159,7 +159,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
         };
 
         await scene.createEmbeddedDocuments("MeasuredTemplate", [templateData]);
-        ui.notifications.info(`已创建区域: ${label}`);
+        ui.notifications.info(game.i18n.format("XJZL.UI.AoeCreator.Created", { label }));
         this.close(); // 创建后自动关闭窗口，方便查看
     }
 
