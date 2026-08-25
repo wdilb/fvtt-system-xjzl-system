@@ -5,7 +5,7 @@
 
 面向 Foundry VTT V13 的《侠界之旅》游戏系统，提供角色成长、战斗流程、特效自动化、规则书资源和战局管理等功能。
 
-**设计、开发与维护：[Tiwelee](https://github.com/wdilb)**
+**系统开发与维护：[Tiwelee](https://github.com/wdilb)**
 
 [![侠界交流群](https://img.shields.io/badge/侠界交流群-967477288-blue)](https://qm.qq.com/q/mJfeP61BwQ)
 [![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q)
