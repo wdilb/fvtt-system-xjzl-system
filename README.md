@@ -1,246 +1,166 @@
----
+# 侠界之旅系统
 
-# 侠界之旅系统 (XJZL System) - Foundry VTT V13
+![Foundry VTT 13](https://img.shields.io/badge/Foundry_VTT-13-orange)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
-![Foundry v13](https://img.shields.io/badge/Foundry-v13-orange)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+面向 Foundry VTT V13 的《侠界之旅》游戏系统，提供角色成长、战斗流程、特效自动化、规则书资源和战局管理等功能。
 
-> **宁可无武，不可无侠。**
->
-> 这是一个专为 **Foundry VTT V13** 开发的武侠跑团系统，基于《侠界之旅》规则集构建。
+**设计、开发与维护：[Tiwelee](https://github.com/wdilb)**
 
-> [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
-> [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
-> <img width="3382" height="1690" alt="image" src="https://github.com/user-attachments/assets/26f7149a-79f9-4fa4-8cdf-c939ced99f25" />
-> <img width="1722" height="1122" alt="image" src="https://github.com/user-attachments/assets/5743f73e-65c7-4f61-8d84-54c7387a26c7" />
+> [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/mJfeP61BwQ)
+> [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/GOBpPre68q)
 
----
+<p align="center">
+  <img src="docs/images/hero-character-sheet.png" alt="侠界之旅系统角色卡总览" width="960">
+</p>
 
-## ✨ 核心特性 (Features)
+## 项目信息
 
-### 🧘‍♂️ 深度修炼系统 (Cultivation)
-本系统还原了基于侠界之旅规则的修炼体验：
-*   **多维修为池**：区分“通用修为”与“专属修为”（内功/武学/技艺）。
-*   **境界突破**：内功分为“领悟、小成、圆满”三重境界，每重境界解锁不同特效。
-*   **招式精进**：招式分为“领悟、掌握、精通、合一（天级）”三（四）重境界，升级可增强伤害与特效。
+| 项目 | 说明 |
+|---|---|
+| Foundry VTT | 最低版本 13，已验证版本 13 |
+| 系统 ID | `xjzl-system` |
+| 界面语言 | 简体中文 |
+| 必需模组 | [socketlib](https://github.com/manuelVo/foundryvtt-socketlib) |
+| 当前版本 | 见 [`system.json`](system.json) 或 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) |
 
-### ⚔️ 武侠战斗 (Hardcore Combat)
-基于 V13 `ApplicationV2` 构建的现代化战斗流：
-*   **虚实博弈**：根据侠界之旅规则，系统内置 **命中(Hit)**、**格挡(Block)**、**看破(Kanpo)** 与 **虚招(Feint)** 对抗逻辑。
-*   **内/外功体系**：区分外功防御与内功防御，支持护体真气抵扣伤害。
-*   **部位与穴位**：支持奇珍异宝镶嵌至特定经脉穴位。
-*   **自动化结算**：一键应用伤害、治疗或 Buff，自动扣除气血、内力与怒气。
+系统仅针对 Foundry VTT V13 进行开发和验证。玩家使用权限代理、物资交易及部分自动结算功能时，需要至少一名 GM 在线。
 
-### 🧶 全周期脚本引擎 (Script Engine)
-系统内置了强大的事件驱动脚本引擎，允许 GM 或模组作者为物品编写 JavaScript 逻辑：
-*   **全时机覆盖**：支持 `Passive` (常驻)、`Attack` (出招前)、`Hit` (命中后)、`Damaged` (受击时)、`Dying` (濒死) 等 10+ 种触发时机。为规则中95%以上的资源实现了特效自动化。
-*   **沙盒化环境**：内置 `Macros` 工具库，轻松实现是否触发架招、让对方检定属性失败则触发效果等复杂逻辑。
-*   **所见即所得**：在物品栏直接编写代码，即刻生效。
+## 主要功能
 
-### 🎨 其他特色 (Immersion)
-*   **可视化经脉图**：在角色卡上直观查看十二正经与奇经八脉的打通情况。
-*   **自定义移动规则**：重写底层网格算法，实现了侠界之旅“方格地图 只有第一次斜着走算1格，后面算2格”移动消耗规则。
-*   **自定义属性组**：为一些无法实现自动化的情况，提供了丰富的手动属性加成选择。
-*   **物资节点**：同一种 Actor 可配置为战利品、队伍仓库或轻量商铺，支持修为奖励、隐藏掉落、需求投骰、真实库存与钱箱；战利品允许玩家查看和领取，仓库存取要求拥有权限，所有交易由活动 GM 复核。
----
+- **角色与成长**：支持玩家角色、NPC、野兽角色卡，以及修为投入、内功境界、武学招式、技艺和经脉成长。
+- **建卡向导**：引导完成角色基础信息、身世、性格、门派、属性及初始资源配置。
+- **武学战斗**：处理实招、虚招、气招、架招、命中、看破、格挡、防御、伤害、治疗和濒死结算。
+- **状态与场景工具**：提供 Active Effect 管理、状态叠层、范围效果、通用伤害与治疗工具，以及可选的 1-2-2-2 方格移动规则。
+- **江湖万卷阁**：集中浏览和筛选系统合集，并支持按条件随机抽取内容。
+- **战局与战斗记录**：支持场地效果、支援 NPC、回合触发、战斗统计、动作记录和战斗评分。
+- **物资节点**：可创建战利品、队伍仓库和商铺，处理库存、银两、修为奖励、隐藏掉落与需求投骰。
+- **脚本扩展**：GM 和内容作者可以为物品、招式、特性及 Active Effect 编写事件脚本。
 
-## 📷 界面预览 (Screenshots)
+## 界面预览
 
-### 角色卡片 (Character Sheet)
-*集成了属性、装备、经脉与修炼面板的现代化界面。*
-<details>
-<summary><strong>点击展开：角色卡片界面</strong></summary>
-<br>
-<img width="1912" height="1290" alt="1" src="https://github.com/user-attachments/assets/0112c588-c1a2-4fd6-947f-b67938db64f9" />
-<img width="1897" height="1297" alt="3" src="https://github.com/user-attachments/assets/3aafe9a4-9d32-43da-8cfd-f831e17c604c" />
-<img width="1913" height="1300" alt="4" src="https://github.com/user-attachments/assets/d31d129c-1e2a-43fd-b373-5c7c0b4ad7d3" />
-</details>
+以下截图来自当前版本，按常见使用流程分组展示系统界面。
 
-### 战斗交互 (Combat)
-*支持普通攻击、趁虚而入以及详细的招式结算卡片。*
-<details>
-<summary><strong>点击展开：战斗交互卡片</strong></summary>
-<br>
-<img width="544" height="1017" alt="image" src="https://github.com/user-attachments/assets/94fd3e75-34d4-4a15-98f2-0b6b8401e292" />
-<img width="1064" height="1432" alt="image" src="https://github.com/user-attachments/assets/bb65deaf-1eb4-4382-b862-df0978d0ce84" />
-<img width="500" height="583" alt="image" src="https://github.com/user-attachments/assets/507705ae-4a03-4f89-bfb4-e0ab903e7310" />
-</details>
+### 角色创建与成长
 
-### 建卡向导 (character-wizard)
-*建卡流程全自动指引*
-<details>
-<summary><strong>点击展开：建卡向导</strong></summary>
-<br>
-<img width="2476" height="1555" alt="image" src="https://github.com/user-attachments/assets/cf8c91c9-dee7-40ec-bd64-520661fd355e" />
-<img width="2557" height="1510" alt="image" src="https://github.com/user-attachments/assets/3cb08c8e-b1b6-437a-9a1f-c64421a3bed9" />
-<img width="2230" height="1449" alt="image" src="https://github.com/user-attachments/assets/579b89ac-0a3f-43c5-922d-67fa354f1557" />
-<img width="2613" height="1563" alt="image" src="https://github.com/user-attachments/assets/46fc320c-8d9e-4e9d-afeb-b1e40465ae72" />
-</details>
+从建卡向导开始，完成角色背景、门派、内功、武学和经脉成长。
 
-### 特效自动化 (AutomatedEffects)
-*为规则中绝大部分的资源特效实现了自动化*
-<details>
-<summary><strong>点击展开：部分资源化展示</strong></summary>
-<br>
-<img width="1440" height="783" alt="image" src="https://github.com/user-attachments/assets/b9032139-0096-4b2f-b110-536092657999" />
-<img width="716" height="1016" alt="image" src="https://github.com/user-attachments/assets/d68ec265-85ea-40b3-be9b-76d5c30069a0" />
-<img width="518" height="1335" alt="image" src="https://github.com/user-attachments/assets/d3371da6-ce2c-4cbb-8a9a-e76b92107004" />
-<img width="491" height="471" alt="image" src="https://github.com/user-attachments/assets/6e31efb8-7f3a-4d06-a343-f0761fe0c8ad" />
-</details>
+#### 建卡向导
 
-### 战斗数据统计 (CombatStats)
-*内置DPS统计，让你用评分狠狠压力队友*
-<details>
-<summary><strong>点击展开：战斗数据统计展示</strong></summary>
-<br>
-<img width="584" height="854" alt="image" src="https://github.com/user-attachments/assets/29cac985-52c4-4b83-b45f-b6c6dd439b41" />
-<img width="543" height="529" alt="image" src="https://github.com/user-attachments/assets/14322f30-d738-41c0-b362-60ec570997a2" />
-<img width="1008" height="1043" alt="image" src="https://github.com/user-attachments/assets/8a7dcc6d-ebda-484e-9684-be7eb1e35b87" />
-<img width="1001" height="1043" alt="image" src="https://github.com/user-attachments/assets/1b3eb645-8cae-4170-9b54-179d99187d88" />
-</details>
+![建卡向导中的门派选择界面](docs/images/character-wizard.png)
 
-### 手动修正 (CustomModifiers)
-*为了避免自动化无法涉及的部分，添加了手动修正。*
-<details>
-<summary><strong>点击展开：手动修正界面</strong></summary>
-<br>
-<img width="1927" height="1307" alt="7" src="https://github.com/user-attachments/assets/34760172-169e-4cc2-a55c-a3cdade0df4c" />
-</details>
+#### 内功与修为
 
-### 合集包浏览器 (CompendiumBrowser)
-*因为合集包数据量庞大，添加了专用浏览器，还包含在筛选条件下随机抽取的功能。*
-<details>
-<summary><strong>点击展开：合集包浏览器界面</strong></summary>
-<br>
-<img width="1652" height="1295" alt="072314fc-7f72-44c2-886a-79b6f572e068" src="https://github.com/user-attachments/assets/74576832-b4fb-450e-8d88-951fc414a4c7" />
-<img width="1197" height="859" alt="image" src="https://github.com/user-attachments/assets/1ccf063d-926c-4813-a744-289b74ce8b9d" />
-</details>
+![角色卡中的内功修炼界面](docs/images/cultivation-neigong.png)
 
----
+#### 经脉与穴位
 
-## 🚀 安装指南 (Installation)
+![角色卡中的经脉与穴位界面](docs/images/meridian-map.png)
 
-本系统仅验证兼容 Foundry VTT V13。推荐通过 Manifest URL 安装，以便 Foundry 自动检测后续更新。
+### 战斗与场景
 
-### ✅ 方式一：Manifest URL 安装（推荐）
+展示角色如何在棋盘场景中移动、选取目标并完成战斗操作。
+
+#### 战斗场景
+
+![战斗场景中的棋盘、范围效果和角色操作栏](docs/images/combat-scene.png)
+
+### 合集、战局与物资
+
+展示 GM 使用频率较高的内容管理工具。
+
+#### 江湖万卷阁
+
+![江湖万卷阁的合集浏览与筛选界面](docs/images/compendium-browser.png)
+
+#### 战局配置
+
+![战局配置中的支援效果界面](docs/images/encounter-support.png)
+
+#### 战利品物资节点
+
+![战利品节点界面，展示物品和修为奖励](docs/images/loot-node.png)
+
+## 安装
+
+### 使用 Manifest URL 安装
+
+这是推荐的安装方式，Foundry 可以据此检查后续更新。
 
 1. 打开 Foundry VTT 的 **Setup** 页面，进入 **Game Systems**。
-2. 点击 **Install System**，在底部的 **Manifest URL** 输入框粘贴：
+2. 点击 **Install System**。
+3. 将以下地址粘贴到 **Manifest URL** 输入框并确认安装：
 
    ```text
    https://raw.githubusercontent.com/wdilb/fvtt-system-xjzl-system/master/system.json
    ```
 
-3. 点击 **Install** 完成安装。
-4. 后续可在 **Game Systems** 页面使用 **Check for Update** 或 **Update All** 检测并安装更新。
+4. 创建或进入世界前，确认必需模组 `socketlib` 已安装并启用。
 
-### 📦 方式二：Release ZIP 手动安装
+<details>
+<summary>手动安装发布包</summary>
 
-Manifest 安装不可用时，可手动安装已发布版本：
+1. 打开项目的 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) 页面。
+2. 下载最新发布版本中的 `xjzl-system.zip`。
+3. 解压后确认系统目录名为 `xjzl-system`。
+4. 将目录放入 Foundry 用户数据目录下的 `Data/systems/`。
+5. 重启 Foundry VTT。
 
-1. 前往本项目的 [Releases](https://github.com/wdilb/fvtt-system-xjzl-system/releases) 页面。
-2. 下载最新版本中名为 `xjzl-system.zip` 的压缩包。
-3. **解压部署**：
-   - 解压下载的压缩包。
-   - **【关键】** 确保解压后的文件夹名为 `xjzl-system`（必须与 `system.json` 中的 `id` 一致）。
-   - 将该文件夹移动至你的 Foundry VTT 用户数据目录：
-     `.../Data/systems/xjzl-system`
-4. **启动系统**：重启 Foundry VTT，在创建世界时即可选择 `xjzl-system`。
+</details>
 
-> 手动解压安装不会通过官方包列表发现本系统；建议首次安装优先使用 Manifest URL。
+<details>
+<summary>安装 master 分支源码</summary>
 
-### 📂 方式三：从源码手动安装
+源码安装仅适合测试尚未发布的改动。
 
-如果需要测试尚未发布的 `master` 分支，可以手动部署源码：
+1. 下载仓库的 `master` 分支源码。
+2. 将解压后的目录重命名为 `xjzl-system`。
+3. 将目录放入 Foundry 用户数据目录下的 `Data/systems/`。
+4. 重启 Foundry VTT。
 
-1. 在本项目 GitHub 页面点击绿色的 **Code** 按钮，选择 **Download ZIP**。
-2. 解压下载的压缩包。
-3. **【关键】** 将解压后的文件夹重命名为 `xjzl-system` (必须严格匹配 `system.json` 中的 `id`)。
-4. 将该文件夹放入你的 Foundry VTT 用户数据目录：
-   `.../Data/systems/xjzl-system`
-5. 重启 Foundry VTT 即可。
+</details>
 
----
+## 快速开始
 
-## ⚠️ 关于数据合集包的重要说明 (Data Disclaimer)
+1. 使用本系统创建一个 Foundry 世界，并确认 `socketlib` 已启用。
+2. 新建 `character` 类型的 Actor。建议对空白角色使用标题栏中的 **建卡向导**；完成向导会重置该角色已有的物品和数据。
+3. 从合集目录打开 **江湖万卷阁**，浏览或拖入内功、武学、装备及其他系统内容。
+4. 多人游戏时保持一名 GM 在线，以便处理权限代理、玩家结算和物资节点事务。
 
-本系统包含庞大的物品与规则数据合集。由于源数据量级过大（超出我个人手动录入负荷），目前系统内所有的合集包数据（Compendium Packs）均由 **AI 辅助转换生成**。
+NPC、野兽、物资节点和战局可通过对应的 Actor 或 Item 类型直接创建。
 
-* **潜在风险**：尽管我们在转换过程中修正了多次提示词，但数据中仍**极大可能**存在数值错误、字段遗漏、格式异常或描述偏差。
-* **使用建议**：在跑团过程中使用合集物品时，请务必**核对物品、武学描述**，小心分辨，请勿完全盲信自动过程。
-* **共建反馈**：如果你发现了数据错误，非常欢迎提交 **Issue** 反馈，帮助修复。感谢你的理解与支持！
----
-## 📖 脚本引擎 (Scripting)
+## 脚本扩展
 
-系统允许为内功、武学招式、已装备物品、特性和 Active Effect（AE）绑定事件脚本，用于参与派生值、出招、命中、防御、资源变化和回合结算。
+系统脚本是带有上下文变量的可信 JavaScript，不是用于运行不可信代码的安全沙盒。脚本可以参与派生值计算、攻击、防御、资源变化和战斗回合等流程。
 
-脚本引擎的完整公开契约已独立维护，避免 README、项目约定和录入规范各自保存一份容易过期的 API：
-
-- [脚本引擎手册](docs/SCRIPT_ENGINE.md)：触发器、上下文字段、执行顺序、公共 API 和安全模式。
-- `module/data/common.mjs`：触发器与脚本 Schema 的运行时代码事实源。
-
-### 快速示例
-
-下面的 `hit` 脚本在攻击命中后发起体魄检定，失败时让目标直接流失 10 点气血：
+下面的 `hit` 脚本会在攻击命中后向目标添加“点穴”状态：
 
 ```javascript
 if (!args.isHit || !args.target) return;
 
-await Macros.requestSave({
-  target: args.target,
-  attacker: actor,
-  type: "tipo",
-  dc: 18,
-  label: "抵抗剧毒",
-  damageOnFail: { value: 10, type: "hp" }
-});
+await game.xjzl.api.effects.addEffect(args.target, "dianxue");
 ```
 
-对应的 JSON 脚本条目：
+编写脚本前请阅读[脚本引擎手册](docs/SCRIPT_ENGINE.md)。手册记录了触发器、上下文字段、执行顺序、公共结算 API 和安全限制；README 不重复维护完整 API。
 
-```json
-{
-  "label": "剧毒检定",
-  "trigger": "hit",
-  "script": "if (!args.isHit || !args.target) return;\nawait Macros.requestSave({ target: args.target, attacker: actor, type: \"tipo\", dc: 18, label: \"抵抗剧毒\", damageOnFail: { value: 10, type: \"hp\" } });",
-  "active": true
-}
-```
+## 数据质量说明
 
-### 编写前须知
+因规则书资源过多，完全依靠我个人手动录入将耗费大量时间，故合集包数据由 AI 辅助转换和录入。虽然数据会持续修正，但仍可能存在数值错误、字段遗漏、格式异常或描述偏差。跑团时请以规则原文为准；发现问题后可通过 [GitHub Issues](https://github.com/wdilb/fvtt-system-xjzl-system/issues) 或通过 [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK) 反馈。
 
-- `passive` 和 `calc` 同步执行，脚本内禁止 `await`、Dialog 和文档写入；其余触发器异步执行。
-- `actor` 是当前脚本的宿主。攻击侧通常是攻击者，`preDefense`、`preTake`、`damaged` 等防御侧触发器中是受击者。
-- 条件变量并非始终存在。优先从 `args` 读取，并检查 `target`、`attacker`、`move`、`item` 是否为空。
-- 正常伤害使用 `applyDamage()`，治疗或直接资源增减使用 `applyHealing()`，绝对资源事务使用 `changeResources()`。
-- 状态使用 `game.xjzl.api.effects` 管理，检定与对抗优先使用 `Macros`。
-- 脚本可执行可信 JavaScript，不是面向不可信代码的安全隔离环境。
+提交问题时，建议附上 Foundry 版本、系统版本、复现步骤，以及浏览器控制台中的 `XJZL |` 日志。
 
-## 👥 贡献与鸣谢 (Credits)
+## 联系与反馈
 
-*   **系统作者**: [Tiwelee](https://github.com/wdilb)
-*   **特别感谢**:
-    *   **一气长虹**: 提供了核心数据类型设计、计算逻辑参考以及无私的规则指导。
-    *   **安迪亚**: 提供了宝贵的界面设计建议与测试反馈。
-*   **联系交流**:
-*   [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
-*   [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=YOUR_LINK)
----
+- GitHub Issues：[问题与功能建议](https://github.com/wdilb/fvtt-system-xjzl-system/issues)
+*   [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/mJfeP61BwQ)
+*   [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/GOBpPre68q)
 
-> **🎨 素材声明**：系统内包含的大部分图像素材由 AI 生成（非AI生成素材由侠界之旅官方提供）。
+## 致谢
 
-<details>
-<summary><strong>🔊 音频素材来源 (Audio Credits)</strong></summary>
+感谢一气长虹与安迪亚在项目开发期间的关注、交流与测试。
 
-- **合集包抽取演出配乐**：基于 nene 创作的 [New Sunrise](https://opengameart.org/content/new-sunrise) V2 修改，采用 [Creative Commons Zero v1.0 Universal（CC0）](https://creativecommons.org/publicdomain/zero/1.0/) 许可。
-- **合集包抽取演出音效**：由项目作者使用 ElevenLabs Sound Effects 生成。
-- 文件对应关系与具体处理方式见 [`assets/sounds/compendium-draw/SOURCES.md`](assets/sounds/compendium-draw/SOURCES.md)。
+## 许可与素材
 
-以上音频素材按各自来源及许可条款使用，不因本项目代码采用 MIT License 而改变其许可条件。
+项目代码采用 [MIT License](LICENSE)。规则内容、合集数据及第三方素材不因代码使用 MIT License 而自动变更其原有权利或许可条件。
 
-</details>
-
-## 📄 协议 (License)
-
-本项目采用 [MIT License](LICENSE) 开源。
-允许在遵守协议的前提下自由修改、分发与使用。
+系统内大部分图像素材由 AI 生成，其他图像素材由《侠界之旅》官方提供。合集抽取演出使用的音频及其许可信息见 [`assets/sounds/compendium-draw/SOURCES.md`](assets/sounds/compendium-draw/SOURCES.md)。
