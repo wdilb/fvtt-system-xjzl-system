@@ -129,11 +129,11 @@
 
 NPC、野兽、物资节点和战局可通过对应的 Actor 或 Item 类型直接创建。
 
-## 脚本扩展
+## 脚本引擎
 
-系统脚本是带有上下文变量的可信 JavaScript，不是用于运行不可信代码的安全沙盒。脚本可以参与派生值计算、攻击、防御、资源变化和战斗回合等流程。
+系统支持为内功、武学招式、装备、特性和 Active Effect 添加脚本，用于参与属性计算、出招、命中、防御、资源变化和回合结算等流程。
 
-下面的 `hit` 脚本会在攻击命中后向目标添加“点穴”状态：
+例如，下面的 `hit` 脚本会在攻击命中后给目标添加“点穴”状态：
 
 ```javascript
 if (!args.isHit || !args.target) return;
@@ -141,7 +141,7 @@ if (!args.isHit || !args.target) return;
 await game.xjzl.api.effects.addEffect(args.target, "dianxue");
 ```
 
-编写脚本前请阅读[脚本引擎手册](docs/SCRIPT_ENGINE.md)。手册记录了触发器、上下文字段、执行顺序、公共结算 API 和安全限制；README 不重复维护完整 API。
+如果你是 GM、内容作者，或希望为物品制作自动化效果，请阅读[脚本引擎手册](docs/SCRIPT_ENGINE.md)。手册包含触发器、上下文变量、执行顺序和公共 API 的完整说明。
 
 ## 数据质量说明
 
