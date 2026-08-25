@@ -40,13 +40,13 @@
 - 内功脚本位于阶段配置中，运行时读取 `system.current.scripts`。
 - AE 脚本位于 `flags.xjzl-system.scripts`。
 
-`trigger` 必须来自 `module/data/common.mjs#SCRIPT_TRIGGERS`。Item、招式和内功脚本受 Schema 选项约束；AE 脚本虽然存放在普通 flags 中，标准编辑界面也只提供这些选项。未知触发器不会被系统的标准流程调用，不应写入任何脚本来源。
+`trigger` 必须来自 `module/data/common.mjs#SCRIPT_TRIGGERS`。Item、招式和内功脚本受 Schema 选项约束；AE 脚本虽然存放在普通 flags 中，标准编辑界面也只提供这些选项。未知触发器不会在攻击、受伤或回合等标准时机执行，不应使用。
 
 ## 执行模型
 
 ### 同步与异步
 
-`passive` 和 `calc` 同步执行，因为它们参与派生数据和面板计算。同步脚本禁止使用 `await`、Dialog、文档写入以及任何依赖稍后完成的 Promise。角色卡预览、重开角色卡和数据刷新都可能重复触发这些计算；同步脚本必须无持久化副作用，并且不能把面板计算当成“一次出招”事件。
+`passive` 和 `calc` 同步执行，因为它们参与角色属性重算和招式面板计算。同步脚本禁止使用 `await`、Dialog、文档写入以及任何依赖稍后完成的 Promise。角色卡预览、重开角色卡和数据刷新都可能重复触发这些计算；同步脚本必须无持久化副作用，并且不能把面板计算当成“一次出招”事件。
 
 其余触发器异步串行执行。异步脚本中的文档写入、伤害、治疗、状态和宏调用都应 `await`。
 
@@ -75,7 +75,7 @@
 
 `passive`、`avoided`、`preDefense`、`preTake`、`damaged`、`dying`、`death`、`resourceChanged`。
 
-因此，“开启架招后增强后续攻击”不能只写在架招的 `attack` 脚本中；应使用 `passive` 修改派生值，或在开启时添加 `tiedToStance` AE。
+因此，“开启架招后持续增强角色或后续攻击”不能只写在架招的 `attack` 脚本中；应使用 `passive` 提供持续生效的加成，或在开启时添加 `tiedToStance` AE。
 
 ## 注入变量
 
@@ -100,14 +100,14 @@
 
 除非触发器参考明确标为可写，否则上下文字段按只读处理。对于 `args.output`、`args.config`、`args.costConfig`、`args.flags` 等可写容器，应修改其中约定的属性，不要替换整个对象；许多调用流程会继续持有原对象引用。`args.baseData`、`args.outcome` 等“只读”对象当前没有冻结，但修改它们不属于公开契约，也不保证影响结算。
 
-后台武学或架招脚本会按来源临时注入 `args.move` 和顶层 `move`，脚本结束后恢复原值。这只用于标识脚本所属招式，不代表角色正在出招；只有 `preAttack`、`attack`、`check`、`preDamage`、`hit`、`hit_once` 属于主动招式资源溯源阶段。
+后台武学或架招脚本会临时获得 `args.move` 和顶层 `move`，用来表示这段脚本属于哪个招式；脚本结束后会恢复原值。这不代表角色正在施展该招式。只有 `preAttack`、`attack`、`check`、`preDamage`、`hit`、`hit_once` 会被系统记作当前主动招式，供后续伤害、治疗和资源变化判断来源。
 
 ## 触发流程
 
 一次普通角色的常规攻击大致按以下顺序运行：
 
 ```text
-passive / calc（派生值与面板）
+passive / calc（持续被动与面板计算）
   → preAttack（余额检查和扣费前）
   → 扣除资源，派发 resourceChanged
   → attack（基础面板已计算，掷骰前）
@@ -128,7 +128,7 @@ passive / calc（派生值与面板）
 
 | 需求 | 优先使用 |
 |---|---|
-| 来源生效期间修改角色卡派生值或系统状态标记 | `passive` |
+| 编写持续生效的被动效果，例如增加属性、伤害修正或设置状态标记 | `passive` |
 | 修改当前招式或普攻的面板伤害、虚招值和说明 | `calc` |
 | 扣费前调整消耗或阻止出招 | `preAttack` |
 | 修改本次动作的全局命中参数，或逐目标修改检定参数 | `attack` / `check` |
@@ -142,18 +142,20 @@ passive / calc（派生值与面板）
 
 ## 触发器参考
 
-### 派生值与面板
+### 持续被动与面板计算
 
 | 触发器 | 时机 | 主要上下文和可写字段 |
 |---|---|---|
-| `passive` | 第一遍基础派生值和状态 flags 解析完成后，第二遍重算前 | 没有面板 `output`；修改 `system` 中供重算使用的临时派生输入/修正字段，或修改 `actor.xjzlStatuses`。随后执行 `system.recalculate()`。 |
-| `calc` | 支持该流程的招式或普攻面板计算时 | 读取 `args.move`、`args.item`、只读 `args.baseData`；修改 `args.output.damage`、`args.output.feint`、`args.output.bonusDesc`、`args.output.feintBonusDesc`。 |
+| `passive` | 角色数据刷新时，在系统完成第一轮属性计算后执行；所有被动脚本完成后再重算一次 | 没有面板 `output`；把被动加成写入 `system` 中对应的可重算字段（通常是 `mod`），也可以修改 `actor.xjzlStatuses`。随后系统执行 `system.recalculate()`，得出最终属性。 |
+| `calc` | 计算招式或普攻面板时；架招和部分固定值招式除外，详见下文 | 读取 `args.move`、`args.item`、只读 `args.baseData`；修改 `args.output.damage`、`args.output.feint`、`args.output.bonusDesc`、`args.output.feintBonusDesc`。 |
 
-#### `passive` 范围与示例
+#### `passive` 的用途、范围与示例
 
-对于武学招式来源，`passive` 会收集当前已开启架招，以及已领悟的轻功、散手和阵法招式；其他类别的武学招式只有作为当前架招时才会被收集。当前内功、已装备物品、特性和 AE 仍按前述通用规则参与。
+需要让内功、装备、特性、状态或武学在生效期间持续提供加成时，通常使用 `passive`。例如增加属性、招式伤害、格挡，或者设置供其他脚本读取的状态标记。
 
-`passive` 应修改会被第二遍 `recalculate()` 消费的修正字段，而不是写入 `args.output`。例如，根据第一遍计算得到的内息增加招式伤害派生修正：
+写在武学招式上的 `passive` 有额外限制：系统只会自动执行当前已开启架招，以及已领悟轻功、散手和阵法招式中的被动脚本；其他类别的武学招式只有作为当前架招时才会执行。当前内功、已装备物品、特性和 AE 中的 `passive` 则按各自正常的生效条件执行。
+
+`passive` 应修改系统的属性或修正字段，而不是写入 `args.output`。例如，根据当前内息增加角色的招式伤害加成：
 
 ```javascript
 const bonus = Math.floor(Math.max(0, S.stats.neixi.total) / 20);
@@ -175,7 +177,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 `calc` 的面板执行边界如下：
 
 - 架招：使用专用强度计算并提前返回，不执行 `calc`。
-- 常规有系数招式：按通用来源顺序收集 `calc`，包括当前内功、装备、特性、当前招式和 AE。
+- 常规有系数招式：会执行当前内功、装备、特性、当前招式和 AE 中的 `calc`。
 - 无系数且 `move.calculation.isFixed` 为 `true`：只执行当前招式自身的 `calc`；内功、装备、特性和 AE 的全局 `calc` 不参与。
 - 无系数且 `isFixed` 不为 `true`：直接按固定值返回，不执行 `calc`。
 
@@ -250,7 +252,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `changes` | 本次事务的变化数组。每项包含 `resource`、`path`、`oldValue`、`newValue`、`delta`。 |
 | `byResource` | 按资源名索引的同一批变化，例如 `args.byResource.hp.delta`。 |
 | `cause` | 来源类别；未提供时为 `update`。 |
-| `sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source` | 调用链能够确定时提供的溯源信息。 |
+| `sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source` | 系统能够确定时提供的来源信息。 |
 | `chainId` / `depth` | 连锁资源事务标识和当前深度。 |
 
 没有实际差值时不触发。脚本再次修改资源会继承 `chainId`；允许的 `depth` 为 `0..7`，准备进入深度 `8` 时终止派发。业务脚本仍必须通过来源标记或其他条件自行防循环。
@@ -276,8 +278,8 @@ await actor.applyHealing({
 | 触发器 | 时机 | 上下文 |
 |---|---|---|
 | `combatStart` | 战斗开始时，每个 Combatant 执行一次 | `args.combatant`、`args.combat`。 |
-| `turnStart` | Actor 回合开始，自动回复/消耗完成后 | 当前没有额外业务字段。 |
-| `turnEnd` | Actor 回合结束，自动回复/消耗完成后 | 当前没有额外业务字段。 |
+| `turnStart` | Actor 回合开始，自动回复/消耗完成后 | 当前没有额外的回合专属字段。 |
+| `turnEnd` | Actor 回合结束，自动回复/消耗完成后 | 当前没有额外的回合专属字段。 |
 
 这三个触发器会遍历该 Actor 全部已领悟武学招式；每个招式脚本执行时仍会临时注入所属 `args.move`。执行由活动 GM 统筹并路由给在线 owner，无在线玩家 owner 时由 GM 执行；脚本不要自行假设执行客户端一定是 GM。
 
@@ -308,7 +310,7 @@ const result = await args.target.applyDamage({
 | `ignoreBlock` / `ignoreDefense` / `ignoreStance` / `ignoreMinDamage` | `boolean`，默认 `false` | 穿透格挡、防御、架招和最低 1 点伤害。 |
 | `targetKanpo` | `number`，默认 `0` | 战斗统计使用的看破值。 |
 | `isSkill` | `boolean`，默认 `true` | 是否按招式伤害计入技能抗性。 |
-| `move` / `item` | `Object` / `Item`，默认 `null` | 资源溯源上下文。 |
+| `move` / `item` | `Object` / `Item`，默认 `null` | 造成这次伤害的招式和物品，用于后续脚本与统计。 |
 | `source` | `string`，默认 `extra` | 常用值：`move`、`basic`、`both`、`dot`、`extra`；影响部分后效。 |
 
 返回 `Promise<object>`，普通角色的常规结果包含 `finalDamage`、`hpLost`、`hutiLost`、`mpLost`、`tiliLost`、`isDying`、`isDead`、`rageGained`、`isHit`；未命中、免疫或其他提前返回路径可能只返回部分字段。容器 Actor 不受伤害，只返回 `{ finalDamage: 0 }`。
@@ -338,7 +340,7 @@ const result = await args.target.applyHealing({
 | `amount` | `number`，默认 `0` | 正数恢复，负数直接流失，`0` 不产生变化。 |
 | `type` | `string`，默认 `hp` | `hp`、`mp`/`neili`、`huti`、`tili`、`rage`。 |
 | `showScrolling` | `boolean`，默认 `true` | 是否显示飘字。 |
-| `healer` | `Actor` 或 `null`，默认当前目标 Actor | 治疗/流失来源，用于溯源和统计。跨 Actor 治疗时应显式传入脚本宿主，例如 `healer: actor`。 |
+| `healer` | `Actor` 或 `null`，默认当前目标 Actor | 造成这次治疗或资源流失的 Actor，用于后续脚本与统计。跨 Actor 治疗时应显式传入脚本宿主，例如 `healer: actor`。 |
 | `move` / `item` | `Object` / `Item`，默认 `null` | 显式参数优先；如果 `healer`（未传时为目标）当前正在执行动作脚本，则从其脚本栈继承。 |
 | `source` | `string`，默认 `extra` | 显式值优先；同一脚本栈能够确定主动招式来源时可继承为 `move`。 |
 
@@ -346,7 +348,7 @@ const result = await args.target.applyHealing({
 
 负数 `applyHealing` 是直接资源事务，不经过防御、抗性、护体分配，也不触发 `avoided`、`preDefense`、`preTake`、`dying`、`death`、`damaged`。即使负数气血变化把目标降到 `0`，它也不会自动执行濒死/死亡流程；需要标准致伤和濒死语义时应使用 `applyDamage`。
 
-跨 Actor 调用如果省略 `healer`，系统无法从 JavaScript 方法调用本身推断调用者，会把目标 Actor 当作来源。为了保留正确的统计、权限代理和 `resourceChanged` 溯源，攻击者、治疗者或 Buff 宿主已知时必须显式传入。
+跨 Actor 调用如果省略 `healer`，系统无法从 JavaScript 方法调用本身推断是谁发起了治疗，会把目标 Actor 当作来源。为了让统计、权限代理和 `resourceChanged` 获得正确的来源信息，攻击者、治疗者或 Buff 宿主已知时必须显式传入。
 
 ### 资源事务
 
@@ -529,7 +531,7 @@ try {
 
 ### 共享事件去重
 
-同一次触发的脚本共享 `args`。套装中多件装备可能响应同一事件时，可设置业务专属标记：
+同一次触发的脚本共享 `args`。套装中多件装备可能响应同一事件时，可设置一个不易与其他脚本冲突的专用标记：
 
 ```javascript
 if (args.ruanweiProcessed) return;
