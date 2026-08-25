@@ -5,10 +5,11 @@
 
 面向 Foundry VTT V13 的《侠界之旅》游戏系统，提供角色成长、战斗流程、特效自动化、规则书资源和战局管理等功能。
 
-**设计、开发与维护：[Tiwelee](https://github.com/wdilb)**· [![QQ：273437679](https://img.shields.io/badge/QQ-273437679-12B7F5)](https://wpa.qq.com/msgrd?v=3&uin=273437679&site=qq&menu=yes)
+**设计、开发与维护：[Tiwelee](https://github.com/wdilb)**
 
-> [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/mJfeP61BwQ)
-> [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/GOBpPre68q)
+[![侠界交流群](https://img.shields.io/badge/侠界交流群-967477288-blue)](https://qm.qq.com/q/mJfeP61BwQ)
+[![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q)
+[![联系作者](https://img.shields.io/badge/联系作者-273437679-12B7F5)](https://wpa.qq.com/msgrd?v=3&uin=273437679&site=qq&menu=yes)
 
 <p align="center">
   <img src="docs/images/hero-character-sheet.png" alt="侠界之旅系统角色卡总览" width="960">
@@ -145,15 +146,15 @@ await game.xjzl.api.effects.addEffect(args.target, "dianxue");
 
 ## 数据质量说明
 
-因规则书资源过多，完全依靠我个人手动录入将耗费大量时间，故合集包数据由 AI 辅助转换和录入。虽然数据会持续修正，但仍可能存在数值错误、字段遗漏、格式异常或描述偏差。跑团时请以规则原文为准；发现问题后可通过 [GitHub Issues](https://github.com/wdilb/fvtt-system-xjzl-system/issues) 或通过 [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/GOBpPre68q) 反馈。
+因规则书资源过多，完全依靠我个人手动录入将耗费大量时间，故合集包数据由 AI 辅助转换和录入。虽然数据会持续修正，但仍可能存在数值错误、字段遗漏、格式异常或描述偏差。跑团时请以规则原文为准；发现问题后可通过 [GitHub Issues](https://github.com/wdilb/fvtt-system-xjzl-system/issues) 或通过 [![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q) 反馈。
 
 提交问题时，建议附上 Foundry 版本、系统版本、复现步骤，以及浏览器控制台中的 `XJZL |` 日志。
 
 ## 联系与反馈
 
 - GitHub Issues：[问题与功能建议](https://github.com/wdilb/fvtt-system-xjzl-system/issues)
-*   [![QQ Group](https://img.shields.io/badge/侠界交流群-967477288-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/mJfeP61BwQ)
-*   [![QQ Group](https://img.shields.io/badge/系统反馈群-818849921-blue?logo=tencent-qq&logoColor=white)](https://qm.qq.com/q/GOBpPre68q)
+*   [![侠界交流群](https://img.shields.io/badge/侠界交流群-967477288-blue)](https://qm.qq.com/q/mJfeP61BwQ)
+*   [![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q)
 
 ## 致谢
 
