@@ -108,7 +108,7 @@
 
 ```text
 passive / calc（持续被动与面板计算）
-  → preAttack（余额检查和扣费前）
+  → preAttack（余额检查和扣除资源前）
   → 扣除资源，派发 resourceChanged
   → attack（基础面板已计算，掷骰前）
   → check（逐目标修正）
@@ -130,7 +130,7 @@ passive / calc（持续被动与面板计算）
 |---|---|
 | 编写持续生效的被动效果，例如增加属性、伤害修正或设置状态标记 | `passive` |
 | 修改当前招式或普攻的面板伤害、虚招值和说明 | `calc` |
-| 扣费前调整消耗或阻止出招 | `preAttack` |
+| 扣除资源前调整消耗或阻止出招 | `preAttack` |
 | 修改本次动作的全局命中参数，或逐目标修改检定参数 | `attack` / `check` |
 | 攻击者在逐目标伤害应用前修改伤害类型、数值或穿透 | `preDamage` |
 | 防御者在减伤前修改防御配置，或在减伤后修改最终伤害 | `preDefense` / `preTake` |
@@ -205,7 +205,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 
 `check` 的主要 `flags`：`grantLevel`、`grantFeintLevel`、`grantHit`、`grantFeint`、`critThresholdMod`、`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`forceHit`、`alwaysHit`。
 
-`preAttack` 的完整上下文是 `move`、`item`、`attacker`、`costConfig`、`abort`、`abortReason`；`args.abort = true` 会在扣费前阻止出招。普通攻击没有资源消耗前置流程，因此不会触发 `preAttack`。`attack` 还提供 `args.flags.autoApplied`；`args.flags.damageResult` 可修改当前面板结果。
+`preAttack` 的完整上下文是 `move`、`item`、`attacker`、`costConfig`、`abort`、`abortReason`；`args.abort = true` 会在扣除资源前阻止出招。普通攻击没有资源消耗前置流程，因此不会触发 `preAttack`。`attack` 还提供 `args.flags.autoApplied`；`args.flags.damageResult` 可修改当前面板结果。
 
 ### 攻击者结算
 
