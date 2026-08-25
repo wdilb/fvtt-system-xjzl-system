@@ -170,6 +170,91 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
       scripts: [] // 初始化为空数组
     };
 
+    // 兼容旧规则书数据：早期部分内功把“修满[永久]”直接写在 stage3.description，
+    // 后续数据则使用独立的 masteryEffect 字段。渲染前统一拆分，避免永久被动重复出现在运功效果中。
+    const explicitMasteryEffect = typeof this.masteryEffect === "string" ? this.masteryEffect.trim() : "";
+    const splitMasteryDescription = (rawDescription) => {
+      const source = typeof rawDescription === "string" ? rawDescription.trim() : "";
+      if (!source) return { description: "", masteryEffect: "" };
+
+      // 数据中既有“修满特效：”，也有直接以“修满[永久]”开头的旧写法；
+      // 圆满运功特效还存在排在永久被动之后的情况，因此不能只按单一前缀截断。
+      const masteryPattern = /(?:修满特效\s*[:：]\s*)?修满\s*(?:\[\s*永久\s*\]|【\s*永久\s*】|（\s*永久\s*）|\(\s*永久\s*\))\s*[:：]?|修满特效\s*[:：]/i;
+      const activePattern = /圆满(?:运功|内功)?特效\s*[:：]?/i;
+      const splitBlock = (block) => {
+        const opening = block.match(/^\s*(<p\b[^>]*>)/i);
+        const closing = block.match(/(<\/p>)\s*$/i);
+        const inner = opening && closing
+          ? block.slice(opening[1].length, block.length - closing[1].length)
+          : block;
+        const mastery = masteryPattern.exec(inner);
+        if (!mastery) return { active: block, mastery: "" };
+
+        const active = activePattern.exec(inner);
+        const findInlineTagStart = (text, index) => {
+          const candidates = [...text.slice(0, index).matchAll(/<(strong|b|em|span)\b[^>]*>/gi)];
+          for (let i = candidates.length - 1; i >= 0; i -= 1) {
+            const candidate = candidates[i];
+            const tagName = candidate[1].toLowerCase();
+            if (new RegExp(`</${tagName}>`, "i").test(text.slice(index))) return candidate.index;
+          }
+          return index;
+        };
+        const masteryStart = findInlineTagStart(inner, mastery.index);
+        const activeStart = active ? findInlineTagStart(inner, active.index) : null;
+        const wrap = (content) => opening && closing
+          ? `${opening[1]}${content.trim()}${closing[1]}`
+          : content.trim();
+        if (active && activeStart < masteryStart) {
+          return {
+            active: wrap(inner.slice(0, masteryStart)),
+            mastery: wrap(inner.slice(masteryStart))
+          };
+        }
+        if (active && activeStart > masteryStart) {
+          return {
+            active: wrap(inner.slice(activeStart)),
+            mastery: wrap(inner.slice(0, activeStart))
+          };
+        }
+        if (masteryStart > 0) {
+          return {
+            active: wrap(inner.slice(0, masteryStart)),
+            mastery: wrap(inner.slice(masteryStart))
+          };
+        }
+        return { active: "", mastery: block };
+      };
+
+      // HTML 富文本按段落逐块拆分，保留圆满运功与永久被动各自的换行。
+      const paragraphs = [...source.matchAll(/<p\b[^>]*>[\s\S]*?<\/p>/gi)].map(match => match[0]);
+      if (paragraphs.length) {
+        const activeBlocks = [];
+        const masteryBlocks = [];
+        for (const paragraph of paragraphs) {
+          const result = splitBlock(paragraph);
+          if (result.active) activeBlocks.push(result.active);
+          if (result.mastery) masteryBlocks.push(result.mastery);
+        }
+        return { description: activeBlocks.join(""), masteryEffect: masteryBlocks.join("") };
+      }
+
+      // 纯文本旧数据按两个效果标记的先后顺序拆分，并统一包一层 p。
+      const mastery = masteryPattern.exec(source);
+      if (!mastery) return { description: source, masteryEffect: "" };
+      const active = activePattern.exec(source);
+      if (active && active.index > mastery.index) {
+        return {
+          description: `<p>${source.slice(active.index).trim()}</p>`,
+          masteryEffect: `<p>${source.slice(0, active.index).trim()}</p>`
+        };
+      }
+      return {
+        description: `<p>${source.slice(0, mastery.index).trim()}</p>`,
+        masteryEffect: `<p>${source.slice(mastery.index).trim()}</p>`
+      };
+    };
+
     if (stage > 0) {
       // 根据阶段读取对应的 config
       const stageKey = `stage${stage}`;
@@ -177,17 +262,20 @@ export class XJZLNeigongData extends foundry.abstract.TypeDataModel {
 
       // 复制属性加成
       if (stageConfig) {
+        const splitDescription = stage === 3
+          ? splitMasteryDescription(stageConfig.description)
+          : { description: stageConfig.description, masteryEffect: "" };
+
         this.current.stats = { ...stageConfig.stats };
         this.current.effect = stageConfig.effect;
-        this.current.description = stageConfig.description;
+        this.current.description = splitDescription.description;
         // 复制数组 (浅拷贝即可，因为里面的对象通常只读)
         this.current.scripts = stageConfig.scripts || [];
+
+        // 独立字段优先；字段为空时使用旧描述中拆出的永久被动。
+        if (stage === 3) this.current.masteryEffect = explicitMasteryEffect || splitDescription.masteryEffect;
       }
 
-      // 如果圆满，激活圆满特效
-      if (stage === 3) {
-        this.current.masteryEffect = this.masteryEffect;
-      }
     }
 
     // 4. 计算进度条 (UI用)
