@@ -45,7 +45,7 @@ export class CombatStatsManager {
     }
 
     /**
-     * 处理重连与数据读取
+     * 处理重连与数据读取；无在线 GM 时跳过玩家端同步，避免阻断系统 ready 初始化。
      */
     static async ready() {
         console.log("XJZL Stats | 正在初始化战斗统计数据...");
@@ -61,12 +61,23 @@ export class CombatStatsManager {
             }
         } else {
             // 玩家: 登录时向 GM 索要最新的内存数据
-            if (xjzlSocket) {
-                const data = await xjzlSocket.executeAsGM("requestCombatStats");
-                if (data) {
-                    this.importSyncData(data);
-                    console.log("XJZL Stats | 成功从主机同步战斗统计记录。");
+            if (xjzlSocket && game.users.activeGM) {
+                try {
+                    const data = await xjzlSocket.executeAsGM("requestCombatStats");
+                    if (data) {
+                        this.importSyncData(data);
+                        console.log("XJZL Stats | 成功从主机同步战斗统计记录。");
+                    }
+                } catch (error) {
+                    // GM 可能在检查通过后断线；此时统计同步不可用，但不应中断系统其余 ready 初始化。
+                    if (error?.name === "SocketlibNoGMConnectedError" || !game.users.activeGM) {
+                        console.info("XJZL Stats | 当前没有在线 GM，跳过战斗统计同步。");
+                    } else {
+                        console.error("XJZL Stats | 战斗统计同步失败：", error);
+                    }
                 }
+            } else {
+                console.info("XJZL Stats | 当前没有在线 GM，跳过战斗统计同步。");
             }
         }
         // 触发 UI 刷新
@@ -197,8 +208,13 @@ export class CombatStatsManager {
         // 无权限客户端直接委托给 GM，利用 Socket 绕过数据库
         if (!game.user.isGM) {
             // 将 Actor/Item 实例降级为 UUID 或纯数据，防止跨网络序列化时丢失 uuid getter
+            if (!xjzlSocket || !game.users.activeGM) return;
             const safeData = this._sanitizeDataForSocket(data);
-            xjzlSocket.executeAsGM("recordCombatStat", safeData);
+            // 统计事件不应因 GM 断线产生未处理的 Promise rejection；GM 上线后由后续事件继续记录。
+            void xjzlSocket.executeAsGM("recordCombatStat", safeData).catch(error => {
+                if (error?.name === "SocketlibNoGMConnectedError" || !game.users.activeGM) return;
+                console.error("XJZL Stats | 战斗统计事件委托失败：", error);
+            });
             return;
         }
         this.processStatRecord(data);
