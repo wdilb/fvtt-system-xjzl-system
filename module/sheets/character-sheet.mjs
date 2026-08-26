@@ -1169,6 +1169,9 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
     _onRender(context, options) {
         super._onRender(context, options);
         const html = this.element; // AppV2 中 this.element 就是根节点
+        if (!(this._cultivationScrollPositions instanceof Map)) {
+            this._cultivationScrollPositions = new Map();
+        }
         // =====================================================
         // Header 滚动条记忆修复 (Capture + Passive)
         // 解决了 V13 原生 scrollable 无法监听 header滚动条的问题
@@ -1183,6 +1186,15 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                     sidebar.scrollTop = this._sidebarScrollPos;
                 }
             }
+
+            // 修炼页每个分类的左侧目录独立滚动，重绘后分别恢复原位置。
+            for (const directory of this.element.querySelectorAll(".cultivation-panel[data-cultivation-panel] .directory-list")) {
+                const category = directory.closest(".cultivation-panel")?.dataset.cultivationPanel;
+                const scrollTop = category ? this._cultivationScrollPositions.get(category) || 0 : 0;
+                if (scrollTop > 0 && Math.abs(directory.scrollTop - scrollTop) > 5) {
+                    directory.scrollTop = scrollTop;
+                }
+            }
         });
 
         // 2. [绑定监听] 检查当前 DOM 引用是否已绑定
@@ -1191,6 +1203,12 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
                 // 过滤目标：只记录 sidebar 的滚动
                 if (event.target.classList?.contains("sidebar-scroll-wrapper")) {
                     this._sidebarScrollPos = event.target.scrollTop;
+                }
+
+                if (event.target.classList?.contains("directory-list")) {
+                    const panel = event.target.closest(".cultivation-panel[data-cultivation-panel]");
+                    const category = panel?.dataset.cultivationPanel;
+                    if (category) this._cultivationScrollPositions.set(category, event.target.scrollTop);
                 }
             }, { capture: true, passive: true }); // passive: true 确保零性能损耗
 
