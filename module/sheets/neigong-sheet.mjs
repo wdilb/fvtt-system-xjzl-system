@@ -11,9 +11,8 @@ import { XJZLModifierPicker } from "../applications/modifier-picker.mjs";
 export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     static DEFAULT_OPTIONS = {
         tag: "form",
-        // xjzl-window 触发 Grid 布局, item-neigong 用于特定样式
-        classes: ["xjzl-window", "item-neigong", "theme-dark"],
-        position: { width: 1000, height: 700 },
+        classes: ["xjzl-window", "xjzl-martial-editor", "item-neigong"],
+        position: { width: 980, height: 720 },
         window: { resizable: true },
         // 告诉 V13：“请帮我监听 Input 变化，并且在重绘时保持滚动位置”
         form: {
@@ -37,22 +36,63 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             // 修改图片
             editImage: XJZLNeigongSheet.prototype._onEditImage,
             // 打开修正选择器
-            openModifierPicker: XJZLNeigongSheet.prototype._onOpenModifierPicker
+            openModifierPicker: XJZLNeigongSheet.prototype._onOpenModifierPicker,
+            // 仅切换界面状态，不写入 Item 数据
+            selectStage: XJZLNeigongSheet.prototype._onSelectStage
         }
     };
 
-    /* 
-       定义各个部分。
-       注意：Header 对应侧栏，Tabs 对应右侧书脊，其余对应中间内容。
-    */
+    // 紧凑信息头、轻量页签与主编辑区分别渲染，避免任一部分覆盖编辑器。
     static PARTS = {
-        header: { template: "systems/xjzl-system/templates/item/neigong/header.hbs", scrollable: [".xjzl-sidebar__content"] },
+        header: { template: "systems/xjzl-system/templates/item/neigong/header.hbs" },
         tabs: { template: "systems/xjzl-system/templates/item/neigong/tabs.hbs" },
-        config: { template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs", scrollable: [""] },
+        config: {
+            template: "systems/xjzl-system/templates/item/neigong/tab-config.hbs",
+            // 使用 V13 Part 原生状态同步；这里必须指向真正 overflow 的内部容器。
+            scrollable: [
+                ".neigong-realm-list",
+                ".neigong-panel-stack",
+                ".neigong-overview-panel .description-field .martial-rich-preview",
+                ".neigong-overview-panel .requirement-field .martial-rich-preview",
+                ".realm-panel.is-selected .realm-description .martial-rich-preview",
+                ".realm-panel.is-selected .mastery-effect-field .martial-rich-preview"
+            ]
+        },
         effects: { template: "systems/xjzl-system/templates/item/neigong/tab-effects.hbs", scrollable: [""] }
     };
 
     tabGroups = { primary: "config" };
+
+    // 这些状态只服务于编辑器导航，绝不写入 Item.system。
+    _uiState = { selectedStage: "overview" };
+
+    _isRichTextDirty(editor) {
+        try {
+            return typeof editor?.isDirty === "function" ? editor.isDirty() : Boolean(editor?.isDirty);
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * ProseMirror 的修改不会总是触发表单 submit；关闭窗口前给用户一次回头保存的机会。
+     * force 关闭（例如删除物品或 Foundry 清理应用）仍保持原有行为。
+     */
+    async close(options = {}) {
+        if (!options.force) {
+            const dirtyEditors = Array.from(this.element?.querySelectorAll("prose-mirror") || [])
+                .filter(editor => this._isRichTextDirty(editor));
+            if (dirtyEditors.length) {
+                const confirmed = await foundry.applications.api.DialogV2.confirm({
+                    window: { title: game.i18n.localize("XJZL.UI.RichTextUnsavedTitle"), icon: "fas fa-triangle-exclamation" },
+                    content: `<p>${game.i18n.localize("XJZL.UI.RichTextUnsavedContent")}</p>`,
+                    rejectClose: false
+                });
+                if (!confirmed) return false;
+            }
+        }
+        return super.close(options);
+    }
 
     /* -------------------------------------------- */
     /*  数据准备                                    */
@@ -62,6 +102,9 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         const context = await super._prepareContext(options);
         context.system = this.document.system;
         context.tabs = this.tabGroups;
+
+        this._uiState ??= { selectedStage: "overview" };
+        context.neigongOverviewSelected = this._uiState.selectedStage === "overview";
 
         // 1. 本地化下拉菜单
         context.elementChoices = {
@@ -96,6 +139,13 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
                 { id: 2, label: "XJZL.Neigong.Stage2", key: "stage2" },
                 { id: 3, label: "XJZL.Neigong.Stage3", key: "stage3" }
             ];
+            if (this._uiState.selectedStage !== "overview" && !context.stages.some(stage => stage.key === this._uiState.selectedStage)) {
+                this._uiState.selectedStage = "overview";
+                context.neigongOverviewSelected = true;
+            }
+            for (const stage of context.stages) {
+                stage.isSelected = stage.key === this._uiState.selectedStage;
+            }
         }
         // 3. 准备特效列表 (用于 Effects Tab)
         context.effects = this.document.effects.map(e => {
@@ -136,15 +186,23 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
             });
         }
 
-        //富文本编辑器
-        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
-            this.document.system.description,
-            {
-                secrets: this.document.isOwner,
-                async: true,
-                relativeTo: this.document
-            }
+        // 富文本字段统一交给 Foundry V13 的 prose-mirror 负责渲染与回写。
+        const enrich = value => foundry.applications.ux.TextEditor.implementation.enrichHTML(
+            value || "",
+            { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );
+        const [enrichedRequirement, enrichedDescription, enrichedMasteryEffect, ...stageDescriptions] = await Promise.all([
+            enrich(this.document.system.requirement),
+            enrich(this.document.system.description),
+            enrich(this.document.system.masteryEffect),
+            ...context.stages.map(stage => enrich(this.document.system.config?.[stage.key]?.description))
+        ]);
+        context.enrichedRequirement = enrichedRequirement;
+        context.enrichedDescription = enrichedDescription;
+        context.enrichedMasteryEffect = enrichedMasteryEffect;
+        context.stages.forEach((stage, index) => {
+            stage.enrichedDescription = stageDescriptions[index];
+        });
 
         return context;
     }
@@ -153,28 +211,29 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
     /*  生命周期与事件监听                          */
     /* -------------------------------------------- */
 
-    /**
-     * 自动保存逻辑
-     * AppV2 默认不监听 input change，我们需要手动触发 submit
-     */
-    // _onRender(context, options) {
-    //     super._onRender(context, options);
-
-    //     // 性能优化：事件委托
-    //     if (!this.element.dataset.delegated) {
-    //         this.element.addEventListener("change", (event) => {
-    //             const target = event.target;
-    //             if (target.matches("input, select, textarea")) {
-    //                 this.submit();
-    //             }
-    //         });
-    //         this.element.dataset.delegated = "true";
-    //     }
-    // }
-
     /* -------------------------------------------- */
     /*  Action Handlers (动作处理)                  */
     /* -------------------------------------------- */
+
+    /** 切换当前编辑的内功境界，仅改变界面，不触发文档更新。 */
+    _onSelectStage(event, target) {
+        const stage = target.dataset.stage;
+        if (!stage) return;
+        this._uiState ??= { selectedStage: "overview" };
+        this._uiState.selectedStage = stage;
+
+        // 直接切换现有 DOM，避免点击导航时打断当前输入框的自动保存。
+        this.element.querySelectorAll(".realm-entry").forEach(node => {
+            const selected = node.dataset.stage === stage;
+            node.classList.toggle("is-selected", selected);
+            node.setAttribute("aria-pressed", String(selected));
+        });
+        this.element.querySelectorAll(".neigong-panel").forEach(card => {
+            const selected = card.dataset.stageKey === stage;
+            card.classList.toggle("is-selected", selected);
+            card.classList.toggle("is-collapsed", !selected);
+        });
+    }
 
     /**
      * 打开属性选择器 (内功卡)
@@ -185,7 +244,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         const index = Number(target.dataset.index);
 
         // 1. 从 DOM 抓取当前可能未保存的数值 (防回滚)
-        const row = target.closest(".mastery-grid-row");
+        const row = target.closest(".mastery-row");
         const valInput = row.querySelector(`input[name="system.masteryChanges.${index}.value"]`);
         const lblInput = row.querySelector(`input[name="system.masteryChanges.${index}.label"]`);
 
@@ -248,6 +307,16 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         const index = Number(target.dataset.index);
         const changes = this.document.system.masteryChanges || [];
 
+        const current = changes[index];
+        if (current?.key || current?.value || current?.label) {
+            const confirmed = await foundry.applications.api.DialogV2.confirm({
+                window: { title: game.i18n.localize("XJZL.UI.Delete") },
+                content: `<p>${game.i18n.localize("XJZL.Neigong.DeleteMasteryConfirm")}</p>`,
+                rejectClose: false
+            });
+            if (!confirmed) return;
+        }
+
         // 过滤掉指定索引的项
         const newChanges = changes.filter((_, i) => i !== index);
 
@@ -292,6 +361,15 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
         const stageConfig = this.document.system.config[stageKey];
         const currentScripts = stageConfig.scripts || [];
+
+        if (currentScripts[index]?.script || currentScripts[index]?.label) {
+            const confirmed = await foundry.applications.api.DialogV2.confirm({
+                window: { title: game.i18n.localize("XJZL.UI.Delete") },
+                content: `<p>${game.i18n.localize("XJZL.Wuxue.DeleteScriptConfirm")}</p>`,
+                rejectClose: false
+            });
+            if (!confirmed) return;
+        }
         const newScripts = currentScripts.filter((_, i) => i !== index);
 
         await this.document.update({
@@ -317,7 +395,14 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
 
     async _onDeleteEffect(event, target) {
         const effectId = target.dataset.id;
-        this.document.effects.get(effectId)?.delete();
+        const effect = this.document.effects.get(effectId);
+        if (!effect) return;
+        const confirmed = await foundry.applications.api.DialogV2.confirm({
+            window: { title: game.i18n.localize("XJZL.UI.Delete") },
+            content: `<p>${game.i18n.format("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
+            rejectClose: false
+        });
+        if (confirmed) await effect.delete();
     }
 
     async _onToggleEffect(event, target) {

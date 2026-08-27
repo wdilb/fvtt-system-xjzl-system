@@ -1,355 +1,168 @@
-<section class="tab xjzl-body xjzl-body-scroll {{#if (eq tabs.primary 'details')}}active{{/if}}" data-tab="details"
-    data-group="primary" data-application-part="details">
-
-    <div class="xjzl-bg-deco">{{localize "XJZL.Wuxue.BgDeco"}}</div>
-
-    <div class="xjzl-flex-col">
-        {{#each system.moves as |move i|}}
-        <div class="move-card {{move._uiClass}}" data-move-index="{{i}}">
-
-            <!-- ================================================== -->
-            <!-- 数据保护区 (Hidden Inputs)                  -->
-            <!-- 必须存在！否则每次编辑武学，修为、等级都会被归零       -->
-            <!-- ================================================== -->
-
-            <!-- 1. 唯一标识符 -->
-            <input type="hidden" name="system.moves.{{i}}.id" value="{{move.id}}">
-
-            <!-- 2. 核心成长数据 (最关键的部分) -->
-            <input type="hidden" name="system.moves.{{i}}.xpInvested" value="{{move.xpInvested}}">
-            <input type="hidden" name="system.moves.{{i}}.level" value="{{move.level}}">
-
-            <!-- 3. 修为来源成分 -->
-            <input type="hidden" name="system.moves.{{i}}.sourceBreakdown.general"
-                value="{{move.sourceBreakdown.general}}">
-            <input type="hidden" name="system.moves.{{i}}.sourceBreakdown.specific"
-                value="{{move.sourceBreakdown.specific}}">
-            <!-- 4. 其他没有显示在界面上的字段 (防止被意外覆盖) -->
-            <input type="hidden" name="system.moves.{{i}}.img" value="{{move.img}}">
-            <!-- 虽然我们没加招式图片，但是确实定义了这个字段，先这样放着 -->
-
-            {{!-- 1. 标题栏 --}}
-            <div class="move-header">
-                <img src="{{move.img}}" />
-                <input type="text" name="system.moves.{{i}}.name" value="{{move.name}}" class="move-name"
-                    placeholder="{{localize 'XJZL.Wuxue.Moves.Name'}}" style="flex:1;">
-
-                <select name="system.moves.{{i}}.type" style="width: 80px;">
-                    {{selectOptions @root.choices.moveTypes selected=move.type}}
-                </select>
-
-                {{#if (eq move.type "qi")}}
-                <select name="system.moves.{{i}}.actionType" style="width: 75px;"
-                    data-tooltip="{{localize 'XJZL.Wuxue.Moves.ActionTypeHint'}}">
-                    {{selectOptions @root.choices.actionTypes selected=move.actionType}}
-                </select>
-                {{/if}}
-
-                <div class="xjzl-checkbox-wrapper" title="{{localize 'XJZL.Wuxue.Moves.IsUltimate'}}"
-                    style="display:flex; align-items:center; gap:2px; margin-left:10px;">
-                    <label style="font-weight:900; color:#b7950b;">{{localize "XJZL.Wuxue.Moves.UltimateChar"}}</label>
-                    <input type="checkbox" name="system.moves.{{i}}.isUltimate" {{checked move.isUltimate}}>
-                </div>
-
-                <a data-action="deleteMove" data-id="{{move.id}}" style="color:#999; margin-left:10px; cursor:pointer;">
-                    <i class="fas fa-trash"></i>
-                </a>
+<section class="tab martial-workspace {{#if (eq tabs.primary 'details')}}active{{/if}}"
+    data-tab="details" data-group="primary" data-application-part="details">
+    <div class="wuxue-editor-layout">
+        <aside class="wuxue-directory" aria-label="{{localize 'XJZL.Wuxue.MoveDirectory'}}">
+            <div class="directory-heading">
+                <div><span>{{localize "XJZL.Wuxue.MoveDirectory"}}</span><small>{{system.moves.length}}</small></div>
+                <button type="button" data-action="addMove" aria-label="{{localize 'XJZL.Wuxue.Moves.AddMove'}}"><i class="fas fa-plus" aria-hidden="true"></i></button>
             </div>
-
-            {{!-- 2. 消耗系数：独占一行，放在标题下 --}}
-            {{#with move.xpCostRatio as |ratio|}}
-            <div class="xjzl-details-box" style="margin-bottom: 15px;">
-                <details {{#if (ne ratio 1)}}open{{/if}}>
-                    <summary style="padding:5px;">
-                        <span><i class="fas fa-coins"></i> {{localize "XJZL.Wuxue.Moves.XPCostRatio"}}</span>
-                        <span class="status {{#if (ne ratio 1)}}modified{{/if}}" style="font-size:10px;">
-                            {{#if (ne ratio 1)}}x{{ratio}}{{else}}(1.0){{/if}}
-                        </span>
-                    </summary>
-                    <div class="content" style="padding:5px;">
-                        <label style="white-space:nowrap;">{{localize "XJZL.Neigong.XPCostRatioLabel"}}:</label>
-                        <input type="number" name="system.moves.{{i}}.xpCostRatio" value="{{ratio}}" min="0.1"
-                            step="0.01" style="width:60px; text-align:center;">
-                        <span style="font-size: 0.8em; color: #888; margin-left: 10px;">{{localize
-                            "XJZL.ArtBook.RatioStandardHint"}}</span>
-                    </div>
-                </details>
-            </div>
-            {{/with}}
-
-            {{!-- 3. 核心双栏布局 --}}
-            <div class="move-body">
-
-                {{!-- === 左侧：基础属性 + 消耗表 === --}}
-                <div class="xjzl-flex-col" style="gap: 15px;">
-
-                    {{!-- A. 基础属性网格 --}}
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 5px;">
-
-                        {{!-- Row 1: 兵器 --}}
-                        <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>{{localize "XJZL.Wuxue.Moves.WeaponType"}}</label>
-                            <select name="system.moves.{{i}}.weaponType">
-                                {{selectOptions @root.choices.weaponTypes selected=move.weaponType}}
-                            </select>
-                        </div>
-                        {{!-- <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>{{localize "XJZL.Wuxue.Moves.WeaponSubtypeLabel"}}</label>
-                            <input type="text" name="system.moves.{{i}}.weaponSubtype" value="{{move.weaponSubtype}}"
-                                placeholder="{{localize 'XJZL.Wuxue.Moves.SubtypePlaceholder'}}">
-                        </div> --}}
-                        {{!-- 改成显示目标，子武器类型已经在需求里显示了 --}}
-                        <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>{{localize "XJZL.Wuxue.Moves.TargetInfo"}}</label>
-                            <input type="text" name="system.moves.{{i}}.targetInfo" value="{{move.targetInfo}}"
-                                placeholder="{{localize 'XJZL.Wuxue.Moves.TargetInfoPlaceholder'}}">
-                        </div>
-                        {{!-- Row 2: 伤害与属性 --}}
-                        <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>{{localize "XJZL.Wuxue.Moves.DamageType"}}</label>
-                            <select name="system.moves.{{i}}.damageType">
-                                {{selectOptions @root.choices.damageTypes selected=move.damageType}}
-                            </select>
-                        </div>
-                        <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>{{localize "XJZL.Wuxue.Moves.ElementLabel"}}</label>
-                            <select name="system.moves.{{i}}.element">
-                                {{selectOptions @root.choices.elements selected=move.element}}
-                            </select>
-                        </div>
-
-                        {{!-- Row 3: 品阶与距离 --}}
-                        <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>{{localize "XJZL.Wuxue.Tier"}}</label>
-                            <select name="system.moves.{{i}}.tier">
-                                {{selectOptions @root.choices.moveTiers selected=move.uiTierSelected}}
-                            </select>
-                        </div>
-                        <div class="xjzl-ink-field" style="margin:0; padding:5px;">
-                            <label>{{localize "XJZL.Wuxue.Moves.Range"}}</label>
-                            <input type="text" name="system.moves.{{i}}.range" value="{{move.range}}" placeholder="2米">
-                        </div>
-
-                        {{!-- Row 4: 动作消耗 --}}
-                        <div class="xjzl-ink-field" style="margin:0; padding:5px; grid-column: 1 / -1;">
-                            <label>{{localize "XJZL.Wuxue.Moves.ActionCost"}}</label>
-                            <input type="text" name="system.moves.{{i}}.actionCost" value="{{move.actionCost}}">
-                        </div>
-                    </div>
-
-                    {{!-- B. 施展需求 --}}
-                    <div class="xjzl-ink-field" style="margin:0; padding:5px; border-left-color: #e74c3c;">
-                        <label style="color:#c0392b;"><i class="fas fa-exclamation-circle"></i> {{localize
-                            "XJZL.Wuxue.Moves.Requirements"}}</label>
-                        <input type="text" name="system.moves.{{i}}.requirements" value="{{move.requirements}}"
-                            placeholder="{{localize 'XJZL.Wuxue.Moves.RequirementsPlaceholder' fallback='例如: 悟性15'}}"
-                            style="font-size:12px; width:100%; color:#c0392b;">
-                    </div>
-
-                    {{!-- C. 消耗表 --}}
-                    <div>
-                        <label style="font-weight:bold; font-size:11px; color:#666;">{{localize
-                            "XJZL.Wuxue.Cost.Label"}}</label>
-                        <div class="cost-table"
-                            style="grid-template-columns: 30px repeat({{move._ui.costLevels.length}}, 1fr);">
-                            <div class="label"></div>
-                            {{#each move._ui.costLabels as |label|}}<div>{{label}}</div>{{/each}}
-
-                            <div class="label">内</div>
-                            {{#each move._ui.costLevels as |lvlIdx|}}
-                            <input type="number" name="system.moves.{{i}}.costs.mp.{{lvlIdx}}"
-                                value="{{lookup move.costs.mp lvlIdx}}">
-                            {{/each}}
-
-                            <div class="label">怒</div>
-                            {{#each move._ui.costLevels as |lvlIdx|}}
-                            <input type="number" name="system.moves.{{i}}.costs.rage.{{lvlIdx}}"
-                                value="{{lookup move.costs.rage lvlIdx}}">
-                            {{/each}}
-
-                            <div class="label">血</div>
-                            {{#each move._ui.costLevels as |lvlIdx|}}
-                            <input type="number" name="system.moves.{{i}}.costs.hp.{{lvlIdx}}"
-                                value="{{lookup move.costs.hp lvlIdx}}">
-                            {{/each}}
-                        </div>
-                    </div>
-                </div>
-
-                {{!-- === 右侧：自动化 + 进阶 + 加成 === --}}
-                <div class="xjzl-flex-col" style="gap: 10px;">
-
-                    {{!-- C. 自动化说明 (移到这里) --}}
-                    <div class="xjzl-ink-field" style="margin:0; padding:5px; border-left-color:var(--c-mp-blue);">
-                        <label><i class="fas fa-robot"></i> {{localize "XJZL.AutomationNote"}}</label>
-                        <input type="text" name="system.moves.{{i}}.automationNote" value="{{move.automationNote}}"
-                            placeholder="{{localize 'XJZL.Wuxue.AutomationNotePlaceholder'}}"
-                            style="font-size:12px; width:100%;">
-                    </div>
-
-                    {{!-- D. 进阶配置 --}}
-                    <div class="xjzl-card"
-                        style="margin:0; padding:8px; background:rgba(0,0,0,0.03); border:1px dashed #ccc;">
-                        <div class="xjzl-flex-row" style="justify-content:space-between; margin-bottom:5px;">
-                            <label style="font-weight:bold; font-size:11px;">{{localize
-                                "XJZL.Wuxue.Progression.Title"}}</label>
-                            <select name="system.moves.{{i}}.progression.mode"
-                                style="height:20px; font-size:11px; width:auto; background:transparent; border:none;">
-                                {{selectOptions @root.choices.progressionModes selected=move.progression.mode}}
-                            </select>
-                        </div>
-
-                        {{#if (eq move.progression.mode "custom")}}
-                        <div class="xjzl-flex-col" style="margin-bottom:5px;">
-                            <input type="text" name="temp.thresholds.{{i}}"
-                                value="{{move.progression.customThresholds}}" class="xjzl-input"
-                                placeholder="1000, 3000" style="font-size:11px; border-bottom:1px dashed #999;">
-                            <p class="notes" style="font-size:0.7em; color:#888; margin:0;">{{localize
-                                "XJZL.Wuxue.Progression.ThresholdsHint"}}
-                        </div>
-                        {{/if}}
-
-                        <div style="display: flex; align-items: center; gap: 10px; margin-top: 5px;">
-                            {{!-- 1. 标签部分 --}}
-                            <label style="font-size:11px; white-space:nowrap; cursor:help; margin:0;"
-                                data-tooltip="{{localize 'XJZL.Wuxue.Progression.MappedStageDesc'}}">
-                                {{localize "XJZL.Wuxue.Progression.MappedStage"}}:
-                                <i class="fas fa-circle-question"
-                                    style="color:var(--c-ink-light); font-size:0.9em;"></i>
-                            </label>
-                            {{!-- 2. 下拉框部分 (现在会紧跟在冒号后面) --}}
-                            <select name="system.moves.{{i}}.progression.mappedStage"
-                                style="height:20px; font-size:11px; width:auto; background:transparent; border:none;">
-                                {{selectOptions @root.choices.mappedStages selected=move.progression.mappedStage}}
-                            </select>
-
-                        </div>
-                        <p class="notes" style="font-size:0.7em; color:#888; margin:0;">{{localize
-                            "XJZL.Wuxue.Progression.MappedStageHint"}}</p>
-                    </div>
-
-                    {{!-- E. 属性加成 --}}
-                    <div class="scaling-box">
-                        <div
-                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: nowrap;">
-
-                            <div style="display: flex; align-items: center; gap: 6px;">
-                                <label style="font-weight:bold; font-size:11px; margin:0; white-space:nowrap;">
-                                    {{localize "XJZL.Wuxue.Calc.Label"}}
-                                </label>
-                                <a data-action="addScaling" title="{{localize 'XJZL.UI.Add'}}"
-                                    style="cursor:pointer; display:flex; align-items:center;">
-                                    <i class="fas fa-plus"></i>
-                                </a>
-                            </div>
-
-                            <div data-tooltip="{{localize 'XJZL.Wuxue.Calc.IsFixedDesc'}}"
-                                style="display:flex; align-items:center; gap:4px; cursor:help;">
-                                <input type="checkbox" name="system.moves.{{i}}.calculation.isFixed" {{checked
-                                    move.calculation.isFixed}}
-                                    style="margin:0; width:13px; height:13px; flex-shrink:0; cursor:pointer;">
-                                <label
-                                    style="font-size:11px; color:#555; margin:0; font-weight:normal; line-height:1; white-space:nowrap;">{{localize
-                                    'XJZL.Wuxue.Calc.IsFixed'}}</label>
-                            </div>
-
-                        </div>
-
-                        <div class="xjzl-grid-inline" style="margin-bottom:8px;">
-                            <label style="font-size:11px; white-space:nowrap;">{{localize
-                                "XJZL.Wuxue.Calc.BaseShort"}}</label>
-                            <input type="number" name="system.moves.{{i}}.calculation.base"
-                                value="{{move.calculation.base}}" class="xjzl-input xjzl-input-short" placeholder="0">
-
-                            <label style="font-size:11px; margin-left:10px; white-space:nowrap;">{{localize
-                                "XJZL.Wuxue.Calc.GrowthShort"}}</label>
-                            <input type="number" name="system.moves.{{i}}.calculation.growth"
-                                value="{{move.calculation.growth}}" class="xjzl-input xjzl-input-short" placeholder="0">
-                        </div>
-
-                        {{#each move.calculation.scalings as |scale idx|}}
-                        <div class="scaling-row">
-                            <select name="system.moves.{{i}}.calculation.scalings.{{idx}}.prop">
-                                {{selectOptions @root.choices.attributes selected=scale.prop}}
-                            </select>
-                            <span class="x-mark">×</span>
-                            <input type="number" name="system.moves.{{i}}.calculation.scalings.{{idx}}.ratio"
-                                value="{{scale.ratio}}" step="0.1">
-                            <a data-action="deleteScaling" data-idx="{{idx}}" class="delete-btn"><i
-                                    class="fas fa-times"></i></a>
-                        </div>
-                        {{/each}}
-                    </div>
-
-                </div> {{!-- 右侧结束 --}}
-            </div>
-
-            {{!-- 4. 底部通栏：脚本列表 --}}
-            <div style="margin-top: 15px; border-top: 1px dashed rgba(0,0,0,0.1); padding-top: 10px;">
-                <div class="xjzl-flex-row"
-                    style="justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <label style="font-weight:bold; font-size:12px; color:#555;">
-                        <i class="fas fa-code"></i> {{localize "XJZL.Script.ScriptList"}}
-                    </label>
-                    <a data-action="addMoveScript" style="font-size:11px; color:var(--c-theme-main); cursor:pointer;">
-                        <i class="fas fa-plus"></i> {{localize "XJZL.Wuxue.Moves.ScriptAdd"}}
-                    </a>
-                </div>
-
-                {{#each move.scripts as |script sIdx|}}
-                <div class="xjzl-script-item">
-                    {{!-- 头部行：名称(自动填充) | 触发器 | 激活 | 删除 --}}
-                    <div class="script-header-row">
-                        <i class="fas fa-code script-icon"></i>
-
-                        {{!-- 1. 脚本名称：占据剩余空间 --}}
-                        <input type="text" name="system.moves.{{i}}.scripts.{{sIdx}}.label" value="{{script.label}}"
-                            class="script-name-input"
-                            placeholder="{{localize 'XJZL.Wuxue.Moves.ScriptNamePlaceholder'}}">
-
-                        {{!-- 2. 触发时机：固定宽度 --}}
-                        <select name="system.moves.{{i}}.scripts.{{sIdx}}.trigger" class="script-trigger-select">
-                            {{selectOptions @root.scriptTriggerChoices selected=script.trigger localize=false}}
-                        </select>
-
-                        {{!-- 3. 右侧工具：激活勾选 + 删除 --}}
-                        <div class="script-tools">
-                            <label class="active-label" data-tooltip="{{localize 'XJZL.UI.ToggleEnable'}}">
-                                <span style="font-size:10px; color:#666;">{{localize "XJZL.UI.Enable"}}</span>
-                                <input type="checkbox" name="system.moves.{{i}}.scripts.{{sIdx}}.active" {{checked
-                                    script.active}}>
-                            </label>
-
-                            <a data-action="deleteMoveScript" data-idx="{{sIdx}}" class="delete-btn"
-                                title="{{localize 'XJZL.UI.Delete'}}">
-                                <i class="fas fa-trash"></i>
-                            </a>
-                        </div>
-                    </div>
-
-                    {{!-- 代码输入框：全宽 + 更高 --}}
-                    <textarea name="system.moves.{{i}}.scripts.{{sIdx}}.script" class="script-editor"
-                        placeholder="// JS Code... (e.g. args.actor, args.item)">{{script.script}}</textarea>
-                </div>
+            <label class="directory-search"><i class="fas fa-search" aria-hidden="true"></i>
+                <input type="search" data-move-search value="{{moveSearchQuery}}" placeholder="{{localize 'XJZL.Wuxue.MoveSearchPlaceholder'}}"></label>
+            <div class="directory-list">
+                <button type="button" class="directory-entry book-entry {{#if bookOverviewSelected}}is-selected{{/if}}"
+                    data-action="selectMove" data-move-id="__book__" aria-pressed="{{bookOverviewSelected}}">
+                    <span class="entry-icon"><i class="fas fa-book-open" aria-hidden="true"></i></span>
+                    <span><strong>{{localize "XJZL.Wuxue.BookOverview"}}</strong><small>{{localize "XJZL.Wuxue.BookOverviewHint"}}</small></span>
+                </button>
+                {{#each system.moves as |move i|}}
+                <button type="button" class="directory-entry wuxue-move-entry {{move._uiClass}} {{#if move.isUltimate}}is-ultimate{{/if}} {{#if move._uiSelected}}is-selected{{/if}}"
+                    data-action="selectMove" data-move-id="{{move.id}}" aria-pressed="{{move._uiSelected}}">
+                    <span class="entry-icon {{move._uiClass}}"><i class="fas {{move._uiIcon}}" aria-hidden="true"></i></span>
+                    <span class="move-entry-copy"><strong>{{move.name}}</strong><small>{{lookup @root.choices.moveTypes move.type}}{{#if move.isUltimate}} <em class="ultimate-badge">{{localize "XJZL.Wuxue.Moves.UltimateBadge"}}</em>{{/if}}</small></span>
+                    <span class="entry-tier">{{#if move._uiTier}}{{move._uiTier}}{{else}}·{{/if}}</span>
+                </button>
+                {{else}}
+                <p class="directory-empty">{{localize "XJZL.Wuxue.EmptyMovesHint"}}</p>
                 {{/each}}
             </div>
+        </aside>
 
-            {{!-- 5. 底部通栏：描述 --}}
-            <div style="margin-top: 10px;">
-                <div class="xjzl-move-editor">
-                    <prose-mirror name="system.moves.{{i}}.description" data-document-u-u-i-d="{{../document.uuid}}"
-                        value="{{move.description}}" toggled="false" button="true">
-                        {{{move.enrichedDescription}}}
-                    </prose-mirror>
+        <main class="wuxue-editor-main">
+            <section class="wuxue-book-panel {{#if bookOverviewSelected}}is-selected{{else}}is-collapsed{{/if}}" data-move-id="__book__">
+                <header class="panel-heading"><div><span class="panel-kicker">{{localize "XJZL.Wuxue.BookKicker"}}</span><h2>{{localize "XJZL.Wuxue.BookOverview"}}</h2></div>
+                    <div class="panel-heading-side"><p>{{localize "XJZL.Wuxue.BookDescription"}}</p>
+                        <small class="panel-save-hint"><i class="fas fa-circle-info" aria-hidden="true"></i>{{localize "XJZL.UI.RichTextSaveHint"}}</small></div></header>
+                <div class="book-overview-grid">
+                    <div class="field-block book-requirements"><span><i class="fas fa-circle-exclamation" aria-hidden="true"></i> {{localize "XJZL.Wuxue.Requirements"}}</span>
+                        <div class="martial-rich-editor">
+                            <div class="martial-rich-preview">{{{enrichedRequirements}}}</div>
+                            <prose-mirror name="system.requirements" data-document-u-u-i-d="{{document.uuid}}"
+                                value="{{system.requirements}}" toggled="false" button="true"></prose-mirror>
+                        </div>
+                    </div>
+                    <div class="field-block book-description"><span>{{localize "XJZL.Info.Description"}}</span>
+                        <div class="martial-rich-editor"><div class="martial-rich-preview">{{{enrichedDescription}}}</div><prose-mirror name="system.description" data-document-u-u-i-d="{{document.uuid}}"
+                            value="{{system.description}}" toggled="false" button="true"></prose-mirror></div></div>
                 </div>
+            </section>
+
+            <nav class="move-section-tabs {{#if bookOverviewSelected}}is-hidden{{/if}}" aria-label="{{localize 'XJZL.Wuxue.MoveEditorSections'}}">
+                <button type="button" class="{{#if (eq selectedMoveSection 'overview')}}is-selected{{/if}}" data-action="selectMoveSection" data-section="overview"><i class="fas fa-feather" aria-hidden="true"></i>{{localize "XJZL.Wuxue.MoveOverview"}}</button>
+                <button type="button" class="{{#if (eq selectedMoveSection 'growth')}}is-selected{{/if}}" data-action="selectMoveSection" data-section="growth"><i class="fas fa-chart-line" aria-hidden="true"></i>{{localize "XJZL.Wuxue.MoveGrowth"}}</button>
+                <button type="button" class="{{#if (eq selectedMoveSection 'automation')}}is-selected{{/if}}" data-action="selectMoveSection" data-section="automation"><i class="fas fa-code" aria-hidden="true"></i>{{localize "XJZL.Wuxue.MoveAutomation"}}</button>
+            </nav>
+
+            <div class="wuxue-move-stack {{#if bookOverviewSelected}}is-hidden{{/if}}">
+                {{#each system.moves as |move i|}}
+                <article class="move-editor-card {{move._uiClass}} {{#if move.isUltimate}}is-ultimate{{/if}} {{#if move._uiSelected}}is-selected{{else}}is-collapsed{{/if}}"
+                    data-move-index="{{i}}" data-move-id="{{move.id}}">
+                    <input type="hidden" name="system.moves.{{i}}.id" value="{{move.id}}">
+                    <input type="hidden" name="system.moves.{{i}}.xpInvested" value="{{move.xpInvested}}">
+                    <input type="hidden" name="system.moves.{{i}}.level" value="{{move.level}}">
+                    <input type="hidden" name="system.moves.{{i}}.sourceBreakdown.general" value="{{move.sourceBreakdown.general}}">
+                    <input type="hidden" name="system.moves.{{i}}.sourceBreakdown.specific" value="{{move.sourceBreakdown.specific}}">
+                    <input type="hidden" name="system.moves.{{i}}.img" value="{{move.img}}">
+
+                    <header class="move-editor-head">
+                        <span class="move-icon-button {{move._uiClass}}" aria-hidden="true"><i class="fas {{move._uiIcon}}"></i></span>
+                        <div class="move-title-group">
+                            <input type="text" name="system.moves.{{i}}.name" value="{{move.name}}" class="move-title-input" placeholder="{{localize 'XJZL.Wuxue.Moves.Name'}}">
+                            <div class="move-title-meta">
+                                <select name="system.moves.{{i}}.type">{{selectOptions @root.choices.moveTypes selected=move.type}}</select>
+                                {{#if (eq move.type "qi")}}<select name="system.moves.{{i}}.actionType">{{selectOptions @root.choices.actionTypes selected=move.actionType}}</select>{{/if}}
+                                <label class="ultimate-toggle"><input type="checkbox" name="system.moves.{{i}}.isUltimate" {{checked move.isUltimate}}><span>{{localize "XJZL.Wuxue.Moves.IsUltimate"}}</span></label>
+                            </div>
+                        </div>
+                        <button type="button" class="icon-button danger delete-move" data-action="deleteMove" data-id="{{move.id}}" aria-label="{{localize 'XJZL.UI.Delete'}}"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                    </header>
+
+                    <section class="move-section-panel {{#if (eq move._uiSection 'overview')}}is-selected{{else}}is-collapsed{{/if}}" data-move-section-panel="overview">
+                        <div class="move-field-grid">
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Moves.WeaponType"}}</span><select name="system.moves.{{i}}.weaponType">{{selectOptions @root.choices.weaponTypes selected=move.weaponType}}</select></label>
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Moves.WeaponSubtypeLabel"}}</span><input type="text" name="system.moves.{{i}}.weaponSubtype" value="{{move.weaponSubtype}}" placeholder="{{localize 'XJZL.Wuxue.Moves.SubtypePlaceholder'}}"></label>
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Moves.TargetInfo"}}</span><input type="text" name="system.moves.{{i}}.targetInfo" value="{{move.targetInfo}}" placeholder="{{localize 'XJZL.Wuxue.Moves.TargetInfoPlaceholder'}}"></label>
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Moves.DamageType"}}</span><select name="system.moves.{{i}}.damageType">{{selectOptions @root.choices.damageTypes selected=move.damageType}}</select></label>
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Moves.ElementLabel"}}</span><select name="system.moves.{{i}}.element">{{selectOptions @root.choices.elements selected=move.element}}</select></label>
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Tier"}}</span><select name="system.moves.{{i}}.tier">{{selectOptions @root.choices.moveTiers selected=move.uiTierSelected}}</select></label>
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Moves.Range"}}</span><input type="text" name="system.moves.{{i}}.range" value="{{move.range}}"></label>
+                            <label class="compact-field"><span>{{localize "XJZL.Wuxue.Moves.ActionCost"}}</span><input type="text" name="system.moves.{{i}}.actionCost" value="{{move.actionCost}}"></label>
+                        </div>
+                        {{#if (eq move.type "feint")}}
+                        <div class="double-feint-row">
+                            <div class="double-feint-copy"><label><input type="checkbox" name="system.moves.{{i}}.doubleFeint" {{checked move.doubleFeint}}> <strong>{{localize "XJZL.Wuxue.Moves.DoubleFeint"}}</strong></label>
+                                <small>{{localize "XJZL.Wuxue.Moves.DoubleFeintHint"}}</small></div>
+                            {{#if move.doubleFeint}}<label class="double-feint-mode"><span>{{localize "XJZL.Wuxue.Moves.DoubleFeintMode"}}</span><select name="system.moves.{{i}}.doubleFeintMode">{{selectOptions @root.choices.doubleFeintModes selected=move.doubleFeintMode}}</select></label>{{/if}}
+                        </div>
+                        {{/if}}
+                        <div class="field-block move-requirements"><span><i class="fas fa-circle-exclamation" aria-hidden="true"></i> {{localize "XJZL.Wuxue.Moves.Requirements"}}</span><div class="martial-rich-editor"><div class="martial-rich-preview">{{{move.enrichedRequirements}}}</div><prose-mirror name="system.moves.{{i}}.requirements" data-document-u-u-i-d="{{../document.uuid}}" value="{{move.requirements}}" toggled="false" button="true"></prose-mirror></div></div>
+                        <div class="field-block move-description"><span>{{localize "XJZL.Info.Description"}}</span><div class="martial-rich-editor"><div class="martial-rich-preview">{{{move.enrichedDescription}}}</div><prose-mirror name="system.moves.{{i}}.description" data-document-u-u-i-d="{{../document.uuid}}" value="{{move.description}}" toggled="false" button="true"></prose-mirror></div></div>
+                    </section>
+
+                    <section class="move-section-panel {{#if (eq move._uiSection 'growth')}}is-selected{{else}}is-collapsed{{/if}}" data-move-section-panel="growth">
+                        <div class="growth-rule-strip">
+                            <label class="training-ratio-card">
+                                <span class="growth-rule-mark" aria-hidden="true">修</span>
+                                <span class="growth-rule-copy"><strong>{{localize "XJZL.Wuxue.Moves.XPCostRatio"}}</strong><small>{{localize "XJZL.Wuxue.Moves.XPCostRatioHint"}}</small></span>
+                                <span class="ratio-input-wrap"><input type="number" name="system.moves.{{i}}.xpCostRatio" value="{{move.xpCostRatio}}" min="0.1" step="0.01"><em>{{localize "XJZL.ArtBook.RatioStandardHint"}}</em></span>
+                            </label>
+                            <section class="progression-card">
+                                <header><strong>{{localize "XJZL.Wuxue.Progression.Title"}}</strong><small>{{localize "XJZL.Wuxue.Progression.Hint"}}</small></header>
+                                <div class="progression-control-grid">
+                                    <label><span>{{localize "XJZL.Wuxue.Progression.Mode"}}</span><select name="system.moves.{{i}}.progression.mode">{{selectOptions @root.choices.progressionModes selected=move.progression.mode}}</select><small class="control-hint">{{localize "XJZL.Wuxue.Progression.ModeHint"}}</small></label>
+                                    <label><span>{{localize "XJZL.Wuxue.Progression.MappedStage"}}</span><select name="system.moves.{{i}}.progression.mappedStage">{{selectOptions @root.choices.mappedStages selected=move.progression.mappedStage}}</select><small class="control-hint">{{localize "XJZL.Wuxue.Progression.MappedStageHint"}}</small></label>
+                                </div>
+                                {{#if (eq move.progression.mode "custom")}}
+                                <label class="threshold-field"><span>{{localize "XJZL.Wuxue.Progression.Thresholds"}}</span><input type="text" name="temp.thresholds.{{i}}" value="{{move.progression.customThresholds}}" placeholder="1000, 3000"><small>{{localize "XJZL.Wuxue.Progression.ThresholdsHint"}}</small></label>
+                                {{/if}}
+                            </section>
+                        </div>
+                        <div class="growth-workbench">
+                            <section class="growth-section cost-section">
+                                <header><div><span class="panel-kicker">01 · COST</span><h3>{{localize "XJZL.Wuxue.Cost.Label"}}</h3><small>{{localize "XJZL.Wuxue.Cost.Hint"}}</small></div></header>
+                                <div class="cost-table" style="grid-template-columns: 62px repeat({{move._ui.costLevels.length}}, minmax(46px, 1fr));">
+                                    <span></span>{{#each move._ui.costLabels as |label|}}<strong>{{label}}</strong>{{/each}}
+                                    <strong>{{localize "XJZL.Wuxue.Cost.MP"}}</strong>{{#each move._ui.costLevels as |lvlIdx|}}<input type="number" name="system.moves.{{i}}.costs.mp.{{lvlIdx}}" value="{{lookup move.costs.mp lvlIdx}}">{{/each}}
+                                    <strong>{{localize "XJZL.Wuxue.Cost.Rage"}}</strong>{{#each move._ui.costLevels as |lvlIdx|}}<input type="number" name="system.moves.{{i}}.costs.rage.{{lvlIdx}}" value="{{lookup move.costs.rage lvlIdx}}">{{/each}}
+                                    <strong>{{localize "XJZL.Wuxue.Cost.HP"}}</strong>{{#each move._ui.costLevels as |lvlIdx|}}<input type="number" name="system.moves.{{i}}.costs.hp.{{lvlIdx}}" value="{{lookup move.costs.hp lvlIdx}}">{{/each}}
+                                </div>
+                            </section>
+                            <section class="growth-section scaling-section">
+                                <header><div><span class="panel-kicker">02 · FORMULA</span><h3>{{localize "XJZL.Wuxue.Calc.Label"}}</h3><small>{{localize "XJZL.Wuxue.Calc.FormulaHint"}}</small></div><button type="button" data-action="addScaling"><i class="fas fa-plus" aria-hidden="true"></i>{{localize "XJZL.UI.Add"}}</button></header>
+                                <div class="calculation-layout">
+                                    <div class="calculation-base-row">
+                                        <label><span>{{localize "XJZL.Wuxue.Calc.Base"}}</span><input type="number" name="system.moves.{{i}}.calculation.base" value="{{move.calculation.base}}"></label>
+                                        <label><span>{{localize "XJZL.Wuxue.Calc.Growth"}}</span><input type="number" name="system.moves.{{i}}.calculation.growth" value="{{move.calculation.growth}}"></label>
+                                        <label class="fixed-mode-card"><span class="fixed-mode-toggle"><input type="checkbox" name="system.moves.{{i}}.calculation.isFixed" {{checked move.calculation.isFixed}}> <strong>{{localize "XJZL.Wuxue.Calc.IsFixed"}}</strong></span><small>{{localize "XJZL.Wuxue.Calc.IsFixedDesc"}}</small></label>
+                                    </div>
+                                    <div class="scaling-list">
+                                        {{#each move.calculation.scalings as |scale idx|}}
+                                        <div class="scaling-row"><label><span>{{localize "XJZL.Wuxue.Calc.Prop"}}</span><select name="system.moves.{{i}}.calculation.scalings.{{idx}}.prop">{{selectOptions @root.choices.attributes selected=scale.prop}}</select></label><span class="scaling-operator">×</span><label><span>{{localize "XJZL.Wuxue.Calc.Ratio"}}</span><input type="number" name="system.moves.{{i}}.calculation.scalings.{{idx}}.ratio" value="{{scale.ratio}}" step="0.1"></label><button type="button" class="icon-button danger" data-action="deleteScaling" data-idx="{{idx}}" aria-label="{{localize 'XJZL.UI.Delete'}}"><i class="fas fa-times" aria-hidden="true"></i></button></div>
+                                        {{else}}<p class="scaling-empty">{{localize "XJZL.Wuxue.Calc.EmptyHint"}}</p>{{/each}}
+                                    </div>
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+
+                    <section class="move-section-panel {{#if (eq move._uiSection 'automation')}}is-selected{{else}}is-collapsed{{/if}}" data-move-section-panel="automation">
+                        <div class="automation-workbench">
+                            <section class="automation-brief">
+                                <header><span class="panel-kicker">{{localize "XJZL.Wuxue.AutomationWorkspaceKicker"}}</span><h3>{{localize "XJZL.Wuxue.AutomationWorkspaceTitle"}}</h3><p>{{localize "XJZL.Wuxue.AutomationWorkspaceHint"}}</p></header>
+                                <div class="automation-flow" aria-hidden="true"><span>{{localize "XJZL.Wuxue.AutomationFlowTrigger"}}</span><b>→</b><span>{{localize "XJZL.Wuxue.AutomationFlowScript"}}</span><b>→</b><span>{{localize "XJZL.Wuxue.AutomationFlowResult"}}</span></div>
+                                <label class="field-block automation-note"><span>{{localize "XJZL.AutomationNote"}}</span><textarea name="system.moves.{{i}}.automationNote" rows="6" placeholder="{{localize 'XJZL.Wuxue.AutomationNotePlaceholder'}}">{{move.automationNote}}</textarea></label>
+                            </section>
+                            <section class="automation-scripts"><header><div><span class="panel-kicker">{{localize "XJZL.Wuxue.AutomationKicker"}}</span><h3>{{localize "XJZL.Script.ScriptList"}}</h3><small>{{localize "XJZL.Wuxue.AutomationScriptsHint"}}</small></div><button type="button" data-action="addMoveScript"><i class="fas fa-plus" aria-hidden="true"></i>{{localize "XJZL.Wuxue.Moves.ScriptAdd"}}</button></header>
+                                <div class="script-list">
+                                    {{#each move.scripts as |script sIdx|}}
+                                    <details class="script-card" data-script-key="{{move.id}}:{{sIdx}}" {{#if (lookup move._uiOpenScripts sIdx)}}open{{/if}}><summary><i class="fas fa-code" aria-hidden="true"></i><strong>{{#if script.label}}{{script.label}}{{else}}{{localize "XJZL.Script.NamePlaceholder"}}{{/if}}</strong><span>{{lookup @root.scriptTriggerChoices script.trigger}}</span><span class="script-state {{#if script.active}}is-active{{/if}}">{{#if script.active}}{{localize "XJZL.UI.Enable"}}{{else}}{{localize "XJZL.UI.StatusDisabled"}}{{/if}}</span></summary><div class="script-card-body"><div class="script-meta-row"><input type="text" name="system.moves.{{i}}.scripts.{{sIdx}}.label" value="{{script.label}}"><select name="system.moves.{{i}}.scripts.{{sIdx}}.trigger">{{selectOptions @root.scriptTriggerChoices selected=script.trigger localize=false}}</select><label class="inline-check"><input type="checkbox" name="system.moves.{{i}}.scripts.{{sIdx}}.active" {{checked script.active}}> {{localize "XJZL.UI.Enable"}}</label><button type="button" class="icon-button danger" data-action="deleteMoveScript" data-idx="{{sIdx}}"><i class="fas fa-trash" aria-hidden="true"></i></button></div><textarea name="system.moves.{{i}}.scripts.{{sIdx}}.script" class="script-code">{{script.script}}</textarea></div></details>
+                                    {{else}}<div class="automation-empty"><strong>{{localize "XJZL.Wuxue.Moves.NoScript"}}</strong><span>{{localize "XJZL.Wuxue.Moves.NoScriptHint"}}</span></div>{{/each}}
+                                </div>
+                            </section>
+                        </div>
+                    </section>
+                </article>
+                {{/each}}
             </div>
-
-        </div>
-        {{/each}}
-
-        <button type="button" data-action="addMove" class="xjzl-btn-seal" style="margin-top:10px;">
-            <i class="fas fa-plus"></i> {{localize "XJZL.Wuxue.Moves.AddMove"}}
-        </button>
+        </main>
     </div>
-
 </section>

@@ -1,218 +1,174 @@
-<section class="tab xjzl-body xjzl-body-scroll {{#if (eq tabs.primary 'config')}}active{{/if}} {{elementClass}}"
+<section class="tab martial-workspace {{#if (eq tabs.primary 'config')}}active{{/if}} {{elementClass}}"
     data-tab="config" data-group="primary" data-application-part="config">
-
-    <div class="xjzl-bg-deco">功</div>
-
-    {{#each stages as |stage|}}
-    <div class="xjzl-card" style="margin-bottom: 30px; position: relative; z-index: 1;">
-
-        <h3
-            style="font-family: var(--font-title); font-size: 24px; color: var(--c-cinnabar); margin-bottom: 15px; border-bottom: 2px solid var(--c-ink-faint); padding-bottom: 5px;">
-            {{localize stage.label}}
-        </h3>
-
-        <div style="margin-bottom: 15px; position: relative;">
-            <textarea name="system.config.{{stage.key}}.description" rows="3"
-                placeholder="{{localize 'XJZL.Neigong.StageDescPlaceholder' fallback='描述此阶段的境界表现...'}}" style="
-                    width: 100%;
-                    border: 1px solid rgba(0,0,0,0.1);
-                    background: rgba(0, 0, 0, 0.03);
-                    border-radius: 4px;
-                    padding: 8px;
-                    font-size: 13px;
-                    font-family: inherit;
-                    resize: vertical;
-                    min-height: 60px;
-                    color: var(--color-text-dark-primary);
-                ">{{lookup (lookup ../system.config stage.key) 'description'}}</textarea>
-
-            <i class="fas fa-pen-fancy"
-                style="position: absolute; bottom: 8px; right: 8px; color: rgba(0,0,0,0.1); pointer-events: none;"></i>
-        </div>
-
-        {{!-- 1. 属性印章矩阵 (改为 6列) --}}
-        <div class="xjzl-stats-grid" style="grid-template-columns: repeat(6, 1fr); gap: 5px;">
-            <div class="xjzl-seal-box compact">
-                <label>{{localize "XJZL.Stats.Liliang"}}</label>
-                <input type="number" name="system.config.{{stage.key}}.stats.liliang"
-                    value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'liliang'}}">
+    <div class="neigong-editor-layout">
+        <aside class="neigong-realm-list" aria-label="{{localize 'XJZL.Neigong.RealmList'}}">
+            <div class="realm-list-heading">
+                <span>{{localize "XJZL.Neigong.RealmList"}}</span>
+                <small>{{localize "XJZL.Neigong.RealmListHint"}}</small>
             </div>
-            <div class="xjzl-seal-box compact">
-                <label>{{localize "XJZL.Stats.Shenfa"}}</label>
-                <input type="number" name="system.config.{{stage.key}}.stats.shenfa"
-                    value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'shenfa'}}">
-            </div>
-            <div class="xjzl-seal-box compact">
-                <label>{{localize "XJZL.Stats.Tipo"}}</label>
-                <input type="number" name="system.config.{{stage.key}}.stats.tipo"
-                    value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'tipo'}}">
-            </div>
-            <div class="xjzl-seal-box compact">
-                <label>{{localize "XJZL.Stats.Neixi"}}</label>
-                <input type="number" name="system.config.{{stage.key}}.stats.neixi"
-                    value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'neixi'}}">
-            </div>
-            <div class="xjzl-seal-box compact">
-                <label>{{localize "XJZL.Stats.Qigan"}}</label>
-                <input type="number" name="system.config.{{stage.key}}.stats.qigan"
-                    value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'qigan'}}">
-            </div>
-            <div class="xjzl-seal-box compact">
-                <label>{{localize "XJZL.Stats.Shencai"}}</label>
-                <input type="number" name="system.config.{{stage.key}}.stats.shencai"
-                    value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'shencai'}}">
-            </div>
-        </div>
+            <button type="button" class="realm-entry {{#if neigongOverviewSelected}}is-selected{{/if}}"
+                data-action="selectStage" data-stage="overview" aria-pressed="{{neigongOverviewSelected}}">
+                <span class="realm-index"><i class="fas fa-book-open" aria-hidden="true"></i></span>
+                <span><strong>{{localize "XJZL.Neigong.Overview"}}</strong><small>{{localize "XJZL.Neigong.OverviewHint"}}</small></span>
+            </button>
+            {{#each stages as |stage|}}
+            <button type="button" class="realm-entry {{#if stage.isSelected}}is-selected{{/if}}"
+                data-action="selectStage" data-stage="{{stage.key}}" aria-pressed="{{stage.isSelected}}">
+                <span class="realm-index">{{stage.id}}</span>
+                <span><strong>{{localize stage.label}}</strong><small>{{localize "XJZL.Neigong.StageEditHint"}}</small></span>
+            </button>
+            {{/each}}
+        </aside>
 
-        {{!-- 使用 lookup 动态获取当前 stage 的 xpCostRatio --}}
-        {{#with (lookup (lookup ../system.config stage.key) 'xpCostRatio') as |ratio|}}
-        <div class="xjzl-details-box">
-            {{!-- 只有当数值不为 1 时才默认展开 --}}
-            <details {{#if (ne ratio 1)}}open{{/if}}>
-                <summary>
-                    <i class="fas fa-coins" style="margin-right: 5px;"></i>
-                    {{localize "XJZL.Neigong.XPCostRatio"}}
-
-                    {{!-- 状态指示器 --}}
-                    <span class="status {{#if (ne ratio 1)}}modified{{/if}}">
-                        {{#if (ne ratio 1)}}
-                        {{localize "XJZL.Neigong.Ratio"}}: x{{ratio}}
-                        {{else}}
-                        ({{localize "XJZL.Neigong.DefaultRatio"}} 1.0)
-                        {{/if}}
-                    </span>
-                </summary>
-
-                <div class="content">
-                    <label>{{localize "XJZL.Neigong.XPCostRatioLabel"}}:</label>
-                    <input type="number" name="system.config.{{stage.key}}.xpCostRatio" value="{{ratio}}" min="0.1"
-                        step="0.1" placeholder="1.0"
-                        style="width: 60px; text-align: center; border-bottom: 1px solid var(--c-cinnabar) !important;">
-                    <span style="color:#999;">{{localize "XJZL.UI.RatioHint"}}</span>
+        <div class="neigong-panel-stack">
+            <section class="neigong-panel neigong-overview-panel {{#if neigongOverviewSelected}}is-selected{{else}}is-collapsed{{/if}}"
+                data-stage-key="overview">
+                <header class="panel-heading">
+                    <div><span class="panel-kicker">{{localize "XJZL.Neigong.OverviewKicker"}}</span>
+                        <h2>{{localize "XJZL.Neigong.Overview"}}</h2></div>
+                    <div class="panel-heading-side"><p>{{localize "XJZL.Neigong.OverviewDescription"}}</p>
+                        <small class="panel-save-hint"><i class="fas fa-circle-info" aria-hidden="true"></i>{{localize "XJZL.UI.RichTextSaveHint"}}</small></div>
+                </header>
+                <div class="overview-form-grid">
+                    <div class="field-block requirement-field">
+                        <span><i class="fas fa-circle-exclamation" aria-hidden="true"></i> {{localize "XJZL.Neigong.Requirement"}}</span>
+                        <div class="martial-rich-editor">
+                            <div class="martial-rich-preview">{{{enrichedRequirement}}}</div>
+                            <prose-mirror name="system.requirement" data-document-u-u-i-d="{{document.uuid}}"
+                                value="{{system.requirement}}" toggled="false" button="true"></prose-mirror>
+                        </div>
+                    </div>
+                    <label class="field-block automation-field">
+                        <span><i class="fas fa-gears" aria-hidden="true"></i> {{localize "XJZL.AutomationNote"}}</span>
+                        <textarea name="system.automationNote" rows="3"
+                            placeholder="{{localize 'XJZL.Neigong.AutomationPlaceholder'}}">{{system.automationNote}}</textarea>
+                    </label>
+                    <div class="field-block description-field">
+                        <span>{{localize "XJZL.Info.Description"}}</span>
+                        <div class="martial-rich-editor">
+                            <div class="martial-rich-preview">{{{enrichedDescription}}}</div>
+                            <prose-mirror name="system.description" data-document-u-u-i-d="{{document.uuid}}"
+                                value="{{system.description}}" toggled="false" button="true"></prose-mirror>
+                        </div>
+                    </div>
                 </div>
-            </details>
-        </div>
-        {{/with}}
+                <section class="overview-stage-roadmap">
+                    <header>
+                        <div><span class="panel-kicker">{{localize "XJZL.Neigong.StageRailTitle"}}</span>
+                            <h3>{{localize "XJZL.Neigong.OverviewRoadmapTitle"}}</h3></div>
+                        <p>{{localize "XJZL.Neigong.OverviewRoadmapHint"}}</p>
+                    </header>
+                    <div class="stage-roadmap-list">
+                        {{#each stages as |stage|}}
+                        <button type="button" class="stage-roadmap-entry" data-action="selectStage" data-stage="{{stage.key}}">
+                            <span class="stage-roadmap-index">{{stage.id}}</span>
+                            <span><strong>{{localize stage.label}}</strong><small>{{localize "XJZL.Neigong.StageSelectHint"}}</small></span>
+                            <span class="stage-roadmap-arrow" aria-hidden="true">→</span>
+                        </button>
+                        {{/each}}
+                    </div>
+                </section>
+            </section>
 
-        {{!-- 脚本区域 --}}
-        <div class="xjzl-flex-col" style="margin-top: 15px;">
-            <div class="xjzl-flex-row" style="justify-content: space-between; align-items: center; margin-bottom: 5px;">
-                <label style="font-family: var(--font-deco); color: var(--c-ink-light);">{{localize
-                    "XJZL.Neigong.ScriptLabel"}}</label>
-                <a class="item-control" data-action="addStageScript" data-stage="{{stage.key}}"
-                    style="font-size: 12px; color: var(--c-cinnabar);">
-                    <i class="fas fa-plus"></i> {{localize "XJZL.Neigong.AddScript"}}
-                </a>
-            </div>
+            {{#each stages as |stage|}}
+            <section class="neigong-panel realm-panel {{#if stage.isSelected}}is-selected{{else}}is-collapsed{{/if}}"
+                data-stage-key="{{stage.key}}">
+                <header class="panel-heading realm-panel-heading">
+                    <div><span class="panel-kicker">{{localize "XJZL.Neigong.RealmKicker"}} {{stage.id}}</span>
+                        <h2>{{localize stage.label}}</h2></div>
+                    <span class="realm-seal" aria-hidden="true">{{stage.id}}</span>
+                </header>
 
-            {{#each (lookup (lookup ../system.config stage.key) 'scripts') as |script i|}}
-            <div class="xjzl-script-item">
-                {{!-- 头部：图标 | 名称 | 触发器 | 工具(开关+删除) --}}
-                <div class="script-header-row">
-                    <i class="fas fa-seedling script-icon"></i>
-
-                    {{!-- 1. 名称：自动填满 --}}
-                    <input type="text" name="system.config.{{stage.key}}.scripts.{{i}}.label" value="{{script.label}}"
-                        class="script-name-input" placeholder="{{localize 'XJZL.Script.NamePlaceholder'}}">
-
-                    {{!-- 2. 触发器：固定宽 --}}
-                    <select name="system.config.{{stage.key}}.scripts.{{i}}.trigger" class="script-trigger-select">
-                        {{selectOptions ../../scriptTriggerChoices selected=script.trigger localize=false}}
-                    </select>
-
-                    {{!-- 3. 工具组 --}}
-                    <div class="script-tools">
-                        <label class="active-toggle" title="{{localize 'XJZL.UI.ToggleEnable'}}">
-                            <span class="label-text">On</span>
-                            <input type="checkbox" name="system.config.{{stage.key}}.scripts.{{i}}.active" {{checked
-                                script.active}}>
-                        </label>
-
-                        <a data-action="deleteStageScript" data-stage="{{stage.key}}" data-index="{{i}}"
-                            class="delete-btn">
-                            <i class="fas fa-trash"></i>
-                        </a>
+                <div class="field-block realm-description">
+                    <span>{{localize "XJZL.Neigong.StageDescription"}}</span>
+                    <div class="martial-rich-editor">
+                        <div class="martial-rich-preview">{{{stage.enrichedDescription}}}</div>
+                        <prose-mirror name="system.config.{{stage.key}}.description" data-document-u-u-i-d="{{@root.document.uuid}}"
+                            value="{{lookup (lookup ../system.config stage.key) 'description'}}" toggled="false" button="true"></prose-mirror>
                     </div>
                 </div>
 
-                {{!-- 代码框 --}}
-                <textarea name="system.config.{{stage.key}}.scripts.{{i}}.script" class="script-editor"
-                    placeholder="// JS Code...">{{script.script}}</textarea>
-            </div>
+                <div class="realm-stat-grid" aria-label="{{localize 'XJZL.Neigong.StatsConfig'}}">
+                    <label><span>{{localize "XJZL.Stats.Liliang"}}</span><input type="number"
+                        name="system.config.{{stage.key}}.stats.liliang" value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'liliang'}}"></label>
+                    <label><span>{{localize "XJZL.Stats.Shenfa"}}</span><input type="number"
+                        name="system.config.{{stage.key}}.stats.shenfa" value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'shenfa'}}"></label>
+                    <label><span>{{localize "XJZL.Stats.Tipo"}}</span><input type="number"
+                        name="system.config.{{stage.key}}.stats.tipo" value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'tipo'}}"></label>
+                    <label><span>{{localize "XJZL.Stats.Neixi"}}</span><input type="number"
+                        name="system.config.{{stage.key}}.stats.neixi" value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'neixi'}}"></label>
+                    <label><span>{{localize "XJZL.Stats.Qigan"}}</span><input type="number"
+                        name="system.config.{{stage.key}}.stats.qigan" value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'qigan'}}"></label>
+                    <label><span>{{localize "XJZL.Stats.Shencai"}}</span><input type="number"
+                        name="system.config.{{stage.key}}.stats.shencai" value="{{lookup (lookup (lookup ../system.config stage.key) 'stats') 'shencai'}}"></label>
+                </div>
+
+                <div class="realm-tools-grid">
+                    {{#with (lookup (lookup ../system.config stage.key) 'xpCostRatio') as |ratio|}}
+                    <label class="setting-card ratio-card">
+                        <span><i class="fas fa-coins" aria-hidden="true"></i> {{localize "XJZL.Neigong.XPCostRatio"}}</span>
+                        <div><input type="number" name="system.config.{{stage.key}}.xpCostRatio" value="{{ratio}}" min="0.1" step="0.1"><small>{{localize "XJZL.UI.RatioHint"}}</small></div>
+                    </label>
+                    {{/with}}
+                    <div class="setting-card script-summary">
+                        <span><i class="fas fa-code" aria-hidden="true"></i> {{localize "XJZL.Neigong.ScriptLabel"}}</span>
+                        <button type="button" data-action="addStageScript" data-stage="{{stage.key}}"><i class="fas fa-plus" aria-hidden="true"></i> {{localize "XJZL.Neigong.AddScript"}}</button>
+                    </div>
+                </div>
+
+                <div class="script-list">
+                    {{#each (lookup (lookup ../system.config stage.key) 'scripts') as |script i|}}
+                    <details class="script-card" {{#unless script.script}}open{{/unless}}>
+                        <summary>
+                            <i class="fas fa-code" aria-hidden="true"></i>
+                            <strong>{{#if script.label}}{{script.label}}{{else}}{{localize "XJZL.Script.NamePlaceholder"}}{{/if}}</strong>
+                            <span>{{lookup ../../scriptTriggerChoices script.trigger}}</span>
+                            <span class="script-state {{#if script.active}}is-active{{/if}}">{{#if script.active}}{{localize "XJZL.UI.Enable"}}{{else}}{{localize "XJZL.UI.StatusDisabled"}}{{/if}}</span>
+                        </summary>
+                        <div class="script-card-body">
+                            <div class="script-meta-row">
+                                <input type="text" name="system.config.{{stage.key}}.scripts.{{i}}.label" value="{{script.label}}" placeholder="{{localize 'XJZL.Script.NamePlaceholder'}}">
+                                <select name="system.config.{{stage.key}}.scripts.{{i}}.trigger">{{selectOptions ../../scriptTriggerChoices selected=script.trigger localize=false}}</select>
+                                <label class="inline-check"><input type="checkbox" name="system.config.{{stage.key}}.scripts.{{i}}.active" {{checked script.active}}> {{localize "XJZL.UI.Enable"}}</label>
+                                <button type="button" class="icon-button danger" data-action="deleteStageScript" data-stage="{{stage.key}}" data-index="{{i}}" aria-label="{{localize 'XJZL.UI.Delete'}}"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                            </div>
+                            <textarea name="system.config.{{stage.key}}.scripts.{{i}}.script" class="script-code" placeholder="// JS Code...">{{script.script}}</textarea>
+                        </div>
+                    </details>
+                    {{/each}}
+                </div>
+
+                {{#if (eq stage.key "stage3")}}
+                <section class="mastery-section">
+                    <header><div><span class="panel-kicker">{{localize "XJZL.Neigong.MasteryKicker"}}</span><h3>{{localize "XJZL.Neigong.MasteryTitle"}}</h3></div>
+                        <button type="button" data-action="addMasteryChange"><i class="fas fa-plus" aria-hidden="true"></i> {{localize "XJZL.Neigong.MasteryAddChange"}}</button></header>
+                    <p>{{localize "XJZL.Neigong.MasteryHint"}}</p>
+                    <div class="mastery-list">
+                        {{#each @root.system.masteryChanges as |change i|}}
+                        <div class="mastery-row">
+                            <input type="hidden" name="system.masteryChanges.{{i}}.key" value="{{change.key}}">
+                            <button type="button" class="modifier-picker" data-action="openModifierPicker" data-index="{{i}}" data-tooltip="{{change.key}}"><span>{{change.displayLabel}}</span><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                            <input type="number" name="system.masteryChanges.{{i}}.value" value="{{change.value}}" placeholder="0">
+                            <input type="text" name="system.masteryChanges.{{i}}.label" value="{{change.label}}" placeholder="{{localize 'XJZL.Neigong.Note'}}">
+                            <button type="button" class="icon-button danger" data-action="deleteMasteryChange" data-index="{{i}}" aria-label="{{localize 'XJZL.UI.Delete'}}"><i class="fas fa-trash" aria-hidden="true"></i></button>
+                        </div>
+                        {{else}}
+                        <p class="empty-inline">{{localize "XJZL.Neigong.EmptyMasteryHint"}}</p>
+                        {{/each}}
+                    </div>
+                    <div class="field-block mastery-effect-field">
+                        <span>{{localize "XJZL.Neigong.MasteryEffect"}}</span>
+                        <small>{{localize "XJZL.Neigong.MasteryEffectHint"}}</small>
+                        <div class="martial-rich-editor">
+                            <div class="martial-rich-preview">{{{@root.enrichedMasteryEffect}}}</div>
+                            <prose-mirror name="system.masteryEffect" data-document-u-u-i-d="{{@root.document.uuid}}"
+                                value="{{@root.system.masteryEffect}}" toggled="false" button="true"></prose-mirror>
+                        </div>
+                    </div>
+                </section>
+                {{/if}}
+            </section>
             {{/each}}
         </div>
     </div>
-    {{/each}}
-
-    {{!-- 圆满境界 --}}
-    <div class="xjzl-card"
-        style="border: 2px solid var(--c-highlight); background: rgba(203, 160, 82, 0.05); padding: 15px; margin-top: 30px;">
-        <div class="xjzl-flex-row" style="justify-content: space-between; align-items: center; margin-bottom: 10px;">
-            <h3 style="color: var(--c-highlight); font-family: var(--font-title); margin: 0;">{{localize
-                "XJZL.Neigong.MasteryTitle"}}</h3>
-            <button type="button" data-action="addMasteryChange"
-                style="width: auto; padding: 2px 8px; font-size: 12px; background: rgba(255,255,255,0.5);">
-                <i class="fas fa-plus"></i> {{localize "XJZL.Neigong.MasteryAddChange"}}
-            </button>
-        </div>
-
-        <p style="color: #666; font-size: 12px; margin-bottom: 10px;">{{localize "XJZL.Neigong.MasteryHint"}}</p>
-
-        {{!-- 表头 (可选，为了对齐好看) --}}
-        <div class="mastery-grid-row" style="font-size: 11px; color: #999; margin-bottom: 5px;">
-            <div>{{localize "XJZL.Neigong.HeaderKey"}}</div>
-            <div style="text-align: center;">{{localize "XJZL.Neigong.HeaderValue"}}</div>
-            <div>{{localize "XJZL.Neigong.Note"}}</div>
-            <div></div>
-        </div>
-
-        {{#each system.masteryChanges as |change i|}}
-        <div class="mastery-grid-row"
-            style="display: grid; grid-template-columns: 2fr 1fr 1.5fr 30px; gap: 8px; align-items: center; margin-bottom: 5px;">
-
-            {{!-- 1. Key (改为 Picker 模式) --}}
-            <div style="position: relative;">
-                {{!-- 隐藏的 input 负责存储真实数据 --}}
-                <input type="hidden" name="system.masteryChanges.{{i}}.key" value="{{change.key}}">
-
-                {{!-- 显示给用户的按钮 --}}
-                <button type="button" data-action="openModifierPicker" data-index="{{i}}" class="picker-trigger"
-                    data-tooltip="{{change.key}}" {{!-- 鼠标悬停显示真实 Key --}}
-                    style="width: 100%; border: 0; border-bottom: 1px solid #ccc; background: transparent; text-align: left; padding: 2px 5px; height: 24px; font-size: 12px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-
-                    {{!-- 显示中文 Label (来自 _prepareContext 计算的 displayLabel) --}}
-                    <span style="{{#unless change.key}}color: #999;{{/unless}}">
-                        {{change.displayLabel}}
-                    </span>
-
-                    <i class="fas fa-caret-down" style="font-size: 10px; color: #999;"></i>
-                </button>
-            </div>
-
-            {{!-- 2. Value (数值) --}}
-            <input type="number" name="system.masteryChanges.{{i}}.value" value="{{change.value}}" placeholder="0"
-                style="border: 0; border-bottom: 1px solid #ccc !important; text-align: center; width: 100%; background: transparent;">
-
-            {{!-- 3. Label (备注) --}}
-            <input type="text" name="system.masteryChanges.{{i}}.label" value="{{change.label}}"
-                placeholder="{{localize 'XJZL.Neigong.Note'}}"
-                style="border: 0; border-bottom: 1px solid #ccc !important; font-size: 12px; width: 100%; background: transparent;">
-
-            {{!-- 4. Delete (删除) --}}
-            <a data-action="deleteMasteryChange" data-index="{{i}}"
-                style="color: #999; text-align: center; cursor: pointer;">
-                <i class="fas fa-trash"></i>
-            </a>
-        </div>
-        {{/each}}
-
-        {{!-- 圆满特效脚本
-        <div class="xjzl-flex-col" style="margin-top: 15px;">
-            <label style="font-weight: bold; color: var(--c-highlight); font-size: 12px;">{{localize
-                "XJZL.Neigong.MasteryScript"}}</label>
-            <textarea name="system.masteryEffect" rows="3" class="script-editor"
-                placeholder="// JavaScript Code...">{{system.masteryEffect}}</textarea>
-        </div> 暂时感觉是用不到的，先注释掉--}}
-    </div>
-
 </section>
