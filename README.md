@@ -11,6 +11,11 @@
 [![系统反馈](https://img.shields.io/badge/系统反馈-818849921-blue)](https://qm.qq.com/q/GOBpPre68q)
 [![联系作者](https://img.shields.io/badge/联系作者-273437679-12B7F5)](https://wpa.qq.com/msgrd?v=3&uin=273437679&site=qq&menu=yes)
 
+
+## 视频教程
+
+如果希望通过实际操作了解系统的安装与使用，可以观看[系统使用说明/教程（哔哩哔哩）](https://www.bilibili.com/video/BV1KF8d61EiV/)。
+
 <p align="center">
   <img src="docs/images/hero-character-sheet.png" alt="侠界之旅系统角色卡总览" width="960">
 </p>
