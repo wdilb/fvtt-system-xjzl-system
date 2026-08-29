@@ -617,7 +617,7 @@
             "quality": 3,
             "type": "medicine",
             "description": "<p>赤如朱血，仿佛如心脏隐隐跳动，需以大量人血炼成，药力极猛。</p><hr><p><strong>效果：</strong>移除自身存在的所有“失血”，然后立即回复气血上限50%的气血值。<br>副作用：陷入走火入魔，持续两回合。</p>",
-            "usageScript": "// 1. 移除失血\nawait game.xjzl.api.effects.removeEffect(actor, 'bloodloss', 99);\n\n// 2. 回复 50%\nconst healAmount = Math.floor(actor.system.resources.hp.max * 0.5);\nawait actor.applyHealing({ amount: healAmount, type: 'hp', showScrolling: true });\n\n// 3. 走火入魔\nawait game.xjzl.api.effects.toggleStatus(actor, 'rage', true, { overlay: true });\nui.notifications.warn(\"药力过猛，走火入魔！请在两回合后手动移除状态。\");",
+            "usageScript": "// 1. 移除失血\nawait game.xjzl.api.effects.removeEffect(actor, 'bloodloss', 99);\n\n// 2. 回复 50%\nconst healAmount = Math.floor(actor.system.resources.hp.max * 0.5);\nawait actor.applyHealing({ amount: healAmount, type: 'hp', showScrolling: true });\n\n// 3. 走火入魔\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"rage\"));\n_stData.statuses = [\"rage\"]; // 保证 actor.statuses 能检测到该状态\nfoundry.utils.setProperty(_stData, \"flags.core.overlay\", true);\nawait game.xjzl.api.effects.addEffect(actor, _stData);\nui.notifications.warn(\"药力过猛，走火入魔！请在两回合后手动移除状态。\");",
             "automationNote": "完全自动化 (走火入魔时间需手动移除)"
         },
         "effects": []
@@ -1230,7 +1230,7 @@
             "quality": 2,
             "type": "medicine",
             "description": "<p>神风帮秘药，以乳香、没药行气化瘀，配伍朱砂、蜈蚣、全蝎镇惊息风。</p><hr><p><strong>效果：</strong>你免疫拉扯、击退、击飞、倒地，持续十回合。<br>副作用：你陷入“倒地”、“禁足”一回合。</p>",
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'prone', true, {overlay:true});\nawait game.xjzl.api.effects.toggleStatus(actor, 'root', true);",
+            "usageScript": "const _stProne = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"prone\"));\n_stProne.statuses = [\"prone\"]; // 保证 actor.statuses 能检测到该状态\nfoundry.utils.setProperty(_stProne, \"flags.core.overlay\", true);\nawait game.xjzl.api.effects.addEffect(actor, _stProne);\nconst _stRoot = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n_stRoot.statuses = [\"root\"]; // 保证 actor.statuses 能检测到该状态\nawait game.xjzl.api.effects.addEffect(actor, _stRoot);",
             "automationNote": "部分自动化：免疫位移需手动判定。副作用自动施加。"
         },
         "effects": [
@@ -1367,7 +1367,7 @@
             "quality": 3,
             "type": "medicine",
             "description": "<p>万佛寺宝药，可引佛入体，护佑回生。</p><hr><p><strong>效果：</strong>格挡值+20，持续一个时辰。<br>·药效持续期间，被击破架招时格挡值依旧生效。<br>副作用：陷入“破甲”，持续一个时辰。</p>",
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'brokenDefense', true); // 破甲",
+            "usageScript": "// 破甲的状态 ID 是 pojia（brokenDefense 只是 flag 键）；统一用 addEffect 施加系统状态\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n_stData.statuses = [\"pojia\"];\n_stData.duration = { seconds: 7200 }; // 一个时辰\nawait game.xjzl.api.effects.addEffect(actor, _stData); // 破甲",
             "automationNote": "完全自动化 (破甲自动，被动格挡AE自动)"
         },
         "effects": [
@@ -1440,7 +1440,7 @@
             "quality": 2,
             "type": "medicine",
             "description": "<p>疗伤神药，能持续疗伤，效果显著。</p><hr><p><strong>效果：</strong>每分钟末回复最大气血5%的气血，持续十分钟或进入战斗。<br>副作用：陷入“下盘不稳”，持续一回合。</p>",
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'unstable', true, {duration:{rounds:1}});",
+            "usageScript": "// 统一用 addEffect 施加系统状态（toggleStatus 不支持 duration）\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n_stData.statuses = [\"unstable\"];\n_stData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "部分自动化：百分比回复需手动。副作用自动。"
         },
         "effects": []
@@ -1599,7 +1599,7 @@
             "recovery": {
                 "mp": 30
             },
-            "usageScript": "await game.xjzl.api.effects.removeEffect(actor, 'root');\nawait game.xjzl.api.effects.removeEffect(actor, 'cuogu');\nawait game.xjzl.api.effects.toggleStatus(actor, 'pain', true, {duration:{rounds:1}});",
+            "usageScript": "await game.xjzl.api.effects.removeEffect(actor, 'root');\nawait game.xjzl.api.effects.removeEffect(actor, 'cuogu');\n// 统一用 addEffect 施加系统状态（toggleStatus 不支持 duration）\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pain\"));\n_stData.statuses = [\"pain\"];\n_stData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化"
         },
         "effects": []
@@ -3085,7 +3085,7 @@
             "quality": 3,
             "type": "medicine",
             "description": "<p>丹药可刺激肉体，壮大筋骨，十分宝贵。</p><hr><p><strong>效果：</strong>次要动作服用，你获得运功体魄点数的护体真气，持续一个时辰或战斗脱离。<br>副作用：陷入“破甲”，持续一个时辰。</p>",
-            "usageScript": "const tipo = actor.system.stats.tipo.total || 0;\nawait actor.applyHealing({amount: tipo, type: 'huti', showScrolling: true});\nawait game.xjzl.api.effects.toggleStatus(actor, 'brokenDefense', true);",
+            "usageScript": "const tipo = actor.system.stats.tipo.total || 0;\nawait actor.applyHealing({amount: tipo, type: 'huti', showScrolling: true});\n// 破甲的状态 ID 是 pojia（brokenDefense 只是 flag 键）；统一用 addEffect 施加系统状态\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n_stData.statuses = [\"pojia\"];\n_stData.duration = { seconds: 7200 }; // 一个时辰\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化"
         },
         "effects": []
@@ -3100,7 +3100,7 @@
             "quality": 3,
             "type": "medicine",
             "description": "<p>江湖奇药，味道浓烈，食之刺激筋骨，片刻间属性狂升，事后入魔。</p><hr><p><strong>效果：</strong>次要动作服用，招式伤害+30，格挡值+10，持续三回合。<br>副作用：你陷入“走火入魔”，持续三回合。</p>",
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'rage', true, {duration:{rounds:3}});",
+            "usageScript": "// 统一用 addEffect 施加系统状态（toggleStatus 不支持 duration）\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"rage\"));\n_stData.statuses = [\"rage\"];\n_stData.duration = { rounds: 3 };\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化"
         },
         "effects": [
@@ -3267,7 +3267,7 @@
                                 "label": "劲气反震",
                                 "trigger": "damaged",
                                 "active": true,
-                                "script": "if (args.finalDamage > 0 && args.attacker) {\n    await args.attacker.applyDamage({amount: 30, type: 'liushi', isHit: true});\n    ui.notifications.info(\"山岳劲气反震对手！\");\n}"
+                                "script": "if (args.finalDamage > 0 && args.attacker && args.attacker.uuid !== actor.uuid && !actor.isReceivingReflection) {\n    args.attacker.isReceivingReflection = true;\n    try {\n        await args.attacker.applyDamage({amount: 30, type: 'liushi', attacker: actor, isHit: true});\n    } finally {\n        args.attacker.isReceivingReflection = false;\n    }\n    ui.notifications.info(\"山岳劲气反震对手！\");\n}"
                             }
                         ]
                     }
@@ -3336,7 +3336,7 @@
             "quality": 2,
             "type": "medicine",
             "description": "<p>用四种安神药材炼制，可保平常心，不妄动杂念。</p><hr><p><strong>效果：</strong>[定力]检定结果+5且优势，持续一时辰。<br>副作用：陷入“自闭”，持续一回合。</p>",
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'zibi', true, {duration:{rounds:1}});",
+            "usageScript": "// 统一用 addEffect 施加系统状态（toggleStatus 不支持 duration）\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"zibi\"));\n_stData.statuses = [\"zibi\"];\n_stData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化 (CheckMod修改数值，Check脚本赋予优势)"
         },
         "effects": [
@@ -3350,20 +3350,18 @@
                         "key": "system.skills.dingli.checkMod",
                         "mode": 2,
                         "value": "5"
+                    },
+                    {
+                        "key": "flags.xjzl-system.dingliCheckLevel",
+                        "mode": 2,
+                        "value": 1
                     }
                 ],
                 "flags": {
                     "xjzl-system": {
                         "slug": "med-buff-longjiao",
                         "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "定力优势",
-                                "trigger": "check",
-                                "active": true,
-                                "script": "if (args.key === 'dingli') args.flags.manualLevel += 1;"
-                            }
-                        ]
+                        "scripts": []
                     }
                 }
             }
@@ -3430,7 +3428,7 @@
             "recovery": {
                 "mp": 100
             },
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'fengzhao', true, {duration:{rounds:1}});",
+            "usageScript": "// 统一用 addEffect 施加系统状态（toggleStatus 不支持 duration）\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fengzhao\"));\n_stData.statuses = [\"fengzhao\"];\n_stData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化"
         },
         "effects": [
@@ -3666,7 +3664,7 @@
             "quality": 2,
             "type": "medicine",
             "description": "<p>刺激体魄，临时壮大气血，放手一搏时服用。</p><hr><p><strong>效果：</strong>气血上限提高20%（同时回复最大气血20%的气血），持续一个时辰。<br>副作用：获得一层“失血”。</p>",
-            "usageScript": "const hpMax = actor.system.resources.hp.max;\nconst boost = Math.floor(hpMax * 0.2);\n// 创建临时Buff增加上限\nconst effectData = {\n    name: \"血海丹-上限提升\",\n    icon: item.img,\n    changes: [{key: 'system.resources.hp.bonus', mode: 2, value: boost}],\n    duration: {seconds: 3600}\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nawait actor.applyHealing({amount: boost, type: 'hp', showScrolling: true});\nawait game.xjzl.api.effects.toggleStatus(actor, 'bloodloss', true);",
+            "usageScript": "const hpMax = actor.system.resources.hp.max;\nconst boost = Math.floor(hpMax * 0.2);\n// 创建临时Buff增加上限\nconst effectData = {\n    name: \"血海丹-上限提升\",\n    icon: item.img,\n    changes: [{key: 'system.resources.hp.bonus', mode: 2, value: boost}],\n    duration: {seconds: 3600}\n};\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nawait actor.applyHealing({amount: boost, type: 'hp', showScrolling: true});\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"bloodloss\"));\n_stData.statuses = [\"bloodloss\"]; // 保证 actor.statuses 能检测到该状态\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化 (动态计算数值)"
         },
         "effects": []
@@ -3812,7 +3810,7 @@
             "quality": 1,
             "type": "medicine",
             "description": "<p>闻名知药义，男子服用。</p><hr><p><strong>效果：</strong>仅男子服用有效，一柱擎天，对女性的相关属性、技能检定结果+5，持续十二个时辰。<br>·副作用，获得一层“乏力”，持续一个时辰。</p>",
-            "usageScript": "const gender = actor.system.info?.gender || \"\";\nif (!gender.includes(\"男\") && !gender.toLowerCase().includes(\"male\")) return ui.notifications.warn(\"女性服用无效。\");\n// 应用Buff\nconst effect = item.effects.contents[0].toObject();\nawait game.xjzl.api.effects.addEffect(actor, effect);\n// 副作用\nawait game.xjzl.api.effects.toggleStatus(actor, 'fali', true);",
+            "usageScript": "const gender = actor.system.info?.gender || \"\";\nif (!gender.includes(\"男\") && !gender.toLowerCase().includes(\"male\")) return ui.notifications.warn(\"女性服用无效。\");\n// 应用Buff\nconst effect = item.effects.contents[0].toObject();\nawait game.xjzl.api.effects.addEffect(actor, effect);\n// 副作用\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"fali\"));\n_stData.statuses = [\"fali\"]; // 保证 actor.statuses 能检测到该状态\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化 (性别检测)"
         },
         "effects": [
@@ -4364,7 +4362,7 @@
             "quality": 3,
             "type": "medicine",
             "description": "<p>接骨木、人参、狗脊、天麻、红花熬制。</p><hr><p><strong>效果：</strong>花费一时辰进行[医术]检定（难度16），成功可将断肢的手脚接回（若该肢体不属于自己难度+4）失败则浪费此药，且下次医术检定难度+1。</p>",
-            "usageScript": "await XJZLMacros.requestSave({ target: actor, type: 'yishu', dc: 16, label: '接肢手术' });",
+            "usageScript": "await Macros.requestSave({ target: actor, type: 'yishu', dc: 16, label: '接肢手术' });",
             "automationNote": "部分自动化：发起检定自动。后果(接回/难度+1)需手动处理。"
         },
         "effects": []
@@ -4479,7 +4477,7 @@
             "quality": 2,
             "type": "medicine",
             "description": "<p>外表呈黑色，气息芬芳清凉，可治关节疼痛乃至续接断骨。</p><hr><p><strong>效果：</strong>花费十分钟进行[医术]检定（难度13），成功可将骨折的手脚接好，失败则浪费此药，且下次医术检定难度+1。</p>",
-            "usageScript": "await XJZLMacros.requestSave({ target: actor, type: 'yishu', dc: 13, label: '接骨手术' });",
+            "usageScript": "await Macros.requestSave({ target: actor, type: 'yishu', dc: 13, label: '接骨手术' });",
             "automationNote": "部分自动化：发起检定自动。后果需手动。"
         },
         "effects": []
@@ -4497,7 +4495,7 @@
             "recovery": {
                 "hp": 100
             },
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'root', true, {duration:{rounds:3}});",
+            "usageScript": "// 统一用 addEffect 施加系统状态（toggleStatus 不支持 duration）\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n_stData.statuses = [\"root\"];\n_stData.duration = { rounds: 3 };\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化"
         },
         "effects": [
@@ -4742,7 +4740,7 @@
             "recovery": {
                 "mp": 10
             },
-            "usageScript": "await game.xjzl.api.effects.toggleStatus(actor, 'unstable', true, {duration:{rounds:1}});",
+            "usageScript": "// 统一用 addEffect 施加系统状态（toggleStatus 不支持 duration）\nconst _stData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n_stData.statuses = [\"unstable\"];\n_stData.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(actor, _stData);",
             "automationNote": "完全自动化"
         },
         "effects": []
@@ -4801,7 +4799,7 @@
                                 "label": "濒死转化活尸",
                                 "trigger": "dying",
                                 "active": true,
-                                "script": "// 1. 阻止系统濒死处理\nargs.preventDying = true;\n\n// 2. 从物品上抓取[活尸]特效模板\nconst sourceEff = thisItem.effects.getName(\"活尸\");\n\nif (sourceEff) {\n    const effData = sourceEff.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    \n    // 应用活尸状态\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}\n\n// 3. 发送剧情提示 (注意 padding-left: 8px)\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"background:#2c3e50; color:#ecf0f1; border:1px solid #000; padding-left: 8px;\"><h3 style=\"border-bottom:1px solid #7f8c8d; color:#e74c3c; margin:0 0 5px 0;\">回光返照</h3><p>药力激发了最后的执念。</p><p><b>${actor.name}</b> 咽下了最后一口气，但化为 <b>[活尸]</b> 继续前行。</p><p style=\"font-size:0.8em; color:#bdc3c7; font-style:italic;\">“...回家...”</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
+                                "script": "// 1. 阻止系统濒死处理\nargs.preventDying = true;\n\n// 2. 优先从来源物品读取模板；最后一份消耗品会在本脚本后销毁，因此保留内联兜底数据。\nconst sourceItem = thisEffect?.origin ? await fromUuid(thisEffect.origin) : null;\nconst sourceEff = sourceItem?.effects?.getName(\"活尸\");\nconst effData = sourceEff?.toObject() || {\n    name: \"活尸\",\n    icon: \"icons/svg/skull.svg\",\n    transfer: false,\n    description: \"虽死犹行，执念归乡。受到伤害即消散(请手动移除)。只能回答回家相关问题。\",\n    changes: [],\n    flags: { \"xjzl-system\": { slug: \"huoshi\", stackable: false } }\n};\n\ndelete effData._id;\neffData.origin = sourceItem?.uuid || actor.uuid;\n\n// 应用活尸状态\nawait game.xjzl.api.effects.addEffect(actor, effData);\n\n// 3. 发送剧情提示 (注意 padding-left: 8px)\nawait ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"background:#2c3e50; color:#ecf0f1; border:1px solid #000; padding-left: 8px;\"><h3 style=\"border-bottom:1px solid #7f8c8d; color:#e74c3c; margin:0 0 5px 0;\">回光返照</h3><p>药力激发了最后的执念。</p><p><b>${actor.name}</b> 咽下了最后一口气，但化为 <b>[活尸]</b> 继续前行。</p><p style=\"font-size:0.8em; color:#bdc3c7; font-style:italic;\">“...回家...”</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
                             }
                         ]
                     }

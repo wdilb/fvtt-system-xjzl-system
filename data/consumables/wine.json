@@ -784,28 +784,21 @@
             "quality": 2,
             "type": "wine",
             "description": "<p>以天山冰雪化水酿酒，混五谷于寒池中发酵，此酒入喉冰冽无比，乃天下奇酒。</p><hr><p><strong>效果：</strong>你的痛觉淡化了很多，当你第一次气血归0时，获得“寒泉”，持续一回合，醉意+20。<br>寒泉：你在濒死状态也可以照常进行自己的回合。</p>",
-            "usageScript": "const res = actor.system.resources; if (res.alcohol) await actor.update({'system.resources.alcohol.value': res.alcohol.value + 20});",
-            "automationNote": "完全自动化"
+            "usageScript": "const res = actor.system.resources; if (res.alcohol) await actor.update({'system.resources.alcohol.value': res.alcohol.value + 20});\nChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding-left: 8px; border-left: 4px solid #2980b9; background: rgba(41,128,185,0.1);\"><h3 style=\"color:#2471a3; margin:0 0 5px 0;\">寒泉酒</h3><p>酒入喉中，痛觉淡去，醉意 <b>+20</b>。</p><p>药效持续期间，你第一次气血归 0 时获得 <b>「寒泉」</b>，持续一回合：<br>你在濒死状态也可以照常进行自己的回合。</p><p style=\"font-size:0.85em; color:#888;\">本系统中濒死不附带晕眩，此项默认成立，无需额外操作。</p></div></div>` });",
+            "automationNote": "醉意+20 已自动化。寒泉效果在本系统中默认成立（濒死不附带晕眩），使用时发送说明卡片；药效触发后请手动移除状态。"
         },
         "effects": [
             {
                 "name": "寒泉酒",
                 "icon": "systems/xjzl-system/assets/icons/consumable/酒1.png",
                 "transfer": false,
-                "description": "下次濒死时获得1回合行动力",
+                "description": "寒泉酒药效：你第一次气血归 0 时获得「寒泉」，持续一回合。寒泉：你在濒死状态也可以照常进行自己的回合。本系统中濒死不附带晕眩，该效果默认成立，无需额外操作。药效触发后请手动移除本状态。",
                 "changes": [],
                 "flags": {
                     "xjzl-system": {
                         "slug": "wine-buff-hanquan",
                         "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "寒泉护体",
-                                "trigger": "dying",
-                                "active": true,
-                                "script": "// 检查是否已触发过\nif (!thisEffect.getFlag('xjzl-system', 'triggered')) {\n    ui.notifications.warn('寒泉酒生效！强行维持意识！');\n    // 移除晕眩状态 (濒死会自动上stun，这里立刻解掉)\n    setTimeout(async () => {\n         await game.xjzl.api.effects.removeEffect(actor, 'stun');\n    }, 500);\n    \n    // 标记已触发并设置1回合后删除\n    await thisEffect.update({\n        'flags.xjzl-system.triggered': true,\n        'duration': { rounds: 1 }\n    });\n}"
-                            }
-                        ]
+                        "scripts": []
                     }
                 }
             }

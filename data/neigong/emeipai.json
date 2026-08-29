@@ -145,7 +145,7 @@
                             "label": "心灯禅功-防御",
                             "trigger": "passive",
                             "active": true,
-                            "script": "const hasExternalEffect = actor.effects.some(e => {\n    if (e.disabled) return false;\n    return e.origin && !e.origin.includes(actor.uuid);\n});\n\nif (hasExternalEffect) {\n    S.combat.def_waigong += 10;\n    S.combat.def_neigong += 10;\n}"
+                            "script": "// 只统计外部施加的 Buff / 状态类特效；武器、防具、奇珍等装备常驻特效不计入\nconst equipmentIds = new Set(\n    actor.items.filter(i => [\"weapon\", \"armor\", \"qizhen\"].includes(i.type) && i.system.equipped).map(i => i.id)\n);\nconst hasExternalEffect = actor.effects.some(e => {\n    if (e.disabled) return false;\n    if (!e.origin || e.origin.includes(actor.uuid)) return false;\n    return !equipmentIds.has(e.origin.split(\".\").pop());\n});\n\nif (hasExternalEffect) {\n    S.combat.def_waigong += 10;\n    S.combat.def_neigong += 10;\n}"
                         }
                     ]
                 }
@@ -241,7 +241,7 @@
                             "label": "五符经-反噬",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.hutiLost > 0 && actor.system.resources.huti <= 0) {\n    if (args.attacker) {\n        args.attacker.isReflecting = true;\n        try {\n            await args.attacker.applyDamage({ attacker: actor, amount: 10, type: \"liushi\", isHit: true});\n            const attMp = args.attacker.system.resources.mp.value;\n            const newMp = Math.max(0, attMp - 10);\n            await args.attacker.changeResources({\"system.resources.mp.value\": newMp}, { cause: \"script\", source: \"script\", sourceActor: actor, attacker: args.attacker, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n            if (actor.token?.object) {\n                 actor.showFloatyText(\"五符反噬\", {fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4});\n            }\n        } finally {\n            args.attacker.isReflecting = false;\n        }\n    }\n}"
+                            "script": "if (actor.isReceivingReflection) return; // 防止双方互相反震时递归\nif (args.hutiLost > 0 && actor.system.resources.huti <= 0) {\n    if (args.attacker) {\n        args.attacker.isReflecting = true;\n        actor.isReceivingReflection = true;\n        try {\n            await args.attacker.applyDamage({ attacker: actor, amount: 10, type: \"liushi\", isHit: true});\n            const attMp = args.attacker.system.resources.mp.value;\n            const newMp = Math.max(0, attMp - 10);\n            await args.attacker.changeResources({\"system.resources.mp.value\": newMp}, { cause: \"script\", source: \"script\", sourceActor: actor, attacker: args.attacker, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n            if (actor.token?.object) {\n                 actor.showFloatyText(\"五符反噬\", {fill: \"#00FFFF\", stroke: \"#000000\", strokeThickness: 4});\n            }\n        } finally {\n            args.attacker.isReflecting = false;\n            actor.isReceivingReflection = false;\n        }\n    }\n}"
                         }
                     ]
                 }
