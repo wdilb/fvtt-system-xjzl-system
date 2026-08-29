@@ -92,8 +92,8 @@
 
 | 类型 | 触发器 | 约束 |
 |---|---|---|
-| 同 步 | `passive`、`calc` | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
-| 异 步 | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
+| <span style="white-space: nowrap;">同步</span> | <span style="white-space: nowrap;"><code>passive</code>、<code>calc</code></span> | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
+| <span style="white-space: nowrap;">异步</span> | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
 
 同步脚本异常会写入控制台；异步脚本异常还会向操作者显示错误通知。单个脚本失败不会回滚此前脚本或数据库操作。
 
