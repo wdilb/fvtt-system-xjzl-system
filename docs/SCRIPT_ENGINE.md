@@ -42,13 +42,58 @@
 
 `trigger` 必须来自 `module/data/common.mjs#SCRIPT_TRIGGERS`。Item、招式和内功脚本受 Schema 选项约束；AE 脚本虽然存放在普通 flags 中，标准编辑界面也只提供这些选项。未知触发器不会在攻击、受伤或回合等标准时机执行，不应使用。
 
+## 先看这里：参数分为两层
+
+每段脚本能看到两类参数：
+
+1. **公用注入变量**：每个触发器都存在，例如 `actor`、`S`、`args`、`thisItem`。
+2. **阶段上下文**：存放在 `args` 中，由当前触发器决定，例如 `hit` 的 `args.target` 和 `args.hpLost`。
+
+下文参数表使用以下标记：
+
+- **只读**：仅供判断；修改不属于公开契约。
+- **可写**：系统会在后续流程读取该值。
+- **条件提供**：只在特定动作类型、结算方式或可确定来源时存在；读取时应使用 `?.` 或 `??`。
+
+## 全脚本公用注入变量
+
+以下变量在所有触发器中都可用，不需要从 `args` 读取：
+
+| 变量 | 类型 | 含义 |
+|---|---|---|
+| `actor` | `Actor` | 当前脚本的宿主。攻击侧触发器通常是攻击者，防御侧触发器是受击者。 |
+| `system` / `S` | `Actor.system` | `actor.system` 的同一引用；`S` 是便捷别名。 |
+| `args` | `Object` | 本次触发的阶段上下文。只有后文对应触发器列出的字段才是稳定公开契约。 |
+| `trigger` | `string` | 当前触发器名称。 |
+| `thisItem` | `Item` / `ActiveEffect` / `null` | 当前脚本来源。Item 脚本指向该 Item；AE 脚本为兼容也指向该 AE。 |
+| `thisEffect` | `ActiveEffect` / `null` | 当前脚本来自 AE 时指向该 AE，否则为 `null`。 |
+| `Macros` | `XJZLMacros` | 系统公开宏工具，例如 `requestSave()`、`requestContest()` 和 `checkStance()`。 |
+| `game` / `ui` / `console` | Foundry 全局对象 | 游戏对象、通知对象和控制台。 |
+
+脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 V13 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。
+
+### `args` 与同名顶层变量
+
+触发开始时已有的 `args` 字段也会展开成同名顶层变量。例如 `args.target` 存在时，脚本也能读取顶层 `target`。
+
+但是：
+
+- 只有对应触发器实际传入的字段才存在。
+- 脚本运行中新增 `args.myFlag` 不会同步新建顶层 `myFlag`。
+- 业务代码推荐统一从 `args` 读取阶段参数，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
+
+对 `args.output`、`args.config`、`args.costConfig`、`args.flags` 等可写容器，应修改后文列出的子字段，不要替换整个对象。`args.baseData`、`args.outcome` 等只读对象当前没有冻结，但修改它们不属于公开契约，也不保证影响结算。
+
+后台武学、架招和战斗时机中的招式脚本会临时获得 `args.move` 和顶层 `move`，用来表示脚本所属的招式。它不代表角色正在施展该招式。只有 `preAttack`、`attack`、`check`、`preDamage`、`hit`、`hit_once` 会被系统记作当前主动招式，供后续伤害、治疗和资源变化判断来源。
+
 ## 执行模型
 
 ### 同步与异步
 
-`passive` 和 `calc` 同步执行，因为它们参与角色属性重算和招式面板计算。同步脚本禁止使用 `await`、Dialog、文档写入以及任何依赖稍后完成的 Promise。角色卡预览、重开角色卡和数据刷新都可能重复触发这些计算；同步脚本必须无持久化副作用，并且不能把面板计算当成“一次出招”事件。
-
-其余触发器异步串行执行。异步脚本中的文档写入、伤害、治疗、状态和宏调用都应 `await`。
+| 类型 | 触发器 | 约束 |
+|---|---|---|
+| 同步 | `passive`、`calc` | 禁止 `await`、Dialog、文档写入及任何 Promise 副作用。脚本必须可重复计算，不能把面板计算当成一次行动。 |
+| 异步 | 其余全部触发器 | 文档写入、伤害、治疗、状态和宏调用都应 `await`。 |
 
 同步脚本异常会写入控制台；异步脚本异常还会向操作者显示错误通知。单个脚本失败不会回滚此前脚本或数据库操作。
 
@@ -77,32 +122,7 @@
 
 因此，“开启架招后持续增强角色或后续攻击”不能只写在架招的 `attack` 脚本中；应使用 `passive` 提供持续生效的加成，或在开启时添加 `tiedToStance` AE。
 
-## 注入变量
-
-以下变量始终注入：
-
-| 变量 | 含义 |
-|---|---|
-| `actor` | 当前执行脚本的宿主 Actor。攻击侧触发器通常是攻击者，防御侧触发器是受击者。 |
-| `system` / `S` | `actor.system` 的同一引用。 |
-| `args` | 本次触发的上下文对象；脚本修改其中约定的可写字段来影响后续流程。 |
-| `trigger` | 当前触发器字符串。 |
-| `thisItem` | 当前脚本来源。Item 脚本指向 Item；AE 脚本为了兼容也指向该 AE。 |
-| `thisEffect` | 当前脚本来自 AE 时指向该 AE，否则为 `null`。 |
-| `Macros` | `XJZLMacros` 公共工具类。 |
-| `game`、`ui`、`console` | Foundry 游戏对象、通知对象和控制台。 |
-
-脚本仍运行在 Foundry 客户端环境中，因此也能访问 `foundry`、`canvas`、`CONFIG`、`CONST`、`ChatMessage`、`Roll`、`fromUuid` 等 V13 全局对象。它们属于 Foundry API，不是脚本引擎额外封装；使用前仍要检查当前场景、画布或文档是否存在。
-
-触发开始时已有的 `args` 字段也会展开成同名顶层变量，但只有对应触发器实际传入的字段才存在。脚本运行中新增的 `args.myFlag` 不会自动生成新的顶层变量。推荐业务代码始终从 `args` 读取条件字段，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
-
-同一次触发收集到的脚本共享同一个 `args` 引用；修改文档或公共 API 时使用 `await`，修改上下文标记时使用命名空间明确的字段，避免与其他脚本冲突。
-
-除非触发器参考明确标为可写，否则上下文字段按只读处理。对于 `args.output`、`args.config`、`args.costConfig`、`args.flags` 等可写容器，应修改其中约定的属性，不要替换整个对象；许多调用流程会继续持有原对象引用。`args.baseData`、`args.outcome` 等“只读”对象当前没有冻结，但修改它们不属于公开契约，也不保证影响结算。
-
-后台武学或架招脚本会临时获得 `args.move` 和顶层 `move`，用来表示这段脚本属于哪个招式；脚本结束后会恢复原值。这不代表角色正在施展该招式。只有 `preAttack`、`attack`、`check`、`preDamage`、`hit`、`hit_once` 会被系统记作当前主动招式，供后续伤害、治疗和资源变化判断来源。
-
-## 触发流程
+## 触发流程与选择速查
 
 一次普通角色的常规攻击大致按以下顺序运行：
 
@@ -120,53 +140,65 @@ passive / calc（持续被动与面板计算）
   → hit_once（整次招式后效）
 ```
 
-治疗和 Buff 招式同样执行 `attack`、`check`、`hit`、`hit_once`，但 `hit` 会提供兼容字段：`actionType` 为 `heal` 或 `buff`，`damageType/type` 为 `none`，并把它们视为命中、非暴击、未破架。
-
-`creature` 使用独立的体力伤害分支，不经过上述标准防御触发链；具体边界见“公共结算 API → 伤害”。`container` 不参与脚本、伤害或治疗生命周期。
-
-### 如何选择触发器
+治疗和 Buff 招式同样执行 `attack`、`check`、`hit`、`hit_once`，但不进入标准伤害防御链。`creature` 使用独立的体力伤害分支；`container` 不参与脚本、伤害或治疗生命周期。
 
 | 需求 | 优先使用 |
 |---|---|
-| 编写持续生效的被动效果，例如增加属性、伤害修正或设置状态标记 | `passive` |
-| 修改当前招式或普攻的面板伤害、虚招值和说明 | `calc` |
+| 持续增加属性、伤害修正或状态标记 | `passive` |
+| 修改招式或普攻的面板数值与说明 | `calc` |
 | 扣除资源前调整消耗或阻止出招 | `preAttack` |
-| 修改本次动作的全局命中参数，或逐目标修改检定参数 | `attack` / `check` |
-| 攻击者在逐目标伤害应用前修改伤害类型、数值或穿透 | `preDamage` |
-| 防御者在减伤前修改防御配置，或在减伤后修改最终伤害 | `preDefense` / `preTake` |
-| 防御者响应未命中，或阻止濒死/死亡状态 | `avoided` / `dying` / `death` |
-| 攻击者处理逐目标后效或整次动作后效 | `hit` / `hit_once` |
+| 修改整次动作的命中参数 | `attack` |
+| 针对单个目标修改命中或穿透 | `check` |
+| 攻击者在应用伤害前修改数值、类型或穿透 | `preDamage` |
+| 防御者响应未命中 | `avoided` |
+| 防御者在减伤前修改防御配置 | `preDefense` |
+| 防御者在减伤后修改最终伤害 | `preTake` |
+| 阻止濒死或死亡状态 | `dying` / `death` |
 | 防御者在资源提交后处理受击后效 | `damaged` |
-| 只关心资源的数据库实际差值 | `resourceChanged` |
+| 响应资源的数据库实际差值 | `resourceChanged` |
+| 攻击者处理逐目标后效或整次动作后效 | `hit` / `hit_once` |
 | 处理进战、回合开始或回合结束 | `combatStart` / `turnStart` / `turnEnd` |
 
-## 触发器参考
+## 触发器完整参数参考
 
-### 持续被动与面板计算
+除特别标注为“可写”的字段外，本节所有参数均按只读处理。
 
-| 触发器 | 时机 | 主要上下文和可写字段 |
-|---|---|---|
-| `passive` | 角色数据刷新时，在系统完成第一轮属性计算后执行；所有被动脚本完成后再重算一次 | 没有面板 `output`；把被动加成写入 `system` 中对应的可重算字段（通常是 `mod`），也可以修改 `actor.xjzlStatuses`。随后系统执行 `system.recalculate()`，得出最终属性。 |
-| `calc` | 计算招式或普攻面板时；架招和部分固定值招式除外，详见下文 | 读取 `args.move`、`args.item`、只读 `args.baseData`；修改 `args.output.damage`、`args.output.feint`、`args.output.bonusDesc`、`args.output.feintBonusDesc`。 |
+### `passive`（同步）
 
-#### `passive` 的用途、范围与示例
+**时机：**角色完成第一轮派生计算后；所有 `passive` 完成后，系统再执行一次 `system.recalculate()`。
 
-需要让内功、装备、特性、状态或武学在生效期间持续提供加成时，通常使用 `passive`。例如增加属性、招式伤害、格挡，或者设置供其他脚本读取的状态标记。
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| 无固定阶段字段 | — | — | 通常 `args` 为空对象。 |
+| `move` | `Object` | 条件提供 | 脚本来自架招、轻功、散手或阵法招式时，临时指向所属招式。 |
 
-写在武学招式上的 `passive` 有额外限制：系统只会自动执行当前已开启架招，以及已领悟轻功、散手和阵法招式中的被动脚本；其他类别的武学招式只有作为当前架招时才会执行。当前内功、已装备物品、特性和 AE 中的 `passive` 则按各自正常的生效条件执行。
-
-`passive` 应修改系统的属性或修正字段，而不是写入 `args.output`。例如，根据当前内息增加角色的招式伤害加成：
+`passive` 不提供 `args.output`。应直接修改 `S` 中可重算的属性或修正字段（通常是 `mod`），也可修改 `actor.xjzlStatuses`。
 
 ```javascript
 const bonus = Math.floor(Math.max(0, S.stats.neixi.total) / 20);
 S.combat.damages.skill.mod += bonus;
 ```
 
-`actor.xjzlStatuses` 位于 Actor Document 上，不在 `system` DataModel 内。需要设置系统状态标记时必须写 `actor.xjzlStatuses.someFlag`，不能写 `S.xjzlStatuses`。
+`actor.xjzlStatuses` 位于 Actor Document 上，不在 `system` DataModel 内；不要写成 `S.xjzlStatuses`。写在武学招式上的 `passive` 只会从已开启架招，以及已领悟的轻功、散手和阵法招式中自动收集。
 
-#### `calc` 范围与示例
+### `calc`（同步）
 
-以下代码是 `calc` 示例：它只增加当前面板的伤害，并把说明追加到伤害详情中。
+**时机：**计算招式或普攻面板时。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `move` | `Object` | 只读 | 当前招式；普攻时为虚拟招式。 |
+| `item` | `Item` / `Object` | 只读 | 所属武学 Item；普攻时为虚拟物品。 |
+| `baseData` | `Object` | 只读 | 计算前的参考快照；修改它不会直接改变结果。 |
+| `baseData.base` | `number` | 只读 | 基础伤害。 |
+| `baseData.weapon` | `number` | 只读 | 武器伤害。 |
+| `baseData.isWeaponMatch` | `boolean` | 只读 | 当前武器是否匹配招式。 |
+| `baseData.level` | `number` | 条件提供 | 招式面板的招式等级。 |
+| `baseData.rank` | `number` | 条件提供 | 普攻面板的武器等级加成。 |
+| `output.damage` | `number` | **可写** | 当前面板伤害。 |
+| `output.feint` | `number` | **可写** | 当前虚招值。 |
+| `output.bonusDesc` | `string[]` | **可写** | 伤害详情的附加说明，通常使用 `.push()`。 |
+| `output.feintBonusDesc` | `string[]` | **可写** | 虚招详情的附加说明。 |
 
 ```javascript
 const bonus = Math.max(0, S.stats.neixi.total);
@@ -174,88 +206,193 @@ args.output.damage += bonus;
 args.output.bonusDesc.push(`内息加成 +${bonus}`);
 ```
 
-`calc` 的面板执行边界如下：
+`calc` 的执行边界：
 
-- 架招：使用专用强度计算并提前返回，不执行 `calc`。
-- 常规有系数招式：会执行当前内功、装备、特性、当前招式和 AE 中的 `calc`。
-- 无系数且 `move.calculation.isFixed` 为 `true`：只执行当前招式自身的 `calc`；内功、装备、特性和 AE 的全局 `calc` 不参与。
-- 无系数且 `isFixed` 不为 `true`：直接按固定值返回，不执行 `calc`。
+- 架招使用专用强度计算，不执行 `calc`。
+- 常规有系数招式会收集当前内功、装备、特性、当前招式和 AE 的 `calc`。
+- 无系数且 `move.calculation.isFixed === true` 时，只执行当前招式自身的 `calc`。
+- 无系数且 `isFixed` 不为 `true` 时，不执行 `calc`。
 
-普攻会执行通用 `calc`。`args.baseData` 的稳定字段为 `base`、`weapon`、`isWeaponMatch`；招式面板另有 `level`，普攻面板另有 `rank`。它是参考快照，修改它不会直接改变最终结果。
+### `preAttack`（异步）
 
-### 出招与检定
+**时机：**系统计算出基础消耗后，余额检查和资源扣除前。普攻不触发。
 
-| 触发器 | 时机 | 主要上下文和可写字段 |
-|---|---|---|
-| `preAttack` | 计算基础消耗后、余额检查和扣除前 | 读取 `args.move`、`args.item`、`args.attacker`；修改 `args.costConfig.mp`、`args.costConfig.hp`、`args.costConfig.rage`、`args.abort`、`args.abortReason`。 |
-| `attack` | 已扣资源、基础面板已计算、掷骰前 | 读取 `args.actionType`、`args.damageType`、`args.type`、`args.element`、`args.costConsumed`；修改 `args.flags` 的约定字段。 |
-| `check` | 对每个目标计算命中/虚招上下文时 | 读取 `args.target`、`args.attacker`、`args.item`、`args.move`；修改目标专属 `args.flags`。 |
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `move` | `Object` | 只读 | 当前招式。 |
+| `item` | `Item` | 只读 | 所属武学。 |
+| `attacker` | `Actor` | 只读 | 出招者，通常与 `actor` 相同。 |
+| `costConfig.mp` | `number` | **可写** | 本次内力消耗。 |
+| `costConfig.hp` | `number` | **可写** | 本次气血消耗。 |
+| `costConfig.rage` | `number` | **可写** | 本次怒气消耗。 |
+| `abort` | `boolean` | **可写** | 设为 `true` 会在扣除资源前中止出招。 |
+| `abortReason` | `string` | **可写** | 中止时向操作者显示的提示。 |
 
-`attack` 的主要 `flags`：
+### `attack`（异步）
 
-| 字段 | 作用 |
-|---|---|
-| `level` / `feintLevel` | 本次命中/虚招优劣势计数。正数为优势，负数为劣势。 |
-| `bonusHit` / `bonusFeint` | 本次命中值/虚招值加成。 |
-| `critThresholdMod` | 暴击阈值修正，正数表示更容易暴击。 |
-| `forceHit` | 跳过投掷的必中。 |
-| `alwaysHit` | 仍投掷、仍可暴击的必定命中。 |
-| `damageResult` | 当前面板结果，可修改 `damage`、`feint`、`breakdown` 和 `feintBreakdown`。 |
-| `abort` / `abortReason` | 中止出招及操作者提示。资源和动作已在 `attack` 前消耗，脚本如需退款或返还动作必须显式处理。 |
+**时机：**资源已扣除、基础面板已计算，但尚未掷骰。攻击、治疗、Buff 和主动开启架招都可进入。
 
-`check` 的主要 `flags`：`grantLevel`、`grantFeintLevel`、`grantHit`、`grantFeint`、`critThresholdMod`、`ignoreBlock`、`ignoreDefense`、`ignoreStance`、`forceHit`、`alwaysHit`。
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `move` / `item` / `attacker` | `Object` / `Item` / `Actor` | 只读 | 当前招式、所属武学和出招者。 |
+| `actionType` | `string` | 只读 | 动作类型，例如 `attack`、`heal` 或 `buff`。 |
+| `damageType` / `type` | `string` | 只读 | 原始伤害类型；两者同义。 |
+| `element` | `string` | 只读 | 招式属性。 |
+| `costConsumed` | `Object` | 只读 | 已实际消耗的 `mp`、`hp`、`rage`、`morale` 及 `desperateBonus`。 |
+| `flags.level` / `flags.feintLevel` | `number` | **可写** | 本次命中/虚招优劣势计数；正数为优势，负数为劣势。 |
+| `flags.bonusHit` / `flags.bonusFeint` | `number` | **可写** | 本次命中值/虚招值数值加成。 |
+| `flags.critThresholdMod` | `number` | **可写** | 暴击阈值修正；正数表示更容易暴击。 |
+| `flags.forceHit` | `boolean` | **可写** | 跳过投掷的必中。 |
+| `flags.alwaysHit` | `boolean` | **可写** | 仍投掷、仍可暴击的必定命中。 |
+| `flags.abort` / `flags.abortReason` | `boolean` / `string` | **可写** | 中止出招及提示。此时资源和动作已消耗，需要退款时必须显式处理。 |
+| `flags.autoApplied` | `boolean` | **可写** | 标记本次流程是否已由脚本自动应用。 |
+| `flags.damageResult` | `Object` | **可写** | 当前面板结果引用。 |
+| `flags.damageResult.damage` / `.feint` | `number` | **可写** | 当前面板伤害和虚招值。 |
+| `flags.damageResult.breakdown` / `.feintBreakdown` | `string` | **可写** | 面板详情文本。 |
 
-`preAttack` 的完整上下文是 `move`、`item`、`attacker`、`costConfig`、`abort`、`abortReason`；`args.abort = true` 会在扣除资源前阻止出招。普通攻击没有资源消耗前置流程，因此不会触发 `preAttack`。`attack` 还提供 `args.flags.autoApplied`；`args.flags.damageResult` 可修改当前面板结果。
+### `check`（异步）
 
-### 攻击者结算
+**时机：**对每个目标单独计算命中和虚招上下文时。
 
-| 触发器 | 时机 | 主要上下文和可写字段 |
-|---|---|---|
-| `preDamage` | 命中、暴击和破架确定后，调用目标 `applyDamage()` 前 | 读取 `args.attacker`、`args.target`、`args.item`、`args.move`、`args.element` 和只读 `args.outcome`；修改 `args.config.amount`、`args.config.type`、`args.config.element`、`args.config.ignoreBlock`、`args.config.ignoreDefense`、`args.config.ignoreStance`、`args.config.applyCritDamage`、`args.config.ignoreMinDamage`。手动结算另有 `args.isManual`。 |
-| `hit` | 每个目标结算后；攻击未命中时也执行 | 攻击提供 `args.attacker`、`args.target`、`args.item`、`args.move`、`args.actionType`、`args.damageType`、`args.type`、`args.element`、`args.isHit`、`args.isCrit`、`args.isBroken`、`args.finalDamage`、`args.hpLost`、`args.mpLost`、`args.hutiLost`、`args.isDying`、`args.isDead`；手动结算另有 `args.isManual`。治疗/Buff 另有 `args.baseAmount`、`args.finalAmount`、`args.healAmount`、`args.isHeal`、`args.isBuff`、`args.isBuffOnly`。 |
-| `hit_once` | 全部目标完成后执行一次 | 通用字段为 `args.targets`、`args.hitCount`、`args.attacker`、`args.item`、`args.move`、`args.actionType`。攻击另有 `args.baseDamage`、`args.damageType`、`args.type`、`args.element`；自动攻击和治疗/Buff 提供 `args.costConsumed`；自动攻击另有 `args.hasCrit`，治疗/Buff 另有 `args.totalHealAmount`；手动攻击另有 `args.isManual`。 |
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `target` | `Actor` | 只读 | 当前目标。 |
+| `attacker` | `Actor` | 只读 | 出招者。 |
+| `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `flags.grantLevel` / `flags.grantFeintLevel` | `number` | **可写** | 仅针对当前目标的命中/虚招优劣势计数。 |
+| `flags.grantHit` / `flags.grantFeint` | `number` | **可写** | 仅针对当前目标的命中值/虚招值加成。 |
+| `flags.critThresholdMod` | `number` | **可写** | 仅针对当前目标的暴击阈值修正。 |
+| `flags.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 仅针对当前目标忽略格挡、防御或架招。 |
+| `flags.forceHit` / `flags.alwaysHit` | `boolean` | **可写** | 仅针对当前目标的必中设置。 |
 
-攻击 `hit` 和 `hit_once` 的 `damageType/type/element` 保留招式或卡片的原始值。如果 `preDamage` 改写了单个目标的 `args.config.type` 或 `args.config.element`，这些后效字段不会同步改写。防御侧需要最终值时可读取 `preTake`、`damaged` 或 `resourceChanged` 的具体结算上下文。
+### `preDamage`（异步，攻击者侧）
 
-攻击侧 `hit` 和 `hit_once.targets[].isCrit` 保留攻击方判定出的暴击状态；如果目标的 `preDefense` 后续修改了 `args.config.isCrit`，最终防御侧暴击状态应从目标的 `damaged` 上下文读取。
+**时机：**命中、暴击和破架已确定，但尚未调用目标的 `applyDamage()`。未命中时不执行。
 
-`hit_once.targets` 的元素结构取决于动作类型：
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
+| `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `element` | `string` | 只读 | 招式原始属性。 |
+| `outcome.isHit` / `.isCrit` / `.isBroken` | `boolean` | 只读 | 攻击方已确定的命中、暴击和破架结果。 |
+| `config.amount` | `number` | **可写** | 即将传入伤害 API 的原始数值。 |
+| `config.type` / `config.element` | `string` | **可写** | 对当前目标实际应用的伤害类型和属性。 |
+| `config.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 对当前目标的穿透配置。 |
+| `config.applyCritDamage` | `boolean` | **可写** | 是否应用暴击伤害倍率；不改变 `outcome.isCrit`。 |
+| `config.ignoreMinDamage` | `boolean` | **可写** | 是否忽略最低 1 点伤害保底。 |
+| `isManual` | `boolean` | 条件提供 | 手动伤害结算时为 `true`。 |
 
-- 攻击：每项包含 `target`、`isHit`、`isCrit`、`isBroken`、`baseDamage`、`finalDamage`、`hpLost`、`hutiLost`、`mpLost`、`isDying`、`isDead` 和原始 `damageResult`。
-- 治疗/Buff：每项包含 `name`、`amount`、`baseAmount`、`isHeal`、`isBlocked`。当前汇总项不包含目标 Actor；需要逐目标 Actor 时在 `hit` 中处理。
+### `avoided`（异步，防御者侧）
 
-未命中、免疫、容器或其他提前返回路径可能只提供部分伤害结果字段。读取损失值时使用 `args.hpLost ?? 0` 等空值兜底。
+**时机：**标准 `applyDamage()` 收到 `isHit: false` 时。
 
-### 防御者结算
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者；环境伤害的 `attacker` 可为 `null`。 |
+| `type` | `string` | 只读 | 伤害类型。 |
+| `baseDamage` | `number` | 只读 | 原始面板伤害。 |
+| `isCrit` | `boolean` | 只读 | 调用方传入的暴击意图；即使未命中也会保留。 |
+| `move` / `item` | `Object` / `Item` / `null` | 只读 | 系统能够确定时提供的招式和物品来源。 |
+| `outcome.isHit` / `.isBroken` | `boolean` | 只读 | 未命中和破架结果快照。 |
 
-| 触发器 | 时机 | 主要上下文和可写字段 |
-|---|---|---|
-| `avoided` | 标准 `applyDamage()` 收到 `isHit: false` 时 | 读取 `args.attacker`、`args.target`、`args.type`、`args.baseDamage`、`args.move`、`args.item` 和只读 `args.outcome`。 |
-| `preDefense` | 命中后、暴击倍率和防御/格挡/抗性计算前 | 修改 `args.config.ignoreBlock`、`args.config.ignoreDefense`、`args.config.ignoreStance`、`args.config.isCrit`、`args.config.applyCritDamage`、`args.config.element`。 |
-| `preTake` | 防御和抗性完成后、资源扣除前 | 读取 `args.baseDamage`、`args.calcDamage`；修改 `args.output.damage`，或设置 `args.output.abort = true` 完全免疫。 |
-| `dying` | 首次进入濒死，或 `source` 为 `move/basic/both` 的攻击继续伤害已濒死目标时 | 读取 `args.attacker`、`args.target`、`args.damage`；设置 `args.preventDying = true`。 |
-| `death` | 死亡条件成立、挂死亡状态前 | 与 `dying` 共享上下文；设置 `args.preventDeath = true`。 |
-| `damaged` | 资源已提交且濒死/死亡判定完成后 | 读取 `args.finalDamage`、`args.hpLost`、`args.mpLost`、`args.hutiLost`、`args.isCrit`、`args.isBroken`、`args.isDying`、`args.isDead`、`args.config`。适合反伤和受击后效。 |
+### `preDefense`（异步，防御者侧）
 
-`hpLost`、`mpLost`、`hutiLost` 是标准伤害部分的实际损失。`finalDamage` 是进入资源分配前的最终伤害值，两者含义不同。
+**时机：**命中后，暴击倍率、防御、格挡和抗性计算前。
 
-`preventDying` 和 `preventDeath` 只阻止本次各自对应的状态处理，不会自动撤销已经提交的资源损失，也不会移除目标原本已有的濒死状态。`preventDying` 不等于 `preventDeath`；如果死亡条件同时成立，`death` 仍会继续执行。脚本如果还需要恢复气血、内力或移除既有状态，必须显式调用相应公共 API。以上标准防御触发器不适用于 `creature` 的体力伤害分支。
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `type` / `damageType` | `string` | 只读 | 当前伤害类型；两者同义。 |
+| `element` | `string` | 只读 | 当前伤害属性。 |
+| `baseDamage` | `number` | 只读 | 原始面板伤害。 |
+| `move` / `item` | `Object` / `Item` / `null` | 只读 | 招式和物品来源。 |
+| `config.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 穿透配置。 |
+| `config.isCrit` | `boolean` | **可写** | 防御侧最终暴击状态。 |
+| `config.applyCritDamage` | `boolean` | **可写** | 是否应用暴击伤害倍率。 |
+| `config.element` | `string` | **可写** | 进入抗性计算的最终属性。 |
 
-### 资源实际变动
+### `preTake`（异步，防御者侧）
 
-`resourceChanged` 在数据库提交并完成上限或禁疗等裁剪后触发。支持 `hp`、`mp`、`rage`、`huti`、`tili`、`morale`；银两和休息次数不触发。
+**时机：**防御、格挡和抗性计算完成后，资源扣除前。
 
-普通角色实际跟踪 `hp`、`mp`、`rage`、`huti`、`morale`；`creature` 实际跟踪 `tili`、`rage`。只有该 Actor 持久化且适用的资源会出现在事件中。
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `type` / `damageType` | `string` | 只读 | 当前伤害类型。 |
+| `element` | `string` | 只读 | `preDefense` 完成后的伤害属性。 |
+| `baseDamage` | `number` | 只读 | 原始面板伤害。 |
+| `calcDamage` | `number` | 只读 | 系统完成减伤后的理论值。 |
+| `isCrit` / `isBroken` | `boolean` | 只读 | 最终暴击和破架状态。 |
+| `move` / `item` | `Object` / `Item` / `null` | 只读 | 招式和物品来源。 |
+| `config` | `Object` | 只读 | 最终防御配置；可用于 `Macros.checkStance(actor, args)` 等判断。 |
+| `output.damage` | `number` | **可写** | 即将进入资源分配的最终伤害。 |
+| `output.abort` | `boolean` | **可写** | 设为 `true` 会完全免疫本次伤害。 |
 
-| 字段 | 含义 |
-|---|---|
-| `changes` | 本次事务的变化数组。每项包含 `resource`、`path`、`oldValue`、`newValue`、`delta`。 |
-| `byResource` | 按资源名索引的同一批变化，例如 `args.byResource.hp.delta`。 |
-| `cause` | 来源类别；未提供时为 `update`。 |
-| `sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source` | 系统能够确定时提供的来源信息。 |
-| `chainId` / `depth` | 连锁资源事务标识和当前深度。 |
+### `dying`（异步，防御者侧）
 
-没有实际差值时不触发。脚本再次修改资源会继承 `chainId`；允许的 `depth` 为 `0..7`，准备进入深度 `8` 时终止派发。业务脚本仍必须通过来源标记或其他条件自行防循环。
+**时机：**首次进入濒死，或 `source` 为 `move`、`basic`、`both` 的攻击继续伤害已濒死目标时。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `damage` | `number` | 只读 | 本次进入资源分配的最终伤害。 |
+| `preventDying` | `boolean` | **可写** | 设为 `true` 阻止本次添加濒死状态。 |
+| `preventDeath` | `boolean` | 只读 | 与 `death` 共享的初始标记；在本阶段修改不代替 `death` 阶段的判定。 |
+
+### `death`（异步，防御者侧）
+
+**时机：**死亡条件成立，添加死亡状态前。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `damage` | `number` | 只读 | 本次进入资源分配的最终伤害。 |
+| `preventDying` | `boolean` | 只读 | 前序 `dying` 阶段留下的标记。 |
+| `preventDeath` | `boolean` | **可写** | 设为 `true` 阻止本次添加死亡状态。 |
+
+`preventDying` 和 `preventDeath` 只阻止本次状态处理，不会撤销已经提交的资源损失，也不会移除原本已有的濒死或死亡状态。`preventDying` 不等于 `preventDeath`；如果死亡条件同时成立，`death` 仍会执行。
+
+### `damaged`（异步，防御者侧）
+
+**时机：**资源已提交，濒死和死亡判定已完成；适合反伤与受击后效。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `attacker` / `target` | `Actor` / `null` | 只读 | 攻击来源和受击者。 |
+| `type` / `damageType` | `string` | 只读 | 最终结算使用的伤害类型。 |
+| `element` | `string` | 只读 | 最终结算使用的伤害属性。 |
+| `finalDamage` | `number` | 只读 | 进入资源分配前的最终伤害。 |
+| `hpLost` / `mpLost` / `hutiLost` | `number` | 只读 | 标准伤害部分造成的实际资源损失。 |
+| `isCrit` / `isBroken` | `boolean` | 只读 | 防御侧最终暴击和破架状态。 |
+| `isDying` / `isDead` | `boolean` | 只读 | 本次结算是否进入濒死或死亡。 |
+| `move` / `item` | `Object` / `Item` / `null` | 只读 | 招式和物品来源。 |
+| `config` | `Object` | 只读 | 最终防御配置；可检查 `ignoreStance`、`isCrit` 等字段。 |
+
+`finalDamage` 与 `hpLost/mpLost/hutiLost` 含义不同：前者是资源分配前的伤害值，后者是实际差值。以上标准防御触发器均不适用于 `creature` 的独立体力伤害分支。
+
+### `resourceChanged`（异步）
+
+**时机：**资源数据库更新已提交，并完成上限、下限和禁疗等裁剪后。没有实际差值时不触发。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `changes` | `Object[]` | 只读 | 本次事务的全部实际变化。 |
+| `changes[].resource` | `string` | 只读 | `hp`、`mp`、`rage`、`huti`、`tili` 或 `morale`。 |
+| `changes[].path` | `string` | 只读 | 对应 Foundry 更新路径。 |
+| `changes[].oldValue` / `.newValue` / `.delta` | `number` | 只读 | 旧值、新值和实际差值；增加为正，减少为负。 |
+| `byResource` | `Object` | 只读 | 按资源名索引同一批变化，例如 `args.byResource.hp`。 |
+| `cause` | `string` | 只读 | 资源事务来源类别；未提供时为 `update`。 |
+| `sourceActor` | `Actor` / `null` | 只读 | 发起普通资源事务的 Actor，能够确定时提供。 |
+| `attacker` / `healer` | `Actor` / `null` | 条件提供 | 伤害或治疗来源。 |
+| `target` | `Actor` / `null` | 条件提供 | 资源实际发生变化的目标。 |
+| `item` / `move` | `Item` / `Object` / `null` | 条件提供 | 物品和招式来源。 |
+| `type` | `string` | 条件提供 | 伤害或治疗事务能够确定时提供的资源/伤害类型。 |
+| `damageType` / `element` | `string` | 条件提供 | 伤害事务的伤害类型和属性。 |
+| `source` | `string` | 条件提供 | 业务来源标记，例如 `move`、`dot` 或自定义去重值。 |
+| `chainId` | `string` | 只读 | 连锁资源事务标识。 |
+| `depth` | `number` | 只读 | 当前连锁深度，范围为 `0..7`。 |
+
+普通角色实际跟踪 `hp`、`mp`、`rage`、`huti`、`morale`；`creature` 实际跟踪 `tili`、`rage`。银两和休息次数不触发。脚本再次修改资源会继承 `chainId`，准备进入深度 `8` 时系统终止派发；业务脚本仍必须自行防循环。
 
 ```javascript
 const hp = args.byResource?.hp;
@@ -271,17 +408,103 @@ await actor.applyHealing({
 });
 ```
 
-伤害与治疗为了保持后效顺序，会先完成 `dying/death/damaged` 或治疗统计，再派发对应的 `resourceChanged`。
+伤害会先完成 `dying`、`death`、`damaged`，治疗会先完成统计，然后才派发对应的 `resourceChanged`。
 
-### 战斗与回合
+### `hit`（异步，攻击者侧）
 
-| 触发器 | 时机 | 上下文 |
-|---|---|---|
-| `combatStart` | 战斗开始时，每个 Combatant 执行一次 | `args.combatant`、`args.combat`。 |
-| `turnStart` | Actor 回合开始，自动回复/消耗完成后 | 当前没有额外的回合专属字段。 |
-| `turnEnd` | Actor 回合结束，自动回复/消耗完成后 | 当前没有额外的回合专属字段。 |
+**时机：**每个目标结算后执行一次。攻击未命中时也执行；治疗和 Buff 也使用该触发器。
 
-这三个触发器会遍历该 Actor 全部已领悟武学招式；每个招式脚本执行时仍会临时注入所属 `args.move`。执行由活动 GM 统筹并路由给在线 owner，无在线玩家 owner 时由 GM 执行；脚本不要自行假设执行客户端一定是 GM。
+**全部动作都提供：**
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `target` / `attacker` | `Actor` | 只读 | 当前目标和出招者。 |
+| `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `actionType` | `string` | 只读 | `attack`、`heal` 或 `buff`。 |
+| `damageType` / `type` | `string` | 只读 | 攻击保留招式原始伤害类型；治疗/Buff 为 `none`。 |
+| `element` | `string` | 只读 | 招式原始属性。 |
+| `isHit` / `isCrit` / `isBroken` | `boolean` | 只读 | 命中、攻击方暴击和破架结果。治疗/Buff 固定为 `true/false/false`。 |
+| `hpLost` / `hutiLost` / `mpLost` | `number` | 只读 | 攻击的实际损失；治疗/Buff 固定为 `0`。 |
+
+**攻击额外提供：**
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `baseDamage` | `number` | 只读 | 招式或卡片面板伤害。 |
+| `finalDamage` | `number` | 条件提供 | 进入目标资源分配前的最终伤害。 |
+| `isDying` / `isDead` | `boolean` | 条件提供 | 本次结算是否使目标进入濒死或死亡。 |
+| `damageResult` | `Object` | 只读 | `applyDamage()` 返回的原始结果对象。 |
+| `isAttack` / `isHeal` / `isBuff` | `boolean` | 条件提供 | 自动攻击结算会提供 `true/false/false`。 |
+| `isManual` | `boolean` | 条件提供 | 自动结算为 `false`，手动结算为 `true`。 |
+
+**治疗/Buff 额外提供：**
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `isAttack` / `isHeal` / `isBuff` | `boolean` | 只读 | 动作分类标记。 |
+| `baseAmount` | `number` | 只读 | 原始治疗量或 Buff 强度。 |
+| `finalAmount` | `number` | 只读 | 治疗时为实际恢复量；Buff 时为强度。 |
+| `healAmount` | `number` | 只读 | 实际恢复量；Buff 时为 `0`。 |
+| `ignoreBlock` / `ignoreDefense` | `boolean` | 只读 | 兼容字段，固定为 `false`。 |
+| `isBuffOnly` | `boolean` | 只读 | 纯 Buff 或面板数值为 `0` 时为 `true`。 |
+
+未命中、免疫、容器或其他提前返回路径可能只提供部分伤害结果字段。读取时使用 `args.hpLost ?? 0` 等空值兜底。`damageType/type/element` 保留招式或卡片原始值；`preDamage` 针对单个目标的改写不会回写这些字段。
+
+### `hit_once`（异步，攻击者侧）
+
+**时机：**本次动作的全部目标完成后执行一次。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `targets` | `Object[]` | 只读 | 全部目标的汇总结果，元素结构见下文。 |
+| `hitCount` | `number` | 只读 | 命中目标数；治疗/Buff 视为全部命中。 |
+| `attacker` / `item` / `move` | `Actor` / `Item` / `Object` | 只读 | 出招者、所属武学和当前招式。 |
+| `actionType` | `string` | 只读 | `attack`、`heal` 或 `buff`。 |
+| `damageType` / `type` | `string` | 只读 | 攻击保留原始伤害类型；治疗/Buff 为 `none`。 |
+| `element` | `string` | 只读 | 招式原始属性。 |
+| `baseDamage` | `number` | 条件提供 | 攻击的面板伤害。 |
+| `hasCrit` | `boolean` | 条件提供 | 自动攻击中是否至少有一个目标被判定为暴击。 |
+| `totalHealAmount` | `number` | 条件提供 | 治疗/Buff 的总实际治疗量。 |
+| `isHeal` | `boolean` | 条件提供 | 治疗为 `true`，Buff 为 `false`。 |
+| `costConsumed` | `Object` | 条件提供 | 自动攻击和治疗/Buff 的实际消耗。 |
+| `isManual` | `boolean` | 条件提供 | 手动攻击结算时为 `true`。 |
+
+`targets` 的元素结构：
+
+- 攻击：`target`、`isHit`、`isCrit`、`isBroken`、`baseDamage`、`finalDamage`、`hpLost`、`hutiLost`、`mpLost`、`isDying`、`isDead`、`damageResult`。
+- 治疗/Buff：`name`、`amount`、`baseAmount`、`isHeal`、`isBlocked`。当前汇总项不包含目标 Actor；需要逐目标 Actor 时应在 `hit` 中处理。
+
+`hit` 和 `hit_once.targets[].isCrit` 保留攻击方判定的暴击状态。如果目标的 `preDefense` 改写了 `config.isCrit`，最终防御侧暴击状态应从 `damaged` 读取。
+
+### `combatStart`（异步）
+
+**时机：**战斗开始时，每个 Combatant 执行一次。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| `combatant` | `Combatant` | 只读 | 当前 Actor 对应的战斗单位。 |
+| `combat` | `Combat` | 只读 | 当前战斗。 |
+| `move` | `Object` | 条件提供 | 脚本来自已领悟武学招式时，临时指向所属招式。 |
+
+### `turnStart`（异步）
+
+**时机：** Actor 回合开始，自动回复或消耗完成后。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| 无回合专属字段 | — | — | 通常 `args` 为空对象。 |
+| `move` | `Object` | 条件提供 | 脚本来自已领悟武学招式时，临时指向所属招式。 |
+
+### `turnEnd`（异步）
+
+**时机：** Actor 回合结束，自动回复或消耗完成后。
+
+| `args` 字段 | 类型 | 访问 | 含义 |
+|---|---|---|---|
+| 无回合专属字段 | — | — | 通常 `args` 为空对象。 |
+| `move` | `Object` | 条件提供 | 脚本来自已领悟武学招式时，临时指向所属招式。 |
+
+`combatStart`、`turnStart`、`turnEnd` 会遍历该 Actor 全部已领悟武学招式。执行由活动 GM 统筹并路由给在线 owner，无在线玩家 owner 时由 GM 执行；脚本不要假设执行客户端一定是 GM。
 
 ## 公共结算 API
 
