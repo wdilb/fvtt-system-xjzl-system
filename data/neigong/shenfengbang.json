@@ -53,7 +53,7 @@
                             "label": "巽震气功-风雷真气",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (game.combat && (args.move.type !== \"basic\" || args.move.id === 'opportunity-attack')) {\n    let counter = actor.getFlag(\"xjzl-system\", \"neigong_xunzhen_counter\") || 0;\n    counter += 1;\n    await actor.setFlag(\"xjzl-system\", \"neigong_xunzhen_counter\", counter);\n\n    const isOdd = (counter % 2 !== 0);\n    const effectName = isOdd ? \"巽真气\" : \"震真气\";\n    \n    const source = thisItem.effects.getName(effectName);\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n\n        const target = args.target;\n        const xun = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xun_zhenqi\");\n        const zhen = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhen_zhenqi\");\n\n        if (xun && zhen) {\n            const xunStacks = xun.getFlag(\"xjzl-system\", \"stacks\") || 1;\n            const zhenStacks = zhen.getFlag(\"xjzl-system\", \"stacks\") || 1;\n            const damage = (xunStacks + zhenStacks) * 10;\n\n            await target.applyDamage({ attacker: actor, \n                type: 'liushi',\n                amount: damage,\n                isHit: true,\n                ignoreDefense: true\n            });\n            ui.notifications.info(`风雷交融！对 ${target.name} 造成 ${damage} 点流失！`);\n\n            await game.xjzl.api.effects.removeEffect(target, \"xun_zhenqi\", xunStacks);\n            await game.xjzl.api.effects.removeEffect(target, \"zhen_zhenqi\", zhenStacks);\n        }\n    }\n}"
+                            "script": "if (!['attack', 'basic-attack'].includes(args.actionType) || !args.isHit || !args.target) return;\nif (game.combat && (args.move.type !== \"basic\" || args.move.id === 'opportunity-attack')) {\n    let counter = actor.getFlag(\"xjzl-system\", \"neigong_xunzhen_counter\") || 0;\n    counter += 1;\n    await actor.setFlag(\"xjzl-system\", \"neigong_xunzhen_counter\", counter);\n\n    const isOdd = (counter % 2 !== 0);\n    const effectName = isOdd ? \"巽真气\" : \"震真气\";\n    \n    const source = thisItem.effects.getName(effectName);\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n\n        const target = args.target;\n        const xun = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xun_zhenqi\");\n        const zhen = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhen_zhenqi\");\n\n        if (xun && zhen) {\n            const xunStacks = xun.getFlag(\"xjzl-system\", \"stacks\") || 1;\n            const zhenStacks = zhen.getFlag(\"xjzl-system\", \"stacks\") || 1;\n            const damage = (xunStacks + zhenStacks) * 10;\n\n            await target.applyDamage({ attacker: actor, \n                type: 'liushi',\n                amount: damage,\n                isHit: true,\n                ignoreDefense: true\n            });\n            await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`风雷交融！对 ${target.name} 造成 ${damage} 点流失！`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n\n            await game.xjzl.api.effects.removeEffect(target, \"xun_zhenqi\", xunStacks);\n            await game.xjzl.api.effects.removeEffect(target, \"zhen_zhenqi\", zhenStacks);\n        }\n    }\n}"
                         }
                     ]
                 }
@@ -148,7 +148,7 @@
                             "label": "风玄劲-大风",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const source = thisItem.effects.getName(\"大风域\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst source = thisItem.effects.getName(\"大风域\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 },
@@ -174,7 +174,7 @@
                             "label": "风玄劲-大风",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const source = thisItem.effects.getName(\"大风域\");\nif (source) {\n    const effectData = source.toObject();\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst source = thisItem.effects.getName(\"大风域\");\nif (source) {\n    const effectData = source.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ]
                 }
@@ -251,7 +251,7 @@
                             "label": "杀无道-触发杀机",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isDying) {\n    const source = thisItem.effects.getName(\"杀机\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改数值 +10\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = \"10\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"触发杀机！\");\n    }\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.isDying) {\n    const source = thisItem.effects.getName(\"杀机\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        // 动态修改数值 +10\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = \"10\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>触发杀机！</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}"
                         }
                     ]
                 },
@@ -271,7 +271,7 @@
                             "label": "杀无道-触发杀机",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isDying) {\n    const source = thisItem.effects.getName(\"杀机\");\n    if (source) {\n        const effectData = source.toObject();\n        effectData.origin = thisItem.uuid;\n        // 动态修改数值 +20\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = \"20\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        ui.notifications.info(\"触发杀机！\");\n    }\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.isDying) {\n    const source = thisItem.effects.getName(\"杀机\");\n    if (source) {\n        const effectData = source.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        // 动态修改数值 +20\n        const change = effectData.changes.find(c => c.key === \"system.combat.damages.skill.mod\");\n        if (change) change.value = \"20\";\n        await game.xjzl.api.effects.addEffect(actor, effectData);\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>触发杀机！</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}"
                         }
                     ]
                 }
@@ -345,13 +345,7 @@
                             "label": "神风诀-消耗狂风",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await effect.delete();\n        args.move.tempWindBonus = stacks;\n        ui.notifications.info(`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`);\n        if (stacks >= 10) ui.notifications.info(\"触发击飞效果！\");\n    }\n}"
-                        },
-                        {
-                            "label": "神风诀-应用加成",
-                            "trigger": "calc",
-                            "active": true,
-                            "script": "if (args.move.tempWindBonus) {\n    args.output.damage += args.move.tempWindBonus;\n    args.output.bonusDesc.push(`狂风 +${args.move.tempWindBonus}`);\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await game.xjzl.api.effects.removeEffect(actor, \"kuangfeng\", stacks);\n        args.flags.damageResult.damage += stacks;\n        args.flags.damageResult.breakdown += `\\n+ 狂风: ${stacks}`;\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n        if (stacks >= 10) await ChatMessage.create({ content: '<div class=xjzl-chat-card>触发击飞效果！</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}"
                         }
                     ]
                 },
@@ -371,13 +365,7 @@
                             "label": "神风诀-消耗狂风",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await effect.delete();\n        args.move.tempWindBonus = stacks;\n        ui.notifications.info(`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`);\n        if (stacks >= 10) ui.notifications.info(\"触发击飞效果！\");\n    }\n}"
-                        },
-                        {
-                            "label": "神风诀-应用加成",
-                            "trigger": "calc",
-                            "active": true,
-                            "script": "if (args.move.tempWindBonus) {\n    args.output.damage += args.move.tempWindBonus;\n    args.output.bonusDesc.push(`狂风 +${args.move.tempWindBonus}`);\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await game.xjzl.api.effects.removeEffect(actor, \"kuangfeng\", stacks);\n        args.flags.damageResult.damage += stacks;\n        args.flags.damageResult.breakdown += `\\n+ 狂风: ${stacks}`;\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n        if (stacks >= 10) await ChatMessage.create({ content: '<div class=xjzl-chat-card>触发击飞效果！</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}"
                         }
                     ]
                 },
@@ -397,13 +385,7 @@
                             "label": "神风诀-消耗狂风",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await effect.delete();\n        args.move.tempWindBonus = stacks;\n        ui.notifications.info(`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`);\n        if (stacks >= 10) ui.notifications.info(\"触发击飞效果！\");\n    }\n}"
-                        },
-                        {
-                            "label": "神风诀-应用加成",
-                            "trigger": "calc",
-                            "active": true,
-                            "script": "if (args.move.tempWindBonus) {\n    args.output.damage += args.move.tempWindBonus;\n    args.output.bonusDesc.push(`狂风 +${args.move.tempWindBonus}`);\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuangfeng\");\nif (effect) {\n    const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirmed = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"神风诀\", icon: \"icons/svg/wing.svg\" },\n        content: `<p>当前狂风层数: <b>${stacks}</b></p><p>是否消耗全部狂风以提升 ${stacks} 点伤害？</p>`,\n        ok: { label: \"消耗\" },\n        reject: { label: \"保留\" }\n    });\n    if (confirmed) {\n        await game.xjzl.api.effects.removeEffect(actor, \"kuangfeng\", stacks);\n        args.flags.damageResult.damage += stacks;\n        args.flags.damageResult.breakdown += `\\n+ 狂风: ${stacks}`;\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`已消耗 ${stacks} 层狂风，本次伤害 +${stacks}`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n        if (stacks >= 10) await ChatMessage.create({ content: '<div class=xjzl-chat-card>触发击飞效果！</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}"
                         }
                     ]
                 }

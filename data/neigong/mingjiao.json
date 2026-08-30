@@ -182,7 +182,7 @@
                             "label": "五行心法-施加五行(小成)",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nif (!args.isHit) return;\n\n// 检查目标架招。趁虚而入(opportunity)或击破架招(isBroken)均视为无架招。\nconst targetStance = args.target.system?.martial?.stanceActive;\nif (targetStance && args.move.id !== 'opportunity-attack' && !args.isBroken) return;\n\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
+                            "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nif (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || !args.isHit) return;\n\n// 检查目标架招。趁虚而入(opportunity)或击破架招(isBroken)均视为无架招。\nconst targetStance = args.target.system?.martial?.stanceActive;\nif (targetStance && args.move.id !== 'opportunity-attack' && !args.isBroken) return;\n\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
                         }
                     ]
                 },
@@ -202,7 +202,7 @@
                             "label": "五行心法-施加五行(圆满)",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nif (!args.isHit) return;\n\n// 圆满境界不再需要判定“无架招”，直接施加\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
+                            "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nif (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || !args.isHit) return;\n\n// 圆满境界不再需要判定“无架招”，直接施加\nconst sourceEffect = thisItem.effects.getName(\"五行\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effData);\n}"
                         }
                     ]
                 }
@@ -362,7 +362,7 @@
                             {
                                 "trigger": "preTake",
                                 "label": "不动明王-护盾",
-                                "script": "// 护盾逻辑：脚本根据当前内功境界判断减免量，或者我们可以简单点做两个AE，这里为了灵活做成一个AE\n// 假设是圆满(30)，小成需要玩家手动调整或接受30\n// 更稳妥的方式是：玩家手动选择添加“不动明王(小成)”或“不动明王(圆满)”\n// 这里脚本里写死30，若需20请玩家自行修正或GM处理\nargs.output.damage = Math.max(0, args.output.damage - 30);\nui.notifications.info(\"不动明王抵挡了伤害！\");\nawait thisEffect.delete();"
+                                "script": "if (!args.attacker || !(args.output.damage > 0)) return;\nconst neigong = actor.itemTypes.neigong.find(i => i.name === '《明王金策》');\nconst reduction = (neigong?.system.stage || 1) >= 3 ? 30 : 20;\nargs.output.damage = Math.max(0, args.output.damage - reduction);\nawait ChatMessage.create({ content: `<div class=xjzl-chat-card>不动明王抵挡了 ${reduction} 点伤害！</div>`, speaker: ChatMessage.getSpeaker({actor: actor}) });\nawait game.xjzl.api.effects.removeEffect(actor, thisEffect.slug);"
                             }
                         ]
                     }
@@ -421,7 +421,7 @@
                             "label": "焚天诀-明王触发(10)",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if (args.move.isUltimate) {\n    const sourceEffect = thisItem.effects.getName(\"明王\");\n    if (sourceEffect) {\n        const effData = sourceEffect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        effData.changes[0].value = 10; // 动态修改数值\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.move.isUltimate) {\n    const sourceEffect = thisItem.effects.getName(\"明王\");\n    if (sourceEffect) {\n        const effData = sourceEffect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        effData.changes[0].value = 10; // 动态修改数值\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}"
                         }
                     ]
                 },
@@ -440,7 +440,7 @@
                             "label": "焚天诀-明王触发(20)",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if (args.move.isUltimate) {\n    const sourceEffect = thisItem.effects.getName(\"明王\");\n    if (sourceEffect) {\n        const effData = sourceEffect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        effData.changes[0].value = 20;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.move.isUltimate) {\n    const sourceEffect = thisItem.effects.getName(\"明王\");\n    if (sourceEffect) {\n        const effData = sourceEffect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        effData.changes[0].value = 20;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}"
                         }
                     ]
                 },
@@ -459,7 +459,7 @@
                             "label": "焚天诀-明王触发(40)",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if (args.move.isUltimate) {\n    const sourceEffect = thisItem.effects.getName(\"明王\");\n    if (sourceEffect) {\n        const effData = sourceEffect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        effData.changes[0].value = 40;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif (args.move.isUltimate) {\n    const sourceEffect = thisItem.effects.getName(\"明王\");\n    if (sourceEffect) {\n        const effData = sourceEffect.toObject();\n        delete effData._id;\n        effData.origin = thisItem.uuid;\n        effData.changes[0].value = 40;\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}"
                         }
                     ]
                 }
@@ -537,7 +537,7 @@
                             "label": "四寂-光明",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst source = thisItem.effects.getName(\"光\"); if(source) { const d = source.toObject(); delete d._id; d.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, d); }"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst source = thisItem.effects.getName(\"光\"); if(source) { const d = source.toObject(); delete d._id; d.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, d); }"
                         }
                     ]
                 },
@@ -562,7 +562,7 @@
                             "label": "四寂-光明(2)",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst source = thisItem.effects.getName(\"光\"); if(source) { const d = source.toObject(); delete d._id; d.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, d); await game.xjzl.api.effects.addEffect(actor, d); }"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst source = thisItem.effects.getName(\"光\"); if(source) { const d = source.toObject(); delete d._id; d.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, d); await game.xjzl.api.effects.addEffect(actor, d); }"
                         }
                     ]
                 },
@@ -587,7 +587,7 @@
                             "label": "四寂-光明(3)",
                             "trigger": "attack",
                             "active": true,
-                            "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst source = thisItem.effects.getName(\"光\"); if(source) { const d = source.toObject(); delete d._id; d.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, d); await game.xjzl.api.effects.addEffect(actor, d); await game.xjzl.api.effects.addEffect(actor, d); }"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType) || (args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst source = thisItem.effects.getName(\"光\"); if(source) { const d = source.toObject(); delete d._id; d.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, d); await game.xjzl.api.effects.addEffect(actor, d); await game.xjzl.api.effects.addEffect(actor, d); }"
                         }
                     ]
                 }

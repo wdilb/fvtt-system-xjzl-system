@@ -116,7 +116,7 @@
                             "label": "罪恶断-洞察检定",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = String(val);\n    effData.changes[1].value = String(val);\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`【罪恶断】获得 ${val} 点断案值`);\n}"
+                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = String(val);\n    effData.changes[1].value = String(val);\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`【罪恶断】获得 ${val} 点断案值`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 },
@@ -135,7 +135,7 @@
                             "label": "罪恶断-洞察检定(+5)",
                             "trigger": "combatStart",
                             "active": true,
-                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total + 5;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = String(val);\n    effData.changes[1].value = String(val);\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    ui.notifications.info(`【罪恶断】获得 ${val} 点断案值 (含圆满+5)`);\n}"
+                            "script": "const roll = await actor.rollAttributeTest(\"dongcha\", { skipDialog: true });\nconst val = roll.total + 5;\nconst sourceEffect = thisItem.effects.getName(\"断案值\");\nif (sourceEffect) {\n    const effData = sourceEffect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.changes[0].value = String(val);\n    effData.changes[1].value = String(val);\n    effData.flags[\"xjzl-system\"].duanVal = val;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`【罪恶断】获得 ${val} 点断案值 (含圆满+5)`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n}"
                         }
                     ]
                 }
@@ -188,7 +188,7 @@
                                 "trigger": "attack",
                                 "label": "确认消耗断案",
                                 "active": true,
-                                "script": "if ((args.move.type !== 'basic' || args.move.id === 'opportunity-attack')) {\n    const val = thisEffect.getFlag('xjzl-system', 'duanVal') || 0;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"断案裁决\" },\n        content: `<p>当前具备 <b>${val}</b> 点断案威力。</p><p>是否在此次出招中消耗断案值？一旦使用该状态即会移除。</p>`,\n        yes: { label: \"消耗加伤\", icon: \"fas fa-check\" },\n        no: { label: \"保留状态\", icon: \"fas fa-times\" }\n    });\n    if(confirm) {\n        ui.notifications.info(\"已消耗断案值增强招式！\");\n        await thisEffect.delete();\n    } else {\n        args.flags.damageResult.damage -= val;\n        args.flags.damageResult.breakdown += `\\n- 放弃消耗断案值 (-${val})`;\n    }\n}"
+                                "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nif ((args.move.type !== 'basic' || args.move.id === 'opportunity-attack')) {\n    const val = thisEffect.getFlag('xjzl-system', 'duanVal') || 0;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"断案裁决\" },\n        content: `<p>当前具备 <b>${val}</b> 点断案威力。</p><p>是否在此次出招中消耗断案值？一旦使用该状态即会移除。</p>`,\n        yes: { label: \"消耗加伤\", icon: \"fas fa-check\" },\n        no: { label: \"保留状态\", icon: \"fas fa-times\" }\n    });\n    if(confirm) {\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>已消耗断案值增强招式！</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n        await game.xjzl.api.effects.removeEffect(actor, thisEffect.slug);\n    } else {\n        // calc 只在有系数或 isFixed 的招式上执行；其余招式没有预加值，不能回扣\n        if ((args.move.calculation?.scalings?.length || 0) > 0 || args.move.calculation?.isFixed) {\n            args.flags.damageResult.damage -= val;\n            args.flags.damageResult.breakdown += `\\n- 放弃消耗断案值 (-${val})`;\n        }\n    }\n}"
                             }
                         ]
                     }
@@ -245,7 +245,7 @@
                             "label": "破罡-破护体",
                             "trigger": "preDamage",
                             "active": true,
-                            "script": "if ((args.move.type !== 'basic' || args.move.id === 'opportunity-attack')) {\n    const tHuti = args.target.system.resources.huti || 0;\n    if (tHuti > 0) {\n        await args.target.changeResources({ \"system.resources.huti\": Math.max(0, tHuti - 20) }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        ui.notifications.info(`破罡神功：消融了 ${Math.min(20, tHuti)} 点护体！`);\n    }\n}"
+                            "script": "if ((args.move.type !== 'basic' || args.move.id === 'opportunity-attack')) {\n    const tHuti = args.target.system.resources.huti || 0;\n    if (tHuti > 0) {\n        await args.target.changeResources({ \"system.resources.huti\": Math.max(0, tHuti - 20) }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        await ChatMessage.create({ content: '<div class=xjzl-chat-card>' + (`破罡神功：消融了 ${Math.min(20, tHuti)} 点护体！`) + '</div>', speaker: ChatMessage.getSpeaker({actor: actor}) });\n    }\n}"
                         }
                     ]
                 }
@@ -344,7 +344,7 @@
                             "label": "界元-回血(1)",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    const heal = mpSpent * 1;\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-yin-yang\"></i> 界元真气流转</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗 ${mpSpent} 点内力，生生不息转化为 <span style=\"color:green; font-weight:bold;\">${heal}</span> 点气血。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    const heal = mpSpent * 1;\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-yin-yang\"></i> 界元真气流转</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗 ${mpSpent} 点内力，生生不息转化为 <span style=\"color:green; font-weight:bold;\">${heal}</span> 点气血。</div></div></div>`;\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -363,7 +363,7 @@
                             "label": "界元-回血(2)",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    const heal = mpSpent * 2;\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-yin-yang\"></i> 界元真气流转</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗 ${mpSpent} 点内力，生生不息转化为 <span style=\"color:green; font-weight:bold;\">${heal}</span> 点气血。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    const heal = mpSpent * 2;\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-yin-yang\"></i> 界元真气流转</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗 ${mpSpent} 点内力，生生不息转化为 <span style=\"color:green; font-weight:bold;\">${heal}</span> 点气血。</div></div></div>`;\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 },
@@ -382,7 +382,7 @@
                             "label": "界元-回血(3)",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    const heal = mpSpent * 3;\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-yin-yang\"></i> 界元真气流转</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗 ${mpSpent} 点内力，生生不息转化为 <span style=\"color:green; font-weight:bold;\">${heal}</span> 点气血。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                            "script": "if (args.actionType && !['attack', 'basic-attack'].includes(args.actionType)) return;\nconst mpSpent = args.costConsumed?.mp || 0;\nif (mpSpent > 0) {\n    const heal = mpSpent * 3;\n    await actor.applyHealing({ healer: actor,  amount: heal, type: \"hp\", showScrolling: true });\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-yin-yang\"></i> 界元真气流转</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">消耗 ${mpSpent} 点内力，生生不息转化为 <span style=\"color:green; font-weight:bold;\">${heal}</span> 点气血。</div></div></div>`;\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
                     ]
                 }
