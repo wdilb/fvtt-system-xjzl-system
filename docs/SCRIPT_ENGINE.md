@@ -271,6 +271,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
+| `targetCount` | `number` | 只读 | 本次实际结算的目标数量；仅在真实逐目标结算阶段提供。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
 | `element` | `string` | 只读 | 招式原始属性。 |

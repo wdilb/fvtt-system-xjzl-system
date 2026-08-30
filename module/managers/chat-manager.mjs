@@ -1440,6 +1440,8 @@ export class ChatCardManager {
                     item: item,
                     move: move,
                     element: moveElement,
+                    // preDamage 才是逐目标的真实结算阶段，供目标数量限定的招式效果使用
+                    targetCount: targets.length,
 
                     // 状态 (只读)
                     outcome: {
@@ -1965,6 +1967,8 @@ export class ChatCardManager {
                     item: item,
                     move: move,
                     element: moveElement,
+                    // 手动结算同样在逐目标阶段执行 preDamage
+                    targetCount: targets.length,
                     outcome: {
                         isHit: true,
                         isCrit: config.isCrit,
