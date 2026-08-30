@@ -756,7 +756,7 @@
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，挥洒剑气，对直线上的敌人造成 0.4 内息点内功伤害。<br>·若自身处在“清风”状态，招式可改为对单体目标施展，挥舞剑气，招式伤害提升 20 点。</p><p>升级：招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "自动检测清风状态增加伤害。单体/直线范围需手动控制。",
+                    "automationNote": "自动检测清风状态：常规招式伤害+10；本次实际只选择一个目标时，自动按单体形态额外+20。目标是否符合直线范围仍需玩家手动确认。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -779,7 +779,13 @@
                             "label": "清风增伤",
                             "trigger": "calc",
                             "active": true,
-                            "script": "const hasQingfeng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qingfeng\");\nif (hasQingfeng) {\n    args.output.damage += 30; // 20特有+10通用\n    args.output.bonusDesc.push(\"清风(通用+特有) +30\");\n}"
+                            "script": "const hasQingfeng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qingfeng\");\nif (hasQingfeng) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"清风通用 +10\");\n}"
+                        },
+                        {
+                            "label": "清风单体形态",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "const hasQingfeng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qingfeng\");\nif (args.outcome?.isHit && hasQingfeng && args.targetCount === 1 && args.config) {\n    args.config.amount += 20;\n    await ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({ actor }),\n        content: `<div class=\"xjzl-chat-card\"><strong>清风单体形态</strong><br>因本次只有一个目标，乾坤清气触发单体形态，招式伤害 +20。</div>`\n    });\n}"
                         }
                     ]
                 },
