@@ -273,7 +273,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_18brxkq"
+                    }
+                }
             }
         ]
     },
@@ -302,7 +307,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1n3yzqu"
+                    }
+                }
             }
         ]
     },
@@ -331,7 +341,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1kyo5p2"
+                    }
+                }
             }
         ]
     },
@@ -445,7 +460,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1g88tvb"
+                    }
+                }
             }
         ]
     },
@@ -474,7 +494,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1fujt1r"
+                    }
+                }
             }
         ]
     },
@@ -841,13 +866,19 @@
             "damage": 15,
             "block": 5,
             "description": "刀镌鬼脸，邪异莫测。<br>仅标签为[恶][邪]之人可以使用。<br>当你使用此刀杀死一个人时，你的内力上限+1，至多增加100点。当你失去吸魂邪刀（离开身体5米外）时，此增益效果清零。",
-            "automationNote": "完全自动化：击杀增加内力上限（Bonus）。",
+            "automationNote": "部分自动化：装备期间，击杀增益自动计入内力上限并限制至100点；[恶][邪]使用限制及离开身体5米后清零仍需手动处理。",
             "scripts": [
+                {
+                    "label": "吸魂增益",
+                    "trigger": "passive",
+                    "active": true,
+                    "script": "const bonus = Math.min(100, actor.getFlag(\"xjzl-system\", \"weapon_xihun_bonus\") || 0);\nS.resources.mp.bonus += bonus;"
+                },
                 {
                     "label": "吸魂",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.damageResult && args.damageResult.isDead) {\n    const currentBonus = S.resources.mp.bonus || 0;\n    if (currentBonus < 100) {\n        await actor.update({'system.resources.mp.bonus': currentBonus + 1});\n        ui.notifications.info('吸魂邪刀：吞噬生魂！');\n    }\n}"
+                    "script": "if (args.damageResult?.isDead) {\n    const currentBonus = Math.min(100, actor.getFlag(\"xjzl-system\", \"weapon_xihun_bonus\") || 0);\n    if (currentBonus < 100) {\n        await actor.setFlag(\"xjzl-system\", \"weapon_xihun_bonus\", currentBonus + 1);\n        ui.notifications.info(\"吸魂邪刀：吞噬生魂！\");\n    }\n}"
                 }
             ]
         }
@@ -1015,7 +1046,12 @@
                         "mode": 2,
                         "value": "25"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1ohudf9"
+                    }
+                }
             }
         ]
     },
@@ -1076,7 +1112,8 @@
                         "maxStacks": 5
                     }
                 },
-                "description": "叠加5层后可消耗所有层数：获得3点怒气 或 回复50点气血 或 回复30点内力。"
+                "description": "叠加5层后可消耗所有层数：获得3点怒气 或 回复50点气血 或 回复30点内力。",
+                "changes": []
             }
         ]
     },
@@ -1204,7 +1241,7 @@
                     "label": "龙牙-杀虐",
                     "trigger": "calc",
                     "active": true,
-                    "script": "const bonus = Math.min(20, S.resources.shanie.value || 0);\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`杀孽加持(+${bonus})`);\n}"
+                    "script": "const bonus = Math.min(20, S.resources.shanie || 0);\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`杀孽加持(+${bonus})`);\n}"
                 }
             ]
         }
@@ -1257,7 +1294,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_3fd5gv"
+                    }
+                }
             }
         ]
     },
@@ -1279,7 +1321,7 @@
                     "label": "鱼骨-刺骨",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit) {\n    const existing = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yugu_spine');\n    const currentStacks = existing ? (existing.getFlag('xjzl-system', 'stacks') || 1) : 0;\n    \n    if (currentStacks >= 2) { // 本次加完就是3层\n        if (existing) await existing.delete();\n        const rootEffect = CONFIG.statusEffects.find(e => e.id === 'root');\n        const data = foundry.utils.deepClone(rootEffect);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info('鱼骨刀：骨刺爆发，禁足！');\n    } else {\n        const aeData = {\n            name: '骨刺',\n            icon: 'icons/svg/bones.svg',\n            flags: { 'xjzl-system': { slug: 'yugu_spine', stackable: true, maxStacks: 3 } }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, aeData);\n    }\n}"
+                    "script": "if (args.isHit) {\n    const existing = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yugu_spine');\n    const currentStacks = existing ? (existing.getFlag('xjzl-system', 'stacks') || 1) : 0;\n    \n    if (currentStacks >= 2) { // 本次加完就是3层\n        if (existing) await game.xjzl.api.effects.removeEffect(args.target, \"yugu_spine\", 99);\n        const rootEffect = CONFIG.statusEffects.find(e => e.id === 'root');\n        const data = foundry.utils.deepClone(rootEffect);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info('鱼骨刀：骨刺爆发，禁足！');\n    } else {\n        const aeData = {\n            name: '骨刺',\n            icon: 'icons/svg/bones.svg',\n            flags: { 'xjzl-system': { slug: 'yugu_spine', stackable: true, maxStacks: 3 } }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, aeData);\n    }\n}"
                 }
             ]
         }
@@ -1296,7 +1338,7 @@
             "damage": 20,
             "block": 10,
             "description": "邪气之刀，用之不慎，极易克死主人。<br>装备后，你的残疾检定具有劣势。<br>·若你的性格为鲁莽，武器招式伤害+10点。",
-            "automationNote": "完全自动化：检测性格修正伤害。",
+            "automationNote": "部分自动化：鲁莽性格的伤害加成自动处理；残疾检定劣势需手动处理。",
             "scripts": [
                 {
                     "label": "新亭侯-鲁莽",
@@ -1462,7 +1504,12 @@
                         "mode": 2,
                         "value": "-1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_p0i6s9"
+                    }
+                }
             }
         ]
     },
@@ -1493,7 +1540,12 @@
                         "mode": 2,
                         "value": "3"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1oz4jab"
+                    }
+                }
             }
         ]
     },
@@ -1524,7 +1576,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_2hyd8d"
+                    }
+                }
             }
         ]
     },
@@ -1565,7 +1622,12 @@
                         "mode": 2,
                         "value": "-20"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_tw0uzl"
+                    }
+                }
             }
         ]
     },
@@ -1601,7 +1663,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1dd3x9z"
+                    }
+                }
             }
         ]
     },
@@ -1656,7 +1723,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1hrvypn"
+                    }
+                }
             }
         ]
     },
@@ -1716,7 +1788,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_4ag4ux"
+                    }
+                }
             }
         ]
     },
@@ -1747,7 +1824,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_fn663z"
+                    }
+                }
             }
         ]
     },
@@ -1790,7 +1872,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_132i0wx"
+                    }
+                }
             }
         ]
     },
@@ -1845,7 +1932,12 @@
                         "mode": 2,
                         "value": "-2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_q5fqjt"
+                    }
+                }
             }
         ]
     },
@@ -1934,7 +2026,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1kzehq1"
+                    }
+                }
             }
         ]
     },
@@ -1965,7 +2062,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1jp62yh"
+                    }
+                }
             }
         ]
     },
@@ -2001,7 +2103,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_br9uyf"
+                    }
+                }
             }
         ]
     },
@@ -2032,7 +2139,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1iegu3d"
+                    }
+                }
             }
         ]
     },
@@ -2216,7 +2328,12 @@
                         "mode": 2,
                         "value": "3"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1ucxr7d"
+                    }
+                }
             }
         ]
     },
@@ -2247,7 +2364,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_10nx1r7"
+                    }
+                }
             }
         ]
     },
@@ -2288,7 +2410,12 @@
                         "mode": 2,
                         "value": "-20"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_itwipr"
+                    }
+                }
             }
         ]
     },
@@ -2324,7 +2451,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_k0svr1"
+                    }
+                }
             }
         ]
     },
@@ -2379,7 +2511,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_kug9e1"
+                    }
+                }
             }
         ]
     },
@@ -2439,7 +2576,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_116xy9f"
+                    }
+                }
             }
         ]
     },
@@ -2470,7 +2612,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_w48lap"
+                    }
+                }
             }
         ]
     },
@@ -2513,7 +2660,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_cv28hz"
+                    }
+                }
             }
         ]
     },
@@ -2568,7 +2720,12 @@
                         "mode": 2,
                         "value": "-2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_txyvmb"
+                    }
+                }
             }
         ]
     },
@@ -2657,7 +2814,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_kuzgwf"
+                    }
+                }
             }
         ]
     },
@@ -2688,7 +2850,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_2uvr4b"
+                    }
+                }
             }
         ]
     },
@@ -2724,7 +2891,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1ub3yt9"
+                    }
+                }
             }
         ]
     },
@@ -2760,7 +2932,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_ghlkor"
+                    }
+                }
             }
         ]
     },
@@ -2944,7 +3121,12 @@
                         "mode": 2,
                         "value": "3"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_dfymyd"
+                    }
+                }
             }
         ]
     },
@@ -2975,7 +3157,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1137zgf"
+                    }
+                }
             }
         ]
     },
@@ -3016,7 +3203,12 @@
                         "mode": 2,
                         "value": "-20"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1l3dvwb"
+                    }
+                }
             }
         ]
     },
@@ -3052,7 +3244,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1p4ix95"
+                    }
+                }
             }
         ]
     },
@@ -3107,7 +3304,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_rq09yx"
+                    }
+                }
             }
         ]
     },
@@ -3170,7 +3372,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1yqkmdi"
+                    }
+                }
             }
         ]
     },
@@ -3202,7 +3409,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1pwvjgo"
+                    }
+                }
             }
         ]
     },
@@ -3247,7 +3459,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1vliwen"
+                    }
+                }
             }
         ]
     },
@@ -3305,7 +3522,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_nzemi7"
+                    }
+                }
             }
         ]
     },
@@ -3401,7 +3623,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1y8ck7u"
+                    }
+                }
             }
         ]
     },
@@ -3433,7 +3660,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_ryi8qq"
+                    }
+                }
             }
         ]
     },
@@ -3470,7 +3702,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_17up0jg"
+                    }
+                }
             }
         ]
     },
@@ -3507,7 +3744,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_eu1bo6"
+                    }
+                }
             }
         ]
     },
@@ -3701,7 +3943,12 @@
                         "mode": 2,
                         "value": "3"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_ymi5gn"
+                    }
+                }
             }
         ]
     },
@@ -3733,7 +3980,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_h6ub91"
+                    }
+                }
             }
         ]
     },
@@ -3775,7 +4027,12 @@
                         "mode": 2,
                         "value": "-20"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_171842n"
+                    }
+                }
             }
         ]
     },
@@ -3812,7 +4069,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_y2stz7"
+                    }
+                }
             }
         ]
     },
@@ -3871,7 +4133,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_y1ru07"
+                    }
+                }
             }
         ]
     },
@@ -3934,7 +4201,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1h68kmt"
+                    }
+                }
             }
         ]
     },
@@ -3966,7 +4238,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_u830kr"
+                    }
+                }
             }
         ]
     },
@@ -4011,7 +4288,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_11nczxt"
+                    }
+                }
             }
         ]
     },
@@ -4069,7 +4351,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1mysyfs"
+                    }
+                }
             }
         ]
     },
@@ -4165,7 +4452,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1m0fqal"
+                    }
+                }
             }
         ]
     },
@@ -4197,7 +4489,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1gn4xd5"
+                    }
+                }
             }
         ]
     },
@@ -4234,7 +4531,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_o0cxsz"
+                    }
+                }
             }
         ]
     },
@@ -4271,7 +4573,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1ygmqml"
+                    }
+                }
             }
         ]
     },
@@ -4465,7 +4772,12 @@
                         "mode": 2,
                         "value": "3"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1gb312j"
+                    }
+                }
             }
         ]
     },
@@ -4497,7 +4809,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_170upz"
+                    }
+                }
             }
         ]
     },
@@ -4539,7 +4856,12 @@
                         "mode": 2,
                         "value": "-20"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1rjqoz1"
+                    }
+                }
             }
         ]
     },
@@ -4576,7 +4898,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1k8w2jf"
+                    }
+                }
             }
         ]
     },
@@ -4635,7 +4962,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_bhsteh"
+                    }
+                }
             }
         ]
     },
@@ -4698,7 +5030,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1rmxpzf"
+                    }
+                }
             }
         ]
     },
@@ -4730,7 +5067,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1p0enyv"
+                    }
+                }
             }
         ]
     },
@@ -4775,7 +5117,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_k1i8sp"
+                    }
+                }
             }
         ]
     },
@@ -4833,7 +5180,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1vqky6"
+                    }
+                }
             }
         ]
     },
@@ -4929,7 +5281,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_fka6az"
+                    }
+                }
             }
         ]
     },
@@ -4961,7 +5318,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_1viapm3"
+                    }
+                }
             }
         ]
     },
@@ -4998,7 +5360,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_15q57ez"
+                    }
+                }
             }
         ]
     },
@@ -5035,7 +5402,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_blade_172xodn"
+                    }
+                }
             }
         ]
     },

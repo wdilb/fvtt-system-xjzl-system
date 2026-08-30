@@ -52,7 +52,12 @@
                         "mode": 2,
                         "value": 5
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1nzz2ri"
+                    }
+                }
             }
         ]
     },
@@ -89,7 +94,12 @@
                         "mode": 2,
                         "value": 1
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1u7gmxi"
+                    }
+                }
             }
         ]
     },
@@ -205,7 +215,7 @@
                     "label": "吹雪·禁足",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"root\");\n    // 禁足默认无限，物品描述说一回合，需要修改持续时间\n    // 由于 addEffect 会返回创建的 AE，我们可以后续修改它，或者构造一个带 duration 的 data 传进去\n    // 这里采用标准状态，GM或玩家手动移除，或者使用宏扩展\n    // 更严谨写法：构造带时间的 data\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    rootData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, rootData);\n}"
+                    "script": "if (args.isHit && args.target && !args.target.system.martial.stanceActive) {\n    const rootData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"root\"));\n    if (!rootData) return;\n    rootData.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, rootData);\n}"
                 }
             ]
         }
@@ -424,7 +434,12 @@
                         "mode": 2,
                         "value": 1
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_8s0k0l"
+                    }
+                }
             }
         ]
     },
@@ -521,7 +536,12 @@
                         "mode": 2,
                         "value": -2
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_13xtoms"
+                    }
+                }
             }
         ]
     },
@@ -545,7 +565,7 @@
                     "label": "天铸·转化",
                     "trigger": "damaged",
                     "active": true,
-                    "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst blockSlug = \"tianzhu-block\";\nconst damageSlug = \"tianzhu-damage\";\n\n// 1. 如果已经神威大成 (伤害模式)，则只刷新神威，不再处理格挡\nconst damageEffect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === damageSlug);\nif (damageEffect) {\n    const sourceDamage = thisItem.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === damageSlug);\n    if (sourceDamage) await game.xjzl.api.effects.addEffect(actor, sourceDamage.toObject());\n    return;\n}\n\n// 2. 检查格挡模式层数\nconst blockEffect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === blockSlug);\nconst currentStacks = blockEffect ? (blockEffect.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (currentStacks < 5) {\n    // 未满5层，叠加格挡\n    const sourceBlock = thisItem.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === blockSlug);\n    if (sourceBlock) await game.xjzl.api.effects.addEffect(actor, sourceBlock.toObject());\n} else {\n    // 满5层再触发 -> 质变！\n    // 删除格挡\n    await blockEffect.delete();\n    \n    // 添加神威 (直接设定为6层效果)\n    const sourceDamage = thisItem.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === damageSlug);\n    if (sourceDamage) {\n        await game.xjzl.api.effects.addEffect(actor, sourceDamage.toObject());\n        ui.notifications.info(\"天铸护手：神兵开锋，攻守逆转！\");\n    }\n}"
+                    "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst blockSlug = \"tianzhu-block\";\nconst damageSlug = \"tianzhu-damage\";\n\n// 1. 如果已经神威大成 (伤害模式)，则只刷新神威，不再处理格挡\nconst damageEffect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === damageSlug);\nif (damageEffect) {\n    const sourceDamage = thisItem.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === damageSlug);\n    if (sourceDamage) await game.xjzl.api.effects.addEffect(actor, sourceDamage.toObject());\n    return;\n}\n\n// 2. 检查格挡模式层数\nconst blockEffect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === blockSlug);\nconst currentStacks = blockEffect ? (blockEffect.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (currentStacks < 5) {\n    // 未满5层，叠加格挡\n    const sourceBlock = thisItem.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === blockSlug);\n    if (sourceBlock) await game.xjzl.api.effects.addEffect(actor, sourceBlock.toObject());\n} else {\n    // 满5层再触发 -> 质变！\n    // 删除格挡\n    await game.xjzl.api.effects.removeEffect(actor, blockSlug, currentStacks);\n    \n    // 添加神威 (直接设定为6层效果)\n    const sourceDamage = thisItem.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === damageSlug);\n    if (sourceDamage) {\n        await game.xjzl.api.effects.addEffect(actor, sourceDamage.toObject());\n        ui.notifications.info(\"天铸护手：神兵开锋，攻守逆转！\");\n    }\n}"
                 }
             ]
         },
@@ -671,7 +691,12 @@
                         "mode": 2,
                         "value": 20
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_13h7upp"
+                    }
+                }
             }
         ]
     },
@@ -720,7 +745,7 @@
                     "label": "阎魔·诛侠",
                     "trigger": "preDamage",
                     "active": true,
-                    "script": "const ownerS = actor.system.social;\nconst isOwnerEvil = (ownerS.exing >= 100 && ownerS.xiayi < 50);\n\nif (isOwnerEvil && args.target && args.target.actor) {\n    const targetS = args.target.actor.system.social;\n    const isTargetXia = (targetS.xiayi >= 100 && targetS.exing < 50);\n    \n    if (isTargetXia) {\n        args.config.amount += 20;\n        ui.notifications.info(\"阎魔之手：诛侠触发 (+20伤害)\");\n    }\n}"
+                    "script": "const ownerS = actor.system.social;\nconst isOwnerEvil = ownerS.exing >= 100 && ownerS.xiayi <= 50;\nconst targetS = args.target?.system?.social;\nconst isTargetXia = targetS\n    && targetS.xiayi >= 100\n    && targetS.exing <= 50;\nif (isOwnerEvil && isTargetXia) {\n    args.config.amount += 20;\n    ui.notifications.info(\"阎魔之手：诛侠触发 (+20伤害)\");\n}"
                 }
             ]
         }
@@ -803,7 +828,12 @@
                         "mode": 2,
                         "value": 1
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1mz1obi"
+                    }
+                }
             }
         ]
     },
@@ -903,7 +933,12 @@
                         "mode": 2,
                         "value": 3
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_16xwimr"
+                    }
+                }
             }
         ]
     },
@@ -935,7 +970,12 @@
                         "mode": 2,
                         "value": 1
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_v6bhkh"
+                    }
+                }
             }
         ]
     },
@@ -977,7 +1017,12 @@
                         "mode": 2,
                         "value": -20
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_10s4970"
+                    }
+                }
             }
         ]
     },
@@ -1044,7 +1089,12 @@
                         "mode": 2,
                         "value": 2
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_101vkpv"
+                    }
+                }
             }
         ]
     },
@@ -1101,7 +1151,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_49fqeg"
+                    }
+                }
             }
         ]
     },
@@ -1163,7 +1218,12 @@
                         "mode": 2,
                         "value": 5
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_awnp8d"
+                    }
+                }
             }
         ]
     },
@@ -1195,7 +1255,12 @@
                         "mode": 2,
                         "value": 10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1fhjw53"
+                    }
+                }
             }
         ]
     },
@@ -1240,7 +1305,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_10tjkvp"
+                    }
+                }
             }
         ]
     },
@@ -1297,7 +1367,12 @@
                         "mode": 2,
                         "value": 2
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1gmglxz"
+                    }
+                }
             }
         ]
     },
@@ -1390,7 +1465,12 @@
                         "mode": 2,
                         "value": 5
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1aj2js5"
+                    }
+                }
             }
         ]
     },
@@ -1452,7 +1532,12 @@
                         "mode": 2,
                         "value": 1
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_141hvrf"
+                    }
+                }
             }
         ]
     },
@@ -1489,7 +1574,12 @@
                         "mode": 2,
                         "value": 5
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_secyx"
+                    }
+                }
             }
         ]
     },
@@ -1507,7 +1597,7 @@
             "quantity": 1,
             "equipped": false,
             "description": "<p>用上好钢材锻造出的兵器，无论是外观还是择规程度都及其出色。</p><hr><p><strong>效果：</strong>无</p>",
-            "automationNote": "",
+            "automationNote": "无特殊自动化。",
             "scripts": []
         }
     },
@@ -1525,7 +1615,7 @@
             "quantity": 1,
             "equipped": false,
             "description": "<p>将铁矿经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p><hr><p><strong>效果：</strong>无</p>",
-            "automationNote": "",
+            "automationNote": "无特殊自动化。",
             "scripts": []
         }
     },
@@ -1543,7 +1633,7 @@
             "quantity": 1,
             "equipped": false,
             "description": "<p>将赤钢经过半熔工艺去除杂质，反是敲打而成的武器,做工精良。</p><hr><p><strong>效果：</strong>无</p>",
-            "automationNote": "",
+            "automationNote": "无特殊自动化。",
             "scripts": []
         }
     },
@@ -1561,7 +1651,7 @@
             "quantity": 1,
             "equipped": false,
             "description": "<p>带有杂质的劣质白铁锻造而成。</p><hr><p><strong>效果：</strong>无</p>",
-            "automationNote": "",
+            "automationNote": "无特殊自动化。",
             "scripts": []
         }
     },
@@ -1579,7 +1669,7 @@
             "quantity": 1,
             "equipped": false,
             "description": "<p>带有杂质的劣质青铜锻造而成。</p><hr><p><strong>效果：</strong>无</p>",
-            "automationNote": "",
+            "automationNote": "无特殊自动化。",
             "scripts": []
         }
     },
@@ -1597,7 +1687,7 @@
             "quantity": 1,
             "equipped": false,
             "description": "<p>农家常用的农具,或者是放置超过十年的破旧兵器,总之,很不好用。</p><hr><p><strong>效果：</strong>无</p>",
-            "automationNote": "",
+            "automationNote": "无特殊自动化。",
             "scripts": []
         }
     },
@@ -1661,7 +1751,12 @@
                         "mode": 2,
                         "value": "3"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1ibf0ul"
+                    }
+                }
             }
         ],
         "system": {
@@ -1690,7 +1785,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1f88g7v"
+                    }
+                }
             }
         ],
         "system": {
@@ -1729,7 +1829,12 @@
                         "mode": 2,
                         "value": "-20"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_u6d1hn"
+                    }
+                }
             }
         ],
         "system": {
@@ -1763,7 +1868,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1q45dut"
+                    }
+                }
             }
         ],
         "system": {
@@ -1815,7 +1925,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_lhzvy5"
+                    }
+                }
             }
         ],
         "system": {
@@ -1872,7 +1987,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1bqwjgf"
+                    }
+                }
             }
         ],
         "system": {
@@ -1901,7 +2021,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1gl4ebp"
+                    }
+                }
             }
         ],
         "system": {
@@ -1936,7 +2061,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1r7nnuz"
+                    }
+                }
             }
         ],
         "system": {
@@ -1975,7 +2105,7 @@
                     "label": "蟠龙反噬",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit && args.isCrit) {\n    await actor.applyDamage({ attacker: actor,  amount: 10, type: \"true\", isHit: true });\n    ui.notifications.warn(`${actor.name} 受到蟠龙反噬！`);\n}"
+                    "script": "if (args.isHit && args.isCrit) {\n    await actor.applyDamage({ attacker: actor,  amount: 10, type: \"liushi\", isHit: true });\n    ui.notifications.warn(`${actor.name} 受到蟠龙反噬！`);\n}"
                 }
             ],
             "automationNote": "完全自动化"
@@ -1996,7 +2126,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_f4gziv"
+                    }
+                }
             }
         ],
         "system": {
@@ -2078,7 +2213,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_acnybv"
+                    }
+                }
             }
         ],
         "system": {
@@ -2107,7 +2247,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1wtdwyf"
+                    }
+                }
             }
         ],
         "system": {
@@ -2141,7 +2286,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1ol6kt9"
+                    }
+                }
             }
         ],
         "system": {
@@ -2175,7 +2325,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_piesyj"
+                    }
+                }
             }
         ],
         "system": {
@@ -2339,7 +2494,12 @@
                         "mode": 2,
                         "value": "3"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_6d72az"
+                    }
+                }
             }
         ],
         "system": {
@@ -2368,7 +2528,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1eadvf9"
+                    }
+                }
             }
         ],
         "system": {
@@ -2407,7 +2572,12 @@
                         "mode": 2,
                         "value": "-20"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1qqu96t"
+                    }
+                }
             }
         ],
         "system": {
@@ -2441,7 +2611,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1s80aa3"
+                    }
+                }
             }
         ],
         "system": {
@@ -2493,7 +2668,12 @@
                         "mode": 5,
                         "value": "true"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_e4t15z"
+                    }
+                }
             }
         ],
         "system": {
@@ -2550,7 +2730,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_18kbimt"
+                    }
+                }
             }
         ],
         "system": {
@@ -2579,7 +2764,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_7po9qf"
+                    }
+                }
             }
         ],
         "system": {
@@ -2614,7 +2804,12 @@
                         "mode": 2,
                         "value": -10
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1ukhqw1"
+                    }
+                }
             }
         ],
         "system": {
@@ -2653,7 +2848,7 @@
                     "label": "蟠龙反噬",
                     "trigger": "hit",
                     "active": true,
-                    "script": "if (args.isHit && args.isCrit) {\n    await actor.applyDamage({ attacker: actor,  amount: 10, type: \"true\", isHit: true });\n    ui.notifications.warn(`${actor.name} 受到蟠龙反噬！`);\n}"
+                    "script": "if (args.isHit && args.isCrit) {\n    await actor.applyDamage({ attacker: actor,  amount: 10, type: \"liushi\", isHit: true });\n    ui.notifications.warn(`${actor.name} 受到蟠龙反噬！`);\n}"
                 }
             ],
             "automationNote": "完全自动化"
@@ -2674,7 +2869,12 @@
                         "mode": 2,
                         "value": "2"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1y6ltu5"
+                    }
+                }
             }
         ],
         "system": {
@@ -2756,7 +2956,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_v2tfux"
+                    }
+                }
             }
         ],
         "system": {
@@ -2785,7 +2990,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_12186t1"
+                    }
+                }
             }
         ],
         "system": {
@@ -2819,7 +3029,12 @@
                         "mode": 2,
                         "value": "1"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_10gbk5n"
+                    }
+                }
             }
         ],
         "system": {
@@ -2853,7 +3068,12 @@
                         "mode": 2,
                         "value": "5"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_1acek1h"
+                    }
+                }
             }
         ],
         "system": {
@@ -3039,7 +3259,12 @@
                         "mode": 2,
                         "value": "10"
                     }
-                ]
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "weapon_unarmed_tglbt1"
+                    }
+                }
             }
         ]
     }
