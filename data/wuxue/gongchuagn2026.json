@@ -1125,5 +1125,546 @@
                 "changes": []
             }
         ]
+    },
+    {
+        "name": "流觞照影剑（人）（玉阙书珍劫）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>剑气如水，能照人影，能载流觞。</p><p><strong>需求：</strong>剑</p><p><strong>属性：</strong>柔</p>",
+            "requirements": "剑",
+            "moves": [
+                {
+                    "name": "玄泉有清声",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "rou",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "@{1 + @up * 2|1}米",
+                    "targetInfo": "单体",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，以指叩剑，剑声激越。使目标获得一层“护身”状态，持续到战斗结束。并立即进入或刷新“一契”状态，持续到战斗结束。</p><p><strong>一契：</strong>进入或刷新此状态时立即选择场上一单位为目标。当目标单位使用招式时，你可主动退出此状态，之后立即以反应动作使用相同类型的招式。</p><p><strong>护身：</strong>每层增加内外功防御 5 点。</p><p><strong>升级：</strong>招式距离+2，内力消耗+1。</p>",
+                    "automationNote": "目标自动获得一层[护身]。一契仅发送卡片说明，目标选择、退出状态和反应动作释放请手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [1, 2, 3]
+                    },
+                    "scripts": [
+                        {
+                            "label": "获得护身与一契提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.target) return;\nconst effect = thisItem.effects.getName(\"护身\");\nif (effect) {\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #2980b9; background:rgba(41,128,185,0.05);\"><div style=\"color:#21618c; font-weight:bold;\"><i class=\"fas fa-link\"></i> 一契提示</div><div style=\"font-size:0.9em; margin-top:3px;\">请手动选择场上一单位作为“一契”目标；目标使用招式时，可主动退出“一契”，再以反应动作使用相同类型招式。</div></div>`\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "三觞解天刑",
+                    "type": "stance",
+                    "element": "rou",
+                    "damageType": "none",
+                    "weaponType": "sword",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，以酒淋剑，以剑催酒，开启架招。立即获得美酒效果。当架招成功为对方施加一层“同醉”，持续到战斗结束。</p><p><strong>同醉：</strong>每层命中-2、暴击骰+1。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "开启架招自动。格挡成功自动给攻击者添加一层[同醉]；美酒消耗和使用美酒效果请根据卡片提示手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": []
+                    },
+                    "costs": {
+                        "mp": [1, 2, 3]
+                    },
+                    "scripts": [
+                        {
+                            "label": "美酒手动处理提示",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "ChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #8e44ad; background:rgba(142,68,173,0.05);\"><div style=\"color:#6c3483; font-weight:bold;\"><i class=\"fas fa-wine-glass\"></i> 三觞解天刑</div><div style=\"font-size:0.9em; margin-top:3px;\">请手动消耗 1 枚美酒，并使用美酒效果。之后架招成功即视为格挡成功，自动给攻击者添加一层[同醉]。</div></div>`\n});"
+                        },
+                        {
+                            "label": "格挡成功施加同醉",
+                            "trigger": "damaged",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args) || args.isBroken || !args.attacker) return;\nconst effect = thisItem.effects.getName(\"同醉\");\nif (!effect) return;\nconst effectData = effect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);"
+                        }
+                    ]
+                },
+                {
+                    "name": "异世同合流",
+                    "type": "real",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，剑气如水，向前刺出，对目标造成 0.4 点内息内功伤害。若命中目标无架招，则立即进入或刷新“一契”状态，持续至战斗结束。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "伤害自动化。命中无架招目标时发送[一契]卡片说明，状态目标选择、退出和后续反应动作请手动处理。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [{"prop": "neixi", "ratio": 0.4}]
+                    },
+                    "costs": {
+                        "mp": [1, 2, 3]
+                    },
+                    "scripts": [
+                        {
+                            "label": "一契手动处理提示",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target || args.target.system.martial?.stanceActive) return;\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #2980b9; background:rgba(41,128,185,0.05);\"><div style=\"color:#21618c; font-weight:bold;\"><i class=\"fas fa-link\"></i> 一契提示</div><div style=\"font-size:0.9em; margin-top:3px;\">请手动让目标进入或刷新“一契”，选择场上一单位作为目标；目标使用招式时，可退出并以反应动作使用相同类型招式。</div></div>`\n});"
+                        }
+                    ]
+                },
+                {
+                    "name": "鉴明去尘垢",
+                    "type": "feint",
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "扇形范围敌人",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，横斩长剑，剑气如镜，鉴明去尘。对扇形范围敌人造成 0.2 点内息内功伤害。若你醉意值不为 0，则当击破架招时对目标施加一层“同醉”，持续到战斗结束。</p><p><strong>同醉：</strong>每层命中-2、暴击骰+1。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "伤害自动化。醉意不为0且击破架招时自动施加[同醉]。扇形目标请由玩家选取。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [{"prop": "neixi", "ratio": 0.2}]
+                    },
+                    "costs": {
+                        "mp": [2, 4, 6]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意破架施加同醉",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isBroken || !args.target || (actor.system.resources.alcohol?.value || 0) === 0) return;\nconst effect = thisItem.effects.getName(\"同醉\");\nif (!effect) return;\nconst effectData = effect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                        }
+                    ]
+                },
+                {
+                    "name": "万殊靡不均",
+                    "type": "real",
+                    "isUltimate": true,
+                    "element": "rou",
+                    "damageType": "neigong",
+                    "weaponType": "sword",
+                    "range": "2米",
+                    "targetInfo": "单体",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>蓄力动作，高举长剑，积蓄酒意，奋力斩下。造成 0.6 内息+醉意值点内功伤害，并为目标施加“万殊”，持续三回合。</p><p><strong>万殊：</strong>其释放的招式类型不可以与你最后释放的招式类型相同。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "伤害自动化。命中后自动添加持续3回合的[万殊]；[万殊]仅记录规则描述，最后招式类型限制请手动执行，并会发送卡片提醒。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [{"prop": "neixi", "ratio": 0.6}],
+                        "isFixed": true
+                    },
+                    "costs": {
+                        "mp": [2, 4, 6],
+                        "rage": [7, 6, 5]
+                    },
+                    "scripts": [
+                        {
+                            "label": "醉意伤害与万殊",
+                            "trigger": "calc",
+                            "active": true,
+                            "script": "const alcohol = actor.system.resources.alcohol?.value || 0;\nargs.output.damage += alcohol;\nif (alcohol > 0) args.output.bonusDesc.push(`醉意值 +${alcohol}`);"
+                        },
+                        {
+                            "label": "施加万殊并发送提醒",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst effect = thisItem.effects.getName(\"万殊\");\nif (effect) {\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    effectData.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n}\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #c0392b; background:rgba(192,57,43,0.05);\"><div style=\"color:#922b21; font-weight:bold;\"><i class=\"fas fa-ban\"></i> 万殊提醒</div><div style=\"font-size:0.9em; margin-top:3px;\">目标已获得[万殊]，持续3回合。请手动记录你最后释放的招式类型，并禁止目标释放与该类型相同的招式。</div></div>`\n});"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "护身",
+                "icon": "systems/xjzl-system/assets/icons/ae/护身.png",
+                "description": "每层增加内外功防御 5 点，持续到战斗结束。",
+                "transfer": false,
+                "flags": {"xjzl-system": {"slug": "hushen", "stackable": true, "maxStacks": 0}},
+                "changes": [
+                    {"key": "system.combat.def_waigong", "mode": 2, "value": "5"},
+                    {"key": "system.combat.def_neigong", "mode": 2, "value": "5"}
+                ]
+            },
+            {
+                "name": "同醉",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "每层命中-2、暴击骰+1，持续到战斗结束。",
+                "transfer": false,
+                "flags": {"xjzl-system": {"slug": "wuxue_liushang_tongzui", "stackable": true, "maxStacks": 0}},
+                "changes": [
+                    {"key": "system.combat.hit_waigong", "mode": 2, "value": "-2"},
+                    {"key": "system.combat.hit_neigong", "mode": 2, "value": "-2"},
+                    {"key": "system.combat.crit_waigong", "mode": 2, "value": "1"},
+                    {"key": "system.combat.crit_neigong", "mode": 2, "value": "1"}
+                ]
+            },
+            {
+                "name": "万殊",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "持续三回合。其释放的招式类型不可以与你最后释放的招式类型相同；最后释放招式类型及限制请手动记录。",
+                "transfer": false,
+                "flags": {"xjzl-system": {"slug": "wuxue_liushang_wanshu", "stackable": false}},
+                "changes": []
+            }
+        ]
+    },
+    {
+        "name": "皴山泼江九法（人/地）（玉阙书珍劫）",
+        "type": "wuxue",
+        "img": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+        "system": {
+            "isOfficial": false,
+            "category": "wuxue",
+            "sect": "jianghushili",
+            "tier": 1,
+            "description": "<p>以点及面、皴山泼江，发祥自山水名画《千里江山图》，后逐渐失落。</p><p><strong>需求：</strong>匕首-笔</p><p><strong>属性：</strong>太极</p>",
+            "requirements": "匕首-笔",
+            "moves": [
+                {
+                    "name": "水榭亭台",
+                    "type": "counter",
+                    "tier": 1,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，立即消耗速度移动至目标身后，一挥一挑，秋波之上竖起一座亭台，造成 0.5 内息点内功伤害，并将其击飞，并创造一处“小景”。</p><p>当你获得“无垠”时，此招变更为“渺渺烟波”。</p><p><strong>小景：</strong>当你进入和离开小景范围时，不会消耗移动速度；因不消耗速度，因此也不会被趁虚而入。当你位于小景时，闪避+2。场上小景已有四处时，所有小景消失，你获得“无垠”。</p><p><strong>无垠：</strong>小景相互勾连，铺就无垠江山。你的招式会发生变化。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "反击伤害自动。位移、击飞和小景地点标记请手动；系统自动计数小景，触发时发送当前计数卡片，达到4处后清除计数并获得[无垠]，同时发送招式变化提醒。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [{"prop": "neixi", "ratio": 0.5}]
+                    },
+                    "costs": {"mp": [1, 2, 3]},
+                    "scripts": [
+                        {
+                            "label": "位移与小景提示",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const effect = thisItem.effects.getName(\"小景\");\nif (effect) {\n    const effectData = effect.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}\nconst scene = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_xiaojing\");\nconst count = scene ? (scene.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (count >= 4) {\n    await game.xjzl.api.effects.removeEffect(actor, \"wuxue_cunshan_xiaojing\", 99);\n    const boundless = thisItem.effects.getName(\"无垠\");\n    if (boundless) {\n        const boundlessData = boundless.toObject();\n        delete boundlessData._id;\n        boundlessData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, boundlessData);\n    }\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #16a085; background:rgba(22,160,133,0.05);\"><div style=\"color:#117864; font-weight:bold;\"><i class=\"fas fa-infinity\"></i> 无垠</div><div style=\"font-size:0.9em; margin-top:3px;\">小景已达4处，计数已清除并获得[无垠]。请手动标记场上小景消失，并将相关招式切换为地级招式。</div></div>`});\n} else {\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #3498db; background:rgba(52,152,219,0.05);\"><div style=\"color:#21618c; font-weight:bold;\"><i class=\"fas fa-paint-brush\"></i> 小景计数：${count}/4</div><div style=\"font-size:0.9em; margin-top:3px;\">请手动将目标移动至身后并击飞，然后标记本次创造的小景地点。</div></div>`});\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "渺渺烟波",
+                    "type": "counter",
+                    "tier": 2,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "3米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "反应动作",
+                    "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，提笔纵横，绘下烟波缥缈，对周围敌人造成 0.5 内息内功伤害，并为其添加“下盘不稳”持续一回合。</p><p><strong>下盘不稳：</strong>你的移动速度减半（向下取整）。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "没有[无垠]时阻止施展。伤害自动，对所选目标自动施加持续1回合的[下盘不稳]。周围目标请由玩家选取。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [{"prop": "neixi", "ratio": 0.5}]
+                    },
+                    "costs": {"mp": [4, 8, 12]},
+                    "scripts": [
+                        {
+                            "label": "无垠限制",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_wuyin\")) { args.abort = true; args.abortReason = \"没有[无垠]，无法施展[渺渺烟波]！\"; }"
+                        },
+                        {
+                            "label": "施加下盘不稳",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nawait game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: 1 } });"
+                        }
+                    ]
+                },
+                {
+                    "name": "白珠崩屑",
+                    "type": "real",
+                    "tier": 1,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，运力一甩，笔尖飞出一点玉色，如飞泉击石，流水迸溅，对目标及周围 3 米另外一个敌人造成 0.3 内息点内功伤害，创造两处“小景”。</p><p>当你获得“无垠”时，此招变更为“悬泉飞瀑”。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
+                    "automationNote": "伤害自动。目标及周围另一名敌人的选择请玩家手动完成；系统自动增加2处小景、报告当前计数，并在达到4处时处理[无垠]和招式变化提醒。小景地点标记手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [{"prop": "neixi", "ratio": 0.3}]
+                    },
+                    "costs": {"mp": [2, 4, 6]},
+                    "scripts": [
+                        {
+                            "label": "创造两处小景",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const effect = thisItem.effects.getName(\"小景\");\nif (!effect) return;\nconst effectData = effect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nfor (let i = 0; i < 2; i++) await game.xjzl.api.effects.addEffect(actor, effectData);\nconst scene = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_xiaojing\");\nconst count = scene ? (scene.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (count >= 4) {\n    await game.xjzl.api.effects.removeEffect(actor, \"wuxue_cunshan_xiaojing\", 99);\n    const boundless = thisItem.effects.getName(\"无垠\");\n    if (boundless) { const data = boundless.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, data); }\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #16a085;\"><b>无垠提醒：</b>小景已达4处，计数清除并获得[无垠]。请手动标记小景消失，并切换相关招式。</div>`});\n} else {\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #3498db;\"><b>小景计数：${count}/4</b><br>请手动标记本次创造的两处小景地点。</div>`});\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "悬泉飞瀑",
+                    "type": "real",
+                    "tier": 2,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "3米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，提笔下按，星汉临尘，白练冲刷，造成 0.5 内息点内功伤害，并使其倒地。若有目标在半空中，可以消耗反应动作施展此招，使其立即落地并倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
+                    "automationNote": "没有[无垠]时阻止施展。正常伤害自动；出招时询问是否作为半空目标的反应释放，确认后自动给目标添加[倒地]。目标是否在半空及反应动作消耗由玩家确认。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [{"prop": "neixi", "ratio": 0.5}]
+                    },
+                    "costs": {"mp": [2, 4, 6]},
+                    "scripts": [
+                        {
+                            "label": "无垠限制与半空反应询问",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_wuyin\")) { args.abort = true; args.abortReason = \"没有[无垠]，无法施展[悬泉飞瀑]！\"; return; }"
+                        },
+                        {
+                            "label": "询问半空反应并倒地",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "if (!args.isHit || !args.target) return;\nconst confirmed = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"悬泉飞瀑·反应释放\" },\n    content: `<p>目标是否处于半空中？</p><p>确认后将手动视为消耗反应动作，并使目标立即落地、陷入[倒地]。</p>`,\n    yes: { label: \"反应释放\", icon: \"fas fa-check\" },\n    no: { label: \"普通命中\", icon: \"fas fa-times\" },\n    rejectClose: false\n});\nif (confirmed) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #2980b9;\"><b>悬泉飞瀑·反应释放：</b>请手动扣除反应动作；目标已落地并倒地。</div>`});\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "石青点翠",
+                    "type": "feint",
+                    "tier": 1,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "1米",
+                    "targetInfo": "单体",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，移步换景，笔尖染青，带出一横翠色，对目标造成 0.3 内息点内功伤害，并创造一处“小景”。若你在使用此招前移动至少 5 米，虚招值+2。</p><p>当你获得“无垠”时，此招变更为“层峦叠嶂”。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+1。</p>",
+                    "automationNote": "出招时弹窗确认是否在此前移动至少5米，确认后虚招值自动+2。伤害自动；系统自动计数小景并在触发时报告，地点标记和[无垠]后的招式切换请手动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": [{"prop": "neixi", "ratio": 0.3}]
+                    },
+                    "costs": {"mp": [1, 2, 3]},
+                    "scripts": [
+                        {
+                            "label": "移动距离确认",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const moved = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"石青点翠·移动确认\" },\n    content: \"<p>你在使用此招前是否移动至少5米？确认后本次虚招值+2。</p>\",\n    yes: { label: \"是，虚招值+2\", icon: \"fas fa-person-walking\" },\n    no: { label: \"否\", icon: \"fas fa-xmark\" },\n    rejectClose: false\n});\nif (moved) args.flags.bonusFeint += 2;"
+                        },
+                        {
+                            "label": "创造小景",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "const effect = thisItem.effects.getName(\"小景\");\nif (!effect) return;\nconst effectData = effect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, effectData);\nconst scene = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_xiaojing\");\nconst count = scene ? (scene.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (count >= 4) {\n    await game.xjzl.api.effects.removeEffect(actor, \"wuxue_cunshan_xiaojing\", 99);\n    const boundless = thisItem.effects.getName(\"无垠\");\n    if (boundless) { const data = boundless.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(actor, data); }\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #16a085;\"><b>无垠提醒：</b>小景已达4处，计数清除并获得[无垠]。请手动标记小景消失，并切换相关招式。</div>`});\n} else {\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #3498db;\"><b>小景计数：${count}/4</b><br>请手动标记本次创造的小景地点。</div>`});\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "层峦叠嶂",
+                    "type": "feint",
+                    "tier": 2,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "1米",
+                    "targetInfo": "周围敌人",
+                    "actionCost": "主要动作",
+                    "description": "<p>主要动作，转身挥笔，峰峦穿云，连嶂横江，对周围敌人造成 0.3 内息点内功伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "没有[无垠]时阻止施展。伤害自动；周围目标请由玩家选取。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": [{"prop": "neixi", "ratio": 0.3}]
+                    },
+                    "costs": {"mp": [4, 8, 12]},
+                    "scripts": [
+                        {
+                            "label": "无垠限制",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_wuyin\")) { args.abort = true; args.abortReason = \"没有[无垠]，无法施展[层峦叠嶂]！\"; }"
+                        }
+                    ]
+                },
+                {
+                    "name": "三叠瓦黛",
+                    "type": "stance",
+                    "tier": 1,
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，提笔三点，点出三片黛色瓦片交叠，护住自身要害，获得三层“护身”状态，每次受到攻击失去一层，持续至架招结束。</p><p><strong>护身：</strong>每层增加内外功防御 5 点。</p><p>当你获得“无垠”时，此招变更为“烟火人家”。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
+                    "automationNote": "开启架招自动获得3层[护身]。每次命中且未破架的内外功攻击自动减少1层；没有该AE时安全跳过。架招解除时自动清理绑定的[护身]。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 5,
+                        "scalings": []
+                    },
+                    "costs": {"mp": [1, 2, 3]},
+                    "scripts": [
+                        {
+                            "label": "获得三层护身",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const effect = thisItem.effects.getName(\"护身\");\nif (!effect) return;\nconst effectData = effect.toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.tiedToStance\", true);\nfor (let i = 0; i < 3; i++) await game.xjzl.api.effects.addEffect(actor, effectData);"
+                        },
+                        {
+                            "label": "受击减少护身",
+                            "trigger": "preDefense",
+                            "active": true,
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_hushen\");\nif (effect) await game.xjzl.api.effects.removeEffect(actor, effect.id, 1);"
+                        }
+                    ]
+                },
+                {
+                    "name": "烟火人家",
+                    "type": "stance",
+                    "tier": 2,
+                    "element": "taiji",
+                    "damageType": "none",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "次要动作",
+                    "description": "<p>次要动作，闭目凝神，提笔挥就渔樵耕读，青砖黛瓦，开启架招，并回复自身最大气血的 10%。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
+                    "automationNote": "没有[无垠]时阻止施展。开启架招和回复最大气血10%自动。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 10,
+                        "scalings": []
+                    },
+                    "costs": {"mp": [2, 4, 6]},
+                    "scripts": [
+                        {
+                            "label": "无垠限制",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_wuyin\")) { args.abort = true; args.abortReason = \"没有[无垠]，无法施展[烟火人家]！\"; }"
+                        },
+                        {
+                            "label": "回复气血",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const maxHp = actor.system.resources.hp.max || 0;\nawait actor.applyHealing({ healer: actor, amount: Math.floor(maxHp * 0.1), type: \"hp\", showScrolling: true });"
+                        }
+                    ]
+                },
+                {
+                    "name": "千里江山",
+                    "type": "real",
+                    "isUltimate": true,
+                    "tier": 2,
+                    "element": "taiji",
+                    "damageType": "neigong",
+                    "weaponType": "dagger",
+                    "weaponSubtype": "笔",
+                    "range": "@{3 + @up|3}米",
+                    "targetInfo": "自身范围内敌方",
+                    "actionCost": "蓄力动作",
+                    "description": "<p>千里江山望无垠，元气淋漓运以神。</p><p>蓄力动作，皴山泼江，再绘千里江山，对自身范围内敌方造成 0.7 内息点内功伤害。进行一次作画技能检定，当超过 10 时，每超过 5 点，招式距离+1。</p><p><strong>升级：</strong>招式距离+1，招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
+                    "automationNote": "没有[无垠]时阻止施展。伤害自动；距离、范围目标和作画技能检定请玩家手动处理，出招时发送检定与距离增加提醒。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 20,
+                        "scalings": [{"prop": "neixi", "ratio": 0.7}]
+                    },
+                    "costs": {
+                        "mp": [8, 16, 24],
+                        "rage": [7, 6, 5]
+                    },
+                    "scripts": [
+                        {
+                            "label": "无垠限制",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_cunshan_wuyin\")) { args.abort = true; args.abortReason = \"没有[无垠]，无法施展[千里江山]！\"; }"
+                        },
+                        {
+                            "label": "作画检定与距离提醒",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"padding:4px 8px; border-left:3px solid #16a085; background:rgba(22,160,133,0.05);\"><div style=\"color:#117864; font-weight:bold;\"><i class=\"fas fa-palette\"></i> 千里江山提醒</div><div style=\"font-size:0.9em; margin-top:3px;\">请手动进行一次[作画]技能检定；结果超过10后，每超过5点，本招式距离手动+1。请手动选取自身范围内敌方目标。</div></div>`});"
+                        }
+                    ]
+                }
+            ]
+        },
+        "effects": [
+            {
+                "name": "小景",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "场景中的小景计数；进入和离开范围不消耗移动，位于其中闪避+2。地点标记由玩家手动处理。",
+                "transfer": false,
+                "flags": {"xjzl-system": {"slug": "wuxue_cunshan_xiaojing", "stackable": true, "maxStacks": 4}},
+                "changes": []
+            },
+            {
+                "name": "无垠",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "小景相互勾连，铺就无垠江山。你的招式会发生变化；相关地形、招式切换和变化后的规则请按武学说明手动执行。",
+                "transfer": false,
+                "flags": {"xjzl-system": {"slug": "wuxue_cunshan_wuyin", "stackable": false}},
+                "changes": []
+            },
+            {
+                "name": "护身",
+                "icon": "systems/xjzl-system/assets/icons/ae/护身.png",
+                "description": "每层增加内外功防御 5 点；三叠瓦黛中每次受到有效内外功攻击减少一层，持续至架招结束。",
+                "transfer": false,
+                "flags": {"xjzl-system": {"slug": "wuxue_cunshan_hushen", "stackable": true, "maxStacks": 3, "tiedToStance": true}},
+                "changes": [
+                    {"key": "system.combat.def_waigong", "mode": 2, "value": "5"},
+                    {"key": "system.combat.def_neigong", "mode": 2, "value": "5"}
+                ]
+            }
+        ]
     }
 ]
