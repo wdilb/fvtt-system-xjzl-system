@@ -7,15 +7,16 @@
             "category": "wuxue",
             "sect": "baicaoge",
             "tier": 1,
-            "description": "集推拿正骨、活血理筋于一体，极受百姓欢迎。",
+            "description": "<p>集推拿正骨、活血理筋于一体，极受百姓欢迎。</p><p><strong>需求：</strong>徒手</p><p><strong>属性：</strong>太极</p>",
             "requirements": "徒手",
             "moves": [
                 {
                     "name": "按压推拿",
                     "type": "qi",
                     "actionType": "buff",
+                    "element": "taiji",
                     "range": "1",
-                    "description": "全回合动作，以拇指和食中指，用力紧捏目标腿部，为其移除“下盘不稳”“禁足”状态。同时目标获得一层“乘风”，至多三层，持续到脱战。<br>乘风：每层使你的速度+1。",
+                    "description": "<p>全回合动作，以拇指和食中指，用力紧捏目标腿部，为其移除“下盘不稳”“禁足”状态。同时目标获得一层“乘风”，至多三层，持续到脱战。</p><p><strong>乘风：</strong>每层使你的速度+1。</p><p><strong>升级：</strong>目标额外获得一层“乘风”，内力消耗+1。</p>",
                     "automationNote": "完全自动化：移除指定状态并添加乘风。",
                     "costs": {
                         "mp": [
@@ -29,7 +30,7 @@
                             "label": "按压推拿",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target) return;\n\n// 1. 移除状态\nconst effectsToRemove = args.target.effects.filter(e => \n    e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\" || \n    e.getFlag(\"xjzl-system\", \"slug\") === \"root\"\n).map(e => e.id);\n\nif (effectsToRemove.length > 0) {\n    await args.target.deleteEmbeddedDocuments(\"ActiveEffect\", effectsToRemove);\n    ui.notifications.info(`${args.target.name} 的下盘不稳/禁足状态已移除。`);\n}\n\n// 2. 添加乘风\n// 计算层数: 基础1 + 升级\nconst lvl = args.move.computedLevel;\nconst stacksToAdd = 1 + (lvl - 1);\n\nconst chengfengData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\nchengfengData.name = \"乘风\";\n\n// 循环添加多次以叠加层数\nfor (let i = 0; i < stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
+                            "script": "if (!args.target) return;\n\n// 1. 移除状态 (走系统状态 API，保留飘字与 GM 权限代理)\nconst slugs = [\"unstable\", \"root\"];\nconst hasAny = args.target.effects.some(e => slugs.includes(e.getFlag(\"xjzl-system\", \"slug\")));\nfor (const slug of slugs) {\n    await game.xjzl.api.effects.removeEffect(args.target, slug, 999);\n}\nif (hasAny) ui.notifications.info(`${args.target.name} 的下盘不稳/禁足状态已移除。`);\n\n// 2. 添加乘风\n// 计算层数: 基础1 + 升级\nconst lvl = args.move.computedLevel;\nconst stacksToAdd = 1 + (lvl - 1);\n\nconst chengfengData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"chengfeng\"));\nchengfengData.name = \"乘风\";\n\n// 循环添加多次以叠加层数\nfor (let i = 0; i < stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, chengfengData);\n}"
                         }
                     ],
                     "weaponType": "unarmed",
@@ -39,8 +40,9 @@
                     "name": "提按端挤",
                     "type": "qi",
                     "actionType": "heal",
+                    "element": "taiji",
                     "range": "1",
-                    "description": "全回合动作，固定骨骼，上下提按，左右端挤，移除目标的脱臼，以及“剧痛”状态，然后为目标回复 5 点气血,5 点内力。",
+                    "description": "<p>全回合动作，固定骨骼，上下提按，左右端挤，移除目标的脱臼，以及“剧痛”状态，然后为目标回复 5 点气血,5 点内力。</p><p><strong>升级：</strong>增加 5 点气血内力回复，内力消耗+1。</p>",
                     "automationNote": "自动移除剧痛、回复气血和内力。脱臼为文本描述状态，需手动移除。",
                     "costs": {
                         "mp": [
@@ -62,7 +64,7 @@
                             "label": "提按端挤",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await pain.delete();\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst totalHeal = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"hp\", showScrolling: true });"
+                            "script": "if (!args.target) return;\n\n// 1. 移除剧痛\nconst pain = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pain\");\nif (pain) {\n    await game.xjzl.api.effects.removeEffect(args.target, \"pain\");\n    ui.notifications.info(`${args.target.name} 的剧痛已移除。`);\n}\n\nui.notifications.info(\"提示：若目标有‘脱臼’状态，请手动移除。\");\n\n// 2. 回复\nconst lvl = args.move.computedLevel;\nconst totalHeal = 5 + (lvl - 1) * 5;\n\n// 回内力\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"mp\", showScrolling: true });\n\n// 回气血\nawait args.target.applyHealing({ healer: actor,  amount: totalHeal, type: \"hp\", showScrolling: true });"
                         }
                     ],
                     "weaponType": "unarmed",
@@ -72,8 +74,9 @@
                     "name": "手摸心会",
                     "type": "qi",
                     "actionType": "buff",
+                    "element": "taiji",
                     "range": "1",
-                    "description": "全回合动作，指腹触摸目标，手法由轻逐渐加重，用心体会，为目标添加“坚骨”，持续到脱战。<br>坚骨：下一次投掷残疾检定时，结果+5（最高100）。",
+                    "description": "<p>全回合动作，指腹触摸目标，手法由轻逐渐加重，用心体会，为目标添加“坚骨”，持续到脱战。</p><p><strong>坚骨：</strong>下一次投掷残疾检定时，结果+5（最高100）。</p><p><strong>升级：</strong>检定结果增加的数值+5，内力消耗+1。</p>",
                     "automationNote": "添加‘坚骨’状态提示。残疾检定需手动计算加值。",
                     "costs": {
                         "mp": [
@@ -87,7 +90,7 @@
                             "label": "手摸心会",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = args.move.computedLevel;\nconst bonus = 5 + (lvl - 1) * 5;\n\nconst effectData = {\n    name: \"坚骨\",\n    icon: args.item.img,\n    description: `下一次投掷残疾检定时，结果+${bonus}。`,\n    changes: [] // 纯提示\n};\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
+                            "script": "const lvl = args.move.computedLevel;\nconst bonus = 5 + (lvl - 1) * 5;\n\nconst effectData = {\n    name: \"坚骨\",\n    icon: args.item.img,\n    description: `下一次投掷残疾检定时，结果+${bonus}。`,\n    flags: { \"xjzl-system\": { slug: \"jiangu\" } }, // 稳定 slug，便于后续识别与移除\n    changes: [] // 纯提示\n};\n\nawait game.xjzl.api.effects.addEffect(args.target, effectData);"
                         }
                     ],
                     "weaponType": "unarmed",
@@ -97,10 +100,11 @@
                     "name": "拔伸牵引",
                     "type": "real",
                     "isUltimate": true,
+                    "element": "taiji",
                     "range": "1",
                     "damageType": "waigong",
-                    "description": "主要动作，抓住敌人肢体以纵轴方向对抗牵引，目标获得“剧痛”，持续五回合。<br>剧痛：目标失去次要动作，速度减半，命中和虚招对抗检定具有劣势。剧痛可被忍耐技能抵挡。",
-                    "automationNote": "命中后施加剧痛状态。剧痛效果已包含在系统状态中。",
+                    "description": "<p>主要动作，抓住敌人肢体以纵轴方向对抗牵引，目标获得“剧痛”，持续五回合。</p><p><strong>剧痛：</strong>目标失去次要动作，速度减半，命中和虚招对抗检定具有劣势。剧痛可被忍耐技能抵挡。</p><p><strong>升级：</strong>剧痛持续回合数+5，怒气消耗-1，内力消耗+2。</p>",
+                    "automationNote": "命中后施加剧痛状态（自动）。速度减半、命中/虚招劣势由系统状态自动处理；失去次要动作需 GM 手动裁定。",
                     "costs": {
                         "mp": [
                             2,
@@ -197,7 +201,7 @@
                         {
                             "label": "白虎摇头",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 基础1层，升级额外加1层 -> Lv1=1, Lv2=2, Lv3=3\nconst stacks = 1 + (lvl - 1);\n\nconst yanzhanData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yanzhan\"));\n\n// 一次性添加指定层数\nawait game.xjzl.api.effects.addEffect(args.target, yanzhanData, stacks);\nawait game.xjzl.api.effects.addEffect(actor, yanzhanData, stacks);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 基础1层，升级额外加1层 -> Lv1=1, Lv2=2, Lv3=3\nconst stacks = 1 + (lvl - 1);\n\nconst yanzhanData = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"yanzhan\"));\nfoundry.utils.setProperty(yanzhanData, \"flags.xjzl-system.maxStacks\", 3); // 描述上限：至多三层\n\n// 一次性添加指定层数\nawait game.xjzl.api.effects.addEffect(args.target, yanzhanData, stacks);\nawait game.xjzl.api.effects.addEffect(actor, yanzhanData, stacks);",
                             "active": true
                         }
                     ]
@@ -465,7 +469,7 @@
                                 "label": "春雨消耗",
                                 "trigger": "attack",
                                 "active": true,
-                                "script": "await thisEffect.delete();"
+                                "script": "await game.xjzl.api.effects.removeEffect(actor, \"chunyu\", 1);"
                             }
                         ]
                     }
@@ -480,7 +484,8 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "suifeng_stance_aura",
-                        "stackable": false
+                        "stackable": false,
+                        "tiedToStance": true
                     }
                 },
                 "changes": []
@@ -524,8 +529,8 @@
                     "scripts": [
                         {
                             "label": "选择针法",
-                            "trigger": "attack",
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 蕴脾血针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续回血)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回血)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\n\n// 提示扣除物品\nconst itemName = dialog === 'feng' ? '锋针' : '大针';\nui.notifications.info(`请手动扣除背包中的 [${itemName}]。`);\n\n// 记录选择到 Item 上\nawait args.item.setFlag('xjzl-system', 'temp_needle_spleen', dialog);",
+                            "trigger": "preAttack",
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 蕴脾血针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续回血)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回血)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.abort = true; args.abortReason = \"已取消针法选择，本次出招中止。\"; return; }\n\n// 提示扣除物品\nconst itemName = dialog === 'feng' ? '锋针' : '大针';\nui.notifications.info(`请手动扣除背包中的 [${itemName}]。`);\n\n// 记录选择到 Item 上\nawait args.item.setFlag('xjzl-system', 'temp_needle_spleen', dialog);",
                             "active": true
                         },
                         {
@@ -568,8 +573,8 @@
                     "scripts": [
                         {
                             "label": "选择针法",
-                            "trigger": "attack",
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 理肺气针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续回内)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回内)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_lung', dialog);",
+                            "trigger": "preAttack",
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 理肺气针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续回内)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回内)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.abort = true; args.abortReason = \"已取消针法选择，本次出招中止。\"; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_lung', dialog);",
                             "active": true
                         },
                         {
@@ -612,8 +617,8 @@
                     "scripts": [
                         {
                             "label": "选择针法",
-                            "trigger": "attack",
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 生肾水针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续护体)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间护体)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_kidney', dialog);",
+                            "trigger": "preAttack",
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 生肾水针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons: [\n        { label: \"锋针 (持续护体)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间护体)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.abort = true; args.abortReason = \"已取消针法选择，本次出招中止。\"; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_kidney', dialog);",
                             "active": true
                         },
                         {
@@ -656,14 +661,14 @@
                     "scripts": [
                         {
                             "label": "选择针法",
-                            "trigger": "attack",
-                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 养肝精针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons:[\n        { label: \"锋针 (持续回怒)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回怒)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.flags.abort = true; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_liver', dialog);",
+                            "trigger": "preAttack",
+                            "script": "const dialog = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"选择针法: 养肝精针\" },\n    content: \"<p>请选择使用的针具：</p>\",\n    buttons:[\n        { label: \"锋针 (持续回怒)\", action: \"feng\", icon: \"fas fa-clock\" },\n        { label: \"大针 (瞬间回怒)\", action: \"da\", icon: \"fas fa-bolt\" }\n    ]\n});\n\nif (!dialog) { args.abort = true; args.abortReason = \"已取消针法选择，本次出招中止。\"; return; }\nui.notifications.info(`请手动扣除背包中的 [${dialog === 'feng' ? '锋针' : '大针'}]。`);\nawait args.item.setFlag('xjzl-system', 'temp_needle_liver', dialog);",
                             "active": true
                         },
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_liver');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"养肝-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 修复：applyHealing 不支持 rage，改为手动 update 怒气并飘字\n    const curRage = args.target.system.resources.rage.value || 0;\n    const maxRage = args.target.system.resources.rage.max || 10;\n    const noRecover = args.target.xjzlStatuses?.noRecoverRage;\n    if (curRage < maxRage && !noRecover) {\n        await args.target.changeResources({ \"system.resources.rage.value\": curRage + 1 }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        if (args.target.showFloatyText) args.target.showFloatyText(\"怒气 +1\", { fill: \"#ff0000\" });\n    }\n}",
+                            "script": "const choice = args.item.getFlag('xjzl-system', 'temp_needle_liver');\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n\nif (choice === 'feng') {\n    const template = thisItem.effects.getName(\"养肝-锋针\");\n    if (template) {\n        const eff = template.toObject();\n        delete eff._id;\n        eff.duration = { rounds: 3 + (lvl - 1) };\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n} else {\n    // 大针：applyHealing 原生支持 rage（自带禁怒锁定与上限处理）\n    await args.target.applyHealing({ healer: actor, amount: 1, type: \"rage\", showScrolling: true });\n}",
                             "active": true
                         },
                         {
@@ -712,88 +717,88 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "蕴脾-锋针",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-                    "description": "每回合末恢复 10 气血。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yunpi_feng",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenHpTurnEnd",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
-                },
-                {
-                    "name": "理肺-锋针",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-                    "description": "每回合末恢复 5 内力。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "lifei_feng",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenMpTurnEnd",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                },
-                {
-                    "name": "生肾-锋针",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-                    "description": "每回合初获得 5 点护体真气。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "shengshen_feng",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "每回合加护体",
-                                    "trigger": "turnStart",
-                                    "active": true,
-                                    "script": "await actor.applyHealing({ healer: actor,  amount: 5, type: 'huti', showScrolling: true });"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "养肝-锋针",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-                    "description": "每回合初获得 1 怒气。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yanggan_feng",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenRageTurnStart",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "蕴脾-锋针",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "description": "每回合末恢复 10 气血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yunpi_feng",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnEnd",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            },
+            {
+                "name": "理肺-锋针",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "description": "每回合末恢复 5 内力。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lifei_feng",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "生肾-锋针",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "description": "每回合初获得 5 点护体真气。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shengshen_feng",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "每回合加护体",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "await actor.applyHealing({ healer: actor,  amount: 5, type: 'huti', showScrolling: true });"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "养肝-锋针",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "description": "每回合初获得 1 怒气。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yanggan_feng",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenRageTurnStart",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "子午流注针法",
@@ -813,7 +818,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>观天时，推盛衰，脉开阖，开启架招。<br>根据当前时辰参考以下表格，获得对应“阳盛”或“阴盛”状态，持续到脱战。<br>·若你已经打通当前时辰对应的十二正经，你还会获得“子午”状态，持续到战斗脱离或解除架招。<br><strong>阳盛：</strong>你以运行阳刚内功或施展阳、刚武学的人为目标时，命中、属性技能、[医术]检定结果+3。<br><strong>阴盛：</strong>你以运行阴柔内功或施展阴、柔武学的人为目标时，命中、属性技能、[医术]检定结果+3。<br><strong>子午：</strong>你在自己的回合末回复 5 点气血、内力。<br>·若在战斗过程中时辰出现变化，则阴盛阳盛的状态、是否存在子午也会相应变化。<br><strong>升级：</strong>格挡值+10，阳盛阴盛的结果+1，消耗+2。</p>",
-                    "automationNote": "开启架招时弹窗选择时辰属性并自动加持。阳盛/阴盛会自动检测对方内功属性赋予命中补正(医术检定需手动+)。",
+                    "automationNote": "开启架招时弹窗选择时辰属性（取消则中止出招），扣费成功后自动加持。命中补正仅自动检测对方运行的内功属性；\"对方上一次施展的武学\"系统无法可靠感知，需玩家手动判断申请加值；[医术]与属性技能检定加值需手动。",
                     "weaponType": "hidden",
                     "damageType": "waigong",
                     "element": "taiji",
@@ -831,9 +836,15 @@
                     "scripts": [
                         {
                             "label": "时辰判定与赋予",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "const content = `<form><div class='form-group'><label>时辰属性:</label><select name='type'><option value='yang'>阳盛</option><option value='yin'>阴盛</option></select></div><div class='form-group'><label>已打通对应经脉 (子午):</label><input type='checkbox' name='ziwu'></div></form>`;\n\nconst choice = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '日时变易 - 时辰判定' },\n    content: content,\n    rejectClose: false,\n    ok: {\n        callback: (event, button) => {\n            const formData = new FormData(button.form);\n            return { type: formData.get('type'), ziwu: formData.get('ziwu') === 'on' };\n        }\n    }\n});\nif (choice === null) { args.abort = true; args.abortReason = \"已取消时辰判定，本次开启架招中止。\"; return; }\n// 只记录选择；实际施加放在 attack 阶段（扣费成功后），避免余额不足出招失败却已上状态\nawait args.item.setFlag('xjzl-system', 'temp_richen', choice);"
+                        },
+                        {
+                            "label": "施加时辰状态",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const content = `<form><div class='form-group'><label>时辰属性:</label><select name='type'><option value='yang'>阳盛</option><option value='yin'>阴盛</option></select></div><div class='form-group'><label>已打通对应经脉 (子午):</label><input type='checkbox' name='ziwu'></div></form>`;\n\nawait foundry.applications.api.DialogV2.prompt({\n    window: { title: '日时变易 - 时辰判定' },\n    content: content,\n    ok: {\n        callback: async (event, button) => {\n            const formData = new FormData(button.form);\n            const type = formData.get('type');\n            const hasZiwu = formData.get('ziwu') === 'on';\n            \n            // 清理旧状态防重叠\n            await game.xjzl.api.effects.removeEffect(actor, 'yang-sheng', 99);\n            await game.xjzl.api.effects.removeEffect(actor, 'yin-sheng', 99);\n            await game.xjzl.api.effects.removeEffect(actor, 'zi-wu', 99);\n            \n            // 计算阳盛阴盛成长数值 (基础3 + 等级-1)\n            const lvl = Math.max(1, move.computedLevel || 1);\n            const bonus = 3 + (lvl - 1);\n\n            const aeName = type === 'yang' ? '阳盛' : '阴盛';\n            const eff = thisItem.effects.getName(aeName).toObject();\n            delete eff._id;\n            eff.origin = thisItem.uuid;\n            // 将算好的数值存入flag供Check阶段读取\n            eff.flags['xjzl-system'].bonus = bonus;\n            await game.xjzl.api.effects.addEffect(actor, eff);\n            \n            if (hasZiwu) {\n                const ziwuEffect = thisItem.effects.getName('子午').toObject();\n                delete ziwuEffect._id;\n                ziwuEffect.origin = thisItem.uuid;\n                await game.xjzl.api.effects.addEffect(actor, ziwuEffect);\n            }\n        }\n    }\n});"
+                            "script": "// 架招开启分支不会执行 hit/hit_once，因此在 attack（资源已扣除）阶段施加，保证先扣费再上状态\nconst choice = args.item.getFlag('xjzl-system', 'temp_richen');\nif (!choice) return;\n\n// 清理旧状态防重叠\nawait game.xjzl.api.effects.removeEffect(actor, 'yang-sheng', 99);\nawait game.xjzl.api.effects.removeEffect(actor, 'yin-sheng', 99);\nawait game.xjzl.api.effects.removeEffect(actor, 'zi-wu', 99);\n\n// 计算阳盛阴盛成长数值 (基础3 + 等级-1)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 3 + (lvl - 1);\n\nconst aeName = choice.type === 'yang' ? '阳盛' : '阴盛';\nconst eff = thisItem.effects.getName(aeName).toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 将算好的数值存入flag供Check阶段读取\neff.flags['xjzl-system'].bonus = bonus;\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\nif (choice.ziwu) {\n    const ziwuEffect = thisItem.effects.getName('子午').toObject();\n    delete ziwuEffect._id;\n    ziwuEffect.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, ziwuEffect);\n}\nawait args.item.unsetFlag('xjzl-system', 'temp_richen');"
                         }
                     ]
                 },
@@ -896,7 +907,7 @@
                             "label": "添加流注",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nlet val = 10 + (lvl - 1) * 5;\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\n\nif (hasZiwu) {\n    const isDrain = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"流经注气 - 子午特效\" },\n        content: \"<p>你具有【子午】状态。是否将[流注]的效果从回复改为<b>流失</b>？</p>\",\n        yes: { label: \"改为流失\", icon: \"fas fa-tint-slash\" },\n        no: { label: \"保持回复\", icon: \"fas fa-heart\" }\n    });\n    if (isDrain) val = -val;\n}\n\nconst effectData = {\n    name: '流注',\n    icon: 'icons/svg/regen.svg',\n    duration: { rounds: 3 },\n    description: `每次出招后${val > 0 ? '回复' : '流失'} ${Math.abs(val)} 点气血和内力。`,\n    origin: thisItem.uuid,\n    changes:[\n        { key: 'flags.xjzl-system.regenHpAttack', mode: 2, value: String(val) },\n        { key: 'flags.xjzl-system.regenMpAttack', mode: 2, value: String(val) }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(args.target, effectData);\nui.notifications.info(`已对 ${args.target.name} 应用 [流注] 效果。`);"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nlet val = 10 + (lvl - 1) * 5;\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\n\nif (hasZiwu) {\n    const isDrain = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"流经注气 - 子午特效\" },\n        content: \"<p>你具有【子午】状态。是否将[流注]的效果从回复改为<b>流失</b>？</p>\",\n        yes: { label: \"改为流失\", icon: \"fas fa-tint-slash\" },\n        no: { label: \"保持回复\", icon: \"fas fa-heart\" }\n    });\n    if (isDrain) val = -val;\n}\n\nconst effectData = {\n    name: '流注',\n    icon: 'icons/svg/regen.svg',\n    duration: { rounds: 3 },\n    description: `每次出招后${val > 0 ? '回复' : '流失'} ${Math.abs(val)} 点气血和内力。`,\n    origin: thisItem.uuid,\n    flags: { 'xjzl-system': { slug: 'liuzhu' } },\n    changes:[\n        { key: 'flags.xjzl-system.regenHpAttack', mode: 2, value: String(val) },\n        { key: 'flags.xjzl-system.regenMpAttack', mode: 2, value: String(val) }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(args.target, effectData);\nui.notifications.info(`已对 ${args.target.name} 应用 [流注] 效果。`);"
                         }
                     ]
                 },
@@ -928,7 +939,7 @@
                             "label": "疗伤与加势",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\n\n// 1. 发起带等级加值的疗伤检定\nconst roll = await actor.rollAttributeTest('liaoshang', { dc: 15, bonus: bonus });\nif (!roll) return;\n\nif (roll.total >= 15) {\n    const totalHeal = roll.total;\n    \n    // 2. 治疗\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'hp', showScrolling: true });\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'mp', showScrolling: true });\n    \n    // 3. 生成X势\n    const weapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (weapon) {\n        const wType = weapon.system.type;\n        const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType] || wType);\n        const effectData = {\n            name: `${wLabel}势`,\n            icon: 'icons/svg/upgrade.svg',\n            description: `使用${wLabel}时命中+10`,\n            origin: thisItem.uuid,\n            changes:[\n                { key: `system.combat.hit_waigong`, mode: 2, value: \"10\" }\n            ],\n            flags: { 'xjzl-system': { stackable: true } }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [${wLabel}势]！`);\n    }\n} else {\n    ui.notifications.warn('疗伤检定失败。');\n}"
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 5;\n\n// 1. 发起带等级加值的疗伤检定\nconst roll = await actor.rollAttributeTest('liaoshang', { dc: 15, bonus: bonus });\nif (!roll) return;\n\nif (roll.total >= 15) {\n    const totalHeal = roll.total;\n    \n    // 2. 治疗\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'hp', showScrolling: true });\n    await args.target.applyHealing({ healer: actor,  amount: totalHeal, type: 'mp', showScrolling: true });\n    \n    // 3. 生成X势（不做全局命中修改，由 AE 的 check 脚本按当前招式武器类型匹配，\n    //    换用其他武器时该势自然不生效）\n    const weapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\n    if (weapon) {\n        const wType = weapon.system.type;\n        const wLabel = game.i18n.localize(CONFIG.XJZL.weaponTypes[wType] || wType);\n        const effectData = {\n            name: `${wLabel}势`,\n            icon: 'icons/svg/upgrade.svg',\n            description: `使用${wLabel}的招式时命中+10（每层）`,\n            origin: thisItem.uuid,\n            changes: [],\n            flags: {\n                'xjzl-system': {\n                    slug: `xjzl_shi_${wType}`,\n                    stackable: true,\n                    weaponType: wType,\n                    scripts: [{\n                        label: \"X势命中加成\",\n                        trigger: \"check\",\n                        active: true,\n                        script: \"const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\\nconst wType = thisEffect.getFlag('xjzl-system', 'weaponType');\\n// 普攻虚拟招式同样带 weaponType（actor.mjs 构建时取当前装备武器），可直接匹配\\nif (!wType || args.move?.weaponType !== wType) return;\\nargs.flags.grantHit += 10 * stacks;\"\n                    }]\n                }\n            }\n        };\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 获得 [${wLabel}势]！`);\n    }\n} else {\n    ui.notifications.warn('疗伤检定失败。');\n}"
                         }
                     ]
                 },
@@ -972,71 +983,71 @@
                             "label": "阴阳子午结算",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nconst hasYang = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yang-sheng');\nconst hasYin = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yin-sheng');\n\nlet calcAmount = args.baseAmount || 0;\nlet healType = 'hp';\n\nif (hasZiwu || hasYang || hasYin) {\n    let contentHtml = '';\n    if (hasZiwu) {\n        contentHtml += `\n        <div class=\"form-group\">\n            <label>十二正经开启数量 (子午):</label>\n            <div class=\"form-fields\">\n                <input type=\"number\" name=\"ziwuCount\" value=\"0\" min=\"0\" max=\"12\" style=\"text-align:center;\">\n            </div>\n            <p class=\"notes\">每条+10回复量。</p>\n        </div><hr>`;\n    }\n    if (hasYang || hasYin) {\n        contentHtml += `\n        <div class=\"form-group\">\n            <label>阴阳盛特殊转化:</label>\n            <div class=\"form-fields\">\n                <select name=\"yinYangChoice\">\n                    <option value=\"default\">默认: 回复气血</option>\n                    ${hasYang ? '<option value=\"yang\">阳盛: 改为回复内力</option>' : ''}\n                    ${hasYin ? '<option value=\"yin\">阴盛: 改为流失气血</option>' : ''}\n                </select>\n            </div>\n        </div>`;\n    }\n\n    const input = await foundry.applications.api.DialogV2.prompt({\n        window: { title: `截时定穴: ${args.target.name}`, width: 350 },\n        content: contentHtml,\n        ok: {\n            callback: (event, btn) => {\n                const fd = new FormData(btn.form);\n                return {\n                    ziwuCount: parseInt(fd.get(\"ziwuCount\")) || 0,\n                    choice: fd.get(\"yinYangChoice\") || \"default\"\n                };\n            }\n        },\n        rejectClose: false\n    });\n\n    if (input) {\n        if (hasZiwu) calcAmount += (input.ziwuCount * 10);\n        if (input.choice === \"yang\") {\n            healType = 'mp';\n            ui.notifications.info(`触发【阳盛】：对 ${args.target.name} 转为回复内力。`);\n        } else if (input.choice === \"yin\") {\n            healType = 'hp';\n            calcAmount = -calcAmount;\n            ui.notifications.info(`触发【阴盛】：使 ${args.target.name} 气血流失。`);\n        }\n    }\n}\n\nawait args.target.applyHealing({ healer: actor, amount: calcAmount, type: healType, showScrolling: true });"
+                            "script": "// 本招为 buff 类型：治疗由本脚本全额结算（含面板数值），避免 heal 类型的系统自动结算与本脚本重复治疗\nconst hasZiwu = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'zi-wu');\nconst hasYang = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yang-sheng');\nconst hasYin = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yin-sheng');\n\nlet calcAmount = args.baseAmount || 0;\nlet healType = 'hp';\n\nif (hasZiwu || hasYang || hasYin) {\n    let contentHtml = '';\n    if (hasZiwu) {\n        contentHtml += `\n        <div class=\"form-group\">\n            <label>十二正经开启数量 (子午):</label>\n            <div class=\"form-fields\">\n                <input type=\"number\" name=\"ziwuCount\" value=\"0\" min=\"0\" max=\"12\" style=\"text-align:center;\">\n            </div>\n            <p class=\"notes\">每条+10回复量。</p>\n        </div><hr>`;\n    }\n    if (hasYang || hasYin) {\n        contentHtml += `\n        <div class=\"form-group\">\n            <label>阴阳盛特殊转化:</label>\n            <div class=\"form-fields\">\n                <select name=\"yinYangChoice\">\n                    <option value=\"default\">默认: 回复气血</option>\n                    ${hasYang ? '<option value=\"yang\">阳盛: 改为回复内力</option>' : ''}\n                    ${hasYin ? '<option value=\"yin\">阴盛: 改为流失气血</option>' : ''}\n                </select>\n            </div>\n        </div>`;\n    }\n\n    const input = await foundry.applications.api.DialogV2.prompt({\n        window: { title: `截时定穴: ${args.target.name}`, width: 350 },\n        content: contentHtml,\n        ok: {\n            callback: (event, btn) => {\n                const fd = new FormData(btn.form);\n                return {\n                    ziwuCount: parseInt(fd.get(\"ziwuCount\")) || 0,\n                    choice: fd.get(\"yinYangChoice\") || \"default\"\n                };\n            }\n        },\n        rejectClose: false\n    });\n\n    if (input) {\n        if (hasZiwu) calcAmount += (input.ziwuCount * 10);\n        if (input.choice === \"yang\") {\n            healType = 'mp';\n            ui.notifications.info(`触发【阳盛】：对 ${args.target.name} 转为回复内力。`);\n        } else if (input.choice === \"yin\") {\n            healType = 'hp';\n            calcAmount = -calcAmount;\n            ui.notifications.info(`触发【阴盛】：使 ${args.target.name} 气血流失。`);\n        }\n    }\n}\n\nawait args.target.applyHealing({ healer: actor, amount: calcAmount, type: healType, showScrolling: true });"
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "阳盛",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-                    "description": "以运行阳刚内功或武学的人为目标时，命中、属性技能、[医术]检定结果增加。",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yang-sheng",
-                            "scripts": [
-                                {
-                                    "label": "阳刚目标命中加成",
-                                    "trigger": "check",
-                                    "script": "const bonus = thisEffect.getFlag('xjzl-system', 'bonus') || 3;\nlet isMatch = false;\n// 探测目标内功属性\nconst neigongId = args.target.system.martial?.active_neigong;\nif (neigongId) {\n    const ng = args.target.items.get(neigongId);\n    if (ng && ['yang', 'gang'].includes(ng.system.element)) isMatch = true;\n}\nif (isMatch) {\n    args.flags.grantHit += bonus;\n}"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "阴盛",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-                    "description": "以运行阴柔内功或武学的人为目标时，命中、属性技能、[医术]检定结果增加。",
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yin-sheng",
-                            "scripts": [
-                                {
-                                    "label": "阴柔目标命中加成",
-                                    "trigger": "check",
-                                    "script": "const bonus = thisEffect.getFlag('xjzl-system', 'bonus') || 3;\nlet isMatch = false;\n// 探测目标内功属性\nconst neigongId = args.target.system.martial?.active_neigong;\nif (neigongId) {\n    const ng = args.target.items.get(neigongId);\n    if (ng && ['yin', 'rou'].includes(ng.system.element)) isMatch = true;\n}\nif (isMatch) {\n    args.flags.grantHit += bonus;\n}"
-                                }
-                            ]
-                        }
-                    }
-                },
-                {
-                    "name": "子午",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
-                    "description": "你在自己的回合末回复 5 点气血、内力。",
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.regenHpTurnEnd",
-                            "mode": 2,
-                            "value": "5"
-                        },
-                        {
-                            "key": "flags.xjzl-system.regenMpTurnEnd",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "zi-wu",
-                            "tiedToStance": true
-                        }
+            ]
+        },
+        "effects": [
+            {
+                "name": "阳盛",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "description": "以运行阳刚内功或武学的人为目标时，命中、属性技能、[医术]检定结果增加。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yang-sheng",
+                        "scripts": [
+                            {
+                                "label": "阳刚目标命中加成",
+                                "trigger": "check",
+                                "script": "const bonus = thisEffect.getFlag('xjzl-system', 'bonus') || 3;\nlet isMatch = false;\n// 仅自动探测目标运行的内功属性（内功 element yang 即代表阳刚）。\n// 规则中\"施展阳、刚武学的人\"指对方上一次施展的武学，系统无法可靠感知（对方对他人施招不可见），\n// 该部分由玩家手动判断并向 GM 申请加值。\nconst neigongId = args.target.system.martial?.active_neigong;\nif (neigongId) {\n    const ng = args.target.items.get(neigongId);\n    if (ng && ng.system.element === 'yang') isMatch = true;\n}\nif (isMatch) {\n    args.flags.grantHit += bonus;\n}"
+                            }
+                        ]
                     }
                 }
-            ]
-        }
+            },
+            {
+                "name": "阴盛",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "description": "以运行阴柔内功或武学的人为目标时，命中、属性技能、[医术]检定结果增加。",
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yin-sheng",
+                        "scripts": [
+                            {
+                                "label": "阴柔目标命中加成",
+                                "trigger": "check",
+                                "script": "const bonus = thisEffect.getFlag('xjzl-system', 'bonus') || 3;\nlet isMatch = false;\n// 仅自动探测目标运行的内功属性（内功 element yin 即代表阴柔）。\n// 规则中\"施展阴、柔武学的人\"指对方上一次施展的武学，系统无法可靠感知（对方对他人施招不可见），\n// 该部分由玩家手动判断并向 GM 申请加值。\nconst neigongId = args.target.system.martial?.active_neigong;\nif (neigongId) {\n    const ng = args.target.items.get(neigongId);\n    if (ng && ng.system.element === 'yin') isMatch = true;\n}\nif (isMatch) {\n    args.flags.grantHit += bonus;\n}"
+                            }
+                        ]
+                    }
+                }
+            },
+            {
+                "name": "子午",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/百草.png",
+                "description": "你在自己的回合末回复 5 点气血、内力。",
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.regenHpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "flags.xjzl-system.regenMpTurnEnd",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ],
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zi-wu",
+                        "tiedToStance": true
+                    }
+                }
+            }
+        ]
     },
     {
         "name": "颐养生机",

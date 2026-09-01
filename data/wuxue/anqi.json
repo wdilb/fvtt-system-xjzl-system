@@ -42,7 +42,7 @@
                         {
                             "label": "击破目盲",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"blind\");\n    ui.notifications.info(`${args.target.name} 被致盲！`);\n}",
+                            "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\n    if (eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被致盲！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -311,7 +311,7 @@
                         {
                             "label": "方圆-选择抗性",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst reduceAmount = 10 + (lvl - 1) * 5;\n\nconst element = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"方圆 - 选择减伤属性\" },\n    content: `\n    <div class=\"form-group\">\n        <label>选择属性:</label>\n        <select name=\"element\">\n            <option value=\"taiji\">太极</option>\n            <option value=\"yin\">阴</option>\n            <option value=\"yang\">阳</option>\n            <option value=\"gang\">刚</option>\n            <option value=\"rou\">柔</option>\n        </select>\n    </div>`,\n    ok: { callback: (event, button) => button.form.elements[\"element\"].value }\n});\n\nif (element) {\n    await game.xjzl.api.effects.removeEffect(actor, \"fangyuan_buff\", 999);\n    const effData = thisItem.effects.getName(\"方圆\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.flags[\"xjzl-system\"].selectedElement = element;\n    effData.flags[\"xjzl-system\"].reduceAmount = reduceAmount;\n    effData.description = `受到 [${element}] 属性伤害减少 ${reduceAmount} 点。`;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst reduceAmount = 10 + (lvl - 1) * 5;\n\nconst element = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"方圆 - 选择减伤属性\" },\n    content: `\n    <div class=\"form-group\">\n        <label>选择属性:</label>\n        <select name=\"element\">\n            <option value=\"taiji\">太极</option>\n            <option value=\"yin\">阴</option>\n            <option value=\"yang\">阳</option>\n            <option value=\"gang\">刚</option>\n            <option value=\"rou\">柔</option>\n        </select>\n    </div>`,\n    ok: { callback: (event, button) => button.form.elements[\"element\"].value },\n    rejectClose: false\n});\n\nif (element) {\n    const desc = `受到 [${element}] 属性伤害减少 ${reduceAmount} 点。`;\n    const effData = thisItem.effects.getName(\"方圆\").toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    effData.flags[\"xjzl-system\"].selectedElement = element;\n    effData.flags[\"xjzl-system\"].reduceAmount = reduceAmount;\n    effData.description = desc;\n    // 方圆为不可叠层 AE：重复施加由底层自动叠加持续时间；\n    // 底层覆盖模式不刷新 flags/描述，这里补一次更新以应用重新选择的减伤属性\n    await game.xjzl.api.effects.addEffect(actor, effData);\n    const existing = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fangyuan_buff\");\n    if (existing) {\n        await existing.update({\n            \"flags.xjzl-system.selectedElement\": element,\n            \"flags.xjzl-system.reduceAmount\": reduceAmount,\n            description: desc\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -343,7 +343,7 @@
                         {
                             "label": "请求棋术对抗",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\n\n// 读取物品自身携带的 AE 模板\nconst effectName = \"黑白\";\nconst effectRef = thisItem.effects.getName(effectName)?.toObject();\n\nif (effectRef) {\n    delete effectRef._id;\n    effectRef.origin = thisItem.uuid;\n    effectRef.duration = { rounds: 3 }; // 确保时长正确\n}\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: 'qishu',\n    label: `手谈一局 (我方棋术应+${bonus})`,\n    outcome: {\n        win: {\n            text: '对抗胜利：应用 [黑白] (3回合)。',\n            targetEffect: effectRef || null\n        },\n        lose: { text: '对抗失败：目标识破了棋局。' }\n    }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\n\n// 读取物品自身携带的 AE 模板\nconst effectName = \"黑白\";\nconst effectRef = thisItem.effects.getName(effectName)?.toObject();\n\nif (effectRef) {\n    delete effectRef._id;\n    effectRef.origin = thisItem.uuid;\n    effectRef.duration = { rounds: 3 }; // 确保时长正确\n}\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: 'qishu',\n    label: `手谈一局`,\n    attBonus: bonus,\n    outcome: {\n        win: {\n            text: '对抗胜利：应用 [黑白] (3回合)。',\n            targetEffect: effectRef || null\n        },\n        lose: { text: '对抗失败：目标识破了棋局。' }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -423,39 +423,55 @@
                         {
                             "label": "烂柯控制",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const hasHeibai = args.target.effects.some(e => e.name === \"黑白\");\n    if (hasHeibai) {\n        await game.xjzl.api.effects.addEffect(args.target, \"root\");\n        await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n        ui.notifications.info(`${args.target.name} 陷入烂柯一梦！`);\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const hasHeibai = args.target.effects.some(e => e.name === \"黑白\");\n    if (hasHeibai) {\n        for (const statusId of [\"root\", \"fushen\"]) {\n            const eff = CONFIG.statusEffects.find(e => e.id === statusId);\n            if (eff) {\n                const data = foundry.utils.deepClone(eff);\n                data.duration = { rounds: 3 };\n                await game.xjzl.api.effects.addEffect(args.target, data);\n            }\n        }\n        ui.notifications.info(`${args.target.name} 陷入烂柯一梦！`);\n    }\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "方圆",
-                    "icon": "icons/magic/defensive/shield-barrier-blue.webp",
-                    "description": "减少特定属性伤害。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "fangyuan_buff",
-                            "stackable": true,
-                            "scripts": [
-                                {
-                                    "label": "减伤",
-                                    "trigger": "preTake",
-                                    "active": true,
-                                    "script": "const el = thisEffect.getFlag(\"xjzl-system\", \"selectedElement\");\nconst amt = thisEffect.getFlag(\"xjzl-system\", \"reduceAmount\") || 0;\nif (args.element === el) {\n    args.output.damage = Math.max(0, args.output.damage - amt);\n    ui.notifications.info(`方圆触发：减免 ${amt} 点 [${el}] 伤害`);\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "duration": {
-                        "rounds": 1
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "方圆",
+                "icon": "icons/magic/defensive/shield-barrier-blue.webp",
+                "description": "减少特定属性伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "fangyuan_buff",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "减伤",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "const el = thisEffect.getFlag(\"xjzl-system\", \"selectedElement\");\nconst amt = thisEffect.getFlag(\"xjzl-system\", \"reduceAmount\") || 0;\nif (args.element === el) {\n    args.output.damage = Math.max(0, args.output.damage - amt);\n    ui.notifications.info(`方圆触发：减免 ${amt} 点 [${el}] 伤害`);\n}"
+                            }
+                        ]
+                    }
+                },
+                "duration": {
+                    "rounds": 1
+                },
+                "changes": []
+            },
+            {
+                "name": "黑白",
+                "icon": "icons/magic/defensive/yin-yang.webp",
+                "description": "他所有招式的属性对你来说视为太极。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "heibai",
+                        "stackable": false
+                    }
+                },
+                "duration": {
+                    "rounds": 3
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "绝影狂手",
@@ -773,29 +789,29 @@
                         {
                             "label": "消耗螺旋提示",
                             "trigger": "attack",
-                            "script": "const luoxuan = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"luoxuan\");\nif (luoxuan) {\n    const stacks = luoxuan.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const coef = 1 + (lvl - 1);\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"疾如旋踵\" },\n        content: `<p>当前拥有 ${stacks} 层 [螺旋]。</p><p>消耗所有层数，每层击飞 3 米。</p><p>每 1 米未击飞距离转化为 ${coef} 点伤害。</p><p>是否消耗？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        await luoxuan.delete();\n        const maxDist = stacks * 3;\n        const msg = `已消耗 ${stacks} 层螺旋。理论击飞 ${maxDist} 米。<br><b>请手动计算撞墙剩余距离并乘以 ${coef}，通过右键【手动应用伤害】附加数值。</b>`;\n        ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n    }\n}",
+                            "script": "const luoxuan = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"luoxuan\");\nif (luoxuan) {\n    const stacks = luoxuan.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const coef = 1 + (lvl - 1);\n    \n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"疾如旋踵\" },\n        content: `<p>当前拥有 ${stacks} 层 [螺旋]。</p><p>消耗所有层数，每层击飞 3 米。</p><p>每 1 米未击飞距离转化为 ${coef} 点伤害。</p><p>是否消耗？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"luoxuan\", 999);\n        const maxDist = stacks * 3;\n        const msg = `已消耗 ${stacks} 层螺旋。理论击飞 ${maxDist} 米。<br><b>请手动计算撞墙剩余距离并乘以 ${coef}，通过右键【手动应用伤害】附加数值。</b>`;\n        ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n    }\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "螺旋",
-                    "icon": "icons/magic/water/projectile-water-ball.webp",
-                    "description": "增加水纹球招式距离。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "luoxuan",
-                            "stackable": true,
-                            "maxStacks": 10
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "螺旋",
+                "icon": "icons/magic/water/projectile-water-ball.webp",
+                "description": "增加水纹球招式距离。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "luoxuan",
+                        "stackable": true,
+                        "maxStacks": 10
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "干泗镖",
@@ -914,7 +930,7 @@
                         {
                             "label": "致盲",
                             "trigger": "hit",
-                            "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
+                            "script": "if (!args.isHit) return;\nconst eff = CONFIG.statusEffects.find(e => e.id === \"blind\");\nif (eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
                             "active": true
                         }
                     ]
@@ -952,7 +968,7 @@
                         {
                             "label": "混沌一击流程",
                             "trigger": "hit",
-                            "script": "const debuffs = [\n    {id: 1, slug: \"root\", name: \"禁足\"},\n    {id: 2, slug: \"cuogu\", name: \"错骨\"},\n    {id: 3, slug: \"stun\", name: \"定身\"},\n    {id: 4, slug: \"fengzhao\", name: \"封招\"},\n    {id: 5, slug: \"zibi\", name: \"自闭\"},\n    {id: 6, slug: \"xuanyun\", name: \"眩晕\"}\n];\n\n// 1. 自动应用所有负面状态\nfor (const db of debuffs) {\n    const eff = CONFIG.statusEffects.find(e => e.id === db.slug);\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n}\n\n// 2. 计算投掷数量\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst diceCount = 1 + (lvl - 1);\n\n// 3. 发送引导卡片\nconst content = `\n<div class=\"xjzl-chat-card\">\n    <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold; color:#8b0000; margin-bottom:5px; padding-bottom:2px;\">\n        <i class=\"fas fa-skull\"></i> 混沌一击 - 结算指引\n    </div>\n    <div style=\"padding:5px; font-size:0.9em;\">\n        <p style=\"margin-bottom:5px;\"><strong>第一步：</strong>请依次手动施展以下招式（不消耗额外动作）：</p>\n        <ul style=\"margin-bottom:10px;\">\n            <li>【干涸大地】</li>\n            <li>【水养四方】</li>\n            <li>【血如泉涌】</li>\n        </ul>\n        <hr style=\"border: 0; border-top: 1px dashed #ccc; margin: 5px 0;\">\n        <p style=\"margin-bottom:5px;\"><strong>第二步：</strong>你已获得全部 6 种负面状态。</p>\n        <p style=\"margin-bottom:5px;\">请手动投掷 <b>${diceCount}d6</b>。</p>\n        <p style=\"margin-bottom:5px;\">根据点数，<b>手动移除</b>对应的状态：</p>\n        <ul style=\"font-size:0.85em; color:#555; column-count: 2; margin: 0;\">\n            <li>1: 禁足</li> <li>2: 错骨</li>\n            <li>3: 定身</li> <li>4: 封招</li>\n            <li>5: 自闭</li> <li>6: 眩晕</li>\n        </ul>\n    </div>\n</div>`;\n\nChatMessage.create({\n    content: content,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "script": "const debuffs = [\n    {id: 1, slug: \"root\", name: \"禁足\"},\n    {id: 2, slug: \"cuogu\", name: \"错骨\"},\n    {id: 3, slug: \"stun\", name: \"定身\"},\n    {id: 4, slug: \"fengzhao\", name: \"封招\"},\n    {id: 5, slug: \"zibi\", name: \"自闭\"},\n    {id: 6, slug: \"xuanyun\", name: \"眩晕\"}\n];\n\n// 1. 自动应用所有负面状态（持续到自己下个回合结束：rounds 2 + 回合末清理，纠正 Foundry 回合开始过期造成的差一）\nconst cleanupScript = \"const remaining = thisEffect.duration?.remaining; if (typeof remaining !== 'number' || remaining <= 1) { await game.xjzl.api.effects.removeEffect(actor, thisEffect.getFlag('xjzl-system', 'slug'), 999); }\";\nfor (const db of debuffs) {\n    const eff = CONFIG.statusEffects.find(e => e.id === db.slug);\n    if(eff) {\n        // 先移除已有同slug状态再重建：addEffect 覆盖模式不合并 flags/scripts，\n        // 直接叠加会导致施展前已有的状态拿不到回合末清理脚本\n        await game.xjzl.api.effects.removeEffect(actor, db.slug, 999);\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 2 };\n        data.flags[\"xjzl-system\"].scripts = [{\n            label: \"混沌一击-回合末清理\",\n            trigger: \"turnEnd\",\n            active: true,\n            script: cleanupScript\n        }];\n        await game.xjzl.api.effects.addEffect(actor, data);\n    }\n}\n\n// 2. 计算投掷数量\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst diceCount = 1 + (lvl - 1);\n\n// 3. 发送引导卡片\nconst content = `\n<div class=\"xjzl-chat-card\">\n    <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold; color:#8b0000; margin-bottom:5px; padding-bottom:2px;\">\n        <i class=\"fas fa-skull\"></i> 混沌一击 - 结算指引\n    </div>\n    <div style=\"padding:5px; font-size:0.9em;\">\n        <p style=\"margin-bottom:5px;\"><strong>第一步：</strong>请依次手动施展以下招式（不消耗额外动作）：</p>\n        <ul style=\"margin-bottom:10px;\">\n            <li>【干涸大地】</li>\n            <li>【水养四方】</li>\n            <li>【血如泉涌】</li>\n        </ul>\n        <hr style=\"border: 0; border-top: 1px dashed #ccc; margin: 5px 0;\">\n        <p style=\"margin-bottom:5px;\"><strong>第二步：</strong>你已获得全部 6 种负面状态。</p>\n        <p style=\"margin-bottom:5px;\">请手动投掷 <b>${diceCount}d6</b>。</p>\n        <p style=\"margin-bottom:5px;\">根据点数，<b>手动移除</b>对应的状态：</p>\n        <ul style=\"font-size:0.85em; color:#555; column-count: 2; margin: 0;\">\n            <li>1: 禁足</li> <li>2: 错骨</li>\n            <li>3: 定身</li> <li>4: 封招</li>\n            <li>5: 自闭</li> <li>6: 眩晕</li>\n        </ul>\n    </div>\n</div>`;\n\nChatMessage.create({\n    content: content,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -1282,63 +1298,63 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "回阳",
-                    "icon": "icons/svg/sun.svg",
-                    "description": "增强针法威力。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "huiyang",
-                            "stackable": true
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "活血",
-                    "icon": "icons/svg/heal.svg",
-                    "description": "回合初回复气血。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "huoxue",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "持续回复",
-                                    "trigger": "turnStart",
-                                    "active": true,
-                                    "script": "const amt = thisEffect.getFlag(\"xjzl-system\", \"regenAmount\") || 0;\nif (amt > 0) {\n    await actor.applyHealing({ healer: actor, amount: amt, type: \"hp\", showScrolling: true});\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "duration": {
-                        "rounds": 2
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "神针",
-                    "icon": "icons/svg/target.svg",
-                    "description": "蓄力中，下回合可发动攻击。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "shenzhen",
-                            "stackable": false
-                        }
-                    },
-                    "duration": {
-                        "rounds": 1
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "回阳",
+                "icon": "icons/svg/sun.svg",
+                "description": "增强针法威力。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huiyang",
+                        "stackable": true
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "活血",
+                "icon": "icons/svg/heal.svg",
+                "description": "回合初回复气血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huoxue",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "持续回复",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "const amt = thisEffect.getFlag(\"xjzl-system\", \"regenAmount\") || 0;\nif (amt > 0) {\n    await actor.applyHealing({ healer: actor, amount: amt, type: \"hp\", showScrolling: true});\n}"
+                            }
+                        ]
+                    }
+                },
+                "duration": {
+                    "rounds": 2
+                },
+                "changes": []
+            },
+            {
+                "name": "神针",
+                "icon": "icons/svg/target.svg",
+                "description": "蓄力中，下回合可发动攻击。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shenzhen",
+                        "stackable": false
+                    }
+                },
+                "duration": {
+                    "rounds": 1
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "玲珑骰",
@@ -1383,7 +1399,7 @@
                         {
                             "label": "庄家投掷",
                             "trigger": "hit",
-                            "script": "const zhuang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhuang\");\nif (zhuang && args.isHit) {\n    const r = await new Roll(\"1d6\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n    const val = r.total;\n    const loss = val * 10;\n    await args.target.applyHealing({ healer: actor, amount: -loss, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`天王盖地虎：点数 ${val} -> 流失 ${loss} 气血`);\n}",
+                            "script": "const zhuang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhuang\");\nif (zhuang && args.isHit) {\n    const r = await new Roll(\"1d6\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n    const val = r.total;\n    const loss = val * 10;\n    await args.target.applyHealing({ healer: actor, amount: -loss, type: \"hp\", showScrolling: true});\n    ui.notifications.info(`天王盖地虎：点数 ${val} -> 流失 ${loss} 气血。拥有[庄]：可额外投掷 1 个 D6 取优，然后手动移除[庄]。`);\n}",
                             "active": true
                         }
                     ]
@@ -1476,7 +1492,7 @@
                         {
                             "label": "击破骰子",
                             "trigger": "hit",
-                            "script": "const zhuang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhuang\");\nif (args.isBroken && zhuang) {\n    const r = await new Roll(\"1d6\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n    if (r.total === 6) {\n        const eff = CONFIG.statusEffects.find(e => e.id === \"jinshi\");\n        if(eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(\"双天双地(6点) -> 禁实\");\n        }\n    }\n}",
+                            "script": "const zhuang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhuang\");\nif (args.isBroken && zhuang) {\n    const r = await new Roll(\"1d6\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n    ui.notifications.info(`双天双地：点数 ${r.total}。拥有[庄]：可额外投掷 1 个 D6 取优，然后手动移除[庄]。`);\n    if (r.total === 6) {\n        const eff = CONFIG.statusEffects.find(e => e.id === \"jinshi\");\n        if(eff) {\n            const data = foundry.utils.deepClone(eff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(\"双天双地(6点) -> 禁实\");\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1519,28 +1535,28 @@
                         {
                             "label": "至尊宝骰子",
                             "trigger": "attack",
-                            "script": "const zhuang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhuang\");\nif (zhuang) {\n    const r = await new Roll(\"1d6\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n    const val = r.total;\n    ui.notifications.info(`至尊宝点数: ${val}`);\n    ChatMessage.create({content: `至尊宝点数: <b>${val}</b><br>1-2: 禁足<br>3-4: 必爆<br>5-6: 失去反应`, speaker: ChatMessage.getSpeaker({actor: actor})});\n}",
+                            "script": "const zhuang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhuang\");\nif (zhuang) {\n    const r = await new Roll(\"1d6\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n    const val = r.total;\n    ui.notifications.info(`至尊宝点数: ${val}`);\n    ChatMessage.create({content: `至尊宝点数: <b>${val}</b><br>1-2: 禁足<br>3-4: 必爆<br>5-6: 失去反应<br>拥有[庄]：可额外投掷 1 个 D6 取优，然后手动移除[庄]。`, speaker: ChatMessage.getSpeaker({actor: actor})});\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "庄",
-                    "icon": "icons/sundry/gaming/dice-pair-white.webp",
-                    "description": "投掷D6时可双骰取优。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "zhuang",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "庄",
+                "icon": "icons/sundry/gaming/dice-pair-white.webp",
+                "description": "投掷D6时可双骰取优。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhuang",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "自在无想飞针",
@@ -1563,7 +1579,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>针灵寻器，开启架招。同时，内劲灌注一组暗器，使其随真气在周身盘旋，你获得 20 层“锁”，附着于每根暗器之上，持续到战斗脱离或被解除架招。</p><p><strong>锁：</strong>该暗器施展《自在无想飞针》时必定命中。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "获得 20 层[锁]自动。锁的必中与每攻击耗 1 层由 AE 自动处理（效果按层绑定在角色身上管理，不自动消耗暗器物品）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1595,7 +1611,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>暗器自然而动，攻向敌手，对敌人造成伤害，命中无架招目标时，你拥有“锁”的那组暗器获得“灵”，持续三回合或解除架招。</p><p><strong>灵：</strong>该暗器的伤害提高 10 点。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "出招时身上还有[锁]且命中无架招目标时，自动获得[灵]（出招阶段记录带锁与否，避免最后一层锁已被消耗导致误判）。必中与耗层由[锁] AE 自动处理；灵的暗器武学增伤由 AE 自动结算。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1616,21 +1632,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "检测锁-必中",
+                            "label": "记录锁使用",
                             "trigger": "attack",
-                            "script": "const lock = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suo\");\nif (lock && lock.getFlag(\"xjzl-system\", \"stacks\") > 0) {\n    args.flags.forceHit = true;\n    ui.notifications.info(\"[锁] 生效：本次攻击必中\");\n}",
+                            "script": "// 出招阶段记录本次是否带[锁]：招式脚本先于[锁] AE 执行，此时最后一层锁尚未被消耗；\n// hit 阶段不能再检查 AE 是否存在，否则只剩 1 层时该层已被扣掉，无法触发灵\nconst lock = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suo\");\nawait thisItem.setFlag(\"xjzl-system\", \"temp_lock_used\", !!(lock && (lock.getFlag(\"xjzl-system\", \"stacks\") || 0) > 0));",
                             "active": true
                         },
                         {
                             "label": "获得灵",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const eff = thisItem.effects.getName(\"灵\").toObject();\n    eff.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "// 本次出招带[锁]且命中无架招目标时，该组暗器获得[灵]（必中与耗层由[锁] AE 处理，增伤由[灵] AE 处理）\nif (!args.isHit || args.target.system.martial.stanceActive) return;\nif (!thisItem.getFlag(\"xjzl-system\", \"temp_lock_used\")) return;\nconst eff = thisItem.effects.getName(\"灵\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: 3 };\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         },
                         {
-                            "label": "灵-增伤",
-                            "trigger": "calc",
-                            "script": "const ling = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"ling\");\nif (ling) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"灵 +10\");\n}",
+                            "label": "清理锁标记",
+                            "trigger": "hit_once",
+                            "script": "await args.item.unsetFlag(\"xjzl-system\", \"temp_lock_used\");",
                             "active": true
                         }
                     ]
@@ -1646,7 +1662,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>盘旋于周身的暗器一齐发射，对目标造成伤害，若你开启架招时盘旋的该组暗器具有“灵”，则每射出一根，招式伤害提升一次武器伤害的数值。</p><p>·若暗器不具备“灵”，则只射出 1 根。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "必中、增伤自动。若无灵需手动调整伤害。",
+                    "automationNote": "必中与耗层由[锁] AE 自动处理。有[灵]时弹窗询问射出数量，自动消耗对应层数并按根数附加武器伤害；无灵只射 1 根（自动）。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1673,51 +1689,62 @@
                     },
                     "scripts": [
                         {
-                            "label": "检测锁与灵",
+                            "label": "万针如瀑-射出数量",
                             "trigger": "attack",
-                            "script": "const lock = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suo\");\nif (lock) {\n    args.flags.forceHit = true;\n    await lock.delete();\n    ui.notifications.info(\"[锁] 耗尽：万针如瀑！\");\n} else {\n    ui.notifications.warn(\"未检测到 [锁]，无法发射暗器流！\");\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "计算爆发伤害",
-                            "trigger": "calc",
-                            "script": "const lock = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suo\");\nconst ling = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"ling\");\nif (lock) {\n    const stacks = lock.getFlag(\"xjzl-system\", \"stacks\") || 0;\n    if (ling) {\n        const weaponDmg = args.baseData.weapon || 0;\n        const bonus = stacks * weaponDmg;\n        args.output.damage += bonus;\n        args.output.bonusDesc.push(`灵·万针齐发 (${stacks} x ${weaponDmg})`);\n    } else {\n        args.output.bonusDesc.push(\"无灵：仅射出 1 根 (伤害可能需手动调整)\");\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "// 无想：有[灵]时弹窗询问射出的暗器数量；每根消耗 1 层锁（其中 1 层由[锁] AE 的攻击脚本自动消耗）\n// 必中同样由[锁] AE 处理；本招伤害加成在 attack 阶段写入 flags.damageResult.damage\nconst lock = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"suo\");\nif (!lock) {\n    ui.notifications.warn(\"未检测到 [锁]，暗器未能盘旋，仅能射出 1 根。\");\n    return;\n}\nconst stacks = lock.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst hasLing = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"ling\");\nif (!hasLing) return; // 无灵只射出 1 根：基础伤害已覆盖，[锁] AE 会自动消耗这 1 层\nconst input = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"无想 - 万针如瀑\" },\n    content: `<p>当前拥有 ${stacks} 层 [锁]，即至多 ${stacks} 根暗器。</p><p>请输入本次射出的数量（1~${stacks}）：</p><div class=\"form-group\"><input type=\"number\" name=\"count\" value=\"${stacks}\" min=\"1\" max=\"${stacks}\" style=\"text-align:center;\"></div>`,\n    ok: { callback: (event, button) => parseInt(button.form.elements[\"count\"].value) || 1 },\n    rejectClose: false\n});\nif (input === null) return;\nconst count = Math.max(1, Math.min(stacks, input));\nif (count > 1) await game.xjzl.api.effects.removeEffect(actor, \"suo\", count - 1);\n// 有灵：每射出一根，招式伤害提升一次武器伤害\nconst weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === \"hidden\");\nconst weaponDmg = weapon ? (weapon.system.damage || 0) : 0;\nconst bonus = count * weaponDmg;\nif (bonus > 0) {\n    args.flags.damageResult = args.flags.damageResult || {};\n    args.flags.damageResult.damage = (args.flags.damageResult.damage ?? 0) + bonus;\n}\nui.notifications.info(`万针如瀑：射出 ${count} 根暗器${bonus > 0 ? `，伤害 +${bonus}` : \"\"}。`);"
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "锁",
-                    "icon": "icons/tools/fasteners/screw-flat-slotted-steel.webp",
-                    "description": "施展本套路必定命中。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "suo",
-                            "stackable": true,
-                            "maxStacks": 20,
-                            "tiedToStance": true
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "灵",
-                    "icon": "icons/magic/light/explosion-star-small-blue-yellow.webp",
-                    "description": "暗器伤害提高。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "ling",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "锁",
+                "icon": "icons/tools/fasteners/screw-flat-slotted-steel.webp",
+                "description": "暗器武学必定命中（仍投掷、可暴击），每次攻击消耗 1 层。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "suo",
+                        "stackable": true,
+                        "maxStacks": 20,
+                        "tiedToStance": true,
+                        "scripts": [
+                            {
+                                "label": "锁-暗器必中",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "// 锁：暗器武学必定命中（仍投掷、可暴击），本次攻击消耗 1 层\nif (args.move?.weaponType !== 'hidden') return;\nargs.flags.alwaysHit = true;\nawait game.xjzl.api.effects.removeEffect(actor, 'suo', 1);\nui.notifications.info('[锁] 生效：本次暗器攻击必定命中，消耗 1 层。');"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "灵",
+                "icon": "icons/magic/light/explosion-star-small-blue-yellow.webp",
+                "description": "暗器武学伤害提高 10 点。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "ling",
+                        "stackable": false,
+                        "tiedToStance": true,
+                        "scripts": [
+                            {
+                                "label": "灵-暗器增伤",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "// 灵：暗器武学伤害+10，不限具体武学\nif (args.move?.weaponType !== 'hidden') return;\nargs.output.damage += 10;\nargs.output.bonusDesc.push(\"灵 +10\");"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "逆龙鳞",
@@ -1884,64 +1911,64 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "隐渊",
-                    "icon": "icons/magic/nature/root-vine-thorn-fire-purple.webp",
-                    "description": "若未被洞察，回合初获得怒气。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yinyuan",
-                            "stackable": false,
-                            "tiedToStance": true,
-                            "scripts": [
-                                {
-                                    "label": "隐渊回怒",
-                                    "trigger": "turnStart",
-                                    "active": true,
-                                    "script": "await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nui.notifications.info(`${actor.name} 隐渊生效：怒气 +1`);"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "触龙",
-                    "icon": "icons/creatures/reptiles/dragon-horned-blue.webp",
-                    "description": "命中/虚招对抗劣势。回合初减少怒气。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "chulong",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "触龙减怒",
-                                    "trigger": "turnStart",
-                                    "active": true,
-                                    "script": "const current = actor.system.resources.rage.value;\nif (current > 0) {\n    await actor.changeResources({\"system.resources.rage.value\": current - 1}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(`${actor.name} 触龙生效：怒气 -1`);\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.attackLevel",
-                            "mode": 2,
-                            "value": "-1"
-                        },
-                        {
-                            "key": "flags.xjzl-system.feintLevel",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "隐渊",
+                "icon": "icons/magic/nature/root-vine-thorn-fire-purple.webp",
+                "description": "若未被洞察，回合初获得怒气。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yinyuan",
+                        "stackable": false,
+                        "tiedToStance": true,
+                        "scripts": [
+                            {
+                                "label": "隐渊回怒",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nui.notifications.info(`${actor.name} 隐渊生效：怒气 +1`);"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "触龙",
+                "icon": "icons/creatures/reptiles/dragon-horned-blue.webp",
+                "description": "命中/虚招对抗劣势。回合初减少怒气。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "chulong",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "触龙减怒",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "const current = actor.system.resources.rage.value;\nif (current > 0) {\n    await actor.changeResources({\"system.resources.rage.value\": current - 1}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(`${actor.name} 触龙生效：怒气 -1`);\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "flags.xjzl-system.attackLevel",
+                        "mode": 2,
+                        "value": "-1"
+                    },
+                    {
+                        "key": "flags.xjzl-system.feintLevel",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "血滴子",
@@ -2184,43 +2211,43 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "血滴",
-                    "icon": "icons/magic/blood/drop-splash-red.webp",
-                    "description": "受击流失气血，满10层转为失血。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xuedi",
-                            "stackable": true,
-                            "scripts": [
-                                {
-                                    "label": "受击流失",
-                                    "trigger": "damaged",
-                                    "active": true,
-                                    "script": "if ([\"waigong\", \"neigong\"].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const loss = 10 * stacks;\n    await actor.applyDamage({ amount: loss, type: \"liushi\", attacker: args.attacker });\n\n    if (stacks >= 10) {\n        const bloodLoss = CONFIG.statusEffects.find(e => e.id === \"bloodloss\");\n        await game.xjzl.api.effects.addEffect(actor, bloodLoss);\n        ui.notifications.warn(`${actor.name} 血滴攻心，引发失血！`);\n    }\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "血锋",
-                    "icon": "icons/weapons/swords/sword-red-skull.webp",
-                    "description": "敌人流失气血时回复等额气血。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xuefeng",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "血滴",
+                "icon": "icons/magic/blood/drop-splash-red.webp",
+                "description": "受击流失气血，满10层转为失血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xuedi",
+                        "stackable": true,
+                        "scripts": [
+                            {
+                                "label": "受击流失",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "if ([\"waigong\", \"neigong\"].includes(args.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const loss = 10 * stacks;\n    await actor.applyDamage({ amount: loss, type: \"liushi\", attacker: args.attacker });\n\n    // 规则：每累积十层血滴添加一层失血。用里程碑标记防止同一段层数内每次受击都重复添加。\n    const milestone = Math.floor(stacks / 10);\n    const lastMilestone = thisEffect.getFlag(\"xjzl-system\", \"lastBleedMilestone\") || 0;\n    if (milestone > lastMilestone) {\n        const bloodLoss = CONFIG.statusEffects.find(e => e.id === \"bloodloss\");\n        if (bloodLoss) {\n            for (let i = 0; i < milestone - lastMilestone; i++) {\n                await game.xjzl.api.effects.addEffect(actor, bloodLoss);\n            }\n            await thisEffect.setFlag(\"xjzl-system\", \"lastBleedMilestone\", milestone);\n            ui.notifications.warn(`${actor.name} 血滴攻心，引发失血！`);\n        }\n    }\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "血锋",
+                "icon": "icons/weapons/swords/sword-red-skull.webp",
+                "description": "敌人流失气血时回复等额气血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "xuefeng",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     }
 ]
