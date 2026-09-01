@@ -136,7 +136,7 @@ export async function seedQizhen() {
                 quantity: d.system?.quantity ?? 1,
                 price: d.system?.price ?? 0,
                 quality: quality,
-                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
+                isOfficial: d.system?.isOfficial ?? true, //默认是官方资源
                 // --- 穴位: 强制重置为空 ---
                 acupoint: "",
 
