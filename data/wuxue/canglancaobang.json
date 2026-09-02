@@ -143,7 +143,7 @@
                             "label": "击飞提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const dist = canvas.grid.measureDistance(actor.token.object.center, args.target.token.object.center);\n    if (dist <= 1.5) {\n        ui.notifications.info(`${args.target.name} 位于1米内，请手动 [击飞]`);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const aToken = actor.token?.object || actor.getActiveTokens()[0];\n    const tToken = args.target.token?.object || args.target.getActiveTokens()[0];\n    if (!aToken || !tToken) return ui.notifications.warn(\"无法获取 Token 位置，请手动判断是否 [击飞]。\");\n    const dist = canvas.grid.measurePath([aToken.center, tToken.center]).distance;\n    if (dist <= 1.5) {\n        ui.notifications.info(`${args.target.name} 位于1米内，请手动 [击飞]`);\n    }\n}"
                         }
                     ]
                 }
@@ -351,7 +351,7 @@
                             "label": "获得蓄劲",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"蓄劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"蓄劲\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);"
                         },
                         {
                             "label": "暴击乏力",
@@ -425,7 +425,7 @@
                             "label": "施加乏力",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const eff = thisItem.effects.getName(\"乏力\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"乏力\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);"
                         }
                     ]
                 },
@@ -439,7 +439,7 @@
                     "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
-                    "description": "<p>全回合动作，剑身没入地面（水面)，内力倾泻奔涌，掀起千重浪，对周围敌人造成 0.7 力量点内功伤害，并引爆他们身上的所有“乏力”，每引爆一层乏力使该敌人流失 10 点气血内力，并使自身回复流失等额数值的气血内力。</p><p>·若一名敌人被引爆了三层“乏力”，则海浪灼目，使其进入“目盲”状态，持续三回合。</p><p><strong>升级：</strong>招式伤害+20，每引爆一层乏力流失的气血内力+5，怒气-1。</p>",
+                    "description": "<p>全回合动作，剑身没入地面（水面)，内力倾泻奔涌，掀起千重浪，对周围敌人造成 0.7 力量点内功伤害，并引爆他们身上的所有“乏力”，每引爆一层乏力使该敌人流失 10 点气血内力，并使自身回复流失等额数值的气血内力。</p><p>·若一名敌人被引爆了三层“乏力”，则海浪灼目，使其进入“目盲”状态，持续三回合。</p><p><strong>消耗：</strong>内力上限的一半</p><p><strong>升级：</strong>招式伤害+20，每引爆一层乏力流失的气血内力+5，怒气-1。</p>",
                     "automationNote": "消耗半管蓝自动。引爆乏力吸取血蓝自动。施加目盲自动。",
                     "calculation": {
                         "base": 0,
@@ -474,7 +474,7 @@
                             "label": "引爆乏力",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const fali = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fali\");\nif (fali) {\n    const stacks = fali.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = stacks * (10 + (lvl - 1) * 5);\n    await fali.delete();\n    await args.target.applyHealing({ healer: actor, amount: -drain, type: \"hp\", showScrolling: true});\n    await args.target.applyHealing({ healer: actor, amount: -drain, type: \"mp\", showScrolling: true});\n    await actor.applyHealing({ healer: actor, amount: drain, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({ healer: actor, amount: drain, type: \"mp\", showScrolling: true});\n    ui.notifications.info(`引爆 ${stacks} 层乏力，吸取 ${drain}`);\n    if (stacks >= 3) {\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"blind\", duration: { rounds: 3 } });\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-water\"></i> 海浪灼目</b><br>${args.target.name} 陷入目盲 3 回合！</div></div>` });\n    }\n}"
+                            "script": "const fali = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fali\");\nif (fali) {\n    const stacks = fali.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const drain = stacks * (10 + (lvl - 1) * 5);\n    await game.xjzl.api.effects.removeEffect(args.target, \"fali\", 99);\n    await args.target.applyHealing({ healer: actor, amount: -drain, type: \"hp\", showScrolling: true});\n    await args.target.applyHealing({ healer: actor, amount: -drain, type: \"mp\", showScrolling: true});\n    await actor.applyHealing({ healer: actor, amount: drain, type: \"hp\", showScrolling: true});\n    await actor.applyHealing({ healer: actor, amount: drain, type: \"mp\", showScrolling: true});\n    ui.notifications.info(`引爆 ${stacks} 层乏力，吸取 ${drain}`);\n    if (stacks >= 3) {\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"blind\", duration: { rounds: 3 } });\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-water\"></i> 海浪灼目</b><br>${args.target.name} 陷入目盲 3 回合！</div></div>` });\n    }\n}"
                         }
                     ]
                 }
@@ -569,7 +569,7 @@
                             "label": "切换剑势",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasSky = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nif (hasSky) {\n    await hasSky.delete();\n    const eff = thisItem.effects.getName(\"重溟式\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #1abc9c; background: rgba(39, 174, 156, 0.1);\"><b><i class=\"fas fa-water\"></i> 剑势切换</b><br>转为 <b>[重溟式]</b>。下一次招式将附带额外特效！<br><span style=\"color:#e74c3c; font-size:0.9em;\">【注意】出招时请在弹窗手动将伤害类型选为<b>内功</b>。</span></div></div>` });\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"穹溟_已切换\").toObject());\n} else {\n    const hasOcean = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\n    if (hasOcean) await hasOcean.delete();\n    const eff = thisItem.effects.getName(\"穹苍式\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-cloud\"></i> 剑势切换</b><br>转为 <b>[穹苍式]</b>。下一次招式将附带额外特效！<br><span style=\"color:#e74c3c; font-size:0.9em;\">【注意】出招时请在弹窗手动将伤害类型选为<b>外功</b>。</span></div></div>` });\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"穹溟_已切换\").toObject());\n}"
+                            "script": "const hasSky = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nif (hasSky) {\n    await game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_sky\", 1);\n    const eff = thisItem.effects.getName(\"重溟式\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #1abc9c; background: rgba(39, 174, 156, 0.1);\"><b><i class=\"fas fa-water\"></i> 剑势切换</b><br>转为 <b>[重溟式]</b>。下一次招式将附带额外特效！<br><span style=\"color:#e74c3c; font-size:0.9em;\">【注意】出招时请在弹窗手动将伤害类型选为<b>内功</b>。</span></div></div>` });\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"穹溟_已切换\").toObject());\n} else {\n    const hasOcean = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\n    if (hasOcean) await game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_ocean\", 1);\n    const eff = thisItem.effects.getName(\"穹苍式\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #3498db; background: rgba(52, 152, 219, 0.1);\"><b><i class=\"fas fa-cloud\"></i> 剑势切换</b><br>转为 <b>[穹苍式]</b>。下一次招式将附带额外特效！<br><span style=\"color:#e74c3c; font-size:0.9em;\">【注意】出招时请在弹窗手动将伤害类型选为<b>外功</b>。</span></div></div>` });\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"穹溟_已切换\").toObject());\n}"
                         },
                         {
                             "label": "初始获得穹苍式",
@@ -811,16 +811,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "清空内力与限制",
-                            "trigger": "preAttack",
-                            "active": true,
-                            "script": "const currentMp = actor.system.resources.mp.value;\nconst switched = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_switched\");\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\n\nif (args.costConfig.isDesperate && switched && hasSky) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-exclamation-triangle\"></i> 规则警告</b><br>若您刚才从重溟切至穹苍，剑气过盛，此招不可用于施展濒死一击！请自觉中止。</div></div>` });\n}\n\nargs.costConfig.qiongmingCost = currentMp;"
-                        },
-                        {
                             "label": "执行扣除",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const cost = actor.system.resources.mp.value;\nawait actor.changeResources({\"system.resources.mp.value\": 0}, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nargs.flags.damageResult.qiongmingCost = cost;"
+                            "script": "const switched = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_switched\");\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nif (switched && hasSky && (args.costConsumed?.desperateBonus || 0) > 0) {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-exclamation-triangle\"></i> 规则警告</b><br>若您刚才从重溟切至穹苍，剑气过盛，此招不可用于施展濒死一击！请自觉中止。</div></div>` });\n}\n\nconst cost = actor.system.resources.mp.value;\nawait actor.changeResources({\"system.resources.mp.value\": 0}, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nargs.flags.damageResult.qiongmingCost = cost;\nactor._qiongmingCost = cost;"
                         },
                         {
                             "label": "姿态适配",
@@ -832,13 +826,13 @@
                             "label": "命中效果与云垂连携",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit) return;\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nconst cost = args.damageResult.qiongmingCost || 0;\nconst val = Math.floor(cost / 2);\n\nif (hasSky && val > 0) {\n    await args.target.applyHealing({ healer: actor, amount: -val, type: \"hp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-wind\"></i> 剑气轰入</b><br>${args.target.name} 承受 ${val} 气血流失！</div></div>` });\n}\n\n// --- 云垂海立 连携特效 ---\nconst waitBleed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_bleed\");\nif (waitBleed) {\n    const lvl = waitBleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = 5 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor, amount: -dmg, type: \"hp\", showScrolling: true});\n}\nconst waitHeal = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_heal\");\nif (waitHeal) {\n    const lvl = waitHeal.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const heal = 5 + (lvl - 1) * 5;\n    await actor.applyHealing({ healer: actor, amount: heal, type: \"mp\", showScrolling: true});\n}"
+                            "script": "if (!args.isHit) return;\nconst hasSky = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_sky\");\nconst cost = actor._qiongmingCost || 0;\nconst val = Math.floor(cost / 2);\n\nif (hasSky && val > 0) {\n    await args.target.applyHealing({ healer: actor, amount: -val, type: \"hp\", showScrolling: true});\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #e74c3c; background: rgba(231, 76, 60, 0.1);\"><b><i class=\"fas fa-wind\"></i> 剑气轰入</b><br>${args.target.name} 承受 ${val} 气血流失！</div></div>` });\n}\n\n// --- 云垂海立 连携特效 ---\nconst waitBleed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_bleed\");\nif (waitBleed) {\n    const lvl = waitBleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const dmg = 5 + (lvl - 1) * 5;\n    await args.target.applyHealing({ healer: actor, amount: -dmg, type: \"hp\", showScrolling: true});\n}\nconst waitHeal = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_wait_heal\");\nif (waitHeal) {\n    const lvl = waitHeal.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const heal = 5 + (lvl - 1) * 5;\n    await actor.applyHealing({ healer: actor, amount: heal, type: \"mp\", showScrolling: true});\n}"
                         },
                         {
                             "label": "重溟回复与清理",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nif (hasOcean && args.hitCount > 0) {\n    const cost = args.damageResult.qiongmingCost || 0;\n    const val = Math.floor(cost / 2);\n    if (val > 0) {\n        await actor.applyHealing({ healer: actor, amount: val, type: \"hp\", showScrolling: true});\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\"><b><i class=\"fas fa-leaf\"></i> 生生不息</b><br>回复了 ${val} 气血。</div></div>` });\n    }\n}\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_bleed\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_heal\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_switched\", 1);"
+                            "script": "const hasOcean = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_qiongming_ocean\");\nif (hasOcean && args.hitCount > 0) {\n    const cost = actor._qiongmingCost || 0;\n    const val = Math.floor(cost / 2);\n    if (val > 0) {\n        await actor.applyHealing({ healer: actor, amount: val, type: \"hp\", showScrolling: true});\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 4px;\"><div style=\"padding: 4px; border-left: 3px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\"><b><i class=\"fas fa-leaf\"></i> 生生不息</b><br>回复了 ${val} 气血。</div></div>` });\n    }\n}\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_bleed\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_wait_heal\", 99);\nawait game.xjzl.api.effects.removeEffect(actor, \"wuxue_qiongming_switched\", 1);\ndelete actor._qiongmingCost;"
                         }
                     ]
                 }
@@ -969,7 +963,6 @@
             "subSect": "canglanpai",
             "tier": 2,
             "description": "<p>逾山越海，双剑归一。</p><p><strong>需求：</strong>《孤峰狂剑》和《啸海绝剑》所有招式全部精通</p><p><strong>效果：</strong>对你而言，《孤峰狂剑》和《啸海绝剑》现在视为同一套武学，不受武学切换规则的影响。</p><p>·你施展剑-重剑武学时，命中+5，暴击骰-1。</p><p><strong>升级：</strong>命中再+5，暴击骰再-1。</p>",
-            "automationNote": "重剑命中与暴击修正已自动化(被动)。",
             "moves": [
                 {
                     "name": "荡海拔山",
@@ -978,15 +971,32 @@
                     "damageType": "none",
                     "weaponType": "none",
                     "description": "被动生效。",
-                    "scripts": [
-                        {
-                            "label": "重剑加成",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "if (args.move.weaponType === \"sword\") {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const hitBonus = 5 + (lvl - 1) * 5;\n    const critBonus = 1 + (lvl - 1) * 1;\n    args.flags.bonusHit += hitBonus;\n    args.flags.critThresholdMod += critBonus;\n}"
-                        }
-                    ],
+                    "automationNote": "武学自带被动AE[重剑合一]：施展剑类武学时命中+5、暴击骰-1（随荡海拔山招式等级成长，未领悟不生效，普攻不加）。AE 默认对所有剑法生效，若侠士使用的并非重剑，请手动关闭该 AE。《孤峰狂剑》与《啸海绝剑》视为同一套武学的规则效果无法自动化，需手动遵守。",
+                    "scripts": [],
                     "actionCost": "无"
+                }
+            ],
+            "effects": [
+                {
+                    "name": "重剑合一",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "施展剑类武学时命中+5、暴击骰-1（随荡海拔山等级成长）。默认对所有剑法生效，若侠士使用的并非重剑，请手动关闭本特效。",
+                    "transfer": true,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_danghai_chongjian",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "重剑加成",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "if (!args.move || args.move.weaponType !== \"sword\") return;\nif (args.item && args.item.type && args.item.type !== \"wuxue\") return;\n// 实时读取荡海拔山招式等级：升级即时生效，未领悟不生效\nconst srcItem = actor.items.find(i => i.type === \"wuxue\" && i.name === \"荡海拔山\");\nconst srcMove = srcItem?.system.moves.find(m => m.name === \"荡海拔山\");\nif (!srcMove || (srcMove.computedLevel || 0) <= 0) return;\nargs.flags.bonusHit += 5 + (srcMove.computedLevel - 1) * 5;\nargs.flags.critThresholdMod += 1 + (srcMove.computedLevel - 1);"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }
@@ -1147,7 +1157,7 @@
                             "label": "东倒西歪",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const unstable = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (unstable) {\n    await unstable.delete();\n    const dongdaoAE = thisItem.effects.getName(\"东倒西歪\");\n    if (dongdaoAE) {\n        const eff = dongdaoAE.toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 陷入 [东倒西歪]`);\n    }\n}"
+                            "script": "if (!args.isHit) return;\nconst unstable = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\");\nif (unstable) {\n    await game.xjzl.api.effects.removeEffect(args.target, \"unstable\", 1);\n    const dongdaoAE = thisItem.effects.getName(\"东倒西歪\");\n    if (dongdaoAE) {\n        const eff = dongdaoAE.toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        eff.duration = { rounds: 3 };\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n        ui.notifications.info(`${args.target.name} 陷入 [东倒西歪]`);\n    }\n}"
                         }
                     ]
                 }
@@ -1423,7 +1433,6 @@
             "subSect": "caobang",
             "tier": 1,
             "description": "<p>此乃漕工衣食所系，漕运工作极为繁重，却也是漕帮弟子日夜打磨之功，强身健体，基础夯实。</p>",
-            "automationNote": "Roleplay向。完全手动。",
             "moves": [
                 {
                     "name": "漕运行",
@@ -1434,6 +1443,7 @@
                     "range": "自身",
                     "actionCost": "无",
                     "description": "<p>此乃漕工衣食所系，漕运工作极为繁重，却也是漕帮弟子日夜打磨之功，强身健体，基础夯实。</p><p><strong>效果：</strong>修习此功，你需要每日做苦工六个时辰，连续三十日，这三十日中你不断体会精疲力尽和肌肉皮骨的坚实之感。</p><p><strong>工钱：</strong>你每参与漕运三十日可根据职位领取工钱：<br>水娃子（略有小成）：二两白银。<br>船佣（融会贯通）：四两白银。<br>船首（炉火纯青）：十两白银。<br>舵首（撼天动地）：五十两白银。</p><p><strong>健体检定：</strong>三十日后，你可以选择力量、身法、体魄中一个属性，进行一个 D20 的检定，难度等于该属性的数值，成功则该属性永久增加 1 点，失败则需要继续做苦工三十日后才能再进行检定。</p><p>·每次进行健体检定时候需消耗 100 修为。</p><p>·当你修炼此功使某项属性提升 10 点时，你获得对应健体属性圆满，无法再通过此功增长属性。</p><p>即：漕运行-力量圆满；漕运行-身法圆满；漕运行-体魄圆满。</p><p><strong>升级：</strong>工钱提高 50%。进行健体检定时结果+1。</p>",
+                    "automationNote": "Roleplay向。完全手动。",
                     "costs": {},
                     "scripts": []
                 }
@@ -1506,7 +1516,7 @@
                             "label": "被动成长与虚招强化",
                             "trigger": "passive",
                             "active": true,
-                            "script": "// 1. 闭气成长计算 (常驻)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.biqi.mod += 2 + (lvl - 1) * 2;\n\n// 2. 检测水中作战状态 (统一水域标记)\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'in_water')) {\n    // 虚招对抗成长\n    const feintBonus = 1 + (lvl - 1) * 1;\n    S.combat.xuzhao += feintBonus;\n    S.combat.kanpo += feintBonus;\n}"
+                            "script": "// 1. 闭气成长计算 (常驻)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.biqi.mod += 2 + (lvl - 1) * 2;\n\n// 2. 检测水中作战状态 (统一水域标记)\nif (actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'in_water')) {\n    // 虚招对抗±N 的系统惯例是同时修正 xuzhao 与 kanpo（同“愚钝”状态）\n    const feintBonus = 1 + (lvl - 1) * 1;\n    S.combat.xuzhao += feintBonus;\n    S.combat.kanpo += feintBonus;\n}"
                         }
                     ]
                 }
