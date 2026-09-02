@@ -169,7 +169,8 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "qinsha",
-                            "stackable": false
+                            "stackable": false,
+                            "tiedToStance": true
                         }
                     },
                     "duration": {
@@ -405,7 +406,7 @@
                         {
                             "label": "无架招流失与绝境封招",
                             "trigger": "hit",
-                            "script": "if (!args.target.system.martial?.stanceActive) {\n    await args.target.applyDamage({ amount: 50, type: 'liushi', attacker: actor, isHit: true, ignoreDefense: true, ignoreBlock: true, ignoreStance: true });\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#8b0000;'><i class='fas fa-tint'></i> 黄沙葬骸</div><div style='font-size:0.9em; color:#555; margin-top:3px;'><b>\" + args.target.name + \"</b> 未开启架招，被风沙侵入心肺，受到流失伤害！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}\n\nconst hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nif (hp / maxHp <= 0.1) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: 'fengzhao', duration: { rounds: 1 } });\n    const msg2 = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #2980b9; background: rgba(41, 128, 185, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#154360;'><i class='fas fa-lock'></i> 绝境反击</div><div style='font-size:0.9em; color:#555; margin-top:3px;'><b>\" + args.target.name + \"</b> 受到强震，陷入<span style='color:red; font-weight:bold;'>封招</span>！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg2 });\n}",
+                            "script": "if (!args.target.system.martial?.stanceActive) {\n    await args.target.applyDamage({ amount: 50, type: 'liushi', attacker: actor, isHit: true, ignoreDefense: true, ignoreBlock: true, ignoreStance: true });\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#8b0000;'><i class='fas fa-tint'></i> 卷沙葬海</div><div style='font-size:0.9em; color:#555; margin-top:3px;'><b>\" + args.target.name + \"</b> 未开启架招，被风沙侵入心肺，受到流失伤害！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}\n\nconst hp = actor.system.resources.hp.value;\nconst maxHp = actor.system.resources.hp.max;\nif (hp / maxHp <= 0.1) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: 'fengzhao', duration: { rounds: 1 } });\n    const msg2 = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #2980b9; background: rgba(41, 128, 185, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#154360;'><i class='fas fa-lock'></i> 绝境反击</div><div style='font-size:0.9em; color:#555; margin-top:3px;'><b>\" + args.target.name + \"</b> 受到强震，陷入<span style='color:red; font-weight:bold;'>封招</span>！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg2 });\n}",
                             "active": true
                         }
                     ]
@@ -533,9 +534,9 @@
                     "scripts": [
                         {
                             "label": "无架招出招限制",
-                            "trigger": "attack",
+                            "trigger": "preAttack",
                             "active": true,
-                            "script": "if (actor.system.martial?.stanceActive) {\n    args.flags.abort = true;\n    args.flags.abortReason = '无上形必须在无架招状态下施展！';\n}"
+                            "script": "if (actor.system.martial?.stanceActive) {\n    args.abort = true;\n    args.abortReason = '无上形必须在无架招状态下施展！';\n}"
                         },
                         {
                             "label": "赋予无上形状态",
@@ -604,7 +605,7 @@
                                     "label": "触发反噬眩晕与结束回合",
                                     "trigger": "hit",
                                     "active": true,
-                                    "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const bonus = thisEffect.getFlag('xjzl-system', 'wushangxingDmg') || 10;\n    const stunData = { id: 'xuanyun', duration: { rounds: 1 } };\n    await game.xjzl.api.effects.addEffect(actor, stunData);\n    await game.xjzl.api.effects.addEffect(args.target, stunData);\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#d35400;'><i class='fas fa-bolt'></i> 无上形 爆发</div><div style='font-size:0.9em; color:#555; margin-top:3px;'>无上形反噬！招式附加了 <span style='color:red; font-weight:bold;'>\" + bonus + \"</span> 点伤害，且双方陷入<span style='color:red; font-weight:bold;'>眩晕</span>！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    if (game.combat && game.combat.combatant?.actorId === actor.id) {\n        await game.combat.nextTurn();\n    }\n    await thisEffect.delete();\n}"
+                                    "script": "if (args.isHit && !args.target.system.martial?.stanceActive) {\n    const bonus = thisEffect.getFlag('xjzl-system', 'wushangxingDmg') || 10;\n    const stunData = { id: 'xuanyun', duration: { rounds: 1 } };\n    await game.xjzl.api.effects.addEffect(actor, stunData);\n    await game.xjzl.api.effects.addEffect(args.target, stunData);\n    const msg = \"<div class='xjzl-chat-card' style='margin-left: 6px;'><div style='border-left: 3px solid #f39c12; background: rgba(243, 156, 18, 0.1); padding: 5px 8px;'><div style='font-weight:bold; color:#d35400;'><i class='fas fa-bolt'></i> 无上形 爆发</div><div style='font-size:0.9em; color:#555; margin-top:3px;'>无上形反噬！招式附加了 <span style='color:red; font-weight:bold;'>\" + bonus + \"</span> 点伤害，且双方陷入<span style='color:red; font-weight:bold;'>眩晕</span>！</div></div></div>\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n    if (game.combat && game.combat.combatant?.actorId === actor.id) {\n        await game.combat.nextTurn();\n    }\n    await game.xjzl.api.effects.removeEffect(actor, \"wushangxing\", 1);\n}"
                                 }
                             ]
                         }
@@ -983,7 +984,7 @@
                             "label": "给自己护体",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "await actor.applyHealing({ healer: actor,  amount: args.baseAmount, type: \"huti\", showScrolling: true });"
+                            "script": "// hit_once 上下文无 baseAmount，且 Buff 的 totalHealAmount 恒为 0；\n// 改读首个目标的 baseAmount（本招为单体，即护体强度）\nconst amt = args.targets?.[0]?.baseAmount ?? 0;\nif (amt > 0) {\n    await actor.applyHealing({ healer: actor, amount: amt, type: \"huti\", showScrolling: true });\n}"
                         }
                     ]
                 },
@@ -1222,8 +1223,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>你每投掷一次伤残（非主动自残），可使你的体魄永久增加 1 点，至多为你增加 10 点体魄。</p>",
-                    "automationNote": "纯被动，请玩家手动记录并增加体魄。",
+                    "description": "<p><strong>上部：</strong>锤身炼体，打熬筋骨。</p><p>你每投掷一次伤残（非主动自残），可使你的体魄永久增加 1 点，至多为你增加 10 点体魄。</p>",
+                    "automationNote": "纯被动无法自动判定投掷伤残，请玩家手动记录并增加体魄（至多+10）。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -1247,8 +1248,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>你的内外功防御永久提高 5 点。</p><p>你的四肢不会再脱臼、骨折。</p>",
-                    "automationNote": "被动防御加成自动。伤残免疫手动。",
+                    "description": "<p><strong>下部：</strong>采气发气，聚练劲力。</p><p>你的内外功防御永久提高 5 点。</p><p>你的四肢不会再脱臼、骨折。</p>",
+                    "automationNote": "内外功防御+5 通过 passive 脚本常驻自动（学会即生效，等价被动AE且无需挂载清理）。四肢不脱臼、骨折的免疫请手动处理。",
                     "requirements": "上部精通；修为 2000",
                     "progression": {
                         "mode": "custom",

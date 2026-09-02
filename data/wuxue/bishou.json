@@ -110,7 +110,7 @@
                         {
                             "label": "格挡-乘风",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst eff = thisItem.effects.getName(\"乘风\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n// 乘风使用系统通用状态，至多三层\nawait game.xjzl.api.effects.addEffect(actor, { id: \"chengfeng\", flags: { \"xjzl-system\": { maxStacks: 3 } } });",
                             "active": true
                         }
                     ]
@@ -170,26 +170,6 @@
                             "key": "system.combat.block",
                             "mode": 2,
                             "value": "-10"
-                        }
-                    ]
-                },
-                {
-                    "name": "乘风",
-                    "icon": "icons/magic/air/wind-weather-snow-gusts.webp",
-                    "description": "速度增加。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "chengfeng_buff",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "1"
                         }
                     ]
                 },
@@ -316,7 +296,7 @@
                         {
                             "label": "击破-乘风",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const eff = thisItem.effects.getName(\"乘风\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(attacker, eff);\n}",
+                            "script": "if (args.isBroken) {\n    // 乘风使用系统通用状态，至多三层\n    await game.xjzl.api.effects.addEffect(actor, { id: \"chengfeng\", flags: { \"xjzl-system\": { maxStacks: 3 } } });\n}",
                             "active": true
                         }
                     ]
@@ -347,7 +327,7 @@
                         {
                             "label": "格挡效果",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 回复内力\nawait actor.applyHealing({ healer: actor,  amount: 5, type: \"mp\", showScrolling: true });\n\n// 获得乘风\nconst eff = thisItem.effects.getName(\"乘风\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 回复内力\nawait actor.applyHealing({ healer: actor, amount: 5, type: \"mp\", showScrolling: true });\n\n// 获得乘风（系统通用状态，至多三层）\nawait game.xjzl.api.effects.addEffect(actor, { id: \"chengfeng\", flags: { \"xjzl-system\": { maxStacks: 3 } } });",
                             "active": true
                         }
                     ]
@@ -384,7 +364,7 @@
                         {
                             "label": "乘风加伤",
                             "trigger": "preDamage",
-                            "script": "if (!args.outcome.isHit) return;\n// 检查目标是否有架招\nif (!args.target.system.martial.stanceActive) {\n    const buff = attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengfeng_buff\");\n    const stacks = buff ? (buff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks > 0) {\n        const bonus = stacks * 5;\n        args.config.amount += bonus;\n        ui.notifications.info(`红花落尽：乘风(${stacks}) 加伤 ${bonus}`);\n    }\n}",
+                            "script": "if (!args.outcome.isHit) return;\n// 检查目标是否有架招\nif (!args.target.system.martial.stanceActive) {\n    const buff = attacker.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengfeng\");\n    const stacks = buff ? (buff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n    if (stacks > 0) {\n        const bonus = stacks * 5;\n        args.config.amount += bonus;\n        ui.notifications.info(`红花落尽：乘风(${stacks}) 加伤 ${bonus}`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -416,54 +396,13 @@
                         {
                             "label": "转化轻灵",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst costPerLayer = Math.max(1, 3 - (lvl - 1));\n\nconst buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengfeng_buff\");\nconst currentStacks = buff ? (buff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (currentStacks >= costPerLayer) {\n    // 计算可转化层数\n    const layersToGain = Math.floor(currentStacks / costPerLayer);\n    const costTotal = layersToGain * costPerLayer;\n\n    // 消耗乘风\n    await game.xjzl.api.effects.removeEffect(actor, \"chengfeng_buff\", costTotal);\n\n    // 获得轻灵\n    const qinglingEff = thisItem.effects.getName(\"轻灵\").toObject();\n    delete qinglingEff._id;\n    qinglingEff.origin = thisItem.uuid;\n    \n    for(let i=0; i<layersToGain; i++) {\n        await game.xjzl.api.effects.addEffect(actor, qinglingEff);\n    }\n    \n    ui.notifications.info(`消耗 ${costTotal} 层乘风，获得 ${layersToGain} 层轻灵。`);\n} else {\n    ui.notifications.warn(`乘风层数不足 (需要 ${costPerLayer})`);\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst costPerLayer = Math.max(1, 3 - (lvl - 1));\n\nconst buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengfeng\");\nconst currentStacks = buff ? (buff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (currentStacks >= costPerLayer) {\n    // 计算可转化层数\n    const layersToGain = Math.floor(currentStacks / costPerLayer);\n    const costTotal = layersToGain * costPerLayer;\n\n    // 消耗乘风\n    await game.xjzl.api.effects.removeEffect(actor, \"chengfeng\", costTotal);\n\n    // 获得轻灵（系统通用状态，至多三层）\n    for(let i=0; i<layersToGain; i++) {\n        await game.xjzl.api.effects.addEffect(actor, { id: \"qingling\", flags: { \"xjzl-system\": { maxStacks: 3 } } });\n    }\n    \n    ui.notifications.info(`消耗 ${costTotal} 层乘风，获得 ${layersToGain} 层轻灵。`);\n} else {\n    ui.notifications.warn(`乘风层数不足 (需要 ${costPerLayer})`);\n}",
                             "active": true
                         }
                     ]
                 }
             ],
-            "effects": [
-                {
-                    "name": "乘风",
-                    "icon": "icons/magic/air/wind-weather-snow-gusts.webp",
-                    "description": "速度增加。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "chengfeng_buff",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
-                },
-                {
-                    "name": "轻灵",
-                    "icon": "icons/magic/movement/trail-streak-white.webp",
-                    "description": "闪避增加。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "qingling_buff",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.dodge",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                }
-            ]
+            "effects": []
         }
     },
     {
@@ -503,7 +442,7 @@
                         {
                             "label": "格挡-回血BUFF",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst healAmt = 1 + (lvl - 1);\n\nconst eff = thisItem.effects.getName(\"金刚回复\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(healAmt);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n// damaged 阶段无 move 上下文，通过架招记录反查当前招式等级\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst healAmt = 1 + (lvl - 1);\n\nconst eff = thisItem.effects.getName(\"金刚回复\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(healAmt);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -947,7 +886,7 @@
                         {
                             "label": "开启阴损",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"阴损\").toObject();\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 4 + (lvl - 1) * 3;\neff.flags[\"xjzl-system\"].yinsunBonus = bonus;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"阴损\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 4 + (lvl - 1) * 3;\neff.flags[\"xjzl-system\"].yinsunBonus = bonus;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -1507,28 +1446,7 @@
                     ]
                 }
             ],
-            "effects": [
-                {
-                    "name": "愚钝",
-                    "icon": "icons/skills/wounds/injury-head-brain-blue.webp",
-                    "description": "虚招对抗降低。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yudun",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.kanpo",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
-                }
-            ]
+            "effects": []
         }
     },
     {
@@ -1741,7 +1659,7 @@
                         {
                             "label": "格挡效果",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst healAmt = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ healer: actor,  amount: healAmt, type: \"hp\", showScrolling: true });\n\nconst eff = thisItem.effects.getName(\"黄泉气\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// damaged 阶段无 move 上下文，通过架招记录反查当前招式等级\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst healAmt = 10 + (lvl - 1) * 10;\nawait actor.applyHealing({ healer: actor,  amount: healAmt, type: \"hp\", showScrolling: true });\n\nconst eff = thisItem.effects.getName(\"黄泉气\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -1757,24 +1675,24 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>飞出令牌后飞回，以自身气血化为疗伤劲力输送给其他友方目标，为其回复 10 点气血、5 内力。</p><p><strong>升级：</strong>气血消耗+10，回复气血+10、内力+5。</p>",
-                    "automationNote": "治疗气血与回复内力需手动。消耗气血自动。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 10,
                         "growth": 10
                     },
                     "costs": {
-                        "mp": [
-                            0,
-                            0,
-                            0
+                        "hp": [
+                            10,
+                            20,
+                            30
                         ]
                     },
                     "scripts": [
                         {
-                            "label": "消耗与内力",
-                            "trigger": "attack",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst hpCost = 10 + (lvl - 1) * 10;\nconst mpHeal = 5 + (lvl - 1) * 5;\n\nawait actor.applyHealing({ healer: actor,  amount: -hpCost, type: \"hp\", showScrolling: true });\nui.notifications.info(`已消耗 ${hpCost} 气血。请手动为目标回复 ${mpHeal} 内力。`);",
-                            "active": true
+                            "label": "回复内力",
+                            "trigger": "hit",
+                            "active": true,
+                            "script": "// 气血回复由 heal 流程按面板自动结算，这里补内力回复\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst mpHeal = 5 + (lvl - 1) * 5;\nawait args.target.applyHealing({ healer: actor, amount: mpHeal, type: \"mp\", showScrolling: true });"
                         }
                     ]
                 },
@@ -1789,7 +1707,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>消耗一层黄泉气，令牌贴身，给周围 3 米范围内所有友方添加一层“护身”，至多三层，持续到脱战。</p><p><strong>护身：</strong>每层使你内外功防御 5 点。</p><p><strong>升级：</strong>额外增加一层，内力消耗+2。</p>",
-                    "automationNote": "消耗黄泉气自动。施加护身自动（需选中目标）。升级效果（额外层）自动。",
+                    "automationNote": "消耗黄泉气与内力自动。给周围 3 米友方添加护身自动（目标由玩家选择）。升级效果（额外层）自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1803,10 +1721,22 @@
                     },
                     "scripts": [
                         {
+                            "label": "黄泉气检查",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "// removeEffect 对不存在的效果静默返回，必须在扣资源前检查层数\nconst hq = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huangquanqi\");\nif (!hq || ((hq.getFlag(\"xjzl-system\", \"stacks\") || 1) < 1)) {\n    args.abort = true;\n    args.abortReason = \"黄泉护身需要消耗一层 [黄泉气]，当前没有黄泉气。\";\n}"
+                        },
+                        {
                             "label": "群体护身",
                             "trigger": "hit",
-                            "script": "if (args.isBuff) {\n    // 消耗\n    await game.xjzl.api.effects.removeEffect(actor, \"huangquanqi_buff\", 1);\n\n    // 计算层数\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const stacksToAdd = 1 + (lvl - 1);\n\n    const eff = thisItem.effects.getName(\"护身\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n\n    for(let i=0; i<stacksToAdd; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "if (args.isBuff) {\n    // 护身使用系统通用状态，至多三层\n    const stacksToAdd = 1 + (Math.max(1, move.computedLevel || 1) - 1);\n    for(let i=0; i<stacksToAdd; i++) {\n        await game.xjzl.api.effects.addEffect(args.target, { id: \"hushen\", flags: { \"xjzl-system\": { maxStacks: 3 } } });\n    }\n}"
+                        },
+                        {
+                            "label": "消耗黄泉气",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "// hit 逐目标执行会重复消耗，消耗移到整次动作仅执行一次的 hit_once\nawait game.xjzl.api.effects.removeEffect(actor, \"huangquanqi\", 1);"
                         }
                     ]
                 },
@@ -1821,7 +1751,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当范围内有其他友方陷入濒死时，可以消耗反应动作释放此招，黄泉不死，挽救其魂，你每消耗一层黄泉气，目标立即回复其气血上限 10%的气血。</p><p><strong>升级：</strong>怒气消耗-1。</p>",
-                    "automationNote": "消耗黄泉气回复需手动执行。",
+                    "automationNote": "触发时机与目标选择手动。回血结算自动（弹窗输入消耗黄泉气层数）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1840,10 +1770,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "效果提示",
+                            "label": "黄泉气回血",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(\"请手动消耗 [黄泉气] 并为目标回复对应百分比气血。\");",
-                            "active": true
+                            "active": true,
+                            "script": "// 触发时机与目标选择由玩家手动，这里实现回血结算\nconst hq2 = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huangquanqi\");\nconst maxLayers = hq2 ? (hq2.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nif (maxLayers <= 0) return ui.notifications.warn(\"你没有可消耗的 [黄泉气]。\");\nconst n = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"生死一念\" },\n    content: `<p>当前拥有 <b>${maxLayers}</b> 层黄泉气。消耗几层？每层回复目标气血上限 10%。</p><input type=\"number\" name=\"layers\" value=\"1\" min=\"1\" max=\"${maxLayers}\" style=\"text-align:center;\">`,\n    ok: { label: \"确定\", callback: (ev, btn) => parseInt(btn.form.elements.layers.value) || 0 }\n});\nconst layers = Math.min(Math.max(n, 0), maxLayers);\nif (layers <= 0) return;\nawait game.xjzl.api.effects.removeEffect(actor, \"huangquanqi\", layers);\nconst heal = Math.floor(args.target.system.resources.hp.max * 0.1 * layers);\nawait args.target.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true });\nui.notifications.info(`消耗 ${layers} 层黄泉气，${args.target.name} 回复 ${heal} 气血。`);"
                         }
                     ]
                 }
@@ -1851,12 +1781,12 @@
             "effects": [
                 {
                     "name": "黄泉气",
-                    "icon": "icons/magic/death/skull-energy-light-purple.webp",
-                    "description": "格挡值增加。",
+                    "icon": "systems/xjzl-system/assets/icons/neigong/江湖1.png",
+                    "description": "黄泉之气护体，每层格挡+1。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
-                            "slug": "huangquanqi_buff",
+                            "slug": "huangquanqi",
                             "stackable": true
                         }
                     },
@@ -1865,31 +1795,6 @@
                             "key": "system.combat.block",
                             "mode": 2,
                             "value": "1"
-                        }
-                    ]
-                },
-                {
-                    "name": "护身",
-                    "icon": "icons/magic/defensive/shield-barrier-blue.webp",
-                    "description": "防御增加。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "hushen_buff",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "5"
-                        },
-                        {
-                            "key": "system.combat.def_neigong",
-                            "mode": 2,
-                            "value": "5"
                         }
                     ]
                 }
@@ -1939,7 +1844,7 @@
                         {
                             "label": "消耗鱼肠",
                             "trigger": "attack",
-                            "script": "const yuchang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yuchang_buff\");\nif (yuchang) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"彗星袭月\" },\n        content: `<p>是否消耗 [鱼肠] 使伤害额外+10？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await yuchang.delete();\n        args.flags.damageResult.damage += 10;\n        args.flags.damageResult.breakdown += \"\\n+ 消耗鱼肠 (+10)\";\n    }\n}",
+                            "script": "const yuchang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yuchang_buff\");\nif (yuchang) {\n    const bonus = yuchang.getFlag(\"xjzl-system\", \"cikeBonus\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 鱼肠加成 (+${bonus})`;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"彗星袭月\" },\n        content: `<p>是否消耗 [鱼肠] 使伤害额外+10？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"yuchang_buff\", 1);\n        args.flags.damageResult.damage += 10;\n        args.flags.damageResult.breakdown += \"\\n+ 消耗鱼肠 (+10)\";\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1972,7 +1877,14 @@
                             3
                         ]
                     },
-                    "scripts": []
+                    "scripts": [
+                        {
+                            "label": "鱼肠加伤",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "const yuchang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yuchang_buff\");\nif (yuchang) {\n    const bonus = yuchang.getFlag(\"xjzl-system\", \"cikeBonus\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 鱼肠加成 (+${bonus})`;\n}"
+                        }
+                    ]
                 },
                 {
                     "name": "鱼肠藏剑",
@@ -2016,7 +1928,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>以披风覆盖全身，开启架招。被击破架招的瞬间，受到伤害之前，使自身获得“鱼肠”状态，持续到战斗脱离或施展其他套路。</p><p><strong>升级:</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "鱼肠被动加伤自动。击破获鱼肠自动。",
+                    "automationNote": "击破获鱼肠自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -2029,12 +1941,6 @@
                         ]
                     },
                     "scripts": [
-                        {
-                            "label": "鱼肠加伤",
-                            "trigger": "attack",
-                            "script": "const yuchang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yuchang_buff\");\nif (yuchang) {\n    const bonus = yuchang.getFlag(\"xjzl-system\", \"cikeBonus\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 鱼肠加成 (+${bonus})`;\n}",
-                            "active": true
-                        },
                         {
                             "label": "击破-鱼肠",
                             "trigger": "preTake",
@@ -2054,7 +1960,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>-风萧萧兮易水寒，壮士一去兮不复还！-</p><p>匹夫一怒，血溅五步！须发怒张，拔匕而出！将自身气血值变为 1 点，进入“匕现”状态，持续到战斗脱离。</p><p><strong>匕现：</strong>匕首武学暴击骰-3 且招式伤害+10。</p><p><strong>升级:</strong>暴击骰再-1，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "鱼肠被动加伤自动。气血变1自动。匕现效果自动。",
+                    "automationNote": "气血变1自动。匕现效果自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2072,12 +1978,6 @@
                         ]
                     },
                     "scripts": [
-                        {
-                            "label": "鱼肠加伤",
-                            "trigger": "attack",
-                            "script": "const yuchang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yuchang_buff\");\nif (yuchang) {\n    const bonus = yuchang.getFlag(\"xjzl-system\", \"cikeBonus\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 鱼肠加成 (+${bonus})`;\n}",
-                            "active": true
-                        },
                         {
                             "label": "应用效果",
                             "trigger": "hit",
@@ -2120,28 +2020,26 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "bixian_buff",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "匕现全局加伤",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "if (args.move?.weaponType === \"dagger\") {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"匕现 +10\");\n}"
+                                },
+                                {
+                                    "label": "匕现暴击修正",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "if (args.move?.weaponType === \"dagger\") {\n    const bonus = thisEffect.getFlag(\"xjzl-system\", \"critBonus\") || 3;\n    args.flags.critThresholdMod += bonus;\n}"
+                                }
+                            ]
                         }
                     },
                     "changes": []
                 }
-            ],
-            "system": {
-                "scripts": [
-                    {
-                        "label": "匕现全局加成",
-                        "trigger": "calc",
-                        "script": "if (args.item.system.weaponType === \"dagger\") {\n    const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bixian_buff\");\n    if (buff) {\n        args.output.damage += 10;\n        args.output.bonusDesc.push(\"匕现 +10\");\n    }\n}",
-                        "active": true
-                    },
-                    {
-                        "label": "匕现暴击修正",
-                        "trigger": "attack",
-                        "script": "if (args.item.system.weaponType === \"dagger\") {\n    const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bixian_buff\");\n    if (buff) {\n        const bonus = buff.getFlag(\"xjzl-system\", \"critBonus\") || 3;\n        args.flags.critThresholdMod += bonus;\n    }\n}",
-                        "active": true
-                    }
-                ]
-            }
+            ]
         }
     },
     {
@@ -2152,7 +2050,7 @@
             "category": "wuxue",
             "sect": "jianghushili",
             "tier": 1,
-            "description": "<p>暗藏蛊毒的尖刺双环，不小心使用会划到自己。</p><p><strong>类型：</strong>匕首-双刺</p><p><strong>属性：</strong>刚</p>",
+            "description": "<p>暗藏蛊毒的尖刺双环，不小心使用会划到自己。</p><p><strong>需求：</strong>匕首-双刺</p><p><strong>属性：</strong>刚</p>",
             "requirements": "匕首-双刺",
             "moves": [
                 {
@@ -2181,7 +2079,7 @@
                         {
                             "label": "格挡-毒环",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst poisonDmg = 5 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"毒环\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.description = `下一次出招造成 ${poisonDmg} 毒素伤害。`;\neff.flags[\"xjzl-system\"].poison = poisonDmg;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n// damaged 阶段无 move 上下文，通过架招记录反查当前招式等级\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\nconst poisonDmg = 5 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"毒环\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.description = `下一次出招造成 ${poisonDmg} 毒素伤害。`;\neff.flags[\"xjzl-system\"].poison = poisonDmg;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -2218,7 +2116,7 @@
                         {
                             "label": "消耗毒环",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 毒环伤害 (+${bonus})`;\n    await buff.delete();\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 毒环伤害 (+${bonus})`;\n    await game.xjzl.api.effects.removeEffect(actor, \"duhuan_buff\", 1);\n}",
                             "active": true
                         }
                     ]
@@ -2255,7 +2153,7 @@
                         {
                             "label": "消耗毒环",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 毒环伤害 (+${bonus})`;\n    await buff.delete();\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 毒环伤害 (+${bonus})`;\n    await game.xjzl.api.effects.removeEffect(actor, \"duhuan_buff\", 1);\n}",
                             "active": true
                         }
                     ]
@@ -2292,7 +2190,7 @@
                         {
                             "label": "消耗毒环",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 毒环伤害 (+${bonus})`;\n    await buff.delete();\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 毒环伤害 (+${bonus})`;\n    await game.xjzl.api.effects.removeEffect(actor, \"duhuan_buff\", 1);\n}",
                             "active": true
                         },
                         {
@@ -2341,7 +2239,7 @@
                         {
                             "label": "消耗毒环",
                             "trigger": "attack",
-                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extra = 10 + (lvl - 1) * 5;\n    \n    args.flags.damageResult.damage += (bonus + extra);\n    args.flags.damageResult.breakdown += `\\n+ 毒环 (${bonus}) + 额外 (${extra})`;\n    await buff.delete();\n}",
+                            "script": "const buff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duhuan_buff\");\nif (buff) {\n    const bonus = buff.getFlag(\"xjzl-system\", \"poison\") || 0;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extra = 10 + (lvl - 1) * 5;\n    \n    args.flags.damageResult.damage += (bonus + extra);\n    args.flags.damageResult.breakdown += `\\n+ 毒环 (${bonus}) + 额外 (${extra})`;\n    await game.xjzl.api.effects.removeEffect(actor, \"duhuan_buff\", 1);\n}",
                             "active": true
                         }
                     ]
@@ -2972,7 +2870,7 @@
                         {
                             "label": "夺魄免耗",
                             "trigger": "attack",
-                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\")) {\n    const cost = move.currentCost.hp;\n    await actor.applyHealing({ healer: actor, amount: cost, type: \"hp\", showScrolling: false});\n    ui.notifications.info(\"夺魄：免疫气血消耗\");\n}",
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"duopo\")) {\n    const cost = move.currentCost.hp;\n    if (cost > 0) {\n        await actor.applyHealing({ healer: actor, amount: cost, type: \"hp\", showScrolling: false});\n        ui.notifications.info(\"夺魄：免疫气血消耗\");\n    }\n}",
                             "active": true
                         },
                         {
@@ -3077,7 +2975,8 @@
                             "script": "const eff = thisItem.effects.getName(\"夺魄\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst def = 5 + (lvl - 1) * 5;\nconst dur = 3 + (lvl - 1);\neff.changes[0].value = String(def);\neff.changes[1].value = String(def);\neff.duration = {rounds: dur};\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionType": "buff"
                 }
             ],
             "effects": [
@@ -3209,7 +3108,7 @@
                         {
                             "label": "击破效果",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await actor.applyHealing({ healer: actor, amount: 20, type: \"hp\", showScrolling: true});\n    await game.xjzl.api.effects.addEffect(args.target, \"unstable\");\n}",
+                            "script": "if (args.isBroken) {\n    await actor.applyHealing({ healer: actor, amount: 20, type: \"hp\", showScrolling: true});\n    const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\nif (unstable) {\n    unstable.duration = { rounds: 2 };\n    await game.xjzl.api.effects.addEffect(args.target, unstable);\n}\n}",
                             "active": true
                         }
                     ]
@@ -3283,7 +3182,7 @@
                         {
                             "label": "击倒",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.addEffect(args.target, \"prone\");\nui.notifications.info(\"目标被击倒。请手动拉拽。\");",
+                            "script": "if (!args.isHit) return;\nawait game.xjzl.api.effects.addEffect(args.target, \"prone\");\nui.notifications.info(\"目标被击倒。请手动拉拽。\");",
                             "active": true
                         }
                     ]
@@ -3544,7 +3443,7 @@
                         {
                             "label": "获得蓄劲",
                             "trigger": "hit",
-                            "script": "const lihen = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lihen\");\nconst stacks = lihen ? (lihen.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst gain = Math.min(3, stacks);\n\nif (gain > 0) {\n    const eff = thisItem.effects.getName(\"蓄劲\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    for(let i=0; i<gain; i++) {\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}",
+                            "script": "const lihen = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lihen\");\nconst stacks = lihen ? (lihen.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst cur = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xujin\");\nconst curStacks = cur ? (cur.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\nconst gain = Math.min(3, stacks, 3 - curStacks);\n\nif (gain > 0) {\n    // 蓄劲使用系统通用状态，至多三层\n    for(let i=0; i<gain; i++) {\n        await game.xjzl.api.effects.addEffect(actor, \"xujin\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3563,31 +3462,6 @@
                         }
                     },
                     "changes": []
-                },
-                {
-                    "name": "蓄劲",
-                    "icon": "icons/skills/melee/strike-dagger-blood-red.webp",
-                    "description": "暴击骰-1。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "xujin_qiutu",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "-1"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
                 }
             ]
         }
@@ -3635,7 +3509,7 @@
                         {
                             "label": "表演等级加成",
                             "trigger": "attack",
-                            "script": "const lvl = actor.system.arts?.biaoyan?.total || 0;\nif (lvl > 0) args.flags.critThresholdMod = lvl;",
+                            "script": "const lvl = actor.system.arts?.biaoyan?.total || 0;\nif (lvl > 0) args.flags.critThresholdMod += lvl;",
                             "active": true
                         }
                     ]
@@ -3709,7 +3583,7 @@
                         {
                             "label": "击退提示",
                             "trigger": "hit",
-                            "script": "ui.notifications.info(`${args.target.name} 被击退 3 米`);",
+                            "script": "if (!args.isHit) return;\nui.notifications.info(`${args.target.name} 被击退 3 米`);",
                             "active": true
                         }
                     ]
@@ -3780,7 +3654,8 @@
                             "script": "const nishang = thisItem.effects.getName(\"霓裳\").toObject();\ndelete nishang._id; nishang.origin = thisItem.uuid; nishang.duration = {rounds: 3};\nawait game.xjzl.api.effects.addEffect(actor, nishang);\n\nconst yuyi = thisItem.effects.getName(\"羽衣\").toObject();\ndelete yuyi._id; yuyi.origin = thisItem.uuid; yuyi.duration = {rounds: 3};\nawait game.xjzl.api.effects.addEffect(actor, yuyi);\n\nui.notifications.info(\"请手动进行 [表演] 检定\");",
                             "active": true
                         }
-                    ]
+                    ],
+                    "actionType": "buff"
                 }
             ],
             "effects": [
@@ -3853,7 +3728,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>断情舍恶，对目标造成伤害，若击破架招，则给予对方一层“亡吾”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "击破施加亡吾自动。",
+                    "automationNote": "击破施加亡吾自动。亡吾的出招[气感]检定无法自动，出招时会收到提示卡片，请手动检定并裁定。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3917,7 +3792,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>安住灵台，不被外物所扰，开启架招，格挡成功时，给予对方一层“亡吾”状态，持续到战斗脱离。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "格挡施加亡吾自动。",
+                    "automationNote": "格挡施加亡吾自动。亡吾的出招[气感]检定无法自动，出招时会收到提示卡片，请手动检定并裁定。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -3950,7 +3825,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>舍去杂念，终得清净，对周围敌人造成伤害，若目标具有“亡吾”，则在受到伤害后需进行[气感]检定（难度=亡吾层数*2），失败则陷入“禁绝”状态，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
-                    "automationNote": "发起亡吾检定自动。禁绝需在检定失败后手动添加。",
+                    "automationNote": "发起亡吾[气感]检定自动，失败自动施加禁绝。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -3989,7 +3864,7 @@
                 {
                     "name": "亡吾",
                     "icon": "icons/magic/mind/amnesia-blue.webp",
-                    "description": "出招需进行气感检定，失败则忘却武学。",
+                    "description": "每次出招需进行难度=层数×2 的[气感]检定，失败则本场战斗忘却当前武学。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -4000,7 +3875,7 @@
                                 {
                                     "label": "出招检定",
                                     "trigger": "attack",
-                                    "script": "const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst dc = stacks * 2;\nui.notifications.info(`${actor.name} 亡吾发作：请进行气感检定 (DC ${dc})，失败则本场忘却此招式。`);",
+                                    "script": "// 亡吾无法可靠自动化，出招时发卡片提示手动检定\nconst stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst dc = stacks * 2;\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"padding:5px; border-left:3px solid #8e44ad; background:rgba(142,68,173,0.1);\"><b>亡吾发作（${stacks} 层）：</b>${actor.name} 出招需进行难度 ${dc} 的 [气感] 检定。<br>失败则本场战斗忘却当前使用的武学，无法再施展对应招式（请手动裁定并记录）。</div></div>`;\nawait ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                                     "active": true
                                 }
                             ]
@@ -4032,7 +3907,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>双刺贯击其脑，对目标造成伤害，命中无架招目标时，为其添加五层“枯骨”，至多十层，持续到战斗脱离。</p><p><strong>枯骨：</strong>每层使外功防御-5，满十层时陷入禁足。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "枯骨叠加自动。",
+                    "automationNote": "枯骨叠加自动。满 10 层的禁足需手动施加。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4101,7 +3976,7 @@
                         {
                             "label": "枯骨爆发",
                             "trigger": "hit",
-                            "script": "const kugu = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kugu\");\nif (kugu) {\n    const stacks = kugu.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"枯骨爆发\" },\n        content: `目标有 ${stacks} 层枯骨，是否引爆？`,\n        yes: { label: \"引爆\" }\n    });\n    if (confirm) {\n        await kugu.delete();\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const dmg = stacks * (10 + (lvl - 1) * 10);\n        await args.target.applyDamage({amount: dmg, type: \"poison\", attacker: actor, isHit: true, ignoreDefense: true});\n        ui.notifications.info(`爆发造成 ${dmg} 毒伤。AOE需手动处理。`);\n    }\n}",
+                            "script": "const kugu = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kugu\");\nif (kugu) {\n    const stacks = kugu.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"枯骨爆发\" },\n        content: `目标有 ${stacks} 层枯骨，是否引爆？`,\n        yes: { label: \"引爆\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(args.target, \"kugu\", stacks);\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const dmg = stacks * (10 + (lvl - 1) * 10);\n        await args.target.applyDamage({amount: dmg, type: \"poison\", attacker: actor, isHit: true, ignoreDefense: true});\n        ui.notifications.info(`爆发造成 ${dmg} 毒伤。AOE需手动处理。`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -4231,15 +4106,7 @@
                         "xjzl-system": {
                             "slug": "kugu",
                             "stackable": true,
-                            "maxStacks": 10,
-                            "scripts": [
-                                {
-                                    "label": "满层禁足",
-                                    "trigger": "passive",
-                                    "script": "const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nif (stacks >= 10) {\n    // 满层逻辑较复杂，建议手动施加[禁足]\n    // 这里仅做数值处理，禁足状态需GM手动添加或在此处写死flag修改\n    // 暂留空，依靠说明提示\n}",
-                                    "active": true
-                                }
-                            ]
+                            "maxStacks": 10
                         }
                     },
                     "changes": [
