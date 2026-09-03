@@ -1605,7 +1605,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>点脚转身，轻敲鼓边，开启架招。格挡成功后为攻击者添加一层“花鼓”，持续到脱战。</p><p><strong>花鼓：</strong>花鼓层数在你回合初减少一层而非回合末，当层数因此归零时，花鼓炸开，你受到【该场战斗中所有角色一共添加花鼓层数*10】的精神伤害，然后移除场上其他目标身上的花鼓。</p><p>·当你出招选择目标时，你可以将自身存在的所有层数“花鼓”都转移给对方，若是范围招式，由你选择转移给任意一个敌人。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "施加花鼓自动。花鼓倒计时及炸裂自动（回合开始）。转移花鼓手动。",
+                    "automationNote": "格挡成功自动为攻击者添加一层花鼓并计入本场累计；花鼓回合初倒计时与归零炸裂（含累计结算与清场）自动；持有者出招时弹窗询问是否转移全部花鼓。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1619,10 +1619,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "施加花鼓",
+                            "label": "施加花鼓并计数",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"花鼓\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);",
-                            "active": true
+                            "active": true,
+                            "script": "// 格挡成功：为攻击者添加一层[花鼓]，并计入本场累计\nif (!Macros.checkStance(actor, args)) return;\nif (!args.attacker) return;\nconst eff = thisItem.effects.getName(\"花鼓\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.attacker, eff);\n\n// 非战斗中的添加不计入“该场战斗累计”\nif (!game.combat?.started) {\n    ui.notifications.info(\"当前不在战斗中：本次添加的花鼓不计入本场累计。\");\n    return;\n}\nconst map = foundry.utils.duplicate(game.combat.getFlag(\"xjzl-system\", \"huaguAdded\") || []);\nconst entry = map.find(e => e.uuid === args.attacker.uuid);\nif (entry) entry.count += 1;\nelse map.push({ uuid: args.attacker.uuid, name: args.attacker.name, count: 1 });\n// Combat 文档仅 GM 可写，统一经 GM 委托写入\nawait game.xjzl.socket.executeAsGM(\"updateDocument\", game.combat.uuid, { \"flags.xjzl-system.huaguAdded\": map });"
                         }
                     ]
                 },
@@ -1636,7 +1636,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>左手锣，右手鼓，锣鼓敲打对目标造成 0.4 内息点内功伤害。命中无架招目标时，若目标具有“花鼓”层数，将它减少一层，若因此层数归零，则花鼓立即炸开，触发爆发伤害。</p><p><strong>升级：</strong>招式伤害+10，减少层数+1，内力消耗+2。</p>",
-                    "automationNote": "命中减少花鼓层数自动（触发炸裂逻辑）。",
+                    "automationNote": "命中无架招目标自动减少花鼓层数（每级+1），层数归零自动炸裂（按本场累计结算并清场）；非战斗中不结算并发卡提示。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1658,8 +1658,8 @@
                         {
                             "label": "催动花鼓",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const target = args.target;\n    const huagu = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huagu\");\n    if (huagu) {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const reduce = 1 + (lvl - 1);\n        const current = huagu.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        if (current <= reduce) {\n            // 触发炸裂\n            let total = 0;\n            if (game.combat) {\n                for (let c of game.combat.combatants) {\n                    const e = c.actor?.effects.find(ef => ef.getFlag('xjzl-system', 'slug') === 'huagu');\n                    if (e) total += (e.getFlag('xjzl-system', 'stacks') || 1);\n                }\n            }\n            const dmg = total * 10;\n            ChatMessage.create({content: `${target.name} 花鼓被迫炸裂！受到 ${dmg} 点精神伤害。`});\n            await target.applyDamage({ attacker: actor, amount: dmg, type: 'mental', ignoreDefense: true, isHit: true});\n            await huagu.delete();\n        } else {\n            await game.xjzl.api.effects.removeEffect(target, \"huagu\", reduce);\n        }\n    }\n}",
-                            "active": true
+                            "active": true,
+                            "script": "// 命中无架招目标时削减[花鼓]层数，层数归零立即炸裂\nif (!args.isHit || !args.target) return;\nif (args.target.system?.martial?.stanceActive) return;\n\nconst target = args.target;\nconst huagu = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huagu\");\nif (!huagu) return;\n\n// 非战斗中无“本场累计”可依，整体不结算\nif (!game.combat?.started) {\n    await ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>当前不在战斗中，[花开富贵] 不结算${target.name}身上的花鼓层数。</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });\n    return;\n}\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduce = lvl; // 基础减少1层，升级每级+1\nconst current = huagu.getFlag(\"xjzl-system\", \"stacks\") || 1;\nif (current > reduce) {\n    await game.xjzl.api.effects.removeEffect(target, \"huagu\", reduce);\n    return;\n}\n\n// ===== 层数归零：花鼓立即炸开 =====\n// 引爆伤害依据“该场战斗所有角色一共添加过的花鼓层数”，累计只增不减\nconst total = (game.combat.getFlag(\"xjzl-system\", \"huaguAdded\") || []).reduce((sum, e) => sum + (e.count || 0), 0);\nconst dmg = total * 10;\n\n// 炸开后移除场上其他目标身上的花鼓\nconst cleared = [];\nfor (const c of game.combat.combatants) {\n    const other = c.actor;\n    if (!other || other.uuid === target.uuid) continue;\n    if (other.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huagu\")) {\n        await game.xjzl.api.effects.removeEffect(other, \"huagu\", 999);\n        cleared.push(other.name);\n    }\n}\n\nawait target.applyDamage({ amount: dmg, type: \"mental\", attacker: actor, item: thisItem, move: args.move, source: \"huagu\", ignoreDefense: true, isHit: true });\nawait game.xjzl.api.effects.removeEffect(target, \"huagu\", 999);\n\nlet content = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\">`;\ncontent += `<p><strong>💥 ${target.name} 的花鼓被迫炸开！</strong></p>`;\ncontent += `<p>本场所有角色累计添加花鼓 <strong>${total}</strong> 层，${target.name} 受到 <strong>${dmg}</strong> 点精神伤害。</p>`;\nif (cleared.length) content += `<p>场上其他目标的花鼓已移除：${cleared.join(\"、\")}。</p>`;\ncontent += `</div></div>`;\nawait ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor: target }) });"
                         }
                     ]
                 },
@@ -1673,7 +1673,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>欢快清脆，鼓点绵密，为自身添加一层“花鼓”，持续到脱战。</p><p><strong>升级：</strong>额外添加一层，内力消耗+2。</p>",
-                    "automationNote": "添加花鼓自动。",
+                    "automationNote": "自动为自身添加花鼓（每级+1）并计入本场累计；非战斗中添加不计入累计。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1689,8 +1689,8 @@
                         {
                             "label": "添加花鼓",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"花鼓\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "// 为自身添加[花鼓]：基础1层，升级每级+1，战斗中计入本场累计\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = lvl;\n\nconst eff = thisItem.effects.getName(\"花鼓\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff, stacks);\n\n// 非战斗中的添加不计入“该场战斗累计”\nif (!game.combat?.started) {\n    ui.notifications.info(\"当前不在战斗中：本次添加的花鼓不计入本场累计。\");\n    return;\n}\nconst map = foundry.utils.duplicate(game.combat.getFlag(\"xjzl-system\", \"huaguAdded\") || []);\nconst entry = map.find(e => e.uuid === actor.uuid);\nif (entry) entry.count += stacks;\nelse map.push({ uuid: actor.uuid, name: actor.name, count: stacks });\nawait game.xjzl.socket.executeAsGM(\"updateDocument\", game.combat.uuid, { \"flags.xjzl-system.huaguAdded\": map });"
                         }
                     ],
                     "actionType": "buff"
@@ -1707,7 +1707,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>得儿飘，得儿飘，欢快舞鼓，为范围内所有友方回复气血内力 10 点，然后为他们添加一层“花鼓”，持续到脱战。</p><p><strong>升级：</strong>回复气血内力+20，怒气消耗-1，额外添加一层“花鼓”，内力消耗+4。</p>",
-                    "automationNote": "回复及添加花鼓自动。",
+                    "automationNote": "自动为目标回复气血内力并添加花鼓（每级+1），战斗中计入本场累计；目标由玩家自行选择。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1728,8 +1728,39 @@
                         {
                             "label": "回复与花鼓",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 20;\nconst stacks = 1 + (lvl - 1);\n\nawait args.target.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true});\nawait args.target.applyHealing({ healer: actor, amount: heal, type: \"mp\", showScrolling: true});\n\nconst eff = thisItem.effects.getName(\"花鼓\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
-                            "active": true
+                            "active": true,
+                            "script": "// 为目标回复气血内力并添加[花鼓]：基础回复10/1层，升级每级+20/+1\nif (!args.target) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 20;\nconst stacks = lvl;\n\nawait args.target.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true });\nawait args.target.applyHealing({ healer: actor, amount: heal, type: \"mp\", showScrolling: true });\n\nconst eff = thisItem.effects.getName(\"花鼓\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff, stacks);\n\n// 非战斗中的添加不计入“该场战斗累计”\nif (!game.combat?.started) {\n    ui.notifications.info(\"当前不在战斗中：本次添加的花鼓不计入本场累计。\");\n    return;\n}\nconst map = foundry.utils.duplicate(game.combat.getFlag(\"xjzl-system\", \"huaguAdded\") || []);\nconst entry = map.find(e => e.uuid === args.target.uuid);\nif (entry) entry.count += stacks;\nelse map.push({ uuid: args.target.uuid, name: args.target.name, count: stacks });\nawait game.xjzl.socket.executeAsGM(\"updateDocument\", game.combat.uuid, { \"flags.xjzl-system.huaguAdded\": map });"
+                        }
+                    ]
+                },
+                {
+                    "name": "花鼓核对",
+                    "type": "qi",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "none",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "无",
+                    "description": "<p><strong>功能性招式（自动化辅助，非规则书内容）：</strong>点脚数鼓，核对本场战斗中所有角色累计添加的“花鼓”层数。</p><p>点击应用后弹窗显示累计明细与总数（炸裂伤害 = 累计层数 × 10），可直接修改保存，用于纠正误操作或清理残留数据。本招式不消耗资源、不可投入修为。</p>",
+                    "automationNote": "功能性辅助招式：应用后弹窗查看并修正本场花鼓累计计数（挂于 combat 的临时数据），并发卡留档；非战斗中仅提示。不消耗资源与动作，不可投入修为。",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            0
+                        ],
+                        "mappedStage": 5
+                    },
+                    "scripts": [
+                        {
+                            "label": "花鼓累计核对",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "// 功能性招式：查看并修正本场战斗的[花鼓]累计添加层数（炸裂伤害 = 累计层数 × 10）\nif (!game.combat?.started) {\n    await ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>当前没有进行中的战斗：花鼓累计仅在一场战斗内有效。</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });\n    return;\n}\n\nconst map = foundry.utils.duplicate(game.combat.getFlag(\"xjzl-system\", \"huaguAdded\") || []);\nconst total = map.reduce((sum, e) => sum + (e.count || 0), 0);\n\nconst rows = map.length\n    ? map.map((e, i) => `<div class=\"form-group\"><label>${e.name || \"未知\"}</label><input type=\"number\" name=\"count_${i}\" value=\"${e.count || 0}\" min=\"0\"></div>`).join(\"\")\n    : `<p style=\"color:#666;\">本场尚无添加记录，可在下方手动登记（登记条目不关联具体角色）。</p><div class=\"form-group\"><label>添加者</label><input type=\"text\" name=\"new_name\" placeholder=\"名字\"></div><div class=\"form-group\"><label>累计添加层数</label><input type=\"number\" name=\"new_count\" value=\"0\" min=\"0\"></div>`;\n\nconst result = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"花鼓累计核对\" },\n    content: `<p>本场所有角色累计添加花鼓：<strong>${total}</strong> 层（炸裂伤害 = 累计层数 × 10）。修改数值后确认保存，清零的条目将被移除。</p>${rows}`,\n    ok: { callback: (event, button) => {\n        const form = button.form;\n        map.forEach((e, i) => { e.count = parseInt(form.elements[`count_${i}`]?.value) || 0; });\n        const newName = (form.elements[\"new_name\"]?.value || \"\").trim();\n        if (newName) {\n            const c = parseInt(form.elements[\"new_count\"]?.value) || 0;\n            if (c > 0) map.push({ uuid: \"\", name: newName, count: c });\n        }\n        return map.filter(e => (e.count || 0) > 0);\n    } },\n    rejectClose: false\n});\nif (!result) return;\n\nawait game.xjzl.socket.executeAsGM(\"updateDocument\", game.combat.uuid, { \"flags.xjzl-system.huaguAdded\": result });\nconst sum = result.reduce((s, e) => s + (e.count || 0), 0);\nawait ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>${actor.name} 核对了花鼓账目：本场累计添加 <strong>${sum}</strong> 层（修正前 ${total} 层）。</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });"
                         }
                     ]
                 }
@@ -1738,18 +1769,24 @@
                 {
                     "name": "花鼓",
                     "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "description": "回合初层数-1，归零炸裂。",
                     "transfer": false,
+                    "description": "回合初层数-1（而非回合末）。层数因此归零时花鼓炸开：持有者受到【该场战斗所有角色累计添加花鼓层数×10】点精神伤害，随后移除场上其他目标身上的花鼓。持有者出招（攻击类）时可选择将自身全部层数转移给一名目标（转移不计入累计）。",
                     "flags": {
                         "xjzl-system": {
                             "slug": "huagu",
                             "stackable": true,
                             "scripts": [
                                 {
-                                    "label": "倒计时炸裂",
+                                    "label": "回合初倒计时（归零炸裂）",
                                     "trigger": "turnStart",
                                     "active": true,
-                                    "script": "const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\nif (stacks <= 1) {\n    let total = 0;\n    if (game.combat) {\n        for (let c of game.combat.combatants) {\n            const e = c.actor?.effects.find(ef => ef.getFlag('xjzl-system', 'slug') === 'huagu');\n            if (e) total += (e.getFlag('xjzl-system', 'stacks') || 1);\n        }\n    }\n    const dmg = total * 10;\n    ChatMessage.create({content: `${actor.name} 花鼓炸裂！受到 ${dmg} 点精神伤害。`});\n    await actor.applyDamage({ attacker: actor,  source: 'dot',amount: dmg, type: 'mental', ignoreDefense: true, isHit: true});\n    await thisEffect.delete();\n    ui.notifications.info(\"花鼓已炸裂，请GM手动移除场上其他人的花鼓效果。\")\n} else {\n    await game.xjzl.api.effects.removeEffect(actor, \"huagu\", 1);\n}"
+                                    "script": "// [花鼓]层数在回合初减少一层而非回合末\nconst stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nif (stacks > 1) {\n    await game.xjzl.api.effects.removeEffect(actor, \"huagu\", 1);\n    return;\n}\n\n// ===== 层数归零：花鼓炸开 =====\n// 引爆伤害依据“该场战斗所有角色一共添加过的花鼓层数”，累计只增不减\nconst total = game.combat ? (game.combat.getFlag(\"xjzl-system\", \"huaguAdded\") || []).reduce((sum, e) => sum + (e.count || 0), 0) : 0;\nconst dmg = total * 10;\n\n// 炸开后移除场上其他目标身上的花鼓\nconst cleared = [];\nif (game.combat) {\n    for (const c of game.combat.combatants) {\n        const other = c.actor;\n        if (!other || other.uuid === actor.uuid) continue;\n        if (other.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"huagu\")) {\n            await game.xjzl.api.effects.removeEffect(other, \"huagu\", 999);\n            cleared.push(other.name);\n        }\n    }\n}\n\nawait actor.applyDamage({ amount: dmg, type: \"mental\", attacker: actor, source: \"huagu\", ignoreDefense: true, isHit: true });\nawait game.xjzl.api.effects.removeEffect(actor, \"huagu\", 999);\n\nlet content = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\">`;\ncontent += `<p><strong>💥 ${actor.name} 的花鼓炸开了！</strong></p>`;\ncontent += `<p>本场所有角色累计添加花鼓 <strong>${total}</strong> 层，${actor.name} 受到 <strong>${dmg}</strong> 点精神伤害。</p>`;\nif (cleared.length) content += `<p>场上其他目标的花鼓已移除：${cleared.join(\"、\")}。</p>`;\ncontent += `</div></div>`;\nawait ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor }) });"
+                                },
+                                {
+                                    "label": "出招转移询问",
+                                    "trigger": "hit_once",
+                                    "active": true,
+                                    "script": "// [花鼓]持有者出招（攻击类）时，可将自身全部层数转移给一名目标；转移不计入本场累计\nif (!args.actionType || ![\"attack\", \"basic-attack\"].includes(args.actionType)) return;\nconst stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\nconst targets = (args.targets || []).map(t => t.target).filter(t => t && t.uuid && t.uuid !== actor.uuid);\nconst unique = [...new Map(targets.map(t => [t.uuid, t])).values()]; // 多段/重复目标去重\nif (!unique.length) return;\n\nlet chosen = unique[0];\nif (unique.length > 1) {\n    // 范围招式：由玩家选择转移给其中任意一个目标\n    const options = unique.map(t => `<option value=\"${t.uuid}\">${t.name}</option>`).join(\"\");\n    const picked = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"花鼓转移\" },\n        content: `<p>是否将你身上全部 <strong>${stacks}</strong> 层[花鼓]转移给一名目标？</p><div class=\"form-group\"><label>选择目标</label><select name=\"target\">${options}</select></div>`,\n        ok: { callback: (event, button) => button.form.elements[\"target\"].value },\n        rejectClose: false\n    });\n    if (!picked) return;\n    chosen = unique.find(t => t.uuid === picked);\n} else {\n    const use = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"花鼓转移\" },\n        content: `<p>是否将你身上全部 <strong>${stacks}</strong> 层[花鼓]转移给 ${chosen.name}？</p>`,\n        yes: { label: \"转移\", icon: \"fas fa-check\" },\n        no: { label: \"取消\", icon: \"fas fa-times\" }\n    });\n    if (!use) return;\n}\n\nconst effData = thisEffect.toObject();\ndelete effData._id;\nif (effData.flags?.[\"xjzl-system\"]) delete effData.flags[\"xjzl-system\"].stacks; // 层数交给 addEffect 的 count 处理\nawait game.xjzl.api.effects.removeEffect(actor, \"huagu\", stacks);\nawait game.xjzl.api.effects.addEffect(chosen, effData, stacks);\nawait ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>${actor.name} 将 <strong>${stacks}</strong> 层[花鼓]转移给了 ${chosen.name}！</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });"
                                 }
                             ]
                         }
