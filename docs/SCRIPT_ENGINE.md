@@ -779,6 +779,37 @@ const confirmed = await foundry.applications.api.DialogV2.confirm({
 
 Dialog 只能出现在异步触发器中。取消操作后的资源退款、状态恢复等行为必须由脚本明确处理。
 
+### 共享数组并发更新
+
+多个角色共用一个计数器时，常见做法是把它记在共享文档的数组 flag 里（例如记在 Combat 上），脚本每次“读取数组 → 本地修改 → 整体写回”。这种写法在并发下会丢更新：两个脚本都基于同一份旧值各自加一，后写回的数组会冲掉先写回的增量，而 Foundry 的更新是整字段覆盖，没有字段级自增可用。
+
+系统为这种场景提供了按文档串行的原子数组事务，把整个读改写过程放进活动 GM 端的队列执行；同一文档的操作严格串行，不同文档互不影响：
+
+```javascript
+await game.xjzl.socket.executeAsGM("updateDocumentAtomic", documentUuid, {
+  type: "arrayDelta",
+  path: "flags.xjzl-system.exampleEntries",
+  key: "uuid",
+  keyValue: actor.uuid,
+  delta: 1,
+  entry: { name: actor.name }
+});
+```
+
+`game.xjzl.socket.executeAsGM` 是系统 socket 的 GM 委托通道：Combat 这类文档只有 GM 可写，调用会被转交到当前活动 GM 的客户端执行。`updateDocumentAtomic(documentUuid, operation, context)` 只接受数据描述，不接受函数或脚本，支持三种操作：
+
+| `operation.type` | 必填字段 | 作用 |
+|---|---|---|
+| `arrayRead` | `path` | 不写入，返回排队执行时文档中该数组的深拷贝；用于先拿到最新账目再计算结果的流程。 |
+| `arrayDelta` | `path`、`key`、`keyValue`、`delta` | 找到 `entry[key] === keyValue` 的条目，对其 `valueField`（默认 `count`）加整数 `delta`；条目不存在且 `delta` 为正时，用 `entry` 提供其余初始字段创建。结果不大于 0 的条目会被移除。 |
+| `arraySnapshot` | `path`、`key`、`base`、`desired` | 用于“弹窗确认后保存”：以打开弹窗时的数组快照 `base` 为基线，把 `desired` 相对 `base` 的修改量合并到执行时的最新数组，保留等待期间其他脚本产生的增量。 |
+
+- `arrayDelta`、`arraySnapshot` 可用 `valueField` 指定数值字段。
+- `arraySnapshot` 对没有 `key` 的旧手工条目按原数组顺序合并；`base` 与 `desired` 应传深拷贝，提交后不要再修改原对象。
+- 返回值是读取或写入后的数组；文档不存在、参数不合法或执行端不是活动 GM 时返回 `null`；写入失败时 Promise 会拒绝，调用方应按业务回退或提示。
+
+只有计数器、账目这类需要“依据最新值修改”的共享数组才需要它；一次性的绝对值更新继续使用 `updateDocument`，资源字段必须使用资源事务 API。不要把它当作资源事务或任意脚本执行器。
+
 ## 招式等级公式
 
 等级公式不是任意 JavaScript。`description`、`range` 可嵌入 `@{表达式|回退文本}`，`actionCost` 公式必须占据整个字段。支持变量 `@level`、`@up`、`@maxLevel`，以及 `min`、`max`、`clamp`、`floor`、`ceil`、`round`、`abs`、`if`。描述中的 `action(...)` 把整数 `1..5` 映射为动作名称。
