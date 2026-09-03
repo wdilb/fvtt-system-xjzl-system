@@ -5,6 +5,9 @@ import { wrapResourceSocketError, wrapResourceSocketResult } from "./utils/resou
 
 export let xjzlSocket;
 
+// 仅供新增的原子数组更新入口使用；原有 socket 处理函数不共用这条队列，避免改变其时序。
+const documentUpdateQueues = new Map();
+
 export function setupSocket() {
     xjzlSocket = socketlib.registerSystem("xjzl-system");
 
@@ -15,6 +18,7 @@ export function setupSocket() {
     xjzlSocket.register("addEffect", _socketAddEffect);
     xjzlSocket.register("removeEffect", _socketRemoveEffect);
     xjzlSocket.register("updateDocument", _socketUpdateDocument);
+    xjzlSocket.register("updateDocumentAtomic", _socketUpdateDocumentAtomic);
     xjzlSocket.register("createEmbedded", _socketCreateEmbedded);
     xjzlSocket.register("deleteEmbedded", _socketDeleteEmbedded);
     xjzlSocket.register("stopStance", _socketStopStance);
@@ -157,6 +161,133 @@ async function _socketUpdateDocument(uuid, data, context) {
         // 仅资源事务错误需要保留 committed/phase 等字段；普通文档更新错误仍走 socketlib 异常通道。
         return wrapResourceSocketError(err);
     }
+}
+
+/**
+ * 在主 GM 端执行通用的文档数组读改写，并按文档 UUID 串行化。
+ * @param {string} documentUuid - 目标文档 UUID
+ * @param {object} operation - 通用数组读写描述
+ * @param {object} context - Foundry update 操作上下文
+ * @returns {Promise<Array<object>|null>} 读取或写入后的数组
+ */
+async function _socketUpdateDocumentAtomic(documentUuid, operation, context = {}) {
+    if (!documentUuid || !operation || typeof operation !== "object") return null;
+
+    const previous = documentUpdateQueues.get(documentUuid) || Promise.resolve();
+    const current = previous
+        .catch(error => {
+            console.error(`XJZL | 文档原子更新队列前序操作失败 [${documentUuid}]:`, error);
+        })
+        .then(async () => {
+            if (isNotActiveGM()) return null;
+            const document = await fromUuid(documentUuid);
+            if (!document || typeof operation.path !== "string" || !operation.path) return null;
+
+            const stored = foundry.utils.getProperty(document, operation.path);
+            const entries = Array.isArray(stored) ? foundry.utils.deepClone(stored) : [];
+            if (operation.type === "arrayRead") return entries;
+
+            const updated = operation.type === "arrayDelta"
+                ? applyAtomicArrayDelta(entries, operation)
+                : operation.type === "arraySnapshot"
+                    ? applyAtomicArraySnapshot(entries, operation)
+                    : null;
+            if (!updated) return null;
+
+            const updateContext = context && typeof context === "object" && !Array.isArray(context)
+                ? { ...context }
+                : {};
+            await document.update({ [operation.path]: updated }, updateContext);
+            return updated;
+        });
+
+    let queued;
+    queued = current.finally(() => {
+        if (documentUpdateQueues.get(documentUuid) === queued) documentUpdateQueues.delete(documentUuid);
+    });
+    documentUpdateQueues.set(documentUuid, queued);
+    return queued;
+}
+
+/** 对数组中指定键的数值字段执行增量，结果归零的条目会被清理。 */
+function applyAtomicArrayDelta(current, operation) {
+    const key = operation.key;
+    const keyValue = operation.keyValue;
+    const valueField = operation.valueField || "count";
+    const delta = Math.trunc(Number(operation.delta));
+    if (typeof key !== "string" || !key || keyValue == null || keyValue === "" || !Number.isFinite(delta) || delta === 0) return null;
+
+    const entries = current.filter(entry => entry && typeof entry === "object");
+    const entry = entries.find(candidate => candidate[key] === keyValue);
+    if (entry) {
+        entry[valueField] = (Number(entry[valueField]) || 0) + delta;
+    } else if (delta > 0) {
+        const defaults = operation.entry && typeof operation.entry === "object"
+            ? foundry.utils.deepClone(operation.entry)
+            : {};
+        entries.push({ ...defaults, [key]: keyValue, [valueField]: delta });
+    }
+
+    return entries.filter(candidate => Number(candidate[valueField]) > 0);
+}
+
+/** 按基线计算快照修改量，再合并到队列执行时的最新数组，避免覆盖并发增量。 */
+function applyAtomicArraySnapshot(current, operation) {
+    const key = operation.key;
+    const valueField = operation.valueField || "count";
+    const base = Array.isArray(operation.base)
+        ? operation.base.filter(entry => entry && typeof entry === "object")
+        : null;
+    const desired = Array.isArray(operation.desired)
+        ? operation.desired.filter(entry => entry && typeof entry === "object")
+        : null;
+    if (typeof key !== "string" || !key || !base || !desired) return null;
+
+    const countOf = entry => Math.max(0, Math.trunc(Number(entry?.[valueField]) || 0));
+    const hasKey = entry => entry?.[key] !== undefined && entry?.[key] !== null && entry?.[key] !== "";
+    const currentByKey = new Map(current.filter(hasKey).map(entry => [entry[key], entry]));
+    const baseByKey = new Map(base.filter(hasKey).map(entry => [entry[key], entry]));
+    const desiredByKey = new Map(desired.filter(hasKey).map(entry => [entry[key], entry]));
+
+    for (const [keyValue, baseEntry] of baseByKey) {
+        const adjustment = countOf(desiredByKey.get(keyValue)) - countOf(baseEntry);
+        if (!adjustment) continue;
+        const currentEntry = currentByKey.get(keyValue);
+        if (currentEntry) currentEntry[valueField] = Math.max(0, countOf(currentEntry) + adjustment);
+        else if (adjustment > 0) {
+            current.push({
+                ...foundry.utils.deepClone(desiredByKey.get(keyValue) || baseEntry),
+                [key]: keyValue,
+                [valueField]: adjustment
+            });
+        }
+    }
+
+    for (const desiredEntry of desired.filter(entry => hasKey(entry) && !baseByKey.has(entry[key]))) {
+        const count = countOf(desiredEntry);
+        if (count > 0 && !currentByKey.has(desiredEntry[key])) current.push(foundry.utils.deepClone(desiredEntry));
+    }
+
+    const baseAnonymous = base.filter(entry => !hasKey(entry));
+    const desiredAnonymous = desired.filter(entry => !hasKey(entry));
+    const currentAnonymous = current.filter(entry => !hasKey(entry));
+    for (let index = 0; index < baseAnonymous.length; index++) {
+        const adjustment = countOf(desiredAnonymous[index]) - countOf(baseAnonymous[index]);
+        if (!adjustment) continue;
+        const currentEntry = currentAnonymous[index];
+        if (currentEntry) currentEntry[valueField] = Math.max(0, countOf(currentEntry) + adjustment);
+        else if (adjustment > 0) {
+            current.push({
+                ...foundry.utils.deepClone(desiredAnonymous[index] || baseAnonymous[index]),
+                [valueField]: adjustment
+            });
+        }
+    }
+    for (const desiredEntry of desiredAnonymous.slice(baseAnonymous.length)) {
+        if (countOf(desiredEntry) > 0) current.push(foundry.utils.deepClone(desiredEntry));
+    }
+
+    return current.filter(entry => countOf(entry) > 0);
 }
 
 async function _socketCreateEmbedded(parentUuid, type, data, context) {
