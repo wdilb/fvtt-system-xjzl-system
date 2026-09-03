@@ -144,14 +144,14 @@
                     "scripts": [
                         {
                             "label": "濒死暴击判断",
-                            "trigger": "attack",
-                            "script": "const target = Array.from(game.user.targets)[0]?.actor;\nif (target && target.system.resources.hp.value <= 0) {\n    // 濒死必定暴击\n    args.flags.critThresholdMod += 20; \n    ui.notifications.info(\"目标濒死，必定暴击！\");\n}",
+                            "trigger": "check",
+                            "script": "if (args.target && args.target.system.resources.hp.value <= 0) {\n    // 濒死必定暴击\n    args.flags.critThresholdMod += 20;\n    ui.notifications.info(\"目标濒死，必定暴击！\");\n}",
                             "active": true
                         },
                         {
                             "label": "附加状态",
                             "trigger": "hit",
-                            "script": "// 1. 错骨 (3回合)\nawait game.xjzl.api.effects.addEffect(args.target, {\n    id: \"cuogu\",\n    duration: { rounds: 3 }\n});\n\n// 2. 若濒死，附加血流不止 (bloodloss)\nif (args.target.system.resources.hp.value <= 0) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n}",
+                            "script": "if (!args.isHit) return;\n// 1. 错骨 (3回合)\nawait game.xjzl.api.effects.addEffect(args.target, {\n    id: \"cuogu\",\n    duration: { rounds: 3 }\n});\n\n// 2. 若濒死，附加血流不止 (bloodloss)\nif (args.target.system.resources.hp.value <= 0) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n}",
                             "active": true
                         }
                     ]
@@ -221,6 +221,12 @@
                     },
                     "scripts": [
                         {
+                            "label": "黑虎加伤",
+                            "trigger": "calc",
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heihu\")) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"黑虎状态 +5\");\n}",
+                            "active": true
+                        },
+                        {
                             "label": "无架招目盲",
                             "trigger": "hit",
                             "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, {\n        id: \"blind\",\n        duration: { rounds: 1 }\n    });\n    ui.notifications.info(`${args.target.name} 陷入目盲！`);\n}",
@@ -257,6 +263,12 @@
                         ]
                     },
                     "scripts": [
+                        {
+                            "label": "黑虎加伤",
+                            "trigger": "calc",
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heihu\")) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"黑虎状态 +5\");\n}",
+                            "active": true
+                        },
                         {
                             "label": "击破击飞提示",
                             "trigger": "hit",
@@ -332,20 +344,18 @@
                     },
                     "scripts": [
                         {
+                            "label": "黑虎加伤",
+                            "trigger": "calc",
+                            "script": "if (actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heihu\")) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"黑虎状态 +5\");\n}",
+                            "active": true
+                        },
+                        {
                             "label": "黑虎特效",
                             "trigger": "hit",
                             "script": "if (args.isHit) {\n    const hasHeihu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heihu\");\n    if (hasHeihu) {\n        await game.xjzl.api.effects.addEffect(args.target, {\n            id: \"cuogu\",\n            duration: { rounds: 1 }\n        });\n        ui.notifications.info(\"黑虎加持：目标错骨！\");\n    }\n}",
                             "active": true
                         }
                     ]
-                }
-            ],
-            "scripts": [
-                {
-                    "label": "黑虎加伤",
-                    "trigger": "calc",
-                    "script": "const hasHeihu = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"heihu\");\nif (hasHeihu) {\n    args.output.damage += 5;\n    args.output.bonusDesc.push(\"黑虎状态 +5\");\n}",
-                    "active": true
                 }
             ],
             "effects": [
@@ -534,7 +544,8 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "lanludagun",
-                            "stackable": false
+                            "stackable": false,
+                            "tiedToStance": true
                         }
                     },
                     "changes": [
@@ -599,7 +610,7 @@
                 {
                     "name": "死生不弃",
                     "type": "qi",
-                    "actionType": "heal",
+                    "actionType": "buff",
                     "element": "yin",
                     "damageType": "none",
                     "weaponType": "blade",
@@ -1202,7 +1213,7 @@
                         {
                             "label": "撕裂提示",
                             "trigger": "hit",
-                            "script": "ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>若压制的是 <b>刀法虚招</b>，请手动给目标施加 [撕裂] (3回合)。</p>\n            <p><i>注: 系统预设撕裂(sielie)为持续效果，请检查配置。</i></p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "script": "ChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>若压制的是 <b>刀法虚招</b>，请手动给目标施加 [撕裂] (3回合)。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -2354,7 +2365,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，太白经天，天下乃变，开启架招，格挡成功时，获得“太白经天”状态，持续一回合。</p><p><strong>太白经天：</strong>你的所有劣势骰，均会化为优势骰。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "格挡获状态自动。劣势转优势全部手动：持续期间所有劣势骰（出招、对抗、检定）请手动按优势处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2413,7 +2424,7 @@
                         {
                             "label": "状态转化",
                             "trigger": "attack",
-                            "script": "const taibai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"taibaijingtian\");\nif (taibai) {\n    await taibai.delete();\n    const wuxing = thisItem.effects.getName(\"五星分天\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, wuxing);\n    ui.notifications.info(\"太白经天 已转化为 五星分天\");\n}",
+                            "script": "const taibai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"taibaijingtian\");\nif (taibai) {\n    await game.xjzl.api.effects.removeEffect(actor, \"taibaijingtian\");\n    const wuxing = thisItem.effects.getName(\"五星分天\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, wuxing);\n    ui.notifications.info(\"太白经天 已转化为 五星分天\");\n}",
                             "active": true
                         }
                     ]
@@ -2442,26 +2453,12 @@
                 {
                     "name": "太白经天",
                     "icon": "icons/magic/light/star-struck-purple.webp",
-                    "description": "劣势转化为优势。",
+                    "description": "劣势转化为优势（请手动按优势处理）。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "taibaijingtian",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "劣势转优势(攻)",
-                                    "trigger": "attack",
-                                    "script": "if (args.flags.level < 0) args.flags.level = Math.abs(args.flags.level);",
-                                    "active": true
-                                },
-                                {
-                                    "label": "劣势转优势(检定)",
-                                    "trigger": "check",
-                                    "script": "if (args.flags.grantLevel > 0) args.flags.grantLevel = -args.flags.grantLevel; // 别人打我优势变劣势\nif (args.flags.grantFeintLevel > 0) args.flags.grantFeintLevel = -args.flags.grantFeintLevel;",
-                                    "active": true
-                                }
-                            ]
+                            "stackable": false
                         }
                     },
                     "changes": []
@@ -2719,7 +2716,7 @@
                         {
                             "label": "调和回血",
                             "trigger": "turnStart",
-                            "script": "const hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    await actor.applyHealing({ healer: actor, amount: 10, type: 'hp', showScrolling: true});\n}",
+                            "script": "// turnStart 会遍历全部已领悟招式，需确认当前开启的正是本架招\nconst m = actor.system.martial;\nif (!m.stanceActive || m.stanceItemId !== thisItem.id || m.stance !== move.id) return;\nconst hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const amount = 10 + (lvl - 1) * 10;\n    await actor.applyHealing({ healer: actor, amount: amount, type: 'hp', showScrolling: true});\n}",
                             "active": true
                         }
                     ]
@@ -2820,7 +2817,7 @@
                     "targetInfo": "自身",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招的时候，你可以用反应动作释放此招，压制对方虚招，借力化劲疗伤，为自己回复气血、内力。</p><p>·当你处于“阴阳调和”状态时，你还可以让场上同样处于此状态下的队友回复等额的气血，以及共同获得 1 点怒气。</p><p><strong>升级：</strong>回复气血内力+20，消耗+2。</p>",
-                    "automationNote": "自奶自动。队友回复需手动。",
+                    "automationNote": "自奶气血内力自动。处于阴阳调和时，自动为场上同状态友方回复等额气血并+1怒气（须有场景Token）；无Token时提示手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2836,7 +2833,7 @@
                         {
                             "label": "调理阴阳",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 20 + (lvl - 1) * 20;\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'hp', showScrolling: true});\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'mp', showScrolling: true});\n\nconst hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    ui.notifications.info(\"阴阳调和触发：请让队友回复等额气血并获得1怒气。\");\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst amount = 20 + (lvl - 1) * 20;\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'hp', showScrolling: true});\nawait actor.applyHealing({ healer: actor, amount: amount, type: 'mp', showScrolling: true});\n\nconst hasTiaohe = actor.effects.some(e => e.name === \"阴阳调和\");\nif (hasTiaohe) {\n    const gainRage = async (target) => {\n        const cur = target.system.resources.rage.value || 0;\n        const max = target.system.resources.rage.max || 0;\n        if (cur < max) {\n            await target.changeResources({ \"system.resources.rage.value\": cur + 1 }, { cause: \"script\", source: \"move\", sourceActor: actor, target: target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        }\n    };\n    // “共同获得 1 点怒气”：自己也获得\n    await gainRage(actor);\n\n    // 场上同样处于“阴阳调和”的友方：仅回复等额气血（正文未含内力），并各获得 1 点怒气\n    const selfToken = actor.getActiveTokens()[0];\n    if (!selfToken) {\n        ui.notifications.info(\"未检测到自身场景 Token，无法定位阴阳调和队友；请手动为队友回复等额气血并+1怒气。\");\n        return;\n    }\n    const selfDisp = selfToken.document.disposition;\n    const seen = new Set([actor.uuid]); // 多个 Token 指向同一 Actor 时只结算一次\n    const healed = [];\n    for (const token of canvas.tokens.placeables) {\n        const a = token.actor;\n        if (!a || seen.has(a.uuid)) continue;\n        seen.add(a.uuid);\n        if (token.document.disposition !== selfDisp) continue;\n        if (!a.effects.some(e => e.name === \"阴阳调和\")) continue;\n        await a.applyHealing({ healer: actor, amount: amount, type: 'hp', showScrolling: true });\n        await gainRage(a);\n        healed.push(a.name);\n    }\n    const list = healed.length ? healed.join(\"、\") : \"无其他同状态队友\";\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #0ea5e9; background:rgba(14,165,233,0.1); padding:5px 8px;\"><b>调理阴阳</b>：阴阳调和流转，${actor.name} 回复 ${amount} 点气血与内力；${list} 回复 ${amount} 点气血，共同获得 1 点怒气。</div></div>` });\n}",
                             "active": true
                         }
                     ]
@@ -3292,7 +3289,7 @@
                         {
                             "label": "绵劲流失",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const mianjin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mianjin\");\n    if (mianjin) {\n        const stacks = mianjin.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        await mianjin.delete();\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const bleed = (5 + (lvl - 1) * 5) * stacks;\n        await args.target.applyDamage({\n            amount: bleed,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(`消耗 ${stacks} 层绵劲，造成 ${bleed} 点流失。`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const mianjin = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mianjin\");\n    if (mianjin) {\n        const stacks = mianjin.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const perStack = 5 + (lvl - 1) * 5;\n        // 玩家选择消耗几层绵劲（1..stacks），取消则不消耗\n        const buttons = [];\n        for (let i = 1; i <= stacks; i++) {\n            buttons.push({ action: \"use\" + i, label: `消耗 ${i} 层 (流失 ${perStack * i})`, callback: () => i });\n        }\n        buttons.push({ action: \"cancel\", label: \"不消耗\", callback: () => 0 });\n        const used = await foundry.applications.api.DialogV2.wait({\n            window: { title: \"怀中揽月\" },\n            content: `<p>击破架招！当前拥有 ${stacks} 层绵劲，每消耗 1 层使目标流失 ${perStack} 点气血。</p>`,\n            buttons,\n            rejectClose: false,\n            close: () => 0\n        });\n        if (used > 0) {\n            await game.xjzl.api.effects.removeEffect(actor, \"mianjin\", used);\n            await args.target.applyDamage({\n                amount: perStack * used,\n                type: \"liushi\",\n                attacker: actor,\n                isHit: true,\n                ignoreDefense: true\n            });\n            ui.notifications.info(`消耗 ${used} 层绵劲，造成 ${perStack * used} 点流失。`);\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3528,8 +3525,8 @@
                         },
                         {
                             "label": "屏蔽受伤回怒",
-                            "trigger": "damaged",
-                            "script": "if (args.rageGained) {\n    // 系统在 damaged 后已经加了怒气，这里我们把它扣回去\n    const current = actor.system.resources.rage.value;\n    if (current > 0) {\n        await actor.changeResources({ \"system.resources.rage.value\": current - 1 }, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    }\n}",
+                            "trigger": "passive",
+                            "script": "actor.xjzlStatuses.noRageOnHit = true;",
                             "active": true
                         }
                     ]
@@ -3565,9 +3562,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "条件检测与消耗",
-                            "trigger": "attack",
-                            "script": "const hasWuchen = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuchen\");\nif (!hasWuchen) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"需处于 [无尘] 心境方可释放。\";\n}",
+                            "label": "条件检测",
+                            "trigger": "preAttack",
+                            "script": "const hasWuchen = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuchen\");\nif (!hasWuchen) {\n    args.abort = true;\n    args.abortReason = \"需处于 [无尘] 心境方可释放。\";\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "无尘怒气惩罚",
+                            "trigger": "calc",
+                            "script": "const rage = actor.system.resources.rage.value || 0;\nif (rage > 0) {\n    const penalty = rage * 5;\n    args.output.damage -= penalty;\n    args.output.bonusDesc.push(`怒气惩罚 -${penalty}`);\n}",
                             "active": true
                         },
                         {
@@ -3610,8 +3613,14 @@
                     "scripts": [
                         {
                             "label": "条件检测",
-                            "trigger": "attack",
-                            "script": "const hasWuchen = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuchen\");\nif (!hasWuchen) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"需处于 [无尘] 心境方可释放。\";\n}",
+                            "trigger": "preAttack",
+                            "script": "const hasWuchen = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuchen\");\nif (!hasWuchen) {\n    args.abort = true;\n    args.abortReason = \"需处于 [无尘] 心境方可释放。\";\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "无尘怒气惩罚",
+                            "trigger": "calc",
+                            "script": "const rage = actor.system.resources.rage.value || 0;\nif (rage > 0) {\n    const penalty = rage * 5;\n    args.output.damage -= penalty;\n    args.output.bonusDesc.push(`怒气惩罚 -${penalty}`);\n}",
                             "active": true
                         },
                         {
@@ -3655,25 +3664,23 @@
                     "scripts": [
                         {
                             "label": "条件检测",
-                            "trigger": "attack",
-                            "script": "const hasWuchen = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuchen\");\nconst rage = actor.system.resources.rage.value || 0;\nif (!hasWuchen || rage > 0) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"需 [无尘] 心境且怒气归零。\";\n}",
+                            "trigger": "preAttack",
+                            "script": "const hasWuchen = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuchen\");\nconst rage = actor.system.resources.rage.value || 0;\nif (!hasWuchen || rage > 0) {\n    args.abort = true;\n    args.abortReason = \"需 [无尘] 心境且怒气归零。\";\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "无尘怒气惩罚",
+                            "trigger": "calc",
+                            "script": "const rage = actor.system.resources.rage.value || 0;\nif (rage > 0) {\n    const penalty = rage * 5;\n    args.output.damage -= penalty;\n    args.output.bonusDesc.push(`怒气惩罚 -${penalty}`);\n}",
                             "active": true
                         },
                         {
                             "label": "增加怒气与精神伤害",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 8 - (lvl - 1);\nconst current = actor.system.resources.rage.value;\nconst max = actor.system.resources.rage.max;\nawait actor.changeResources({ \"system.resources.rage.value\": Math.min(max, current + gain) }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n\n// 额外精神伤害\nconst shencai = args.target.system.stats.shencai.total || 0;\nif (shencai > 0) {\n    await args.target.applyDamage({\n        amount: shencai,\n        type: \"mental\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><b>无我无道</b><br>造成 ${shencai} 点精神伤害（基于目标神采）。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst gain = 8 - (lvl - 1);\nconst current = actor.system.resources.rage.value;\nconst max = actor.system.resources.rage.max;\nawait actor.changeResources({ \"system.resources.rage.value\": Math.min(max, current + gain) }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n\n// 额外精神伤害：hit 触发器在未命中时也会执行，怒气按“释放后”保留，精神伤害需命中\nconst shencai = args.isHit ? (args.target.system.stats.shencai.total || 0) : 0;\nif (shencai > 0) {\n    await args.target.applyDamage({\n        amount: shencai,\n        type: \"mental\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        ignoreBlock: true\n    });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><b>无法</b><br>造成 ${shencai} 点精神伤害（基于目标神采）。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
-                }
-            ],
-            "scripts": [
-                {
-                    "label": "无尘怒气惩罚",
-                    "trigger": "calc",
-                    "script": "if ([\"real\", \"feint\", \"counter\", \"ultimate\"].includes(args.move.type)) {\n    const rage = actor.system.resources.rage.value || 0;\n    if (rage > 0) {\n        const penalty = rage * 5;\n        args.output.damage -= penalty;\n        args.output.bonusDesc.push(`怒气惩罚 -${penalty}`);\n    }\n}",
-                    "active": true
                 }
             ],
             "effects": [
@@ -3701,7 +3708,7 @@
             "category": "wuxue",
             "sect": "jianghushili",
             "tier": 3,
-            "description": "<p>此刀法威力无穷，又偏偏不似刀法。纯以蛮力驭使，却又辅有一套精妙绝伦的拳掌功夫。</p><p><strong>需求：</strong>刀/徒手</p><p><strong>属性：</strong>阳</p>",
+            "description": "<p>此刀法威力无穷，又偏偏不似刀法。纯以蛮力驭使，却又辅有一套精妙绝伦的拳掌功夫。</p><p><strong>需求：</strong>刀/徒手</p><p><strong>属性：</strong>阳</p><p>注：本套路刀掌并用。选择徒手打法时，可在武学详情中手动将各招式的武器类型改为「徒手」。</p>",
             "requirements": "刀；徒手",
             "moves": [
                 {
@@ -3714,7 +3721,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，展臂俯身，百穴归一，开启架招。每次格挡成功后，投掷一个 D20，如果大于等于 10，在伤害结算完成后，你恢复 10 点气血。</p><p><strong>升级：</strong>格挡值+10，额外回复 10 气血，消耗+4。</p>",
-                    "automationNote": "格挡回血判定手动。",
+                    "automationNote": "格挡成功自动投掷D20并回血(卡片说明)。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -3729,9 +3736,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "格挡回血提示",
+                            "label": "格挡回血",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n// 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 10;\nui.notifications.info(`格挡成功！请投掷 D20 >= 10，若成功则手动回复 ${heal} 点气血。`);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n// 获取当前架招等级\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst heal = 10 + (lvl - 1) * 10;\nconst roll = await new Roll(\"1d20\").roll();\nconst success = roll.total >= 10;\nif (success) {\n    await actor.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true });\n}\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #f59e0b; background:rgba(245,158,11,0.1); padding:5px 8px;\"><b>如虎添翼</b>：格挡成功，虎势检定 D20=${roll.total} ${success ? `≥ 10，回复 ${heal} 点气血。` : \"< 10，未能回血。\"}</div></div>` });",
                             "active": true
                         }
                     ]
@@ -3746,7 +3753,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，施虎贪拳，劈出霸烈刀气，对直线上至多 2 名敌人造成伤害。同时为他们增加“虎啸”状态，持续到战斗脱离：</p><p><strong>虎啸：</strong>在回合初投掷一个 D20，如果小于等于 10，则封招一回合，并移除“虎啸”。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "回合初判定手动。",
+                    "automationNote": "命中施加虎啸自动。虎啸回合初自动投掷判定。目标选择手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3769,7 +3776,19 @@
                         {
                             "label": "施加虎啸",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"虎啸\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "// hit 触发器在未命中时也会执行，需检查命中\nif (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"虎啸\").toObject();\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "active": true
+                        },
+                        {
+                            "label": "魔虎追踪-虎贪",
+                            "trigger": "hit_once",
+                            "script": "// 魔虎三连招追踪：记录本战斗已施展的招式，凑齐三招自动激发魔虎\nconst cid = game.combat?.id || \"none\";\nlet rec = actor.getFlag(\"xjzl-system\", \"mohuTrack\") || {};\nif (rec.combatId !== cid) rec = { combatId: cid };\nrec.shanbeng = true;\nawait actor.setFlag(\"xjzl-system\", \"mohuTrack\", rec);\nif (rec.shanbeng && rec.yinhu && rec.yangru) {\n    await actor.unsetFlag(\"xjzl-system\", \"mohuTrack\");\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mohu\")) {\n        const eff = thisItem.effects.getName(\"魔虎\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #7f1d1d; background:rgba(127,29,29,0.1); padding:5px 8px;\"><b>虎啸奇掌刀</b>：不善执念激发，陷入【魔虎】状态！</div></div>` });\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "魔虎记录清理",
+                            "trigger": "combatStart",
+                            "script": "// 进战时清理旧战斗残留的魔虎追踪记录\nawait actor.unsetFlag(\"xjzl-system\", \"mohuTrack\");",
                             "active": true
                         }
                     ]
@@ -3784,7 +3803,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，施虎嗔拳，刀法随心境凌乱愤怒，对目标造成伤害。</p><p>·本次虚招对抗将进行 3 次，你需要连胜其中的 2 次，方能击破敌方架招。</p><p>若成功击破敌人架招，可将其击退 5 米倒地，并使其陷入眩晕状态，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "特殊对抗规则手动。击破后眩晕自动。击退手动。",
+                    "automationNote": "虚招对抗手动(卡片提醒)，破架以Shift+点击应用伤害为准。破架眩晕自动。击退手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3805,9 +3824,27 @@
                     },
                     "scripts": [
                         {
+                            "label": "多次对抗提醒",
+                            "trigger": "attack",
+                            "script": "ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #b91c1c; background:rgba(185,28,28,0.1); padding:5px 8px;\"><b>银虎踏岳：</b>本次虚招对抗需手动进行 3 次，连胜其中 2 次方能破架。若破架，请<b>按住 Shift + 点击应用伤害</b>标记破架，命中后系统会自动施加眩晕；击退 5 米与倒地请手动处理。</div></div>` });",
+                            "active": true
+                        },
+                        {
                             "label": "击破眩晕",
                             "trigger": "hit",
                             "script": "if (args.isBroken) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"xuanyun\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被击破！请手动击退 5 米并倒地。`);\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "魔虎追踪-虎嗔",
+                            "trigger": "hit_once",
+                            "script": "// 魔虎三连招追踪：记录本战斗已施展的招式，凑齐三招自动激发魔虎\nconst cid = game.combat?.id || \"none\";\nlet rec = actor.getFlag(\"xjzl-system\", \"mohuTrack\") || {};\nif (rec.combatId !== cid) rec = { combatId: cid };\nrec.yinhu = true;\nawait actor.setFlag(\"xjzl-system\", \"mohuTrack\", rec);\nif (rec.shanbeng && rec.yinhu && rec.yangru) {\n    await actor.unsetFlag(\"xjzl-system\", \"mohuTrack\");\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mohu\")) {\n        const eff = thisItem.effects.getName(\"魔虎\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #7f1d1d; background:rgba(127,29,29,0.1); padding:5px 8px;\"><b>虎啸奇掌刀</b>：不善执念激发，陷入【魔虎】状态！</div></div>` });\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "魔虎记录清理",
+                            "trigger": "combatStart",
+                            "script": "// 进战时清理旧战斗残留的魔虎追踪记录\nawait actor.unsetFlag(\"xjzl-system\", \"mohuTrack\");",
                             "active": true
                         }
                     ]
@@ -3821,8 +3858,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
-                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，施虎痴拳，旋身劈出刀气轰击敌方，对其造成伤害。</p><p>·同时使周围敌方陷入强烈的颤栗之中，无法自拔，怒气-2。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "完全自动化。",
+                    "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，施虎痴拳，旋身劈出刀气轰击敌方，对其造成 0.7 力量点外功伤害。</p><p>·同时使周围敌方陷入强烈的颤栗之中，无法自拔，怒气-2。</p><p>·如你本次战斗已经施展过【山崩地啸(虎贪)】、【银虎踏岳(虎嗔)】、【羊入虎口(虎痴)】，则立刻激发自身所有不善执念，陷入“魔虎”状态，持续到你内力枯竭或战斗脱离。</p><p><strong>魔虎：</strong>浑身黑气勃发，掌刀宛如漆黑獠牙，周身寂灭。你四肢着地，似作猛兽行进，你的移动速度翻倍，并且《趁虚而入》不会使你的速度归零。</p><p>·你的刀法技能等级增加徒手技能等级的数值。</p><p>·你的悟性增加徒手技能等级的数值。</p><p>·在你的每回合初，你流失 10 点内力。内力归零时，脱离魔虎状态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
+                    "automationNote": "怒气流失卡片提醒手动。魔虎由三连招施展齐全后自动激发，增益、速度翻倍与内力流失自动。战斗结束后请手动移除魔虎/虎啸；《趁虚而入》速度不归零的豁免系统暂不支持，需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3843,9 +3880,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "减少怒气",
+                            "label": "颤栗提醒",
                             "trigger": "hit",
-                            "script": "const current = args.target.system.resources.rage.value;\nif (current > 0) {\n    const newVal = Math.max(0, current - 2);\n    await args.target.changeResources({ \"system.resources.rage.value\": newVal }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n}",
+                            "script": "ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #b91c1c; background:rgba(185,28,28,0.1); padding:5px 8px;\"><b>羊入虎口：</b>周围敌方陷入强烈颤栗，范围内的敌人请各自手动流失 2 点怒气。</div></div>` });",
+                            "active": true
+                        },
+                        {
+                            "label": "魔虎追踪-虎痴",
+                            "trigger": "hit_once",
+                            "script": "// 魔虎三连招追踪：记录本战斗已施展的招式，凑齐三招自动激发魔虎\nconst cid = game.combat?.id || \"none\";\nlet rec = actor.getFlag(\"xjzl-system\", \"mohuTrack\") || {};\nif (rec.combatId !== cid) rec = { combatId: cid };\nrec.yangru = true;\nawait actor.setFlag(\"xjzl-system\", \"mohuTrack\", rec);\nif (rec.shanbeng && rec.yinhu && rec.yangru) {\n    await actor.unsetFlag(\"xjzl-system\", \"mohuTrack\");\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mohu\")) {\n        const eff = thisItem.effects.getName(\"魔虎\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n        ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #7f1d1d; background:rgba(127,29,29,0.1); padding:5px 8px;\"><b>虎啸奇掌刀</b>：不善执念激发，陷入【魔虎】状态！</div></div>` });\n    }\n}",
+                            "active": true
+                        },
+                        {
+                            "label": "魔虎记录清理",
+                            "trigger": "combatStart",
+                            "script": "// 进战时清理旧战斗残留的魔虎追踪记录\nawait actor.unsetFlag(\"xjzl-system\", \"mohuTrack\");",
                             "active": true
                         }
                     ]
@@ -3861,7 +3910,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，虎目圆睁，煞气凛然，刀掌交替出招，对周围范围内所有敌人造成伤害。</p><p>·若你处于【魔虎】状态，将周围敌方眩晕一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+16。</p>",
-                    "automationNote": "魔虎眩晕自动。进入魔虎状态手动。",
+                    "automationNote": "魔虎眩晕自动。魔虎由三连招（山崩地啸/银虎踏岳/羊入虎口）施展齐全后自动激发。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -3900,12 +3949,20 @@
                 {
                     "name": "虎啸",
                     "icon": "icons/creatures/mammals/cat-tiger-roar-orange.webp",
-                    "description": "回合初判定封招。",
+                    "description": "回合初投D20，≤10则封招一回合并移除虎啸。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "huxiao",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "虎啸判定",
+                                    "trigger": "turnStart",
+                                    "script": "const roll = await new Roll(\"1d20\").roll();\nif (roll.total <= 10) {\n    await game.xjzl.api.effects.addEffect(actor, { id: \"fengzhao\", duration: { rounds: 1 } });\n    await game.xjzl.api.effects.removeEffect(actor, \"huxiao\");\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #d97706; background:rgba(217,119,6,0.1); padding:5px 8px;\"><b>虎啸发作</b>（D20=${roll.total} ≤ 10）：被颤栗笼罩，封招一回合，虎啸已移除。</div></div>` });\n} else {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #6b7280; background:rgba(107,114,128,0.1); padding:5px 8px;\"><b>虎啸</b>（D20=${roll.total} > 10）：抵抗住了颤栗，虎啸仍在。</div></div>` });\n}",
+                                    "active": true
+                                }
+                            ]
                         }
                     },
                     "changes": []
@@ -3913,7 +3970,7 @@
                 {
                     "name": "魔虎",
                     "icon": "icons/creatures/mammals/cat-tiger-fanged-glowing-red.webp",
-                    "description": "速度翻倍，刀法+徒手，悟性+徒手。",
+                    "description": "速度翻倍(趁虚而入不归零)，刀法+徒手，悟性+徒手，回合初流失10内力，归零脱离。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -3921,9 +3978,15 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "属性加成",
+                                    "label": "属性与速度加成",
                                     "trigger": "passive",
-                                    "script": "const unarmedRank = actor.system.combat.weaponRanks.unarmed?.total || 0;\nactor.system.combat.weaponRanks.blade.mod += unarmedRank;\nactor.system.stats.wuxing.mod += unarmedRank;",
+                                    "script": "const rank = actor.system.combat.weaponRanks.unarmed?.total || 0;\n// 刀法技能等级与悟性增加徒手技能等级\nactor.system.combat.weaponRanks.blade.mod += rank;\nactor.system.stats.wuxing.mod += rank;\n// 移动速度翻倍：passive 在首轮派生完成后执行，把 speedTotal 整体加回 combat.speed，\n// recalculate 重算后约为原速两倍（含经脉、装备等全部修正）；禁足类硬控仍会将其归零\nactor.system.combat.speed += actor.system.combat.speedTotal || 0;",
+                                    "active": true
+                                },
+                                {
+                                    "label": "内力枯竭脱离",
+                                    "trigger": "turnStart",
+                                    "script": "// turnStart 在回合初自动消耗完成后触发，此时内力流失已经结算\nconst mp = actor.system.resources.mp.value || 0;\nif (mp <= 0) {\n    await game.xjzl.api.effects.removeEffect(actor, \"mohu\");\n    ui.notifications.info(\"内力枯竭，脱离【魔虎】状态。\");\n}",
                                     "active": true
                                 }
                             ]
@@ -4210,7 +4273,7 @@
                                     "label": "冷心回合末",
                                     "trigger": "turnEnd",
                                     "active": true,
-                                    "script": "const hasManual = actor.items.some(i => i.name === \"雪饮六诀\" && i.type === \"wuxue\");\nif (hasManual) {\n    const eff = thisItem.effects.getName(\"冰心\").toObject();\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.maxStacks\", 10);\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"冷心：获得1层 [冰心]\");\n} else {\n    // 获得怒气\n    const current = actor.system.resources.rage.value;\n    const max = actor.system.resources.rage.max;\n    if (current < max) {\n        await actor.changeResources({\"system.resources.rage.value\": current + 1}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        ui.notifications.info(\"冷心：获得1点怒气\");\n    }\n}"
+                                    "script": "const hasManual = actor.items.some(i => i.name === \"雪饮六诀\" && i.type === \"wuxue\");\nif (hasManual) {\n    // AE 脚本中 thisItem 指向 AE 自身，需从雪饮六诀物品上取冰心模板\n    const src = actor.items.find(i => i.type === \"wuxue\" && i.name === \"雪饮六诀\");\n    const eff = src?.effects.getName(\"冰心\")?.toObject();\n    if (!eff) return;\n    foundry.utils.setProperty(eff, \"flags.xjzl-system.maxStacks\", 10);\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"冷心：获得1层 [冰心]\");\n} else {\n    // 获得怒气\n    const current = actor.system.resources.rage.value;\n    const max = actor.system.resources.rage.max;\n    if (current < max) {\n        await actor.changeResources({\"system.resources.rage.value\": current + 1}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        ui.notifications.info(\"冷心：获得1点怒气\");\n    }\n}"
                                 }
                             ]
                         }
