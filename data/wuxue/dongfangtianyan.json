@@ -43,7 +43,7 @@
                         {
                             "label": "获得刀笔",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst bleed = 5 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"刀笔\").toObject();\neff.duration = { rounds: rounds };\neff.changes[0].value = String(bleed);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst bleed = 5 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"刀笔\").toObject();\ndelete eff._id;\neff.duration = { rounds: rounds };\neff.flags[\"xjzl-system\"].bleedValue = bleed;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -148,7 +148,7 @@
                         {
                             "label": "格挡获墨",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"墨\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"墨\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -191,66 +191,70 @@
                         {
                             "label": "武器脱手",
                             "trigger": "hit",
-                            "script": "// 获得从戎\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"从戎\").toObject();\neff.duration = { rounds: rounds };\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\n// 卸下武器\nconst weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === \"dagger\");\nif (weapon) {\n    await weapon.update({\"system.equipped\": false});\n    ui.notifications.info(`${weapon.name} 已脱手！`);\n}",
+                            "script": "if (!args.isHit) return;\n// 获得从戎\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"从戎\").toObject();\ndelete eff._id;\neff.duration = { rounds: rounds };\neff.flags[\"xjzl-system\"].bleedValue = 20;\nawait game.xjzl.api.effects.addEffect(actor, eff);\n\n// 卸下武器\nconst weapon = actor.itemTypes.weapon.find(w => w.system.equipped && w.system.type === \"dagger\");\nif (weapon) {\n    await weapon.update({\"system.equipped\": false});\n    ui.notifications.info(`${weapon.name} 已脱手！`);\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "刀笔",
-                    "icon": "icons/tools/scribal/quill-ink-red.webp",
-                    "description": "出招造成额外流血。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "daobi",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.bleedOnHit",
-                            "mode": 2,
-                            "value": "0"
-                        }
-                    ]
-                },
-                {
-                    "name": "墨",
-                    "icon": "icons/tools/scribal/ink-pot.webp",
-                    "description": "格挡积累，出招消耗。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "mo_ink",
-                            "stackable": true
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "从戎",
-                    "icon": "icons/weapons/swords/sword-guard-flanged-purple.webp",
-                    "description": "出招造成大量流血。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "congrong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.bleedOnHit",
-                            "mode": 2,
-                            "value": "20"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "刀笔",
+                "icon": "icons/tools/scribal/quill-ink-red.webp",
+                "description": "出招造成额外流血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "daobi",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "出招附加流血",
+                                "trigger": "hit",
+                                "script": "if (!args.isAttack || !args.isHit) return;\nconst bleed = thisEffect.getFlag(\"xjzl-system\", \"bleedValue\") || 5;\nawait args.target.applyDamage({\n    amount: bleed,\n    type: \"bleed\",\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true,\n    item: args.item,\n    move: args.move,\n    source: \"extra\"\n});",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "墨",
+                "icon": "icons/tools/scribal/ink-pot.webp",
+                "description": "格挡积累，出招消耗。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "mo_ink",
+                        "stackable": true
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "从戎",
+                "icon": "icons/weapons/swords/sword-guard-flanged-purple.webp",
+                "description": "出招造成大量流血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "congrong",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "出招附加流血",
+                                "trigger": "hit",
+                                "script": "if (!args.isAttack || !args.isHit) return;\nconst bleed = thisEffect.getFlag(\"xjzl-system\", \"bleedValue\") || 20;\nawait args.target.applyDamage({\n    amount: bleed,\n    type: \"bleed\",\n    attacker: actor,\n    isHit: true,\n    ignoreDefense: true,\n    item: args.item,\n    move: args.move,\n    source: \"extra\"\n});",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "潇湘水云曲",
@@ -296,7 +300,7 @@
                         {
                             "label": "施加烟雨",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"烟雨\").toObject();\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"烟雨\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
                             "active": true
                         }
                     ]
@@ -327,7 +331,7 @@
                         {
                             "label": "格挡反伤",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    // 获取当前架招等级\n    const stanceId = actor.system.martial.stance;\n    const moveData = thisItem.system.moves.find(m => m.id === stanceId);\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const dmg = 10 + (lvl - 1) * 10;\n    await args.attacker.applyDamage({\n        amount: dmg,\n        type: \"mental\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"寒江冷月：反弹精神伤害\");\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (args.attacker.isReceivingReflection) return;\n\n// 获取当前架招等级\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst dmg = 10 + (lvl - 1) * 10;\n\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({\n        amount: dmg,\n        type: \"mental\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        item: thisItem,\n        source: \"extra\"\n    });\n    ui.notifications.info(\"寒江冷月：反弹精神伤害\");\n} finally {\n    args.attacker.isReceivingReflection = false;\n}",
                             "active": true
                         }
                     ]
@@ -453,26 +457,26 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "烟雨",
-                    "icon": "icons/magic/water/water-hand.webp",
-                    "description": "被潇湘水云曲克制。",
-                    "transfer": false,
-                    "duration": {
-                        "rounds": 3
-                    },
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "yanyu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "烟雨",
+                "icon": "icons/magic/water/water-hand.webp",
+                "description": "被潇湘水云曲克制。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 3
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "yanyu",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "斫琴",
@@ -528,34 +532,34 @@
                         {
                             "label": "施加妆容",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 5 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"妆容\").toObject();\neff.origin = thisItem.uuid;\neff.changes[0].value = String(bonus);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"已上妆，神采提升。请手动扣除 10 两银子。\");",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 5 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"妆容\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.changes[0].value = String(bonus);\n\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"已上妆，神采提升。请手动扣除 10 两银子。\");",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "妆容",
-                    "icon": "icons/equipment/head/mask-carved-wood-brown.webp",
-                    "description": "神采提升。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "zhuangrong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.stats.shencai.mod",
-                            "mode": 2,
-                            "value": "0"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "妆容",
+                "icon": "icons/equipment/head/mask-carved-wood-brown.webp",
+                "description": "神采提升。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhuangrong",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.stats.shencai.mod",
+                        "mode": 2,
+                        "value": "0"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "祛邪剑法",
@@ -788,30 +792,30 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "祛邪",
-                    "icon": "icons/magic/light/beam-rays-yellow-blue-small.webp",
-                    "description": "提高速度与剑法距离。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "quxie",
-                            "stackable": true,
-                            "maxStacks": 5
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "祛邪",
+                "icon": "icons/magic/light/beam-rays-yellow-blue-small.webp",
+                "description": "提高速度与剑法距离。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "quxie",
+                        "stackable": true,
+                        "maxStacks": 5
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "葵花神针",
@@ -859,7 +863,7 @@
                         {
                             "label": "施加葵花",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst vampPct = 10 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"葵花\").toObject();\neff.origin = thisItem.uuid;\n// 将吸血比例写入 Flag，供攻击时读取\neff.flags[\"xjzl-system\"].vampPct = vampPct;\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst vampPct = 10 + (lvl - 1) * 5;\n\nconst eff = thisItem.effects.getName(\"葵花\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n// 将吸血比例写入 Flag，供攻击时读取\neff.flags[\"xjzl-system\"].vampPct = vampPct;\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
                         }
                     ]
@@ -874,7 +878,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>捏针剑指，抛飞飘出，对目标造成伤害，击中无架招目标时，为其添加一层“葵花”，至多三层，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "吸血自动。命中无架招施加葵花自动。",
+                    "automationNote": "吸血自动。命中无架招施加葵花自动。葵花看破劣势发卡片提醒（需防守方手动调低）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -895,6 +899,12 @@
                     },
                     "scripts": [
                         {
+                            "label": "葵花看破劣势提醒",
+                            "trigger": "check",
+                            "script": "// 看破的优劣势只能由防守方在看破弹窗手动调整（系统无按攻击者区分的看破优劣势入口），发卡提醒；劣势固定一层，不随葵花层数叠加\nconst kh = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuihua\");\nif (kh && args.target.system.martial?.stanceActive) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\"><b>${args.target.name}</b> 身中葵花：本次看破检定应带 <b>1</b> 层劣势，请防守方在看破弹窗手动调低。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "active": true
+                        },
+                        {
                             "label": "葵花吸血",
                             "trigger": "hit",
                             "script": "const kuihua = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuihua\");\nif (kuihua && args.isHit) {\n    const stacks = kuihua.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const pct = kuihua.getFlag(\"xjzl-system\", \"vampPct\") || 10;\n    const heal = Math.floor(actor.system.resources.hp.max * (pct / 100) * stacks);\n    if (heal > 0) {\n        await actor.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true});\n        ui.notifications.info(`葵花吸血：回复 ${heal} 点气血`);\n    }\n}",
@@ -903,7 +913,7 @@
                         {
                             "label": "施加葵花",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 此处葵花默认吸血比例为基础 10% (无法读取云衣等级，取保底)\n    // 如果学了云衣，最好手动修正或读取云衣等级\n    const cloudMove = thisItem.system.moves.find(m => m.name === \"云衣\");\n    let vampPct = 10;\n    if (cloudMove) {\n        const lvl = Math.max(1, cloudMove.computedLevel || 1);\n        vampPct = 10 + (lvl - 1) * 5;\n    }\n\n    const eff = thisItem.effects.getName(\"葵花\").toObject();\n    eff.origin = thisItem.uuid;\n    eff.flags[\"xjzl-system\"].vampPct = vampPct;\n    \n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    // 此处葵花默认吸血比例为基础 10% (无法读取云衣等级，取保底)\n    // 如果学了云衣，最好手动修正或读取云衣等级\n    const cloudMove = thisItem.system.moves.find(m => m.name === \"云衣\");\n    let vampPct = 10;\n    if (cloudMove) {\n        const lvl = Math.max(1, cloudMove.computedLevel || 1);\n        vampPct = 10 + (lvl - 1) * 5;\n    }\n\n    const eff = thisItem.effects.getName(\"葵花\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.flags[\"xjzl-system\"].vampPct = vampPct;\n    \n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
                             "active": true
                         }
                     ]
@@ -990,30 +1000,24 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "葵花",
-                    "icon": "icons/consumables/flowers/sunflower-yellow.webp",
-                    "description": "虚招对抗劣势，被葵花神针攻击时被吸血。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "kuihua",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.defendFeintLevel",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "葵花",
+                "icon": "icons/consumables/flowers/sunflower-yellow.webp",
+                "description": "虚招对抗劣势，被葵花神针攻击时被吸血。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "kuihua",
+                        "stackable": true,
+                        "maxStacks": 3
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "去势大法",
@@ -1037,13 +1041,15 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>在战斗外，压制一个被点穴的目标，直探其身，当场开刀，割其宝贝（视作获得残疾 80 的效果），目标阵痛，然后陷入“下盘不稳”，持续一周。</p><p>·你获得目标的【宝贝】，可留给他自己做纪念。</p>",
-                    "automationNote": "获得宝贝自动。施加长期下盘不稳自动。",
+                    "automationNote": "获得宝贝自动。施加长期下盘不稳自动。残疾80效果需手动记录。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
                     },
                     "costs": {
                         "mp": [
+                            5,
+                            5,
                             5
                         ]
                     },
@@ -1081,7 +1087,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>捏碎暗器，内力催发绿雾毒粉，呛鼻刺目，造成精神伤害（内功命中、内功暴击），为目标添加“化骨”，持续五回合。</p><p><strong>化骨：</strong>在自己的每回合初进行一次[韧性]检定（难度 @{14 + @up * 2|14}），失败则受到 30 点毒素伤害，若处于濒死，则受到双倍毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，[韧性]检定难度+2。</p>",
-                    "automationNote": "消耗物品需手动扣除。化骨效果需配合回合提示手动检定。",
+                    "automationNote": "消耗物品需手动扣除。施加化骨自动。回合初自动发送韧性检定请求，玩家点击检定，失败伤害自动结算（濒死翻倍自动判定）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1103,39 +1109,39 @@
                         {
                             "label": "施加化骨",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 14 + (lvl - 1) * 2;\n\n    const eff = thisItem.effects.getName(\"化骨\").toObject();\n    eff.origin = thisItem.uuid;\n    eff.flags[\"xjzl-system\"].dc = dc;\n    \n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 14 + (lvl - 1) * 2;\n\n    const eff = thisItem.effects.getName(\"化骨\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.flags[\"xjzl-system\"].dc = dc;\n    \n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "化骨",
-                    "icon": "icons/magic/death/skull-poison-green.webp",
-                    "description": "每回合初韧性检定，失败受毒伤。",
-                    "transfer": false,
-                    "duration": {
-                        "rounds": 5
-                    },
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "huagu",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "回合初检定提示",
-                                    "trigger": "turnStart",
-                                    "active": true,
-                                    "script": "const dc = thisEffect.getFlag('xjzl-system', 'dc') || 14;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\" style=\"background:#2c3e50; color:white; padding:5px;\">化骨毒发作</div><div style=\"padding:5px;\"><p>${actor.name} 需进行 <b>韧性检定 (DC ${dc})</b>。</p><p>❌ 失败: 受到 30 毒素伤害 (濒死翻倍)。</p></div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "化骨",
+                "icon": "icons/magic/death/skull-poison-green.webp",
+                "description": "每回合初韧性检定，失败受毒伤。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 5
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huagu",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "回合初韧性检定",
+                                "trigger": "turnStart",
+                                "active": true,
+                                "script": "const dc = thisEffect.getFlag('xjzl-system', 'dc') || 14;\n// 濒死时毒伤翻倍，在发起检定时按当前状态确定数值\nconst dying = actor.statuses?.has?.(\"dying\") || actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dying\");\nawait Macros.requestSave({\n    target: actor,\n    type: \"renxing\",\n    dc: dc,\n    label: \"化骨毒发作\",\n    damageOnFail: { value: dying ? 60 : 30, type: \"poison\" },\n    successText: \"韧性检定成功，抵御化骨之毒。\",\n    failureText: \"韧性检定失败，受到毒素伤害（濒死中为双倍）。\"\n});"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "葵阴秘典",

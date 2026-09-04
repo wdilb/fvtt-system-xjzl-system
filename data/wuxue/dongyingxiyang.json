@@ -111,7 +111,7 @@
                         {
                             "label": "格挡反伤",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (args.attacker) {\n    await args.attacker.applyDamage({\n        amount: 10,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    ui.notifications.info(\"中段构：反击流失 10 点气血\");\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nif (!args.attacker || args.attacker.uuid === actor.uuid) return;\nif (args.attacker.isReceivingReflection) return;\n\nargs.attacker.isReceivingReflection = true;\ntry {\n    await args.attacker.applyDamage({\n        amount: 10,\n        type: \"liushi\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        item: thisItem,\n        source: \"extra\"\n    });\n    ui.notifications.info(\"中段构：反击流失 10 点气血\");\n} finally {\n    args.attacker.isReceivingReflection = false;\n}",
                             "active": true
                         }
                     ]
@@ -127,7 +127,7 @@
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
                     "description": "<p>力压刀尖，向前突刺，对直线上所有敌人造成伤害。</p><p>·命中敌人后，可继续推刀前刺，自身每前进 1 米，便可将直线上敌人也全部向后击退 1 米，同时使他们流失 5 点气血。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "命中流失自动。位移/击退手动。",
+                    "automationNote": "命中流失5自动（规则为每前进1米+5，多余米数请手动补投）。位移/击退手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -303,7 +303,7 @@
                         {
                             "label": "添加波返",
                             "trigger": "attack",
-                            "script": "const eff = thisItem.effects.getName(\"波返\").toObject();\n\n// 动态计算持续时间\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\neff.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"波返\").toObject();\ndelete eff._id;\n\n// 动态计算持续时间\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\neff.duration = { rounds: rounds };\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -351,37 +351,37 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "波返",
-                    "icon": "icons/magic/defensive/barrier-shield-dome-deflect-blue.webp",
-                    "description": "闪避+5，闪避成功反震倒地。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "bofan",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "闪避反震提示",
-                                    "trigger": "avoided",
-                                    "script": "if (args.attacker) {\n    ui.notifications.info(\"波返触发：请手动判定将攻击者 [\" + args.attacker.name + \"] 反震倒地\");\n}",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.dodge",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "波返",
+                "icon": "icons/magic/defensive/barrier-shield-dome-deflect-blue.webp",
+                "description": "闪避+5，闪避成功反震倒地。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "bofan",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "闪避反震提示",
+                                "trigger": "avoided",
+                                "script": "if (args.attacker) {\n    ui.notifications.info(\"波返触发：请手动判定将攻击者 [\" + args.attacker.name + \"] 反震倒地\");\n}",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.dodge",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "居合-拔刀十式",
@@ -405,7 +405,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>刀尖向下指敌，振落刃上血迹，开启架招。</p><p>若你在本回合受到或造成过伤害，施展本招式后还可以不消耗动作，立即纳刀进入收刀姿态。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "收刀姿态提示手动。拔刀姿态下格挡翻倍需手动处理。",
+                    "automationNote": "格挡成功发卡片提醒可纳刀。免动作纳刀条件（本回合受到或造成过伤害）需GM裁定。拔刀姿态下血振格挡翻倍自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -419,15 +419,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "收刀提示",
-                            "trigger": "attack",
-                            "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (!sheathed) {\n    ui.notifications.info(\"若本回合造成或受到过伤害，可手动添加 [收刀姿态] AE\");\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "姿态回怒",
-                            "trigger": "attack",
-                            "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"收刀姿态出招：怒气+1\");\n}",
+                            "label": "格挡提醒",
+                            "trigger": "damaged",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\"><b>血振</b>：格挡成功。若本回合受到或造成过伤害，可不消耗动作使用【拔刀／纳刀】纳刀（进入收刀姿态）。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -457,12 +451,6 @@
                     },
                     "scripts": [
                         {
-                            "label": "姿态回怒",
-                            "trigger": "attack",
-                            "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"收刀姿态出招：怒气+1\");\n}",
-                            "active": true
-                        },
-                        {
                             "label": "获得残心",
                             "trigger": "hit",
                             "script": "const eff = thisItem.effects.getName(\"残心\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst maxStacks = 1 + (lvl - 1);\neff.flags[\"xjzl-system\"].maxStacks = maxStacks;\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
@@ -480,7 +468,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>疾风闪光般的迅速横切！对敌人造成伤害，然后进入拔刀姿态。</p><p>·若出招前处于收刀姿态，招式伤害+10。</p><p>·若你处于收刀姿态且自身处于倒地或半空中，你可以消耗反应动作释放此招。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "收刀姿态加伤自动。自动移除收刀姿态。",
+                    "automationNote": "收刀姿态加伤自动。攻击结束后自动切换为拔刀姿态。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -500,21 +488,15 @@
                     },
                     "scripts": [
                         {
-                            "label": "姿态回怒",
-                            "trigger": "attack",
-                            "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"收刀姿态出招：怒气+1\");\n}",
-                            "active": true
-                        },
-                        {
                             "label": "姿态加伤预览",
                             "trigger": "calc",
                             "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"收刀姿态加成 (+10)\");\n}",
                             "active": true
                         },
                         {
-                            "label": "解除收刀",
+                            "label": "进入拔刀姿态",
                             "trigger": "hit",
-                            "script": "const sheathed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    await sheathed.delete();\n    ui.notifications.info(\"进入拔刀姿态\");\n}",
+                            "script": "// 不管是否命中都切换；收刀AE可能已由回怒逻辑切换，保持幂等\nconst sheathed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) await sheathed.delete();\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"badao\")) {\n    const badaoData = thisItem.effects.getName(\"拔刀姿态\").toObject();\n    delete badaoData._id;\n    badaoData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, badaoData);\n}",
                             "active": true
                         }
                     ]
@@ -529,7 +511,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，压制对方虚招，沿左右肩向下斜切，对目标造成伤害，然后不消耗速度移动 2 米。</p><p>·释放完袈裟斩后，纳刀进入收刀姿态。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "进入收刀姿态自动。移动手动。",
+                    "automationNote": "进入收刀姿态自动。不消耗速度移动2米发卡片提醒（需手动移动）。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -549,15 +531,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "姿态回怒",
-                            "trigger": "attack",
-                            "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"收刀姿态出招：怒气+1\");\n}",
-                            "active": true
-                        },
-                        {
                             "label": "纳刀",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"收刀姿态\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"纳刀：进入收刀姿态\");",
+                            "script": "// 释放完袈裟斩后纳刀；若已因回怒切换为拔刀姿态则一并移除\nconst drawn = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"badao\");\nif (drawn) await drawn.delete();\nconst eff = thisItem.effects.getName(\"收刀姿态\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\"><b>袈裟斩</b>：已纳刀进入收刀姿态。可不消耗速度移动 2 米，请手动调整位置。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -573,7 +549,7 @@
                     "targetInfo": "扇形",
                     "actionCost": "蓄力动作",
                     "description": "<p>注：你只能在收刀姿态释放此招。</p><p>鞘扭向左，徐徐推刃，瞬间化为半月弧光，拔刀斩击前方扇形区域内敌人，造成伤害。</p><p>·若造成暴击，则可迅速纳刀，进入收刀姿态。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "收刀姿态检查自动。解除收刀自动。暴击纳刀自动。",
+                    "automationNote": "收刀姿态检查自动（未收刀时免消耗拦截）。姿态切换自动。暴击纳刀自动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -598,69 +574,132 @@
                     },
                     "scripts": [
                         {
-                            "label": "姿态回怒",
-                            "trigger": "attack",
-                            "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"收刀姿态出招：怒气+1\");\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "姿态检查与解除",
-                            "trigger": "attack",
-                            "script": "const sheathed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (!sheathed) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"必须处于 [收刀姿态] 才能释放此招\";\n} else {\n    // 出招即拔刀，先移除，若暴击再加回\n    await sheathed.delete();\n}",
+                            "label": "姿态检查",
+                            "trigger": "preAttack",
+                            "script": "// 在扣除资源前拦截，避免姿态不满足时浪费消耗和动作\nconst sheathed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (!sheathed) {\n    args.abort = true;\n    args.abortReason = \"必须处于 [收刀姿态] 才能释放此招\";\n}",
                             "active": true
                         },
                         {
                             "label": "暴击纳刀",
                             "trigger": "hit",
-                            "script": "if (args.isCrit) {\n    const eff = thisItem.effects.getName(\"收刀姿态\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n    ui.notifications.info(\"暴击！迅速纳刀进入收刀姿态\");\n}",
+                            "script": "if (args.isCrit) {\n    const drawn = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"badao\");\n    if (drawn) await drawn.delete();\n    if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\")) {\n        const eff = thisItem.effects.getName(\"收刀姿态\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n    ui.notifications.info(\"暴击！迅速纳刀进入收刀姿态\");\n}",
+                            "active": true
+                        }
+                    ]
+                },
+                {
+                    "name": "拔刀／纳刀",
+                    "type": "qi",
+                    "actionType": "buff",
+                    "element": "none",
+                    "damageType": "none",
+                    "weaponType": "blade",
+                    "range": "自身",
+                    "targetInfo": "自身",
+                    "actionCost": "简要动作",
+                    "description": "<p>拔出或收入兵器是一个简要动作，切换《居合-拔刀十式》的姿态。身上没有任何姿态时，默认进入收刀姿态。</p><p><strong>拔刀姿态：</strong>【血振】提供的格挡值翻倍。</p><p><strong>收刀姿态：</strong>将刀归入刀鞘后持握的状态，在此状态下施展《居合-拔刀十式》，可获得 1 点怒气。</p>",
+                    "automationNote": "姿态切换自动。收刀姿态回怒与切换自动（发卡片）。拔刀姿态格挡翻倍自动。血振格挡成功后的免动作纳刀需GM裁定。",
+                    "requirements": "",
+                    "calculation": {
+                        "base": 0,
+                        "growth": 0
+                    },
+                    "costs": {
+                        "mp": [
+                            0,
+                            0,
+                            0
+                        ]
+                    },
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            0
+                        ],
+                        "mappedStage": 5
+                    },
+                    "scripts": [
+                        {
+                            "label": "切换姿态",
+                            "trigger": "hit",
+                            "script": "const sheathed = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nconst drawn = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"badao\");\n\nconst shoudaoData = thisItem.effects.getName(\"收刀姿态\").toObject();\ndelete shoudaoData._id;\nshoudaoData.origin = thisItem.uuid;\nconst badaoData = thisItem.effects.getName(\"拔刀姿态\").toObject();\ndelete badaoData._id;\nbadaoData.origin = thisItem.uuid;\n\nif (sheathed) {\n    await sheathed.delete();\n    await game.xjzl.api.effects.addEffect(actor, badaoData);\n    ui.notifications.info(\"拔刀：进入拔刀姿态\");\n} else {\n    if (drawn) await drawn.delete();\n    await game.xjzl.api.effects.addEffect(actor, shoudaoData);\n    ui.notifications.info(\"纳刀：进入收刀姿态\");\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "收刀姿态",
-                    "icon": "icons/skills/melee/sword-sheathed-wood.webp",
-                    "description": "刀归入鞘。拔刀十式获益。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "shoudao",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "残心",
-                    "icon": "icons/magic/perception/eye-ringed-glow-red.webp",
-                    "description": "提高命中。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "canxin",
-                            "stackable": true,
-                            "scripts": [
-                                {
-                                    "label": "回合末提示",
-                                    "trigger": "turnEnd",
-                                    "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    ui.notifications.info(\"残心：回合结束处于收刀姿态，可手动消耗一层残心获得额外反应动作\");\n}",
-                                    "active": true
-                                }
-                            ]
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.hit_waigong",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "收刀姿态",
+                "icon": "icons/skills/melee/sword-sheathed-wood.webp",
+                "description": "刀归入鞘。此状态下施展《居合-拔刀十式》招式时获得 1 点怒气，并切换为拔刀姿态。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shoudao",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "出招回怒并拔刀",
+                                "trigger": "attack",
+                                "script": "// 收刀状态下施展本书任意招式：+1 怒气并切换为拔刀姿态；切换招自身除外\nif (!args.item || args.item.name !== \"居合-拔刀十式\") return;\nif (args.move?.name === \"拔刀／纳刀\") return;\n\nawait actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: args.item, move: args.move });\n\nconst badaoData = args.item.effects.getName(\"拔刀姿态\").toObject();\ndelete badaoData._id;\nbadaoData.origin = args.item.uuid;\nawait thisEffect.delete();\nawait game.xjzl.api.effects.addEffect(actor, badaoData);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\"><b>居合·收刀姿态</b>：施展《居合-拔刀十式》，怒气 +1，已切换为拔刀姿态。</div></div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "拔刀姿态",
+                "icon": "icons/skills/melee/sword-drawn.webp",
+                "description": "刀已出鞘。【血振】架招提供的格挡值翻倍。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "badao",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "血振格挡翻倍",
+                                "trigger": "passive",
+                                "script": "// 拔刀姿态下【血振】提供的格挡值翻倍：额外叠加等同血振本体强度（base+growth*(lvl-1)）\nconst m = S.martial;\nif (!m?.stanceActive || !m.stanceItemId) return;\nconst stanceItem = actor.items.get(m.stanceItemId);\nconst stanceMove = stanceItem?.system?.moves?.find(v => v.id === m.stance);\nif (!stanceMove || stanceMove.name !== \"血振\") return;\nconst lvl = Math.max(1, stanceMove.computedLevel || 1);\nconst block = (stanceMove.calculation?.base || 0) + (stanceMove.calculation?.growth || 0) * (lvl - 1);\nif (block > 0) S.combat.block += block;",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "残心",
+                "icon": "icons/magic/perception/eye-ringed-glow-red.webp",
+                "description": "提高命中。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "canxin",
+                        "stackable": true,
+                        "scripts": [
+                            {
+                                "label": "回合末提示",
+                                "trigger": "turnEnd",
+                                "script": "const sheathed = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shoudao\");\nif (sheathed) {\n    ui.notifications.info(\"残心：回合结束处于收刀姿态，可手动消耗一层残心获得额外反应动作\");\n}",
+                                "active": true
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.hit_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "杀神一刀",
@@ -684,7 +723,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>刀身震颤，杀意凌冽，开启架招，并获得一层“杀意”，持续到脱战。格挡成功后，获得一层“杀意”，持续到脱战，杀意至多叠加十层。</p><p><strong>杀意：</strong>造成内外功伤害时移除所有杀意，每移除一层使你招式伤害+5。</p><p>·若你出招消耗杀意后，将人打入濒死或杀死，则返还消耗的杀意。</p><p><strong>升级：</strong>格挡值+10，格挡成功时获得的杀意+1 层，内力消耗+4。</p>",
-                    "automationNote": "开启/格挡获杀意自动。出招消耗杀意加伤自动。击杀返还自动。",
+                    "automationNote": "开启/格挡获杀意自动。出招消耗杀意加伤自动。击杀返还杀意需手动补回层数。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -723,7 +762,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>杀意爆发，不消耗速度突进至目标周围空格，斩出刀光，对目标造成伤害，根据消耗“杀意”层数，触发以下效果：</p><p>3 层：招式释放距离+5。</p><p>6 层：将目标打入濒死时伤残检定-10（最低 1）。</p><p>10 层：招式将人打入濒死后，额外获得 3 怒气。</p><p><strong>升级：</strong>造成伤害+20，怒气消耗-1，内力消耗+8。</p>",
-                    "automationNote": "杀意伤害加成自动。层数效果(距离/伤残/回怒)提示手动。",
+                    "automationNote": "杀意伤害加成自动。10层濒死回怒自动。距离/伤残效果提示手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -752,13 +791,13 @@
                         {
                             "label": "层数效果检查",
                             "trigger": "attack",
-                            "script": "const shayi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shayi\");\nif (shayi) {\n    const stacks = shayi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    let msg = `当前杀意 ${stacks} 层：\\n`;\n    if (stacks >= 3) msg += \"- 距离+5 (请手动确认)\\n\";\n    if (stacks >= 6) msg += \"- 濒死伤残检定 -10\\n\";\n    if (stacks >= 10) msg += \"- 濒死额外回怒 +3\";\n    ui.notifications.info(msg);\n    // 记录层数供 hit 判断\n    args.flags.shayiStacks = stacks;\n}",
+                            "script": "// 清除上次动作的消耗记录，确保 hit 阶段读到的是本次消耗\nawait actor.unsetFlag(\"xjzl-system\", \"lastShayiConsumed\");\nconst shayi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shayi\");\nif (shayi) {\n    const stacks = shayi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    let msg = `当前杀意 ${stacks} 层：\\n`;\n    if (stacks >= 3) msg += \"- 距离+5 (请手动确认)\\n\";\n    if (stacks >= 6) msg += \"- 濒死伤残检定 -10\\n\";\n    if (stacks >= 10) msg += \"- 濒死额外回怒 +3\";\n    ui.notifications.info(msg);\n}",
                             "active": true
                         },
                         {
                             "label": "回怒判定",
                             "trigger": "hit",
-                            "script": "if (args.flags.shayiStacks >= 10 && args.isDying) {\n    await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 3}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"神光一现 (10层)：击倒回怒 +3\");\n}",
+                            "script": "// hit 阶段没有 args.flags，从 actor flag 读取 preDamage 阶段记录的本次消耗层数\nconst consumed = actor.getFlag(\"xjzl-system\", \"lastShayiConsumed\") || 0;\nif (consumed >= 10 && (args.isDying || args.isDead)) {\n    await actor.changeResources({\"system.resources.rage.value\": actor.system.resources.rage.value + 3}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    ui.notifications.info(\"神光一现 (10层)：击倒回怒 +3\");\n}",
                             "active": true
                         }
                     ]
@@ -781,7 +820,7 @@
                         "scalings": [
                             {
                                 "prop": "neixi",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -803,49 +842,49 @@
                         {
                             "label": "层数效果检查",
                             "trigger": "attack",
-                            "script": "const shayi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shayi\");\nif (shayi) {\n    const stacks = shayi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    let msg = `当前杀意 ${stacks} 层：\\n`;\n    if (stacks >= 4) msg += \"- 附加 [禁疗] (1回合)\\n\";\n    if (stacks >= 8) msg += \"- 触发 [伤残检定]\\n\";\n    if (stacks >= 10) msg += \"- 附加 [封招] (1回合)\";\n    ui.notifications.info(msg);\n    // 记录层数供 hit 提示\n    args.flags.shayiStacks = stacks;\n}",
+                            "script": "// 清除上次动作的消耗记录，确保 hit 阶段读到的是本次消耗\nawait actor.unsetFlag(\"xjzl-system\", \"lastShayiConsumed\");\nconst shayi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shayi\");\nif (shayi) {\n    const stacks = shayi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    let msg = `当前杀意 ${stacks} 层：\\n`;\n    if (stacks >= 4) msg += \"- 附加 [禁疗] (1回合)\\n\";\n    if (stacks >= 8) msg += \"- 触发 [伤残检定]\\n\";\n    if (stacks >= 10) msg += \"- 附加 [封招] (1回合)\";\n    ui.notifications.info(msg);\n}",
                             "active": true
                         },
                         {
                             "label": "效果应用提示",
                             "trigger": "hit",
-                            "script": "const stacks = args.flags.shayiStacks || 0;\nif (stacks >= 4) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <b>血飘人间效果 (${stacks}层)</b><br>\n                ${stacks >= 4 ? \"- 请手动施加 [禁疗]<br>\" : \"\"}\n                ${stacks >= 8 ? \"- 请手动投掷 [伤残检定]<br>\" : \"\"}\n                ${stacks >= 10 ? \"- 请手动施加 [封招]\" : \"\"}\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "// hit 阶段没有 args.flags，从 actor flag 读取 preDamage 阶段记录的本次消耗层数\nconst stacks = actor.getFlag(\"xjzl-system\", \"lastShayiConsumed\") || 0;\nif (stacks >= 4) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <b>血飘人间效果 (${stacks}层)</b><br>\n                ${stacks >= 4 ? \"- 请手动施加 [禁疗]<br>\" : \"\"}\n                ${stacks >= 8 ? \"- 请手动投掷 [伤残检定]<br>\" : \"\"}\n                ${stacks >= 10 ? \"- 请手动施加 [封招]\" : \"\"}\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "杀意",
-                    "icon": "icons/magic/death/skull-energy-light-purple.webp",
-                    "description": "出招时消耗所有层数，每层伤害+5。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "shayi",
-                            "stackable": true,
-                            "maxStacks": 10,
-                            "scripts": [
-                                {
-                                    "label": "杀意释放与返还",
-                                    "trigger": "preDamage",
-                                    "active": true,
-                                    "script": "if ([\"waigong\", \"neigong\"].includes(args.config.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.config.amount += stacks * 5;\n    \n    // 记录消耗的层数到 flags，以便 hit 阶段读取\n    // 由于 preDamage 的 args.flags 不会传给 hit，我们只能通过其他方式传递\n    // 或者，利用 hit 脚本去读取 消耗前 的层数？不行，preDamage 是先执行的。\n    // 方案：preDamage 写入 actor 的临时 flag\n    await actor.setFlag(\"xjzl-system\", \"lastShayiConsumed\", stacks);\n\n    await thisEffect.delete();\n    ui.notifications.info(\"杀意释放：伤害 +\" + (stacks*5));\n}"
-                                },
-                                {
-                                    "label": "击杀返还监听",
-                                    "trigger": "hit",
-                                    "active": true,
-                                    "script": "// 注意：这个脚本挂在 AE 上，但 AE 在 preDamage 阶段可能已经被删除了！\n// 如果 AE 被删除了，这个脚本就不会运行。\n// 因此，返还逻辑必须写在【招式】的 scripts 中，或者 preDamage 暂时不删 AE？\n// 不行，规则是“造成伤害时移除”。\n// 正解：在【招式】里写一个 hit 脚本来处理返还。此处代码仅作逻辑说明，实际不生效。\n// 见下方修正后的通用 Hit 脚本。"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "杀意",
+                "icon": "icons/magic/death/skull-energy-light-purple.webp",
+                "description": "造成内外功伤害时移除所有层数，每层使招式伤害+5。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "shayi",
+                        "stackable": true,
+                        "maxStacks": 10,
+                        "scripts": [
+                            {
+                                "label": "杀意增伤",
+                                "trigger": "preDamage",
+                                "active": true,
+                                "script": "if ([\"waigong\", \"neigong\"].includes(args.config.type)) {\n    const stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.config.amount += stacks * 5;\n\n    // 只记录消耗层数供后续脚本读取，不在此处删除 AE：\n    // preDamage 逐目标执行，范围招式的每个目标都应吃到增伤，删除延迟到 hit_once\n    await actor.setFlag(\"xjzl-system\", \"lastShayiConsumed\", stacks);\n}"
+                            },
+                            {
+                                "label": "动作结束消耗杀意",
+                                "trigger": "hit_once",
+                                "active": true,
+                                "script": "// 本次动作造成过内外功伤害（preDamage 已记录层数）时，动作结束统一移除杀意\nif (args.actionType !== \"attack\") return;\nif (!actor.getFlag(\"xjzl-system\", \"lastShayiConsumed\")) return;\nawait actor.unsetFlag(\"xjzl-system\", \"lastShayiConsumed\");\nawait thisEffect.delete();\nui.notifications.info(\"杀意释放：消耗所有杀意层数\");"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "八方手里剑",
@@ -1015,7 +1054,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>大力劈出手中之剑，贯穿目标。对目标造成自身气血上限 20%的外功伤害（外功命中，可暴击）。</p><p>若目标拥有“奴隶标记”，还会将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "伤害与气血转化自动。奴隶标记击飞提示自动，击飞位移需手动调整棋子。",
                     "calculation": {
                         "isFixed": true,
                         "base": 0,
@@ -1048,61 +1087,61 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "虔诚",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
-                    "description": "天主护佑：速度增加，且下一次出招招式伤害提升。",
-                    "transfer": false,
-                    "duration": {
-                        "rounds": 3
-                    },
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "qiancheng",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "消耗移除",
-                                    "trigger": "hit_once",
-                                    "active": true,
-                                    "script": "if (args.actionType === \"attack\") {\n    await thisEffect.delete();\n    actor.showFloatyText(\"虔诚结束\", {fill: \"#ffffff\"});\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "奴隶标记",
-                    "icon": "icons/svg/degen.svg",
-                    "description": "异教烙印：受到《侍从之剑》《骑誓之剑》《西洋剑法》伤害时，额外承受真实流失伤害。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "slave_mark",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "连携流失伤害",
-                                    "trigger": "damaged",
-                                    "active": true,
-                                    "script": "if (!args.attacker || !args.item) return;\nconst validItems = [\"侍从之剑\", \"骑誓之剑\", \"西洋剑法\"];\n\nif (validItems.includes(args.item.name)) {\n    await actor.applyDamage({\n        amount: 10,\n        type: \"liushi\",\n        attacker: args.attacker, \n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #8b0000; background:rgba(139,0,0,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-tint\"></i> 奴隶标记触发</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">受西洋剑系连击，伤口崩裂，额外流失了 <b>10</b> 点气血。</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "虔诚",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                "description": "天主护佑：速度增加，且下一次出招招式伤害提升。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 3
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qiancheng",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "双生命周期结算",
+                                "trigger": "hit_once",
+                                "active": true,
+                                "script": "// 双生命周期：伤害加成只对下一次出招生效（不论命中）；速度加成持续到真正造成伤害\nif (args.actionType !== \"attack\") return;\nconst dealt = (args.targets || []).some(t => t.isHit && ((t.hpLost ?? 0) + (t.hutiLost ?? 0) + (t.mpLost ?? 0) + (t.tiliLost ?? 0) + (t.damageResult?.tiliLost ?? 0)) > 0);\nif (dealt) {\n    await thisEffect.delete();\n    actor.showFloatyText(\"虔诚结束\", {fill: \"#ffffff\"});\n} else {\n    // 未造成伤害：伤害加成已随本次出招消耗，仅移除伤害修正，保留速度\n    const remain = (thisEffect.changes || []).filter(c => c.key !== \"system.combat.damages.skill.mod\");\n    await thisEffect.update({ changes: remain });\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "奴隶标记",
+                "icon": "icons/svg/degen.svg",
+                "description": "异教烙印：受到《侍从之剑》《骑誓之剑》《西洋剑法》伤害时，额外承受真实流失伤害。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "slave_mark",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "连携流失伤害",
+                                "trigger": "damaged",
+                                "active": true,
+                                "script": "if (!args.attacker || !args.item) return;\nconst validItems = [\"侍从之剑\", \"骑誓之剑\", \"西洋剑法\"];\n\nif (validItems.includes(args.item.name)) {\n    await actor.applyDamage({\n        amount: 10,\n        type: \"liushi\",\n        attacker: args.attacker, \n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left: 3px solid #8b0000; background:rgba(139,0,0,0.1); padding:5px 8px;\"><div style=\"font-weight:bold; color:#8b0000;\"><i class=\"fas fa-tint\"></i> 奴隶标记触发</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">受西洋剑系连击，伤口崩裂，额外流失了 <b>10</b> 点气血。</div></div></div>`;\n    ChatMessage.create({speaker: ChatMessage.getSpeaker({actor: actor}), content: msg});\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "西洋剑法",
@@ -1144,14 +1183,7 @@
                             6
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "标记触发",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        await args.target.applyDamage({\n            amount: 10,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n        ui.notifications.info(\"奴隶标记：额外流失 10 点\");\n    }\n}",
-                            "active": true
-                        }
-                    ]
+                    "scripts": []
                 },
                 {
                     "name": "佯剑",
@@ -1186,12 +1218,6 @@
                             "label": "击破效果",
                             "trigger": "hit",
                             "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    \n    // 获得滑步AE\n    const eff = thisItem.effects.getName(\"滑步\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "标记触发",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        await args.target.applyDamage({\n            amount: 10,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1265,13 +1291,13 @@
                         {
                             "label": "记录使用",
                             "trigger": "hit",
-                            "script": "await actor.setFlag(\"xjzl-system\", \"wuxue_western_combo_flag\", true);",
+                            "script": "// 规则为“曾以绞剑伤敌”，未命中不记录\nif (!args.isHit) return;\nawait actor.setFlag(\"xjzl-system\", \"wuxue_western_combo_flag\", true);",
                             "active": true
                         },
                         {
-                            "label": "标记触发",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        await args.target.applyDamage({\n            amount: 10,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n    }\n}",
+                            "label": "战斗开始重置连携",
+                            "trigger": "combatStart",
+                            "script": "await actor.unsetFlag(\"xjzl-system\", \"wuxue_western_combo_flag\");",
                             "active": true
                         }
                     ]
@@ -1294,7 +1320,7 @@
                         "scalings": [
                             {
                                 "prop": "liliang",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -1316,32 +1342,26 @@
                             "trigger": "preDamage",
                             "script": "const used = actor.getFlag(\"xjzl-system\", \"wuxue_western_combo_flag\");\nif (used) {\n    args.config.type = \"liushi\";\n    args.config.ignoreDefense = true;\n    ui.notifications.info(\"绞剑连携：伤害转化为流失\");\n}",
                             "active": true
-                        },
-                        {
-                            "label": "标记触发",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        await args.target.applyDamage({\n            amount: 10,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n    }\n}",
-                            "active": true
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "滑步",
-                    "icon": "icons/skills/movement/feet-winged-boots-brown.webp",
-                    "description": "可消耗次要动作滑步。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "huabu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "滑步",
+                "icon": "icons/skills/movement/feet-winged-boots-brown.webp",
+                "description": "可消耗次要动作滑步。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huabu",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "骑誓之剑",
@@ -1388,12 +1408,6 @@
                             "label": "无架招击倒",
                             "trigger": "hit",
                             "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n    ui.notifications.info(`${args.target.name} 被击倒`);\n}",
-                            "active": true
-                        },
-                        {
-                            "label": "标记触发",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        await args.target.applyDamage({\n            amount: 10,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1487,12 +1501,6 @@
                             "trigger": "hit",
                             "script": "const eff = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\nif(eff) {\n    const data = foundry.utils.deepClone(eff);\n    data.duration = { rounds: 3 };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
                             "active": true
-                        },
-                        {
-                            "label": "标记触发",
-                            "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const hasMark = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"slave_mark\");\n    if (hasMark) {\n        await args.target.applyDamage({\n            amount: 10,\n            type: \"liushi\",\n            attacker: actor,\n            isHit: true,\n            ignoreDefense: true\n        });\n    }\n}",
-                            "active": true
                         }
                     ]
                 },
@@ -1534,23 +1542,23 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "奇袭",
-                    "icon": "icons/skills/melee/strike-dagger-white-orange.webp",
-                    "description": "移除可施展实招。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "qixi",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "奇袭",
+                "icon": "icons/skills/melee/strike-dagger-white-orange.webp",
+                "description": "移除可施展实招。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qixi",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "提气再战",
@@ -1577,12 +1585,12 @@
                     "description": "<p>释放精力，回复气血。</p>",
                     "automationNote": "治疗量计算自动。次数限制手动。",
                     "calculation": {
-                        "base": 0,
+                        "base": 5,
                         "growth": 5,
                         "scalings": [
                             {
                                 "prop": "renxing",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -1622,7 +1630,7 @@
                     "description": "<p>回复气血并获得“祝福”，持续一日。</p>",
                     "automationNote": "治疗自动。祝福BUFF自动。祝福效果手动。",
                     "calculation": {
-                        "base": 0,
+                        "base": 10,
                         "growth": 10
                     },
                     "costs": {
@@ -1647,23 +1655,23 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "祝福",
-                    "icon": "icons/magic/life/cross-yellow-green.webp",
-                    "description": "攻击被闪避后可移除此BUFF强制命中(不暴击)。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "zhufu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "祝福",
+                "icon": "icons/magic/life/cross-yellow-green.webp",
+                "description": "攻击被闪避后可移除此BUFF强制命中(不暴击)。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "zhufu",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "天神庇护",
@@ -1715,30 +1723,30 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "庇护",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "受到>30伤害时化为1点并移除。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "bihu",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "庇护触发",
-                                    "trigger": "preTake",
-                                    "active": true,
-                                    "script": "if (args.calcDamage > 30) {\n    const originalDamage = args.calcDamage;\n    args.output.damage = 1;\n    await thisEffect.delete();\n    \n    const cardContent = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; border-left:4px solid #f1c40f; background:rgba(241, 196, 15, 0.1); margin-left: 2px;\">\n            <div style=\"font-weight:bold; color:#d35400; font-size:1.1em;\">\n                <i class=\"fas fa-shield-alt\"></i> 天神庇护触发！\n            </div>\n            <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                神圣的力量化解了致命的攻击。<br>\n                即将受到的 <span style=\"text-decoration:line-through; color:#999;\">${originalDamage}</span> 点伤害被化为 <span style=\"font-weight:bold; color:red;\">1</span> 点！\n            </div>\n        </div>\n    </div>`;\n    \n    ChatMessage.create({\n        content: cardContent,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "庇护",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "受到>30伤害时化为1点并移除。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "bihu",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "庇护触发",
+                                "trigger": "preTake",
+                                "active": true,
+                                "script": "if (args.calcDamage > 30) {\n    const originalDamage = args.calcDamage;\n    args.output.damage = 1;\n    await thisEffect.delete();\n    \n    const cardContent = `\n    <div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; border-left:4px solid #f1c40f; background:rgba(241, 196, 15, 0.1); margin-left: 2px;\">\n            <div style=\"font-weight:bold; color:#d35400; font-size:1.1em;\">\n                <i class=\"fas fa-shield-alt\"></i> 天神庇护触发！\n            </div>\n            <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                神圣的力量化解了致命的攻击。<br>\n                即将受到的 <span style=\"text-decoration:line-through; color:#999;\">${originalDamage}</span> 点伤害被化为 <span style=\"font-weight:bold; color:red;\">1</span> 点！\n            </div>\n        </div>\n    </div>`;\n    \n    ChatMessage.create({\n        content: cardContent,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            }
+        ]
     }
 ]
