@@ -2081,6 +2081,10 @@ export class ChatCardManager {
                 damageType: flags.damageType,//  伤害类型 (waigong, neigong 等)
                 type: flags.damageType,//  伤害类型，与防御端保持统一
                 element: moveElement,//  招式的属性 (taiji, yin, yang 等)
+                // 与自动结算的 hit 上下文保持同构，动作分类标记脚本才能统一判断
+                isAttack: true,
+                isHeal: false,
+                isBuff: false,
                 isManual: true // 给脚本一个标记，万一脚本需要区分
             };
             await attacker.runScripts(SCRIPT_TRIGGERS.HIT, hitContext, move);
@@ -2115,6 +2119,7 @@ export class ChatCardManager {
             damageType: flags.damageType,//  伤害类型 (waigong, neigong 等)
             type: flags.damageType,//  伤害类型，与防御端保持统一
             element: moveElement,//  招式的属性 (taiji, yin, yang 等)
+            hasCrit: summary.some(t => t.isCrit), // 与自动结算对齐：本次动作是否有任一目标暴击
             isManual: true
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
