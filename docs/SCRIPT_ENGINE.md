@@ -435,7 +435,7 @@ await actor.applyHealing({
 | `finalDamage` | `number` | 条件提供 | 进入目标资源分配前的最终伤害。 |
 | `isDying` / `isDead` | `boolean` | 条件提供 | 本次结算是否使目标进入濒死或死亡。 |
 | `damageResult` | `Object` | 只读 | `applyDamage()` 返回的原始结果对象。 |
-| `isAttack` / `isHeal` / `isBuff` | `boolean` | 条件提供 | 自动攻击结算会提供 `true/false/false`。 |
+| `isAttack` / `isHeal` / `isBuff` | `boolean` | 条件提供 | 攻击结算（自动与手动）提供 `true/false/false`。 |
 | `isManual` | `boolean` | 条件提供 | 自动结算为 `false`，手动结算为 `true`。 |
 
 **治疗/Buff 额外提供：**
@@ -464,7 +464,7 @@ await actor.applyHealing({
 | `damageType` / `type` | `string` | 只读 | 攻击保留原始伤害类型；治疗/Buff 为 `none`。 |
 | `element` | `string` | 只读 | 招式原始属性。 |
 | `baseDamage` | `number` | 条件提供 | 攻击的面板伤害。 |
-| `hasCrit` | `boolean` | 条件提供 | 自动攻击中是否至少有一个目标被判定为暴击。 |
+| `hasCrit` | `boolean` | 条件提供 | 攻击中是否至少有一个目标被判定为暴击（自动与手动结算均提供）。 |
 | `totalHealAmount` | `number` | 条件提供 | 治疗/Buff 的总实际治疗量。 |
 | `isHeal` | `boolean` | 条件提供 | 治疗为 `true`，Buff 为 `false`。 |
 | `costConsumed` | `Object` | 条件提供 | 自动攻击和治疗/Buff 的实际消耗。 |
