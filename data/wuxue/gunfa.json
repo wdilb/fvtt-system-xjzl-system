@@ -148,13 +148,13 @@
                         {
                             "label": "撑山爆发",
                             "trigger": "attack",
-                            "script": "const chengshan = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengshan\");\nif (chengshan) {\n    const stacks = chengshan.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 10;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 撑山(${stacks}层): ${bonus}`;\n    await chengshan.delete();\n    ui.notifications.info(\"撑山效果已移除\");\n}",
+                            "script": "const chengshan = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengshan\");\nif (chengshan) {\n    const stacks = chengshan.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const bonus = stacks * 10;\n    args.flags.damageResult.damage += bonus;\n    args.flags.damageResult.breakdown += `\\n+ 撑山(${stacks}层): ${bonus}`;\n    await game.xjzl.api.effects.removeEffect(actor, \"chengshan\", 99);\n    ui.notifications.info(\"撑山效果已移除\");\n}",
                             "active": true
                         },
                         {
                             "label": "击倒提示",
                             "trigger": "hit",
-                            "script": "if (args.damageResult.baseDamage > 0 && args.isHit) {\n    ui.notifications.info(\"若消耗了重物，请手动将目标 [击倒]\");\n}",
+                            "script": "if (args.isHit) {\n    ui.notifications.info(\"若消耗了重物，请手动将目标 [击倒]\");\n}",
                             "active": true
                         }
                     ]
@@ -236,7 +236,7 @@
                         {
                             "label": "留情叠加",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const target = args.target;\n    const existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"liuqing\");\n    const currentStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\n    if (currentStacks >= 2) {\n        if (existing) await existing.delete();\n        const rootEff = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if (rootEff) {\n            const data = foundry.utils.deepClone(rootEff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(target, data);\n            ui.notifications.info(`${target.name} 留情满层，转化为 [禁足]`);\n        }\n    } else {\n        const eff = thisItem.effects.getName(\"留情\").toObject();\n        await game.xjzl.api.effects.addEffect(target, eff);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const target = args.target;\n    const existing = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"liuqing\");\n    const currentStacks = existing ? (existing.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\n    if (currentStacks >= 2) {\n        await game.xjzl.api.effects.removeEffect(target, \"liuqing\", 99);\n        const rootEff = CONFIG.statusEffects.find(e => e.id === \"root\");\n        if (rootEff) {\n            const data = foundry.utils.deepClone(rootEff);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(target, data);\n            ui.notifications.info(`${target.name} 留情满层，转化为 [禁足]`);\n        }\n    } else {\n        const eff = thisItem.effects.getName(\"留情\").toObject();\n        await game.xjzl.api.effects.addEffect(target, eff);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -509,7 +509,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>击向目标颈部，造成伤害。</p><p>·每消耗一层莲花真气，击飞目标 1 米。</p><p>·当你被击破架招时，可消耗反应动作释放此招。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
-                    "automationNote": "消耗真气击飞弹窗询问。反应施展手动。",
+                    "automationNote": "消耗真气击飞弹窗询问（可自选层数）。反应施展手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -536,7 +536,7 @@
                         {
                             "label": "消耗真气",
                             "trigger": "attack",
-                            "script": "const zhenqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lianhuazhenqi\");\nif (zhenqi) {\n    const stacks = zhenqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"七寸打蛇\" },\n        content: `<p>当前有 ${stacks} 层莲花真气。</p><p>是否全部消耗以击飞目标？</p>`,\n        yes: { label: \"消耗\" },\n        no: { label: \"不消耗\" }\n    });\n    if (confirm) {\n        await zhenqi.delete();\n        ui.notifications.info(`已消耗 ${stacks} 层真气，请手动击飞目标 ${stacks} 米`);\n    }\n}",
+                            "script": "const zhenqi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"lianhuazhenqi\");\nif (zhenqi) {\n    const stacks = zhenqi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    const num = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"七寸打蛇\" },\n        content: `<p>当前有 ${stacks} 层莲花真气。</p><p>消耗多少层？（每消耗一层击飞目标 1 米）</p><input type=\"number\" name=\"layers\" value=\"${stacks}\" min=\"0\" max=\"${stacks}\">`,\n    ok: { label: \"确定\", callback: (e, b) => parseInt(b.form.elements.layers.value) || 0 }\n    });\n    const use = Math.min(Math.max(0, Number(num) || 0), stacks);\n    if (use > 0) {\n        await game.xjzl.api.effects.removeEffect(actor, \"lianhuazhenqi\", use);\n        ui.notifications.info(`已消耗 ${use} 层真气，请手动击飞目标 ${use} 米`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -551,7 +551,8 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "toushiwenlu",
-                            "stackable": false
+                            "stackable": false,
+                            "tiedToStance": true
                         }
                     },
                     "changes": [
@@ -628,7 +629,7 @@
                         {
                             "label": "效果应用",
                             "trigger": "hit",
-                            "script": "const hq = thisItem.effects.getName(\"黄泉气\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, hq);\n\nif (args.isBroken) {\n    const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (unstable) {\n        const data = foundry.utils.deepClone(unstable);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "if (args.isHit) {\n    const hq = thisItem.effects.getName(\"黄泉气\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, hq);\n\n    if (args.isBroken) {\n        const unstable = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n        if (unstable) {\n            const data = foundry.utils.deepClone(unstable);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -659,7 +660,7 @@
                         {
                             "label": "被破获气",
                             "trigger": "damaged",
-                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const stacks = 1 + (lvl - 1);\n    const hq = thisItem.effects.getName(\"黄泉气\").toObject();\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(actor, hq);\n    }\n    ui.notifications.info(`架招被破，获得 ${stacks} 层黄泉气`);\n}",
+                            "script": "if (args.isBroken) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const stacks = 1 + (lvl - 1);\n    const hq = thisItem.effects.getName(\"黄泉气\").toObject();\n    for(let i=0; i<stacks; i++) {\n        await game.xjzl.api.effects.addEffect(actor, hq);\n    }\n    ui.notifications.info(`架招被破，获得 ${stacks} 层黄泉气`);\n}",
                             "active": true
                         }
                     ]
@@ -1431,7 +1432,7 @@
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>咆哮大喝，与范围内所有敌人进行一次[定力]对抗，若敌人失败，则为其添加状态“畏惧”，持续@{1 + @up|一}回合。</p><p><strong>畏惧：</strong>你无法对给你添加此状态的目标进行普通攻击。你被他攻击时，内外功防御归零。</p><p><strong>升级：</strong>持续回合数+1，[定力]对抗结果+2，内力消耗+4。</p>",
-                    "automationNote": "对抗请求自动。畏惧状态自动（需物品内有对应AE）。",
+                    "automationNote": "对抗与施加畏惧自动；畏惧的『被来源攻击时无视防御』已自动化，『无法对施加者进行普通攻击』需手动裁定。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1452,7 +1453,7 @@
                         {
                             "label": "发起对抗",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 尝试获取物品内的特效，如果没有则只显示文本\nconst fearEffect = thisItem.effects.getName(\"畏惧\");\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"dingli\",\n    defType: \"dingli\",\n    label: \"万夫莫敌 - 定力对抗\",\n    outcome: {\n        win: {\n            text: \"目标心生畏惧！\",\n            targetEffect: fearEffect ? fearEffect.toObject() : null\n        },\n        lose: {\n            text: \"目标意志坚定，不受影响。\"\n        }\n    }\n});",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\n// 升级：持续回合数+1、[定力]对抗结果+2；设置 origin 供 AE 的 preDefense 脚本识别施加者\nconst fearEffect = thisItem.effects.getName(\"畏惧\");\nlet fearData = null;\nif (fearEffect) {\n    fearData = fearEffect.toObject();\n    fearData.origin = thisItem.uuid;\n    fearData.duration = { rounds: 1 + (lvl - 1) };\n}\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"dingli\",\n    defType: \"dingli\",\n    label: \"万夫莫敌 - 定力对抗\",\n    attBonus: (lvl - 1) * 2,\n    outcome: {\n        win: {\n            text: \"目标心生畏惧！\",\n            targetEffect: fearData\n        },\n        lose: {\n            text: \"目标意志坚定，不受影响。\"\n        }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -1750,13 +1751,13 @@
                         {
                             "label": "远程减伤",
                             "trigger": "preTake",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nif (t1 && t2) {\n    const dist = canvas.grid.measureDistance(t1.center, t2.center);\n    if (dist > 3) {\n        args.output.damage = Math.max(0, args.output.damage - 5);\n        ui.notifications.info(\"水泼不进：远程减伤 5\");\n    }\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nif (t1 && t2) {\n    const dist = canvas.grid.measurePath([t1.center, t2.center]).distance;\n    if (dist > 3) {\n        args.output.damage = Math.max(0, args.output.damage - 5);\n        ui.notifications.info(\"水泼不进：远程减伤 5\");\n    }\n}",
                             "active": true
                         },
                         {
                             "label": "近战击退",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nif (t1 && t2) {\n    const dist = canvas.grid.measureDistance(t1.center, t2.center);\n    if (dist <= 3) {\n        ui.notifications.info(\"水泼不进：请手动 [击退目标] 并 [后退]\");\n    }\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst t1 = actor.token?.object || actor.getActiveTokens()[0];\nconst t2 = args.attacker.token?.object || args.attacker.getActiveTokens()[0];\nif (t1 && t2) {\n    const dist = canvas.grid.measurePath([t1.center, t2.center]).distance;\n    if (dist <= 3) {\n        ui.notifications.info(\"水泼不进：请手动 [击退目标] 并 [后退]\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1828,16 +1829,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "倒地易暴",
-                            "trigger": "attack",
-                            "script": "const isProne = args.attacker.targets.first()?.actor?.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\");\nif (isProne) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonus = 1 + (lvl - 1);\n    args.flags.critThresholdMod += bonus;\n}",
-                            "active": true
-                        },
-                        {
                             "label": "击倒提示",
                             "trigger": "hit",
                             "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    ui.notifications.info(`${args.target.name} 被击倒`);\n}",
                             "active": true
+                        },
+                        {
+                            "label": "倒地易暴",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "// 仅针对当前目标判断倒地状态（check 阶段才有 args.target）\nconst isProne = args.target?.effects?.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\");\nif (isProne) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    args.flags.critThresholdMod += lvl;\n}"
                         }
                     ]
                 },
@@ -1879,7 +1880,7 @@
                         {
                             "label": "获波返",
                             "trigger": "hit",
-                            "script": "const isProne = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\");\nif (isProne) {\n    ui.notifications.info(`${args.target.name} 被击飞`);\n    const eff = thisItem.effects.getName(\"波返\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (!args.isHit) return;\nconst isProne = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"prone\");\nif (isProne) {\n    ui.notifications.info(`${args.target.name} 被击飞`);\n    const eff = thisItem.effects.getName(\"波返\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ]
@@ -2250,7 +2251,7 @@
                         {
                             "label": "获风",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"疾风\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"疾风\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -2297,7 +2298,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>击飞周围敌人 1 米，再跃至半空中进行多次攻击，消耗全部“疾风”，每消耗一层，对范围内所有敌人造成一次伤害。</p><p>·每次造成伤害都需要对方投掷一次残疾检定。</p><p><strong>升级：</strong>每次招式伤害+20，怒气-1，消耗+8。</p>",
-                    "automationNote": "伤害计算自动。残疾检定提示。",
+                    "automationNote": "多层伤害自动（每层独立结算，各跳伤害与首跳完全一致）。击飞手动。残疾检定发送汇总卡片，检定手动执行。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -2322,22 +2323,28 @@
                     },
                     "scripts": [
                         {
-                            "label": "消耗疾风",
+                            "label": "无疾风零伤",
                             "trigger": "calc",
-                            "script": "const eff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jifeng\");\nconst stacks = eff ? (eff.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\n// 伤害 = 基础 * 层数\n// 这里的 base 已经是 growth 后的单次伤害\n// 脚本修改总伤害\nif (stacks > 0) {\n    args.output.damage = args.output.damage * stacks;\n    args.output.bonusDesc.push(`疾风爆发 (${stacks}层): x${stacks} 倍率`);\n} else {\n    args.output.damage = 0;\n    args.output.bonusDesc.push(\"无疾风层数，伤害为0\");\n}",
+                            "script": "// 规则：每消耗一层疾风造成一次伤害，无层数则本招无伤害\nconst jifeng = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jifeng\");\nconst stacks = jifeng ? (jifeng.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks <= 0) {\n    args.output.damage = 0;\n    args.output.bonusDesc.push(\"无疾风层数，无伤害\");\n}",
                             "active": true
                         },
                         {
-                            "label": "清理层数",
-                            "trigger": "attack",
-                            "script": "const eff = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jifeng\");\nif (eff) await eff.delete();",
-                            "active": true
-                        },
-                        {
-                            "label": "残疾检定",
+                            "label": "疾风连击",
                             "trigger": "hit",
-                            "script": "if (args.isHit && args.finalDamage > 0) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\">请 ${args.target.name} 进行 <b>残疾检定</b></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "if (!args.isHit) return;\nconst cfg = actor.getFlag(\"xjzl-system\", \"bifeng_last_hit\");\nif (!cfg || !(cfg.amount > 0)) return;\nconst jifeng = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jifeng\");\nconst stacks = jifeng ? (jifeng.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks <= 1) return;\n\n// 每层疾风独立造成一次伤害：额外跳复用首跳经过 preDamage 全部修改后的输入配置\n// （士气等一次性攻击侧加成已固化在其中），防御、抗性、护体由每次伤害独立正常结算。\nconst extra = stacks - 1;\nfor (let i = 0; i < extra; i++) {\n    await args.target.applyDamage({\n        amount: cfg.amount,\n        type: cfg.type,\n        element: cfg.element,\n        attacker: actor,\n        isHit: true,\n        isCrit: cfg.isCrit,\n        isBroken: cfg.isBroken,\n        applyCritDamage: cfg.applyCritDamage,\n        ignoreBlock: cfg.ignoreBlock,\n        ignoreDefense: cfg.ignoreDefense,\n        ignoreStance: cfg.ignoreStance,\n        ignoreMinDamage: cfg.ignoreMinDamage,\n        item: args.item ?? null,\n        move: args.move ?? null,\n        source: \"move\"\n    });\n}",
                             "active": true
+                        },
+                        {
+                            "label": "汇总检定与清层",
+                            "trigger": "hit_once",
+                            "active": true,
+                            "script": "// 汇总提示：每层疾风对每个命中目标各造成一次伤害，每次伤害需一次残疾检定\nconst jifeng = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jifeng\");\nconst stacks = jifeng ? (jifeng.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nconst hits = args.hitCount || 0;\nif (hits > 0 && stacks > 0) {\n    const total = hits * stacks;\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\">碧峰倒转（${stacks} 层疾风）命中 ${hits} 个目标，共 ${total} 次伤害，请各目标分别进行共 <b>${total}</b> 次残疾检定。</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}\n// 消耗全部疾风\nif (jifeng) await game.xjzl.api.effects.removeEffect(actor, \"jifeng\", 99);\n// 清理首跳配置快照\nawait actor.unsetFlag(\"xjzl-system\", \"bifeng_last_hit\");"
+                        },
+                        {
+                            "label": "存首跳配置",
+                            "trigger": "preDamage",
+                            "active": true,
+                            "script": "// 首跳输入配置（含 preDamage 对数值/类型/穿透/暴击的全部修改）存入临时 flag，\n// 供 hit 补算的额外跳逐跳复用，hit_once 统一清理。多目标串行结算时逐目标覆盖，\n// hit 读到的必然是当前目标的配置。\nawait actor.setFlag(\"xjzl-system\", \"bifeng_last_hit\", {\n    amount: args.config.amount,\n    type: args.config.type,\n    element: args.config.element,\n    isCrit: args.outcome.isCrit === true,\n    isBroken: args.outcome.isBroken === true,\n    applyCritDamage: args.config.applyCritDamage !== false,\n    ignoreBlock: args.config.ignoreBlock === true,\n    ignoreDefense: args.config.ignoreDefense === true,\n    ignoreStance: args.config.ignoreStance === true,\n    ignoreMinDamage: args.config.ignoreMinDamage === true\n});"
                         }
                     ]
                 }
@@ -2508,8 +2515,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
-                    "description": "<p>若气血不足则无法释放，主要动作，心癫目赤，获得 3 怒气，然后将自身气血内力恢复到满值，坠入“疯魔”状态，持续五回合。</p><p><strong>疯魔：</strong>《疯魔杖法》招式伤害+10。持续期间，你受到的伤害和消耗的内力变为原来的三倍，且无法开启架招，即格挡值归零。</p><p>·疯魔结束时，你的怒气归零。</p><p>·疯魔期间陷入濒死，直接进行死亡检定。</p><p>·疯魔持续期间，你无法重复释放【疯魔入体】。</p><p><strong>升级：</strong>疯魔期间受到的伤害和内力消耗减少 50%。</p>",
-                    "automationNote": "完全自动化。疯魔结束后的怒气归零和陷入濒死时的死亡检定需手动处理。",
+                    "description": "<p>消耗最大气血的 30%。若气血不足则无法释放，主要动作，心癫目赤，获得 3 怒气，然后将自身气血内力恢复到满值，坠入“疯魔”状态，持续五回合。</p><p><strong>疯魔：</strong>《疯魔杖法》招式伤害+10。持续期间，你受到的伤害和消耗的内力变为原来的三倍，且无法开启架招，即格挡值归零。</p><p>·疯魔结束时，你的怒气归零。</p><p>·疯魔期间陷入濒死，直接进行死亡检定。</p><p>·疯魔持续期间，你无法重复释放【疯魔入体】。</p><p><strong>升级：</strong>疯魔期间受到的伤害和内力消耗减少 50%。</p>",
+                    "automationNote": "自动：扣血、回满气血内力、获得怒气、施加疯魔与重复释放拦截。手动：疯魔结束后的怒气归零、疯魔期间陷入濒死时的死亡检定。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2575,7 +2582,13 @@
                             "label": "疯意击飞",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const hasFengyi = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyi\");\nif (args.flags.usedFengyi || hasFengyi) {\n    if (args.hitCount > 0) {\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c0392b; font-weight:bold; background:rgba(192,57,43,0.1); border-left:4px solid #c0392b;\"><i class=\"fas fa-meteor\"></i> 疯意爆发，力量磅礴倾泻，将所有命中的敌人击飞！</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
+                            "script": "// 判定依据：出招时(attack 阶段)是否具有疯意——即使该层随后被消耗也算\nconst hadFengyi = actor.getFlag(\"xjzl-system\", \"fengyi_at_cast\") === true;\nawait actor.unsetFlag(\"xjzl-system\", \"fengyi_at_cast\");\nif (hadFengyi && args.hitCount > 0) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; color:#c0392b; font-weight:bold; background:rgba(192,57,43,0.1); border-left:4px solid #c0392b;\"><i class=\"fas fa-meteor\"></i> 疯意爆发，力量磅礴倾泻，将所有命中的敌人击飞！</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}"
+                        },
+                        {
+                            "label": "记录疯意状态",
+                            "trigger": "attack",
+                            "active": true,
+                            "script": "// 招式脚本先于 AE 脚本执行，此处快照的是疯意被消耗决策处理前的状态；\n// 出招与应用伤害可能不在同一客户端，故持久化到 flag 供 hit_once 跨阶段读取\nconst hasFengyi = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyi\");\nif (hasFengyi) {\n    await actor.setFlag(\"xjzl-system\", \"fengyi_at_cast\", true);\n} else {\n    await actor.unsetFlag(\"xjzl-system\", \"fengyi_at_cast\");\n}"
                         }
                     ]
                 }
@@ -3152,7 +3165,7 @@
                         {
                             "label": "施加太岁",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"太岁当值\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.duration = { rounds: 1 + (lvl - 1) };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"太岁当值\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.duration = { rounds: 1 + (lvl - 1) };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
                         }
                     ]
@@ -3213,21 +3226,15 @@
                                     "script": "const hasShenda = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenda\");\nif (!hasShenda) {\n    args.flags.level -= 1;\n    args.flags.feintLevel -= 1;\n}"
                                 },
                                 {
-                                    "label": "属性检定劣势",
-                                    "trigger": "check",
+                                    "label": "检定劣势施加",
+                                    "trigger": "passive",
                                     "active": true,
-                                    "script": "const hasShenda = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenda\");\nif (!hasShenda) {\n    args.flags.level -= 1;\n}"
+                                    "script": "// [神打]：无视太岁当值的效果——有神打时不施加属性/技能检定劣势\nconst hasShenda = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"shenda\");\nif (!hasShenda) {\n    actor.xjzlStatuses.globalCheckLevel -= 1;\n}"
                                 }
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "flags.xjzl-system.globalCheckLevel",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
+                    "changes": []
                 },
                 {
                     "name": "神打",
@@ -3436,7 +3443,7 @@
                         {
                             "label": "消耗五雷",
                             "trigger": "hit",
-                            "script": "const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\nif (wulei) {\n    const stacks = wulei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await wulei.delete();\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding: 5px 10px;\"><b>${args.target.name}</b> 身上的 [五雷] 被引爆！<br>贡献层数: <b>${stacks}</b> (伤害+${stacks*10})</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "const wulei = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wulei\");\nif (wulei) {\n    const stacks = wulei.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    await game.xjzl.api.effects.removeEffect(args.target, \"wulei\", 99);\n    // 升级：雷云的流失系数+10，按招式等级计算后提示 GM\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const coef = 10 + (lvl - 1) * 10;\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding: 5px 10px;\"><b>${args.target.name}</b> 身上的 [五雷] 被引爆！<br>贡献层数: <b>${stacks}</b> (流失系数 ${coef}，该目标贡献 ${stacks * coef} 点雷云流失)</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}",
                             "active": true
                         }
                     ]
@@ -3647,7 +3654,7 @@
                         "scalings": [
                             {
                                 "prop": "liliang",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -3993,7 +4000,7 @@
                         {
                             "label": "延迟伤害",
                             "trigger": "preTake",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 弹出确认\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"据险坚守\" },\n    content: `<p>是否解除架招，将本次 <b>${args.output.damage}</b> 点伤害延迟到下回合？</p>`,\n    yes: { label: \"延迟伤害\", icon: \"fas fa-shield-alt\" },\n    no: { label: \"正常承受\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    // 1. 免疫本次伤害\n    const storedDmg = args.output.damage;\n    args.output.damage = 0;\n    \n    // 2. 解除架招\n    await actor.stopStance();\n    \n    // 3. 施加延迟流血AE\n    const delayEff = {\n        name: \"延迟伤害 (据险坚守)\",\n        icon: \"icons/svg/blood.svg\",\n        duration: { rounds: 1 },\n        flags: {\n            \"xjzl-system\": {\n                slug: \"delayed_pain\",\n                stackable: true,\n                regenHpTurnStart: -storedDmg\n            }\n        }\n    };\n    \n    await game.xjzl.api.effects.addEffect(actor, delayEff);\n    ui.notifications.info(`伤害已延迟！下回合开始将流失 ${storedDmg} 气血。`);\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"据险坚守\" },\n    content: `<p>是否解除架招，将本次 <b>${args.output.damage}</b> 点伤害延迟到下回合？</p>`,\n    yes: { label: \"延迟伤害\", icon: \"fas fa-shield-alt\" },\n    no: { label: \"正常承受\", icon: \"fas fa-times\" }\n});\n\nif (confirm && args.output.damage > 0) {\n    // 1. 免疫本次伤害\n    const storedDmg = args.output.damage;\n    args.output.damage = 0;\n\n    // 2. 解除架招\n    await actor.stopStance();\n\n    // 3. 施加延迟伤害 AE：不设 duration，由 AE 自身的 turnStart 脚本在下一次回合开始时\n    //    结算并自毁。之所以不用 regenHpTurnStart changes + rounds:1，是因为回合切换时 AE\n    //    可能先于回合开始脚本过期，导致延迟伤害丢失；每次延迟独立成条（slug 加随机后缀），\n    //    避免同 slug 叠加时互相覆盖数值。\n    const delayEff = {\n        name: \"延迟伤害 (据险坚守)\",\n        icon: \"icons/svg/blood.svg\",\n        flags: {\n            \"xjzl-system\": {\n                slug: \"delayed_pain_\" + foundry.utils.randomID().toLowerCase(),\n                delayedValue: storedDmg,\n                scripts: [\n                    {\n                        label: \"延迟伤害结算\",\n                        trigger: \"turnStart\",\n                        active: true,\n                        script: \"const dmg = Math.abs(Number(thisEffect.getFlag(\\\"xjzl-system\\\", \\\"delayedValue\\\")) || 0);\\nif (dmg > 0) {\\n    await actor.applyHealing({ healer: actor, amount: -dmg, type: \\\"hp\\\", showScrolling: true });\\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({ actor: actor }), content: `<div class=\\\"xjzl-chat-card\\\" style=\\\"padding:4px 8px; border-left:3px solid #c0392b; margin-left:4px;\\\"><b>据险坚守</b>：延迟的 ${dmg} 点伤害于回合开始结算。</div>` });\\n}\\nawait thisEffect.delete();\"\n                    }\n                ]\n            }\n        }\n    };\n\n    await game.xjzl.api.effects.addEffect(actor, delayEff);\n    ui.notifications.info(`伤害已延迟！下回合开始将流失 ${storedDmg} 气血。`);\n}",
                             "active": true
                         }
                     ]
@@ -4073,7 +4080,7 @@
                         {
                             "label": "消耗提示",
                             "trigger": "hit",
-                            "script": "const bingsha = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bingsha\");\nif (bingsha) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const loss = 20 + (lvl - 1) * 10;\n    \n    // 这里不自动消耗，因为是“可以选择”\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"此志无双\" },\n        content: `<p>是否消耗 [兵煞] 使目标流失 ${loss} 点气血/内力？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-bolt\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await bingsha.delete();\n        await args.target.applyHealing({ healer: actor, amount: -loss, type: \"hp\", showScrolling: true});\n        await args.target.applyHealing({ healer: actor, amount: -loss, type: \"mp\", showScrolling: true});\n    }\n}",
+                            "script": "if (!args.isHit) return;\nconst bingsha = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bingsha\");\nif (bingsha) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const loss = 20 + (lvl - 1) * 10;\n    \n    // 这里不自动消耗，因为是“可以选择”\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"此志无双\" },\n        content: `<p>是否消耗 [兵煞] 使目标流失 ${loss} 点气血/内力？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-bolt\" },\n        no: { label: \"保留\", icon: \"fas fa-times\" }\n    });\n    \n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"bingsha\", 1);\n        await args.target.applyHealing({ healer: actor, amount: -loss, type: \"hp\", showScrolling: true});\n        await args.target.applyHealing({ healer: actor, amount: -loss, type: \"mp\", showScrolling: true});\n    }\n}",
                             "active": true
                         }
                     ]
@@ -4169,7 +4176,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>次要动作，逆转经脉，激发自身潜能，下次招式伤害提升【消耗的气血一半】的数值。</p><p><strong>升级：</strong>消耗气血增加 10%，怒气消耗+1。</p>",
+                    "description": "<p>次要动作，逆转经脉，激发自身潜能，消耗 @{10 * @level|10}% 最大气血，下次招式伤害提升【消耗的气血一半】的数值。</p><p><strong>升级：</strong>消耗气血增加 10%，怒气消耗+1。</p>",
                     "automationNote": "扣血及获BUFF自动。",
                     "calculation": {
                         "base": 0,
@@ -4285,7 +4292,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招时，可消耗反应动作使用此招，压制对方虚招，恶露宝相，凌空而袭，造成伤害。</p><p>可移除自身存在的“新佛”，给对方添加“旧魔”，持续到战斗脱离。</p><p><strong>升级:</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "状态转化手动。",
+                    "automationNote": "弹窗选择后自动移除[新佛]并施加[旧魔]。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4308,7 +4315,7 @@
                         {
                             "label": "状态转化",
                             "trigger": "hit",
-                            "script": "const xinfo = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xinfo\");\nif (xinfo) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"血海弥勒\" },\n        content: `<p>是否移除 [新佛] 给对方施加 [旧魔]？</p>`,\n        yes: { label: \"执行\", icon: \"fas fa-skull\" },\n        no: { label: \"取消\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await xinfo.delete();\n        \n        const eff = thisItem.effects.getName(\"旧魔\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        const fofa = args.target.system.arts?.fofa?.total || 0;\n        eff.changes[0].value = String(-fofa);\n        \n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
+                            "script": "if (!args.isHit) return;\nconst xinfo = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xinfo\");\nif (xinfo) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"血海弥勒\" },\n        content: `<p>是否移除 [新佛] 给对方施加 [旧魔]？</p>`,\n        yes: { label: \"执行\", icon: \"fas fa-skull\" },\n        no: { label: \"取消\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"xinfo\", 1);\n        \n        const eff = thisItem.effects.getName(\"旧魔\").toObject();\n        delete eff._id;\n        eff.origin = thisItem.uuid;\n        const fofa = args.target.system.arts?.fofa?.total || 0;\n        eff.changes[0].value = String(-fofa);\n        \n        await game.xjzl.api.effects.addEffect(args.target, eff);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -4331,7 +4338,7 @@
                         "scalings": [
                             {
                                 "prop": "liliang",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -4406,12 +4413,6 @@
                             "slug": "randeng",
                             "stackable": false,
                             "scripts": [
-                                {
-                                    "label": "消耗BUFF增伤",
-                                    "trigger": "calc",
-                                    "active": true,
-                                    "script": "// calc 阶段预览\nconst bonus = Number(thisEffect.changes[0].value) || 0;\nargs.output.damage += bonus;\nargs.output.bonusDesc.push(`燃灯加成 +${bonus}`);"
-                                },
                                 {
                                     "label": "移除BUFF",
                                     "trigger": "hit_once",
@@ -4489,7 +4490,7 @@
                         {
                             "label": "格挡-霸王",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\n// 获取AE模板\nconst eff = thisItem.effects.getName(\"霸王\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 默认每次格挡加1层\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(`格挡成功！霸王意气叠加。`);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst eff = thisItem.effects.getName(\"霸王\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\n// 每次格挡获得1层；升级（2级起）额外获得一层\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gain = lvl >= 2 ? 2 : 1;\nawait game.xjzl.api.effects.addEffect(actor, eff, gain);\nui.notifications.info(`格挡成功！霸王意气叠加 (+${gain} 层)。`);",
                             "active": true
                         }
                     ]
@@ -4794,7 +4795,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，以内功展开道道真气，身形如披风云，飘忽不定，开启架招。格挡成功后，获得一层“披风”，可无限叠加，持续到脱战或解除架招。</p><p><strong>披风：</strong>每层使你闪避+5。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
-                    "automationNote": "扣血自动。格挡叠层自动。",
+                    "automationNote": "扣血自动。格挡叠层自动。 修炼合一此招后需手动将气血上限-50。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -4832,7 +4833,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，杖如山呼海啸，在范围内击出道道虚影，对面前 3*3 米内的敌人造成 0.7 内息点内功伤害。</p><p>·你每有一层“披风”，击飞目标 1 米。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
-                    "automationNote": "击飞距离提示自动，位移手动。",
+                    "automationNote": "击飞距离提示自动，位移手动。 修炼合一此招后需手动将气血上限-50。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4876,7 +4877,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，杖带疾风，闪至目标身前，直刺目标，对目标造成 0.7 内息点内功伤害，若击破目标架招，使目标陷入“禁足”“封招”，持续一回合。</p><p>·你身上每有一层“披风”，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "披风加成自动。击破效果自动。位移手动。",
+                    "automationNote": "披风加成自动。击破效果自动。位移手动。 修炼合一此招后需手动将气血上限-50。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -4927,7 +4928,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，以自身本源肾气，维持风劲不散。</p><p>流失 60 点气血，获得一层“披风”，持续到脱战或解除架招。（每次至多获得 1 层）</p><p><strong>升级：</strong>流失气血-10，内力消耗+4。</p>",
-                    "automationNote": "流失气血自动。获得披风自动。",
+                    "automationNote": "流失气血自动。获得披风自动。 修炼合一此招后需手动将气血上限-50。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -4959,7 +4960,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>看破虚招后消耗反应动作和 4 层“披风”，压制目标虚招，并且将此招虚招引向你周围的其他敌人或其他友方。</p><p>·此次虚招攻击沿用攻击者的数据（包括命中、伤害、虚招值、暴击骰等）。</p><p><strong>升级：</strong>消耗“披风”层数-1，消耗+4。</p>",
-                    "automationNote": "消耗披风自动。转移虚招效果完全手动。",
+                    "automationNote": "消耗披风自动。转移虚招效果完全手动。 修炼合一此招后需手动将气血上限-50。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -4998,7 +4999,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，消耗所有“披风”，棍卷狂风，似带惊雷，对周围敌人造成 0.9 内息点内功伤害，被击中的角色进行一次[韧性]检定，难度＝10+2*消耗披风层数。检定失败则陷入“眩晕”一回合。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，消耗+16。</p>",
-                    "automationNote": "消耗披风自动。检定请求自动。",
+                    "automationNote": "消耗披风自动。检定请求自动。 修炼合一此招后需手动将气血上限-50。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -5030,12 +5031,6 @@
                         ]
                     },
                     "scripts": [
-                        {
-                            "label": "消耗披风",
-                            "trigger": "attack",
-                            "script": "const pifeng = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"pifeng\");\nconst stacks = pifeng ? (pifeng.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nif (pifeng) {\n    await pifeng.delete();\n    args.flags.consumedPifeng = stacks; // 存入标志供 hit 使用\n}",
-                            "active": true
-                        },
                         {
                             "label": "发起检定",
                             "trigger": "hit",
@@ -5157,7 +5152,7 @@
                         {
                             "label": "击破效果",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    // 目标乏力 x3\n    const fali = CONFIG.statusEffects.find(e => e.id === \"fali\");\n    if (fali) {\n        const d1 = foundry.utils.deepClone(fali);\n        d1.flags[\"xjzl-system\"].stacks = 3;\n        await game.xjzl.api.effects.addEffect(args.target, d1);\n    }\n    \n    // 自身天机 x2\n    const tianji = thisItem.effects.getName(\"天机\").toObject();\n    delete tianji._id;\n    tianji.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, tianji);\n    await game.xjzl.api.effects.addEffect(actor, tianji);\n}",
+                            "script": "if (args.isBroken) {\n    // 目标乏力 x3\n    const fali = CONFIG.statusEffects.find(e => e.id === \"fali\");\n    if (fali) {\n        const d1 = foundry.utils.deepClone(fali);\n        await game.xjzl.api.effects.addEffect(args.target, d1, 3);\n    }\n    \n    // 自身天机 x2\n    const tianji = thisItem.effects.getName(\"天机\").toObject();\n    delete tianji._id;\n    tianji.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, tianji);\n    await game.xjzl.api.effects.addEffect(actor, tianji);\n}",
                             "active": true
                         }
                     ]
@@ -5239,7 +5234,7 @@
                         {
                             "label": "操作提示",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxConsume = 1 + (lvl - 1);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p><b>天机难测命中！</b></p>\n            <p>请手动为自己添加一个已知状态。</p>\n            <p>可选：消耗至多 ${maxConsume} 层 [天机]，增加持续时间/层数。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst maxConsume = 1 + (lvl - 1);\n\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p><b>天机难测命中！</b></p>\n            <p>请手动为自己添加一个已知状态。</p>\n            <p>可选：消耗至多 ${maxConsume} 层 [天机]，增加持续时间/层数。</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
                             "active": true
                         }
                     ]
@@ -5254,7 +5249,7 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "主要动作",
-                    "description": "<p>主要动作，以棍引天，终窥得一线天机，使自己进入“窥天”状态，持续@{1 + @up|一}回合。</p><p><strong>窥天：</strong>在你视线范围内进行的 D20 投掷，你可以消耗 1 层“天机”，将投掷的结果更改成任何数字。</p><p><strong>升级：</strong>窥天持续回合数+1，消耗+8，怒气消耗-1。</p>",
+                    "description": "<p>主要动作，消耗 5 层“天机”，以棍引天，终窥得一线天机，使自己进入“窥天”状态，持续@{1 + @up|一}回合。</p><p><strong>窥天：</strong>在你视线范围内进行的 D20 投掷，你可以消耗 1 层“天机”，将投掷的结果更改成任何数字。</p><p><strong>升级：</strong>窥天持续回合数+1，消耗+8，怒气消耗-1。</p>",
                     "automationNote": "消耗天机获得窥天自动。改骰效果手动。",
                     "calculation": {
                         "base": 0,
@@ -5282,9 +5277,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "前置检查与消耗",
+                            "label": "消耗天机",
                             "trigger": "attack",
-                            "script": "const tianji = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tianji\");\nconst stacks = tianji ? (tianji.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks < 5) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"需要 5 层 [天机] 才能施展！\";\n    return;\n}\nawait tianji.delete(); // 消耗所有 (因为是5层施展，通常全部消耗，或者这里代码写的是检查5层消耗5层？原文描述：消耗5层天机。OK，那就消耗5层。这里为简便直接delete，如果有多余的再改 removeEffect)\n// 修正：调用 removeEffect 5层\n// await game.xjzl.api.effects.removeEffect(actor, \"tianji\", 5); // 考虑到可能有多余5层的情况",
+                            "script": "// 天机上限即为5层，preAttack 已保证至少5层，移除全部即消耗5层\nawait game.xjzl.api.effects.removeEffect(actor, \"tianji\", 99);",
                             "active": true
                         },
                         {
@@ -5292,6 +5287,12 @@
                             "trigger": "hit",
                             "script": "const eff = thisItem.effects.getName(\"窥天\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.duration = { rounds: 1 + (lvl - 1) };\n\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
+                        },
+                        {
+                            "label": "天机不足检查",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "const tianji = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tianji\");\nconst stacks = tianji ? (tianji.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\nif (stacks < 5) {\n    args.abort = true;\n    args.abortReason = \"需要 5 层 [天机] 才能施展！\";\n}"
                         }
                     ]
                 }
