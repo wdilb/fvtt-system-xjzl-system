@@ -5,9 +5,9 @@
  * 版本: Foundry VTT V13
  * 
  * 核心职责:
- * 1. 定义数据库结构 (defineSchema)
- * 2. 初始化用于 AE 修改的临时数据 (prepareBaseData)
- * 3. 计算复杂的武侠规则衍生数据 (prepareDerivedData)
+ * 1. defineSchema —— 定义持久化到数据库的字段（只存"事实"数据）
+ * 2. prepareBaseData —— 挂载 Schema 之外的运行时字段，作为 AE 的写入落点
+ * 3. prepareDerivedData —— 计算武侠规则的衍生数据（total 等面板值）
  * ==========================================
  */
 export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
@@ -18,34 +18,36 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    * ------------------------------------------------------------
    * 定义存储在 actors.db 中的字段。
    * 使用 foundry.data.fields 保证类型安全。
-   * 
-   * [重构注]: 
-   * 移除了所有 mod, total, bonus 等临时字段。
-   * 移除了纯计算的战斗属性。
-   * 仅保留需要持久化的核心数据 (value, assigned, max)。
+   *
+   * 设计原则：Schema 只持久化"事实"数据 —— 玩家手动维护或必须存档的
+   * 状态（基础值 value、已分配点数 assigned、资源 value/max 等）。
+   * 凡是能算出来的派生值（mod, total, bonus 及整个 combat 面板）一律不入库，
+   * 改由 prepareBaseData 在每次数据准备时以内存属性重建。
+   * 注意：这些派生字段在运行时依然存在、依然可被 AE 修改，只是不写入数据库。
+   * 好处：存档体积小；修改计算公式无需数据迁移；派生字段每次从 0 重建，
+   * 从结构上杜绝加成重复叠加。
    */
   static defineSchema() {
     const fields = foundry.data.fields;
 
-    // [Helper] 七维属性模板：只保留 基础值(value) 和 分配值(assigned)
-    // mod 和 total 移至 prepareBaseData 初始化
+    // [Helper] 七维属性模板：仅持久化 基础值(value) 和 已分配点数(assigned)，
+    // mod/total 等派生字段由 prepareBaseData 挂载
     const makeStatField = (labelKey) => new fields.SchemaField({
       value: new fields.NumberField({ required: true, integer: true, initial: 1, label: "XJZL.Stats.Base" }),
       assigned: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.Assigned" })
     }, { label: labelKey });
 
-    // [Helper] 资源池模板：只保留 当前值(value) 和 最大值(max)
-    // bonus 移至 prepareBaseData 初始化
+    // [Helper] 资源池模板：仅持久化 当前值(value) 和 最大值(max)，
+    // 上限修正 bonus 由 prepareBaseData 挂载
     const makeResourceField = (initialVal, maxVal, labelKey) => new fields.SchemaField({
       value: new fields.NumberField({ required: true, integer: true, initial: initialVal, label: labelKey }),
       max: new fields.NumberField({ required: true, integer: true, initial: maxVal })
     });
 
-    // [Helper] 技艺 Schema (Arts Helper) - 仅保留基础等级
+    // [Helper] 技艺模板：仅持久化基础等级，其余字段
+    // (mod, bookBonus, total, checkMod, bookCheck) 由 prepareBaseData 挂载
     const makeArtSchema = () => new fields.SchemaField({
-      // 1. 等级相关
       value: new fields.NumberField({ initial: 0, min: 0, integer: true }) // 基础等级 (手动)
-      // mod, bookBonus, total, checkMod, bookCheck 均在运行时生成
     });
 
     // 使用循环构建对象结构
@@ -60,8 +62,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       attemptsSchema[key] = new fields.NumberField({ initial: 0, min: 0, integer: true });
     }
 
-    // [重构注]: 战斗属性 (combat) 和修正 (makeModField) 大部分已从 Schema 移除
-    // 它们将在 prepareBaseData 中重建为内存对象，不占用数据库
+    // combat 面板全部为派生数据，Schema 中不定义字段，
+    // 由 prepareBaseData 构建为纯内存对象
 
     return {
       // === A. 基础档案 (Info) ===
@@ -89,14 +91,14 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
         // 自由属性点 (可自由分配到除悟性外的属性上)
         freePoints: new fields.SchemaField({
           value: new fields.NumberField({ min: 0, initial: 0, integer: true }), // 初始赠送
-          // mod, total 在运行时生成
+          // mod/total 由 prepareBaseData 挂载
         }, { label: "XJZL.Stats.FreePoints" }),
 
         // 悟性特殊处理：包含玄关打通状态
         wuxing: new fields.SchemaField({
           value: new fields.NumberField({ required: true, integer: true, initial: 1, label: "XJZL.Stats.Base" }),
           breakLimit: new fields.NumberField({ required: true, integer: true, initial: 0, label: "XJZL.Stats.WuxingBreakLimit" })
-          // mod 在运行时生成
+          // mod 由 prepareBaseData 挂载
         }, { label: "XJZL.Stats.Wuxing" }),
 
         liliang: makeStatField("XJZL.Stats.Liliang"), // 力量
@@ -148,12 +150,12 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       }),
 
       // === E. 战斗属性 (Combat) ===
-      // [重构]: 这里的字段大部分已移除，将在 prepareBaseData 中作为纯内存数据初始化。
-      // Schema 中仅保留空容器或需要持久化的特殊标记（如有）。
-      // 外部引用路径 (system.combat.block 等) 保持不变。
+      // 全部为运行时派生数据：格挡/速度/攻防等简单数值，以及武器等级、
+      // 伤害、抗性、消耗 (weaponRanks/damages/resistances/costs) 均由
+      // prepareBaseData 构建为内存对象。保留空容器是为了让
+      // system.combat.xxx 路径始终可访问（AE 依赖路径落点）。
       combat: new fields.SchemaField({
-        // 容器占位，具体内容在 BaseData 生成
-        // weaponRanks, damages, resistances, costs 均在内存中构建
+        // 字段在 prepareBaseData 中构建
       }),
 
       // === F. 武学状态 (Martial Status) ===
@@ -322,20 +324,20 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    * ------------------------------------------------------------
    * 2. 基础数据准备 (prepareBaseData)
    * ------------------------------------------------------------
-   * 在 Active Effects 应用之前运行。
-   * 用于初始化那些"不存在于 Schema 中，但需要被 AE 修改"的数据结构。
-   * FVTT的执行步骤：
-   * Step 1: prepareBaseData() (初始化数据结构)
-   * Step 2: applyActiveEffects() (应用装备/Buff的修改)
-   * Step 3: prepareDerivedData() (计算最终结果)
-   * 所以放在prepareBaseData中的属性可以被AE修改。
-   * 
-   * [重构关键]:
-   * 在这里手动挂载所有被从 Schema 中移除的 mod, total, bonus 字段。
-   * 确保外部调用 (Active Effects) 依然能通过原路径访问它们。
+   * 在 AE 应用之前运行，挂载所有"不在 Schema 中、但需要被 AE 修改"的字段。
+   *
+   * Foundry 的数据准备流水线：
+   * Step 1: prepareBaseData()    —— 初始化数据结构
+   * Step 2: applyActiveEffects() —— 装备/Buff 通过 AE 按路径写入修正
+   * Step 3: prepareDerivedData() —— 基于修正后的数据计算最终值
+   *
+   * AE 依赖路径落点（如 system.stats.liliang.mod、system.combat.speed），
+   * 而这些路径不在 Schema 中，必须在这里先行创建 AE 才能写入，
+   * prepareDerivedData 再用它们计算 total。
+   * 每次数据准备都从这里从 0 重建，因此无需手动归零，也不会重复叠加。
    */
   prepareBaseData() {
-    // === 0. 重建 Stats 的临时字段 (mod, total, neigongBonus) ===
+    // === 0. 挂载 Stats 的运行时字段 (mod, total, neigongBonus) ===
     for (const [key, stat] of Object.entries(this.stats)) {
       if (key === 'freePoints') {
         // 自由点数比较特殊，没有 neigongBonus
@@ -352,15 +354,15 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       stat.identityBonus = 0; // 身份加成 (技艺系统)
     }
 
-    // === 1. 重建 Resources 的临时字段 (bonus) ===
-    // 凡是之前使用 makeResourceField 的都需要 bonus，确保逻辑兼容
+    // === 1. 挂载 Resources 的运行时字段 (bonus) ===
+    // 所有资源池的上限都可能被 AE 修正，统一提供 bonus 字段
     const resourceKeys = ["hp", "mp", "satiety", "alcohol", "morale", "shalu"];
     for (const resKey of resourceKeys) {
       if (this.resources[resKey]) {
         this.resources[resKey].bonus = 0;
       }
     }
-    // 怒气比较特殊，但也可能需要 bonus (虽然 Logic 中没怎么用，但保持结构一致)
+    // 怒气上限固定为 10，仍保留 bonus 字段以保持结构一致
     if (this.resources.rage) this.resources.rage.bonus = 0;
 
 
@@ -393,13 +395,11 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       };
     }
 
-    // === 3. 重建 Combat 结构 (核心重构部分) ===
-    // 此时 this.combat 只是一个空的 SchemaField (或者包含了少量持久化数据)
-    // 我们需要填入那些被移出 Schema 的字段。
+    // === 3. 构建 Combat 结构 ===
+    // combat 在 Schema 中是空容器，全部字段在此以内存属性构建
 
     // 3.1 简单数值修正 (Simple Modifiers)
-    // 在旧 Schema 中它们是 NumberField, 这里我们初始化为原始数字 0
-    // Active Effect 修改 system.combat.speed 时会自动将 0 变为新数值
+    // 初始化为 0 的基础修正值，AE 可通过 system.combat.speed 等路径直接修改
     const simpleCombatStats = [
       "block", "kanpo", "xuzhao", "speed", "dodge", "initiative",
       "def_waigong", "def_neigong", "hit_waigong", "hit_neigong",
@@ -410,9 +410,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       this.combat[key] = 0;
     }
 
-    // 3.2 复杂结构修正 (Complex Objects)
-    // 对应原本的 makeModField -> { value, mod, total } 结构
-    // 无论 Schema 里是否有，这里都确保生成对象
+    // 3.2 复合结构修正 (Complex Objects)
+    // 需要区分来源的条目使用 { value: 基础, mod: AE修正, total: 最终 } 结构
     const makeRuntimeMod = () => ({ value: 0, mod: 0, total: 0 });
 
     // A. 武器等级 (Weapon Ranks)
@@ -420,7 +419,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     const weaponKeys = Object.keys(CONFIG.XJZL?.weaponTypes || {});
     for (const key of weaponKeys) {
       if (key === 'none') continue;
-      // 重建完整结构，包含 counts 和 bonus
+      // 完整结构：value/mod/total + r1/r2 加成 + counts 计数器
       this.combat.weaponRanks[key] = {
         value: 0, // 基础 (Derived)
         mod: 0,   // AE 修正
@@ -462,8 +461,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     this.combat.costs.rage = makeRuntimeMod();
     this.combat.costs.ultimateRageDiscount = makeRuntimeMod(); //绝招专属怒气减免（至少1）
 
-    // === 4. 重建 Arts 的临时字段 ===
-    // Arts Schema 中保留了 value，这里补全其他字段
+    // === 4. 挂载 Arts 的运行时字段 ===
+    // Schema 中只存基础等级 value，其余字段在此补齐
     for (const art of Object.values(this.arts)) {
       art.mod = 0;
       art.bookBonus = 0;
@@ -484,10 +483,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
    * 在 Active Effects 应用之后运行。
    * 负责处理所有复杂的武侠逻辑计算。
    * 
-   * [重构注]:
-   * 此方法保持原样，没有任何逻辑变更。
-   * 因为 prepareBaseData 已经完美重建了数据结构，所以这里的 this.stats.liliang.mod 
-   * 或 this.combat.speed 等调用依然有效。
+   * 此时 mod/bonus 等字段已包含 AE 修正，可直接参与计算。
    */
   prepareDerivedData() {
     this._applyCustomModifiers(); //应用手动修正 (最优先)
@@ -685,7 +681,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       art.bookBonus = 0;
       art.bookCheck = 0;
     }
-    //从局部变量改为直接存在 combat.weaponRanks 下面
+    // 计数缓存直接挂在 combat.weaponRanks 上，供 _resolveWeaponRankBases 读取
     for (const rankData of Object.values(combat.weaponRanks)) {
       // 初始化计数缓存
       rankData.counts = { t1: 0, t2: 0, t3: 0 };
@@ -703,7 +699,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     let wuxingEarthCount = 0; // 地级精通数
 
     if (actor) {
-      // 优化了写法，fvtt会自动将物品按类型索引到 actor.itemTypes，性能更好
+      // actor.itemTypes 由 Foundry 按物品类型预建索引，比遍历 items 列表更快
       const neigongs = actor.itemTypes.neigong || [];
       for (const item of neigongs) {
         // 自动应用属性加成 (仅当内功正在运行 active=true 时)
@@ -780,16 +776,16 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
         // 遍历每一招
         for (const move of moves) {
-          // 现在必须针对每一招单独获取 tier
-          // 如果数据迁移没做好，move.tier 可能是 undefined，给个默认值 1 (人级)
+          // 同一武学内不同招式的品级可以不同，tier 必须按招式单独读取
+          // 若数据迁移不完整，move.tier 可能是 undefined，按 人级(1) 兜底
           const tier = move.tier ?? bookTier;
-          // 读取 effectiveStage 不再读取computedLevel
-          // 如果 mappedStage=5，effectiveStage 会是 0，这里 stage=0，后续 if (stage >= 2) 不会通过，完美忽略
+          // 读取 effectiveStage 而非 computedLevel：
+          // 若 mappedStage=5，effectiveStage 为 0，下方 stage >= 2 的判断自然不通过
           const stage = move.effectiveStage || 0;
           const wType = move.weaponType; // 武器类型
 
-          //把悟性加成从下面的武器里移动到外面，虽然规则书上写的不加，但lxx说规则书是错的
-          //但是轻功和阵法不加
+          // 悟性加成在此统一统计，不再要求招式带武器类型——规则书写不加，
+          // 但 lxx 确认规则书有误，照常计入；仅轻功和阵法仍然除外
           if (!isWuxingExcluded) {
             // 1. 统计悟性加成 (需达到 精通/Stage>=3)
             if (stage >= 3) {
@@ -942,7 +938,7 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
       // r1Bonus: 静态，来自 DataModel/背景
       const r1 = Math.min(counts.t1 + (rankData.r1Bonus || 0), 4);
 
-      // r2Bonus: 动态，刚刚在 _prepareArts 里被身份加过了！
+      // r2Bonus: 动态，已在 _prepareArts 中被身份加成累加，此处只读取
       const r2 = Math.min(counts.t2 + (rankData.r2Bonus || 0), 4);
 
       // r3: 天级无上限
@@ -1030,10 +1026,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     for (const [key, stat] of Object.entries(stats)) {
       if (key === 'wuxing' || key === 'freePoints') continue;
 
-      // Total = Base + Assigned + Mod + NeigongBonus
-      // mod: AE修正 + (如果有)脚本动态修正
-      // neigongBonus: 内功静态修正
-      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0) + (stat.neigongBonus || 0) + (stat.identityBonus || 0) + + meridianAllStatBonus;
+      // Total = 基础值 + 已分配 + mod(AE/脚本修正) + 内功加成 + 身份加成 + 任督全属性加成
+      stat.total = (stat.value || 0) + (stat.assigned || 0) + (stat.mod || 0) + (stat.neigongBonus || 0) + (stat.identityBonus || 0) + meridianAllStatBonus;
 
       // TODO 属性小于0 死亡
     }
@@ -1327,11 +1321,11 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
 
     // 计算最终格挡总值 (Total Block)
     // ------------------------------------
-    // 基础格挡 = 属性衍生(通常为0) + 装备/Buff修正 + 经脉修正 + 武器提供的格挡值
-    // 注意：bonuses.block 包含了经脉和AE的加值
+    // 基础格挡 = combat.block (AE/修正组写入) + bonuses.block (经脉加成)
+    // 武器装备与架招的格挡值在下方 blockTotal 中另行累加
     const baseBlock = (combat.block || 0) + bonuses.block;
 
-    // 新增一个字段用来记录架招的格挡值，这个字段不需要定义在 schema 里，直接挂在 combat 内存对象上即可
+    // 架招提供的格挡值单独记录（供面板区分"其中架招占多少"），仅存在于内存，不入 Schema
     combat.stanceBlockValue = 0;
 
     let equipmentBlock = 0;
@@ -1425,9 +1419,8 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     combat.costs.rage.total = (combat.costs.rage.value || 0) + (combat.costs.rage.mod || 0);
     combat.costs.ultimateRageDiscount.total = (combat.costs.ultimateRageDiscount.value || 0) + (combat.costs.ultimateRageDiscount.mod || 0);
 
-    // 暴击 (基础20 - 属性加成 + 修正 - 士气) *越低越好*
-    // 士气不影响全局暴击，不在这里计算了
-    // 最小值限制为 0
+    // 暴击 (基础20 - 属性加成 + 修正) *越低越好*
+    // 士气不影响全局暴击，不在此计算；结果最小限制为 0
     combat.critWaigongTotal = Math.max(0, 20 - Math.floor(S.liliang / 20) + (combat.crit_waigong || 0) + bonuses.critWaigong);
     combat.critNeigongTotal = Math.max(0, 20 - Math.floor(S.qigan / 20) + (combat.crit_neigong || 0) + bonuses.critNeigong);
   }
