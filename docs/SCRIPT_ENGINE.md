@@ -81,6 +81,7 @@
 - 只有对应触发器实际传入的字段才存在。
 - 脚本运行中新增 `args.myFlag` 不会同步新建顶层 `myFlag`。
 - 业务代码推荐统一从 `args` 读取阶段参数，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
+- 脚本内声明变量不要与注入的顶层变量重名（如 `const move` 会与注入的 `move` 冲突直接抛错），局部变量请另起名。
 
 对 `args.output`、`args.config`、`args.costConfig`、`args.flags` 等可写容器，应修改后文列出的子字段，不要替换整个对象。`args.baseData`、`args.outcome` 等只读对象当前没有冻结，但修改它们不属于公开契约，也不保证影响结算。
 
@@ -616,7 +617,7 @@ await game.xjzl.api.effects.addEffect(args.target, "prone");
 await game.xjzl.api.effects.removeEffect(args.target, "prone", 1);
 ```
 
-`addEffect(actor, effectDataOrId, count = 1)` 接受系统状态 ID 或 AE 数据，负责权限委托、本地化、slug 匹配、叠层和刷新，返回 `Promise<ActiveEffect|undefined>`。`removeEffect(actor, effectIdOrSlug, amount = 1)` 按文档 ID 或 slug 移除/减层；成功删除时返回删除结果，减层时通常返回 `undefined`。
+`addEffect(actor, effectDataOrId, count = 1)` 接受系统状态 ID 或 AE 数据，负责权限委托、本地化、slug 匹配、叠层和刷新，返回 `Promise<ActiveEffect|undefined>`。`removeEffect(actor, effectIdOrSlug, amount = 1)` 按文档 ID 或 slug 移除/减层；成功删除时返回删除结果，减层时通常返回 `undefined`。对可叠层效果，`removeEffect` 的 `amount` 默认只减一层；需要整体移除时传入不小于当前层数的数值。
 
 从来源 Item 复制 AE 时先转为普通对象并清除 `_id`：
 
