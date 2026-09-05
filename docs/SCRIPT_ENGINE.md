@@ -765,6 +765,43 @@ args.ruanweiProcessed = true;
 
 不要使用过于通用的 `args.processed`，避免与其他脚本冲突。
 
+### 多段伤害招式
+
+一次出招造成多段相同伤害时，各跳应复用同一份攻击侧输入，防御与抗性由每跳独立正常结算：
+
+```javascript
+// preDamage：固化本跳最终输入（含脚本修改），存入临时 flag
+await actor.setFlag("xjzl-system", "example_last_hit", {
+  amount: args.config.amount,
+  type: args.config.type,
+  applyCritDamage: args.config.applyCritDamage !== false
+});
+
+// hit：按剩余段数逐跳补算
+if (args.isHit) {
+  const cfg = actor.getFlag("xjzl-system", "example_last_hit");
+  if (cfg && cfg.amount > 0) {
+    for (let i = 1; i < segmentCount; i++) {
+      await args.target.applyDamage({
+        amount: cfg.amount,
+        type: cfg.type,
+        attacker: actor,
+        isCrit: args.isCrit,
+        applyCritDamage: cfg.applyCritDamage,
+        item: args.item,
+        move: args.move,
+        source: "move"
+      });
+    }
+  }
+}
+
+// hit_once：清理 flag
+await actor.unsetFlag("xjzl-system", "example_last_hit");
+```
+
+`args.finalDamage` 是防御计算后的值，把它再传入 `applyDamage` 会二次扣抗性并再次触发防御侧脚本；多段伤害应复用 `preDamage` 后的输入值。flag 必须在 `hit_once` 清理；多目标串行结算时 `preDamage` 逐目标覆盖、`hit` 读到的即当前目标配置。
+
 ### 玩家决策
 
 已有检定或对抗能力时使用 `Macros`。确实需要简单选择时使用 V13 命名空间：
