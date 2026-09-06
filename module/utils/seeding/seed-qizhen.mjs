@@ -48,115 +48,124 @@ export async function seedQizhen() {
     // 解锁并清理旧数据
     await pack.configure({ locked: false });
 
-    // 清理旧 Item
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        console.log(`XJZL Seeder | 清理旧奇珍数据 (${index.size}条)...`);
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+    let createdCount = 0;
+
+    try {
+        // 清理旧 Item
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            console.log(`XJZL Seeder | 清理旧奇珍数据 (${index.size}条)...`);
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+
+        // 清理旧 Folder
+        if (pack.folders.size > 0) {
+            await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
+        }
+
+        // =====================================================
+        // 3. 重建文件夹结构 (凡/铜/银/金/玉)
+        // =====================================================
+        // 定义品质映射
+        const qualityLabels = {
+            0: "凡",
+            1: "铜",
+            2: "银",
+            3: "金",
+            4: "玉"
+        };
+        const qualities = [0, 1, 2, 3, 4];
+
+        console.log("XJZL Seeder | 创建品质分类文件夹...");
+
+        // 批量创建文件夹
+        const folderPromises = qualities.map(q =>
+            Folder.create({
+                name: qualityLabels[q],
+                type: "Item",
+                pack: PACK_NAME
+            }, { pack: PACK_NAME })
+        );
+
+        const createdFolders = await Promise.all(folderPromises);
+
+        // 建立映射表: quality(Int) -> folderId(String)
+        const foldersMap = {};
+        qualities.forEach((q, i) => foldersMap[q] = createdFolders[i].id);
+
+        // =====================================================
+        // 4. 构建 Item 数据数组
+        // =====================================================
+        const itemsToCreate = [];
+
+        for (const d of qizhenData) {
+            // 1. 确定品质 (默认为 0)
+            // 数据源里应该是 system.quality，如果没有则容错处理
+            const quality = d.system?.quality ?? 0;
+
+            // 2. 确定文件夹 ID
+            const targetFolderId = foldersMap[quality];
+
+            // 3. 处理 Active Effects
+            const effects = d.effects ? d.effects.map(e => ({
+                name: e.name,
+                icon: e.icon || d.img,
+                transfer: e.transfer ?? true, // 奇珍默认为被动传输
+                disabled: e.disabled ?? false,
+                changes: e.changes || [],
+                flags: e.flags || {},
+                description: e.description || "",
+                // 补上 duration
+                duration: e.duration || {},
+                // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
+                statuses: e.statuses || [],
+                tint: e.tint || null,
+                // 补上 origin，虽然通常是空的，但保持结构完整
+                origin: e.origin || null
+            })) : [];
+
+            // 4. 处理 Scripts
+            const itemScripts = d.system?.scripts || [];
+
+            // 5. 构建 Item 对象
+            itemsToCreate.push({
+                name: d.name,
+                type: "qizhen",
+                img: d.img,
+                folder: targetFolderId, // 分配到对应品质的文件夹
+                system: {
+                    // --- 基础状态 ---
+                    equipped: false,
+                    quantity: d.system?.quantity ?? 1,
+                    price: d.system?.price ?? 0,
+                    quality: quality,
+                    isOfficial: d.system?.isOfficial ?? true, //默认是官方资源
+                    // --- 穴位: 强制重置为空 ---
+                    acupoint: "",
+
+                    // --- 脚本与文本 ---
+                    scripts: itemScripts,
+                    description: d.system?.description || "",
+                    automationNote: d.system?.automationNote || ""
+                },
+                effects: effects,
+                flags: d.flags || {}
+            });
+        }
+
+        // =====================================================
+        // 5. 批量写入数据库
+        // =====================================================
+        if (itemsToCreate.length > 0) {
+            console.log(`XJZL Seeder | 正在写入 ${itemsToCreate.length} 个奇珍...`);
+            await Item.createDocuments(itemsToCreate, { pack: PACK_NAME, keepId: false });
+        }
+
+        createdCount = itemsToCreate.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
 
-    // 清理旧 Folder
-    if (pack.folders.size > 0) {
-        await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
-    }
-
-    // =====================================================
-    // 3. 重建文件夹结构 (凡/铜/银/金/玉)
-    // =====================================================
-    // 定义品质映射
-    const qualityLabels = {
-        0: "凡",
-        1: "铜",
-        2: "银",
-        3: "金",
-        4: "玉"
-    };
-    const qualities = [0, 1, 2, 3, 4];
-
-    console.log("XJZL Seeder | 创建品质分类文件夹...");
-
-    // 批量创建文件夹
-    const folderPromises = qualities.map(q =>
-        Folder.create({
-            name: qualityLabels[q],
-            type: "Item",
-            pack: PACK_NAME
-        }, { pack: PACK_NAME })
-    );
-
-    const createdFolders = await Promise.all(folderPromises);
-
-    // 建立映射表: quality(Int) -> folderId(String)
-    const foldersMap = {};
-    qualities.forEach((q, i) => foldersMap[q] = createdFolders[i].id);
-
-    // =====================================================
-    // 4. 构建 Item 数据数组
-    // =====================================================
-    const itemsToCreate = [];
-
-    for (const d of qizhenData) {
-        // 1. 确定品质 (默认为 0)
-        // 数据源里应该是 system.quality，如果没有则容错处理
-        const quality = d.system?.quality ?? 0;
-
-        // 2. 确定文件夹 ID
-        const targetFolderId = foldersMap[quality];
-
-        // 3. 处理 Active Effects
-        const effects = d.effects ? d.effects.map(e => ({
-            name: e.name,
-            icon: e.icon || d.img,
-            transfer: e.transfer ?? true, // 奇珍默认为被动传输
-            disabled: e.disabled ?? false,
-            changes: e.changes || [],
-            flags: e.flags || {},
-            description: e.description || "",
-            // 补上 duration
-            duration: e.duration || {}, 
-            // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
-            statuses: e.statuses || [],
-            tint: e.tint || null,
-            // 补上 origin，虽然通常是空的，但保持结构完整
-            origin: e.origin || null
-        })) : [];
-
-        // 4. 处理 Scripts
-        const itemScripts = d.system?.scripts || [];
-
-        // 5. 构建 Item 对象
-        itemsToCreate.push({
-            name: d.name,
-            type: "qizhen",
-            img: d.img,
-            folder: targetFolderId, // 分配到对应品质的文件夹
-            system: {
-                // --- 基础状态 ---
-                equipped: false,
-                quantity: d.system?.quantity ?? 1,
-                price: d.system?.price ?? 0,
-                quality: quality,
-                isOfficial: d.system?.isOfficial ?? true, //默认是官方资源
-                // --- 穴位: 强制重置为空 ---
-                acupoint: "",
-
-                // --- 脚本与文本 ---
-                scripts: itemScripts,
-                description: d.system?.description || "",
-                automationNote: d.system?.automationNote || ""
-            },
-            effects: effects,
-            flags: d.flags || {}
-        });
-    }
-
-    // =====================================================
-    // 5. 批量写入数据库
-    // =====================================================
-    if (itemsToCreate.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${itemsToCreate.length} 个奇珍...`);
-        await Item.createDocuments(itemsToCreate, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${itemsToCreate.length} 个奇珍！(来源: qizhen.json)`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个奇珍！(来源: qizhen.json)`);
 }

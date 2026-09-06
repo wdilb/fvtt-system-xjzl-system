@@ -67,97 +67,107 @@ export async function seedWeapons() {
 
     // 3. 解锁并清理旧数据
     await pack.configure({ locked: false });
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        console.log(`XJZL Seeder | 清理旧兵器数据 (${index.size}条)...`);
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+
+    let createdCount = 0;
+
+    try {
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            console.log(`XJZL Seeder | 清理旧兵器数据 (${index.size}条)...`);
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+        // 清理文件夹
+        if (pack.folders.size > 0) {
+            await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
+        }
+
+        // 4. 创建文件夹结构 (按兵器类型)
+        console.log("XJZL Seeder | 创建兵器分类文件夹...");
+        const folders = {};
+        const folderPromises = types.map(t =>
+            Folder.create({
+                name: typeLabels[t] || t,
+                type: "Item",
+                pack: PACK_NAME
+            }, { pack: PACK_NAME })
+        );
+
+        const createdFolders = await Promise.all(folderPromises);
+        types.forEach((t, i) => folders[t] = createdFolders[i].id);
+
+        // 5. 构建 Item 数组
+        const items = [];
+        for (const d of weaponData) {
+
+            // --- 5.1 处理 Active Effects ---
+            // 兵器的 AE 通常用于：被动属性加成(装备生效)、特殊状态(中毒/发光等)
+            const effects = d.effects ? d.effects.map(e => ({
+                name: e.name,
+                icon: e.icon || d.img,
+                // 兵器特效通常随装备生效 (transfer: true)
+                // 除非是主动使用的消耗型技能 (transfer: false)
+                transfer: e.transfer ?? true,
+                disabled: e.disabled ?? false,
+                changes: e.changes || [],
+                // 关键：保留 flags (slug, stacking, scripts inside AE)
+                flags: e.flags || {},
+                description: e.description || "",
+                // 补上 duration
+                duration: e.duration || {},
+                // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
+                statuses: e.statuses || [],
+                tint: e.tint || null,
+                // 补上 origin，虽然通常是空的，但保持结构完整
+                origin: e.origin || null
+            })) : [];
+
+            // --- 5.2 处理 Item 自身的 Scripts ---
+            // 格式: [{ label, trigger, script, active }]
+            // 这里的数据结构必须严格符合 makeScriptEffectSchema
+            const itemScripts = d.system.scripts || [];
+
+            items.push({
+                name: d.name,
+                type: "weapon", // 固定类型
+                img: d.img,
+                folder: folders[d.system.type] || null, // 放入对应类型的文件夹
+                system: {
+                    // --- 基础状态 ---
+                    equipped: false,        // 导入时默认未装备
+                    quantity: d.system.quantity ?? 1,
+                    price: d.system.price ?? 0,
+                    quality: d.system.quality ?? 0, // 0-4 (凡/铜/银/金/玉)
+                    isOfficial: d.system.isOfficial ?? true, //默认是官方资源
+                    // --- 核心属性 ---
+                    type: d.system.type,    // sword, blade...
+                    subtype: d.system.subtype || "", // 重剑, 软剑...
+
+                    damage: d.system.damage ?? 0,
+                    block: d.system.block ?? 0,
+
+                    // --- 脚本逻辑 ---
+                    scripts: itemScripts,
+
+                    // --- 文本信息 ---
+                    description: d.system.description || "",
+                    automationNote: d.system.automationNote || ""
+                },
+                effects: effects,
+                flags: d.flags || {} // 保留可能存在的自定义 flags
+            });
+        }
+
+        // 6. 批量写入
+        if (items.length > 0) {
+            console.log(`XJZL Seeder | 正在写入 ${items.length} 把神兵利器...`);
+            await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
+        }
+
+        createdCount = items.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
-    // 清理文件夹
-    if (pack.folders.size > 0) {
-        await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
-    }
 
-    // 4. 创建文件夹结构 (按兵器类型)
-    console.log("XJZL Seeder | 创建兵器分类文件夹...");
-    const folders = {};
-    const folderPromises = types.map(t =>
-        Folder.create({
-            name: typeLabels[t] || t,
-            type: "Item",
-            pack: PACK_NAME
-        }, { pack: PACK_NAME })
-    );
-
-    const createdFolders = await Promise.all(folderPromises);
-    types.forEach((t, i) => folders[t] = createdFolders[i].id);
-
-    // 5. 构建 Item 数组
-    const items = [];
-    for (const d of weaponData) {
-
-        // --- 5.1 处理 Active Effects ---
-        // 兵器的 AE 通常用于：被动属性加成(装备生效)、特殊状态(中毒/发光等)
-        const effects = d.effects ? d.effects.map(e => ({
-            name: e.name,
-            icon: e.icon || d.img,
-            // 兵器特效通常随装备生效 (transfer: true)
-            // 除非是主动使用的消耗型技能 (transfer: false)
-            transfer: e.transfer ?? true,
-            disabled: e.disabled ?? false,
-            changes: e.changes || [],
-            // 关键：保留 flags (slug, stacking, scripts inside AE)
-            flags: e.flags || {},
-            description: e.description || "",
-            // 补上 duration
-            duration: e.duration || {}, 
-            // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
-            statuses: e.statuses || [],
-            tint: e.tint || null,
-            // 补上 origin，虽然通常是空的，但保持结构完整
-            origin: e.origin || null
-        })) : [];
-
-        // --- 5.2 处理 Item 自身的 Scripts ---
-        // 格式: [{ label, trigger, script, active }]
-        // 这里的数据结构必须严格符合 makeScriptEffectSchema
-        const itemScripts = d.system.scripts || [];
-
-        items.push({
-            name: d.name,
-            type: "weapon", // 固定类型
-            img: d.img,
-            folder: folders[d.system.type] || null, // 放入对应类型的文件夹
-            system: {
-                // --- 基础状态 ---
-                equipped: false,        // 导入时默认未装备
-                quantity: d.system.quantity ?? 1,
-                price: d.system.price ?? 0,
-                quality: d.system.quality ?? 0, // 0-4 (凡/铜/银/金/玉)
-                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
-                // --- 核心属性 ---
-                type: d.system.type,    // sword, blade...
-                subtype: d.system.subtype || "", // 重剑, 软剑...
-
-                damage: d.system.damage ?? 0,
-                block: d.system.block ?? 0,
-
-                // --- 脚本逻辑 ---
-                scripts: itemScripts,
-
-                // --- 文本信息 ---
-                description: d.system.description || "",
-                automationNote: d.system.automationNote || ""
-            },
-            effects: effects,
-            flags: d.flags || {} // 保留可能存在的自定义 flags
-        });
-    }
-
-    // 6. 批量写入
-    if (items.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${items.length} 把神兵利器...`);
-        await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 把兵器！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 把兵器！`);
 }

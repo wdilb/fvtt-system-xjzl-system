@@ -54,44 +54,54 @@ export async function seedMacros() {
 
     // 3. 清理旧数据
     await pack.configure({ locked: false });
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        await Macro.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+
+    let createdCount = 0;
+
+    try {
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            await Macro.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+        if (pack.folders.size > 0) {
+            await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
+        }
+
+        // 4. 创建文件夹
+        console.log("XJZL Seeder | 创建文件夹结构...");
+        const uniqueFolders = [...new Set(macrosData.map(d => d._folderName))];
+        const folderMap = {};
+
+        for (const name of uniqueFolders) {
+            const folder = await Folder.create({
+                name: name,
+                type: "Macro",
+                pack: PACK_NAME
+            }, { pack: PACK_NAME });
+            folderMap[name] = folder.id;
+        }
+
+        // 5. 构建数据
+        const macrosToCreate = macrosData.map(d => ({
+            name: d.name,
+            type: d.type || "script",
+            img: d.img || "icons/svg/dice-target.svg",
+            command: d.command,
+            folder: folderMap[d._folderName],
+            author: game.user.id,
+            ownership: { default: 2 }, // 观察者
+            flags: d.flags || {}
+        }));
+
+        // 6. 写入
+        if (macrosToCreate.length > 0) {
+            await Macro.createDocuments(macrosToCreate, { pack: PACK_NAME, keepId: false });
+        }
+
+        createdCount = macrosToCreate.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
-    if (pack.folders.size > 0) {
-        await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
-    }
 
-    // 4. 创建文件夹
-    console.log("XJZL Seeder | 创建文件夹结构...");
-    const uniqueFolders = [...new Set(macrosData.map(d => d._folderName))];
-    const folderMap = {};
-
-    for (const name of uniqueFolders) {
-        const folder = await Folder.create({
-            name: name,
-            type: "Macro",
-            pack: PACK_NAME
-        }, { pack: PACK_NAME });
-        folderMap[name] = folder.id;
-    }
-
-    // 5. 构建数据
-    const macrosToCreate = macrosData.map(d => ({
-        name: d.name,
-        type: d.type || "script",
-        img: d.img || "icons/svg/dice-target.svg",
-        command: d.command,
-        folder: folderMap[d._folderName],
-        author: game.user.id,
-        ownership: { default: 2 }, // 观察者
-        flags: d.flags || {}
-    }));
-
-    // 6. 写入
-    if (macrosToCreate.length > 0) {
-        await Macro.createDocuments(macrosToCreate, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${macrosToCreate.length} 个宏指令！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个宏指令！`);
 }

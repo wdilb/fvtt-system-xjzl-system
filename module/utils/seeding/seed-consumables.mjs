@@ -49,71 +49,81 @@ export async function seedConsumables() {
 
     // 3. 解锁并清理旧数据
     await pack.configure({ locked: false });
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        console.log(`XJZL Seeder | 清理旧数据 (${index.size}条)...`);
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+
+    let createdCount = 0;
+
+    try {
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            console.log(`XJZL Seeder | 清理旧数据 (${index.size}条)...`);
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+        // 清理文件夹
+        if (pack.folders.size > 0) {
+            await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
+        }
+
+        // 4. 创建文件夹结构 (按类型)
+        console.log("XJZL Seeder | 创建分类文件夹...");
+        const folders = {};
+        const folderPromises = types.map(t =>
+            Folder.create({ name: typeLabels[t] || t, type: "Item", pack: PACK_NAME }, { pack: PACK_NAME })
+        );
+        const createdFolders = await Promise.all(folderPromises);
+        types.forEach((t, i) => folders[t] = createdFolders[i].id);
+
+        // 5. 构建 Item 数组
+        const items = [];
+        for (const d of consumablesData) {
+            // 准备 AE 数据
+            const effects = d.effects ? d.effects.map(e => ({
+                name: e.name,
+                icon: e.icon,
+                transfer: e.transfer ?? false, // 消耗品通常为 false
+                changes: e.changes,
+                flags: e.flags,
+                description: e.description,
+                // 补上 duration
+                duration: e.duration || {},
+                // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
+                statuses: e.statuses || [],
+                tint: e.tint || null,
+                // 补上 origin，虽然通常是空的，但保持结构完整
+                origin: e.origin || null
+            })) : [];
+
+            items.push({
+                name: d.name,
+                type: d.type,
+                img: d.img,
+                folder: folders[d.system.type] || folders['other'], // 归类到对应文件夹
+                system: {
+                    quantity: d.system.quantity,
+                    price: d.system.price,
+                    quality: d.system.quality,
+                    type: d.system.type,
+                    isOfficial: d.system.isOfficial ?? true, //默认是官方资源
+                    description: d.system.description,
+                    usageScript: d.system.usageScript,
+                    automationNote: d.system.automationNote,
+                    autoReplace: d.system.autoReplace ?? true, //为空则默认为true
+                    recovery: d.system.recovery || { hp: 0, mp: 0, rage: 0 } // 默认值
+                },
+                effects: effects
+            });
+        }
+
+        // 6. 批量写入
+        if (items.length > 0) {
+            console.log(`XJZL Seeder | 正在写入 ${items.length} 个物品...`);
+            await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
+        }
+
+        createdCount = items.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
-    // 清理文件夹
-    if (pack.folders.size > 0) {
-        await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
-    }
 
-    // 4. 创建文件夹结构 (按类型)
-    console.log("XJZL Seeder | 创建分类文件夹...");
-    const folders = {};
-    const folderPromises = types.map(t =>
-        Folder.create({ name: typeLabels[t] || t, type: "Item", pack: PACK_NAME }, { pack: PACK_NAME })
-    );
-    const createdFolders = await Promise.all(folderPromises);
-    types.forEach((t, i) => folders[t] = createdFolders[i].id);
-
-    // 5. 构建 Item 数组
-    const items = [];
-    for (const d of consumablesData) {
-        // 准备 AE 数据
-        const effects = d.effects ? d.effects.map(e => ({
-            name: e.name,
-            icon: e.icon,
-            transfer: e.transfer ?? false, // 消耗品通常为 false
-            changes: e.changes,
-            flags: e.flags,
-            description: e.description,
-            // 补上 duration
-            duration: e.duration || {}, 
-            // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
-            statuses: e.statuses || [],
-            tint: e.tint || null,
-            // 补上 origin，虽然通常是空的，但保持结构完整
-            origin: e.origin || null
-        })) : [];
-
-        items.push({
-            name: d.name,
-            type: d.type,
-            img: d.img,
-            folder: folders[d.system.type] || folders['other'], // 归类到对应文件夹
-            system: {
-                quantity: d.system.quantity,
-                price: d.system.price,
-                quality: d.system.quality,
-                type: d.system.type,
-                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
-                description: d.system.description,
-                usageScript: d.system.usageScript,
-                automationNote: d.system.automationNote,
-                autoReplace: d.system.autoReplace ?? true, //为空则默认为true
-                recovery: d.system.recovery || { hp: 0, mp: 0, rage: 0 } // 默认值
-            },
-            effects: effects
-        });
-    }
-
-    // 6. 批量写入
-    if (items.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${items.length} 个物品...`);
-        await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个消耗品！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个消耗品！`);
 }

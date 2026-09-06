@@ -36,33 +36,43 @@ export async function seedMisc() {
 
     // 3. 解锁并清理旧数据
     await pack.configure({ locked: false });
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        console.log(`XJZL Seeder | 清理杂物旧数据 (${index.size}条)...`);
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+
+    let createdCount = 0;
+
+    try {
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            console.log(`XJZL Seeder | 清理杂物旧数据 (${index.size}条)...`);
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+        // 既然没有分类，也不需要清理或创建文件夹
+
+        // 4. 构建 Item 数组
+        const items = miscData.map(d => ({
+            name: d.name,
+            type: "misc", // 对应 system.json documentTypes 中的 misc
+            img: d.img || "icons/svg/item-bag.svg",
+            system: {
+                quantity: d.system?.quantity ?? 1,
+                price: d.system?.price ?? 0,
+                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
+                quality: d.system?.quality ?? 0,
+                description: d.system?.description ?? ""
+            },
+            effects: [] // 杂物无特效
+        }));
+
+        // 5. 批量写入
+        if (items.length > 0) {
+            console.log(`XJZL Seeder | 正在写入 ${items.length} 个杂物...`);
+            await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
+        }
+
+        createdCount = items.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
-    // 既然没有分类，也不需要清理或创建文件夹
 
-    // 4. 构建 Item 数组
-    const items = miscData.map(d => ({
-        name: d.name,
-        type: "misc", // 对应 system.json documentTypes 中的 misc
-        img: d.img || "icons/svg/item-bag.svg",
-        system: {
-            quantity: d.system?.quantity ?? 1,
-            price: d.system?.price ?? 0,
-            isOfficial: d.system.isOfficial ?? true, //默认是官方资源
-            quality: d.system?.quality ?? 0,
-            description: d.system?.description ?? ""
-        },
-        effects: [] // 杂物无特效
-    }));
-
-    // 5. 批量写入
-    if (items.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${items.length} 个杂物...`);
-        await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个杂物！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个杂物！`);
 }

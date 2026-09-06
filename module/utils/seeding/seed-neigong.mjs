@@ -92,117 +92,126 @@ export async function seedNeigong() {
 
     await pack.configure({ locked: false });
 
-    // 清空旧数据
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
-    }
-    // 清空旧文件夹
-    if (pack.folders.size > 0) {
-        await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
-    }
+    let createdCount = 0;
 
-    // 3. 创建文件夹结构 (按门派)
-    console.log("XJZL Seeder | 创建内功门派文件夹...");
-    const folders = {}; // { sectKey: folderId }
+    try {
+        // 清空旧数据
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+        // 清空旧文件夹
+        if (pack.folders.size > 0) {
+            await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
+        }
 
-    // 仅为有数据的门派创建文件夹
-    const activeSects = [...new Set(neigongData.map(d => d.system.sect))];
+        // 3. 创建文件夹结构 (按门派)
+        console.log("XJZL Seeder | 创建内功门派文件夹...");
+        const folders = {}; // { sectKey: folderId }
 
-    const folderPromises = activeSects.map(sectKey =>
-        Folder.create({
-            name: SECT_MAP[sectKey] || sectKey,
-            type: "Item",
-            pack: PACK_NAME
-        }, { pack: PACK_NAME })
-    );
+        // 仅为有数据的门派创建文件夹
+        const activeSects = [...new Set(neigongData.map(d => d.system.sect))];
 
-    const createdFolders = await Promise.all(folderPromises);
-    activeSects.forEach((key, i) => folders[key] = createdFolders[i].id);
+        const folderPromises = activeSects.map(sectKey =>
+            Folder.create({
+                name: SECT_MAP[sectKey] || sectKey,
+                type: "Item",
+                pack: PACK_NAME
+            }, { pack: PACK_NAME })
+        );
 
-    // 4. 构建 Item 数组
-    const items = [];
+        const createdFolders = await Promise.all(folderPromises);
+        activeSects.forEach((key, i) => folders[key] = createdFolders[i].id);
 
-    // 辅助函数：处理阶段数据 (Stage Schema)
-    const processStage = (stageData) => {
-        if (!stageData) return {};
-        return {
-            stats: stageData.stats || { liliang: 0, shenfa: 0, tipo: 0, neixi: 0, qigan: 0, shencai: 0 },
-            // effect: stageData.effect || "",  忽略这个属性，完全没用
-            description: stageData.description || "",
-            xpCostRatio: stageData.xpCostRatio ?? 1,
-            // 脚本处理：确保是数组对象结构
-            scripts: Array.isArray(stageData.scripts) ? stageData.scripts.map(s => ({
-                label: s.label || "阶段特效",
-                trigger: s.trigger || "passive",
-                script: s.script || "",
-                active: s.active ?? true
-            })) : []
+        // 4. 构建 Item 数组
+        const items = [];
+
+        // 辅助函数：处理阶段数据 (Stage Schema)
+        const processStage = (stageData) => {
+            if (!stageData) return {};
+            return {
+                stats: stageData.stats || { liliang: 0, shenfa: 0, tipo: 0, neixi: 0, qigan: 0, shencai: 0 },
+                // effect: stageData.effect || "",  忽略这个属性，完全没用
+                description: stageData.description || "",
+                xpCostRatio: stageData.xpCostRatio ?? 1,
+                // 脚本处理：确保是数组对象结构
+                scripts: Array.isArray(stageData.scripts) ? stageData.scripts.map(s => ({
+                    label: s.label || "阶段特效",
+                    trigger: s.trigger || "passive",
+                    script: s.script || "",
+                    active: s.active ?? true
+                })) : []
+            };
         };
-    };
 
-    for (const d of neigongData) {
-        // 内功通常不需要 Active Effects 来处理被动属性（因为 DataModel 会自动计算 system.current.stats）
-        // 但如果有特殊效果（如持续性 Buff 模板），依然可以保留
-        const effects = d.effects ? d.effects.map(e => ({
-            name: e.name,
-            icon: e.icon || d.img,
-            transfer: e.transfer ?? false, // 内功特效通常不直接 transfer，而是通过脚本调用
-            disabled: e.disabled ?? false,
-            changes: e.changes || [],
-            flags: e.flags || {},
-            description: e.description || "",
-            // 补上 duration
-            duration: e.duration || {},
-            // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
-            statuses: e.statuses || [],
-            tint: e.tint || null,
-            // 补上 origin，虽然通常是空的，但保持结构完整
-            origin: e.origin || null
-        })) : [];
+        for (const d of neigongData) {
+            // 内功通常不需要 Active Effects 来处理被动属性（因为 DataModel 会自动计算 system.current.stats）
+            // 但如果有特殊效果（如持续性 Buff 模板），依然可以保留
+            const effects = d.effects ? d.effects.map(e => ({
+                name: e.name,
+                icon: e.icon || d.img,
+                transfer: e.transfer ?? false, // 内功特效通常不直接 transfer，而是通过脚本调用
+                disabled: e.disabled ?? false,
+                changes: e.changes || [],
+                flags: e.flags || {},
+                description: e.description || "",
+                // 补上 duration
+                duration: e.duration || {},
+                // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
+                statuses: e.statuses || [],
+                tint: e.tint || null,
+                // 补上 origin，虽然通常是空的，但保持结构完整
+                origin: e.origin || null
+            })) : [];
 
-        items.push({
-            name: d.name,
-            type: "neigong",
-            img: d.img,
-            folder: folders[d.system.sect], // 放入对应门派文件夹
-            system: {
-                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
-                // 静态配置
-                tier: d.system.tier ?? 1,      // 1=人, 2=地, 3=天
-                element: d.system.element || "taiji", // yin, yang, taiji
-                sect: d.system.sect || "none",
-                subSect: d.system.subSect || "none", // 二级势力，默认为 none
+            items.push({
+                name: d.name,
+                type: "neigong",
+                img: d.img,
+                folder: folders[d.system.sect], // 放入对应门派文件夹
+                system: {
+                    isOfficial: d.system.isOfficial ?? true, //默认是官方资源
+                    // 静态配置
+                    tier: d.system.tier ?? 1,      // 1=人, 2=地, 3=天
+                    element: d.system.element || "taiji", // yin, yang, taiji
+                    sect: d.system.sect || "none",
+                    subSect: d.system.subSect || "none", // 二级势力，默认为 none
 
-                description: d.system.description || "",
-                requirement: d.system.requirement || "",
-                automationNote: d.system.automationNote || "",
+                    description: d.system.description || "",
+                    requirement: d.system.requirement || "",
+                    automationNote: d.system.automationNote || "",
 
-                // 三阶配置
-                config: {
-                    stage1: processStage(d.system.config?.stage1),
-                    stage2: processStage(d.system.config?.stage2),
-                    stage3: processStage(d.system.config?.stage3)
+                    // 三阶配置
+                    config: {
+                        stage1: processStage(d.system.config?.stage1),
+                        stage2: processStage(d.system.config?.stage2),
+                        stage3: processStage(d.system.config?.stage3)
+                    },
+
+                    // 圆满特效
+                    masteryEffect: d.system.masteryEffect || "",
+                    masteryChanges: Array.isArray(d.system.masteryChanges) ? d.system.masteryChanges : [],
+
+                    // 动态数据初始值 (归零)
+                    xpInvested: 0,
+                    active: false,
+                    sourceBreakdown: { general: 0, specific: 0 }
                 },
+                effects: effects
+            });
+        }
 
-                // 圆满特效
-                masteryEffect: d.system.masteryEffect || "",
-                masteryChanges: Array.isArray(d.system.masteryChanges) ? d.system.masteryChanges : [],
+        // 5. 批量写入
+        if (items.length > 0) {
+            console.log(`XJZL Seeder | 正在写入 ${items.length} 个内功...`);
+            await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
+        }
 
-                // 动态数据初始值 (归零)
-                xpInvested: 0,
-                active: false,
-                sourceBreakdown: { general: 0, specific: 0 }
-            },
-            effects: effects
-        });
+        createdCount = items.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
 
-    // 5. 批量写入
-    if (items.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${items.length} 个内功...`);
-        await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个内功！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个内功！`);
 }

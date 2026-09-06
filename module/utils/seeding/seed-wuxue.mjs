@@ -245,154 +245,163 @@ export async function seedWuxue() {
 
     await pack.configure({ locked: false });
 
-    // 清空 Items
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
-    }
-    // 清空 Folders
-    if (pack.folders.size > 0) {
-        await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
-    }
+    let createdCount = 0;
 
-    // 3. 创建文件夹结构 (按门派)
-    console.log("XJZL Seeder | 创建武学门派文件夹...");
-    const folders = {}; // { sectKey: folderId }
-    const activeSects = [...new Set(wuxueData.map(d => d.system.sect))];
-
-    const folderPromises = activeSects.map(sectKey =>
-        Folder.create({
-            name: SECT_MAP[sectKey] || sectKey,
-            type: "Item",
-            pack: PACK_NAME
-        }, { pack: PACK_NAME })
-    );
-
-    const createdFolders = await Promise.all(folderPromises);
-    activeSects.forEach((key, i) => folders[key] = createdFolders[i].id);
-
-    // 4. 构建 Item 数组
-    const items = [];
-
-    for (const d of wuxueData) {
-        const bookTier = d.system.tier;
-        // 1. 处理招式
-        const processedMoves = processMoves(d.system.moves, d.system.requirements, bookTier);
-
-        // 2. 确定书本品阶 (Book Tier Resolution)
-        // 逻辑：优先读取 JSON 数据中的 tier。
-        // 如果 JSON 中未定义，则尝试根据招式自动推断（取招式中最低的品阶）。
-        // 如果都无法确定，默认为 1 (人级)。
-
-        let finalTier = d.system.tier; // 1. 尝试直接读取
-
-        if (finalTier === undefined || finalTier === null) {
-            // 2. JSON 没写，开始自动计算
-            let calculatedTier = 1; // 默认保底
-
-            if (processedMoves.length > 0) {
-                // 提取所有有效的数字品阶 (非 null 的)
-                const validTiers = processedMoves
-                    .map(m => m.tier)
-                    .filter(t => typeof t === 'number');
-
-                if (validTiers.length > 0) {
-                    calculatedTier = Math.min(...validTiers);
-                }
-            }
-            finalTier = calculatedTier;
+    try {
+        // 清空 Items
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+        // 清空 Folders
+        if (pack.folders.size > 0) {
+            await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
         }
 
-        // 武学一般没有 Item 级的 effects，通常脚本都在 moves 里
-        // 但如果有些被动武学有全局效果，也可以支持
-        // AI生成的JSON 似乎有时候会把 effects 写在 system 里，这里做一下兼容性的查找
-        const rawEffects = d.effects || d.system?.effects || [];
-        const effects = rawEffects.map(e => {
-            // === 自动修复逻辑：根目录 scripts 迁移 ===
-            if (e.scripts) {
-                // 严厉校验：如果有 scripts 但连 flags 对象都没有，视为严重结构错误，直接阻断
-                if (!e.flags) {
-                    const errMsg = `[XJZL Import Error] 武学 [${d.name}] 的特效 [${e.name}] 在根目录定义了 scripts，但完全缺失 flags 字段。导入已紧急停止。`;
-                    ui.notifications.error(errMsg);
-                    console.error(e); // 打印出错的对象以便调试
-                    throw new Error(errMsg); // 抛出错误以停止 Promise 执行
+        // 3. 创建文件夹结构 (按门派)
+        console.log("XJZL Seeder | 创建武学门派文件夹...");
+        const folders = {}; // { sectKey: folderId }
+        const activeSects = [...new Set(wuxueData.map(d => d.system.sect))];
+
+        const folderPromises = activeSects.map(sectKey =>
+            Folder.create({
+                name: SECT_MAP[sectKey] || sectKey,
+                type: "Item",
+                pack: PACK_NAME
+            }, { pack: PACK_NAME })
+        );
+
+        const createdFolders = await Promise.all(folderPromises);
+        activeSects.forEach((key, i) => folders[key] = createdFolders[i].id);
+
+        // 4. 构建 Item 数组
+        const items = [];
+
+        for (const d of wuxueData) {
+            const bookTier = d.system.tier;
+            // 1. 处理招式
+            const processedMoves = processMoves(d.system.moves, d.system.requirements, bookTier);
+
+            // 2. 确定书本品阶 (Book Tier Resolution)
+            // 逻辑：优先读取 JSON 数据中的 tier。
+            // 如果 JSON 中未定义，则尝试根据招式自动推断（取招式中最低的品阶）。
+            // 如果都无法确定，默认为 1 (人级)。
+
+            let finalTier = d.system.tier; // 1. 尝试直接读取
+
+            if (finalTier === undefined || finalTier === null) {
+                // 2. JSON 没写，开始自动计算
+                let calculatedTier = 1; // 默认保底
+
+                if (processedMoves.length > 0) {
+                    // 提取所有有效的数字品阶 (非 null 的)
+                    const validTiers = processedMoves
+                        .map(m => m.tier)
+                        .filter(t => typeof t === 'number');
+
+                    if (validTiers.length > 0) {
+                        calculatedTier = Math.min(...validTiers);
+                    }
                 }
-
-                // 确保 xjzl-system 命名空间存在
-                if (!e.flags["xjzl-system"]) e.flags["xjzl-system"] = {};
-
-                // 执行迁移：将根目录的 scripts 移动到 flags.xjzl-system 下
-                e.flags["xjzl-system"].scripts = e.scripts;
-
-                console.warn(`XJZL Seeder | ⚠️ 自动修复: 已将特效 [${e.name}] 的脚本移动至 flags 正确位置。`);
+                finalTier = calculatedTier;
             }
-            // ================================================
-            // 基础结构
-            const effectData = {
-                name: e.name,
-                icon: d.img, // 如果特效没配图标，默认用物品图标，暂时使用物品图标吧，AI会给特效配上不存在的图标 e.icon
-                transfer: e.transfer ?? false,
-                disabled: e.disabled ?? false,
-                changes: e.changes || [],
-                flags: e.flags || {},
-                description: e.description || "",
-                // 补上 duration
-                duration: e.duration || {},
-                // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
-                statuses: e.statuses || [],
-                tint: e.tint || null,
-                // 补上 origin，虽然通常是空的，但保持结构完整
-                origin: e.origin || null
-            };
-            // 只有当 JSON 里显式定义了 duration 时才写入
-            if (e.duration) {
-                effectData.duration = e.duration;
-            }
-            return effectData;
-        });
+
+            // 武学一般没有 Item 级的 effects，通常脚本都在 moves 里
+            // 但如果有些被动武学有全局效果，也可以支持
+            // AI生成的JSON 似乎有时候会把 effects 写在 system 里，这里做一下兼容性的查找
+            const rawEffects = d.effects || d.system?.effects || [];
+            const effects = rawEffects.map(e => {
+                // === 自动修复逻辑：根目录 scripts 迁移 ===
+                if (e.scripts) {
+                    // 严厉校验：如果有 scripts 但连 flags 对象都没有，视为严重结构错误，直接阻断
+                    if (!e.flags) {
+                        const errMsg = `[XJZL Import Error] 武学 [${d.name}] 的特效 [${e.name}] 在根目录定义了 scripts，但完全缺失 flags 字段。导入已紧急停止。`;
+                        ui.notifications.error(errMsg);
+                        console.error(e); // 打印出错的对象以便调试
+                        throw new Error(errMsg); // 抛出错误以停止 Promise 执行
+                    }
+
+                    // 确保 xjzl-system 命名空间存在
+                    if (!e.flags["xjzl-system"]) e.flags["xjzl-system"] = {};
+
+                    // 执行迁移：将根目录的 scripts 移动到 flags.xjzl-system 下
+                    e.flags["xjzl-system"].scripts = e.scripts;
+
+                    console.warn(`XJZL Seeder | ⚠️ 自动修复: 已将特效 [${e.name}] 的脚本移动至 flags 正确位置。`);
+                }
+                // ================================================
+                // 基础结构
+                const effectData = {
+                    name: e.name,
+                    icon: d.img, // 如果特效没配图标，默认用物品图标，暂时使用物品图标吧，AI会给特效配上不存在的图标 e.icon
+                    transfer: e.transfer ?? false,
+                    disabled: e.disabled ?? false,
+                    changes: e.changes || [],
+                    flags: e.flags || {},
+                    description: e.description || "",
+                    // 补上 duration
+                    duration: e.duration || {},
+                    // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
+                    statuses: e.statuses || [],
+                    tint: e.tint || null,
+                    // 补上 origin，虽然通常是空的，但保持结构完整
+                    origin: e.origin || null
+                };
+                // 只有当 JSON 里显式定义了 duration 时才写入
+                if (e.duration) {
+                    effectData.duration = e.duration;
+                }
+                return effectData;
+            });
 
 
 
-        // 如果存在全局 Item 脚本 (非常少见，比如“装备此书获得被动”)
-        const itemScripts = Array.isArray(d.system.scripts) ? d.system.scripts.map(s => ({
-            label: s.label,
-            trigger: s.trigger,
-            script: s.script,
-            active: s.active
-        })) : [];
+            // 如果存在全局 Item 脚本 (非常少见，比如“装备此书获得被动”)
+            const itemScripts = Array.isArray(d.system.scripts) ? d.system.scripts.map(s => ({
+                label: s.label,
+                trigger: s.trigger,
+                script: s.script,
+                active: s.active
+            })) : [];
 
-        items.push({
-            name: d.name,
-            type: "wuxue",
-            img: d.img,
-            folder: folders[d.system.sect],
-            system: {
-                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
-                // 总纲配置
-                category: d.system.category || "wuxue", // wuxue, sanshou, qinggong, zhenfa
-                sect: d.system.sect || "none",
-                subSect: d.system.subSect || "none", // 二级势力，默认为 none
-                // 使用自动计算出的 Tier
-                tier: finalTier,
+            items.push({
+                name: d.name,
+                type: "wuxue",
+                img: d.img,
+                folder: folders[d.system.sect],
+                system: {
+                    isOfficial: d.system.isOfficial ?? true, //默认是官方资源
+                    // 总纲配置
+                    category: d.system.category || "wuxue", // wuxue, sanshou, qinggong, zhenfa
+                    sect: d.system.sect || "none",
+                    subSect: d.system.subSect || "none", // 二级势力，默认为 none
+                    // 使用自动计算出的 Tier
+                    tier: finalTier,
 
-                description: d.system.description || "",
-                requirements: d.system.requirements || "",
+                    description: d.system.description || "",
+                    requirements: d.system.requirements || "",
 
-                // 核心：招式列表
-                moves: processedMoves,
+                    // 核心：招式列表
+                    moves: processedMoves,
 
-                // 核心：全局脚本
-                scripts: itemScripts
-            },
-            effects: effects
-        });
+                    // 核心：全局脚本
+                    scripts: itemScripts
+                },
+                effects: effects
+            });
+        }
+
+        // 5. 批量写入
+        if (items.length > 0) {
+            console.log(`XJZL Seeder | 正在写入 ${items.length} 个武学...`);
+            await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
+        }
+
+        createdCount = items.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
 
-    // 5. 批量写入
-    if (items.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${items.length} 个武学...`);
-        await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个武学！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个武学！`);
 }

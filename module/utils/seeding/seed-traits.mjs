@@ -30,39 +30,48 @@ export async function seedTraits() {
 
     await pack.configure({ locked: false });
 
-    // 清空旧数据
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+    let createdCount = 0;
+
+    try {
+        // 清空旧数据
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+
+        // 构建 Item 数组
+        const items = traitsData.map(t => {
+            return {
+                name: t.name || "未命名特效",
+                type: "trait",
+                img: t.img || "icons/magic/light/explosion-star-glow-green.webp",
+                system: {
+                    // 如果没有则兜底为 "general"
+                    type: t.system?.type || "general",
+
+                    description: t.system?.description || t.description || "",
+                    automationNote: t.system?.automationNote || t.automationNote || "",
+
+                    // 脚本同理
+                    scripts: Array.isArray(t.system?.scripts) ? t.system.scripts.map(s => ({
+                        label: s.label || "特效",
+                        trigger: s.trigger || "passive",
+                        script: s.script || "",
+                        active: s.active ?? true
+                    })) : []
+                },
+                effects: Array.isArray(t.effects) ? t.effects : []
+            };
+        });
+
+        console.log(`XJZL Seeder | 正在写入 ${items.length} 个特效...`);
+        await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
+
+        createdCount = items.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
 
-    // 构建 Item 数组
-    const items = traitsData.map(t => {
-        return {
-            name: t.name || "未命名特效",
-            type: "trait",
-            img: t.img || "icons/magic/light/explosion-star-glow-green.webp",
-            system: {
-                // 如果没有则兜底为 "general"
-                type: t.system?.type || "general",
-
-                description: t.system?.description || t.description || "",
-                automationNote: t.system?.automationNote || t.automationNote || "",
-
-                // 脚本同理
-                scripts: Array.isArray(t.system?.scripts) ? t.system.scripts.map(s => ({
-                    label: s.label || "特效",
-                    trigger: s.trigger || "passive",
-                    script: s.script || "",
-                    active: s.active ?? true
-                })) : []
-            },
-            effects: Array.isArray(t.effects) ? t.effects : []
-        };
-    });
-
-    console.log(`XJZL Seeder | 正在写入 ${items.length} 个特效...`);
-    await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
-
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个特效！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个特效！`);
 }

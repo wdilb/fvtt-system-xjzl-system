@@ -65,93 +65,103 @@ export async function seedArmor() {
 
     // 3. 解锁并清理旧数据
     await pack.configure({ locked: false });
-    const index = await pack.getIndex();
-    if (index.size > 0) {
-        console.log(`XJZL Seeder | 清理旧防具数据 (${index.size}条)...`);
-        await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+
+    let createdCount = 0;
+
+    try {
+        const index = await pack.getIndex();
+        if (index.size > 0) {
+            console.log(`XJZL Seeder | 清理旧防具数据 (${index.size}条)...`);
+            await Item.deleteDocuments(index.map(d => d._id), { pack: PACK_NAME });
+        }
+        // 清理文件夹
+        if (pack.folders.size > 0) {
+            await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
+        }
+
+        // 4. 创建文件夹结构 (按部位)
+        console.log("XJZL Seeder | 创建防具分类文件夹...");
+        const folders = {};
+        const folderPromises = types.map(t =>
+            Folder.create({
+                name: typeLabels[t] || t,
+                type: "Item",
+                pack: PACK_NAME
+            }, { pack: PACK_NAME })
+        );
+
+        // 等待所有文件夹创建完成
+        const createdFolders = await Promise.all(folderPromises);
+        // 建立 type -> folderId 的映射
+        types.forEach((t, i) => folders[t] = createdFolders[i].id);
+
+        // 5. 构建 Item 数组
+        const items = [];
+        for (const d of armorData) {
+
+            // --- 5.1 处理 Active Effects ---
+            // 防具的属性加成现在全部依赖 AE。
+            // 通常防具的特效是 transfer: true (被动)。
+            // 你的 XJZLActiveEffect 类会自动处理 "未装备时抑制" 的逻辑，所以这里放心设为 true。
+            const effects = d.effects ? d.effects.map(e => ({
+                name: e.name,
+                icon: e.icon || d.img, // 如果没配图标，默认用物品图标
+                // 防具通常是被动传输，除非是主动使用的技能
+                transfer: e.transfer ?? true,
+                disabled: e.disabled ?? false,
+                changes: e.changes || [],
+                // 重要：保留 flags，因为里面存了 slug, stackable, 以及 AE 内部的 scripts
+                flags: e.flags || {},
+                description: e.description || "",
+                // 补上 duration
+                duration: e.duration || {},
+                // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
+                statuses: e.statuses || [],
+                tint: e.tint || null,
+                // 补上 origin，虽然通常是空的，但保持结构完整
+                origin: e.origin || null
+            })) : [];
+
+            // --- 5.2 处理 Item 自身的 Scripts ---
+            // 对应 XJZLArmorData.scripts (makeScriptEffectSchema 数组)
+            // 格式: [{ label: "...", trigger: "damaged", script: "...", active: true }]
+            const itemScripts = d.system.scripts || [];
+
+            items.push({
+                name: d.name,
+                type: "armor", // 固定类型
+                img: d.img,
+                folder: folders[d.system.type], // 归类到对应部位文件夹
+                system: {
+                    // 基础数据
+                    type: d.system.type, // head, top, ...
+                    price: d.system.price ?? 0,
+                    quality: d.system.quality ?? 0, // 0-4
+                    quantity: d.system.quantity ?? 1,
+                    equipped: false, // 导入时默认未装备
+                    isOfficial: d.system.isOfficial ?? true, //默认是官方资源
+                    // 描述与备注
+                    description: d.system.description || "",
+                    automationNote: d.system.automationNote || "",
+
+                    // 物品级脚本 (例如：受击触发 damaged, 穿戴触发 passive 等)
+                    scripts: itemScripts
+                },
+                effects: effects
+            });
+        }
+
+        // 6. 批量写入
+        if (items.length > 0) {
+            console.log(`XJZL Seeder | 正在写入 ${items.length} 个防具...`);
+            await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
+        }
+
+        createdCount = items.length;
+    } finally {
+        // 写入完成后回锁：系统合集包在 Foundry 中默认锁定，保持只读可避免 GM 浏览时误改源数据
+        await pack.configure({ locked: true });
     }
-    // 清理文件夹
-    if (pack.folders.size > 0) {
-        await Folder.deleteDocuments(pack.folders.map(f => f.id), { pack: PACK_NAME });
-    }
 
-    // 4. 创建文件夹结构 (按部位)
-    console.log("XJZL Seeder | 创建防具分类文件夹...");
-    const folders = {};
-    const folderPromises = types.map(t =>
-        Folder.create({ 
-            name: typeLabels[t] || t, 
-            type: "Item", 
-            pack: PACK_NAME 
-        }, { pack: PACK_NAME })
-    );
-    
-    // 等待所有文件夹创建完成
-    const createdFolders = await Promise.all(folderPromises);
-    // 建立 type -> folderId 的映射
-    types.forEach((t, i) => folders[t] = createdFolders[i].id);
-
-    // 5. 构建 Item 数组
-    const items = [];
-    for (const d of armorData) {
-        
-        // --- 5.1 处理 Active Effects ---
-        // 防具的属性加成现在全部依赖 AE。
-        // 通常防具的特效是 transfer: true (被动)。
-        // 你的 XJZLActiveEffect 类会自动处理 "未装备时抑制" 的逻辑，所以这里放心设为 true。
-        const effects = d.effects ? d.effects.map(e => ({
-            name: e.name,
-            icon: e.icon || d.img, // 如果没配图标，默认用物品图标
-            // 防具通常是被动传输，除非是主动使用的技能
-            transfer: e.transfer ?? true, 
-            disabled: e.disabled ?? false,
-            changes: e.changes || [],
-            // 重要：保留 flags，因为里面存了 slug, stackable, 以及 AE 内部的 scripts
-            flags: e.flags || {}, 
-            description: e.description || "",
-            // 补上 duration
-            duration: e.duration || {}, 
-            // 补上 statuses (V11+ 系统状态标识) 和 tint (颜色)
-            statuses: e.statuses || [],
-            tint: e.tint || null,
-            // 补上 origin，虽然通常是空的，但保持结构完整
-            origin: e.origin || null
-        })) : [];
-
-        // --- 5.2 处理 Item 自身的 Scripts ---
-        // 对应 XJZLArmorData.scripts (makeScriptEffectSchema 数组)
-        // 格式: [{ label: "...", trigger: "damaged", script: "...", active: true }]
-        const itemScripts = d.system.scripts || [];
-
-        items.push({
-            name: d.name,
-            type: "armor", // 固定类型
-            img: d.img,
-            folder: folders[d.system.type], // 归类到对应部位文件夹
-            system: {
-                // 基础数据
-                type: d.system.type, // head, top, ...
-                price: d.system.price ?? 0,
-                quality: d.system.quality ?? 0, // 0-4
-                quantity: d.system.quantity ?? 1,
-                equipped: false, // 导入时默认未装备
-                isOfficial: d.system.isOfficial ?? true, //默认是官方资源
-                // 描述与备注
-                description: d.system.description || "",
-                automationNote: d.system.automationNote || "",
-
-                // 物品级脚本 (例如：受击触发 damaged, 穿戴触发 passive 等)
-                scripts: itemScripts
-            },
-            effects: effects
-        });
-    }
-
-    // 6. 批量写入
-    if (items.length > 0) {
-        console.log(`XJZL Seeder | 正在写入 ${items.length} 个防具...`);
-        await Item.createDocuments(items, { pack: PACK_NAME, keepId: false });
-    }
-
-    ui.notifications.info(`XJZL | 成功生成 ${items.length} 个防具！`);
+    ui.notifications.info(`XJZL | 成功生成 ${createdCount} 个防具！`);
 }
