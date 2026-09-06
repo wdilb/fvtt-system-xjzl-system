@@ -448,6 +448,7 @@ export class ChatCardManager {
                 flags: {
                     grantLevel: 0,
                     grantFeintLevel: 0,  // 虚招修正
+                    targetKanpoLevel: 0, // 当前动作给予目标看破检定的层级修正
                     ignoreBlock: false,
                     ignoreDefense: false,
                     ignoreStance: false,
@@ -507,6 +508,8 @@ export class ChatCardManager {
                 critThresholdMod: checkContext.flags.critThresholdMod || 0,
                 grantHit: checkContext.flags.grantHit || 0,
                 grantFeint: checkContext.flags.grantFeint || 0,
+                // 新目标也必须生成同样的延迟看破快照，避免发卡后选目标时丢失修正。
+                targetKanpoLevel: checkContext.flags.targetKanpoLevel || 0,
                 forceHit: checkContext.flags.forceHit || false, // 存储单目标必中
                 alwaysHit: checkContext.flags.alwaysHit || false
             });
@@ -564,7 +567,7 @@ export class ChatCardManager {
                 const displayName = target.name || tActor.name;
 
                 // 复用计算逻辑 (局部)
-                const states = targetStates.get(uuid) || { attackState: 0, feintState: 0 }; // 读取刚才算的状态
+                const states = targetStates.get(uuid) || { attackState: 0, feintState: 0, targetKanpoLevel: 0 }; // 读取刚才算的状态
                 const state = states.attackState;
 
                 // --- 命中判定逻辑 ---
@@ -660,17 +663,21 @@ export class ChatCardManager {
             const targetActor = target.actor || target;
             if (!targetActor) continue;
 
-            // A. 缓存优先 (如果是 ApplyDamage 二次调用，且不需要补骰，可能走缓存)
-            // 但如果刚补了骰子，这里的缓存可能还是旧的，所以要注意 flags 更新时机
-            // 通常建议如果 d2 存在，总是重新计算最稳妥
+            // A. 已缓存目标在出招时已经完成逐目标判定；补骰只服务于本次新增目标。
+            // 保留缓存也能避免重复执行 CHECK 脚本，并防止其快照字段在默认状态下丢失。
             const cached = flags.targetsResultMap?.[safeKey];
-            if (cached && !needsSupplemental) {
+            if (cached) {
                 results[uuid] = cached;
                 continue;
             }
 
             // B. 确定最终使用的骰子 (Final Die)
-            const states = targetStates.get(uuid) || { attackState: 0, feintState: 0, forceHit: false };
+            const states = targetStates.get(uuid) || {
+                attackState: 0,
+                feintState: 0,
+                targetKanpoLevel: 0,
+                forceHit: false
+            };
             const state = states.attackState;
             const isTargetForceHit = states.forceHit;
             let finalDie = d1;
@@ -714,6 +721,7 @@ export class ChatCardManager {
                 ignoreStance: states.ignoreStance,
                 critThresholdMod: states.critThresholdMod || 0,
                 finalFeint: finalFeint,
+                targetKanpoLevel: states.targetKanpoLevel ?? 0,
                 forceHit: isTargetForceHit
             };
         }
@@ -814,6 +822,7 @@ export class ChatCardManager {
                 target: target, // 保留原始target对象以获取纹理
                 displayName: displayName,
                 feintState: res.feintState || 0,
+                targetKanpoLevel: res.targetKanpoLevel || 0,
                 finalFeintVal: targetFeintVal
             });
         }
@@ -847,7 +856,15 @@ export class ChatCardManager {
 
                 // 3. 遍历有效目标发送请求
                 for (const tData of validTargetsToRequest) {
-                    const { uuid, actor: targetActor, target, displayName, feintState, finalFeintVal } = tData;
+                    const {
+                        uuid,
+                        actor: targetActor,
+                        target,
+                        displayName,
+                        feintState,
+                        targetKanpoLevel,
+                        finalFeintVal
+                    } = tData;
 
                     // 计算针对该目标的最终点数
                     let finalDie = d1;
@@ -895,6 +912,7 @@ export class ChatCardManager {
                                 targetUuid: uuid,
                                 attackTotal: attackTotal,
                                 originMessageId: message.id,
+                                targetKanpoLevel: targetKanpoLevel,
                                 // 双虚招标记: 供结果回写时按轮次存储与防重 (单轮不传，保持旧行为)
                                 ...(isDoubleFeint ? { contestIndex: contestIdx, doubleFeint: true } : {})
                             }
@@ -952,7 +970,7 @@ export class ChatCardManager {
     }
 
     /**
-     * 响应虚招对抗
+     * 响应虚招对抗，并合并防守者当前状态与攻击卡快照中的本次看破修正。
      */
     static async _onDefendFeint(defender, flags, message) {
         // =====================================================
@@ -1024,12 +1042,8 @@ export class ChatCardManager {
         // A. 自身抗性: 防御者自身的看破能力修正
         const selfLevel = targetActor.xjzlStatuses?.feintLevel || 0;
 
-        // B. 外来影响: 攻击者状态赋予防御者的修正 (例如攻击者动作迟缓)
-        let grantLevel = 0;
-        // if (attackerActor) {
-        //     grantLevel = attackerActor.xjzlStatuses?.defendFeintLevel || 0;
-        // }
-        // 这个flag应该无法增加看破的优势，这里只可能通过脚本来修改。
+        // B. 外来影响: 出招时已按目标计算并固化，避免延迟响应造成状态漂移或重复执行脚本。
+        const grantLevel = Number(flags.targetKanpoLevel) || 0;
 
         // C. 汇总自动层级
         const autoLevel = selfLevel + grantLevel;

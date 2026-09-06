@@ -3152,6 +3152,7 @@ export class XJZLActor extends Actor {
           ignoreDefense: false,
           ignoreStance: false,
           grantFeintLevel: 0,  // 虚招等级修正
+          targetKanpoLevel: 0, // 当前动作给予目标看破检定的层级修正
           critThresholdMod: 0, // 针对该目标的暴击阈值修正
           grantHit: 0,         // 针对该目标的命中加值
           grantFeint: 0,        // 针对该目标的虚招加值

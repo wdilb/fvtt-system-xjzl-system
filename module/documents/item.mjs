@@ -2137,6 +2137,7 @@ export class XJZLItem extends Item {
             flags: {
               grantLevel: 0,      // 攻击修正
               grantFeintLevel: 0,  // 虚招修正
+              targetKanpoLevel: 0, // 当前动作给予目标看破检定的层级修正
               ignoreBlock: false,
               ignoreDefense: false,
               ignoreStance: false,
@@ -2190,6 +2191,8 @@ export class XJZLItem extends Item {
             critThresholdMod: checkContext.flags.critThresholdMod || 0,
             grantHit: checkContext.flags.grantHit || 0,
             grantFeint: checkContext.flags.grantFeint || 0,
+            // 保留原始计数，防守方点击看破时再与其自身状态合并。
+            targetKanpoLevel: checkContext.flags.targetKanpoLevel || 0,
             forceHit: checkContext.flags.forceHit || false,
             alwaysHit: checkContext.flags.alwaysHit || false
           });
@@ -2282,7 +2285,13 @@ export class XJZLItem extends Item {
           // 修改为使用 t.document.uuid 作为 Key，而不是 t.id
           // t.id 只是由 ID 组成的字符串，而 uuid 包含场景信息，更安全
           const tokenUuid = t.document.uuid;
-          const ctx = targetContexts.get(tokenUuid) || { attackState: 0, grantHit: 0, grantFeint: 0, forceHit: false };
+          const ctx = targetContexts.get(tokenUuid) || {
+            attackState: 0,
+            grantHit: 0,
+            grantFeint: 0,
+            targetKanpoLevel: 0,
+            forceHit: false
+          };
           const state = ctx.attackState;
           // 核心命中判断逻辑
           let finalDie = "-";
@@ -2342,6 +2351,7 @@ export class XJZLItem extends Item {
             ignoreStance: ctx.ignoreStance,
             critThresholdMod: ctx.critThresholdMod,
             finalFeint: finalFeint,
+            targetKanpoLevel: ctx.targetKanpoLevel || 0,
             forceHit: ctx.forceHit // 记录该目标是否触发了单体必中
           };
         });
@@ -2351,7 +2361,7 @@ export class XJZLItem extends Item {
         // 同时，虽然没投攻击骰，但虚招优劣势 (feintState) 已经算好了存着了
         targets.forEach(t => {
           const tokenUuid = t.document.uuid;
-          const ctx = targetContexts.get(tokenUuid) || { attackState: 0 };
+          const ctx = targetContexts.get(tokenUuid) || { attackState: 0, targetKanpoLevel: 0 };
           const finalFeint = calcResult.feint + (ctx.grantFeint || 0);
           targetsResults[t.document.uuid] = {
             name: t.name,
@@ -2365,7 +2375,8 @@ export class XJZLItem extends Item {
             ignoreDefense: ctx.ignoreDefense,
             ignoreStance: ctx.ignoreStance,
             critThresholdMod: ctx.critThresholdMod,
-            finalFeint: finalFeint
+            finalFeint: finalFeint,
+            targetKanpoLevel: ctx.targetKanpoLevel || 0
           };
         });
         if (effectiveMode === "heal") flavorText = "施展治疗";
@@ -2494,7 +2505,8 @@ export class XJZLItem extends Item {
                 ignoreDefense: res.ignoreDefense,
                 ignoreStance: res.ignoreStance,
                 critThresholdMod: res.critThresholdMod || 0,
-                finalFeint: res.finalFeint || 0
+                finalFeint: res.finalFeint || 0,
+                targetKanpoLevel: res.targetKanpoLevel || 0
               };
               return acc;
             }, {})
