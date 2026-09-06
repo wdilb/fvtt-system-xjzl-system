@@ -878,7 +878,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>捏针剑指，抛飞飘出，对目标造成伤害，击中无架招目标时，为其添加一层“葵花”，至多三层，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
-                    "automationNote": "吸血自动。命中无架招施加葵花自动。葵花看破劣势发卡片提醒（需防守方手动调低）。",
+                    "automationNote": "完全自动化：吸血、命中无架招目标施加葵花、葵花看破劣势。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -899,9 +899,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "葵花看破劣势提醒",
+                            "label": "葵花看破劣势",
                             "trigger": "check",
-                            "script": "// 看破的优劣势只能由防守方在看破弹窗手动调整（系统无按攻击者区分的看破优劣势入口），发卡提醒；劣势固定一层，不随葵花层数叠加\nconst kh = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuihua\");\nif (kh && args.target.system.martial?.stanceActive) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\"><b>${args.target.name}</b> 身中葵花：本次看破检定应带 <b>1</b> 层劣势，请防守方在看破弹窗手动调低。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "// 劣势固定一层，不随葵花层数叠加；系统会将修正固化到本次目标的看破请求中\nconst hasKuihua = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"kuihua\");\nif (hasKuihua) args.flags.targetKanpoLevel -= 1;",
                             "active": true
                         },
                         {
@@ -1006,7 +1006,7 @@
             {
                 "name": "葵花",
                 "icon": "icons/consumables/flowers/sunflower-yellow.webp",
-                "description": "虚招对抗劣势，被葵花神针攻击时被吸血。",
+                "description": "受到《葵花神针》招式攻击时，虚招对抗具有劣势，且每层葵花使攻击者吸取 10%的气血。",
                 "transfer": false,
                 "flags": {
                     "xjzl-system": {
