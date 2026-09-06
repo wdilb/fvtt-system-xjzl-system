@@ -261,6 +261,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `attacker` | `Actor` | 只读 | 出招者。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
 | `flags.grantLevel` / `flags.grantFeintLevel` | `number` | **可写** | 仅针对当前目标的命中/虚招优劣势计数。 |
+| `flags.targetKanpoLevel` | `number` | **可写** | 当前动作给予目标本次看破检定的优劣势计数；会随攻击卡固化，正数为优势，负数为劣势。 |
 | `flags.grantHit` / `flags.grantFeint` | `number` | **可写** | 仅针对当前目标的命中值/虚招值加成。 |
 | `flags.critThresholdMod` | `number` | **可写** | 仅针对当前目标的暴击阈值修正。 |
 | `flags.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 仅针对当前目标忽略格挡、防御或架招。 |
