@@ -593,7 +593,7 @@ await actor.changeResources({
 });
 ```
 
-`changeResources(updates, context)` 的 `updates` 是 Foundry 更新路径到绝对值的对象；`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。返回底层 Actor 更新结果。它会串行提交同一 Actor 的事务，并按实际差值派发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
+`changeResources(updates, context)` 的 `updates` 默认是 Foundry 更新路径到绝对值的对象；如果需要原子增减，可显式传入 `{ delta: n }`，例如 `{"system.resources.rage.value": { delta: 1 }}`。普通数字的绝对值语义保持不变。`context` 可包含 `cause`、`sourceActor`、`attacker`、`healer`、`target`、`item`、`move`、`source`。返回底层 Actor 更新结果。它会串行提交同一 Actor 的事务，并按实际差值派发 `resourceChanged`；不要用它模拟需要防御、抗性、护体、禁疗或统计语义的正常伤害/治疗。
 
 这 6 类资源字段——`system.resources.hp.value`、`system.resources.mp.value`、`system.resources.rage.value`、`system.resources.huti`（旧世界兼容 `system.resources.huti.value`）、`system.resources.tili.value`、`system.resources.morale.value`——在脚本中必须通过 `changeResources`（或语义匹配的 `applyDamage` / `applyHealing`）写入，不要直接 `actor.update()` / `args.target.update()` 修改这些路径。直接 `update` 只有兼容兜底，新脚本统一使用资源事务入口，以保留非 owner 的 GM socket 委托和按实际差值触发的 `resourceChanged` 语义。
 

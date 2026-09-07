@@ -37,7 +37,8 @@ const MOVE_ACTION_RESOURCE_TRIGGERS = new Set([
 ]);
 const RESOURCE_TRANSACTION_OPTIONS = new Set([
   "xjzlResourceContext",
-  "xjzlResourceTransaction"
+  "xjzlResourceTransaction",
+  "xjzlResourceDelta"
 ]);
 
 /**
@@ -92,7 +93,8 @@ function inheritScriptResourceContext(actor, context = {}) {
 /** 移除资源事务的内部选项；普通 update 直接复用原对象，保持 Foundry 原生调用语义。 */
 function getDatabaseOperation(operation = {}) {
   if (operation?.xjzlResourceContext === undefined
-    && operation?.xjzlResourceTransaction === undefined) return operation;
+    && operation?.xjzlResourceTransaction === undefined
+    && operation?.xjzlResourceDelta === undefined) return operation;
   const databaseOperation = { ...operation };
   for (const key of RESOURCE_TRANSACTION_OPTIONS) delete databaseOperation[key];
   return databaseOperation;
@@ -132,7 +134,7 @@ export class XJZLActor extends Actor {
 
   /**
    * 统一资源事务入口：提交成功后按实际差值触发 resourceChanged。
-   * @param {Object} updates - Actor.update 使用的增量对象
+   * @param {Object} updates - Actor.update 使用的绝对值对象；资源路径也支持显式 { delta: number }
    * @param {Object} context - cause、item、move、sourceActor 等触发上下文
    * @returns {Promise<Document|null|undefined>} 原始 Actor 更新结果或 socket 空结果
    */
@@ -148,7 +150,10 @@ export class XJZLActor extends Actor {
       return unwrapResourceSocketResult(socketResult);
     }
 
-    const transaction = await this._commitResourceChanges(updates, context);
+    const operation = this._hasResourceDeltaUpdates(updates)
+      ? { xjzlResourceDelta: true }
+      : {};
+    const transaction = await this._commitResourceChanges(updates, context, operation);
     if (transaction.changes.length > 0) {
       await this._dispatchResourceChanges(transaction.changes, context);
     }
@@ -187,8 +192,31 @@ export class XJZLActor extends Actor {
 
   /**
    * 提交资源更新并计算真实差值；此方法不负责触发脚本，供伤害结算延迟派发。
+   * @param {Object} [options]
+   * @param {boolean} [options.lockHeld=false] - 调用方已持有资源锁时跳过再次加锁。
    */
-  async _commitResourceChanges(updates = {}, context = {}, operation = {}) {
+  async _commitResourceChanges(updates = {}, context = {}, operation = {}, { lockHeld = false } = {}) {
+    // 增量描述必须在资源锁内解析；否则 current + delta 仍可能读取到旧值。
+    if (operation?.xjzlResourceDelta && !lockHeld) {
+      return await this._withResourceCommitLock(async () => {
+        const resolvedUpdates = this._resolveResourceDeltaUpdates(updates);
+        return await this._commitResourceChanges(
+          resolvedUpdates,
+          context,
+          operation,
+          { lockHeld: true }
+        );
+      });
+    }
+    if (operation?.xjzlResourceDelta) updates = this._resolveResourceDeltaUpdates(updates);
+
+    const commitWithLock = callback => lockHeld
+      ? callback()
+      : this._withResourceCommitLock(callback);
+    const commitFastPath = callback => (lockHeld || this._resourceCommitQueue)
+      ? commitWithLock(callback)
+      : callback();
+
     const contextItem = context.move || null;
     const contextScripts = contextItem?.scripts;
     const contextHasResourceScript = Array.isArray(contextScripts) && contextScripts.some(script =>
@@ -198,8 +226,8 @@ export class XJZLActor extends Actor {
     const scriptSourcesChanged = this._changesResourceScriptSources(updates);
     if (this._resourceScriptCache === false && !contextHasResourceScript && !scriptSourcesChanged) {
       const databaseOperation = getDatabaseOperation(operation);
-      const result = this._resourceCommitQueue && this._getChangedResourceFields(updates).length > 0
-        ? await this._withResourceCommitLock(() => super.update(updates, databaseOperation))
+      const result = this._getChangedResourceFields(updates).length > 0
+        ? await commitFastPath(() => super.update(updates, databaseOperation))
         : await super.update(updates, databaseOperation);
       return { result, changes: [] };
     }
@@ -211,13 +239,13 @@ export class XJZLActor extends Actor {
 
     // 快速路径：没有资源字段，或 Actor 没有该触发器脚本时，行为等同原始 update。
     if (!hasResourceScripts) {
-      const result = this._resourceCommitQueue && changedFields.length > 0
-        ? await this._withResourceCommitLock(() => super.update(updates, databaseOptions))
+      const result = changedFields.length > 0
+        ? await commitFastPath(() => super.update(updates, databaseOptions))
         : await super.update(updates, databaseOptions);
       return { result, changes: [] };
     }
 
-    return await this._withResourceCommitLock(async () => {
+    return await commitWithLock(async () => {
       // 快照全部“实际适用且持久化”的资源字段，确保完整性检查额外裁剪的资源也能进入本次 changes。
       const applicableFields = this._getApplicableResourceFields();
       const before = this._snapshotResources(applicableFields);
@@ -284,6 +312,47 @@ export class XJZLActor extends Actor {
     return RESOURCE_FIELDS.filter(field => (field.updatePaths || [field.path]).some(path =>
       foundry.utils.getProperty(changes, path) !== undefined
     ));
+  }
+
+  /**
+   * 判断资源更新中是否包含显式增量描述。
+   * 普通数字仍表示绝对值；只有 { delta: number } 才表示在锁内基于当前值增减。
+   */
+  _hasResourceDeltaUpdates(updates = {}) {
+    return Object.values(updates).some(value => value
+      && typeof value === "object"
+      && !Array.isArray(value)
+      && Object.prototype.hasOwnProperty.call(value, "delta"));
+  }
+
+  /**
+   * 将显式资源增量解析为锁内读取到的绝对值。
+   * @param {Object} updates - 支持资源路径到 { delta: number } 的更新对象。
+   * @returns {Object} 可直接交给 Actor.update 的绝对值更新对象。
+   */
+  _resolveResourceDeltaUpdates(updates = {}) {
+    const resolvedUpdates = { ...updates };
+    for (const [path, operation] of Object.entries(updates)) {
+      if (!operation
+        || typeof operation !== "object"
+        || Array.isArray(operation)
+        || !Object.prototype.hasOwnProperty.call(operation, "delta")) continue;
+
+      const field = RESOURCE_FIELDS.find(resourceField =>
+        (resourceField.updatePaths || [resourceField.path]).includes(path)
+      );
+      if (!field) throw new TypeError(`XJZL | 增量资源路径不受支持: ${path}`);
+
+      const delta = operation.delta;
+      if (typeof delta !== "number" || !Number.isFinite(delta)) {
+        throw new TypeError(`XJZL | 资源增量必须是有限数字: ${path}`);
+      }
+
+      const current = this._readResourceValue(field);
+      if (!Number.isFinite(current)) throw new TypeError(`XJZL | 无法读取资源当前值: ${path}`);
+      resolvedUpdates[path] = current + delta;
+    }
+    return resolvedUpdates;
   }
 
   /**
@@ -2554,143 +2623,16 @@ export class XJZLActor extends Actor {
 
     // 允许负数，只拦截 0
     if (amount === 0) return { actualHeal: 0 };
+    if (type === "tili" && !this.system.resources.tili) {
+      return { actualHeal: 0, type, overflow: amount, isBlocked: false, oldVal: null, newVal: null };
+    }
 
-    const updates = {};
     let actualHeal = 0; // 实际变动值 (正或负)
     let label = "";
     let color = "#00FF00"; // 默认绿色 (HP回复)
     let oldVal = 0;
     let newVal = 0;
 
-    // A. 气血 (HP)
-    if (type === "hp") {
-      const current = this.system.resources.hp.value;
-      const max = this.system.resources.hp.max;
-      oldVal = current;
-
-      // 检查禁疗 (预检查，用于计算 actualHeal 显示 0 还是 真实值)
-      // 虽然 _preUpdate 会拦截，但为了飘字准确，这里先判一下
-      // 禁疗只阻止正向回复 (amount > 0)，不阻止扣血 (amount < 0)
-      if (amount > 0 && this.xjzlStatuses.noRecoverHP) {
-        actualHeal = 0;
-        newVal = current;
-      } else {
-        // 兼容正负数逻辑
-        // 如果是回复(>0): 限制不超过 max
-        // 如果是流失(<0): 限制不低于 0
-        if (amount > 0) {
-          newVal = Math.min(max, current + amount);
-        } else {
-          newVal = Math.max(0, current + amount);
-        }
-
-        actualHeal = newVal - current;
-        if (actualHeal !== 0) {
-          updates["system.resources.hp.value"] = newVal;
-        }
-      }
-
-      // 根据正负生成 Label 和 Color
-      if (actualHeal > 0) {
-        label = `+${actualHeal}`;
-        color = "#00FF00"; // 绿
-      } else if (actualHeal < 0) {
-        label = `${actualHeal}`; // 自带负号
-        color = "#FF0000"; // 红 (扣血)
-      }
-    }
-
-    // B. 内力 (MP / Neili)
-    else if (type === "mp" || type === "neili") {
-      const current = this.system.resources.mp.value;
-      const max = this.system.resources.mp.max;
-      oldVal = current;
-
-      // 气滞只阻止回复
-      if (amount > 0 && this.xjzlStatuses.noRecoverNeili) {
-        actualHeal = 0;
-        newVal = current;
-      } else {
-        // 兼容正负数逻辑
-        if (amount > 0) {
-          newVal = Math.min(max, current + amount);
-        } else {
-          newVal = Math.max(0, current + amount);
-        }
-
-        actualHeal = newVal - current;
-        if (actualHeal !== 0) {
-          updates["system.resources.mp.value"] = newVal;
-        }
-      }
-
-      // Label 和 Color
-      label = `内力 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
-      color = "#0000FF"; // 蓝色
-    }
-
-    // C. 护体真气 (Huti)
-    else if (type === "huti") {
-      const current = this.system.resources.huti || 0;
-      oldVal = current;
-
-      // 护体允许减少
-      newVal = Math.max(0, current + amount);
-
-      // 护体通常没有固定上限，或者由 DataModel 限制
-      actualHeal = newVal - current;
-
-      if (actualHeal !== 0) {
-        updates["system.resources.huti"] = newVal;
-      }
-
-      label = `护体 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
-      color = "#00FFFF"; // 青色/天蓝
-    }
-
-    // D. 野兽体力 (Tili)
-    else if (type === "tili") {
-      const resource = this.system.resources.tili;
-      // 非野兽没有体力字段；保持旧有的安全无操作语义，避免通用资源脚本误传类型时崩溃。
-      if (!resource) {
-        return { actualHeal: 0, type, overflow: amount, isBlocked: false, oldVal: null, newVal: null };
-      }
-      const current = resource.value;
-      const max = resource.max;
-      oldVal = current;
-      newVal = amount > 0 ? Math.min(max, current + amount) : Math.max(0, current + amount);
-      actualHeal = newVal - current;
-
-      if (actualHeal !== 0) updates["system.resources.tili.value"] = newVal;
-      label = `体力 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
-      color = "#82C96F";
-    }
-
-    // E. 怒气 (Rage)
-    else if (type === "rage") {
-      const current = this.system.resources.rage.value;
-      const max = this.system.resources.rage.max;
-      oldVal = current;
-
-      // 不怒 (怒气锁定) 只阻止获得怒气，不阻止扣除
-      if (amount > 0 && this.xjzlStatuses.noRecoverRage) {
-        actualHeal = 0;
-        newVal = current;
-      } else {
-        // 回复不超过上限，扣除不低于 0
-        newVal = amount > 0 ? Math.min(max, current + amount) : Math.max(0, current + amount);
-        actualHeal = newVal - current;
-        if (actualHeal !== 0) {
-          updates["system.resources.rage.value"] = newVal;
-        }
-      }
-
-      label = `怒气 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
-      color = "#e67e22"; // 橙
-    }
-
-    // 执行更新
-    // 注意：如果 updates 为空（被 Flag 拦截导致 actualHeal=0），这里就不会执行
     const resourceContext = {
       cause: amount > 0 ? "healing" : "resourceLoss",
       healer: resourceHealer,
@@ -2701,9 +2643,144 @@ export class XJZLActor extends Actor {
       source: resourceSource
     };
     let resourceTransaction = { result: null, changes: [] };
-    if (!foundry.utils.isEmpty(updates)) {
-      resourceTransaction = await this._commitResourceChanges(updates, resourceContext);
-    }
+
+    // 治疗值、上限和禁疗状态必须与提交处于同一锁内，避免等待资源锁期间读到的 current 失效。
+    await this._withResourceCommitLock(async () => {
+      const updates = {};
+
+      // A. 气血 (HP)
+      if (type === "hp") {
+        const current = this.system.resources.hp.value;
+        const max = this.system.resources.hp.max;
+        oldVal = current;
+
+        // 检查禁疗 (预检查，用于计算 actualHeal 显示 0 还是 真实值)
+        // 虽然 _preUpdate 会拦截，但为了飘字准确，这里先判一下
+        // 禁疗只阻止正向回复 (amount > 0)，不阻止扣血 (amount < 0)
+        if (amount > 0 && this.xjzlStatuses.noRecoverHP) {
+          actualHeal = 0;
+          newVal = current;
+        } else {
+          // 兼容正负数逻辑
+          // 如果是回复(>0): 限制不超过 max
+          // 如果是流失(<0): 限制不低于 0
+          if (amount > 0) {
+            newVal = Math.min(max, current + amount);
+          } else {
+            newVal = Math.max(0, current + amount);
+          }
+
+          actualHeal = newVal - current;
+          if (actualHeal !== 0) {
+            updates["system.resources.hp.value"] = newVal;
+          }
+        }
+
+        // 根据正负生成 Label 和 Color
+        if (actualHeal > 0) {
+          label = `+${actualHeal}`;
+          color = "#00FF00"; // 绿
+        } else if (actualHeal < 0) {
+          label = `${actualHeal}`; // 自带负号
+          color = "#FF0000"; // 红 (扣血)
+        }
+      }
+
+      // B. 内力 (MP / Neili)
+      else if (type === "mp" || type === "neili") {
+        const current = this.system.resources.mp.value;
+        const max = this.system.resources.mp.max;
+        oldVal = current;
+
+        // 气滞只阻止回复
+        if (amount > 0 && this.xjzlStatuses.noRecoverNeili) {
+          actualHeal = 0;
+          newVal = current;
+        } else {
+          // 兼容正负数逻辑
+          if (amount > 0) {
+            newVal = Math.min(max, current + amount);
+          } else {
+            newVal = Math.max(0, current + amount);
+          }
+
+          actualHeal = newVal - current;
+          if (actualHeal !== 0) {
+            updates["system.resources.mp.value"] = newVal;
+          }
+        }
+
+        // Label 和 Color
+        label = `内力 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
+        color = "#0000FF"; // 蓝色
+      }
+
+      // C. 护体真气 (Huti)
+      else if (type === "huti") {
+        const current = this.system.resources.huti || 0;
+        oldVal = current;
+
+        // 护体允许减少
+        newVal = Math.max(0, current + amount);
+
+        // 护体通常没有固定上限，或者由 DataModel 限制
+        actualHeal = newVal - current;
+
+        if (actualHeal !== 0) {
+          updates["system.resources.huti"] = newVal;
+        }
+
+        label = `护体 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
+        color = "#00FFFF"; // 青色/天蓝
+      }
+
+      // D. 野兽体力 (Tili)
+      else if (type === "tili") {
+        const resource = this.system.resources.tili;
+        const current = resource.value;
+        const max = resource.max;
+        oldVal = current;
+        newVal = amount > 0 ? Math.min(max, current + amount) : Math.max(0, current + amount);
+        actualHeal = newVal - current;
+
+        if (actualHeal !== 0) updates["system.resources.tili.value"] = newVal;
+        label = `体力 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
+        color = "#82C96F";
+      }
+
+      // E. 怒气 (Rage)
+      else if (type === "rage") {
+        const current = this.system.resources.rage.value;
+        const max = this.system.resources.rage.max;
+        oldVal = current;
+
+        // 不怒 (怒气锁定) 只阻止获得怒气，不阻止扣除
+        if (amount > 0 && this.xjzlStatuses.noRecoverRage) {
+          actualHeal = 0;
+          newVal = current;
+        } else {
+          // 回复不超过上限，扣除不低于 0
+          newVal = amount > 0 ? Math.min(max, current + amount) : Math.max(0, current + amount);
+          actualHeal = newVal - current;
+          if (actualHeal !== 0) {
+            updates["system.resources.rage.value"] = newVal;
+          }
+        }
+
+        label = `怒气 ${actualHeal > 0 ? '+' : ''}${actualHeal}`;
+        color = "#e67e22"; // 橙
+      }
+
+      // 执行更新；resourceChanged 必须在锁外派发，避免脚本回调形成锁内递归。
+      if (!foundry.utils.isEmpty(updates)) {
+        resourceTransaction = await this._commitResourceChanges(
+          updates,
+          resourceContext,
+          {},
+          { lockHeld: true }
+        );
+      }
+    });
 
     // 视觉效果
     // 逻辑：
