@@ -19,6 +19,7 @@
                     "description": "<p>次要动作，左拳抬起，右拳下护，开启架招。格挡成功时，获得 5 点士气。</p>",
                     "actionCost": "次要动作",
                     "range": "自身",
+                    "automationNote": "格挡成功自动回复 5 点士气。",
                     "costs": {
                         "mp": [
                             1,
@@ -48,6 +49,7 @@
                     "description": "<p>主要动作，左脚弓步，右拳旋出，对目标造成 0.4 力量点外功伤害，若目标无架招，将其击飞 1 米。</p>",
                     "actionCost": "主要动作",
                     "range": "1米",
+                    "automationNote": "伤害自动。命中无架招目标时的击飞仅发送提示，请手动位移。",
                     "costs": {
                         "mp": [
                             1,
@@ -83,6 +85,7 @@
                     "description": "<p>主要动作，左掌插喉，右腿弹踢，对目标造成 0.3 力量点外功伤害。击破架招时，目标痛苦捂喉，进行一次残疾检定，且具有劣势。</p>",
                     "actionCost": "主要动作",
                     "range": "1米",
+                    "automationNote": "伤害自动。击破架招后的残疾检定仅发送提示，请手动执行（劣势）。",
                     "costs": {
                         "mp": [
                             1,
@@ -118,6 +121,7 @@
                     "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招。压制对方虚招，脚踢裆腹，肘顶心窝，给对方造成 0.5 力量点外功伤害。目标痛苦捂裆，进行一次残疾检定，且具有劣势。</p>",
                     "actionCost": "反应动作",
                     "range": "1米",
+                    "automationNote": "伤害自动。残疾检定仅发送提示，请手动执行（劣势）。",
                     "costs": {
                         "mp": [
                             1,
@@ -154,6 +158,7 @@
                     "description": "<p>主要动作，击拳锁颈，回拉下压，对敌人造成 0.6 力量点外功伤害，并顺势将目标擒抱（挣脱难度 15）。</p>",
                     "actionCost": "主要动作",
                     "range": "2米",
+                    "automationNote": "伤害与擒抱自动：命中自动施加禁足状态近似擒抱。挣脱检定（难度 15）请手动执行，成功后手动移除禁足。",
                     "costs": {
                         "mp": [
                             2,
@@ -230,11 +235,11 @@
                         {
                             "label": "克制剑棍伤害修正",
                             "trigger": "preDamage",
-                            "script": "const targetWeapon = args.target.itemTypes.weapon.find(w => w.system.equipped);\nif (targetWeapon) {\n    const type = targetWeapon.system.type;\n    if (type === 'sword' || type === 'staff') {\n        args.config.amount += 10;\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #d35400; background:rgba(211,84,0,0.1); margin-left:2px;\"><b>破锋克制！</b><br>敌方手持剑棍，刀势更胜，伤害 <b>+10</b>。</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
+                            "script": "const stance = args.target.system.martial || {};\nif (stance.stanceActive && stance.stance && stance.stanceItemId) {\n    const stanceItem = args.target.items.get(stance.stanceItemId);\n    const stanceMove = stanceItem?.system.moves.find(m => m.id === stance.stance);\n    const wt = stanceMove?.weaponType;\n    if (wt === 'sword' || wt === 'staff') {\n        args.config.amount += 10;\n        ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; border-left:4px solid #d35400; background:rgba(211,84,0,0.1); margin-left:2px;\"><b>破锋克制！</b><br>敌方架招以剑棍应对，刀势更胜，伤害 <b>+10</b>。</div></div>`,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
                             "active": true
                         }
                     ],
-                    "automationNote": "若目标装备剑或棍，伤害自动+10并发送卡片提示。骑马击退效果需手动处理。"
+                    "automationNote": "若目标开启的架招属于剑或棍武学，伤害自动+10并发送卡片提示。骑马击退效果需手动处理。"
                 },
                 {
                     "name": "连环提柳",
@@ -290,7 +295,7 @@
                         {
                             "label": "格挡获刚劲",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"刚劲\").toObject());\n}",
+                            "script": "if (Macros.checkStance(actor, args) && S.combat.blockTotal > 0) {\n    await game.xjzl.api.effects.addEffect(actor, { id: \"gangjin\", flags: { \"xjzl-system\": { maxStacks: 3 } } });\n}",
                             "active": true
                         }
                     ],
@@ -340,27 +345,7 @@
                     "automationNote": "检测到目标装备剑或棍时会自动施加 1 回合缴械状并将发送卡片提示。骑马变AOE需玩家手动选择多个目标。"
                 }
             ],
-            "effects": [
-                {
-                    "name": "刚劲",
-                    "icon": "icons/svg/explosion.svg",
-                    "description": "每层使你的刚属性武学招式伤害+5。",
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.gang.mod",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ],
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "gangjin_pofeng",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    }
-                }
-            ]
+            "effects": []
         }
     },
     {
@@ -447,7 +432,7 @@
                     "description": "<p>次要动作，枪指敌方，周围 5 米内每有一个敌人，自身获得一层“挑灯”，持续到战斗脱离。</p><p>·若在骑马时施展，招式范围提升 5 米。</p><p><strong>升级：</strong>每个敌人额外增加一层“挑灯”，消耗+1。</p>",
                     "actionCost": "次要动作",
                     "range": "5米",
-                    "targetInfo": "周围的人",
+                    "targetInfo": "自身",
                     "costs": {
                         "mp": [
                             1,
@@ -462,7 +447,7 @@
                     "scripts": [
                         {
                             "label": "挑灯检测与结算",
-                            "trigger": "hit",
+                            "trigger": "hit_once",
                             "script": "const countStr = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"沙场点兵\" },\n    content: \"<p>范围内有多少个敌人？</p><input type='number' value='1'>\",\n    ok: { callback: (e, b) => b.form.elements[0].value }\n});\nconst count = parseInt(countStr);\nif (count > 0) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const totalStacks = count * lvl;\n    const eff = thisItem.effects.getName(\"挑灯\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff, totalStacks);\n    actor.showFloatyText(`挑灯 +${totalStacks}`, {fill: \"#FFA500\"});\n}",
                             "active": true
                         }
@@ -605,7 +590,7 @@
                         {
                             "label": "命中获乘风",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"乘风\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(actor, { id: \"chengfeng\", flags: { \"xjzl-system\": { maxStacks: 3 } } });\n}",
                             "active": true
                         }
                     ]
@@ -706,26 +691,6 @@
                         }
                     },
                     "changes": []
-                },
-                {
-                    "name": "乘风",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/将军营.png",
-                    "description": "每层使你速度+1。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "chengfeng",
-                            "stackable": true,
-                            "maxStacks": 3
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
                 }
             ]
         }
@@ -772,7 +737,7 @@
                         {
                             "label": "获得威风",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"威风\"));\n}",
+                            "script": "if (args.isHit) {\n    const eff = thisItem.effects.getName(\"威风\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ],
@@ -788,6 +753,7 @@
                     "description": "<p>主要动作，枪尖布花，前倾疾刺，对至多两个目标造成 0.4 力量点外功伤害。击破架招时，使目标陷入“破甲”，持续三回合。<br>破甲：你的外功防御归零。<br>·若在骑马时施展，施展前每移动 5 米，虚招值+1（至多+3）。</p>",
                     "actionCost": "主要动作",
                     "range": "2米",
+                    "targetInfo": "至多两个目标",
                     "costs": {
                         "mp": [
                             2,
@@ -809,11 +775,11 @@
                         {
                             "label": "击破施加破甲",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, \"pojia\");\n    // 破甲默认无持续时间，或根据配置。这里规则说持续三回合。系统通用破甲通常是永久或手动。如果需要3回合，应该修改 duration。\n    // 修正：调用 addEffect 后返回的是 Effect Document，可以 update duration。\n    // 但简单起见，这里假设系统破甲状态默认配置正确，或者让玩家手动管理。\n    // 如果需要严格3回合，应该自定义一个带时间的破甲或者 update。\n    // 鉴于 \"pojia\" 是系统通用状态，通常是被动。这里特殊赋予持续时间比较麻烦。建议在 automationNote 提示手动移除或 GM 修改。\n}",
+                            "script": "if (args.isBroken) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"pojia\", duration: { rounds: 3 } });\n}",
                             "active": true
                         }
                     ],
-                    "automationNote": "破甲状态持续3回合需手动移除。骑马移动带来的虚招加值需手动在弹窗中调整。"
+                    "automationNote": "击破架招自动施加持续三回合的破甲。骑马移动带来的虚招加值需手动在弹窗中调整。"
                 },
                 {
                     "name": "横江飞渡",
@@ -826,6 +792,7 @@
                     "description": "<p>招式仅可在骑马时释放，主要动作，臂夹枪，腿夹马，进入“骠骑”状态，持续到脱战或下马。<br>骠骑：你当前骑乘的马匹速度+5，你在马匹上的下一次攻击提升马匹速度*1 的伤害。</p>",
                     "actionCost": "主要动作",
                     "range": "自身",
+                    "targetInfo": "自身",
                     "costs": {
                         "mp": [
                             2,
@@ -837,11 +804,11 @@
                         {
                             "label": "开启骠骑",
                             "trigger": "attack",
-                            "script": "await game.xjzl.api.effects.addEffect(actor, thisItem.effects.getName(\"骠骑\"));\nui.notifications.info(\"骠骑状态已应用，下一次攻击伤害提升。\");",
+                            "script": "const eff = thisItem.effects.getName(\"骠骑\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nui.notifications.info(\"骠骑状态已应用，下一次攻击伤害提升。\");",
                             "active": true
                         }
                     ],
-                    "automationNote": "需手动确认是否骑马。马匹速度提升需手动调整。"
+                    "automationNote": "需手动确认是否骑马并手动调整马匹速度。下一次攻击的马匹速度伤害加成（系数随本招等级成长）无法自动判定马匹数据，请手动结算，用后手动移除[骠骑]。"
                 },
                 {
                     "name": "回马枪",
@@ -902,7 +869,7 @@
                                 {
                                     "trigger": "hit",
                                     "label": "威风士气变动",
-                                    "script": "if (args.actionType === 'attack') { await actor.changeResources({'system.resources.morale.value': S.resources.morale.value + 5}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); if (args.target.system?.resources?.morale) await args.target.changeResources({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - 5)}, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); }"
+                                    "script": "if (args.isHit && args.actionType === 'attack') { await actor.changeResources({'system.resources.morale.value': S.resources.morale.value + 5}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); if (args.target.system?.resources?.morale) await args.target.changeResources({'system.resources.morale.value': Math.max(0, args.target.system.resources.morale.value - 5)}, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) }); }"
                                 }
                             ]
                         }
@@ -911,16 +878,12 @@
                 {
                     "name": "骠骑",
                     "icon": "icons/svg/horse.svg",
-                    "description": "马匹速度+5，下一次攻击提升马匹速度*1 的伤害。",
+                    "description": "马匹速度+5；你在马匹上的下一次攻击提升(马匹速度×系数)的伤害，系数随【横江飞渡】招式等级成长。(数值需手动结算，用后手动移除)",
+                    "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "piaoqi",
-                            "scripts": [
-                                {
-                                    "trigger": "calc",
-                                    "script": "const speed = S.combat.speedTotal || 0; const ratio = 1 + (args.move.computedLevel - 1); args.output.damage += speed * ratio; args.output.bonusDesc.push('骠骑冲锋加成'); await thisEffect.delete();"
-                                }
-                            ]
+                            "stackable": false
                         }
                     }
                 }
@@ -976,7 +939,7 @@
                         {
                             "label": "饮羽层数管理",
                             "trigger": "hit",
-                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinyu\");\nif (effect && (effect.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 2) {\n    await effect.delete();\n    actor.showFloatyText(\"- 饮羽 (爆发)\", { fill: \"#cccccc\" });\n} else {\n    const eff = thisItem.effects.getName(\"饮羽\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
+                            "script": "const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yinyu\");\nif (effect && (effect.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 2) {\n    await game.xjzl.api.effects.removeEffect(actor, \"yinyu\", 2);\n    actor.showFloatyText(\"- 饮羽 (爆发)\", { fill: \"#cccccc\" });\n} else {\n    const eff = thisItem.effects.getName(\"饮羽\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, eff);\n}",
                             "active": true
                         }
                     ],
@@ -1239,7 +1202,7 @@
                         {
                             "label": "添加错骨",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n    cuogu.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, cuogu);\n}",
+                            "script": "if (args.isHit) {\n    const cuogu = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"cuogu\"));\n    if (cuogu) {\n        cuogu.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, cuogu);\n    }\n}",
                             "active": true
                         }
                     ],
@@ -1437,6 +1400,7 @@
                     "actionCost": "主要动作",
                     "range": "1米",
                     "targetInfo": "单体",
+                    "automationNote": "常规伤害自动。对半空中目标的反应动作施展为手动判定。",
                     "costs": {
                         "mp": [
                             2,
@@ -1493,7 +1457,7 @@
                         {
                             "label": "消耗战意与金鼓提示",
                             "trigger": "attack",
-                            "script": "const zhanyi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhanyi\");\nlet stacks = 0;\nif (zhanyi) {\n    stacks = zhanyi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.bonusHit += stacks * 10;\n    await zhanyi.delete();\n    actor.showFloatyText(`命中+${stacks*10}`, {fill: \"#00ff00\"});\n}\n\n// 动态金鼓数值\nconst jinguBonus = 10 + (stacks * 10);\nconst msg = `\n<div class=\"xjzl-chat-card\">\n    <div style=\"font-weight:bold; color:#c0392b; border-bottom:1px solid #ccc; margin-bottom:5px;\">\n        <i class=\"fas fa-drum\"></i> 战鼓宣天！\n    </div>\n    <div style=\"font-size:0.9em;\">\n        消耗了 <b>${stacks}</b> 层战意，全军振奋！<br>\n        请周围友方手动为自己添加 <b>[金鼓]</b> 状态，此状态每回合初将恢复 <b style=\"color:green;\">${jinguBonus}</b> 点士气 (持续3回合)。\n    </div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
+                            "script": "const zhanyi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"zhanyi\");\nlet stacks = 0;\nif (zhanyi) {\n    stacks = zhanyi.getFlag(\"xjzl-system\", \"stacks\") || 1;\n    args.flags.bonusHit += stacks * 10;\n    await game.xjzl.api.effects.removeEffect(actor, \"zhanyi\", stacks);\n    actor.showFloatyText(`命中+${stacks*10}`, {fill: \"#00ff00\"});\n}\n\n// 动态金鼓数值\nconst jinguBonus = 10 + (stacks * 10);\nconst msg = `\n<div class=\"xjzl-chat-card\">\n    <div style=\"font-weight:bold; color:#c0392b; border-bottom:1px solid #ccc; margin-bottom:5px;\">\n        <i class=\"fas fa-drum\"></i> 战鼓宣天！\n    </div>\n    <div style=\"font-size:0.9em;\">\n        消耗了 <b>${stacks}</b> 层战意，全军振奋！<br>\n        请周围友方手动为自己添加 <b>[金鼓]</b> 状态，此状态每回合初将恢复 <b style=\"color:green;\">${jinguBonus}</b> 点士气 (持续3回合)。\n    </div>\n</div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });",
                             "active": true
                         },
                         {
@@ -1640,7 +1604,6 @@
             "tier": 1,
             "description": "<p>将军营士卒因其意志坚定，斗志昂扬，士气极盛，常以一鼓作气击败敌人，难以被挫折击败。</p><p><strong>需求：</strong>《百战诀》修炼圆满</p>",
             "requirements": "《百战诀》修炼圆满",
-            "automationNote": "完全自动化。进战及击倒敌人时均会自动恢复士气（数值随此招式等级成长，并采用了防并发覆盖机制）。",
             "moves": [
                 {
                     "name": "士气如虹",
@@ -1651,6 +1614,7 @@
                     "actionCost": "无",
                     "range": "自身",
                     "targetInfo": "自身",
+                    "automationNote": "完全自动化。进战及击倒敌人时均会自动恢复士气（数值随此招式等级成长，并采用了防并发覆盖机制）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1913,9 +1877,9 @@
                     "damageType": "fire",
                     "weaponType": "special",
                     "requirements": "火器-一窝蜂-银 1200 两",
-                    "range": "10",
+                    "range": "10米",
                     "description": "<p>全回合动作，火箭漫天，每支造成 5 点火焰伤害。<br>·你最多一次性射出 32 支火箭。<br>·目标每有一级[轻功]，便能减少一根火箭的火焰伤害（即减少 5 点火焰伤害）。<br>·一窝蜂需双手持握，使用的回合无法移动，使用后每回合可以装入一支火箭。<br>·无需投掷命中，敌人无法闪避。<br><strong>升级：</strong>每支火箭造成的火焰伤害+1，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。使用请注意安全，据说曾有主持人使用此武器猛烈攻击孕妇！",
+                    "automationNote": "必中与轻功减免自动：出招时弹窗选择发射数量并按数量结算总伤害，目标每级[轻功]自动抵消一支火箭的伤害。装填数量与弹药消耗请手动记录。使用请注意安全，据说曾有主持人使用此武器猛烈攻击孕妇！",
                     "costs": {
                         "mp": [
                             2,
@@ -1929,14 +1893,21 @@
                     },
                     "scripts": [
                         {
-                            "label": "一窝蜂-装填",
+                            "label": "一窝蜂-选择发射数量",
+                            "trigger": "preAttack",
+                            "script": "const dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '一窝蜂: 发射数量' },\n    content: '<div class=\"form-group\"><label>发射火箭数 (1-32)</label><input type=\"number\" name=\"count\" value=\"32\" min=\"1\" max=\"32\"></div>',\n    ok: { label: '发射', callback: (e, b) => new FormData(b.form).get('count') }\n});\n// 玩家关闭弹窗返回 null：preAttack 阶段资源和动作均未消耗，直接中止即为完整取消\nif (dialog === null) {\n    args.abort = true;\n    args.abortReason = \"已取消一窝蜂发射。\";\n    return;\n}\n// 钳制发射数量：最多 32 支，输入非法时按 1 支处理\nconst parsed = parseInt(dialog);\nconst count = Math.max(1, Math.min(32, isNaN(parsed) ? 1 : parsed));\n// args 无法跨阶段传递，写入持久 flag 供 attack 阶段读取\nawait actor.setFlag(\"xjzl-system\", \"yiwofeng_count\", count);",
+                            "active": true
+                        },
+                        {
+                            "label": "一窝蜂-应用数量伤害",
                             "trigger": "attack",
-                            "script": "const dialog = await foundry.applications.api.DialogV2.prompt({\n    window: { title: '一窝蜂: 发射数量' },\n    content: '<div class=\"form-group\"><label>发射火箭数 (1-32)</label><input type=\"number\" name=\"count\" value=\"32\" min=\"1\" max=\"32\"></div>',\n    ok: { label: '发射', callback: (e, b) => new FormData(b.form).get('count') }\n});\nconst count = parseInt(dialog) || 1;\n\n// 读取基础单发伤害 (已经在 calculateMoveDamage 中算好)\nconst singleDmg = args.flags.damageResult.damage;\nconst totalDmg = singleDmg * count;\n\n// 直接修改最终伤害\nargs.flags.damageResult.damage = totalDmg;\n\n// 更新 Breakdown (为了显示好看)\nargs.flags.damageResult.breakdown += `\n+ 一窝蜂装填 (${count}发): ${totalDmg - singleDmg}`;\n\n// 必中\nargs.flags.forceHit = true;\n\n// 存储数量供后续使用\n// 我们将其暂存在 damageResult 对象上，因为它会一直传递\nargs.flags.damageResult.rocketCount = count;\nargs.flags.damageResult.singleDmg = singleDmg;"
+                            "script": "// 读取 preAttack 弹窗保存的数量，读取后立即清理，避免残留影响后续结算\nlet count = actor.getFlag(\"xjzl-system\", \"yiwofeng_count\") || 1;\nawait actor.unsetFlag(\"xjzl-system\", \"yiwofeng_count\");\ncount = Math.max(1, Math.min(32, count));\n\n// 读取基础单发伤害 (已经在 calculateMoveDamage 中算好)\nconst singleDmg = args.flags.damageResult.damage;\nconst totalDmg = singleDmg * count;\n\n// 直接修改最终伤害\nargs.flags.damageResult.damage = totalDmg;\n\n// 更新 Breakdown (为了显示好看)\nargs.flags.damageResult.breakdown += `\n+ 一窝蜂装填 (${count}发): ${totalDmg - singleDmg}`;\n\n// 必中\nargs.flags.forceHit = true;",
+                            "active": true
                         },
                         {
                             "label": "一窝蜂-轻功减免",
                             "trigger": "preDamage",
-                            "script": "// 从传递过来的对象中读取参数\n// 注意：hit/preDamage 阶段，之前的 flags.damageResult 被展开到了 args 中，或者作为 damageResult 存在\n// 根据你的 ChatManager 实现，它通常在 args.damageResult 里，或者直接在 args 里\n// 安全起见，我们在 attack 脚本里把 count 放进了 damageResult，这里应该能通过 args.damageResult 读到\n// 如果 args.damageResult 不存在，我们得检查下 ChatManager._applyDamage 的逻辑\n// 查看代码：summary.push(resultEntry); resultEntry 包含 ...damageResult\n// hitContext = { ...resultEntry }\n// 所以 args.rocketCount 应该直接可用 (如果它在 damageResult 里)\n\n// 重新确认逻辑：Attack 脚本修改的是 calcResult对象。\n// Item.roll 将 calcResult 存入了 flags['xjzl-system'].calc\n// ChatManager._applyDamage 读取 flags.calc\n// 构造 damageResult 时，并没有把 flags.calc 里的自定义字段全拷进去，只拷了 damage/feint/breakdown 等标准字段\n// ！！！修正：为了确保传递，我们还是得利用 preDamage 的 args.config.amount 反推，或者像之前一样把 count 存到 flags.bonusDamage 里 (不推荐了)\n\n// 【稳健写法】\n// 1. 获取当前伤害 (这是总伤害)\nconst totalDamage = args.config.amount;\n\n// 2. 重新计算单发伤害 (5 + lvl - 1)\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst singleDmg = 5 + (lvl - 1);\n\n// 3. 反推数量\nconst count = Math.floor(totalDamage / singleDmg);\n\n// 4. 获取目标轻功\nconst qinggong = args.target.system.skills?.qinggong?.total || 0;\n\n// 5. 减免逻辑\nconst effective = Math.max(0, count - qinggong);\nconst realDamage = effective * singleDmg;\n\n// 6. 修改伤害\nargs.config.amount = realDamage;\n\n// 7. 必中属性\nargs.config.ignoreBlock = true;\nargs.config.ignoreDefense = true;\n\nif (qinggong > 0) {\n    ui.notifications.info(`${args.target.name} 轻功抵消了 ${Math.min(count, qinggong)} 支火箭`);\n}"
+                            "script": "// attack 阶段已把总伤害改写为 单发伤害×数量，这里从 config.amount 反推数量后按目标轻功逐支减免\nconst totalDamage = args.config.amount;\n\n// 重新计算单发伤害 (5 + lvl - 1)\nconst lvl = Math.max(1, args.move?.computedLevel || 1);\nconst singleDmg = 5 + (lvl - 1);\n\n// 3. 反推数量\nconst count = Math.floor(totalDamage / singleDmg);\n\n// 4. 获取目标轻功\nconst qinggong = args.target.system.skills?.qinggong?.total || 0;\n\n// 5. 减免逻辑\nconst effective = Math.max(0, count - qinggong);\nconst realDamage = effective * singleDmg;\n\n// 6. 修改伤害\nargs.config.amount = realDamage;\n\n// 7. 必中属性\nargs.config.ignoreBlock = true;\nargs.config.ignoreDefense = true;\n\nif (qinggong > 0) {\n    ui.notifications.info(`${args.target.name} 轻功抵消了 ${Math.min(count, qinggong)} 支火箭`);\n}"
                         }
                     ],
                     "actionCost": "全回合动作"
@@ -1966,7 +1937,7 @@
                         {
                             "label": "血战到底",
                             "trigger": "passive",
-                            "script": "const hp = S.resources.hp.value;\nconst maxHp = S.resources.hp.max;\nif (maxHp > 0 && (hp / maxHp) < 0.1) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const baseBonus = 5 + (lvl - 1) * 5;\n    \n    const shanie = S.resources.shanie || 0;\n    const maxShanieBonus = 5 + (lvl - 1) * 5;\n    const shanieBonus = Math.min(shanie, maxShanieBonus);\n    \n    const totalBonus = baseBonus + shanieBonus;\n    \n    S.combat.damages.global.mod += totalBonus;\n    S.combat.hit_waigong += totalBonus;\n    S.combat.hit_neigong += totalBonus;\n}"
+                            "script": "const hp = S.resources.hp.value;\nconst maxHp = S.resources.hp.max;\nif (maxHp > 0 && (hp / maxHp) < 0.1) {\n    const lvl = Math.max(1, args.move?.computedLevel || 1);\n    const baseBonus = 5 + (lvl - 1) * 5;\n    \n    const shanie = S.resources.shanie || 0;\n    const maxShanieBonus = 5 + (lvl - 1) * 5;\n    const shanieBonus = Math.min(shanie, maxShanieBonus);\n    \n    const totalBonus = baseBonus + shanieBonus;\n    \n    S.combat.damages.global.mod += totalBonus;\n    S.combat.hit_waigong += totalBonus;\n    S.combat.hit_neigong += totalBonus;\n}"
                         }
                     ],
                     "actionCost": "无"
@@ -1996,7 +1967,7 @@
                         {
                             "label": "风驰电掣",
                             "trigger": "passive",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nS.skills.mashu.mod += (2 + (lvl - 1));"
+                            "script": "const lvl = Math.max(1, args.move?.computedLevel || 1);\nS.skills.mashu.mod += (2 + (lvl - 1));"
                         }
                     ],
                     "actionCost": "无"
@@ -2026,7 +1997,7 @@
                     "targetInfo": "周围友方",
                     "actionCost": "蓄力动作",
                     "description": "<p>手持号旗，指挥若定，调兵遣将，消耗自身士气，然后向周围友方（包括自己）添加以下任意一个“号令”状态，持续三回合。</p><p>·若友方已有“号令”，则替换为新的号令效果。</p><p>·若友方士气不足，部分号令无法对其生效。</p><p><strong>号令-一鼓作气：</strong>每回合初获得 10 点士气。</p><p><strong>号令-全军冲锋：</strong>可以选择在回合初-5 士气，然后移动速度+5。</p><p><strong>号令-迎敌备战：</strong>内外功防御+10。</p><p><strong>号令-诱敌深入：</strong>闪避+10。</p><p><strong>号令-包抄夹击：</strong>招式命中后添加“下盘不稳”一回合。</p><p><strong>号令-破军诛将：</strong>招式伤害+10。</p><p><strong>号令-合军聚众：</strong>可以选择每回合末-5 士气，然后回复 5 气血。</p><p><strong>号令-鸣金收兵：</strong>可以选择每回合末-5 士气，然后可以朝你的方向不消耗速度移动至多 3 米。</p><p><strong>升级：</strong>释放范围+5，士气消耗-5。</p>",
-                    "automationNote": "出招自动扣除士气。命中时弹出选择框向目标下达号令。冲锋/合军/鸣金 等可选效果，回合初/末会自动弹窗询问，若玩家选择“不消耗”则该状态自动解除。",
+                    "automationNote": "出招自动扣除士气。命中时弹出选择框向目标下达号令，若目标已有其他号令会自动替换。[全军冲锋]在回合初弹窗询问，选择不消耗或士气不足时自动解除；[合军聚众][鸣金收兵]在回合末弹窗询问，选择不消耗则本回合不生效，状态保留至持续结束（之后每回合仍可选择）。",
                     "costs": {
                         "mp": [
                             0
@@ -2039,15 +2010,15 @@
                     "scripts": [
                         {
                             "label": "前置校验与扣除",
-                            "trigger": "attack",
+                            "trigger": "preAttack",
                             "active": true,
-                            "script": "if (!args.config?.isFree) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const cost = Math.max(0, 25 - (lvl - 1) * 5);\n    const cur = S.resources.morale?.value || 0;\n    if (cur < cost) {\n        args.flags.abort = true;\n        args.flags.abortReason = `施展号令千军需要 ${cost} 点士气！`;\n    } else {\n        await actor.changeResources({ 'system.resources.morale.value': cur - cost }, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        actor.showFloatyText(`消耗士气 -${cost}`, {fill: \"#888888\"});\n    }\n}"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst cost = Math.max(0, 25 - (lvl - 1) * 5);\nconst cur = S.resources.morale?.value || 0;\nif (cur < cost) {\n    args.abort = true;\n    args.abortReason = `施展号令千军需要 ${cost} 点士气！`;\n} else {\n    await actor.changeResources({ 'system.resources.morale.value': cur - cost }, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    actor.showFloatyText(`消耗士气 -${cost}`, {fill: \"#888888\"});\n}"
                         },
                         {
                             "label": "选择并下达号令",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const options =[\n    { label: '一鼓作气 (+10士气/回合)', slug: 'haoling_1' },\n    { label: '全军冲锋 (需扣士气,速度+5)', slug: 'haoling_2' },\n    { label: '迎敌备战 (防御+10)', slug: 'haoling_3' },\n    { label: '诱敌深入 (闪避+10)', slug: 'haoling_4' },\n    { label: '包抄夹击 (招式命中附带下盘不稳)', slug: 'haoling_5' },\n    { label: '破军诛将 (伤害+10)', slug: 'haoling_6' },\n    { label: '合军聚众 (需扣士气,回合末回血)', slug: 'haoling_7' },\n    { label: '鸣金收兵 (需扣士气,回合末位移)', slug: 'haoling_8' }\n];\n\nconst content = options.map((o, i) => `<div class=\"form-group\"><input type=\"radio\" name=\"choice\" value=\"${i}\" ${i===0?'checked':''}> <label>${o.label}</label></div>`).join('');\n\nconst idx = await foundry.applications.api.DialogV2.prompt({\n    window: { title: `向 ${args.target.name} 下令` },\n    content: content,\n    ok: { label: '下达', callback: (e, b) => new FormData(b.form).get('choice') }\n});\n\nif (idx !== null) {\n    const choice = options[parseInt(idx)];\n    const effectData = foundry.utils.deepClone(thisItem.effects.find(e => e.flags?.['xjzl-system']?.slug === choice.slug).toObject());\n    if (effectData) {\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`已对 ${args.target.name} 下达: ${choice.label}`);\n    }\n}"
+                            "script": "const options =[\n    { label: '一鼓作气 (+10士气/回合)', slug: 'haoling_1' },\n    { label: '全军冲锋 (需扣士气,速度+5)', slug: 'haoling_2' },\n    { label: '迎敌备战 (防御+10)', slug: 'haoling_3' },\n    { label: '诱敌深入 (闪避+10)', slug: 'haoling_4' },\n    { label: '包抄夹击 (招式命中附带下盘不稳)', slug: 'haoling_5' },\n    { label: '破军诛将 (伤害+10)', slug: 'haoling_6' },\n    { label: '合军聚众 (需扣士气,回合末回血)', slug: 'haoling_7' },\n    { label: '鸣金收兵 (需扣士气,回合末位移)', slug: 'haoling_8' }\n];\n\nconst content = options.map((o, i) => `<div class=\"form-group\"><input type=\"radio\" name=\"choice\" value=\"${i}\" ${i===0?'checked':''}> <label>${o.label}</label></div>`).join('');\n\nconst idx = await foundry.applications.api.DialogV2.prompt({\n    window: { title: `向 ${args.target.name} 下令` },\n    content: content,\n    ok: { label: '下达', callback: (e, b) => new FormData(b.form).get('choice') }\n});\n\nif (idx !== null) {\n    const choice = options[parseInt(idx)];\n    const effectData = foundry.utils.deepClone(thisItem.effects.find(e => e.flags?.['xjzl-system']?.slug === choice.slug).toObject());\n    if (effectData) {\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        // 描述要求号令互斥替换；addEffect 对同名刷新会累加持续时间，因此连同同号令一起移除后重建，确保重置为新的三回合\n        for (const o of options) {\n            await game.xjzl.api.effects.removeEffect(args.target, o.slug, 1);\n        }\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`已对 ${args.target.name} 下达: ${choice.label}`);\n    }\n}"
                         }
                     ]
                 }
@@ -2094,7 +2065,7 @@
                                 "label": "冲锋士气消耗确认",
                                 "trigger": "turnStart",
                                 "active": true,
-                                "script": "const cur = actor.system.resources.morale?.value || 0;\nif (cur >= 5) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: {title: \"全军冲锋\"},\n        content: `<p>是否消耗 5 点士气以维持本回合的 <b>[全军冲锋]</b> (速度+5)？</p>`,\n        yes: {label: \"消耗\"}, no: {label: \"不消耗\"}\n    });\n    if (confirm) {\n        actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) - 5;\n        if (!actor._moraleTimer) {\n            actor._moraleTimer = setTimeout(async () => {\n                const totalDelta = actor._pendingMoraleDelta;\n                actor._pendingMoraleDelta = 0;\n                actor._moraleTimer = null;\n                const c = actor.system.resources.morale?.value || 0;\n                await actor.changeResources({'system.resources.morale.value': Math.max(0, c + totalDelta)}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n                actor.showFloatyText(`士气 ${totalDelta}`, {fill: \"#ff0000\"});\n            }, 50);\n        }\n    } else {\n        await thisEffect.delete();\n        ui.notifications.info(\"[全军冲锋] 状态解除。\");\n    }\n} else {\n    await thisEffect.delete();\n    ui.notifications.warn(\"士气不足，[全军冲锋] 状态解除。\");\n}"
+                                "script": "const cur = actor.system.resources.morale?.value || 0;\nif (cur >= 5) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: {title: \"全军冲锋\"},\n        content: `<p>是否消耗 5 点士气以维持本回合的 <b>[全军冲锋]</b> (速度+5)？</p>`,\n        yes: {label: \"消耗\"}, no: {label: \"不消耗\"}\n    });\n    if (confirm) {\n        actor._pendingMoraleDelta = (actor._pendingMoraleDelta || 0) - 5;\n        if (!actor._moraleTimer) {\n            actor._moraleTimer = setTimeout(async () => {\n                const totalDelta = actor._pendingMoraleDelta;\n                actor._pendingMoraleDelta = 0;\n                actor._moraleTimer = null;\n                const c = actor.system.resources.morale?.value || 0;\n                await actor.changeResources({'system.resources.morale.value': Math.max(0, c + totalDelta)}, { cause: \"script\", source: \"script\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n                actor.showFloatyText(`士气 ${totalDelta}`, {fill: \"#ff0000\"});\n            }, 50);\n        }\n    } else {\n        await game.xjzl.api.effects.removeEffect(actor, \"haoling_2\", 1);\n        ui.notifications.info(\"[全军冲锋] 状态解除。\");\n    }\n} else {\n    await game.xjzl.api.effects.removeEffect(actor, \"haoling_2\", 1);\n    ui.notifications.warn(\"士气不足，[全军冲锋] 状态解除。\");\n}"
                             }
                         ]
                     }
