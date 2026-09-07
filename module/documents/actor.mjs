@@ -1301,6 +1301,9 @@ export class XJZLActor extends Actor {
         restoreMove = this._injectContextMove(sandbox, entry.contextData);
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
+        // 每个脚本都可能通过 await 更新 Actor；重新绑定可避免同一触发批次中的后续脚本读取旧 system。
+        sandbox.system = this.system;
+        sandbox.S = this.system;
         // 入栈：记录当前正在执行的脚本来源
         this._scriptContextStack.push({
           item: thisItem,
@@ -1369,6 +1372,9 @@ export class XJZLActor extends Actor {
         restoreMove = this._injectContextMove(sandbox, entry.contextData);
         sandbox.thisItem = thisItem;
         sandbox.thisEffect = thisEffect;
+        // 每个脚本都可能通过 await 更新 Actor；重新绑定可避免同一触发批次中的后续脚本读取旧 system。
+        sandbox.system = this.system;
+        sandbox.S = this.system;
         // 入栈：记录当前正在执行的脚本来源
         this._scriptContextStack.push({
           item: thisItem,
@@ -1977,9 +1983,6 @@ export class XJZLActor extends Actor {
       return { finalDamage: 0, hpLost: 0, isDead: false };
     }
 
-    const sys = this.system;
-    const combat = sys.combat;
-
     // =====================================================
     // 3. 防御前置脚本 (Trigger: PRE_DEFENSE)
     // =====================================================
@@ -1999,6 +2002,9 @@ export class XJZLActor extends Actor {
     };
 
     await this.runScripts(SCRIPT_TRIGGERS.PRE_DEFENSE, preDefContext);
+
+    // PRE_DEFENSE 允许脚本修改效果和战斗属性；此处重新读取，避免后续减伤沿用旧快照。
+    const combat = this.system.combat;
 
     // =====================================================
     // 4. 计算理论伤害 (Calculation)
@@ -2038,7 +2044,7 @@ export class XJZLActor extends Actor {
 
 
     // C. 抗性 (Resistance)
-    const resMap = sys.combat.resistances;
+    const resMap = combat.resistances;
     const globalRes = resMap.global.total || 0;
     let skillRes = 0
     if (type === "waigong" || type === "neigong") {
@@ -2109,8 +2115,10 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 7. 资源扣除 (Deduction)
     // =====================================================
-    // 拍摄快照
-    const originalHP = sys.resources.hp.value;
+    // PRE_TAKE 可能先消耗或恢复资源；扣除伤害必须基于脚本执行后的最新状态。
+    const postTakeSystem = this.system;
+    const resources = postTakeSystem.resources;
+    const originalHP = resources.hp.value;
 
     // --- 计算流失伤害 ---
     let liushiDamage = 0;
@@ -2122,16 +2130,16 @@ export class XJZLActor extends Actor {
         liushiDamage += (this.xjzlStatuses.wuxueBleedOnHit || 0);
       }
       if (liushiDamage > 0) {
-        const liushiRes = sys.combat.resistances?.liushi?.total || 0;
+        const liushiRes = postTakeSystem.combat.resistances?.liushi?.total || 0;
         liushiDamage = Math.max(0, liushiDamage - liushiRes);
       }
     }
 
     // 准备更新
     const updates = {};
-    let currentHuti = sys.resources.huti ?? 0;
-    let currentHP = sys.resources.hp.value;
-    let currentMP = sys.resources.mp.value;
+    let currentHuti = resources.huti ?? 0;
+    let currentHP = resources.hp.value;
+    let currentMP = resources.mp.value;
 
     let stdHutiLost = 0, stdHpLost = 0, stdMpLost = 0;
     let liuHutiLost = 0, liuHpLost = 0, liuMpLost = 0;
@@ -2410,8 +2418,10 @@ export class XJZLActor extends Actor {
     // B. 被击回怒
     let rageGained = false;
     if (finalDamage > 0 && ["waigong", "neigong"].includes(type)) {
-      const currentRage = sys.resources.rage.value;
-      const maxRage = sys.resources.rage.max;
+      // DAMAGED 和 resourceChanged 脚本可能已经修改怒气；这里必须读取最新值再计算系统回怒。
+      const rage = this.system.resources.rage;
+      const currentRage = rage.value;
+      const maxRage = rage.max;
       const noRecover = this.xjzlStatuses?.noRecoverRage;
       // 读取受击不回怒标记
       const noRageOnHit = this.xjzlStatuses?.noRageOnHit;
@@ -2788,9 +2798,8 @@ export class XJZLActor extends Actor {
     // --- 容器没有自动回复 ---
     if (this.type === "container") return;
 
-    const updates = {};
     const messages = [];
-    const resources = this.system.resources;
+    const regenDeltas = new Map();
 
     // 定义资源键名映射
     const resKeys = ["hp", "mp", "rage"];
@@ -2801,6 +2810,8 @@ export class XJZLActor extends Actor {
     let deathTriggered = false; // 防止单次结算触发多次死亡卡片
 
     for (const res of resKeys) {
+      // 每轮都重新读取；前一轮的死亡状态切换可能刷新 Actor 或触发资源副作用。
+      const resources = this.system.resources;
       // 拼接 Flag Key，例如: regenHpTurnStart
       // 注意大小写：配置里是 regenHp... 所以这里要把 res 首字母大写
       const capRes = res.charAt(0).toUpperCase() + res.slice(1);
@@ -2818,7 +2829,8 @@ export class XJZLActor extends Actor {
         let newVal = Math.max(0, Math.min(max, current + delta));
 
         if (newVal !== current) {
-          updates[`system.resources.${res}.value`] = newVal;
+          // 先保存本轮实际变化量，最后再基于最新资源生成绝对更新，避免跨 await 覆盖其他修改。
+          regenDeltas.set(res, newVal - current);
 
           // 记录日志文本
           const sign = delta > 0 ? "+" : "";
@@ -2868,6 +2880,15 @@ export class XJZLActor extends Actor {
     }
 
     // 执行更新
+    const updates = {};
+    const latestResources = this.system.resources;
+    for (const [res, delta] of regenDeltas) {
+      const current = latestResources[res].value;
+      const max = latestResources[res].max;
+      const newVal = Math.max(0, Math.min(max, current + delta));
+      if (newVal !== current) updates[`system.resources.${res}.value`] = newVal;
+    }
+
     if (!foundry.utils.isEmpty(updates)) {
       await this.changeResources(updates, {
         cause: "regen",
@@ -3083,6 +3104,9 @@ export class XJZLActor extends Actor {
       return ui.notifications.error("伤害计算失败");
     }
 
+    // 配置弹窗、趁虚而入资源处理和出招回复都可能异步刷新 Actor；攻击上下文应使用此时的最新状态。
+    const attackStartStatuses = this.xjzlStatuses || {};
+
     // =====================================================
     // 5. 执行 ATTACK 阶段脚本
     // =====================================================
@@ -3092,7 +3116,7 @@ export class XJZLActor extends Actor {
       attacker: this,    // 明确 attacker
       costConsumed: costConsumed,
       flags: {
-        level: s.attackLevel || 0,
+        level: attackStartStatuses.attackLevel || 0,
         feintLevel: 0, // 普攻没有虚招
         abort: false,
         abortReason: "",
@@ -3118,6 +3142,9 @@ export class XJZLActor extends Actor {
       return;
     }
 
+    // ATTACK 允许脚本异步施加状态；后续目标计算必须使用更新后的被动状态。
+    const postAttackStatuses = this.xjzlStatuses || {};
+
     // =====================================================
     // 6. 伤害计算，应该不需要了，我们把伤害计算提前了
     // =====================================================
@@ -3132,9 +3159,9 @@ export class XJZLActor extends Actor {
     const selfLevel = attackContext.flags.level + config.manualAttackLevel;
 
     // 自身被动
-    const baseIgnoreBlock = isOpportunity ? true : (s.ignoreBlock || false); //趁虚而入必定无视格挡
-    const baseIgnoreDefense = s.ignoreDefense || false;
-    const baseIgnoreStance = isOpportunity ? true : (s.ignoreStance || false); //趁虚而入必定无视架招
+    const baseIgnoreBlock = isOpportunity ? true : (postAttackStatuses.ignoreBlock || false); //趁虚而入必定无视格挡
+    const baseIgnoreDefense = postAttackStatuses.ignoreDefense || false;
+    const baseIgnoreStance = isOpportunity ? true : (postAttackStatuses.ignoreStance || false); //趁虚而入必定无视架招
 
     // 遍历目标运行 CHECK 脚本
     for (const targetToken of targets) {

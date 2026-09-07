@@ -62,7 +62,7 @@
 | 变量 | 类型 | 含义 |
 |---|---|---|
 | `actor` | `Actor` | 当前脚本的宿主。攻击侧触发器通常是攻击者，防御侧触发器是受击者。 |
-| `system` / `S` | `Actor.system` | `actor.system` 的同一引用；`S` 是便捷别名。 |
+| `system` / `S` | `Actor.system` | 每个脚本开始执行时绑定为当前 `actor.system`；`S` 是便捷别名。脚本通过 `await` 更新 Actor 后，如需读取最新状态应使用 `actor.system`。 |
 | `args` | `Object` | 本次触发的阶段上下文。只有后文对应触发器列出的字段才是稳定公开契约。 |
 | `trigger` | `string` | 当前触发器名称。 |
 | `thisItem` | `Item` / `ActiveEffect` / `null` | 当前脚本来源。Item 脚本指向该 Item；AE 脚本为兼容也指向该 AE。 |

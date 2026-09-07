@@ -1875,6 +1875,8 @@ export class XJZLItem extends Item {
         if (preAttackContext.abortReason) ui.notifications.warn(preAttackContext.abortReason);
         return;
       }
+      // PRE_ATTACK 允许脚本异步改变状态；攻击上下文的初始等级应读取脚本执行后的状态。
+      const postPreAttackStatuses = actor.xjzlStatuses || {};
       // =====================================================
 
       // 检查余额 (这里改为 throw Error 以便跳出 try 块并由 catch 统一处理，或者你也可以保留 return)
@@ -2013,8 +2015,8 @@ export class XJZLItem extends Item {
         // 核心 Flags (供脚本修改)
         costConsumed: costConsumed,
         flags: {
-          level: s.attackLevel || 0, // 使用数值计数器，不再使用布尔值的flags,初始值继承自 Actor
-          feintLevel: s.feintLevel || 0, // 虚招自身等级
+          level: postPreAttackStatuses.attackLevel || 0, // 使用数值计数器，不再使用布尔值的flags,初始值继承自 Actor
+          feintLevel: postPreAttackStatuses.feintLevel || 0, // 虚招自身等级
           abort: false,       // 脚本设为 true 可阻断攻击
           abortReason: "",     // 阻断原因
           autoApplied: false, // 是否已经完成流程的标记
@@ -2039,6 +2041,9 @@ export class XJZLItem extends Item {
         if (attackContext.flags.abortReason) ui.notifications.warn(attackContext.flags.abortReason);
         return;
       }
+
+      // ATTACK 允许脚本异步施加状态；后续目标计算必须使用更新后的被动状态。
+      const postAttackStatuses = actor.xjzlStatuses || {};
 
       // 提取 ATTACK 阶段产生的数值修正 (供后续使用)
       const scriptBonusHit = attackContext.flags.bonusHit || 0;
@@ -2118,9 +2123,9 @@ export class XJZLItem extends Item {
 
       // 获取攻击者自身的被动状态 (Base)
       // 这里的逻辑是：如果攻击者身上本来就有"无视格挡"的Buff，那打谁都无视
-      const baseIgnoreBlock = s.ignoreBlock || false;
-      const baseIgnoreDefense = s.ignoreDefense || false;
-      const baseIgnoreStance = s.ignoreStance || false;
+      const baseIgnoreBlock = postAttackStatuses.ignoreBlock || false;
+      const baseIgnoreDefense = postAttackStatuses.ignoreDefense || false;
+      const baseIgnoreStance = postAttackStatuses.ignoreStance || false;
 
       // 遍历目标进行脚本运算
       if (targets.length > 0) {
