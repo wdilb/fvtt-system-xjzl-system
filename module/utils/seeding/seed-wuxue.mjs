@@ -121,6 +121,7 @@ const processMoves = (rawMoves, bookReqs = "", defaultTier = null) => {
             element: m.element || "none", // taiji, yin, yang...
             damageType: m.damageType || "none",
             weaponType: m.weaponType || "none",
+            weaponSubtype: m.weaponSubtype || "",
 
             // 2. 描述与显示
             description: m.description || "",
