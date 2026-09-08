@@ -94,7 +94,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>双拳摆腰，开启架招，成功格挡后，获得“沉舟”，持续到战斗脱离。</p><p><strong>沉舟：</strong>下一次出招额外消耗 5 内力，招式伤害+5。</p><p><strong>升级：</strong>格挡值+5，沉舟的伤害再+5，内力消耗+1。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "完全自动化。仅出招触发：普攻不增伤、不额外消耗、不移除状态；趁虚而入享受增伤并消耗状态。",
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -173,25 +173,25 @@
                                 {
                                     "label": "沉舟增伤",
                                     "trigger": "calc",
-                                    "script": "if (args.move.type === 'basic' && args.move.id === 'opportunity-attack') return;\nconst dmgBonus = thisEffect.getFlag(\"xjzl-system\", \"wuxue_chenzhouDmg\") || 5;\nargs.output.damage += dmgBonus;\nargs.output.bonusDesc.push(`沉舟 +${dmgBonus}`);",
+                                    "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nconst dmgBonus = thisEffect.getFlag(\"xjzl-system\", \"wuxue_chenzhouDmg\") || 5;\nargs.output.damage += dmgBonus;\nargs.output.bonusDesc.push(`沉舟 +${dmgBonus}`);",
+                                    "active": true
+                                },
+                                {
+                                    "label": "沉舟额外消耗",
+                                    "trigger": "preAttack",
+                                    "script": "if (args.move.type === 'stance') return;\nargs.costConfig.mp = (args.costConfig.mp || 0) + 5;",
                                     "active": true
                                 },
                                 {
                                     "label": "出招后移除",
                                     "trigger": "hit_once",
-                                    "script": "if (args.move.type === 'basic' && args.move.id === 'opportunity-attack') return;\nawait thisEffect.delete();",
+                                    "script": "if (args.move.type === 'basic' && args.move.id !== 'opportunity-attack') return;\nawait thisEffect.delete();",
                                     "active": true
                                 }
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.costs.neili.mod",
-                            "mode": 2,
-                            "value": "-5"
-                        }
-                    ]
+                    "changes": []
                 },
                 {
                     "name": "重创",
@@ -249,7 +249,7 @@
                         {
                             "label": "格挡提示颤手",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) { const cardContent = `<div class='xjzl-chat-card'><div class='card-header'><h3>捉贼见赃</h3></div><div class='card-content'>格挡成功！<br>若攻击者使用<b>刀、剑</b>，请手动为其添加一层颤手。<br>目标: ${args.attacker.name}</div></div>`; ChatMessage.create({ user: game.user.id, content: cardContent }); }"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) { const cardContent = `<div class='xjzl-chat-card'><div class='card-header'><h3>捉贼见赃</h3></div><div class='card-content'>格挡成功！<br>若攻击者使用<b>刀、剑</b>，请手动为其添加一层颤手。<br>目标: ${args.attacker.name}</div></div>`; ChatMessage.create({ user: game.user.id, content: cardContent }); }"
                         }
                     ],
                     "weaponType": "dagger",
@@ -320,7 +320,7 @@
                         {
                             "label": "添加颤手",
                             "trigger": "hit",
-                            "script": "const effect = CONFIG.statusEffects.find(e => e.id === 'chanshou'); if (effect) { const data = foundry.utils.deepClone(effect); foundry.utils.setProperty(data, 'flags.xjzl-system.stacks', 3); await game.xjzl.api.effects.addEffect(args.target, data); }"
+                            "script": "const effect = CONFIG.statusEffects.find(e => e.id === 'chanshou'); if (effect) { const data = foundry.utils.deepClone(effect); await game.xjzl.api.effects.addEffect(args.target, data, 3); }"
                         },
                         {
                             "label": "武器脱手提示",
@@ -328,7 +328,7 @@
                             "script": "ui.notifications.warn('你的武器已脱手，请手动处理装备状态。');"
                         }
                     ],
-                    "actionCost": "无"
+                    "actionCost": "反应动作"
                 },
                 {
                     "name": "抓一儆百",
@@ -416,12 +416,12 @@
                         "growth": 10
                     },
                     "description": "<p>次要动作，腿影幢幢，若虚若实，开启架招。你每次格挡成功时投掷 D6，获得以下状态中的一个，若重复则重新投掷，持续到战斗脱离：<br>1 追日 2 追电 3 追风 4 追浪 5 追魂 6 悔恨<br>升级：格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "自动化: 开启架招; 格挡检测。手动: 格挡成功后提示投D6并手动添加对应Buff（已内置）。",
+                    "automationNote": "完全自动化。格挡成功后自动投掷D6并添加未持有的对应状态，重复自动重投，集齐六种后不再触发。",
                     "scripts": [
                         {
-                            "label": "格挡提示随机Buff",
+                            "label": "格挡自动投掷追字诀",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) { ui.notifications.info('格挡成功！请投掷 D6 并手动添加对应“追”字诀状态。'); }"
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst defs = [\n    ['追日', 'zhuiri'],\n    ['追电', 'zhuidian'],\n    ['追风', 'zhuifeng'],\n    ['追浪', 'zhuilang'],\n    ['追魂', 'zhuihun'],\n    ['悔恨', 'huihen']\n];\nconst owned = new Set(actor.effects.map(e => e.getFlag('xjzl-system', 'slug')).filter(Boolean));\nconst remaining = defs.filter(d => !owned.has(d[1]));\nif (!remaining.length) return;\n// 规则：获得其中一个，若重复则重新投掷，即只从未持有的状态中掷取\nlet pick = null;\nwhile (!pick) {\n    const roll = await new Roll('1d6').evaluate();\n    if (game.dice3d) await game.dice3d.showForRoll(roll, game.user, true);\n    const candidate = defs[roll.total - 1];\n    if (remaining.some(d => d[0] === candidate[0])) pick = candidate;\n}\nconst tpl = thisItem.effects.getName(pick[0]);\nif (!tpl) return;\nconst data = tpl.toObject();\ndelete data._id;\ndata.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, data);\nui.notifications.info(`追梦！格挡成功，获得【${pick[0]}】。`);"
                         }
                     ],
                     "weaponType": "unarmed",
@@ -452,8 +452,24 @@
                         ]
                     },
                     "description": "<p>主要动作，飘忽不定，造成 0.5 内息点内功伤害。<br>可消耗任意以下状态，使招式产生叠加变化：<br>1 追日：腿风炽烈，双腿环踢，招式伤害+10。<br>2 追电：爆裂迅猛，疾势一脚，招式暴击骰-1。<br>3 追风：速度飞快，腿化残影，释放距离+1。<br>4 追浪：气浪滔滔，席卷而至，招式攻击目标+1。<br>5 追魂：诡异难测，声东击西，招式类型变为虚招，且虚招值+1。<br>6 悔恨：心境难明，悲痛心死，招式为目标添加“禁足”“迟滞”一回合。<br>·当你一次性消耗三个（包含三个）以上的状态后，获得“连击”，持续到战斗脱离。<br>连击：你施展消耗主要动作的招式后，可以消耗反应动作，再次释放该招式，然后移除“连击”。<br>升级：招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "完全手动：请根据拥有的Buff手动调整伤害/暴击/距离/类型。消耗Buff请手动删除。若消耗3个以上，请手动添加“连击”（系统状态 lianji）。",
-                    "scripts": [],
+                    "automationNote": "自动: 出招时弹窗勾选消耗身上持有的追字诀；追日增伤、追电暴击骰、追魂虚招值、悔恨禁足迟滞、消耗三个及以上自动获得连击。手动: 追风的距离、追浪的目标数、追魂的招式类型变更。",
+                    "scripts": [
+                        {
+                            "label": "弹窗消耗追字诀",
+                            "trigger": "attack",
+                            "script": "const defs = [\n    ['追日', 'zhuiri', '招式伤害+10'],\n    ['追电', 'zhuidian', '招式暴击骰-1'],\n    ['追风', 'zhuifeng', '释放距离+1（需手动处理）'],\n    ['追浪', 'zhuilang', '招式攻击目标+1（需手动添加目标）'],\n    ['追魂', 'zhuihun', '招式类型变虚招（需手动处理），虚招值+1'],\n    ['悔恨', 'huihen', '命中后目标添加禁足、迟滞一回合（自动）']\n];\nconst owned = defs.filter(d => actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === d[1]));\nif (!owned.length) return;\nconst options = owned.map(d => `<label style=\"display:block; margin:4px 0;\"><input type=\"checkbox\" name=\"zhui_consume\" value=\"${d[1]}\"> <b>【${d[0]}】</b>${d[2]}</label>`).join('');\nconst picked = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"追影 - 消耗追字诀\" },\n    content: `<p>勾选本次出招要消耗的“追”字诀：</p>${options}`,\n    ok: { label: \"消耗\", callback: (event, button) => Array.from(button.form.querySelectorAll('input[name=\"zhui_consume\"]:checked')).map(el => el.value) },\n    rejectClose: false\n});\nif (!picked || !picked.length) return;\n\n// 悔恨的后效需要跨阶段传递：attack 入队，hit 读队头，hit_once 出队；队列按出招/结算顺序对齐批次，避免多张未结算卡片互相覆盖\nconst queue = actor.getFlag('xjzl-system', 'zhuiying_huihen_queue') || [];\nqueue.push(picked.includes('huihen'));\nawait actor.setFlag('xjzl-system', 'zhuiying_huihen_queue', queue);\n\nif (picked.includes('zhuiri')) args.flags.damageResult.damage += 10;\nif (picked.includes('zhuidian')) args.flags.critThresholdMod += 1;\nif (picked.includes('zhuihun')) args.flags.bonusFeint += 1;\n\nconst nameBySlug = Object.fromEntries(defs.map(d => [d[1], d[0]]));\nfor (const slug of picked) await game.xjzl.api.effects.removeEffect(actor, slug);\nui.notifications.info(`已消耗：${picked.map(s => nameBySlug[s]).join('、')}。`);\n\nif (picked.length >= 3) {\n    await game.xjzl.api.effects.addEffect(actor, 'lianji');\n    ui.notifications.info(`一次性消耗 ${picked.length} 个状态，获得【连击】！`);\n}"
+                        },
+                        {
+                            "label": "悔恨禁足迟滞",
+                            "trigger": "hit",
+                            "script": "const queue = actor.getFlag('xjzl-system', 'zhuiying_huihen_queue') || [];\nif (!queue.length || !queue[0] || !args.isHit) return;\nfor (const id of ['root', 'chizhi']) {\n    const tpl = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === id));\n    if (!tpl) continue;\n    tpl.duration = { rounds: 1 };\n    await game.xjzl.api.effects.addEffect(args.target, tpl);\n}"
+                        },
+                        {
+                            "label": "清理悔恨标记",
+                            "trigger": "hit_once",
+                            "script": "const queue = actor.getFlag('xjzl-system', 'zhuiying_huihen_queue') || [];\nif (queue.length) {\n    queue.shift();\n    await actor.setFlag('xjzl-system', 'zhuiying_huihen_queue', queue);\n}"
+                        }
+                    ],
                     "actionCost": "主要动作"
                 },
                 {
@@ -522,8 +538,14 @@
                         ]
                     },
                     "description": "<p>-不幸强说幸，欺人苦自欺-<br>主要动作，粉身碎骨，绝后光前，对目标造成 0.8 内息点内功伤害。<br>若战场上还存在陷入濒死或已经死亡的友方，你临阵觉悟，获得“追日”“追电”“追风”“追浪”“追魂”“悔恨”，持续到战斗脱离。<br>升级：招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "需手动：若有友方濒死/死亡，请手动给自己添加所有6个Buff（内置在物品中）。",
-                    "scripts": [],
+                    "automationNote": "出招时弹窗确认战场是否存在濒死或已死亡的友方，确认后自动获得全部六种追字诀（持续到战斗脱离）。",
+                    "scripts": [
+                        {
+                            "label": "临阵觉悟询问",
+                            "trigger": "attack",
+                            "script": "const confirmed = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"追逝 - 临阵觉悟\" },\n    content: \"<p>战场上是否还存在陷入<b>濒死</b>或已经<b>死亡</b>的友方？</p><p>若存在，你将获得全部六种“追”字诀状态（持续到战斗脱离）。</p>\",\n    yes: { label: \"存在，临阵觉悟\" },\n    no: { label: \"不存在\" }\n});\nif (!confirmed) return;\nfor (const name of ['追日', '追电', '追风', '追浪', '追魂', '悔恨']) {\n    const tpl = thisItem.effects.getName(name);\n    if (!tpl) continue;\n    const data = tpl.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, data);\n}\nui.notifications.info(\"临阵觉悟！获得全部六种“追”字诀。\");"
+                        }
+                    ],
                     "actionCost": "主要动作"
                 }
             ],
@@ -669,6 +691,7 @@
                     },
                     "description": "<p>蓄力动作，剑尖绕身画圆，对周围敌人造成 0.4 力量点外功伤害。然后在自身周围 3 米范围斩出半球形的‘月影’，持续到战斗脱离。<br>月影：你处于月影范围时，格挡值+5，看破值+1。<br>·月影形成在原地，不会跟随你移动，你只能拥有一个月影，如果你斩出新的月影，之前的消失。<br>升级：招式伤害+10，格挡值+5，看破值+1，内力消耗+4。</p>",
                     "automationNote": "自动化: 伤害。手动: 月影范围判定和Buff添加（已提供'月影'AE供手动添加）。",
+                    "x-xjzl-aura": true,
                     "scripts": [],
                     "actionCost": "蓄力动作"
                 },
@@ -699,7 +722,7 @@
                     "description": "<p>当你看破对手虚招时，你可以消耗反应释放此招，压制目标虚招，内力迸发，瞬息一刺，对目标造成 0.6 力量点外功伤害。<br>你每消耗一层“无尽刃”，可以为目标添加一层“流血”，持续到战斗脱离。<br>升级：招式伤害+10，内力消耗+2。</p>",
                     "automationNote": "完全手动：请手动删除无尽刃层数，并给目标添加对应层数的流血（bleed_stack）。",
                     "scripts": [],
-                    "actionCost": "无"
+                    "actionCost": "反应动作"
                 },
                 {
                     "name": "无尽",
@@ -873,7 +896,7 @@
                         {
                             "label": "格挡叠加捉拿",
                             "trigger": "damaged",
-                            "script": "if (Macros.checkStance(actor, args)) { const effect = thisItem.effects.getName('捉拿'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(args.attacker, data); ui.notifications.info(`${args.attacker.name} 被捉拿！`); } }"
+                            "script": "if (Macros.checkStance(actor, args) && args.attacker) { const effect = thisItem.effects.getName('捉拿'); if (effect) { const data = effect.toObject(); delete data._id; data.origin = thisItem.uuid; await game.xjzl.api.effects.addEffect(args.attacker, data); ui.notifications.info(`${args.attacker.name} 被捉拿！`); } }"
                         }
                     ],
                     "weaponType": "dagger",
@@ -1073,7 +1096,7 @@
                             "label": "回忆检定",
                             "trigger": "attack",
                             "active": true,
-                            "script": "// 阻断后续标准的卡片和目标判定流程\nargs.flags.abort = true;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\n// 难度随等级下降: 15 -> 10 -> 5\nconst dc = 15 - (lvl - 1) * 5;\n\n// 投掷 D20\nconst r = await new Roll(\"1d20\").evaluate();\nif(game.dice3d) game.dice3d.showForRoll(r, game.user, true);\n\nconst isSuccess = r.total >= dc;\nconst resultHtml = isSuccess \n    ? \"<span style='color:green; font-weight:bold;'><i class='fas fa-check'></i> 检定成功！主持人将协助你回忆。</span>\" \n    : \"<span style='color:red; font-weight:bold;'><i class='fas fa-times'></i> 检定失败...什么都想不起来。</span>\";\n\n// 发送自定义战报卡片\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left:4px solid #2c3e50; background:rgba(0,0,0,0.05); padding:6px; margin-left:2px;\">\n            <div style=\"font-weight:bold; color:#2c3e50;\"><i class=\"fas fa-brain\"></i> 回忆检定 (DC ${dc})</div>\n            <div style=\"font-size:0.9em; margin-top:4px;\">1d20 掷出 <b>${r.total}</b><br>${resultHtml}</div>\n        </div>\n    </div>`\n});"
+                            "script": "// 阻断后续标准的卡片和目标判定流程\nargs.flags.abort = true;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\n// 难度随等级下降: 15 -> 10 -> 5\nconst dc = 15 - (lvl - 1) * 5;\n\n// 投掷 D20\nconst r = await new Roll(\"1d20\").evaluate();\nif(game.dice3d) await game.dice3d.showForRoll(r, game.user, true);\n\nconst isSuccess = r.total >= dc;\nconst resultHtml = isSuccess \n    ? \"<span style='color:green; font-weight:bold;'><i class='fas fa-check'></i> 检定成功！主持人将协助你回忆。</span>\" \n    : \"<span style='color:red; font-weight:bold;'><i class='fas fa-times'></i> 检定失败...什么都想不起来。</span>\";\n\n// 发送自定义战报卡片\nChatMessage.create({\n    speaker: ChatMessage.getSpeaker({actor: actor}),\n    content: `<div class=\"xjzl-chat-card\">\n        <div style=\"border-left:4px solid #2c3e50; background:rgba(0,0,0,0.05); padding:6px; margin-left:2px;\">\n            <div style=\"font-weight:bold; color:#2c3e50;\"><i class=\"fas fa-brain\"></i> 回忆检定 (DC ${dc})</div>\n            <div style=\"font-size:0.9em; margin-top:4px;\">1d20 掷出 <b>${r.total}</b><br>${resultHtml}</div>\n        </div>\n    </div>`\n});"
                         }
                     ]
                 }
@@ -1110,7 +1133,7 @@
             "sect": "liushanmen",
             "tier": 2,
             "description": "<p>刑罚者，民之鞭策也。侠界凡罪大恶极者，必有重刑，诛其身，补其过，方赦其罪。《大诰》之中刑罚至惨比比皆是，寻常人难以想象。<br>需求：《止刑功》修炼圆满。</p>",
-            "requirements": "无",
+            "requirements": "《止刑功》修炼圆满",
             "moves": [
                 {
                     "name": "拷问",
@@ -1168,7 +1191,7 @@
             "sect": "liushanmen",
             "tier": 2,
             "description": "<p>替人洗雪冤屈，推翻诬陷不实，翻案还原真相。<br>需求：《罪恶断》修炼圆满</p>",
-            "requirements": "无",
+            "requirements": "《罪恶断》修炼圆满",
             "moves": [
                 {
                     "name": "讼状",
@@ -1209,7 +1232,7 @@
                         "base": 0,
                         "growth": 0
                     },
-                    "description": "<p>（注：此为六扇门弟子必要时所行之非常手段，主观依赖性极强，请主持人酌情安排。）<br>你可以在探查清楚后，前往衙门对簿公堂，为一名在押犯人翻案。<br>你需要分别对衙门（县令或知府）、原告、百姓进行三次难度相同的[说服]检定，全部成功后，翻案成功，否则失败，根据目标的恶行值来确定难度。<br>恶行值 0 小于 100 小于 500<br>说服难度 15 20 25 ·若你有该犯人无罪的证据，说服难度-5。<br>·若犯人的恶行值大于等于 500，翻案必定失败。<br>翻案失败：你身败名裂，朝廷声望-3，一年内无法再替人翻案。<br>翻案成功：犯人被无罪释放，他对你感激涕零，将赠送他所有现银、产业总价值 20%的银两给你作为报酬（至少 100 两）。<br>·你增长该犯人当前恶行值 20%的恶行值，若你没有增长恶行值，你获得自身神采数值的侠义值。<br>·按照朝廷律法，你每月只能翻案一次。<br>升级：讼状中归你所有的银两比例提高 10%，翻案中进行的[说服]检定结果+1。</p>",
+                    "description": "<p>（注：此为六扇门弟子必要时所行之非常手段，主观依赖性极强，请主持人酌情安排。）</p><p>你可以在探查清楚后，前往衙门对簿公堂，为一名在押犯人翻案。<br>你需要分别对衙门（县令或知府）、原告、百姓进行三次难度相同的[说服]检定，全部成功后，翻案成功，否则失败，根据目标的恶行值来确定难度：<br>恶行值为 0，说服难度 15；恶行值小于 100，说服难度 20；恶行值小于 500，说服难度 25。<br>·若你有该犯人无罪的证据，说服难度-5。<br>·若犯人的恶行值大于等于 500，翻案必定失败。<br>翻案失败：你身败名裂，朝廷声望-3，一年内无法再替人翻案。<br>翻案成功：犯人被无罪释放，他对你感激涕零，将赠送他所有现银、产业总价值 20%的银两给你作为报酬（至少 100 两）。<br>·你增长该犯人当前恶行值 20%的恶行值，若你没有增长恶行值，你获得自身神采数值的侠义值。<br>·按照朝廷律法，你每月只能翻案一次。<br>升级：讼状中归你所有的银两比例提高 10%，翻案中进行的[说服]检定结果+1。</p>",
                     "automationNote": "完全手动：请GM主持翻案流程。",
                     "scripts": [],
                     "actionCost": "无"
@@ -1285,7 +1308,7 @@
                     "img": "systems/xjzl-system/assets/icons/wuxue/六扇门.png",
                     "description": "<p><strong>第一关</strong><br>需求：第一关穴位打通 2 个以上，修为 1000。<br>效果：你的招式提升消耗内力值等额的伤害。</p><p><strong>第二关</strong><br>需求：第二关穴位打通 2 个以上，修为 2000。<br>效果：你的招式提升消耗内力值*2 的伤害。</p><p><strong>第三关</strong><br>需求：第三关穴位打通 2 个以上，修为 4000。<br>效果：你的招式提升消耗内力值*3 的伤害。</p>",
                     "requirements": "",
-                    "automationNote": "被动效果完全自动化。calc阶段提供面板预估，attack阶段根据真实耗蓝自动校准最终伤害并发送卡片。穴位打通需求需玩家自觉遵守。",
+                    "automationNote": "被动效果完全自动化。attack阶段根据真实耗蓝附加额外伤害并发送卡片（面板数值不含该加成）。穴位打通需求需玩家自觉遵守。",
                     "weaponType": "none",
                     "progression": {
                         "mode": "custom",
@@ -1323,16 +1346,10 @@
                         "slug": "yiyiguantong",
                         "scripts": [
                             {
-                                "label": "伤害预估 (预览用)",
-                                "trigger": "calc",
-                                "active": true,
-                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst mpCost = args.move.currentCost?.mp || 0;\nif (mpCost <= 0) return;\n\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\nconst bonus = Math.floor(mpCost * multiplier);\n\nif (bonus > 0) {\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`一以贯通(Lv.${level}): +${bonus} (基于面板消耗${mpCost}预估，不代表最终结果)`);\n}"
-                            },
-                            {
-                                "label": "真实伤害校准",
+                                "label": "真实伤害加成",
                                 "trigger": "attack",
                                 "active": true,
-                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst mpCost = args.move.currentCost?.mp || 0;\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\n\n// 1. 先把 calc 阶段加的预估值扣掉\nconst previewBonus = Math.floor(mpCost * multiplier);\nargs.flags.damageResult.damage -= previewBonus;\n\n// 2. 获取本次真正扣掉的内力 (含减耗、免费施法、濒死额外耗蓝)\nconst realMp = args.costConsumed?.mp || 0;\nconst realBonus = Math.floor(realMp * multiplier);\n\n// 3. 把真正的加值加进去\nargs.flags.damageResult.damage += realBonus;\n\n// 4. 更新卡片描述\nif (realBonus !== previewBonus) {\n    args.flags.damageResult.breakdown += `\\n+ 一以贯通 (实扣${realMp}内力): +${realBonus}`;\n}\n\n// 5. 只要造成了额外伤害，发一张带边距的卡片\nif (realBonus > 0) {\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bolt\"></i> 一以贯通 (Lv.${level})</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">实际消耗 ${realMp} 点内力，招式伤害提升 <span style=\"color:#8e44ad; font-weight:bold;\">${realBonus}</span> 点！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
+                                "script": "if ((args.move.type === 'basic' && args.move.id !== 'opportunity-attack')) return;\nconst sourceItem = actor.items.find(i => i.name === '一以贯通' && i.type === 'wuxue');\nif (!sourceItem) return;\nconst passiveMove = sourceItem.system.moves.find(m => m.name === '一以贯通');\nconst level = passiveMove?.computedLevel || 0;\nif (level < 1) return;\n\nconst multiplier = Math.min(level, 3);\n\n// 基于本次真正扣掉的内力计算加值 (含减耗、免费施法、濒死额外耗蓝)\nconst realMp = args.costConsumed?.mp || 0;\nconst realBonus = Math.floor(realMp * multiplier);\n\nargs.flags.damageResult.damage += realBonus;\n\nif (realBonus > 0) {\n    args.flags.damageResult.breakdown += `\\n+ 一以贯通 (实扣${realMp}内力): +${realBonus}`;\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#732d91;\"><i class=\"fas fa-bolt\"></i> 一以贯通 (Lv.${level})</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">实际消耗 ${realMp} 点内力，招式伤害提升 <span style=\"color:#8e44ad; font-weight:bold;\">${realBonus}</span> 点！</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                             }
                         ]
                     }

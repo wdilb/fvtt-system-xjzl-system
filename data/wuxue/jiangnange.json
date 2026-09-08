@@ -87,6 +87,7 @@
                     "actionCost": "次要动作",
                     "description": "<p>抚剑轻吟，开启架招。架招开启期间，在自身回合初为 3 米范围内未陷入濒死的友方单位回复 5 点气血。</p><p><strong>升级：</strong>格挡值+5，恢复气血+5，内力消耗+1。</p>",
                     "automationNote": "格挡能力自动。回合初自动弹卡片提示玩家对周围友方手动施加治疗。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 5
@@ -169,7 +170,7 @@
                     "name": "清冷月",
                     "type": "stance",
                     "element": "yin",
-                    "damageType": "waigong",
+                    "damageType": "none",
                     "weaponType": "instrument",
                     "range": "自身",
                     "targetInfo": "自身",
@@ -192,7 +193,7 @@
                             "label": "格挡触发清音",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "const stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nif (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    effect.duration.rounds = rounds;\n    effect.changes[0].value = String(bonus);\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}"
+                            "script": "const stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nif (Macros.checkStance(actor, args)) {\n    const bonus = 1 + (lvl - 1);\n    const rounds = 1 + (lvl - 1);\n    const effect = thisItem.effects.getName(\"清音\").toObject();\n    delete effect._id;\n    effect.duration.rounds = rounds;\n    effect.changes[0].value = String(bonus);\n    await game.xjzl.api.effects.addEffect(actor, effect);\n}"
                         }
                     ]
                 },
@@ -229,7 +230,7 @@
                             "label": "侠恶判定",
                             "trigger": "check",
                             "active": true,
-                            "script": "const getTag = (x, e) => {\n    if (x >= 1000 && e < 200) return 'xia';\n    if (x >= 500 && e < 100) return 'xia';\n    if (x >= 100 && e < 50) return 'xia';\n    if (e >= 1000 && x < 200) return 'e';\n    if (e >= 500 && x < 100) return 'e';\n    if (e >= 100 && x < 50) return 'e';\n    return 'none';\n};\nconst myTag = getTag(actor.system.social.xiayi || 0, actor.system.social.exing || 0);\nconst tTag = getTag(args.target.system.social.xiayi || 0, args.target.system.social.exing || 0);\n\n// 只有双方都有明显的、且互不相同的标签才触发（避免无标签和有标签被判定为“不同”）\nif (myTag !== 'none' && tTag !== 'none' && myTag !== tTag) {\n    args.flags.critThresholdMod += 2;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.05);\">\n            <div style=\"font-weight:bold; color:#8e44ad;\">道不同不相为谋</div>\n            <div style=\"font-size:0.9em;\">对 [${args.target.name}] 侠恶相斥，暴击阈值降低 2 点。</div>\n        </div>`\n    });\n}"
+                            "script": "const getTag = (x, e) => {\n    if (x >= 100 && e <= 50) return 'xia';\n    if (e >= 100 && x <= 50) return 'e';\n    return 'none';\n};\nconst myTag = getTag(actor.system.social.xiayi || 0, actor.system.social.exing || 0);\nconst tTag = getTag(args.target.system.social.xiayi || 0, args.target.system.social.exing || 0);\n\n// 只有双方都有明显的、且互不相同的标签才触发（避免无标签和有标签被判定为“不同”）\nif (myTag !== 'none' && tTag !== 'none' && myTag !== tTag) {\n    args.flags.critThresholdMod += 2;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px; border-left: 3px solid #8e44ad; background: rgba(142,68,173,0.05);\">\n            <div style=\"font-weight:bold; color:#8e44ad;\">道不同不相为谋</div>\n            <div style=\"font-size:0.9em;\">对 [${args.target.name}] 侠恶相斥，暴击阈值降低 2 点。</div>\n        </div>`\n    });\n}"
                         },
                         {
                             "label": "性别伤害修正",
@@ -310,8 +311,7 @@
                             5
                         ]
                     },
-                    "scripts": [],
-                    "effects": []
+                    "scripts": []
                 }
             ],
             "effects": [
@@ -508,7 +508,7 @@
                                 "label": "诗酒触发",
                                 "trigger": "hit",
                                 "active": true,
-                                "script": "if (args.isHit && args.item.name === '醉梦笔录' && args.target.system.resources?.alcohol) {\n    const cur = args.target.system.resources.alcohol.value;\n    await args.target.update({ 'system.resources.alcohol.value': cur + 5 });\n    if (args.target.showFloatyText) {\n        args.target.showFloatyText(\"醉意 +5\", { fill: \"#cc00ff\" });\n    }\n}"
+                                "script": "if (args.isHit && args.item.name === '醉梦笔录' && args.target.system.resources?.alcohol) {\n    const cur = args.target.system.resources.alcohol.value || 0;\n    // 醉意不在六大跟踪资源内，{ delta } 增量会抛“增量资源路径不受支持”；改用绝对值形式，非 owner 时仍能经 socket 委托 GM 写入\n    await args.target.changeResources({\n        'system.resources.alcohol.value': cur + 5\n    }, { cause: 'script', sourceActor: actor, item: args.item, move: args.move, source: 'shijiu' });\n    if (args.target.showFloatyText) {\n        args.target.showFloatyText(\"醉意 +5\", { fill: \"#cc00ff\" });\n    }\n}"
                             }
                         ]
                     }
@@ -1117,19 +1117,13 @@
                     "description": "<p>蓄力动作，千回百转，迂回盘绕，对周围敌人造成 0.6 力量点外功伤害。</p><p>若你处于“颜体”，招式击飞所有敌人 3 米。</p><p>若你处于“柳体”，自身和周围友方获得 20 点护体真气，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。</p>",
                     "scripts": [
                         {
-                            "label": "探测颜柳状态",
-                            "trigger": "attack",
-                            "active": true,
-                            "script": "args.flags.damageResult.yantiTrigger = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yanti');\nargs.flags.damageResult.liutiTrigger = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'liuti');"
-                        },
-                        {
                             "label": "颜柳特效与提示",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const isYanti = args.damageResult?.yantiTrigger;\nconst isLiuti = args.damageResult?.liutiTrigger;\nlet contentHtml = \"\";\n\nif (isYanti) {\n    contentHtml += \"<li><span style='color:#c0392b;font-weight:bold;'>颜体刚猛</span>：将击中的敌人击飞 3 米！(请手动进行位移操作)</li>\";\n}\nif (isLiuti) {\n    await actor.applyHealing({ healer: actor,  amount: 20, type: 'huti', showScrolling: true });\n    contentHtml += \"<li><span style='color:#27ae60;font-weight:bold;'>柳体生息</span>：自身已获得 20 点护体真气！<br><span style='color:#555;'>(周围友方请手动操作增加 20 护体)</span></li>\";\n}\n\nif (contentHtml !== \"\") {\n    const msg = `<div class=\"xjzl-chat-card\">\n        <div style=\"font-weight:bold; border-bottom:1px solid #ccc; padding-bottom:3px; margin-bottom:5px;\">\n            <i class=\"fas fa-paint-brush\"></i> 龙飞凤舞 意象触发\n        </div>\n        <ul style=\"padding-left: 20px; font-size: 0.9em; color: #444;\">\n            ${contentHtml}\n        </ul>\n    </div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
+                            "script": "const isYanti = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'yanti');\nconst isLiuti = actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'liuti');\nlet contentHtml = \"\";\n\nif (isYanti) {\n    contentHtml += \"<li><span style='color:#c0392b;font-weight:bold;'>颜体刚猛</span>：将击中的敌人击飞 3 米！(请手动进行位移操作)</li>\";\n}\nif (isLiuti) {\n    await actor.applyHealing({ healer: actor,  amount: 20, type: 'huti', showScrolling: true });\n    contentHtml += \"<li><span style='color:#27ae60;font-weight:bold;'>柳体生息</span>：自身已获得 20 点护体真气！<br><span style='color:#555;'>(周围友方请手动操作增加 20 护体)</span></li>\";\n}\n\nif (contentHtml !== \"\") {\n    const msg = `<div class=\"xjzl-chat-card\">\n        <div style=\"font-weight:bold; border-bottom:1px solid #ccc; padding-bottom:3px; margin-bottom:5px;\">\n            <i class=\"fas fa-paint-brush\"></i> 龙飞凤舞 意象触发\n        </div>\n        <ul style=\"padding-left: 20px; font-size: 0.9em; color: #444;\">\n            ${contentHtml}\n        </ul>\n    </div>`;\n    ChatMessage.create({content: msg, speaker: ChatMessage.getSpeaker({actor: actor})});\n}"
                         }
                     ],
-                    "automationNote": "绝招预判状态防止执行时冲突。自身护体增加自动响应，击飞位移与友方护体增加全靠玩家手动处理。",
+                    "automationNote": "颜体/柳体状态自动检测触发。自身护体增加自动响应，击飞位移与友方护体增加全靠玩家手动处理。",
                     "actionCost": "蓄力动作",
                     "targetInfo": "范围"
                 }
@@ -1208,7 +1202,8 @@
                     "damageType": "neigong",
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
-                    "range": "3",
+                    "range": "3米",
+                    "targetInfo": "单体",
                     "costs": {
                         "mp": [
                             2,
@@ -1243,7 +1238,8 @@
                     "damageType": "neigong",
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
-                    "range": "5",
+                    "range": "5米",
+                    "targetInfo": "直线路径敌人",
                     "costs": {
                         "mp": [
                             4,
@@ -1278,6 +1274,7 @@
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
                     "range": "自身",
+                    "targetInfo": "自身",
                     "costs": {
                         "mp": [
                             2,
@@ -1308,7 +1305,8 @@
                     "damageType": "neigong",
                     "weaponType": "dagger",
                     "weaponSubtype": "笔",
-                    "range": "3",
+                    "range": "3米",
+                    "targetInfo": "周围敌人",
                     "costs": {
                         "mp": [
                             8,
@@ -1471,6 +1469,7 @@
                     "actionCost": "蓄力动作",
                     "description": "<p>【神机预贯，变幻天机】</p><p>蓄力动作，尽变之义，极变之致，消耗“弈理”，在自身周围内布下‘渊微’，持续@{1 + @up|一}回合。</p><p><strong>渊微：</strong>区域内的敌人无法离开此范围，只能在区域范围内移动。</p><p>·你处于区域内时每回合初额外获得一个主要动作。</p><p>·渊微形成在原地，不会跟随你移动，你只能拥有一个渊微，如果你布下新的渊微，之前的消失。</p><p><strong>升级：</strong>持续回合数+1，怒气消耗-1，内力消耗+8。</p>",
                     "automationNote": "检测并消耗弈理，如果不足将阻断出招。区域效果需手动处理。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1489,10 +1488,16 @@
                     },
                     "scripts": [
                         {
+                            "label": "缺少弈理时阻断出招",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "const yili = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yili');\nif (!yili) {\n    args.abort = true;\n    args.abortReason = \"缺少必要的 [弈理] 状态，无法施展此绝招。\";\n}"
+                        },
+                        {
                             "label": "消耗弈理与渊微提示",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const yili = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yili');\nif (yili) {\n    await yili.delete();\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #8e44ad; background: rgba(142,68,173,0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#8e44ad;\"><i class=\"fas fa-chess-board\"></i> 渊微降临</div>\n        <div style=\"font-size:0.9em; color:#555;\">已消耗 [弈理]。请在周围布下【渊微】区域，持续 <b>${rounds}</b> 回合。</div>\n        <hr>\n        <ul style=\"font-size: 0.85em; color: #666; padding-left: 15px; margin-bottom: 0;\">\n            <li>敌人无法离开此区域</li>\n            <li>施法者处于区域内时：每回合初额外获得一个主要动作</li>\n        </ul>\n    </div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });\n} else {\n    ui.notifications.warn(\"未检测到【弈理】状态，无法施展此绝招！\");\n    args.flags.abort = true;\n    args.flags.abortReason = \"缺少必要的 [弈理] 状态。\";\n}"
+                            "script": "const yili = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'yili');\nif (!yili) return;\nawait yili.delete();\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 5px; border-left: 4px solid #8e44ad; background: rgba(142,68,173,0.05); padding: 5px;\">\n        <div style=\"font-weight:bold; color:#8e44ad;\"><i class=\"fas fa-chess-board\"></i> 渊微降临</div>\n        <div style=\"font-size:0.9em; color:#555;\">已消耗 [弈理]。请在周围布下【渊微】区域，持续 <b>${rounds}</b> 回合。</div>\n        <hr>\n        <ul style=\"font-size: 0.85em; color: #666; padding-left: 15px; margin-bottom: 0;\">\n            <li>敌人无法离开此区域</li>\n            <li>施法者处于区域内时：每回合初额外获得一个主要动作</li>\n        </ul>\n    </div>`;\n    ChatMessage.create({ content: msg, speaker: ChatMessage.getSpeaker({actor: actor}) });"
                         }
                     ]
                 }
@@ -1507,12 +1512,12 @@
                 "flags": {
                     "xjzl-system": {
                         "slug": "yili",
+                        "tiedToStance": true,
                         "scripts": [
                             {
                                 "label": "全局技能技艺加成",
                                 "trigger": "passive",
                                 "active": true,
-                                "tiedToStance": true,
                                 "script": "const lvl = thisEffect.getFlag('xjzl-system', 'stanceLevel') || 1;\nconst bonus = 1 + (lvl - 1);\n\n// 动态为每一个属性技能附加检定加值\nif (S.skills) {\n    for (const key of Object.keys(CONFIG.XJZL.skills)) {\n        if (S.skills[key]) S.skills[key].checkMod += bonus;\n    }\n}\n\n// 动态为每一个技艺技能附加检定加值\nif (S.arts) {\n    for (const key of Object.keys(CONFIG.XJZL.arts)) {\n        if (S.arts[key]) S.arts[key].checkMod += bonus;\n    }\n}"
                             }
                         ]
@@ -1720,6 +1725,7 @@
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，一缕书墨香回忆，获得“江南”状态，持续到战斗脱离。</p><p><strong>江南：</strong>你与周围 5 米内友方招式伤害+5。</p><p>·你每个回合初必须再次消耗 1 点内力维持“江南”，否则移除江南。</p><p><strong>升级：</strong>江南提升的伤害+5，施展和维持的消耗+1。</p>",
                     "automationNote": "完全自动化。会给自己和选中的目标上BUFF。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1836,7 +1842,7 @@
             "category": "sanshou",
             "sect": "jiangnange",
             "tier": 2,
-            "description": "<p>众人皆醉我独醒，举世皆俗我独清。身处红尘不沾世俗，凡夫俗子难为知音，曲高和寡，遗世独立。</p><p><strong>需求：</strong>《风雅颂》修炼圆满</p><p><strong>【清雅】</strong></p><p>清新文雅，风格脱俗。</p><p>你的[演奏]、[棋术]、[书写]、[作画]每有一种达到 5 级，你的神采+5。</p><p><strong>【高雅】</strong></p><p>高尚典雅，名士之风。</p><p>你施展笔/乐器/棋类武学时，命中和招式伤害提升【神采/10】的数值。</p><p><strong>升级：</strong>清雅中需求的四艺等级-1；高雅中，命中伤害额外+5。</p><p style=\"color:#8b0000;\"></p>",
+            "description": "<p>众人皆醉我独醒，举世皆俗我独清。身处红尘不沾世俗，凡夫俗子难为知音，曲高和寡，遗世独立。</p><p><strong>需求：</strong>《风雅颂》修炼圆满</p><p><strong>【清雅】</strong></p><p>清新文雅，风格脱俗。</p><p>你的[演奏]、[棋术]、[书写]、[作画]每有一种达到 5 级，你的神采+5。</p><p><strong>【高雅】</strong></p><p>高尚典雅，名士之风。</p><p>你施展笔/乐器/棋类武学时，命中和招式伤害提升【神采/10】的数值。</p><p><strong>升级：</strong>清雅中需求的四艺等级-1；高雅中，命中伤害额外+5。</p>",
             "requirements": "《风雅颂》修炼圆满",
             "moves": [
                 {
@@ -1848,7 +1854,7 @@
                     "range": "自身",
                     "actionCost": "无",
                     "description": "<p>众人皆醉我独醒，举世皆俗我独清。身处红尘不沾世俗，凡夫俗子难为知音，曲高和寡，遗世独立。</p><p><strong>【清雅】</strong>你的[演奏]、[棋术]、[书写]、[作画]每有一种达到 5 级，你的神采+5。</p><p><strong>【高雅】</strong>你施展笔/乐器/棋类武学时，命中和招式伤害提升【神采/10】的数值。</p><p><strong>升级：</strong>清雅中需求的四艺等级-1；高雅中，命中伤害额外+5。</p>",
-                    "automationNote": "【清雅】全局自动生效；【高雅】自动为所有招式加成。若非指定武器，请手动打开武学的特效界面然后停用高雅的特效。",
+                    "automationNote": "【清雅】全局自动生效；【高雅】自动为笔/乐器/棋类/奇门武学加成。注：因武器子类型数据未完整录入，系统按武器大类识别，匕首类武学（含匕首-尺等非笔武器）也会获得加成，如需精确排除请手动停用该特效。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1880,7 +1886,7 @@
                                     "label": "高雅：命中与伤害加成",
                                     "trigger": "attack",
                                     "active": true,
-                                    "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack') || args.move.type === \"stance\" || args.move.type === \"qi\") return;\n\nconst validTypes = ['special', 'instrument', 'hidden'];\nif (!validTypes.includes(args.move.weaponType)) return;\n\nconst originItem = (thisEffect.parent && thisEffect.parent.type === \"wuxue\") ? thisEffect.parent : actor.items.find(i => i.name === \"大雅之堂\");\nif (!originItem) return;\n\nconst dyzt = originItem.system.moves.find(m => m.name === \"大雅之堂\");\nconst lvl = Math.max(1, dyzt?.computedLevel || 1);\n\nconst currentShencai = S.stats.shencai.total || 0;\nconst baseBonus = Math.floor(currentShencai / 10);\nconst extraBonus = (lvl - 1) * 5;\nconst totalBonus = baseBonus + extraBonus;\n\nargs.flags.bonusHit += totalBonus;\nargs.flags.damageResult.damage += totalBonus;\nargs.flags.damageResult.breakdown += `\\n+ 高雅加成: ${totalBonus}`;"
+                                    "script": "if ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack') || args.move.type === \"stance\" || args.move.type === \"qi\") return;\n\n// 武器子类型数据未完整录入，无法精确区分“匕首-笔”，匕首类整体放行，边界在 automationNote 中说明\nconst validTypes = ['dagger', 'special', 'instrument', 'hidden'];\nif (!validTypes.includes(args.move.weaponType)) return;\n\nconst originItem =(thisEffect.parent && thisEffect.parent.type === \"wuxue\") ? thisEffect.parent : actor.items.find(i => i.name === \"大雅之堂\");\nif (!originItem) return;\n\nconst dyzt = originItem.system.moves.find(m => m.name === \"大雅之堂\");\nconst lvl = Math.max(1, dyzt?.computedLevel || 1);\n\nconst currentShencai = S.stats.shencai.total || 0;\nconst baseBonus = Math.floor(currentShencai / 10);\nconst extraBonus = (lvl - 1) * 5;\nconst totalBonus = baseBonus + extraBonus;\n\nargs.flags.bonusHit += totalBonus;\nargs.flags.damageResult.damage += totalBonus;\nargs.flags.damageResult.breakdown += `\\n+ 高雅加成: ${totalBonus}`;"
                                 }
                             ]
                         }
