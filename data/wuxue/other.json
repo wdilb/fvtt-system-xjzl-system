@@ -426,7 +426,7 @@
                             "label": "施加封招",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"fengzhao\", { duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被封招！`);\n}"
+                            "script": "if (args.isHit) {\n    // addEffect 第三参是叠层数，不接受 duration 配置；改用带 id 的补丁对象由 addEffect 合并系统状态底板\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fengzhao\", duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被封招！`);\n}"
                         },
                         {
                             "label": "消耗魂吸血",
@@ -465,7 +465,7 @@
                                     "label": "回合末转化",
                                     "trigger": "turnEnd",
                                     "active": true,
-                                    "script": "const wuxueItem = actor.items.find(i => i.name === \"摄魂魔刀\");\nif (!wuxueItem) return;\nconst hunAe = wuxueItem.effects.getName(\"魂\");\nif (!hunAe) return;\nconst eff = hunAe.toObject();\ndelete eff._id;\neff.origin = wuxueItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\nawait thisEffect.delete();"
+                                    "script": "const wuxueItem = actor.items.find(i => i.name === \"摄魂魔刀\");\nif (!wuxueItem) return;\nconst hunAe = wuxueItem.effects.getName(\"魂\");\nif (!hunAe) return;\nconst eff = hunAe.toObject();\ndelete eff._id;\neff.origin = wuxueItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);\n// AE 须走系统 API 移除，保留权限代理与飘字语义\nawait game.xjzl.api.effects.removeEffect(actor, \"juhun_ready\");"
                                 }
                             ]
                         }
@@ -748,9 +748,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "青云意门槛检查",
+                            "trigger": "preAttack",
+                            "script": "// 检查放在 preAttack：中止发生在扣除资源前，避免内力已被扣掉\nif (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qingyunyi\")) {\n    args.abort = true;\n    args.abortReason = \"必须消耗 [青云意] 才能施展\";\n}",
+                            "active": true
+                        },
+                        {
                             "label": "消耗青云意",
                             "trigger": "attack",
-                            "script": "const qingyun = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"qingyunyi\");\nif (!qingyun) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"必须消耗 [青云意] 才能施展\";\n    return;\n}\nawait game.xjzl.api.effects.removeEffect(actor, \"qingyunyi\", 1);",
+                            "script": "// 资源已扣除后再移除青云意，避免其他原因中止时白耗状态\nawait game.xjzl.api.effects.removeEffect(actor, \"qingyunyi\", 1);",
                             "active": true
                         },
                         {
@@ -998,7 +1004,7 @@
                         {
                             "label": "骨折提示",
                             "trigger": "hit",
-                            "script": "const hasMiesheng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"miesheng\");\nif (hasMiesheng) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\"><b>问枯冢 - 灭生特效</b></div><div style=\"padding:5px;\">目标 <b>${args.target.name}</b> 随机一条腿骨折，请手动投掷伤残表或应用效果。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "// 灭生骨折以命中为前提\nif (!args.isHit) return;\nconst hasMiesheng = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"miesheng\");\nif (hasMiesheng) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\"><b>问枯冢 - 灭生特效</b></div><div style=\"padding:5px;\">目标 <b>${args.target.name}</b> 随机一条腿骨折，请手动投掷伤残表或应用效果。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -1077,14 +1083,7 @@
                     },
                     "changes": []
                 }
-            ],
-            "progression": {
-                "mode": "custom",
-                "customThresholds": [
-                    0
-                ],
-                "mappedStage": 0
-            }
+            ]
         }
     },
     {
@@ -1451,7 +1450,7 @@
                             "label": "无架招禁虚",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target.system.martial.stanceActive) {\n    // 获取系统通用状态：禁虚 (jinxu)\n    const status = CONFIG.statusEffects.find(e => e.id === \"jinxu\");\n    if (status) {\n        // 克隆并修改持续时间为1回合\n        const data = foundry.utils.deepClone(status);\n        data.duration = { rounds: 1 };\n        // 调用 API 应用\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 未开启招架，被禁虚！`);\n    }\n}"
+                            "script": "if (!args.isHit) return;\nif (!args.target.system.martial.stanceActive) {\n    // 获取系统通用状态：禁虚 (jinxu)\n    const status = CONFIG.statusEffects.find(e => e.id === \"jinxu\");\n    if (status) {\n        // 克隆并修改持续时间为1回合\n        const data = foundry.utils.deepClone(status);\n        data.duration = { rounds: 1 };\n        // 调用 API 应用\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 未开启招架，被禁虚！`);\n    }\n}"
                         }
                     ]
                 },
@@ -1636,7 +1635,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，挥舞长剑，烈火乍起，开启架招。格挡成功后，自身陷入“引燃”，持续到战斗脱离，同时获得一层“凡火”，最多三层，持续到脱战。</p><p><strong>凡火：</strong>你对他人造成火焰伤害时，每有一层凡火，额外造成 5 火焰伤害。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
-                    "automationNote": "格挡自动施加引燃和凡火。凡火增伤自动。",
+                    "automationNote": "格挡自动施加引燃（回合初自燃与五回合损毁提醒自动；1米传染请手动施加）。自燃不吃凡火/疯火。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1667,7 +1666,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>主要动作，剑身刺地，翻转火花，对目标造成 0.4 内息点内功伤害，命中无架招目标时，使其陷入“引燃”，持续到战斗脱离。</p><p>·自身每有一层“凡火”，虚招值+1。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
-                    "automationNote": "凡火加虚招值自动。命中无架招施加引燃自动。",
+                    "automationNote": "凡火加虚招值自动。命中无架招施加引燃自动，施加瞬间自动结算凡火/疯火爆发（含战报卡片）。1米传染手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1695,7 +1694,7 @@
                         {
                             "label": "施加引燃",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = thisItem.effects.getName('引燃').toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被引燃！`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const effectData = thisItem.effects.getName('引燃').toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, effectData);\n    ui.notifications.info(`${args.target.name} 被引燃！`);\n\n    // 施加引燃的瞬间视为“对他人造成火焰伤害”：结算凡火/疯火爆发\n    let burst = 0;\n    let heal = 0;\n    let fanhuoStacks = 0;\n    let fenghuoBonus = null;\n    const fanhuo = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'fanhuo');\n    if (fanhuo) {\n        fanhuoStacks = fanhuo.getFlag('xjzl-system', 'stacks') || 1;\n        burst += 5 * fanhuoStacks;\n    }\n    const fenghuo = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'fenghuo');\n    if (fenghuo) {\n        fenghuoBonus = Number(fenghuo.getFlag('xjzl-system', 'fenghuoBonus')) || 0;\n        burst += 10 + fenghuoBonus;\n        heal = 10 + fenghuoBonus;\n    }\n    if (burst > 0) {\n        const result = await args.target.applyDamage({ amount: burst, type: 'fire', attacker: actor, source: 'extra' });\n        let detail = `<p>引燃落焰，凡火/疯火随之灼烧：</p>`;\n        if (fanhuoStacks > 0) detail += `<p>凡火 ×${fanhuoStacks}：<b>${5 * fanhuoStacks}</b> 点火焰伤害</p>`;\n        if (fenghuoBonus !== null) detail += `<p>疯火：<b>${10 + fenghuoBonus}</b> 点火焰伤害</p>`;\n        detail += `<p style=\"color:#8b0000;\">${args.target.name} 实际受到 <b>${result?.finalDamage ?? burst}</b> 点火焰伤害</p>`;\n        await ChatMessage.create({\n            content: `<div class=\"xjzl-chat-card\"><div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\"><i class=\"fas fa-fire\" style=\"color:#e67e22;\"></i> 引燃爆发 - ${args.target.name}</div><div style=\"padding:5px; font-size:0.9em;\">${detail}</div></div>`,\n            speaker: ChatMessage.getSpeaker({ actor: actor })\n        });\n    }\n    if (heal > 0) {\n        await actor.applyHealing({ healer: actor, amount: heal, type: 'hp', showScrolling: true });\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1727,7 +1726,7 @@
                         {
                             "label": "火中长生",
                             "trigger": "hit",
-                            "script": "// 1. 扣除 10% 最大气血\nconst hpCost = Math.floor(actor.system.resources.hp.max * 0.1);\nawait actor.applyHealing({ healer: actor, amount: -hpCost, type: 'hp', showScrolling: true});\n\n// 2. 检查凡火\nconst fanhuo = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'fanhuo');\nconst currentStacks = fanhuo ? (fanhuo.getFlag('xjzl-system', 'stacks') || 1) : 0;\n\n// 升级后每次获得层数 (Lv1=1, Lv2+=1)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gainStacks = 1 + (lvl - 1);\n\nif (currentStacks >= 3) {\n    // 转化疯火\n    if (fanhuo) await fanhuo.delete();\n    \n    const fenghuoData = thisItem.effects.getName('疯火').toObject();\n    delete fenghuoData._id;\n    fenghuoData.origin = thisItem.uuid;\n    \n    // 升级加成写入 Flag (疯火特效里读取)\n    const bonus = (lvl - 1) * 10;\n    fenghuoData.flags['xjzl-system'].fenghuoBonus = bonus;\n    // 动态修改疯火的伤害加成 (基础10 + 成长)\n    const totalFireDmg = 10 + bonus;\n    fenghuoData.changes[0].value = String(totalFireDmg);\n\n    await game.xjzl.api.effects.addEffect(actor, fenghuoData);\n    ui.notifications.info(`${actor.name} 凡火已极，化为疯火！`);\n} else {\n    // 获得凡火\n    const fanhuoData = thisItem.effects.getName('凡火').toObject();\n    delete fanhuoData._id;\n    fanhuoData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, fanhuoData, gainStacks);\n}",
+                            "script": "// 1. 扣除 10% 最大气血\nconst hpCost = Math.floor(actor.system.resources.hp.max * 0.1);\nawait actor.applyHealing({ healer: actor, amount: -hpCost, type: 'hp', showScrolling: true});\n\n// 2. 检查凡火\nconst fanhuo = actor.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'fanhuo');\nconst currentStacks = fanhuo ? (fanhuo.getFlag('xjzl-system', 'stacks') || 1) : 0;\n\n// 升级后每次获得层数 (Lv1=1, Lv2+=1)\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst gainStacks = 1 + (lvl - 1);\n\nif (currentStacks >= 3) {\n    // 转化疯火 (移除 AE 须走系统 API)\n    if (fanhuo) await game.xjzl.api.effects.removeEffect(actor, 'fanhuo', 3);\n    \n    const fenghuoData = thisItem.effects.getName('疯火').toObject();\n    delete fenghuoData._id;\n    fenghuoData.origin = thisItem.uuid;\n    \n    // 升级加成写入 Flag (疯火特效里读取)\n    const bonus = (lvl - 1) * 10;\n    fenghuoData.flags['xjzl-system'].fenghuoBonus = bonus;\n\n    await game.xjzl.api.effects.addEffect(actor, fenghuoData);\n    ui.notifications.info(`${actor.name} 凡火已极，化为疯火！`);\n} else {\n    // 获得凡火\n    const fanhuoData = thisItem.effects.getName('凡火').toObject();\n    delete fanhuoData._id;\n    fanhuoData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, fanhuoData, gainStacks);\n}",
                             "active": true
                         }
                     ]
@@ -1780,12 +1779,20 @@
                 {
                     "name": "引燃",
                     "icon": "icons/magic/fire/flame-burning-skeleton-orange.webp",
-                    "description": "被神火点燃。",
+                    "description": "你在自己的每回合初受到 10 点火焰伤害。每经过五回合，你身上的防具、包裹物品随机损毁一件/套/份。如果你在其他“引燃”的角色身边（距离 1 米）结束自己的回合，你也会被添加“引燃”。",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "yinran",
-                            "stackable": false
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "回合初燃烧",
+                                    "trigger": "turnStart",
+                                    "active": true,
+                                    "script": "// 追踪燃烧回合数，每满 5 回合提醒 GM 手动损毁物品（破坏性操作保持人工执行）\nconst ticks = (thisEffect.getFlag('xjzl-system', 'ticks') || 0) + 1;\nawait thisEffect.update({ 'flags.xjzl-system.ticks': ticks });\nif (ticks % 5 === 0) {\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px;\"><b>引燃</b>：${actor.name} 已燃烧 ${ticks} 回合，请 GM 随机损毁其一件/套/份防具或包裹物品。</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}\n\n// 回合初自燃：固定 10 点火焰伤害。这是状态自身的灼烧，不属于施术者“造成火焰伤害”，不吃凡火/疯火\nawait actor.applyDamage({ amount: 10, type: 'fire', source: 'dot' });\n// 注：1米传染为人工裁定（需逐个检查结束回合时的站位），由玩家/GM手动施加引燃。\n// 传染出的引燃可复制本状态数据，记得清掉 flags.xjzl-system.ticks 计数。"
+                                }
+                            ]
                         }
                     },
                     "changes": []
@@ -1793,27 +1800,29 @@
                 {
                     "name": "凡火",
                     "icon": "icons/magic/fire/flame-burning-campfire-orange.webp",
-                    "description": "造成火焰伤害时，每层额外造成 5 点。",
+                    "description": "造成火焰伤害时，每层额外造成 5 点。（对火焰伤害招式与施加引燃的瞬间自动结算）",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
                             "slug": "fanhuo",
                             "stackable": true,
-                            "maxStacks": 3
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "凡火增伤",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "// 通用火焰增伤：角色施展的招式伤害类型为 fire 时按层加伤\n// 引燃的回合初自燃不经过招式面板，因此不触发本脚本\nif (args.move?.damageType === 'fire') {\n    const stacks = thisEffect.getFlag('xjzl-system', 'stacks') || 1;\n    const bonus = 5 * stacks;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`凡火: +${bonus} 火焰伤害`);\n}"
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.fire.mod",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
+                    "changes": []
                 },
                 {
                     "name": "疯火",
                     "icon": "icons/magic/fire/elemental-fire-flying-orange.webp",
-                    "description": "造成火焰伤害时增加伤害并回血。",
+                    "description": "造成火焰伤害时额外+10并回复等量气血。（对火焰伤害招式与施加引燃的瞬间自动结算；升级加成经 fenghuoBonus 由结算读取）",
                     "transfer": false,
                     "flags": {
                         "xjzl-system": {
@@ -1821,21 +1830,21 @@
                             "stackable": false,
                             "scripts": [
                                 {
-                                    "label": "疯火回血",
-                                    "trigger": "hit",
+                                    "label": "疯火增伤",
+                                    "trigger": "calc",
                                     "active": true,
-                                    "script": "if (args.actionType === 'attack' && args.config?.element === 'fire') {\n    // 读取升级加成 (基础10 + Bonus)\n    const bonus = Number(thisEffect.getFlag('xjzl-system', 'fenghuoBonus')) || 0;\n    const heal = 10 + bonus;\n    await actor.applyHealing({ healer: actor, amount: heal, type: 'hp', showScrolling: true});\n}"
+                                    "script": "// 通用火焰增伤：角色施展的招式伤害类型为 fire 时+10，升级加成经 fenghuoBonus flag 注入\nif (args.move?.damageType === 'fire') {\n    const bonus = Number(thisEffect.getFlag('xjzl-system', 'fenghuoBonus')) || 0;\n    const total = 10 + bonus;\n    args.output.damage += total;\n    args.output.bonusDesc.push(`疯火: +${total} 火焰伤害`);\n}"
+                                },
+                                {
+                                    "label": "疯火回血",
+                                    "trigger": "hit_once",
+                                    "active": true,
+                                    "script": "// 通用火焰回血：整次动作最多回复一次（不按目标重复），且需实际造成过火焰伤害（未命中或被完全抵消则不回）。\n// 引燃施加瞬间的爆发在施招脚本内自行结算回血，此处只覆盖火焰伤害招式。\nif (args.actionType === 'attack' && args.type === 'fire' && (args.hitCount || 0) > 0\n    && (args.targets || []).some(t => t.isHit && (t.finalDamage ?? 0) > 0)) {\n    const bonus = Number(thisEffect.getFlag('xjzl-system', 'fenghuoBonus')) || 0;\n    const heal = 10 + bonus;\n    await actor.applyHealing({ healer: actor, amount: heal, type: 'hp', showScrolling: true });\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:4px solid #27ae60; background:rgba(39,174,96,0.08);\"><span style=\"color:#27ae60; font-weight:bold;\"><i class=\"fas fa-fire\"></i> 疯火噬身还精</span><br>${actor.name} 借火焰掠夺生机，回复 <b>${heal}</b> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({ actor: actor })\n    });\n}"
                                 }
                             ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.fire.mod",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "changes": []
                 }
             ]
         }
@@ -2031,7 +2040,7 @@
                         {
                             "label": "Buff提示",
                             "trigger": "hit",
-                            "script": "const tongku = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'tongku');\nconst stacks = tongku ? (tongku.getFlag('xjzl-system', 'stacks') || 1) : 0;\n\nif (stacks > 0) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"background:#8e44ad; color:white;\">痛断肠 - 效果触发</div>\n            <div style=\"padding:5px;\">\n                <p>目标拥有 <b>${stacks}</b> 层 [恸哭]。</p>\n                <p>请手动为自己添加 <b>${stacks}</b> 层任意 [人级叠加类状态]。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "// 获得层数以命中为前提，未命中不结算\nif (!args.isHit) return;\nconst tongku = args.target.effects.find(e => e.getFlag('xjzl-system', 'slug') === 'tongku');\nconst stacks = tongku ? (tongku.getFlag('xjzl-system', 'stacks') || 1) : 0;\n\nif (stacks > 0) {\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"background:#8e44ad; color:white;\">痛断肠 - 效果触发</div>\n            <div style=\"padding:5px;\">\n                <p>目标拥有 <b>${stacks}</b> 层 [恸哭]。</p>\n                <p>请手动为自己添加 <b>${stacks}</b> 层任意 [人级叠加类状态]。</p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -2651,6 +2660,7 @@
                     "description": "<p>主要动作，血滴掌心邪蛊，选择范围内一个空格，弹出蛊虫，在目标周围3米范围形成淡绿色的‘腐蛊雾霭’，持续三回合。</p><p><strong>腐蛊雾霭：</strong>该区域不会影响敌我视线，在区域内的角色进行命中检定和虚招对抗时具有劣势。</p><p>·若区域内角色离开此区域（消耗移动速度，施展轻功，被击飞、击退），则陷入“眩晕”一回合。</p><p>·你只能在战场布置一个‘腐蛊雾霭’。</p><p><strong>升级：</strong>战场可布置的最大数量+1。</p>",
                     "requirements": "物品：迷神蛊*1",
                     "automationNote": "物品消耗需手动。区域布置与效果需手动。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -2697,7 +2707,7 @@
                     "targetInfo": "单体",
                     "actionCost": "简要动作",
                     "description": "<p>简要动作，挥舞刀风，似情人私语，怨侣纠缠，敌人进行[定力]检定（难度15），若失败，受到0.2内息+0.3神采点气血流失（不会造成暴击），并陷入“禁足”，持续两回合。</p><p>·若敌人为异性，检定难度+5。</p><p><strong>升级：</strong>招式伤害+20，内力消耗+4，怒气消耗-1。</p>",
-                    "automationNote": "禁足检定自动。异性判断尝试自动。伤害需手动应用。",
+                    "automationNote": "命中不直接造成伤害。命中后自动发起定力检定（异性难度+5）：失败时按面板数值结算气血流失并禁足2回合，成功则无事发生。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -2726,9 +2736,9 @@
                     },
                     "scripts": [
                         {
-                            "label": "定力检定与流失提示",
-                            "trigger": "hit",
-                            "script": "// 1. 计算流失伤害 (面板值)\nconst bleedDmg = args.finalAmount || args.damageResult?.damage || 0;\n\n// 2. 异性判断\nconst selfGender = actor.system.info?.gender;\nconst targetGender = args.target.system.info?.gender;\nlet dc = 15;\nif (selfGender && targetGender && selfGender !== targetGender) {\n    dc += 5;\n}\n\n// 3. 构建禁足AE\nconst rootEff = CONFIG.statusEffects.find(e => e.id === \"root\");\nlet effectData = null;\nif (rootEff) {\n    effectData = foundry.utils.deepClone(rootEff);\n    effectData.duration = { rounds: 2 };\n}\n\n// 4. 发起检定\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: dc,\n    label: \"抵抗葬死欢场\",\n    onFail: effectData // 失败自动挂禁足\n});\n\n// 5. 伤害提示\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">葬死欢场 - 伤害结算</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>如果目标<b>检定失败</b>，请GM手动应用流失伤害：</p>\n            <p style=\"font-size:1.2em; color:red; font-weight:bold;\">${bleedDmg} 点 (流失)</p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
+                            "label": "延迟伤害与定力检定",
+                            "trigger": "preDamage",
+                            "script": "// 现行惯例（同 清平曲·醉里吴音/地龙翻身）：流失与禁足仅在定力检定失败后结算。\n// 截获已含全部增伤的最终面板值后归零，伤害改由检定失败结算（直接气血流失，不暴击），以免重复扣血。\nconst selfGender = actor.system.info?.gender;\nconst targetGender = args.target.system.info?.gender;\nlet dc = 15;\nif (selfGender && targetGender && selfGender !== targetGender) {\n    dc += 5;\n}\nconst dmg = Math.max(0, Number(args.config.amount) || 0);\nargs.config.amount = 0;\nargs.config.ignoreMinDamage = true;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: dc,\n    label: \"抵抗葬死欢场\",\n    onFail: { id: \"root\", duration: { rounds: 2 } },\n    damageOnFail: { value: dmg, type: \"hp\" },\n    failureText: \"定力失守：气血流失，且被禁足！\"\n});",
                             "active": true
                         }
                     ]
@@ -2765,7 +2775,7 @@
                         {
                             "label": "重伤回血",
                             "trigger": "hit",
-                            "script": "// 检查目标当前气血比例\nconst targetHp = args.target.system.resources.hp.value;\nconst targetMax = args.target.system.resources.hp.max;\n\nif (targetMax > 0 && (targetHp / targetMax) < 0.5) {\n    await actor.applyHealing({ healer: actor,  amount: 100, type: \"hp\", showScrolling: true });\n    ui.notifications.info(\"目标陷入重伤，自身回复气血！\");\n}",
+                            "script": "// 回伤要求先命中，未命中时不得触发\nif (!args.isHit) return;\n// 检查目标当前气血比例\nconst targetHp = args.target.system.resources.hp.value;\nconst targetMax = args.target.system.resources.hp.max;\n\nif (targetMax > 0 && (targetHp / targetMax) < 0.5) {\n    await actor.applyHealing({ healer: actor,  amount: 100, type: \"hp\", showScrolling: true });\n    ui.notifications.info(\"目标陷入重伤，自身回复气血！\");\n}",
                             "active": true
                         }
                     ]
