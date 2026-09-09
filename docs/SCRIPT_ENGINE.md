@@ -79,6 +79,7 @@
 但是：
 
 - 只有对应触发器实际传入的字段才存在。
+- `args` 是阶段上下文：同一触发内的脚本共享同一对象；跨触发阶段不会保留。唯一例外是 `attack` 阶段写入 `args.flags` 的自定义键——它们随攻击卡持久化为 `scriptFlags`，供同卡的 `hit`/`hit_once` 读取（见 `attack` 触发器说明）。
 - 脚本运行中新增 `args.myFlag` 不会同步新建顶层 `myFlag`。
 - 业务代码推荐统一从 `args` 读取阶段参数，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
 - 脚本内声明变量不要与注入的顶层变量重名（如 `const move` 会与注入的 `move` 冲突直接抛错），局部变量请另起名。
@@ -250,6 +251,8 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `flags.damageResult` | `Object` | **可写** | 当前面板结果引用。 |
 | `flags.damageResult.damage` / `.feint` | `number` | **可写** | 当前面板伤害和虚招值。 |
 | `flags.damageResult.breakdown` / `.feintBreakdown` | `string` | **可写** | 面板详情文本。 |
+
+对上表之外的自定义键写入 `args.flags`（例如 `args.flags.myMark = true`）会随本次攻击卡持久化：卡片后续结算时的 `hit` 和 `hit_once` 可通过只读的 `args.scriptFlags` 读取这份快照。需要把出招阶段的决策传递给结算阶段时优先使用该机制，不要写 Actor 持久 flag——多张待结算卡片会互相污染，未结算的卡片还会造成残留。
 
 ### `check`（异步）
 
@@ -437,6 +440,7 @@ await actor.applyHealing({
 | `finalDamage` | `number` | 条件提供 | 进入目标资源分配前的最终伤害。 |
 | `isDying` / `isDead` | `boolean` | 条件提供 | 本次结算是否使目标进入濒死或死亡。 |
 | `damageResult` | `Object` | 只读 | `applyDamage()` 返回的原始结果对象。 |
+| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张卡片独立。 |
 | `isAttack` / `isHeal` / `isBuff` | `boolean` | 条件提供 | 攻击结算（自动与手动）提供 `true/false/false`。 |
 | `isManual` | `boolean` | 条件提供 | 自动结算为 `false`，手动结算为 `true`。 |
 
@@ -471,6 +475,7 @@ await actor.applyHealing({
 | `isHeal` | `boolean` | 条件提供 | 治疗为 `true`，Buff 为 `false`。 |
 | `costConsumed` | `Object` | 条件提供 | 自动攻击和治疗/Buff 的实际消耗。 |
 | `isManual` | `boolean` | 条件提供 | 手动攻击结算时为 `true`。 |
+| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张卡片独立。 |
 
 `targets` 的元素结构：
 
@@ -642,7 +647,7 @@ await game.xjzl.api.effects.addEffect(args.target, effectData);
 }
 ```
 
-解除架招使用 `await actor.stopStance()`，以同时清理绑定效果。
+解除架招使用 `await actor.stopStance()`，以同时清理绑定效果。开启新架招时，系统会在本招 `attack` 脚本执行前清理其他武学遗留的绑定特效（origin 指向当前武学的除外，它们由本次出招脚本创建或由 `addEffect` 按 slug 复用刷新）。
 
 ### 状态 flags
 

@@ -3848,6 +3848,26 @@ export class XJZLActor extends Actor {
   /* -------------------------------------------- */
 
   /**
+   * 清理架招绑定特效（flags.xjzl-system.tiedToStance）
+   * 供 stopStance 与开启新架招（切换架招）时调用，保证"持续至架招解除"的效果跟随架招生命周期。
+   * @param {string|null} [excludeOrigin=null] - 豁免清理的 origin。
+   *   切换架招时传入当前武学物品的 uuid：本次出招的 attack 脚本可能刚创建了新的绑定特效，
+   *   重复添加时会由 addEffect 按 slug 复用刷新，不能在这里被清掉。
+   * @returns {Promise<void>}
+   */
+  async clearStanceTiedEffects(excludeOrigin = null) {
+    if (this.type === "container") return; //容器直接返回
+
+    const effectIds = this.effects
+      .filter(e => e.getFlag("xjzl-system", "tiedToStance") && (!excludeOrigin || e.origin !== excludeOrigin))
+      .map(e => e.id);
+
+    if (effectIds.length > 0) {
+      await this.deleteEmbeddedDocuments("ActiveEffect", effectIds);
+    }
+  }
+
+  /**
    * 主动解除当前架招
    * 1. 重置 martial 状态
    * 2. 移除源自该架招的临时特效 (如果有)
@@ -3874,20 +3894,11 @@ export class XJZLActor extends Actor {
       "system.martial.stanceItemId": ""  // 清空物品ID
     };
 
-    // 3. 查找需要清理的特效 (只清理标记了 tiedToStance 标签的AE)
-    const effectsToDelete = [];
-    for (const effect of this.effects) {
-      if (effect.getFlag("xjzl-system", "tiedToStance")) {
-        effectsToDelete.push(effect.id);
-      }
-    }
-
-    // 4. 执行更新
+    // 3. 执行更新
     await this.update(updates);
 
-    if (effectsToDelete.length > 0) {
-      await this.deleteEmbeddedDocuments("ActiveEffect", effectsToDelete);
-    }
+    // 4. 清理绑定特效 (只清理标记了 tiedToStance 标签的AE)
+    await this.clearStanceTiedEffects();
 
     // 5. 视觉反馈
     this.showFloatyText("解除架招", {

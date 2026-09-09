@@ -1586,6 +1586,8 @@ export class ChatCardManager {
                 damageType: flags.damageType, //  伤害类型 (waigong, neigong 等)
                 type: flags.damageType,       //  伤害类型，与防御端保持统一
                 element: moveElement,         //  招式的属性 (taiji, yin, yang 等)
+                // 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
+                scriptFlags: flags.scriptFlags || {},
                 // 添加一些参数和_applyHeal保持一致
                 isAttack: true,       // 明确标记
                 isHeal: false,
@@ -1682,7 +1684,9 @@ export class ChatCardManager {
             type: flags.damageType,//  伤害类型，与防御端保持统一
             element: moveElement,//  招式的属性 (taiji, yin, yang 等)
             hasCrit: hasCrit, // 标记本次AOE中是否对任意目标产生了暴击
-            costConsumed: flags.costConsumed
+            costConsumed: flags.costConsumed,
+            // 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
+            scriptFlags: flags.scriptFlags || {}
         };
 
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
@@ -2096,6 +2100,7 @@ export class ChatCardManager {
                 type: flags.damageType,//  伤害类型，与防御端保持统一
                 element: moveElement,//  招式的属性 (taiji, yin, yang 等)
                 // 与自动结算的 hit 上下文保持同构，动作分类标记脚本才能统一判断
+                scriptFlags: flags.scriptFlags || {},
                 isAttack: true,
                 isHeal: false,
                 isBuff: false,
@@ -2134,7 +2139,8 @@ export class ChatCardManager {
             type: flags.damageType,//  伤害类型，与防御端保持统一
             element: moveElement,//  招式的属性 (taiji, yin, yang 等)
             hasCrit: summary.some(t => t.isCrit), // 与自动结算对齐：本次动作是否有任一目标暴击
-            isManual: true
+            isManual: true,
+            scriptFlags: flags.scriptFlags || {}
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
     }
@@ -2827,7 +2833,10 @@ export class ChatCardManager {
                 mpLost: 0,
 
                 // 5. 额外标记
-                isBuffOnly: isBuffType || (baseAmount === 0)
+                isBuffOnly: isBuffType || (baseAmount === 0),
+
+                // 6. 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
+                scriptFlags: flags.scriptFlags || {}
             };
 
             //  D.无论有没有数值，都执行 HIT 脚本
@@ -2851,7 +2860,9 @@ export class ChatCardManager {
             element: move.element || "none",          // 传递五行
             isHeal: !isBuffType,
             totalHealAmount: summaryData.reduce((acc, cur) => acc + cur.amount, 0), // 方便统计总奶量
-            costConsumed: flags.costConsumed
+            costConsumed: flags.costConsumed,
+            // 出招时 attack 阶段脚本写入的自定义 flags 快照（随卡片持久化），只读
+            scriptFlags: flags.scriptFlags || {}
         };
         await attacker.runScripts(SCRIPT_TRIGGERS.HIT_ONCE, globalContext, move);
         // =====================================================

@@ -2002,6 +2002,13 @@ export class XJZLItem extends Item {
       // 这是“决策阶段”，用于决定是否优势、是否允许出招、消耗资源
       // 替代了旧的 executionScript
 
+      // 架招招式：在新架招 attack 脚本执行前清理其他武学遗留的绑定特效（tiedToStance），
+      // 避免旧绑定 AE 参与本次出招。豁免 origin 指向当前武学的特效：
+      // 同武学切换/重开架招时由 addEffect 按 slug 复用刷新，不做删除。
+      if (move.type === "stance") {
+        await actor.clearStanceTiedEffects(this.uuid);
+      }
+
       const attackContext = {
         move: move,
         item: this,
@@ -2466,6 +2473,10 @@ export class XJZLItem extends Item {
             moveType: move.type,       // 招式类型
             ...(detailAccess ? { detailAccess } : {}), // 锁定状态只在发卡时按来源阵营计算一次
             costConsumed: costConsumed,// 记录消耗
+            // attack 阶段脚本对 args.flags 的写入快照（如爆发决策等自定义标记）。
+            // 应用伤害时由 chat-manager 以 args.scriptFlags 只读暴露给 hit/hit_once 脚本；
+            // 每张卡片持有独立快照，多张待结算卡片互不干扰，未结算也不会残留 Actor 状态。
+            scriptFlags: foundry.utils.deepClone(attackContext.flags),
             forceHit: isGlobalForceHit, // 存入全局必中状态
             alwaysHit: attackContext.flags.alwaysHit || false,
             // 2. 数值结果
