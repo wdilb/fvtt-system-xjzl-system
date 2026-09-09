@@ -325,7 +325,7 @@
                         {
                             "label": "伤害回血",
                             "trigger": "hit",
-                            "script": "const heal = Math.floor(args.damageResult.damage);\nif (heal > 0) {\n    await actor.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true});\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:green; font-weight:bold;\"><i class=\"fas fa-heart\"></i> 回光返照</p><p>汲取了 <b>${heal}</b> 点气血！</p></div>`\n    });\n}",
+                            "script": "if (!args.isHit) return;\n// 描述要求回复\"扣除防御格挡前\"的伤害；hit 阶段以面板伤害 baseDamage 为准（damageResult 里没有 damage 字段）\nconst heal = Math.floor(args.baseDamage || 0);\nif (heal > 0) {\n    await actor.applyHealing({ healer: actor, amount: heal, type: \"hp\", showScrolling: true});\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:green; font-weight:bold;\"><i class=\"fas fa-heart\"></i> 回光返照</p><p>汲取了 <b>${heal}</b> 点气血！</p></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -623,8 +623,9 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>抛弃一切防守，攻击对手纰漏，进入“殊死”，持续到战斗脱离。</p><p><strong>殊死：</strong>你解除所有架招且无法开启架招。</p><p>·你用招式命中开启人级架招的目标时，视作命中无架招目标。</p>",
+                    "description": "<p>抛弃一切防守，攻击对手纰漏，进入“殊死”，持续到战斗脱离。</p><p><strong>殊死：</strong>你解除所有架招且无法开启架招。</p><p>·你用招式命中开启人级架招的目标时，视作命中无架招目标。但对方依旧格挡成功，并且拥有格挡值减伤和相应格挡成功的效果，你施展虚招时依旧需要与对方进行虚招对抗。</p><p><strong>升级：</strong>命中并视作无架招的架招品级提高一级（人-地-天），怒气消耗+2。</p>",
                     "automationNote": "开启自动应用BUFF。触发效果需手动判断。",
+                    "actionType": "buff",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -850,6 +851,7 @@
                     "actionCost": "主要动作",
                     "description": "<p>用内力从袖口、包裹等敌人看不见的地方打出四组刻牌，埋入四个不同空格底下，这四个空格处于‘暗刻’，持续到战斗脱离。</p><p><strong>暗刻：</strong>只有释放此招的人才知道暗刻的位置，若有敌人立于该区域出招，暗刻麻将引爆，气浪掀翻该空格及周围 1 米范围内的敌人，造成 0.4 力量点外功伤害（不会造成暴击），且将敌人全部击退 1 米。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+2。</p>",
                     "automationNote": "仅造成伤害，其他均手动。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -917,7 +919,7 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "8",
+                    "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>九牌连射，贯通一气，命中则造成 0.5 力量点外功伤害，且无视对方外功防御。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
@@ -985,7 +987,7 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "8",
+                    "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>激射五种字牌，对目标造成 0.4 力量点外功伤害，命中无架招目标时，添加一层“失准”至多三层，持续到战斗脱离。</p><p><strong>失准：</strong>每层使你的命中-5。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
@@ -1026,7 +1028,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招的时候，可以消耗反应动作压制对方虚招，射出五种绿色将牌，以内力激活自身气血，回复 0.2 内息点气血。</p><p>·每点[疗伤]等级提高 1 气血回复量。</p><p><strong>升级：</strong>回复量+10，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。。",
+                    "automationNote": "完全自动化。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1055,7 +1057,7 @@
                             "label": "伤害转治疗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 1. 抓取被截断前的原始面板伤害\nconst rawDamage = args.baseDamage;\n\n// 2. 抓取技能\nconst liaoshang = actor.system.skills.liaoshang.total;\nconst totalHeal = rawDamage + liaoshang;\n\n// 3. 执行回血\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: \"hp\", showScrolling: true});\n\n// 4. 发送反馈卡片\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-heart\"></i> 一色常青</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">气血流转，招式伤害融合疗伤技艺，回复了 <b>${totalHeal}</b> 点气血！</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
+                            "script": "if (!args.isHit) return;\n// 1. 抓取被截断前的原始面板伤害\nconst rawDamage = args.baseDamage;\n\n// 2. 抓取技能\nconst liaoshang = actor.system.skills.liaoshang.total;\nconst totalHeal = rawDamage + liaoshang;\n\n// 3. 执行回血\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: \"hp\", showScrolling: true});\n\n// 4. 发送反馈卡片\nconst msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-heart\"></i> 一色常青</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">气血流转，招式伤害融合疗伤技艺，回复了 <b>${totalHeal}</b> 点气血！</div></div></div>`;\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });"
                         }
                     ]
                 },
@@ -1066,7 +1068,7 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "8",
+                    "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>激荡内力，连续射出十四枚同类型的将牌，幺牌为引，九宝成莲，造成 0.8 力量点外功伤害，再使目标流失 20 点内力。</p><p><strong>升级：</strong>伤害+20，流失内力+5，怒气-1，消耗+4。</p>",
@@ -1155,7 +1157,7 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招后，消耗反应动作释放此招，压制对方招式，双手空翻，令所围之处狂风大起，飞沙走石，并对东南西北四个直线方向 5 米内各一名敌方目标造成 0.8 力量点外功伤害。同时使他们陷入目盲，持续两回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
@@ -1197,7 +1199,7 @@
                     "targetInfo": "范围",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招后，消耗反应动作释放此招，压制对方招式，大手一挥半空掷出中、发、白三张字牌，降下三元真气，为所有友方添加【听牌层数*10】点护体真气，持续到战斗脱离。</p><p><strong>升级：</strong>护体真气的系数+10，内力消耗+4。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "自身护体自动（每次施展一次）。范围内友方的等量护体需手动添加（脚本会发送提示卡片）。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1213,7 +1215,7 @@
                     "scripts": [
                         {
                             "label": "三元护体",
-                            "trigger": "hit",
+                            "trigger": "hit_once",
                             "active": true,
                             "script": "const tingpai = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"tingpai\");\nconst stacks = tingpai ? (tingpai.getFlag(\"xjzl-system\", \"stacks\") || 1) : 0;\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst coef = 10 + (lvl - 1) * 10;\nconst hutiAmount = stacks * coef;\n\nif (hutiAmount > 0) {\n    await actor.applyHealing({ healer: actor, amount: hutiAmount, type: \"huti\", showScrolling: true});\n    const msg = `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f39c12; background: rgba(243,156,18,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#d35400;\"><i class=\"fas fa-shield-alt\"></i> 顶聚三元</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">降下三元真气！自身获得 <b>${hutiAmount}</b> 点护体，请手动为范围内友方添加等量护体。</div></div></div>`;\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msg });\n}"
                         }
@@ -1263,7 +1265,7 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招后，消耗反应动作释放此招，压制对方招式，手腕翻飞，十指连弹，以迅雷不及掩耳之势击出九张数字牌，并对其造成 0.9 力量点外功伤害。</p><p>此招式忽视目标外功防御。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
@@ -1302,7 +1304,7 @@
                     "element": "taiji",
                     "damageType": "waigong",
                     "weaponType": "hidden",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>抛出手中所有的幺九牌，分散击出，对周围敌人造成 0.8 力量点外功伤害并击飞 3 米。</p><p>·你可以用“听牌”来代替怒气消耗，每层听牌可代替 1 点怒气消耗。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+16。</p>",
@@ -1377,6 +1379,7 @@
                     "actionCost": "简要动作",
                     "description": "<p>你本回合可以不遵循武学切换规则，施展两套相同的武器类型的人级武学。</p><p><strong>升级：</strong>可施展武学的等级提高一级（人-地-天）。</p>",
                     "automationNote": "纯规则描述，手动执行。",
+                    "actionType": "buff",
                     "calculation": {
                         "base": 0,
                         "growth": 0

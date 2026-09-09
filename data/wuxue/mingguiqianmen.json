@@ -214,6 +214,7 @@
                 {
                     "name": "重明天音",
                     "type": "qi",
+                    "actionType": "buff",
                     "element": "yang",
                     "damageType": "none",
                     "weaponType": "sword",
@@ -420,6 +421,7 @@
                 {
                     "name": "御魔式·沙罗染血",
                     "type": "qi",
+                    "actionType": "buff",
                     "element": "taiji",
                     "damageType": "none",
                     "weaponType": "sword",
@@ -428,6 +430,7 @@
                     "actionCost": "次要动作",
                     "description": "<p>血化剑阵吸取周围一切气血，进入“沙罗染血”状态，持续一回合。</p><p><strong>沙罗染血：</strong>处于该状态时，解除架招。</p><p>·当 @{1 + @up|1} 米内有其他人出招时，你回复 5 点内力；</p><p>·当 @{1 + @up|1} 米内有敌人濒死时，你获得 1 点怒气，回复 5 点气血。</p><p><strong>升级：</strong>沙罗染血的效果范围增加 1 米，他人出招内力额外回复 5 点，敌人濒死气血额外回复 5 点，内力消耗+4。</p>",
                     "automationNote": "HP消耗自动。状态获取自动。状态内的光环效果（回内/回怒/回血）均为手动。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -564,6 +567,7 @@
                 {
                     "name": "御魔式·我欲即法",
                     "type": "qi",
+                    "actionType": "buff",
                     "element": "taiji",
                     "damageType": "none",
                     "weaponType": "sword",
@@ -948,7 +952,7 @@
                         {
                             "label": "抓子",
                             "trigger": "attack",
-                            "script": "let white = 0;\nlet black = 0;\nlet results = [];\n\nfor (let i = 0; i < 5; i++) {\n    const r = await new Roll(\"1d20\").evaluate();\n    results.push(r.total);\n    if (r.total >= 11) white++;\n    else black++;\n}\n\nui.notifications.info(`抓子结果: [${results.join(\", \")}] -> 白${white}, 黑${black}`);\n\nif (white > 0) {\n    const wEff = thisItem.effects.getName(\"白色\").toObject();\n    wEff.flags[\"xjzl-system\"].maxStacks = 5;\n    for(let i=0; i<white; i++) {\n        await game.xjzl.api.effects.addEffect(actor, wEff);\n    }\n}\nif (black > 0) {\n    const bEff = thisItem.effects.getName(\"黑色\").toObject();\n    bEff.flags[\"xjzl-system\"].maxStacks = 5;\n    for(let i=0; i<black; i++) {\n        await game.xjzl.api.effects.addEffect(actor, bEff);\n    }\n}",
+                            "script": "let white = 0;\nlet black = 0;\nlet results = [];\n\nfor (let i = 0; i < 5; i++) {\n    const r = await new Roll(\"1d20\").evaluate();\n    results.push(r.total);\n    if (r.total >= 11) white++;\n    else black++;\n}\n\nui.notifications.info(`抓子结果: [${results.join(\", \")}] -> 白${white}, 黑${black}`);\n\nif (white > 0) {\n    const wEff = thisItem.effects.getName(\"白色\").toObject();\n    wEff.flags[\"xjzl-system\"].maxStacks = 5;\n    await game.xjzl.api.effects.addEffect(actor, wEff, white);\n}\nif (black > 0) {\n    const bEff = thisItem.effects.getName(\"黑色\").toObject();\n    bEff.flags[\"xjzl-system\"].maxStacks = 5;\n    await game.xjzl.api.effects.addEffect(actor, bEff, black);\n}",
                             "active": true
                         }
                     ]
@@ -984,8 +988,8 @@
                     "scripts": [
                         {
                             "label": "迟滞必爆",
-                            "trigger": "attack",
-                            "script": "const target = Array.from(game.user.targets)[0]?.actor;\nif (target) {\n    const hasChizhi = target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chizhi\");\n    if (hasChizhi) {\n        args.flags.critThresholdMod += 20;\n        ui.notifications.info(\"目标迟滞，必定暴击\");\n    }\n}",
+                            "trigger": "check",
+                            "script": "if (!args.target) return;\nconst hasChizhi = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chizhi\");\nif (hasChizhi) {\n    args.flags.critThresholdMod += 20;\n    ui.notifications.info(\"目标迟滞，必定暴击\");\n}",
                             "active": true
                         }
                     ]
@@ -1038,7 +1042,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>摸得定胜子，伸手拨云天，对目标造成伤害，额外造成自身[棋艺]等级*10 的精神伤害。</p><p>·若目标的最高技艺等级小于自身棋艺等级，此招必定暴击。</p><p><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "精神伤害需手动应用。棋艺暴击判定需手动（无法自动获取目标最高技艺）。",
+                    "automationNote": "精神伤害与棋艺压制必爆自动判定。目标缺少技艺数据（如野兽）时无法自动判定压制，请手动判断。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -1063,10 +1067,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "额外效果提示",
+                            "label": "棋艺压制必爆",
+                            "trigger": "check",
+                            "active": true,
+                            "script": "if (!args.target?.system?.arts) return;\nconst chess = actor.system.arts?.qishu?.total || 0;\nif (chess <= 0) return;\nconst targetMaxArt = Math.max(...Object.values(args.target.system.arts).map(a => a?.total || 0));\nif (targetMaxArt < chess) {\n    args.flags.critThresholdMod += 20;\n    ui.notifications.info(`棋艺压制（${chess} > ${targetMaxArt}）：必定暴击`);\n}"
+                        },
+                        {
+                            "label": "棋艺精神伤害",
                             "trigger": "hit",
-                            "script": "const chess = actor.system.arts.qishu.total || 0;\nconst mental = chess * 10;\nChatMessage.create({\n    content: `<div class=\"xjzl-chat-card\">\n        <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">胜负一手</div>\n        <div style=\"padding:5px; font-size:0.9em;\">\n            <p>额外精神伤害: <b>${mental}</b> (棋艺 ${chess} * 10)</p>\n            <p><i>若 [${args.target.name}] 最高技艺 < ${chess}，请手动视为暴击。</i></p>\n        </div>\n    </div>`,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});",
-                            "active": true
+                            "active": true,
+                            "script": "if (!args.isHit) return;\nconst chess = actor.system.arts?.qishu?.total || 0;\nconst mental = chess * 10;\nif (mental <= 0) return;\nconst res = await args.target.applyDamage({ amount: mental, type: \"mental\", attacker: actor, item: args.item, move: args.move, source: \"extra\" });\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #8e44ad; background:rgba(142,68,173,0.1); padding:4px;\"><b><i class=\"fas fa-chess-knight\"></i> 胜负一手：</b>棋艺 ${chess} ×10，额外造成 <b>${res.finalDamage ?? mental}</b> 点精神伤害。</div>` });"
                         }
                     ]
                 }
@@ -1151,6 +1161,7 @@
                 {
                     "name": "爻变",
                     "type": "qi",
+                    "actionType": "buff",
                     "element": "taiji",
                     "damageType": "none",
                     "weaponType": "hidden",
@@ -1172,9 +1183,15 @@
                     },
                     "scripts": [
                         {
+                            "label": "无爻阻断",
+                            "trigger": "preAttack",
+                            "script": "const yaos = actor.getFlag(\"xjzl-system\", \"qiyao\") || [];\nif (yaos.length === 0) {\n    args.abort = true;\n    args.abortReason = \"当前身上没有爻，无法施展爻变！\";\n}",
+                            "active": true
+                        },
+                        {
                             "label": "爻变翻转",
                             "trigger": "attack",
-                            "script": "let yaos = actor.getFlag(\"xjzl-system\", \"qiyao\") || [];\nif (yaos.length === 0) {\n    ui.notifications.warn(\"当前身上没有爻，无法爻变！\");\n    args.flags.abort = true;\n    return;\n}\n\nlet radios = yaos.map((y, i) => `<label><input type=\"radio\" name=\"yaoIndex\" value=\"${i}\" ${i===0?'checked':''}> 第 ${i+1} 爻 (${y==='yang'?'阳':'阴'})</label><br>`).join('');\n\nconst chosenIndex = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"爻变\" },\n    content: `<p>请选择要反转的爻：</p><form>${radios}</form>`,\n    ok: { callback: (event, button) => parseInt(new FormData(button.form).get(\"yaoIndex\")) }\n});\n\nif (chosenIndex === null || chosenIndex === undefined) {\n    args.flags.abort = true; return;\n}\n\nyaos[chosenIndex] = (yaos[chosenIndex] === \"yang\") ? \"yin\" : \"yang\";\n\nlet msgHtml = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #3498db; background:rgba(52,152,219,0.1); padding:6px;\"><p>爻变成功！当前卦列: [${yaos.map(y=>y===\"yang\"?\"阳\":\"阴\").join(\", \")}]</p></div>`;\n\nif (yaos.length >= 3) {\n    const gua = yaos.join(\"\");\n    yaos = [];\n    msgHtml += `<div style=\"margin-top:5px; font-weight:bold; color:#8e44ad;\">三爻齐聚，化生八卦！</div>`;\n    const guaMap = {\n        \"yinyinyin\": { name: \"坤\", eff: \"坤卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【坤卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyin\": { name: \"艮\", eff: \"艮卦\", text: \"周围3米变为困难地形。\" },\n        \"yinyangyin\": { name: \"坎\", eff: \"坎卦\", text: \"本套路属性视为阴柔。\" },\n        \"yinyinyang\": { name: \"震\", eff: \"震卦\", text: \"造成伤害时击退目标1米。\" },\n        \"yangyangyin\": { name: \"巽\", eff: \"巽卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【巽卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyang\": { name: \"离\", eff: \"离卦\", text: \"本套路招式造成伤害时附带10点火焰伤害。\" },\n        \"yinyangyang\": { name: \"兑\", eff: \"兑卦\", text: \"下次命中无架招目标时施加缚身。\" }\n    };\n    if (gua === \"yangyangyang\") {\n        await actor.changeResources({ \"system.resources.rage.value\": { delta: 2 } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        msgHtml += `<p style=\"color:#e67e22;\">【乾卦】现！立即获得 2 点怒气。</p>`;\n    } else {\n        const gData = guaMap[gua];\n        if (gData) {\n            const effData = thisItem.effects.getName(gData.eff)?.toObject();\n            if (effData) {\n                delete effData._id; effData.origin = thisItem.uuid;\n                await game.xjzl.api.effects.addEffect(actor, effData);\n            }\n            msgHtml += `<p style=\"color:#2980b9;\">【${gData.name}卦】现！${gData.text}</p>`;\n        }\n    }\n}\nawait actor.setFlag(\"xjzl-system\", \"qiyao\", yaos);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msgHtml });",
+                            "script": "let yaos = actor.getFlag(\"xjzl-system\", \"qiyao\") || [];\nif (yaos.length === 0) {\n    ui.notifications.warn(\"当前身上没有爻，无法爻变！\");\n    return;\n}\n\nlet radios = yaos.map((y, i) => `<label><input type=\"radio\" name=\"yaoIndex\" value=\"${i}\" ${i===0?'checked':''}> 第 ${i+1} 爻 (${y==='yang'?'阳':'阴'})</label><br>`).join('');\n\nconst chosenIndex = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"爻变\" },\n    content: `<p>请选择要反转的爻：</p><form>${radios}</form>`,\n    ok: { callback: (event, button) => parseInt(new FormData(button.form).get(\"yaoIndex\")) }\n});\n\nif (chosenIndex === null || chosenIndex === undefined) {\n    // 攻击阶段内力已扣除：玩家取消弹窗时按实际消耗退还\n    const refund = args.costConsumed?.mp || 0;\n    if (refund > 0) {\n        await actor.changeResources({ \"system.resources.mp.value\": { delta: refund } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    }\n    ui.notifications.info(\"已取消爻变并退还内力。\");\n    return;\n}\n\nyaos[chosenIndex] = (yaos[chosenIndex] === \"yang\") ? \"yin\" : \"yang\";\n\nlet msgHtml = `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #3498db; background:rgba(52,152,219,0.1); padding:6px;\"><p>爻变成功！当前卦列: [${yaos.map(y=>y===\"yang\"?\"阳\":\"阴\").join(\", \")}]</p></div>`;\n\nif (yaos.length >= 3) {\n    const gua = yaos.join(\"\");\n    yaos = [];\n    msgHtml += `<div style=\"margin-top:5px; font-weight:bold; color:#8e44ad;\">三爻齐聚，化生八卦！</div>`;\n    const guaMap = {\n        \"yinyinyin\": { name: \"坤\", eff: \"坤卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【坤卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyin\": { name: \"艮\", eff: \"艮卦\", text: \"周围3米变为困难地形。\" },\n        \"yinyangyin\": { name: \"坎\", eff: \"坎卦\", text: \"本套路属性视为阴柔。\" },\n        \"yinyinyang\": { name: \"震\", eff: \"震卦\", text: \"造成伤害时击退目标1米。\" },\n        \"yangyangyin\": { name: \"巽\", eff: \"巽卦\", text: \"已为你自动施加状态，请打开武学详情，手动将【巽卦】赋予周围3米内的其他友方。\" },\n        \"yangyinyang\": { name: \"离\", eff: \"离卦\", text: \"本套路招式造成伤害时附带10点火焰伤害。\" },\n        \"yinyangyang\": { name: \"兑\", eff: \"兑卦\", text: \"下次命中无架招目标时施加缚身。\" }\n    };\n    if (gua === \"yangyangyang\") {\n        await actor.changeResources({ \"system.resources.rage.value\": { delta: 2 } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n        msgHtml += `<p style=\"color:#e67e22;\">【乾卦】现！立即获得 2 点怒气。</p>`;\n    } else {\n        const gData = guaMap[gua];\n        if (gData) {\n            const effData = thisItem.effects.getName(gData.eff)?.toObject();\n            if (effData) {\n                delete effData._id; effData.origin = thisItem.uuid;\n                await game.xjzl.api.effects.addEffect(actor, effData);\n            }\n            msgHtml += `<p style=\"color:#2980b9;\">【${gData.name}卦】现！${gData.text}</p>`;\n        }\n    }\n}\nawait actor.setFlag(\"xjzl-system\", \"qiyao\", yaos);\nChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: msgHtml });",
                             "active": true
                         }
                     ]
@@ -1398,7 +1415,7 @@
                                 {
                                     "label": "施加缚身并移除",
                                     "trigger": "hit",
-                                    "script": "if (args.isHit && !args.target.system.martial.stanceActive && args.item?.name === \"奇爻异术\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 1 } });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #2ecc71; background:rgba(46,204,113,0.1); padding:4px;\"><b><i class=\"fas fa-link\"></i> 兑卦触发：</b>对 ${args.target.name} 施加了 [缚身]！</div>` });\n    await thisEffect.delete();\n}",
+                                    "script": "if (args.isHit && !args.target.system.martial.stanceActive && args.item?.name === \"奇爻异术\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 1 } });\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px; border-left:3px solid #2ecc71; background:rgba(46,204,113,0.1); padding:4px;\"><b><i class=\"fas fa-link\"></i> 兑卦触发：</b>对 ${args.target.name} 施加了 [缚身]！</div>` });\n    await game.xjzl.api.effects.removeEffect(actor, \"bagua_dui\", 1);\n}",
                                     "active": true
                                 }
                             ]
@@ -1458,7 +1475,7 @@
                                 "label": "护体触发",
                                 "trigger": "damaged",
                                 "active": true,
-                                "script": "if (args.isBroken) {\n    const wuxueItem = actor.items.find(i => i.name === \"混沌为一\" && i.type === \"wuxue\");\n    const moveData = wuxueItem?.system.moves.find(m => m.name === \"混沌为一\");\n    const lvl = Math.max(1, moveData?.computedLevel || 1);\n    const base = 10 + (lvl - 1) * 10;\n    const qigan = actor.system.stats.qigan.total || 0;\n    const amount = base + qigan;\n    \n    await actor.applyHealing({ healer: actor, amount: amount, type: \"huti\", showScrolling: true});\n    \n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:#2980b9; font-weight:bold;\"><i class=\"fas fa-shield-alt\"></i> 混沌为一</p><p>架招被击破，感悟万物，获得 <b>${amount}</b> 点护体真气！</p></div>`\n    });\n}"
+                                "script": "if (args.isBroken) {\n    const wuxueItem = actor.items.find(i => i.name === \"混沌为一\" && i.type === \"wuxue\");\n    const moveData = wuxueItem?.system.moves.find(m => m.name === \"混沌为一\");\n    // transfer 被动不受领悟门槛约束，需自查招式已领悟（computedLevel > 0）\n    if (!moveData || !(moveData.computedLevel > 0)) return;\n    const lvl = moveData.computedLevel;\n    const base = 10 + (lvl - 1) * 10;\n    const qigan = actor.system.stats.qigan.total || 0;\n    const amount = base + qigan;\n    \n    await actor.applyHealing({ healer: actor, amount: amount, type: \"huti\", showScrolling: true});\n    \n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:5px;\"><p style=\"color:#2980b9; font-weight:bold;\"><i class=\"fas fa-shield-alt\"></i> 混沌为一</p><p>架招被击破，感悟万物，获得 <b>${amount}</b> 点护体真气！</p></div>`\n    });\n}"
                             }
                         ]
                     }
@@ -1534,8 +1551,8 @@
                     "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "次要动作",
-                    "description": "<p>以指为弓，弹射而出，对敌人造成伤害，目标进行[轻功]或[渡气]检定（难度 @{15 + @up|15}），若失败，额外受到 10 点气血流失。</p><p><strong>升级：</strong>检定难度+1，气血流失+10，内力消耗+2。</p>",
-                    "automationNote": "请求检定自动。失败惩罚需手动应用（流失伤害暂不支持自动挂钩检定结果）。",
+                    "description": "<p>以指为弓，弹射而出，对敌人造成 0.1 身法点外功伤害，目标进行[轻功]或[渡气]检定（难度 @{15 + @up|15}），若失败，额外受到 10 点气血流失。</p><p>·<strong>消耗：</strong>任意石子大小物品（用后消耗）。</p><p><strong>升级：</strong>检定难度+1，气血流失+10，内力消耗+2。</p>",
+                    "automationNote": "完全自动化：命中后同时发起[轻功]与[渡气]两张检定卡片，由目标自行点选其一，失败自动流失气血。石子材料的消耗需手动记录。",
                     "calculation": {
                         "base": 0,
                         "growth": 0,
@@ -1557,7 +1574,7 @@
                         {
                             "label": "请求检定",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1);\n    const bleed = 10 + (lvl - 1) * 10;\n    \n    // 提示\n    ChatMessage.create({\n        content: `<p>目标需进行 轻功/渡气 检定 (DC ${dc})。</p><p>失败受到 ${bleed} 点气血流失。</p>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    \n    // 发起请求 (只支持单一属性，这里选轻功作为默认)\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"qinggong\",\n        dc: dc,\n        label: \"玄弓劲闪避\"\n    });\n}",
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 15 + (lvl - 1);\n    const bleed = 10 + (lvl - 1) * 10;\n    // 规则允许目标在[轻功]或[渡气]中二选一：同时发出两张检定卡，由目标自行点选其一，另一张作废即可\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"qinggong\",\n        dc: dc,\n        label: \"玄弓劲·轻功检定\",\n        damageOnFail: { value: bleed, type: \"hp\" },\n        failureText: `轻功检定失败，受到 ${bleed} 点气血流失！`\n    });\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"duqi\",\n        dc: dc,\n        label: \"玄弓劲·渡气检定\",\n        damageOnFail: { value: bleed, type: \"hp\" },\n        failureText: `渡气检定失败，受到 ${bleed} 点气血流失！`\n    });\n}",
                             "active": true
                         }
                     ]
