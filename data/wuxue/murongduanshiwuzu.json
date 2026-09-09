@@ -38,7 +38,7 @@
                         {
                             "label": "格挡获凌虚",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"凌虚\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\nconst eff = thisItem.effects.getName(\"凌虚\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -206,28 +206,28 @@
                             "label": "效果应用",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    // 敌方封招：传入对象配置持续时间\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fengzhao\", duration: { rounds: 1 } });\n    \n    // 自身凌虚\n    const lingxu = thisItem.effects.getName(\"凌虚\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, lingxu);\n}"
+                            "script": "if (args.isHit) {\n    // 敌方封招：传入对象配置持续时间\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fengzhao\", duration: { rounds: 1 } });\n    \n    // 自身凌虚\n    const lingxu = thisItem.effects.getName(\"凌虚\").toObject();\n    delete lingxu._id;\n    lingxu.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, lingxu);\n}"
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "凌虚",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
-                    "description": "《凌虚指》释放距离+4。招式伤害提升。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "lingxu",
-                            "stackable": false,
-                            "tiedToStance": true
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "凌虚",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖1.png",
+                "description": "《凌虚指》释放距离+4。招式伤害提升。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "lingxu",
+                        "stackable": false,
+                        "tiedToStance": true
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "星斗寰移",
@@ -444,7 +444,7 @@
                         {
                             "label": "获凝气",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"凝气\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "if (!args.isHit) return;\nconst eff = thisItem.effects.getName(\"凝气\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -484,7 +484,7 @@
                         {
                             "label": "获六脉贯通",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst rangeBonus = 5 + (lvl - 1) * 5;\nconst eff = thisItem.effects.getName(\"六脉贯通\").toObject();\neff.duration = { rounds: rounds };\neff.description += ` (射程+${rangeBonus}米)`;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nconst rangeBonus = 5 + (lvl - 1) * 5;\nconst eff = thisItem.effects.getName(\"六脉贯通\").toObject();\ndelete eff._id;\neff.origin = thisItem.uuid;\neff.duration = { rounds: rounds };\neff.description += ` (射程+${rangeBonus}米)`;\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
                     ]
@@ -535,93 +535,93 @@
                         }
                     ]
                 }
-            ],
-            "effects": [
-                {
-                    "name": "气脉",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "六脉神指消耗增加，命中降低，伤害提升。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "qimai",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "气脉增伤",
-                                    "trigger": "calc",
-                                    "active": true,
-                                    "script": "if (args.item?.name === '六脉神指') {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    args.output.damage += data.dmg;\n    args.output.bonusDesc.push(`气脉增伤 +${data.dmg}`);\n}"
-                                },
-                                {
-                                    "label": "气脉耗蓝",
-                                    "trigger": "preAttack",
-                                    "active": true,
-                                    "script": "if (args.item?.name === '六脉神指') {\n    if (!actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'ningqi')) {\n        const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n        args.costConfig.mp += data.cost;\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor}),\n            content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #c0392b; padding:5px 8px; background:rgba(192,57,43,0.1);\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-fire\"></i> 气脉激荡</div><div style=\"font-size:0.9em; color:#555;\">额外消耗 ${data.cost} 点内力。</div></div></div>`\n        });\n    }\n}"
-                                },
-                                {
-                                    "label": "气脉减命中",
-                                    "trigger": "attack",
-                                    "active": true,
-                                    "script": "if (args.item?.name === '六脉神指') {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    args.flags.bonusHit -= data.hit;\n}"
-                                },
-                                {
-                                    "label": "气脉移除",
-                                    "trigger": "hit_once",
-                                    "active": true,
-                                    "script": "if (args.item?.name === '六脉神指') {\n    await thisEffect.delete();\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "凝气",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "六脉神指不消耗内力。",
-                    "transfer": false,
-                    "duration": {
-                        "rounds": 1
-                    },
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "ningqi",
-                            "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "凝气免耗",
-                                    "trigger": "preAttack",
-                                    "active": true,
-                                    "script": "if (args.item?.name === '六脉神指') {\n    args.costConfig.mp = 0;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #2980b9; padding:5px 8px; background:rgba(41,128,185,0.1);\"><div style=\"font-weight:bold; color:#154360;\"><i class=\"fas fa-wind\"></i> 凝气成剑</div><div style=\"font-size:0.9em; color:#555;\">招式内力消耗归零。</div></div></div>`\n    });\n}"
-                                }
-                            ]
-                        }
-                    },
-                    "changes": []
-                },
-                {
-                    "name": "六脉贯通",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
-                    "description": "射程增加，主要与反应动作互换，选中目标失去反应。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "liumaiguantong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": []
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "气脉",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "六脉神指消耗增加，命中降低，伤害提升。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "qimai",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "气脉增伤",
+                                "trigger": "calc",
+                                "active": true,
+                                "script": "if (args.item?.name === '六脉神指') {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    args.output.damage += data.dmg;\n    args.output.bonusDesc.push(`气脉增伤 +${data.dmg}`);\n}"
+                            },
+                            {
+                                "label": "气脉耗蓝",
+                                "trigger": "preAttack",
+                                "active": true,
+                                "script": "if (args.item?.name === '六脉神指') {\n    if (!actor.effects.some(e => e.getFlag('xjzl-system', 'slug') === 'ningqi')) {\n        const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n        args.costConfig.mp += data.cost;\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor}),\n            content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #c0392b; padding:5px 8px; background:rgba(192,57,43,0.1);\"><div style=\"font-weight:bold; color:#922b21;\"><i class=\"fas fa-fire\"></i> 气脉激荡</div><div style=\"font-size:0.9em; color:#555;\">额外消耗 ${data.cost} 点内力。</div></div></div>`\n        });\n    }\n}"
+                            },
+                            {
+                                "label": "气脉减命中",
+                                "trigger": "attack",
+                                "active": true,
+                                "script": "if (args.item?.name === '六脉神指') {\n    const data = thisEffect.getFlag('xjzl-system', 'qimai') || { cost: 5, hit: 5, dmg: 10 };\n    args.flags.bonusHit -= data.hit;\n}"
+                            },
+                            {
+                                "label": "气脉移除",
+                                "trigger": "hit_once",
+                                "active": true,
+                                "script": "if (args.item?.name === '六脉神指') {\n    await game.xjzl.api.effects.removeEffect(actor, 'qimai');\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "凝气",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "六脉神指不消耗内力。",
+                "transfer": false,
+                "duration": {
+                    "rounds": 1
+                },
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "ningqi",
+                        "stackable": false,
+                        "scripts": [
+                            {
+                                "label": "凝气免耗",
+                                "trigger": "preAttack",
+                                "active": true,
+                                "script": "if (args.item?.name === '六脉神指') {\n    args.costConfig.mp = 0;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #2980b9; padding:5px 8px; background:rgba(41,128,185,0.1);\"><div style=\"font-weight:bold; color:#154360;\"><i class=\"fas fa-wind\"></i> 凝气成剑</div><div style=\"font-size:0.9em; color:#555;\">招式内力消耗归零。</div></div></div>`\n    });\n}"
+                            }
+                        ]
+                    }
+                },
+                "changes": []
+            },
+            {
+                "name": "六脉贯通",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
+                "description": "射程增加，主要与反应动作互换，选中目标失去反应。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "liumaiguantong",
+                        "stackable": false
+                    }
+                },
+                "changes": []
+            }
+        ]
     },
     {
         "name": "天阳指",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/江湖3.png",
         "system": {
-            "category": "wuxue",
+            "category": "sanshou",
             "sect": "jianghushili",
             "subSect": "duanshi",
             "tier": 2,
@@ -668,7 +668,7 @@
                         {
                             "label": "被动效果",
                             "trigger": "passive",
-                            "script": "// 二品(Lv2) 点穴优势\nif ((move.computedLevel || 0) >= 2) {\n    system.skills.dianxue.checkMod += 1;\n    system.stats.neixi.checkMod += 1; // 兼容属性检定\n}",
+                            "script": "// 二品(Lv2) 点穴优势\nif ((move.computedLevel || 0) >= 2) {\n    actor.xjzlStatuses.dianxueCheckLevel += 1;\n}",
                             "active": true
                         },
                         {
@@ -725,34 +725,34 @@
                     ],
                     "actionCost": "无"
                 }
-            ],
-            "effects": [
-                {
-                    "name": "护灵",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "降低 50 点内力上限，免疫毒素伤害和毒素效果。",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "huling",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.resources.mp.bonus",
-                            "mode": 2,
-                            "value": "-50"
-                        },
-                        {
-                            "key": "system.combat.resistances.poison.mod",
-                            "mode": 2,
-                            "value": "999"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "护灵",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "降低 50 点内力上限，免疫毒素伤害和毒素效果。",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "huling",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.resources.mp.bonus",
+                        "mode": 2,
+                        "value": "-50"
+                    },
+                    {
+                        "key": "system.combat.resistances.poison.mod",
+                        "mode": 2,
+                        "value": "999"
+                    }
+                ]
+            }
+        ]
     },
     {
         "name": "巫筮",
@@ -840,6 +840,12 @@
                     "actionCost": "无",
                     "description": "<p>在休整时，消耗一份染料在自身身上绘制战纹。</p>",
                     "automationNote": "纯手动。物品内预设了所有颜色的战纹AE，请玩家消耗染料后，手动在特效列表中启用对应的一个。",
+                    "progression": {
+                        "mode": "custom",
+                        "customThresholds": [
+                            100
+                        ]
+                    },
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -848,514 +854,514 @@
                         "mp": []
                     }
                 }
-            ],
-            "effects": [
-                {
-                    "name": "巫纹 (铅丹·熊)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "招式伤害+5",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-xiong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (铅丹·虎)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "招式伤害+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-hu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (铅丹·狼)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "招式伤害+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-lang",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (铅丹·蛇)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "内外功防御+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-she",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "2"
-                        },
-                        {
-                            "key": "system.combat.def_neigong",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (铅丹·鹰)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "招式伤害+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-ying",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.damages.skill.mod",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (苗绿·熊)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "气血上限+10",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-xiong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.resources.hp.bonus",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (苗绿·虎)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "气血上限+5",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-hu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.resources.hp.bonus",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (苗绿·狼)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "格挡值+4",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-lang",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.block",
-                            "mode": 2,
-                            "value": "4"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (苗绿·蛇)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "毒素抗性+5 (毒伤-5)",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-she",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.resistances.poison.mod",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (苗绿·鹰)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "内外功防御+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-ying",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "2"
-                        },
-                        {
-                            "key": "system.combat.def_neigong",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (牙银·熊)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "暴击骰-1",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-xiong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "-1"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (牙银·虎)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "虚招值+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-hu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.xuzhao",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (牙银·狼)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "暴击骰-2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-lang",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "-2"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "-2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (牙银·蛇)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "先攻+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-she",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.initiative",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (牙银·鹰)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "先攻+5",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-ying",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.initiative",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (绀青·熊)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "格挡值+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-xiong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.block",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (绀青·虎)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "内力+5",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-hu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.resources.mp.bonus",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (绀青·狼)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "虚招值+1",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-lang",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.xuzhao",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (绀青·蛇)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "内力+10",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-she",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.resources.mp.bonus",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (绀青·鹰)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "看破值+1",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-ying",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.kanpo",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (炭黑·熊)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "内外功防御+5",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-xiong",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.def_waigong",
-                            "mode": 2,
-                            "value": "5"
-                        },
-                        {
-                            "key": "system.combat.def_neigong",
-                            "mode": 2,
-                            "value": "5"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (炭黑·虎)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "看破值+2",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-hu",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.kanpo",
-                            "mode": 2,
-                            "value": "2"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (炭黑·狼)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "移动速度+1",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-lang",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "1"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (炭黑·蛇)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "暴击骰-1",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-she",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.crit_waigong",
-                            "mode": 2,
-                            "value": "-1"
-                        },
-                        {
-                            "key": "system.combat.crit_neigong",
-                            "mode": 2,
-                            "value": "-1"
-                        }
-                    ]
-                },
-                {
-                    "name": "巫纹 (炭黑·鹰)",
-                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                    "description": "移动速度+3",
-                    "transfer": false,
-                    "flags": {
-                        "xjzl-system": {
-                            "slug": "wuwen-ying",
-                            "stackable": false
-                        }
-                    },
-                    "changes": [
-                        {
-                            "key": "system.combat.speed",
-                            "mode": 2,
-                            "value": "3"
-                        }
-                    ]
-                }
             ]
-        }
+        },
+        "effects": [
+            {
+                "name": "巫纹 (铅丹·熊)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "招式伤害+5",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-xiong",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (铅丹·虎)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "招式伤害+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-hu",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (铅丹·狼)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "招式伤害+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-lang",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (铅丹·蛇)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "内外功防御+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-she",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (铅丹·鹰)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "招式伤害+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-ying",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.damages.skill.mod",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (苗绿·熊)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "气血上限+10",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-xiong",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.resources.hp.bonus",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (苗绿·虎)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "气血上限+5",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-hu",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.resources.hp.bonus",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (苗绿·狼)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "格挡值+4",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-lang",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.block",
+                        "mode": 2,
+                        "value": "4"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (苗绿·蛇)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "毒素抗性+5 (毒伤-5)",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-she",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.resistances.poison.mod",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (苗绿·鹰)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "内外功防御+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-ying",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "2"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (牙银·熊)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "暴击骰-1",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-xiong",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-1"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (牙银·虎)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "虚招值+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-hu",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (牙银·狼)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "暴击骰-2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-lang",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-2"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (牙银·蛇)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "先攻+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-she",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (牙银·鹰)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "先攻+5",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-ying",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.initiative",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (绀青·熊)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "格挡值+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-xiong",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.block",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (绀青·虎)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "内力+5",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-hu",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.resources.mp.bonus",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (绀青·狼)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "虚招值+1",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-lang",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.xuzhao",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (绀青·蛇)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "内力+10",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-she",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.resources.mp.bonus",
+                        "mode": 2,
+                        "value": "10"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (绀青·鹰)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "看破值+1",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-ying",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (炭黑·熊)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "内外功防御+5",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-xiong",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.def_waigong",
+                        "mode": 2,
+                        "value": "5"
+                    },
+                    {
+                        "key": "system.combat.def_neigong",
+                        "mode": 2,
+                        "value": "5"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (炭黑·虎)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "看破值+2",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-hu",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.kanpo",
+                        "mode": 2,
+                        "value": "2"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (炭黑·狼)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "移动速度+1",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-lang",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "1"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (炭黑·蛇)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "暴击骰-1",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-she",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.crit_waigong",
+                        "mode": 2,
+                        "value": "-1"
+                    },
+                    {
+                        "key": "system.combat.crit_neigong",
+                        "mode": 2,
+                        "value": "-1"
+                    }
+                ]
+            },
+            {
+                "name": "巫纹 (炭黑·鹰)",
+                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                "description": "移动速度+3",
+                "transfer": false,
+                "flags": {
+                    "xjzl-system": {
+                        "slug": "wuwen-ying",
+                        "stackable": false
+                    }
+                },
+                "changes": [
+                    {
+                        "key": "system.combat.speed",
+                        "mode": 2,
+                        "value": "3"
+                    }
+                ]
+            }
+        ]
     }
 ]

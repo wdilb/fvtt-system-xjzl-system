@@ -153,7 +153,7 @@
             {
               "label": "毒素引爆",
               "trigger": "hit",
-              "script": "if (args.isHit) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mingjiao_du\");\n    const stacks = poison ? (poison.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n    \n    if (stacks > 0) {\n        const extraDmg = stacks * 5;\n        await args.target.applyDamage({\n            amount: extraDmg,\n            type: \"poison\",\n            attacker: actor,\n            ignoreDefense: true,\n            ignoreBlock: true,\n            ignoreMinDamage: true\n        });\n        \n        const content = `\n            <div class=\"xjzl-chat-card\">\n                <div class=\"card-content-wrapper\" style=\"padding-left: 8px; border-left: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\">\n                    <div style=\"font-weight:bold; color:#27ae60; font-size:1.1em; margin-bottom: 4px;\">\n                        <i class=\"fas fa-biohazard\"></i> 毒素引爆\n                    </div>\n                    <div style=\"font-size:0.9em; color:#555;\">\n                        引爆了目标身上的 <span style=\"font-weight:bold;\">${stacks}</span> 层毒素。<br>\n                        造成额外 <span style=\"font-weight:bold; color:#27ae60;\">${extraDmg}</span> 点毒素伤害。\n                    </div>\n                </div>\n            </div>`;\n        \n        ChatMessage.create({\n            content: content,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
+              "script": "if (args.isHit) {\n    const poison = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"mingjiao_du\");\n    const stacks = poison ? (poison.getFlag(\"xjzl-system\", \"stacks\") || 0) : 0;\n    \n    if (stacks > 0) {\n        const extraDmg = stacks * 5;\n        await args.target.applyDamage({\n            amount: extraDmg,\n            type: \"poison\",\n            attacker: actor,\n            item: thisItem,\n            move: args.move,\n            ignoreDefense: true,\n            ignoreBlock: true,\n            ignoreMinDamage: true\n        });\n        \n        const content = `\n            <div class=\"xjzl-chat-card\">\n                <div class=\"card-content-wrapper\" style=\"padding-left: 8px; border-left: 4px solid #2ecc71; background: rgba(46, 204, 113, 0.1);\">\n                    <div style=\"font-weight:bold; color:#27ae60; font-size:1.1em; margin-bottom: 4px;\">\n                        <i class=\"fas fa-biohazard\"></i> 毒素引爆\n                    </div>\n                    <div style=\"font-size:0.9em; color:#555;\">\n                        引爆了目标身上的 <span style=\"font-weight:bold;\">${stacks}</span> 层毒素。<br>\n                        造成额外 <span style=\"font-weight:bold; color:#27ae60;\">${extraDmg}</span> 点毒素伤害。\n                    </div>\n                </div>\n            </div>`;\n        \n        ChatMessage.create({\n            content: content,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}",
               "active": true
             }
           ]
@@ -245,7 +245,7 @@
           "range": "自身",
           "targetInfo": "自身",
           "actionCost": "蓄力动作",
-          "description": "钻入地下，获得“遁地”，持续到本回合末，或你想要结束遁地。<br>遁地：你处于地面下 2 米深度，可以水平移动，每移动 1 米消耗 4 米移动力。在该状态下移动不受《趁虚而入》攻击，也不会因进入地面招式范围而受到伤害。该状态结束时，你从所在位置的地面钻出，若该空格内有其他目标，将其朝任意方向击飞 1 米。",
+          "description": "钻入地下，获得“遁地”，持续到本回合末，或你想要结束遁地。<br>遁地：你处于地面下 2 米深度，可以水平移动，每移动 1 米消耗 4 米移动力。在该状态下移动不受《趁虚而入》攻击，也不会因进入地面招式范围而受到伤害。该状态结束时，你从所在位置的地面钻出，若该空格内有其他目标，将其朝任意方向击飞 1 米。<br>·你可以在乡间土路、泥地、沙地、草地等地形施展此招，但在官道或铺有青砖等坚硬物体的地面会因地基夯实无法施展此招，或施展中途被阻挡。<br><strong>升级：</strong>每移动 1 米消耗的移动力-1，内力消耗+1。",
           "automationNote": "应用遁地状态。移动力消耗、免疫趁虚、击飞需手动。",
           "costs": {
             "mp": [
@@ -273,7 +273,7 @@
             {
               "label": "获得遁地",
               "trigger": "hit",
-              "script": "const effect = thisItem.effects.getName(\"遁地\");\nif (effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());",
+              "script": "const effect = thisItem.effects.getName(\"遁地\");\nif (effect) {\n    const data = effect.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
               "active": true
             }
           ]
@@ -287,7 +287,7 @@
           "range": "2米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
-          "description": "刀尖捧沙，砸向敌人造成伤害，并为其添加“目盲”，持续一回合。<br>若有敌人处于半空中，可消耗反应动作释放此招，原地挥洒泥沙，对其造成伤害，并为其添加“目盲”，持续一回合。",
+          "description": "刀尖捧沙，砸向敌人造成 0.3 力量点外功伤害，并为其添加“目盲”，持续一回合。<br>若有敌人处于半空中，可消耗反应动作释放此招，原地挥洒泥沙，对其造成伤害，并为其添加“目盲”，持续一回合。<br><strong>升级：</strong>招式伤害+5，内力消耗+1。",
           "automationNote": "命中施加目盲。反应动作需手动。",
           "costs": {
             "mp": [
@@ -320,7 +320,7 @@
             {
               "label": "致盲",
               "trigger": "hit",
-              "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, \"blind\");\n}",
+              "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"blind\", duration: { rounds: 1 } });\n}",
               "active": true
             }
           ]
@@ -334,8 +334,8 @@
           "range": "1米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
-          "description": "弯刀缠割目标四肢，对其造成伤害。击破架招时，与其进行一次[角力]对抗，若你胜利，目标陷入“禁足”，持续两回合。",
-          "automationNote": "角力对抗自动。禁足效果自动(System ID)。",
+          "description": "弯刀缠割目标四肢，对其造成 0.3 力量点外功伤害。击破架招时，与其进行一次[角力]对抗，若你胜利，目标陷入“禁足”，持续两回合。<br><strong>升级：</strong>招式伤害+5，角力检定结果+1，消耗+1。",
+          "automationNote": "角力对抗自动（角力加成随等级成长）。禁足效果自动(System ID)。",
           "costs": {
             "mp": [
               1,
@@ -367,7 +367,7 @@
             {
               "label": "角力对抗",
               "trigger": "hit",
-              "script": "if (args.isBroken) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"jiaoli\",\n        defType: \"jiaoli\",\n        label: \"土崩瓦解 - 角力对抗\",\n        outcome: {\n            win: {\n                text: \"目标双腿被缚！\",\n                targetEffect: \"root\"\n            },\n            lose: { text: \"目标挣脱了束缚。\" }\n        }\n    });\n}",
+              "script": "if (args.isBroken) {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"jiaoli\",\n        defType: \"jiaoli\",\n        label: \"土崩瓦解 - 角力对抗\",\n        attBonus: Math.max(0, (args.move.computedLevel || 1) - 1),\n        outcome: {\n            win: {\n                text: \"目标双腿被缚！\",\n                targetEffect: \"root\"\n            },\n            lose: { text: \"目标挣脱了束缚。\" }\n        }\n    });\n}",
               "active": true
             }
           ]
@@ -382,7 +382,7 @@
           "range": "1米",
           "targetInfo": "单体",
           "actionCost": "反应动作",
-          "description": "当自身处于“遁地”且目标“禁足”时，可消耗反应动作释放此招，刀扎脚心，拉其入土，对目标造成伤害，并添加“入土”一回合。<br>入土：你全身陷入地下，无法被选中，且失去所有动作和速度，同时每回合初流失 50 点气血。",
+          "description": "当自身处于“遁地”且目标“禁足”时，可消耗反应动作释放此招，刀扎脚心，拉其入土，对目标造成 0.6 力量点外功伤害，并添加“入土”一回合。<br>入土：你全身陷入地下，无法被选中，且失去所有动作和速度，同时每回合初流失 50 点气血。<br><strong>升级：</strong>招式伤害+10，入土回合数+1，怒气消耗-1，内力消耗+2。",
           "automationNote": "命中施加入土AE。",
           "costs": {
             "mp": [
@@ -415,7 +415,7 @@
             {
               "label": "入土状态",
               "trigger": "hit",
-              "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nconst effect = thisItem.effects.getName(\"入土\");\nif (effect) {\n    const data = effect.toObject();\n    data.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
+              "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n\nconst effect = thisItem.effects.getName(\"入土\");\nif (effect) {\n    const data = effect.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    data.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}",
               "active": true
             }
           ]
@@ -443,7 +443,7 @@
           "range": "8米",
           "targetInfo": "直线",
           "actionCost": "蓄力动作",
-          "description": "消耗：箭矢*1。拉满弓弦，劲射而出，对直线上敌人造成伤害，并将他们击退 1 米。<br>若目标无架招，为其添加一层“流血”，持续到战斗脱离。<br>若有敌人处于半空中，可消耗反应动作释放此招，立于原地射箭，对敌人造成伤害。",
+          "description": "消耗：箭矢*1。拉满弓弦，劲射而出，对直线上敌人造成 0.4 力量点外功伤害，并将他们击退 1 米。<br>若目标无架招，为其添加一层“流血”，持续到战斗脱离。<br>若有敌人处于半空中，可消耗反应动作释放此招，立于原地射箭，对敌人造成伤害。<br><strong>升级：</strong>招式伤害+10，内力消耗+4。",
           "automationNote": "命中无架招目标自动流血。击退和箭矢消耗手动。",
           "costs": {
             "mp": [
@@ -490,7 +490,7 @@
           "range": "自身",
           "targetInfo": "自身",
           "actionCost": "次要动作",
-          "description": "消耗：箭矢*1。擦拭箭头，观察战场，开启架招。成功格挡时，可消耗反应动作，掷出手中箭矢，对目标施展【执锐摧甲】。",
+          "description": "消耗：箭矢*1。擦拭箭头，观察战场，开启架招。成功格挡时，可消耗反应动作，掷出手中箭矢，对目标施展【执锐摧甲】。<br><strong>升级：</strong>格挡值+10，内力消耗+2。",
           "automationNote": "箭矢消耗和反击需手动。",
           "costs": {
             "mp": [
@@ -525,7 +525,7 @@
           "range": "1米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
-          "description": "弓弦割喉，对目标造成伤害。击破目标架招时，为其添加“破甲”，持续一回合。<br>破甲：你的外功防御归零。",
+          "description": "弓弦割喉，对目标造成 0.4 力量点外功伤害。击破目标架招时，为其添加“破甲”，持续一回合。<br>破甲：你的外功防御归零。<br><strong>升级：</strong>招式伤害+10，持续回合数+1，消耗+2。",
           "automationNote": "破招自动应用破甲。",
           "costs": {
             "mp": [
@@ -558,7 +558,7 @@
             {
               "label": "破甲",
               "trigger": "hit",
-              "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const pojia = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n    pojia.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(args.target, pojia);\n}",
+              "script": "if (args.isBroken) {\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    const pojia = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"pojia\"));\n    if (pojia) {\n        pojia.duration = { rounds: rounds };\n        await game.xjzl.api.effects.addEffect(args.target, pojia);\n    }\n}",
               "active": true
             }
           ]
@@ -573,7 +573,7 @@
           "range": "10米",
           "targetInfo": "目标及周围2米",
           "actionCost": "蓄力动作",
-          "description": "消耗：箭矢*5。数箭齐射，杀气如麻，对目标及其周围 2 米内的敌人造成伤害，并为其添加三层“流血”，持续到战斗脱离。<br>若目标处于“破甲”，还会为其添加一层“失血”。",
+          "description": "消耗：箭矢*5。数箭齐射，杀气如麻，对目标及其周围 2 米内的敌人造成 0.7 力量点外功伤害，并为其添加三层“流血”，持续到战斗脱离。<br>·若目标处于“破甲”，还会为其添加一层“失血”。<br><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+8。",
           "automationNote": "命中应用3层流血，检测破甲状态应用失血。箭矢消耗需手动。",
           "costs": {
             "mp": [
@@ -606,7 +606,7 @@
             {
               "label": "流血与失血",
               "trigger": "hit",
-              "script": "if (!args.isHit) return;\nfor(let i=0; i<3; i++) await game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\");\n\nif (args.target.statuses.has(\"pojia\") || args.target.effects.some(e => e.name === \"破甲\")) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n    ui.notifications.info(`${args.target.name} 伤口崩裂，陷入失血！`);\n}",
+              "script": "if (!args.isHit) return;\nawait game.xjzl.api.effects.addEffect(args.target, \"bleed_stack\", 3);\n\nif (args.target.statuses.has(\"pojia\") || args.target.effects.some(e => e.name === \"破甲\")) {\n    await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n    ui.notifications.info(`${args.target.name} 伤口崩裂，陷入失血！`);\n}",
               "active": true
             }
           ]
@@ -674,8 +674,7 @@
           "damageType": "none",
           "weaponType": "staff",
           "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-          "description": "<p>次要动作，舞枪而立，开启架招。同时获得一层“磐石”，至多三层，持续到战斗脱离。</p><p>磐石：每层增加格挡值 5 点。</p>",
-          "upgrade": "格挡值+10，内力消耗+2。",
+          "description": "<p>次要动作，舞枪而立，开启架招。同时获得一层“磐石”，至多三层，持续到战斗脱离。</p><p>磐石：每层增加格挡值 5 点。</p><p><strong>升级：</strong>格挡值+10，内力消耗+2。</p>",
           "range": "自身",
           "targetInfo": "自身",
           "actionCost": "次要动作",
@@ -708,7 +707,7 @@
               "label": "添加磐石",
               "trigger": "attack",
               "active": true,
-              "script": "const effect = thisItem.effects.getName(\"磐石\");\nif (effect) {\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n}"
+              "script": "const effect = thisItem.effects.getName(\"磐石\");\nif (effect) {\n    const data = effect.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, data);\n}"
             }
           ]
         },
@@ -719,8 +718,7 @@
           "damageType": "waigong",
           "weaponType": "staff",
           "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-          "description": "<p>蓄力动作，缓扫周身，巨力对周围敌人造成 0.4 力量点外功伤害。若目标成功格挡此招，为其添加一层“颤手”，持续到战斗脱离。</p><p>颤手：满五层后，手持武器脱手落地（需花费主要动作拾起），并陷入“缴械”一回合，然后移除所有颤手。</p><p>缴械：你无法施展徒手以外的武学。</p>",
-          "upgrade": "招式伤害+10，内力消耗+4。",
+          "description": "<p>蓄力动作，缓扫周身，巨力对周围敌人造成 0.4 力量点外功伤害。若目标成功格挡此招，为其添加一层“颤手”，持续到战斗脱离。</p><p>颤手：满五层后，手持武器脱手落地（需花费主要动作拾起），并陷入“缴械”一回合，然后移除所有颤手。</p><p>缴械：你无法施展徒手以外的武学。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
           "range": "2米",
           "targetInfo": "周围敌人",
           "actionCost": "蓄力动作",
@@ -769,8 +767,7 @@
           "damageType": "waigong",
           "weaponType": "staff",
           "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-          "description": "<p>主要动作，枪扎一线，对目标造成 0.4 力量点外功伤害，击破目标架招时，将其击飞 1 米。</p>",
-          "upgrade": "招式伤害+10，击飞距离+1，内力消耗+2。",
+          "description": "<p>主要动作，枪扎一线，对目标造成 0.4 力量点外功伤害，击破目标架招时，将其击飞 1 米。</p><p><strong>升级：</strong>招式伤害+10，击飞距离+1，内力消耗+2。</p>",
           "range": "2米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
@@ -812,8 +809,7 @@
           "damageType": "waigong",
           "weaponType": "staff",
           "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-          "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制对方虚招，摆腰砸枪，巨力对目标造成 0.6 力量点外功伤害，并将其击倒。</p><p>·招式伤害提升自身当前格挡值的数值。</p>",
-          "upgrade": "招式伤害+10，内力消耗+2。",
+          "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制对方虚招，摆腰砸枪，巨力对目标造成 0.6 力量点外功伤害，并将其击倒。</p><p>·招式伤害提升自身当前格挡值的数值。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
           "range": "3米",
           "targetInfo": "单体",
           "actionCost": "反应动作",
@@ -864,8 +860,7 @@
           "damageType": "none",
           "weaponType": "staff",
           "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-          "description": "<p>蓄力动作，枪挑直刺，为自己和 2 米范围所有敌人添加“禁足”，持续到自己或被命中的敌人陷入濒死；然后自身获得“独木”，持续三回合。</p><p>独木：你获得 10 点格挡值，在你的每个回合末，都可以无消耗动作施展一次【麻木不仁】。</p>",
-          "upgrade": "格挡值+10，怒气消耗-1，内力消耗+4。",
+          "description": "<p>蓄力动作，枪挑直刺，为自己和 2 米范围所有敌人添加“禁足”，持续到自己或被命中的敌人陷入濒死；然后自身获得“独木”，持续三回合。</p><p>独木：你获得 10 点格挡值，在你的每个回合末，都可以无消耗动作施展一次【麻木不仁】。</p><p><strong>升级：</strong>格挡值+10，怒气消耗-1，内力消耗+4。</p>",
           "range": "2米",
           "targetInfo": "单体及周围",
           "actionCost": "蓄力动作",
@@ -898,7 +893,7 @@
               "label": "自身效果",
               "trigger": "hit_once",
               "active": true,
-              "script": "// 1. 自身禁足\nawait game.xjzl.api.effects.addEffect(actor, \"root\");\n\n// 2. 自身独木 (数值随等级成长)\nconst effectTemp = thisItem.effects.getName(\"独木\");\nif (effectTemp) {\n    const effectData = effectTemp.toObject();\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础10点，每级成长10点\n    const bonus = 10 + (lvl - 1) * 10;\n    \n    // 修改数值\n    effectData.changes[0].value = String(bonus);\n    effectData.description = `格挡+${bonus}。在你的每个回合末，都可以无消耗动作施展一次【麻木不仁】。`;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}\n\nui.notifications.info(\"已对自己应用禁足与独木。请手动对范围内敌人应用禁足。\");"
+              "script": "// 1. 自身禁足\nawait game.xjzl.api.effects.addEffect(actor, \"root\");\n\n// 2. 自身独木 (数值随等级成长)\nconst effectTemp = thisItem.effects.getName(\"独木\");\nif (effectTemp) {\n    const effectData = effectTemp.toObject();\n    delete effectData._id;\n    effectData.origin = thisItem.uuid;\n    const lvl = Math.max(1, args.move.computedLevel || 1);\n    // 基础10点，每级成长10点\n    const bonus = 10 + (lvl - 1) * 10;\n    \n    // 修改数值\n    effectData.changes[0].value = String(bonus);\n    effectData.description = `格挡+${bonus}。在你的每个回合末，都可以无消耗动作施展一次【麻木不仁】。`;\n    \n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}\n\nui.notifications.info(\"已对自己应用禁足与独木。请手动对范围内敌人应用禁足。\");"
             }
           ]
         }
@@ -946,7 +941,7 @@
             {
               "label": "添加火油",
               "trigger": "hit",
-              "script": "const effect = thisItem.effects.getName(\"火油\");\nif (!effect) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst amount = 1 + (lvl - 1);\nfor(let i=0; i<amount; i++) {\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n}",
+              "script": "const effect = thisItem.effects.getName(\"火油\");\nif (!effect) return;\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nconst amount = 1 + (lvl - 1);\nconst data = effect.toObject();\ndelete data._id;\ndata.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, data, amount);",
               "active": true
             }
           ]
@@ -985,7 +980,7 @@
             {
               "label": "破招引燃",
               "trigger": "hit",
-              "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"引燃\");\n    if (effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}",
+              "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"引燃\");\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
               "active": true
             }
           ]
@@ -1024,7 +1019,7 @@
             {
               "label": "命中引燃",
               "trigger": "hit",
-              "script": "if (args.isHit) {\n    const effect = thisItem.effects.getName(\"引燃\");\n    if (effect) await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}",
+              "script": "if (args.isHit) {\n    const effect = thisItem.effects.getName(\"引燃\");\n    if (effect) {\n        const data = effect.toObject();\n        delete data._id;\n        data.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
               "active": true
             }
           ]
@@ -1134,6 +1129,7 @@
           "actionCost": "次要动作",
           "description": "<p>次要动作，伏划暗刃，开启架招。被击破架招时，在自身周围 3 米范围劈出‘遁光’，持续到脱战。</p><p><strong>遁光：</strong>你的敌人在‘遁光’陷入“目盲”“下盘不稳”，且受到攻击时，伤害提升 10 点。</p><p>·遁光形成在原地，不会跟随你移动，你只能拥有一个遁光，如果你劈出新的遁光，之前的消失。</p><p><strong>升级：</strong>格挡值+10，遁光内他人受到的伤害+5，内力消耗+2。</p>",
           "automationNote": "被破招时请手动放置遁光区域。",
+          "x-xjzl-aura": true,
           "costs": {
             "mp": [
               2,
@@ -1207,6 +1203,7 @@
           "actionCost": "反应动作",
           "description": "<p>当你看破对方虚招时，可消耗反应动作施展此招，压制对方虚招，掠影截杀，对目标造成 0.6 力量点外功伤害。</p><p>同时自身获得“蕴影”状态，持续三回合。</p><p><strong>蕴影：</strong>你格挡成功时，在自身周围 1 米范围形成‘遁光’，持续到脱战。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+2。</p>",
           "automationNote": "命中给予自身蕴影状态。格挡产生遁光需手动。",
+          "x-xjzl-aura": true,
           "costs": {
             "mp": [
               2,
@@ -1230,7 +1227,7 @@
             {
               "label": "获得蕴影",
               "trigger": "hit_once",
-              "script": "const effect = thisItem.effects.getName(\"蕴影\");\nif (effect) {\n    const effData = effect.toObject();\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
+              "script": "const effect = thisItem.effects.getName(\"蕴影\");\nif (effect) {\n    const effData = effect.toObject();\n    delete effData._id;\n    effData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, effData);\n}",
               "active": true
             }
           ]
@@ -1338,7 +1335,7 @@
           "range": "1米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
-          "description": "旋刀劈斩，对目标造成伤害。<br>消耗一层“刀势”，斩出圆环刀影，招式变为对周围敌人造成伤害，且击倒目标。",
+          "description": "旋刀劈斩，对目标造成 0.5 力量点内功伤害。<br>消耗一层“刀势”，斩出圆环刀影，招式变为对周围敌人造成伤害，且击倒目标。<br><strong>升级：</strong>招式伤害+10，内力消耗+2。",
           "automationNote": "消耗刀势、变更为AOE及击倒效果需手动。",
           "costs": {
             "mp": [
@@ -1378,7 +1375,7 @@
           "range": "自身",
           "targetInfo": "自身",
           "actionCost": "次要动作",
-          "description": "摄势横刀，开启架招。每次格挡成功时，获得一层“刀势”，至多三层，持续到脱战或更换其他武器的武学套路。<br>刀势：每层使刀法命中+10。",
+          "description": "摄势横刀，开启架招。每次格挡成功时，获得一层“刀势”，至多三层，持续到脱战或更换其他武器的武学套路。<br>刀势：每层使刀法命中+10。<br><strong>升级：</strong>格挡值+10，内力消耗+2。",
           "automationNote": "格挡成功自动获得刀势。",
           "costs": {
             "mp": [
@@ -1406,7 +1403,7 @@
             {
               "label": "格挡获势",
               "trigger": "damaged",
-              "script": "if (!Macros.checkStance(actor, args)) return;\nconst effect = thisItem.effects.getName(\"刀势\");\nif (effect) {\n    await game.xjzl.api.effects.addEffect(actor, effect.toObject());\n    ui.notifications.info(\"格挡成功，获得刀势！\");\n}",
+              "script": "if (!Macros.checkStance(actor, args)) return;\nconst effect = thisItem.effects.getName(\"刀势\");\nif (effect) {\n    const data = effect.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(actor, data);\n    ui.notifications.info(\"格挡成功，获得刀势！\");\n}",
               "active": true
             }
           ]
@@ -1420,7 +1417,7 @@
           "range": "2米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
-          "description": "抛刀透骨，对目标造成伤害，击破架招时，给目标添加“缚身”，持续两回合。<br>虚招对抗投掷前，你每消耗一层“刀势”，此招的虚招对抗检定+2。",
+          "description": "抛刀透骨，对目标造成 0.4 力量点内功伤害，击破架招时，给目标添加“缚身”，持续两回合。<br>虚招对抗投掷前，你每消耗一层“刀势”，此招的虚招对抗检定+2。<br><strong>升级：</strong>招式伤害+10，内力消耗+2。",
           "automationNote": "破招施加缚身。消耗刀势手动。",
           "costs": {
             "mp": [
@@ -1468,7 +1465,7 @@
           "range": "3米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
-          "description": "覆魂舞刀，对目标造成伤害。<br>消耗一层“刀势”，斩出圆环刀影，招式变为对周围敌人造成伤害，且击倒目标。",
+          "description": "覆魂舞刀，对目标造成 0.8 力量点内功伤害。<br>消耗一层“刀势”，斩出圆环刀影，招式变为对周围敌人造成伤害，且击倒目标。<br><strong>升级：</strong>招式伤害+20，怒气消耗-1，内力消耗+4。",
           "automationNote": "消耗刀势及AOE击倒需手动。",
           "costs": {
             "mp": [
@@ -1819,7 +1816,7 @@
               "label": "破招双重心火",
               "trigger": "hit",
               "active": true,
-              "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`击破架招，给 ${args.target.name} 施加了2层心火，请手动处理击飞。`);\n    }\n}"
+              "script": "if (args.isBroken) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData, 2);\n        ui.notifications.info(`击破架招，给 ${args.target.name} 施加了2层心火，请手动处理击飞。`);\n    }\n}"
             }
           ]
         },
@@ -1863,7 +1860,7 @@
               "label": "命中双重心火",
               "trigger": "hit",
               "active": true,
-              "script": "if (args.isHit) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n    }\n}"
+              "script": "if (args.isHit) {\n    const effect = thisItem.effects.getName(\"心火\");\n    if (effect) {\n        const effectData = effect.toObject();\n        delete effectData._id;\n        effectData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, effectData, 2);\n    }\n}"
             }
           ]
         },
@@ -1914,7 +1911,7 @@
               "label": "入魔眩晕",
               "trigger": "hit",
               "active": true,
-              "script": "if (!args.isHit) return;\nconst hasRage = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"rage\");\n\nif (hasRage) {\n    const stun = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"stun\"));\n    if (stun) {\n        stun.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, stun);\n        actor.showFloatyText(\"入魔引爆！\", { fill: \"#ff4500\" });\n    }\n}"
+              "script": "if (!args.isHit) return;\nconst hasRage = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"rage\");\n\nif (hasRage) {\n    const stun = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"xuanyun\"));\n    if (stun) {\n        stun.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, stun);\n        actor.showFloatyText(\"入魔引爆！\", { fill: \"#ff4500\" });\n    }\n}"
             }
           ]
         }
@@ -2167,7 +2164,7 @@
           "weaponType": "hidden",
           "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
           "description": "<p>消耗：金花银叶-银 800 两（消耗品）</p><p>主要动作，金银灿烂，射向目标要害，对其造成 0.3 力量+0.3 内息点外功伤害，并为其添加“金花”，持续一日（十二个时辰）。</p><p>金花：你每过一个时辰，进行一次残疾检定，且该次检定不受其他武学内功效果影响。</p>",
-          "range": "10",
+          "range": "10米",
           "targetInfo": "单体",
           "actionCost": "主要动作",
           "xpCostRatio": 1,
@@ -2208,7 +2205,7 @@
               "label": "施加金花",
               "trigger": "hit",
               "active": true,
-              "script": "if (!args.isHit) return;\nconst effect = thisItem.effects.getName(\"金花\");\nif (effect) {\n    await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}"
+              "script": "if (!args.isHit) return;\nconst effect = thisItem.effects.getName(\"金花\");\nif (effect) {\n    const data = effect.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
             }
           ]
         }
@@ -2275,7 +2272,7 @@
               "label": "蛛毒追加",
               "trigger": "hit",
               "active": true,
-              "script": "if (args.isHit) {\n    const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhudu\");\n    if (effect) {\n        const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const poisonDmg = stacks * 5;\n        \n        // 造成额外的毒素伤害\n        await args.target.applyDamage({\n            amount: poisonDmg,\n            type: \"poison\",\n            attacker: actor,\n            isHit: true\n        });\n        \n        // 飘字提示\n        actor.showFloatyText(`蛛毒追加 ${poisonDmg}点毒伤!`, {fill: \"#8e44ad\"});\n    }\n}"
+              "script": "if (args.isHit) {\n    const effect = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_zhudu\");\n    if (effect) {\n        const stacks = effect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const poisonDmg = stacks * 5;\n        \n        // 造成额外的毒素伤害\n        await args.target.applyDamage({\n            amount: poisonDmg,\n            type: \"poison\",\n            attacker: actor,\n            item: thisItem,\n            move: args.move,\n            isHit: true\n        });\n        \n        // 飘字提示\n        actor.showFloatyText(`蛛毒追加 ${poisonDmg}点毒伤!`, {fill: \"#8e44ad\"});\n    }\n}"
             }
           ]
         },
@@ -2383,9 +2380,8 @@
           "damageType": "waigong",
           "weaponType": "unarmed",
           "img": "systems/xjzl-system/assets/icons/wuxue/明教.png",
-          "description": "<p>蓄力动作，挥袋套人，用你的[巧手]对抗目标的[轻功]或[气感]，若你获胜，将其套入袋中并为其添加“乾坤袋”，持续到你花费主要动作为其解开或者乾坤袋损坏。</p><p>乾坤袋：你被困在袋中，速度降低为 1 且只能看清 1 米以内的事物，他人可以花费一个主要动作将你和乾坤袋拎起，并花费双倍移动速度携带你行动。</p><p>·袋中的目标攻击乾坤袋，扣除防护值后，只能对结构值造成十分之一的伤害。</p>",
-          "upgrade": "袖里乾坤中你进行的[巧手]对抗检定结果+1。",
-          "range": "1",
+          "description": "<p>蓄力动作，挥袋套人，用你的[巧手]对抗目标的[轻功]或[气感]，若你获胜，将其套入袋中并为其添加“乾坤袋”，持续到你花费主要动作为其解开或者乾坤袋损坏。</p><p>乾坤袋：你被困在袋中，速度降低为 1 且只能看清 1 米以内的事物，他人可以花费一个主要动作将你和乾坤袋拎起，并花费双倍移动速度携带你行动。</p><p>·袋中的目标攻击乾坤袋，扣除防护值后，只能对结构值造成十分之一的伤害。</p><p><strong>升级：</strong>袖里乾坤中你进行的[巧手]对抗检定结果+1。</p>",
+          "range": "1米",
           "targetInfo": "单体",
           "actionCost": "蓄力动作",
           "xpCostRatio": 1,
@@ -2554,7 +2550,7 @@
               "label": "添加储力BUFF",
               "trigger": "hit",
               "active": true,
-              "script": "const effect = thisItem.effects.getName(\"储力聚气\");\nif (effect) {\n    await game.xjzl.api.effects.addEffect(args.target, effect.toObject());\n}"
+              "script": "const effect = thisItem.effects.getName(\"储力聚气\");\nif (effect) {\n    const data = effect.toObject();\n    delete data._id;\n    data.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, data);\n}"
             }
           ]
         }
@@ -2583,7 +2579,7 @@
                 "label": "生效后移除",
                 "trigger": "hit_once",
                 "active": true,
-                "script": "if (args.move.type !== 'qi' && args.move.type !== 'stance') await thisEffect.delete();"
+                "script": "if (args.move.type !== 'qi' && args.move.type !== 'stance') await game.xjzl.api.effects.removeEffect(actor, \"wuxue_chulijuqi\");"
               }
             ]
           }
