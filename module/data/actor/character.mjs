@@ -1228,6 +1228,9 @@ export class XJZLCharacterData extends foundry.abstract.TypeDataModel {
     res.global.total = 0 + (res.global.mod || 0);
     res.neigong.total = 0 + (res.neigong.mod || 0);
     res.waigong.total = 0 + (res.waigong.mod || 0);
+    // 流失/招式抗性此前漏算，导致写入 .mod 的 AE(如流失抗性药品)完全不生效
+    res.liushi.total = 0 + (res.liushi.mod || 0);
+    res.skill.total = 0 + (res.skill.mod || 0);
 
     // 3. 武器等级修正与伤害计算 (Weapon Ranks & Dmg)
     // ------------------------------------
