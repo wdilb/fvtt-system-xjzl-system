@@ -2895,7 +2895,14 @@ export class XJZLActor extends Actor {
       const flagKey = `regen${capRes}${timing}`;
 
       // 从 xjzlStatuses 读取数值 (我们在 prepareDerivedData 里已经转成 int 了)
-      const delta = this.xjzlStatuses[flagKey] || 0;
+      let delta = this.xjzlStatuses[flagKey] || 0;
+
+      // 负向 regen 视为流失，先按流失抗性减免再结算：流失抗性同时作用于气血与内力流失(不含怒气)。
+      // 减免必须在下方濒死判死逻辑之前完成，否则抗性本可吸收的流失仍会触发濒死内力归零判死。
+      if (delta < 0 && (res === "hp" || res === "mp")) {
+        const liushiRes = this.system.combat?.resistances?.liushi?.total || 0;
+        if (liushiRes > 0) delta = Math.min(0, delta + liushiRes);
+      }
 
       if (delta !== 0) {
         const current = resources[res].value;
