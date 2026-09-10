@@ -1975,7 +1975,7 @@
                     "targetInfo": "自身",
                     "actionCost": "无",
                     "description": "<p>霸刀堂高深轻功，施展之时，步法助势，使刀法如破竹之势力。</p><p>你每次被《趁虚而入》攻击后，依旧可以不消耗速度朝任意方向移动一米，同时获得一层“劲力”，至多三层，持续到战斗结束。</p><p><strong>劲力：</strong>每层提高招式伤害 5 点。</p>",
-                    "automationNote": "完全自动化。被《趁虚而入》攻击后自动获得一层系统[劲力]状态（上限3层），并在聊天栏发卡片提示免费移动。",
+                    "automationNote": "劲力自动：被《趁虚而入》攻击后自动获得一层系统[劲力]状态（上限3层）并发卡片提示；提示的免费移动1米与[劲力]的移除需手动处理。",
                     "costs": {
                         "mp": [
                             0
@@ -1985,15 +1985,29 @@
                         "base": 0,
                         "growth": 0,
                         "scalings": []
-                    },
-                    "scripts": [
-                        {
-                            "label": "被趁虚而入攻击",
-                            "trigger": "damaged",
-                            "active": true,
-                            "script": "if (args.move && args.move.id === 'opportunity-attack') {\n    const jinli = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === 'jinli'));\n    if (jinli) {\n        // 覆盖最大层数为3\n        foundry.utils.setProperty(jinli, 'flags.xjzl-system.maxStacks', 3);\n        await game.xjzl.api.effects.addEffect(actor, jinli);\n        \n        actor.showFloatyText(\"步法助势 (劲力)\", {fill: \"#00FF00\"});\n        \n        const cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding: 6px; padding-left: 10px; border-left: 3px solid #2e7d32; background: rgba(46, 125, 50, 0.05);\">\n                <b style=\"color: #2e7d32;\"><i class=\"fas fa-shoe-prints\"></i> 破锋步触发：</b><br>\n                <span style=\"font-size: 0.9em; color: #555;\">\n                    受到《趁虚而入》攻击，获得一层[劲力]。<br>\n                    你可以不消耗速度，朝任意方向移动 1 米。\n                </span>\n            </div>\n        </div>`;\n        \n        ChatMessage.create({\n            content: cardContent,\n            speaker: ChatMessage.getSpeaker({actor: actor})\n        });\n    }\n}"
+                    }
+                }
+            ],
+            "effects": [
+                {
+                    "name": "破锋步",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖2.png",
+                    "description": "常驻载体：被《趁虚而入》攻击后自动获得一层[劲力]（至多3层）。",
+                    "transfer": true,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "pofengbu_reactive",
+                            "scripts": [
+                                {
+                                    "label": "被趁虚而入获得劲力",
+                                    "trigger": "damaged",
+                                    "active": true,
+                                    "script": "// 轻功招式的脚本只在出招/架招等时机被收集，防御方反应必须挂在常驻 transfer AE 上才能生效\nconst pofeng = thisEffect.parent?.system?.moves?.find(m => m.name === \"破锋步\");\n// transfer AE 不受领悟门槛约束，脚本内需自查招式是否已领悟\nif (!pofeng || (pofeng.computedLevel || 0) <= 0) return;\nif (args.move?.id !== \"opportunity-attack\") return;\n\nconst jinli = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"jinli\"));\nif (!jinli) return;\n// 破锋步的劲力上限为3层，覆盖系统默认的无限叠层\nfoundry.utils.setProperty(jinli, \"flags.xjzl-system.maxStacks\", 3);\nawait game.xjzl.api.effects.addEffect(actor, jinli);\n\nactor.showFloatyText(\"步法助势 (劲力)\", { fill: \"#00FF00\" });\n\nconst cardContent = `\n<div class=\"xjzl-chat-card\">\n    <div style=\"padding: 6px; padding-left: 10px; border-left: 3px solid #2e7d32; background: rgba(46, 125, 50, 0.05);\">\n        <b style=\"color: #2e7d32;\"><i class=\"fas fa-shoe-prints\"></i> 破锋步触发：</b><br>\n        <span style=\"font-size: 0.9em; color: #555;\">\n            受到《趁虚而入》攻击，获得一层[劲力]。<br>\n            你可以不消耗速度，朝任意方向移动 1 米。\n        </span>\n    </div>\n</div>`;\n\nChatMessage.create({\n    content: cardContent,\n    speaker: ChatMessage.getSpeaker({ actor: actor })\n});"
+                                }
+                            ]
                         }
-                    ]
+                    },
+                    "changes": []
                 }
             ]
         }
@@ -2038,7 +2052,6 @@
             "tier": 3,
             "description": "快如流星，转瞬即逝。",
             "requirements": "悟性15",
-            "automationNote": "完全自动化，常驻速度+2自动。进入战斗赋予自己[流星]实现加速与位移提示。",
             "moves": [
                 {
                     "name": "流星步",
@@ -2048,7 +2061,7 @@
                     "targetInfo": "自身",
                     "actionCost": "无",
                     "description": "<p><strong>效果：</strong>你的速度+2。</p><p>每次进入战斗时，移步成影，进入“流星”，持续到战斗脱离。</p><p><strong>流星：</strong>你的速度提升等同于当前怒气的数值。</p><p>·你每次施展绝招消耗怒气后，可不消耗速度地朝任意方向移动等同于消耗怒气数值的距离。</p>",
-                    "automationNote": "进战自动获得流星，其余交由流星状态底层处理。",
+                    "automationNote": "常驻速度+2自动，进入战斗自动获得[流星]状态；绝招消耗怒气后的额外移动仅发送卡片提示，需手动移动；[流星]持续到战斗脱离，脱离后需手动移除。",
                     "costs": {
                         "mp": [
                             0
@@ -2175,7 +2188,7 @@
                     "actionCost": "次要动作",
                     "requirements": "悟性5",
                     "description": "<p>效果：你的速度+1。</p><p>次要动作，观人群站位，分地形地貌，进行一次[道法]检定（难度10），若成功，可选择视野任意一个敌人为其添加“下盘不稳”，持续三回合；<br>再为自己添加一层“乘风”，至多三层，持续到战斗脱离。</p>",
-                    "automationNote": "被动速度自动。主动效果点击应用后自动进行道法检定，成功后自动施加状态（需选中目标以施加下盘不稳）。",
+                    "automationNote": "被动速度自动。主动效果点击应用后自动进行道法检定，成功后自动施加状态（需选中敌方目标以施加下盘不稳）。",
                     "costs": {
                         "mp": [
                             0
@@ -2185,7 +2198,7 @@
                         {
                             "label": "阴阳路-道法检定",
                             "trigger": "hit",
-                            "script": "const roll = await actor.rollAttributeTest('daofa', { async: true });\nif (roll && roll.total >= 10) {\n    ui.notifications.info('阴阳路：道法检定成功！');\n    \n    // 1. 对敌人施加下盘不稳\n    if (args.target) {\n        const unstable = CONFIG.statusEffects.find(e => e.id === 'unstable');\n        if (unstable) {\n            const data = foundry.utils.deepClone(unstable);\n            data.duration = { rounds: 3 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`已对 ${args.target.name} 施加 [下盘不稳]`);\n        }\n    } else {\n        ui.notifications.warn('未选中目标，无法施加 [下盘不稳]。');\n    }\n\n    // 2. 给自己施加乘风\n    const chengfeng = CONFIG.statusEffects.find(e => e.id === 'chengfeng');\n    if (chengfeng) {\n        const data = foundry.utils.deepClone(chengfeng);\n        // 覆盖最大层数为 3\n        foundry.utils.setProperty(data, 'flags.xjzl-system.maxStacks', 3);\n        await game.xjzl.api.effects.addEffect(actor, data);\n        ui.notifications.info('已获得 [乘风]');\n    }\n} else {\n    ui.notifications.warn('阴阳路：道法检定失败。');\n}",
+                            "script": "const roll = await actor.rollAttributeTest('daofa', { async: true });\nif (roll && roll.total >= 10) {\n    ui.notifications.info('阴阳路：道法检定成功！');\n    \n    // 1. 对敌人施加下盘不稳\n    // 注意：未选目标时系统会把 buff 默认施加给自身，必须排除，否则会给自己挂下盘不稳\n    if (args.target && args.target !== actor) {\n        const unstable = CONFIG.statusEffects.find(e => e.id === 'unstable');\n        if (unstable) {\n            const data = foundry.utils.deepClone(unstable);\n            data.duration = { rounds: 3 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`已对 ${args.target.name} 施加 [下盘不稳]`);\n        }\n    } else {\n        ui.notifications.warn('未选中敌方目标，无法施加 [下盘不稳]。');\n    }\n\n    // 2. 给自己施加乘风\n    const chengfeng = CONFIG.statusEffects.find(e => e.id === 'chengfeng');\n    if (chengfeng) {\n        const data = foundry.utils.deepClone(chengfeng);\n        // 覆盖最大层数为 3\n        foundry.utils.setProperty(data, 'flags.xjzl-system.maxStacks', 3);\n        await game.xjzl.api.effects.addEffect(actor, data);\n        ui.notifications.info('已获得 [乘风]');\n    }\n} else {\n    ui.notifications.warn('阴阳路：道法检定失败。');\n}",
                             "active": true
                         }
                     ]
