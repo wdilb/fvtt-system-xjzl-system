@@ -42,7 +42,7 @@
                         {
                             "label": "命中禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true);\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n    ui.notifications.info(`${args.target.name} 被禁足！`);\n}",
                             "active": true
                         }
                     ]
@@ -747,7 +747,7 @@
                         {
                             "label": "格挡翻倍",
                             "trigger": "attack",
-                            "script": "const weapon = actor.itemTypes.weapon.find(w => w.system.equipped);\nif (weapon) {\n    const val = weapon.system.block || 0;\n    if (val > 0) {\n        const effData = {\n            name: \"修金镀银-格挡加成\",\n            icon: move.img || thisItem.img,\n            changes:[{ key: \"system.combat.block\", mode: 2, value: String(val) }],\n            flags: { \"xjzl-system\": { slug: \"xiujinduyin\", stackable: false } },\n            origin: thisItem.uuid\n        };\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}",
+                            "script": "const weapon = actor.itemTypes.weapon.find(w => w.system.equipped);\nif (weapon) {\n    const val = weapon.system.block || 0;\n    if (val > 0) {\n        const effData = {\n            name: \"修金镀银-格挡加成\",\n            icon: move.img || thisItem.img,\n            changes:[{ key: \"system.combat.block\", mode: 2, value: String(val) }],\n            flags: { \"xjzl-system\": { slug: \"xiujinduyin\", stackable: false, tiedToStance: true } },\n            origin: thisItem.uuid\n        };\n        await game.xjzl.api.effects.addEffect(actor, effData);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -911,7 +911,7 @@
                         {
                             "label": "借力禁足",
                             "trigger": "hit",
-                            "script": "const jieli = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jieli\");\nif (args.isHit && jieli) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true, {duration: {rounds: 1}});\n}",
+                            "script": "const jieli = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jieli\");\nif (args.isHit && jieli) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n}",
                             "active": true
                         }
                     ]
@@ -1015,7 +1015,7 @@
                         {
                             "label": "借力控制",
                             "trigger": "hit",
-                            "script": "const jieli = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jieli\");\nif (args.isHit && jieli) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true, {duration: {rounds: 1}});\n    await game.xjzl.api.effects.toggleStatus(args.target, \"fushen\", true, {duration: {rounds: 1}});\n}",
+                            "script": "const jieli = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"jieli\");\nif (args.isHit && jieli) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 1 } });\n}",
                             "active": true
                         }
                     ]
@@ -1786,7 +1786,7 @@
                         {
                             "label": "禁足",
                             "trigger": "hit",
-                            "script": "if (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true, {duration: {rounds: 1}});\n}",
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n}",
                             "active": true
                         }
                     ]
@@ -1979,7 +1979,7 @@
                         {
                             "label": "禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true, {duration: {rounds: rounds}});\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const rounds = 1 + (lvl - 1);\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: rounds } });\n}",
                             "active": true
                         }
                     ]
@@ -2059,7 +2059,7 @@
                         {
                             "label": "消耗音罡必暴",
                             "trigger": "attack",
-                            "script": "const yingang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yingang\");\nif (yingang) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"无音神罡\" },\n        content: `<p>消耗 [音罡] 使此招 <b>必定暴击</b>？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await yingang.delete();\n        args.flags.critThresholdMod = 20;\n        ui.notifications.info(\"音罡爆发，必定暴击！\");\n    }\n}",
+                            "script": "const yingang = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"yingang\");\nif (yingang) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"无音神罡\" },\n        content: `<p>消耗 [音罡] 使此招 <b>必定暴击</b>？</p>`,\n        yes: { label: \"消耗\", icon: \"fas fa-check\" },\n        no: { label: \"不消耗\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await yingang.delete();\n        args.flags.forceCrit = true;\n        ui.notifications.info(\"音罡爆发，必定暴击！\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2080,7 +2080,7 @@
                                     "label": "施法获护体",
                                     "trigger": "attack",
                                     "active": true,
-                                    "script": "if (move.item.id === thisItem.id) {\n    const amount = Number(thisEffect.getFlag('xjzl-system', 'hutiAmount')) || 10;\n    await actor.applyHealing({ healer: actor, amount: amount, type: \"huti\", showScrolling: true});\n}"
+                                    "script": "if (args.item && args.item.name === \"鬼狱音诀\") {\n    const amount = Number(thisEffect.getFlag('xjzl-system', 'hutiAmount')) || 10;\n    await actor.applyHealing({ healer: actor, amount: amount, type: \"huti\", showScrolling: true});\n}"
                                 }
                             ]
                         }
@@ -2148,8 +2148,7 @@
                         "mp": [
                             2,
                             4,
-                            6,
-                            8
+                            6
                         ]
                     },
                     "scripts": [
@@ -2180,8 +2179,7 @@
                         "mp": [
                             2,
                             4,
-                            6,
-                            8
+                            6
                         ]
                     },
                     "scripts": [
@@ -2218,8 +2216,7 @@
                         "mp": [
                             2,
                             4,
-                            6,
-                            8
+                            6
                         ]
                     },
                     "scripts": [
@@ -2237,29 +2234,27 @@
                     "isUltimate": true,
                     "actionType": "attack",
                     "element": "yin",
-                    "damageType": "neigong",
+                    "damageType": "none",
                     "weaponType": "special",
                     "range": "@{2 + @up * 3|2}米",
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>卷起阵阵鬼气，使范围内所有敌人陷入“恶鬼缠身”状态，使自身进入“鬼王”状态，持续到战斗结束。</p><p><strong>鬼王：</strong>带有“鬼”字的招式伤害+10 点；</p><p>·对“恶鬼缠身”和“厉鬼缠身”状态的敌人进行的虚招对抗具有优势。</p><p><strong>升级：</strong>招式伤害+10，招式距离+3，怒气-1，消耗+4。</p>",
-                    "automationNote": "自动附加恶鬼缠身并赋予鬼王。针对拥有恶鬼/厉鬼的目标使用虚招自动获得优势，若目标用虚招攻击鬼王，将发送全局卡片提示鬼王手动附加看破优势。",
+                    "automationNote": "自动附加恶鬼缠身并赋予鬼王（本招自身不造成伤害，鬼王加伤随本招等级提升：+10/+20/+30）。针对拥有恶鬼/厉鬼的目标使用虚招自动获得优势，若目标用虚招攻击鬼王，将发送全局卡片提示鬼王手动附加看破优势。",
                     "calculation": {
                         "base": 0,
-                        "growth": 10
+                        "growth": 0
                     },
                     "costs": {
                         "mp": [
                             4,
                             8,
-                            12,
-                            16
+                            12
                         ],
                         "rage": [
                             6,
                             5,
-                            4,
-                            3
+                            4
                         ]
                     },
                     "scripts": [
@@ -2273,7 +2268,7 @@
                             "label": "自身获得鬼王",
                             "trigger": "hit_once",
                             "active": true,
-                            "script": "const gui = thisItem.effects.getName(\"鬼王\").toObject();\ndelete gui._id;\ngui.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(actor, gui);\nactor.showFloatyText(\"化身鬼王！\", { fill: \"#8b0000\", fontSize: 40 });"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst gui = thisItem.effects.getName(\"鬼王\").toObject();\ndelete gui._id;\ngui.origin = thisItem.uuid;\ngui.flags[\"xjzl-system\"].dmgBonus = 10 + (lvl - 1) * 10;\nawait game.xjzl.api.effects.addEffect(actor, gui);\nactor.showFloatyText(\"化身鬼王！\", { fill: \"#8b0000\", fontSize: 40 });"
                         }
                     ]
                 }
@@ -2344,7 +2339,7 @@
                                     "label": "鬼招加伤",
                                     "trigger": "calc",
                                     "active": true,
-                                    "script": "if (args.move.name.includes(\"鬼\")) {\n    args.output.damage += 10;\n    args.output.bonusDesc.push(\"鬼王加伤: +10\");\n}"
+                                    "script": "if (args.move.name.includes(\"鬼\")) {\n    const bonus = Number(thisEffect.getFlag(\"xjzl-system\", \"dmgBonus\")) || 10;\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`鬼王加伤: +${bonus}`);\n}"
                                 },
                                 {
                                     "label": "虚招攻击优势",
@@ -2381,7 +2376,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>鞭首昂起，迅势劈砸，对目标造成伤害，若目标在本场战斗中曾受到过毒素伤害，还会再次诱发毒素，此招使其额外受到 10 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，额外毒素伤害+5，消耗+2。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "自动弹窗询问是否诱发毒素（目标本场是否曾受毒伤由玩家判断），确认后额外毒素伤害自动结算。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -2405,7 +2400,7 @@
                         {
                             "label": "诱发额外毒伤",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"血口赤牙 - 诱发毒素\" },\n    content: \"<p>若目标在本场战斗中曾受到过毒素伤害，可再次诱发毒素。是否诱发？</p>\",\n    yes: { label: \"诱发\", icon: \"fas fa-biohazard\" },\n    no: { label: \"取消\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extraDmg = 10 + (lvl - 1) * 5;\n    await args.target.applyDamage({\n        amount: extraDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true\n    });\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #27ae60; padding:5px 8px; background:rgba(39,174,96,0.1);\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-biohazard\"></i> 诱发毒伤</div><div style=\"font-size:0.9em; color:#555;\">对 ${args.target.name} 额外造成 ${extraDmg} 点毒素伤害！</div></div></div>`\n    });\n}",
+                            "script": "if (!args.isHit) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"血口赤牙 - 诱发毒素\" },\n    content: \"<p>若目标在本场战斗中曾受到过毒素伤害，可再次诱发毒素。是否诱发？</p>\",\n    yes: { label: \"诱发\", icon: \"fas fa-biohazard\" },\n    no: { label: \"取消\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const extraDmg = 10 + (lvl - 1) * 5;\n    await args.target.applyDamage({\n        amount: extraDmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        item: args.item,\n        move: args.move\n    });\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"margin-left:6px;\"><div style=\"border-left:3px solid #27ae60; padding:5px 8px; background:rgba(39,174,96,0.1);\"><div style=\"font-weight:bold; color:#1e8449;\"><i class=\"fas fa-biohazard\"></i> 诱发毒伤</div><div style=\"font-size:0.9em; color:#555;\">对 ${args.target.name} 额外造成 ${extraDmg} 点毒素伤害！</div></div></div>`\n    });\n}",
                             "active": true
                         }
                     ]
@@ -2444,7 +2439,7 @@
                         {
                             "label": "角力对抗",
                             "trigger": "hit",
-                            "script": "if (!args.isHit) return;\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"恶蛟缠身 - 角力对抗\",\n    outcome: {\n        win: { text: \"缠绕成功！\", targetEffect: \"unstable\" },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
+                            "script": "if (!args.isHit) return;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"恶蛟缠身 - 角力对抗\",\n    outcome: {\n        win: { text: \"缠绕成功！\", targetEffect: { id: \"unstable\", duration: { rounds: rounds } } },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -2564,7 +2559,13 @@
                                     "label": "强击翻倍",
                                     "trigger": "preDamage",
                                     "active": true,
-                                    "script": "const s = args.target.xjzlStatuses;\nif (s.unstable || s.prone) {\n    args.config.isCrit = true;\n    if (args.config.type === 'poison') {\n        args.config.amount *= 2;\n        ui.notifications.info('毒蛟：该招式毒素伤害已自动翻倍');\n    } else {\n        ui.notifications.info('毒蛟：已必定暴击。若有附带的额外毒素伤害，请手动翻倍');\n    }\n}"
+                                    "script": "const s = args.target.xjzlStatuses;\nif (s.unstable || s.prone) {\n    if (args.config.type === 'poison') {\n        args.config.amount *= 2;\n        ui.notifications.info('毒蛟：该招式毒素伤害已自动翻倍');\n    } else {\n        ui.notifications.info('毒蛟：已必定暴击。若有附带的额外毒素伤害，请手动翻倍');\n    }\n}"
+                                },
+                                {
+                                    "label": "必定暴击",
+                                    "trigger": "check",
+                                    "active": true,
+                                    "script": "const s = args.target.xjzlStatuses;\nif (s.unstable || s.prone) {\n    args.flags.forceCrit = true;\n    ui.notifications.info(\"毒蛟：对失衡目标必定暴击！\");\n}"
                                 }
                             ]
                         }
@@ -2591,7 +2592,7 @@
                     "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "15",
+                    "range": "15米",
                     "targetInfo": "2个目标",
                     "actionCost": "主要动作",
                     "description": "<p>双箭连环，选择范围内两个目标，分别对他们造成 0.6 力量点外功伤害。</p><p>·若有敌人处于半空中，可以消耗反应动作释放此招，射出连环双箭，攻击目标和另一个敌人。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
@@ -2654,7 +2655,7 @@
                     "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "20",
+                    "range": "20米",
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
                     "description": "<p>瞄准敌首，对直线上敌人造成 0.6 力量点外功伤害，击破架招时，将目标击退至你 20 米外的范围并倒地。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
@@ -2685,7 +2686,7 @@
                     "element": "gang",
                     "damageType": "none",
                     "weaponType": "special",
-                    "range": "20",
+                    "range": "20米",
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>拉弦，掠过范围内敌人，为他们添加“烈云”标记，持续一回合。</p><p><strong>烈云：</strong>被标记的敌人受到《烈云神箭》的攻击时，投掷一次 D20，如果出现 1，则被击破架招。</p><p><strong>升级：</strong>击破架招的数字范围额外+1。（合一时，出现 1，2，3，4 时击破架招。）</p>",
@@ -2706,7 +2707,7 @@
                         {
                             "label": "添加烈云",
                             "trigger": "hit",
-                            "script": "const eff = thisItem.effects.getName(\"烈云\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.flags[\"xjzl-system\"].threshold = lvl;\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
+                            "script": "const eff = thisItem.effects.getName(\"烈云\").toObject();\nconst lvl = Math.max(1, move.computedLevel || 1);\neff.flags[\"xjzl-system\"].threshold = lvl;\neff.duration = { rounds: 1 };\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
                         }
                     ]
@@ -2717,11 +2718,12 @@
                     "element": "gang",
                     "damageType": "none",
                     "weaponType": "special",
-                    "range": "2",
+                    "range": "2米",
                     "targetInfo": "范围",
                     "actionCost": "次要动作",
                     "description": "<p>单臂托天，单掌震地，开启架招，同时在周围 2 米内扬起大片‘尘埃’，持续到脱战。</p><p><strong>尘埃：</strong>区域内所有人（包括友方和自己）陷入目盲；当你在尘埃范围内格挡成功时，尘埃替换为灰白的‘乱雾’区域，持续一回合后消散。</p><p><strong>乱雾：</strong>你处于区域中时，无法被选为目标。</p><p><strong>升级：</strong>格挡值+10，内力消耗+4。</p>",
                     "automationNote": "尘埃/乱雾区域效果需手动处理。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -2755,7 +2757,7 @@
                     "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "20",
+                    "range": "20米",
                     "targetInfo": "范围",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招后，可消耗反应动作释放此招，射出暗箭，对目标及其周围 5 米范围内的敌人造成 0.6 力量点外功伤害。同时给所有无架招的敌人添加“缚身”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
@@ -2782,7 +2784,7 @@
                         {
                             "label": "施加缚身",
                             "trigger": "hit",
-                            "script": "if (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"fushen\");\n    // fushen是配置好的status，有duration rounds 1 (根据配置)\n    // 如果配置里没有duration，则需要手动deep clone加duration，这里假设status配置正确\n}",
+                            "script": "if (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"fushen\", duration: { rounds: 1 } });\n}",
                             "active": true
                         }
                     ]
@@ -2793,7 +2795,7 @@
                     "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "20",
+                    "range": "20米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>抬手张弓，射出愈飞愈强的一箭，对单个目标造成 0.7 力量点外功伤害。</p><p>招式伤害提升【敌人与你相隔距离*1】的数值。</p><p><strong>升级：</strong>招式伤害+10，提升伤害系数+1，消耗+4。</p>",
@@ -2820,7 +2822,7 @@
                         {
                             "label": "距离加伤",
                             "trigger": "calc",
-                            "script": "const targets = Array.from(game.user.targets);\nif (targets.length === 1) {\n    const t = targets[0];\n    const dist = canvas.grid.measureDistance(actor.token?.object || {x:0,y:0}, t);\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const coef = 1 + (lvl - 1);\n    const bonus = Math.floor(dist * coef);\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`距离加成 (+${bonus})`);\n} else {\n    args.output.bonusDesc.push(\"距离加成 (需选中1个目标)\");\n}",
+                            "script": "const targets = Array.from(game.user.targets);\nconst selfToken = actor.token?.object || actor.getActiveTokens()[0];\nif (targets.length === 1 && selfToken) {\n    const t = targets[0];\n    const dist = canvas.grid.measurePath([selfToken.center, t.center]).distance;\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const coef = 1 + (lvl - 1);\n    const bonus = Math.floor(dist * coef);\n    args.output.damage += bonus;\n    args.output.bonusDesc.push(`距离加成 (+${bonus})`);\n} else {\n    args.output.bonusDesc.push(\"距离加成 (需在场景中选中1个目标)\");\n}",
                             "active": true
                         }
                     ]
@@ -2832,7 +2834,7 @@
                     "element": "gang",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "25",
+                    "range": "25米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>射出破空一箭，如韶光流逝般贯穿目标，对其造成 1.0 力量点外功伤害。</p><p>·如果你处于‘乱雾’区域，本招式所需怒气-1；</p><p>·如果你攻击处于目盲状态的目标，此招式可额外消耗一根箭矢，攻击另一个目盲目标。</p><p><strong>升级：</strong>招式伤害+20，怒气-1，内力消耗+8。</p>",
@@ -2889,9 +2891,9 @@
                             "scripts": [
                                 {
                                     "label": "受击破架",
-                                    "trigger": "preDamage",
+                                    "trigger": "preDefense",
                                     "active": true,
-                                    "script": "if (args.item && args.item.name === \"烈云神箭\") {\n    const threshold = thisEffect.getFlag(\"xjzl-system\", \"threshold\") || 1;\n    const roll = await new Roll(\"1d20\").evaluate();\n    if (game.dice3d) game.dice3d.showForRoll(roll, game.user, true);\n    const result = roll.total;\n    \n    if (result <= threshold) {\n        args.config.isBroken = true;\n        ui.notifications.info(`烈云标记触发！(Roll ${result} <= ${threshold}) 强制破架！`);\n    }\n}"
+                                    "script": "if (!args.item || args.item.name !== \"烈云神箭\") return;\nif (!actor.system.martial.stanceActive) return;\nconst threshold = thisEffect.getFlag(\"xjzl-system\", \"threshold\") || 1;\nconst roll = await new Roll(\"1d20\").evaluate();\nif (game.dice3d) await game.dice3d.showForRoll(roll, game.user, true);\nif (roll.total <= threshold) {\n    await actor.stopStance();\n    const pofang = CONFIG.statusEffects.find(e => e.id === \"pofang\");\n    if (pofang) await game.xjzl.api.effects.addEffect(actor, pofang);\n    ui.notifications.info(`烈云标记触发！(Roll ${roll.total} <= ${threshold}) 架招被强制击破！`);\n}"
                                 }
                             ]
                         }
@@ -3106,19 +3108,13 @@
                             "label": "半空追击判定",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"射天狼 - 对空打击\" },\n    content: `<p>是否消耗<b>反应动作</b>对半空中的敌人施展此招？</p>`,\n    yes: { label: \"是 (将击落并破架)\", icon: \"fas fa-plane-slash\" },\n    no: { label: \"否 (常规蓄力)\", icon: \"fas fa-bow-arrow\" }\n});\nif (confirm) {\n    actor._tianlangMidAir = true; // 挂载在 actor 的瞬时内存中\n    ui.notifications.info(\"已消耗反应动作，本次攻击附带击落与破甲效果。\");\n}"
+                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"射天狼 - 对空打击\" },\n    content: `<p>是否消耗<b>反应动作</b>对半空中的敌人施展此招？</p>`,\n    yes: { label: \"是 (将击落并破架)\", icon: \"fas fa-plane-slash\" },\n    no: { label: \"否 (常规蓄力)\", icon: \"fas fa-bow-arrow\" }\n});\nif (confirm) {\n    args.flags.tianlangMidAir = true; // 随攻击卡持久化，供 hit 阶段的 scriptFlags 读取\n    ui.notifications.info(\"已消耗反应动作，本次攻击附带击落与破甲效果。\");\n}"
                         },
                         {
                             "label": "对空破架结算",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.isHit || !actor._tianlangMidAir) return; // 读取瞬时内存\n\nif (args.target.system.martial?.stanceActive) {\n    await args.target.update({ \"system.martial.stanceActive\": false });\n    const pofang = CONFIG.statusEffects.find(e => e.id === \"pofang\");\n    if (pofang) await game.xjzl.api.effects.addEffect(args.target, pofang);\n}\n\nconst prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\nif (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n\nconst cardContent = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 8px;\">\n    <div style=\"border-left: 4px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px; margin-left: 2px;\">\n        <div style=\"font-weight:bold; color:#c0392b; font-size:1.1em;\">\n            <i class=\"fas fa-fighter-jet\"></i> 击落！\n        </div>\n        <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n            箭如流星，将半空中的 <b>${args.target.name}</b> 狠狠击落并贯穿其架势！\n        </div>\n    </div>\n</div>`;\nChatMessage.create({\n    content: cardContent,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
-                        },
-                        {
-                            "label": "标记清理",
-                            "trigger": "hit_once",
-                            "active": true,
-                            "script": "delete actor._tianlangMidAir;"
+                            "script": "if (!args.isHit || !args.scriptFlags?.tianlangMidAir) return;\n\nif (args.target.system.martial?.stanceActive) {\n    await args.target.stopStance();\n    const pofang = CONFIG.statusEffects.find(e => e.id === \"pofang\");\n    if (pofang) await game.xjzl.api.effects.addEffect(args.target, pofang);\n}\n\nconst prone = CONFIG.statusEffects.find(e => e.id === \"prone\");\nif (prone) await game.xjzl.api.effects.addEffect(args.target, prone);\n\nconst cardContent = `\n<div class=\"xjzl-chat-card\" style=\"padding-left: 8px;\">\n    <div style=\"border-left: 4px solid #c0392b; background: rgba(192, 57, 43, 0.1); padding: 5px; margin-left: 2px;\">\n        <div style=\"font-weight:bold; color:#c0392b; font-size:1.1em;\">\n            <i class=\"fas fa-fighter-jet\"></i> 击落！\n        </div>\n        <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n            箭如流星，将半空中的 <b>${args.target.name}</b> 狠狠击落并贯穿其架势！\n        </div>\n    </div>\n</div>`;\nChatMessage.create({\n    content: cardContent,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});"
                         }
                     ]
                 }
@@ -3159,7 +3155,7 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>鞭影织成网罗，罩向敌手，对目标造成 0.7 力量点外功伤害，若击破架招，则给予目标“缚身”状态，持续两回合。</p><p>若此招命中已有“缚身”的目标，则给予自身“蛊心”状态，持续到战斗脱离。</p><p><strong>蛊心:</strong>招式命中后，使目标受到 10 点毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
@@ -3186,7 +3182,7 @@
                         {
                             "label": "效果处理",
                             "trigger": "hit",
-                            "script": "// 1. 击破 -> 缚身\nif (args.isBroken) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"fushen\", true);\n    // 修正 duration (status 默认无)\n    // 由于 toggleStatus 比较简单，这里为了精确 duration，改用 addEffect\n    const fushen = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n    if (fushen) {\n        const data = foundry.utils.deepClone(fushen);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被缚身！`);\n    }\n}\n\n// 2. 命中缚身 -> 蛊心\nconst targetFushen = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fushen\");\nif (targetFushen) {\n    const guxin = thisItem.effects.getName(\"蛊心\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, guxin);\n    ui.notifications.info(\"获得 [蛊心] 状态\");\n}",
+                            "script": "if (!args.isHit) return;\n\n// 1. 命中已有缚身 -> 蛊心（须在本次施加缚身前判断，避免击破新上的缚身后误触发）\nconst targetFushen = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fushen\");\nif (targetFushen) {\n    const guxin = thisItem.effects.getName(\"蛊心\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, guxin);\n    ui.notifications.info(\"获得 [蛊心] 状态\");\n}\n\n// 2. 击破 -> 缚身，持续两回合\nif (args.isBroken) {\n    const fushen = CONFIG.statusEffects.find(e => e.id === \"fushen\");\n    if (fushen) {\n        const data = foundry.utils.deepClone(fushen);\n        data.duration = { rounds: 2 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n        ui.notifications.info(`${args.target.name} 被缚身！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -3197,7 +3193,7 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当你看破对方虚招时，可消耗反应动作释放此招，压制对方虚招，鞭子顺着对方的武器缠住目标的身体，对其造成 0.8 力量点外功伤害，若目标无架招，则给予其“缴械”状态，持续一回合，同时与目标进行一个[角力]对抗，若你胜出，则施鞭缠绕，为目标添加“禁足”状态，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
@@ -3224,7 +3220,7 @@
                         {
                             "label": "缴械与对抗",
                             "trigger": "hit",
-                            "script": "// 1. 无架招缴械\nif (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"jiaoxie\", true);\n}\n\n// 2. 角力对抗\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"蛛手擒龙 - 角力对抗\",\n    outcome: {\n        win: {\n            text: \"缠绕成功！\",\n            targetEffect: \"root\"\n        },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
+                            "script": "// 1. 无架招缴械\nif (!args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"jiaoxie\", duration: { rounds: 1 } });\n}\n\n// 2. 角力对抗\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoli\",\n    defType: \"jiaoli\",\n    label: \"蛛手擒龙 - 角力对抗\",\n    outcome: {\n        win: {\n            text: \"缠绕成功！\",\n            targetEffect: { id: \"root\", duration: { rounds: 1 } }\n        },\n        lose: { text: \"缠绕失败。\" }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -3260,7 +3256,7 @@
                     "element": "yin",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "直线",
                     "actionCost": "蓄力动作",
                     "description": "<p>鞭影纵横，对前方一条直线上的敌人造成 1.0 力量点外功伤害，并为自身添加“天蛛”，持续到战斗脱离。</p><p><strong>天蛛：</strong>你的《天蛛盘丝鞭》造成的伤害变为毒素伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气-1，内力消耗+16。</p>",
@@ -3362,7 +3358,7 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "8",
+                    "range": "8米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>绳索层层交织，环环相扣，将大网抛至范围内一处空格后张开，对空格周围 2 米范围内的所有敌人造成 0.6 力量点外功伤害，同时使其陷入“禁足”，持续一回合。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+8。</p>",
@@ -3389,7 +3385,7 @@
                         {
                             "label": "禁足",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true);\n}",
+                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"root\", duration: { rounds: 1 } });\n}",
                             "active": true
                         }
                     ]
@@ -3400,11 +3396,11 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "8",
+                    "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>绳索紧紧缠绕对方，对其造成 0.7 力量点外功伤害，同时怒斥目标，对方须进行[定力]检定（难度 @{13 + @up * 2|13}），失败则难以经受拷问，忏悔自身罪行，解除自身架招。</p><p><strong>升级：</strong>招式伤害+10，难度+2，内力消耗+4。</p>",
-                    "automationNote": "命中发起定力判定请求自动。失败解除架招需防御者手动。",
+                    "automationNote": "命中自动发起定力检定，失败自动解除防御者架招。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -3427,7 +3423,7 @@
                         {
                             "label": "定力检定",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 13 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"忏悔罪行 (失败解除架招)\"\n    });\n}",
+                            "script": "if (args.isHit) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const dc = 13 + (lvl - 1) * 2;\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: dc,\n        label: \"忏悔罪行 (失败解除架招)\",\n        removeStanceOnFail: true\n    });\n}",
                             "active": true
                         }
                     ]
@@ -3438,7 +3434,7 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "8",
+                    "range": "8米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>将绳索紧密盘绕在对手身上，发力收紧绳索，给予对手强烈痛苦，造成 0.6 力量点外功伤害。命中无架招目标时，使目标获得三层“乏力”，持续到战斗脱离。</p><p><strong>升级：</strong>招式伤害+10，内力消耗+4。</p>",
@@ -3465,7 +3461,7 @@
                         {
                             "label": "施加乏力",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    for(let i=0; i<3; i++) {\n        await game.xjzl.api.effects.toggleStatus(args.target, \"fali\", true);\n    }\n    ui.notifications.info(`${args.target.name} 获得 3 层乏力！`);\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await game.xjzl.api.effects.addEffect(args.target, \"fali\", 3);\n    ui.notifications.info(`${args.target.name} 获得 3 层乏力！`);\n}",
                             "active": true
                         }
                     ]
@@ -3476,7 +3472,7 @@
                     "element": "rou",
                     "damageType": "none",
                     "weaponType": "special",
-                    "range": "8",
+                    "range": "8米",
                     "targetInfo": "单体友方",
                     "actionCost": "主要动作",
                     "description": "<p>用绳索精准抽击穴位，激发目标武学潜能，为其添加“天道酬”，持续到战斗脱离。</p><p><strong>天道酬：</strong>使用精通或合一的招式时伤害提升 10 点。</p><p><strong>升级：</strong>伤害再提升 10 点，内力消耗+4。</p>",
@@ -3510,7 +3506,7 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "special",
-                    "range": "10",
+                    "range": "10米",
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>将强大内力灌注绳索，对目标当头猛烈一击，造成 0.9 力量点外功伤害。若目标无架招，则使其陷入“命舛”状态，持续到战斗脱离。</p><p><strong>命舛：</strong>出招时浑浑噩噩，降低 40 点伤害。目标每回合末可进行一次[定力]检定（难度 25），成功则解除该状态。</p><p><strong>升级：</strong>招式伤害+20，命舛额外降低伤害 10，怒气-1.内力消耗+8。</p>",
