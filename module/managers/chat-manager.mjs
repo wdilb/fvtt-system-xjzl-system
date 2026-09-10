@@ -453,6 +453,7 @@ export class ChatCardManager {
                     ignoreDefense: false,
                     ignoreStance: false,
                     critThresholdMod: 0, // 允许 CHECK 脚本针对特定目标修改暴击阈值
+                    forceCrit: false,    // 允许 CHECK 脚本针对特定目标强制暴击
                     grantHit: 0,      // 针对此人的命中修正
                     grantFeint: 0,    // 针对此人的虚招修正
                     forceHit: false,   //必中标记
@@ -506,6 +507,7 @@ export class ChatCardManager {
                 ignoreDefense: finalIgnoreDefense,
                 ignoreStance: finalIgnoreStance,
                 critThresholdMod: checkContext.flags.critThresholdMod || 0,
+                forceCrit: checkContext.flags.forceCrit || false,
                 grantHit: checkContext.flags.grantHit || 0,
                 grantFeint: checkContext.flags.grantFeint || 0,
                 // 新目标也必须生成同样的延迟看破快照，避免发卡后选目标时丢失修正。
@@ -720,6 +722,7 @@ export class ChatCardManager {
                 ignoreDefense: states.ignoreDefense,
                 ignoreStance: states.ignoreStance,
                 critThresholdMod: states.critThresholdMod || 0,
+                forceCrit: states.forceCrit || false,
                 finalFeint: finalFeint,
                 targetKanpoLevel: states.targetKanpoLevel ?? 0,
                 forceHit: isTargetForceHit
@@ -1357,10 +1360,17 @@ export class ChatCardManager {
                 // 6. 修正3 (来自 玩家弹窗手动输入)
                 const manualMod = flags.manualCritMod || 0;
 
+                // 7. 强制暴击标记 (来自 ATTACK/CHECK 脚本)：命中即视为暴击。
+                // 基础阈值可被 AE 修正抬到 20 以上且无上限钳制，仅靠阈值修正在此之上无法保证必暴，
+                // 因此提供直接开关；野兽攻击的 neverCrit 仍在下方统一抑制
+                const forceCrit = flags.forceCrit || res.forceCrit || false;
+                // 暴击以攻击骰为前提：反击/必中等无攻击骰的动作（dieUsed 为 "-"）即使被强制也不暴击
+                const hasAttackDie = Number.isInteger(die) && die >= 1 && die <= 20;
+
                 const finalThreshold = Math.max(0, baseThreshold - moraleMod - globalScriptMod - targetScriptMod - manualMod);
 
-                // 4. 判定 (命中 且 骰子 >= 动态阈值)
-                if (isHit && die >= finalThreshold) {
+                // 4. 判定 (命中 且 存在攻击骰 且 [脚本强制暴击 或 骰子 >= 动态阈值])
+                if (isHit && hasAttackDie && (forceCrit || die >= finalThreshold)) {
                     isCrit = true;
                 }
             }

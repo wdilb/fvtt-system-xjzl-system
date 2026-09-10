@@ -3199,6 +3199,7 @@ export class XJZLActor extends Actor {
         abortReason: "",
         autoApplied: false,    // 是否自动应用
         critThresholdMod: 0,   // 暴击阈值修正
+        forceCrit: false,      // 允许脚本强制本次动作暴击（命中即视为暴击，无视骰子与阈值）
         bonusHit: 0,           // 脚本给予的命中加值
         bonusFeint: 0,         // 脚本给予的虚招加值(虽然普攻一般不用，但为了兼容性加上)
         forceHit: false, // 全局必中参数
@@ -3258,6 +3259,7 @@ export class XJZLActor extends Actor {
           grantFeintLevel: 0,  // 虚招等级修正
           targetKanpoLevel: 0, // 当前动作给予目标看破检定的层级修正
           critThresholdMod: 0, // 针对该目标的暴击阈值修正
+          forceCrit: false,    // 允许脚本针对该目标强制暴击
           grantHit: 0,         // 针对该目标的命中加值
           grantFeint: 0,        // 针对该目标的虚招加值
           forceHit: false, // 添加单目标必中参数
@@ -3283,6 +3285,7 @@ export class XJZLActor extends Actor {
         ignoreDefense: baseIgnoreDefense || checkContext.flags.ignoreDefense,
         ignoreStance: baseIgnoreStance || checkContext.flags.ignoreStance,
         critThresholdMod: checkContext.flags.critThresholdMod || 0,
+        forceCrit: checkContext.flags.forceCrit || false,
         grantHit: checkContext.flags.grantHit || 0,
         grantFeint: checkContext.flags.grantFeint || 0,
         forceHit: checkContext.flags.forceHit || false,
@@ -3417,6 +3420,7 @@ export class XJZLActor extends Actor {
         ignoreDefense: ctx.ignoreDefense,
         ignoreStance: ctx.ignoreStance,
         critThresholdMod: ctx.critThresholdMod || 0,
+        forceCrit: ctx.forceCrit || false,
         forceHit: isTargetForceHit
       };
     });
@@ -3462,6 +3466,7 @@ export class XJZLActor extends Actor {
           moveType: "basic",
           scriptBonusHit: scriptBonusHit,
           critThresholdMod: attackContext.flags.critThresholdMod || 0,
+          forceCrit: attackContext.flags.forceCrit || false,
           forceHit: isGlobalForceHit,
           alwaysHit: attackContext.flags.alwaysHit || false,
 
@@ -3489,6 +3494,7 @@ export class XJZLActor extends Actor {
               forceHit: res.forceHit,
               alwaysHit: res.alwaysHit || false,
               critThresholdMod: res.critThresholdMod || 0,
+              forceCrit: res.forceCrit || false,
               total: res.total,
               dieUsed: res.dieUsed,
               feintState: 0,

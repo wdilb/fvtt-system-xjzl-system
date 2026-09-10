@@ -244,6 +244,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `flags.level` / `flags.feintLevel` | `number` | **可写** | 本次命中/虚招优劣势计数；正数为优势，负数为劣势。 |
 | `flags.bonusHit` / `flags.bonusFeint` | `number` | **可写** | 本次命中值/虚招值数值加成。 |
 | `flags.critThresholdMod` | `number` | **可写** | 暴击阈值修正；正数表示更容易暴击。 |
+| `flags.forceCrit` | `boolean` | **可写** | 强制本次动作暴击；存在攻击骰且命中时，无视暴击阈值。无攻击骰的动作（反击、必中等）不会暴击。仅自动结算生效，手动结算由弹窗自行勾选。 |
 | `flags.forceHit` | `boolean` | **可写** | 跳过投掷的必中。 |
 | `flags.alwaysHit` | `boolean` | **可写** | 仍投掷、仍可暴击的必定命中。 |
 | `flags.abort` / `flags.abortReason` | `boolean` / `string` | **可写** | 中止出招及提示。此时资源和动作已消耗，需要退款时必须显式处理。 |
@@ -267,6 +268,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `flags.targetKanpoLevel` | `number` | **可写** | 当前动作给予目标本次看破检定的优劣势计数；会随攻击卡固化，正数为优势，负数为劣势。 |
 | `flags.grantHit` / `flags.grantFeint` | `number` | **可写** | 仅针对当前目标的命中值/虚招值加成。 |
 | `flags.critThresholdMod` | `number` | **可写** | 仅针对当前目标的暴击阈值修正。 |
+| `flags.forceCrit` | `boolean` | **可写** | 仅针对当前目标强制暴击。 |
 | `flags.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 仅针对当前目标忽略格挡、防御或架招。 |
 | `flags.forceHit` / `flags.alwaysHit` | `boolean` | **可写** | 仅针对当前目标的必中设置。 |
 

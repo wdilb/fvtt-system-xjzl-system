@@ -2028,6 +2028,7 @@ export class XJZLItem extends Item {
           abortReason: "",     // 阻断原因
           autoApplied: false, // 是否已经完成流程的标记
           critThresholdMod: 0, // 允许脚本修改暴击阈值,正数表示更容易暴击 (例如 2 表示阈值降低 2 点)
+          forceCrit: false, // 允许脚本强制本次动作暴击（命中即视为暴击，无视骰子与阈值）
           bonusHit: 0,    // 自身命中加值
           bonusFeint: 0,   // 自身虚招数值加值
           forceHit: false, // 全局必中标记
@@ -2154,6 +2155,7 @@ export class XJZLItem extends Item {
               ignoreDefense: false,
               ignoreStance: false,
               critThresholdMod: 0, // 添加这个字段，让 CHECK 脚本可以修改
+              forceCrit: false, // 允许脚本针对该目标强制暴击
               grantHit: 0,    // 针对该目标的命中加值
               grantFeint: 0,   // 针对该目标的虚招数值加值
               forceHit: false,
@@ -2201,6 +2203,7 @@ export class XJZLItem extends Item {
             ignoreDefense: finalIgnoreDefense,
             ignoreStance: finalIgnoreStance,
             critThresholdMod: checkContext.flags.critThresholdMod || 0,
+            forceCrit: checkContext.flags.forceCrit || false,
             grantHit: checkContext.flags.grantHit || 0,
             grantFeint: checkContext.flags.grantFeint || 0,
             // 保留原始计数，防守方点击看破时再与其自身状态合并。
@@ -2362,6 +2365,7 @@ export class XJZLItem extends Item {
             ignoreDefense: ctx.ignoreDefense,
             ignoreStance: ctx.ignoreStance,
             critThresholdMod: ctx.critThresholdMod,
+            forceCrit: ctx.forceCrit || false,
             finalFeint: finalFeint,
             targetKanpoLevel: ctx.targetKanpoLevel || 0,
             forceHit: ctx.forceHit // 记录该目标是否触发了单体必中
@@ -2387,6 +2391,7 @@ export class XJZLItem extends Item {
             ignoreDefense: ctx.ignoreDefense,
             ignoreStance: ctx.ignoreStance,
             critThresholdMod: ctx.critThresholdMod,
+            forceCrit: ctx.forceCrit || false,
             finalFeint: finalFeint,
             targetKanpoLevel: ctx.targetKanpoLevel || 0
           };
@@ -2489,6 +2494,7 @@ export class XJZLItem extends Item {
             attackBonus: config.bonusAttack,//传递手动加值，因为后面可能需要进行补骰
             scriptBonusHit: scriptBonusHit, // 保存 ATTACK 脚本算出的全局命中修正
             critThresholdMod: attackContext.flags.critThresholdMod || 0,
+            forceCrit: attackContext.flags.forceCrit || false,
             contextLevel: {
               selfLevel: selfLevel,  // 存下 Roll 时的自身等级
               selfFeintLevel: selfFeintLevel //自身虚招等级
@@ -2521,6 +2527,7 @@ export class XJZLItem extends Item {
                 ignoreDefense: res.ignoreDefense,
                 ignoreStance: res.ignoreStance,
                 critThresholdMod: res.critThresholdMod || 0,
+                forceCrit: res.forceCrit || false,
                 finalFeint: res.finalFeint || 0,
                 targetKanpoLevel: res.targetKanpoLevel || 0
               };
