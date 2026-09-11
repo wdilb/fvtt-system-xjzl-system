@@ -103,7 +103,7 @@
                         {
                             "label": "击破提示",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const ratio = 10 + (Math.max(1, move.computedLevel || 1) - 1) * 10;\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">秋后算账 - 击破触发</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>目标应掉落行囊中 <b>${ratio}%</b> 的银两。</p>\n                <p><i>请GM手动处理掉落。</i></p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                            "script": "if (args.isBroken) {\n    const ratio = 10 + (Math.max(1, move.computedLevel || 1) - 1) * 10;\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\">\n            <div class=\"card-header\" style=\"border-bottom:1px solid #ccc; font-weight:bold;\">秋后算账 - 击破触发</div>\n            <div style=\"padding:5px; font-size:0.9em;\">\n                <p>目标应掉落行囊中 <b>${ratio}%</b> 的银两。</p>\n                <p><i>请GM手动处理掉落。</i></p>\n            </div>\n        </div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -286,7 +286,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>拇指食指揉搓，拿捏目标造成伤害。击破架招时，目标陷入“散财”，持续三回合。</p><p><strong>散财：</strong>每移动 1 米掉落 10 两在之前的空格处。</p><p>·掉落银两可在其 1 米内以一个主要动作捡起。</p><p>你可以与目标进行[交易]对抗检定，若你获胜，招式虚招值+3。</p><p><strong>升级：</strong>招式伤害+10，散财掉落银两+5，消耗+2。</p>",
-                    "automationNote": "出招前弹窗提示是否进行交易对抗，若胜利自动增加虚招值。击破自动施加散财Buff。",
+                    "automationNote": "检定时自动与目标进行真正的[交易]对抗（卡片在伤害结算前发出）。若对抗获胜，请在出招卡片上 Shift+点击[虚招对抗]按钮，输入 +3 作为临时虚招加成。击破自动施加散财Buff。",
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -307,8 +307,8 @@
                     "scripts": [
                         {
                             "label": "交易对抗",
-                            "trigger": "attack",
-                            "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"生财有道\" },\n    content: `<p>是否进行了 [交易] 对抗并获胜？</p>`,\n    yes: { label: \"获胜 (+3虚招)\", icon: \"fas fa-check\" },\n    no: { label: \"未进行/失败\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    args.flags.bonusFeint += 3;\n}",
+                            "trigger": "check",
+                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"jiaoyi\",\n    label: \"生财有道 - [交易]对抗\",\n    outcome: {\n        win: { text: \"讨价还价胜出：可在出招卡片上 Shift+点击[虚招对抗]按钮输入 +3 虚招加成。\" },\n        lose: { text: \"对方滴水不漏，无额外效果。\" }\n    }\n});",
                             "active": true
                         },
                         {
@@ -462,7 +462,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>金光灿灿，朝目标投掷若干枚金钱镖，每投掷一枚使其流失 10 点气血（外功命中可暴击），至多掷出五枚。</p><p>·若目标嗜好兵器、华服、首饰、金银财宝、古玩字画中的任意一种，此招必定命中。</p><p><strong>升级：</strong>可额外掷出 5 枚。</p>",
-                    "automationNote": "出招时自动弹窗询问投掷数量并计算总伤害。请玩家手动扣除相应银两。",
+                    "automationNote": "出招时弹窗询问投掷数量并计算总伤害，关闭弹窗视为取消出招（动作仍会消耗，内力消耗为0）。请玩家手动扣除相应银两。流失伤害类型不参与自动暴击判定，规则书的\"可暴击\"需手动处理。",
                     "calculation": {
                         "isFixed": true,
                         "base": 0,
@@ -480,13 +480,13 @@
                             "label": "数量选择与伤害计算",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxDarts = 5 + (lvl - 1) * 5;\n\n// 弹窗询问\nconst countStr = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"金钱镖\" },\n    content: `<div style=\"text-align:center;\"><p>最大投掷数: ${maxDarts}</p><label>投掷数量 (请自觉扣除 50两/枚)</label><br><input type=\"number\" name=\"count\" value=\"1\" min=\"1\" max=\"${maxDarts}\" autofocus style=\"margin-top: 8px; width: 60%; text-align: center;\"></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value }\n});\n\nconst num = Math.min(maxDarts, Math.max(1, parseInt(countStr) || 1));\n\n// 直接修改最终伤害\nargs.flags.damageResult.damage = num * 10;\nargs.flags.damageResult.breakdown = `投掷 ${num} 枚金钱镖\\n固定流失伤害: ${num * 10}\\n(⚠️ 请手动扣除 ${num * 50} 两白银)`;"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst maxDarts = 5 + (lvl - 1) * 5;\n\nconst numStr = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"金钱镖\" },\n    content: `<div style=\"text-align:center;\"><p>最大投掷数: ${maxDarts}</p><label>投掷数量 (请自觉扣除 50两/枚)</label><br><input type=\"number\" name=\"count\" value=\"1\" min=\"1\" max=\"${maxDarts}\" autofocus style=\"margin-top: 8px; width: 60%; text-align: center;\"></div>`,\n    ok: { callback: (event, button) => button.form.elements.count.value },\n    rejectClose: false\n});\n\n// 关闭弹窗（DialogV2 返回 null）视为取消出招；此阶段动作与资源已消耗，\n// 本招内力消耗为 0，无需退款\nif (numStr == null) {\n    args.flags.abort = true;\n    args.flags.abortReason = \"已取消金钱镖，未投掷任何镖（动作已消耗）。\";\n    return;\n}\n\nconst num = Math.min(maxDarts, Math.max(1, parseInt(numStr) || 1));\n\n// 直接修改最终伤害\nargs.flags.damageResult.damage = num * 10;\nargs.flags.damageResult.breakdown = `投掷 ${num} 枚金钱镖\\n固定流失伤害: ${num * 10}\\n(⚠️ 请手动扣除 ${num * 50} 两白银)`;"
                         },
                         {
                             "label": "嗜好必中检测",
                             "trigger": "check",
                             "active": true,
-                            "script": "const targetShihao = args.target.system.social?.shihao || [];\nconst moneyHobbies = [\"weapon\", \"clothes\", \"jewelry\", \"money\", \"antique\"];\nconst hasHobby = targetShihao.some(h => moneyHobbies.includes(h));\nif (hasHobby) {\n    args.flags.alwaysHit = true;\n    ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px; border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.05);\">\n            <div style=\"font-weight:bold; color:#d35400;\">见钱眼开</div>\n            <div style=\"font-size:0.9em;\">目标对财宝的贪欲使其避无可避，金钱镖必定命中。</div>\n        </div>`\n    });\n}"
+                            "script": "const targetShihao = args.target.system.social?.shihao || [];\nconst moneyHobbies = [\"weapon\", \"clothes\", \"jewelry\", \"money\", \"antique\"];\nconst hasHobby = targetShihao.some(h => moneyHobbies.includes(h));\nif (hasHobby) {\n    args.flags.alwaysHit = true;\n    await ChatMessage.create({\n        speaker: ChatMessage.getSpeaker({actor: actor}),\n        content: `<div class=\"xjzl-chat-card\" style=\"padding-left: 5px; border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.05);\">\n            <div style=\"font-weight:bold; color:#d35400;\">见钱眼开</div>\n            <div style=\"font-size:0.9em;\">目标对财宝的贪欲使其避无可避，金钱镖必定命中。</div>\n        </div>`\n    });\n}"
                         }
                     ]
                 }
@@ -513,7 +513,7 @@
                     "targetInfo": "自身",
                     "actionCost": "无",
                     "description": "<p>包含【穷奢极欲】【荣华富贵】【重义轻财】三式。</p>",
-                    "automationNote": "穷奢极欲神采提升自动。荣华富贵与重义轻财扣款需手动，[豪绅]状态需手动从物品特效中添加。",
+                    "automationNote": "穷奢极欲神采提升自动。[豪绅]状态需手动从物品特效中添加，其中伤害减免自动生效，暴击骰+1需手动处理。荣华富贵与重义轻财扣款需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -554,12 +554,6 @@
                                 "trigger": "preTake",
                                 "active": true,
                                 "script": "let lvl = 1;\nconst item = actor.items.find(i => i.name === '物华天宝' && i.type === 'wuxue');\nif (item) {\n    const move = item.system.moves.find(m => m.name === '物华天宝');\n    if (move) lvl = Math.max(1, move.computedLevel || 1);\n}\nconst reduct = 10 + (lvl - 1) * 5;\nargs.output.damage = Math.max(0, args.output.damage - reduct);"
-                            },
-                            {
-                                "label": "暴击抵抗",
-                                "trigger": "check",
-                                "active": true,
-                                "script": "args.flags.critThresholdMod -= 1;"
                             }
                         ]
                     }
@@ -759,21 +753,18 @@
                         "xjzl-system": {
                             "slug": "gunshi",
                             "stackable": true,
-                            "maxStacks": 3
+                            "maxStacks": 3,
+                            "scripts": [
+                                {
+                                    "label": "棍法命中加成",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "const stacks = thisEffect?.getFlag(\"xjzl-system\", \"stacks\") || 1;\nif (args.move?.weaponType === \"staff\") {\n    args.flags.bonusHit += 10 * stacks;\n}"
+                                }
+                            ]
                         }
                     },
-                    "changes": [
-                        {
-                            "key": "system.combat.weaponRanks.staff.mod",
-                            "mode": 2,
-                            "value": "0"
-                        },
-                        {
-                            "key": "system.combat.hit_waigong",
-                            "mode": 2,
-                            "value": "10"
-                        }
-                    ]
+                    "changes": []
                 }
             ]
         }
@@ -1011,7 +1002,7 @@
                                 {
                                     "label": "侠者增伤",
                                     "trigger": "preTake",
-                                    "script": "// 检查攻击者是否为[侠]：侠义>=100 且 恶行<50\nconst attSocial = args.attacker?.system?.social;\nif (attSocial && attSocial.xiayi >= 100 && attSocial.exing < 50) {\n    args.output.damage += 10;\n    if (args.output.bonusDesc) args.output.bonusDesc.push(\"明是非[否]：遭侠者惩戒 (+10)\");\n}",
+                                    "script": "// 检查攻击者是否为[侠]：侠义>=100 且 恶行<=50\nconst attSocial = args.attacker?.system?.social;\nif (attSocial && attSocial.xiayi >= 100 && attSocial.exing <= 50) {\n    args.output.damage += 10;\n    if (args.output.bonusDesc) args.output.bonusDesc.push(\"明是非[否]：遭侠者惩戒 (+10)\");\n}",
                                     "active": true
                                 }
                             ]
@@ -1089,7 +1080,7 @@
                                 "label": "维持侠胆",
                                 "trigger": "turnEnd",
                                 "active": true,
-                                "script": "const xiayi = actor.system.social.xiayi || 0;\nif (xiayi >= 5) {\n    await actor.update({'system.social.xiayi': xiayi - 5});\n    actor.showFloatyText('-5 侠义 (维持)', {fill: '#0000FF', fontSize: 24});\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><b>侠胆</b>: 消耗 5 点侠义值维持状态 (剩余 ${xiayi - 5})。</div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    ui.notifications.warn(`${actor.name} 侠义值不足，侠胆消散！`);\n    await thisEffect.delete();\n}"
+                                "script": "const xiayi = actor.system.social.xiayi || 0;\nif (xiayi >= 5) {\n    await actor.update({'system.social.xiayi': xiayi - 5});\n    actor.showFloatyText('-5 侠义 (维持)', {fill: '#0000FF', fontSize: 24});\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><b>侠胆</b>: 消耗 5 点侠义值维持状态 (剩余 ${xiayi - 5})。</div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    ui.notifications.warn(`${actor.name} 侠义值不足，侠胆消散！`);\n    await game.xjzl.api.effects.removeEffect(actor, \"xiadan\", 1);\n}"
                             }
                         ]
                     }
@@ -1160,7 +1151,7 @@
                         {
                             "label": "抛掷与暴击判定",
                             "trigger": "attack",
-                            "script": "// 1. 抛掷检定\nconst doPaozhi = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"撒手锏 - 抛掷\" },\n    content: \"<p>是否进行 <b>[抛掷]</b> 检定以增加伤害？</p>\",\n    yes: { label: \"投掷\", icon: \"fas fa-dice-d20\" },\n    no: { label: \"跳过\", icon: \"fas fa-forward\" }\n});\n\nif (doPaozhi) {\n    // 调用 Actor 的检定方法\n    const roll = await actor.rollAttributeTest(\"paozhi\", { chatMessage: true });\n    if (roll) {\n        const bonus = roll.total;\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 抛掷检定: ${bonus}`;\n    }\n}\n\n// 2. 反应动作判定 (暴击)\nconst noReaction = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"撒手锏 - 暴击判定\" },\n    content: \"<p>目标是否 <b>没有反应动作</b>？</p>\",\n    yes: { label: \"是 (必暴)\", icon: \"fas fa-skull\" },\n    no: { label: \"否 (正常)\", icon: \"fas fa-times\" }\n});\n\nif (noReaction) {\n    // 提高暴击阈值修正，使其极易暴击 (例如 +50)\n    args.flags.critThresholdMod += 50;\n    ui.notifications.info(\"目标无反应动作，招式必定暴击！\");\n}",
+                            "script": "// 1. 抛掷检定\nconst doPaozhi = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"撒手锏 - 抛掷\" },\n    content: \"<p>是否进行 <b>[抛掷]</b> 检定以增加伤害？</p>\",\n    yes: { label: \"投掷\", icon: \"fas fa-dice-d20\" },\n    no: { label: \"跳过\", icon: \"fas fa-forward\" }\n});\n\nif (doPaozhi) {\n    // 调用 Actor 的检定方法\n    const roll = await actor.rollAttributeTest(\"paozhi\", { chatMessage: true });\n    if (roll) {\n        const bonus = roll.total;\n        args.flags.damageResult.damage += bonus;\n        args.flags.damageResult.breakdown += `\\n+ 抛掷检定: ${bonus}`;\n    }\n}\n\n// 2. 反应动作判定 (暴击)\nconst noReaction = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"撒手锏 - 暴击判定\" },\n    content: \"<p>目标是否 <b>没有反应动作</b>？</p>\",\n    yes: { label: \"是 (必暴)\", icon: \"fas fa-skull\" },\n    no: { label: \"否 (正常)\", icon: \"fas fa-times\" }\n});\n\nif (noReaction) {\n    // 强制本次动作暴击（命中且存在攻击骰时生效；手动结算需在弹窗自行勾选暴击）\n    args.flags.forceCrit = true;\n    ui.notifications.info(\"目标无反应动作，招式必定暴击！\");\n}",
                             "active": true
                         }
                     ]
