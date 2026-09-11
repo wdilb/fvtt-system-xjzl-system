@@ -3227,6 +3227,9 @@ export class XJZLActor extends Actor {
       return;
     }
 
+    // 出招阶段 flags 快照：attack 脚本写入的自定义键可被本卡的 check/hit/hit_once 读取（与武学招式一致）
+    const attackFlagsSnapshot = foundry.utils.deepClone(attackContext.flags);
+
     // ATTACK 允许脚本异步施加状态；后续目标计算必须使用更新后的被动状态。
     const postAttackStatuses = this.xjzlStatuses || {};
 
@@ -3258,6 +3261,8 @@ export class XJZLActor extends Actor {
         attacker: this,
         item: virtualItem,
         move: virtualMove,
+        // 攻击阶段脚本写入的自定义 flags 快照（只读）
+        scriptFlags: attackFlagsSnapshot,
         flags: {
           grantLevel: 0,
           ignoreBlock: false,
@@ -3478,6 +3483,7 @@ export class XJZLActor extends Actor {
           alwaysHit: attackContext.flags.alwaysHit || false,
 
           costConsumed: costConsumed, // 记录消耗
+          scriptFlags: attackFlagsSnapshot, // 出招阶段自定义 flags 快照，供结算脚本只读
           damage: calcResult.damage,
           feint: 0,
           calc: calcResult,

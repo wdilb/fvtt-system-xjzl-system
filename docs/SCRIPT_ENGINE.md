@@ -79,7 +79,7 @@
 但是：
 
 - 只有对应触发器实际传入的字段才存在。
-- `args` 是阶段上下文：同一触发内的脚本共享同一对象；跨触发阶段不会保留。唯一例外是 `attack` 阶段写入 `args.flags` 的自定义键——它们随攻击卡持久化为 `scriptFlags`，供同卡的 `hit`/`hit_once` 读取（见 `attack` 触发器说明）。
+- `args` 是阶段上下文：同一触发内的脚本共享同一对象；跨触发阶段不会保留。唯一例外是 `attack` 阶段写入 `args.flags` 的自定义键——它们随攻击卡持久化为 `scriptFlags`，供同卡的 `check`/`hit`/`hit_once` 读取（见 `attack` 触发器说明）。
 - 脚本运行中新增 `args.myFlag` 不会同步新建顶层 `myFlag`。
 - 业务代码推荐统一从 `args` 读取阶段参数，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
 - 脚本内声明变量不要与注入的顶层变量重名（如 `const move` 会与注入的 `move` 冲突直接抛错），局部变量请另起名。
@@ -253,7 +253,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `flags.damageResult.damage` / `.feint` | `number` | **可写** | 当前面板伤害和虚招值。 |
 | `flags.damageResult.breakdown` / `.feintBreakdown` | `string` | **可写** | 面板详情文本。 |
 
-对上表之外的自定义键写入 `args.flags`（例如 `args.flags.myMark = true`）会随本次攻击卡持久化：卡片后续结算时的 `hit` 和 `hit_once` 可通过只读的 `args.scriptFlags` 读取这份快照。需要把出招阶段的决策传递给结算阶段时优先使用该机制，不要写 Actor 持久 flag——多张待结算卡片会互相污染，未结算的卡片还会造成残留。
+对上表之外的自定义键写入 `args.flags`（例如 `args.flags.myMark = true`）会随本次攻击卡持久化：卡片后续的 `check`（掷骰时与手动补算新目标时）、`hit` 和 `hit_once` 可通过只读的 `args.scriptFlags` 读取这份快照。需要把出招阶段的决策传递给结算阶段时优先使用该机制，不要写 Actor 持久 flag——多张待结算卡片会互相污染，未结算的卡片还会造成残留。
 
 ### `check`（异步）
 
@@ -264,6 +264,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `target` | `Actor` | 只读 | 当前目标。 |
 | `attacker` | `Actor` | 只读 | 出招者。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；掷骰时与手动补算新目标时均提供。 |
 | `flags.grantLevel` / `flags.grantFeintLevel` | `number` | **可写** | 仅针对当前目标的命中/虚招优劣势计数。 |
 | `flags.targetKanpoLevel` | `number` | **可写** | 当前动作给予目标本次看破检定的优劣势计数；会随攻击卡固化，正数为优势，负数为劣势。 |
 | `flags.grantHit` / `flags.grantFeint` | `number` | **可写** | 仅针对当前目标的命中值/虚招值加成。 |
@@ -716,7 +717,7 @@ await Macros.requestContest({
 | `outcome.win/lose` 字段 | 类型与作用 |
 |---|---|
 | `text` | 结果说明字符串。 |
-| `selfEffect` / `targetEffect` | 单个状态 ID 或 AE 数据对象。当前对抗助手不支持数组；需要多个状态时应由其他脚本逐个调用状态 API。 |
+| `selfEffect` / `targetEffect` | 状态 ID、AE 数据对象或它们的数组；数组按顺序逐个应用。 |
 | `selfRecovery` | `{ value, type }`；给发起者恢复资源，`type` 应为 `applyHealing` 支持的资源类型。 |
 | `targetDamage` / `selfDamage` | `{ value, type }`；伤害类型走 `applyDamage`，无视格挡、架招和基础防御但保留抗性；资源类型走负数 `applyHealing` 直接流失。 |
 

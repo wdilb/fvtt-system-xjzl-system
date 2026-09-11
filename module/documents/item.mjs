@@ -2137,6 +2137,8 @@ export class XJZLItem extends Item {
 
       // 遍历目标进行脚本运算
       if (targets.length > 0) {
+        // 出招阶段 flags 快照：attack 脚本写入的自定义键可被本卡的 check/hit/hit_once 读取
+        const attackFlagsSnapshot = foundry.utils.deepClone(attackContext.flags);
         for (const targetToken of targets) {
           const targetActor = targetToken.actor;
           if (!targetActor) continue;
@@ -2147,6 +2149,8 @@ export class XJZLItem extends Item {
             item: this,          // "我用什么打的他？"
             attacker: actor,     // 保持 args.attacker 恒为攻击者
             move: move,          // 招式数据
+            // 攻击阶段脚本写入的自定义 flags 快照（只读）
+            scriptFlags: attackFlagsSnapshot,
             flags: {
               grantLevel: 0,      // 攻击修正
               grantFeintLevel: 0,  // 虚招修正

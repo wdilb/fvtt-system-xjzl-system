@@ -445,6 +445,8 @@ export class ChatCardManager {
                 attacker: attacker,    // 攻击者 (脚本中既可以用 args.actor 也可以用 args.attacker)
                 item: item,            // 来源物品 (可能是实体Item，也可能是虚拟构造的Basic Attack对象)
                 move: move,            // 具体招式数据
+                // 卡片创建时持久化的出招阶段 flags 快照（只读），与 roll 时 check 读到的内容一致
+                scriptFlags: flags.scriptFlags || {},
                 flags: {
                     grantLevel: 0,
                     grantFeintLevel: 0,  // 虚招修正
@@ -2626,6 +2628,16 @@ export class ChatCardManager {
 
     // --- 辅助：安全应用 AE ---
     static async _applyEffectHelper(actor, effectRef, message) {
+        // JSDoc 声明支持数组（如 ["prone", "fushen"]），逐个应用后拼接结果名
+        if (Array.isArray(effectRef)) {
+            const names = [];
+            for (const ref of effectRef) {
+                const name = await ChatCardManager._applyEffectHelper(actor, ref, message);
+                if (name) names.push(name);
+            }
+            return names.join("、");
+        }
+
         let effectData = {};
 
         // 情况 A: 传入的是字符串 ID (如 "prone", "dianxue")
