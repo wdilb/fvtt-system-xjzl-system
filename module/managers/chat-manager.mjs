@@ -294,7 +294,7 @@ export class ChatCardManager {
             case "rollFeintContest":
                 // 这是攻击者点的
                 if (!item) return ui.notifications.warn("源物品数据已丢失。");
-                await ChatCardManager._rollFeintContest(attacker, item, flags, targets, message);
+                await ChatCardManager._rollFeintContest(attacker, item, flags, targets, message, isShiftPressed);
                 break;
             case "rollDisability":
                 // 调用 utils 中的投掷逻辑
@@ -754,7 +754,7 @@ export class ChatCardManager {
      * 执行虚招对抗流程
      * 1. 复核命中 -> 2. 攻方投掷(仅一次) -> 3. 发送防御请求
      */
-    static async _rollFeintContest(attacker, item, flags, targets, message) {
+    static async _rollFeintContest(attacker, item, flags, targets, message, isShiftPressed = false) {
         // 如果标记显示已经处理过，直接提示并退出
         if (flags.feintProcessed) {
             ui.notifications.warn("该虚招对抗请求已处理完毕，请勿重复点击。");
@@ -830,6 +830,23 @@ export class ChatCardManager {
                 targetKanpoLevel: res.targetKanpoLevel || 0,
                 finalFeintVal: targetFeintVal
             });
+        }
+
+        // Shift+点击：为本次虚招对抗附加临时虚招值加成（可为负）。
+        // 场景：招式结算后才能确定结果的对抗（如生财有道的[交易]对抗）获胜后，
+        // 此时面板虚招已固化，由攻击者在此手动补入加成再进行看破对抗。
+        if (isShiftPressed && validTargetsToRequest.length > 0) {
+            const bonus = await foundry.applications.api.DialogV2.prompt({
+                window: { title: "临时虚招加成", icon: "fas fa-hand-fist" },
+                content: `<p>为本次虚招对抗输入额外的虚招值加成（可为负数）：</p>
+                          <input type="number" name="feintBonus" value="0" style="text-align:center; width:60%;"/>`,
+                ok: { callback: (event, button) => parseInt(button.form.elements.feintBonus.value) || 0 },
+                rejectClose: false
+            });
+            if (bonus) {
+                for (const entry of validTargetsToRequest) entry.finalFeintVal += bonus;
+                ui.notifications.info(`本次虚招对抗附加虚招值 ${bonus >= 0 ? "+" : ""}${bonus}`);
+            }
         }
 
         // 准备更新到 message 的数据对象
