@@ -300,7 +300,7 @@
                         {
                             "label": "剪刀脚对抗",
                             "trigger": "hit",
-                            "script": "await Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"unarmed\",\n    label: \"夺命剪刀脚 - 徒手对抗\",\n    outcome: {\n        win: {\n            text: \"双腿绞杀！双方倒地并纠缠在一起。\",\n            selfEffect: [\"prone\", \"fushen\", \"root\"],\n            targetEffect: [\"prone\", \"fushen\", \"root\"]\n        },\n        lose: {\n            text: \"目标稳住下盘，未被摔倒。\"\n        }\n    }\n});",
+                            "script": "if (!args.isHit) return;\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"unarmed\",\n    label: \"夺命剪刀脚 - 徒手对抗\",\n    outcome: {\n        win: {\n            text: \"双腿绞杀！双方倒地并纠缠在一起。\",\n            selfEffect: [\"prone\", \"fushen\", \"root\"],\n            targetEffect: [\"prone\", \"fushen\", \"root\"]\n        },\n        lose: {\n            text: \"目标稳住下盘，未被摔倒。\"\n        }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -373,7 +373,7 @@
                             "label": "应用龟息",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 1 + (lvl - 1);\n\nconst effData = {\n    name: \"龟息\",\n    icon: item.img,\n    flags: {\n        \"xjzl-system\": { \n            \"slug\": \"guixi\"\n        }\n    },\n    changes: [\n        { key: \"system.skills.qianxing.mod\", mode: 2, value: String(bonus) },\n        { key: \"system.skills.biqi.mod\", mode: 2, value: String(bonus) },\n        { key: \"flags.xjzl-system.zibi\", mode: 5, value: \"true\" }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(actor, effData);"
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst bonus = 1 + (lvl - 1);\n\nconst effData = {\n    name: \"龟息\",\n    icon: item.img,\n    flags: {\n        \"xjzl-system\": { \n            \"slug\": \"guixi\"\n        }\n    },\n    changes: [\n        { key: \"system.skills.qianxing.checkMod\", mode: 2, value: String(bonus) },\n        { key: \"system.skills.lianxi.checkMod\", mode: 2, value: String(bonus) },\n        { key: \"flags.xjzl-system.zibi\", mode: 5, value: \"true\" }\n    ]\n};\nawait game.xjzl.api.effects.addEffect(actor, effData);"
                         }
                     ],
                     "actionType": "buff"
@@ -447,7 +447,7 @@
                         {
                             "label": "点穴加成",
                             "trigger": "passive",
-                            "script": "// 基础+1，每级再+1 -> 等级1=+1, 等级2=+2\nconst lvl = Math.max(1, args.move.computedLevel || 1);\nactor.system.skills.dianxue.mod += lvl;",
+                            "script": "// 基础+1，每级再+1 -> 等级1=+1, 等级2=+2\nconst lvl = Math.max(1, args.move.computedLevel || 1);\n// 检定结果加成走 checkMod，不影响技能总等级\nactor.system.skills.dianxue.checkMod += lvl;",
                             "active": true
                         }
                     ]
@@ -1028,8 +1028,10 @@
                     "description": "<p>丹田内气外发，狂声怒吼，范围内所有敌人和其他友方进行一次[定力]检定，失败则受到等同于你最大内力值一半的精神伤害，检定成功则此伤害减半。</p><p><strong>升级：</strong>检定难度+3，消耗+10。</p>",
                     "automationNote": "显示完整伤害。请提示目标进行定力检定，成功者手动减半伤害。",
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
-                        "growth": 0
+                        "growth": 0,
+                        "scalings": []
                     },
                     "costs": {
                         "mp": [
@@ -1091,7 +1093,7 @@
                         {
                             "label": "回复与护身",
                             "trigger": "hit",
-                            "script": "const maxHP = actor.system.resources.hp.max;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst ratio = 0.2 + (lvl - 1) * 0.1;\nconst totalHeal = Math.floor(maxHP * ratio);\n\n// 1. 回血\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: 'hp', showScrolling: true});\n\n// 2. 获得护身 (层数: 1 + (lvl-1))\n// 假设基础得1层，升级额外得1层 -> total = 1 + (lvl-1)\nconst stacksToAdd = 1 + (lvl - 1);\n\n// 循环调用 addEffect 以叠加层数\nfor(let i=0; i<stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(actor, \"hushen_sheshen\");\n}\n\n// 3. 永久扣除体魄提示与修正\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"舍身诀后遗症\" },\n    content: `<p>战斗结束后，体魄将永久-5。</p><p>是否现在添加属性修正？</p>`,\n    yes: { label: \"添加修正\", icon: \"fas fa-skull\" },\n    no: { label: \"稍后手动\", icon: \"fas fa-clock\" }\n});\n\nif (confirm) {\n    const modifiers = foundry.utils.deepClone(actor.system.customModifiers || []);\n    modifiers.push({\n        id: foundry.utils.randomID(),\n        name: '舍身诀后遗症',\n        enabled: true,\n        changes: [{key: 'stats.tipo.value', value: -5}]\n    });\n    await actor.update({'system.customModifiers': modifiers});\n    ui.notifications.info(\"体魄永久-5！\");\n}",
+                            "script": "const maxHP = actor.system.resources.hp.max;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst ratio = 0.2 + (lvl - 1) * 0.1;\nconst totalHeal = Math.floor(maxHP * ratio);\n\n// 1. 回血\nawait actor.applyHealing({ healer: actor, amount: totalHeal, type: 'hp', showScrolling: true});\n\n// 2. 获得护身 (层数: 1 + (lvl-1))\n// 假设基础得1层，升级额外得1层 -> total = 1 + (lvl-1)\nconst stacksToAdd = 1 + (lvl - 1);\n\n// 护身是系统状态(每层内外功防御+5)，用 count 参数一次叠加\nawait game.xjzl.api.effects.addEffect(actor, \"hushen\", stacksToAdd);\n\n// 3. 永久扣除体魄提示与修正\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"舍身诀后遗症\" },\n    content: `<p>战斗结束后，体魄将永久-5。</p><p>是否现在添加属性修正？</p>`,\n    yes: { label: \"添加修正\", icon: \"fas fa-skull\" },\n    no: { label: \"稍后手动\", icon: \"fas fa-clock\" }\n});\n\nif (confirm) {\n    const modifiers = foundry.utils.deepClone(actor.system.customModifiers || []);\n    modifiers.push({\n        id: foundry.utils.randomID(),\n        name: '舍身诀后遗症',\n        enabled: true,\n        changes: [{key: 'stats.tipo.value', value: -5}]\n    });\n    await actor.update({'system.customModifiers': modifiers});\n    ui.notifications.info(\"体魄永久-5！\");\n}",
                             "active": true
                         }
                     ]
@@ -1230,6 +1232,7 @@
                     "actionCost": "无",
                     "description": "<p>敌人在你 1 米内开始回合时流失 30 气血。</p><p><strong>升级：</strong>无音流失气血+10。</p>",
                     "automationNote": "辅助用招式。无消耗，无动作。请在满足条件的敌方回合开始时对其使用此招式，将自动根据[通音]等级计算流失伤害。",
+                    "x-xjzl-aura": true,
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -1257,23 +1260,23 @@
                         }
                     ]
                 }
+            ],
+            "effects": [
+                {
+                    "name": "无音",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "光环：敌人在你 1 米内开始回合时，对其造成气血流失。(请手动使用招式【无音】)",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuyin_aura",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
             ]
-        },
-        "effects": [
-            {
-                "name": "无音",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                "description": "光环：敌人在你 1 米内开始回合时，对其造成气血流失。(请手动使用招式【无音】)",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuyin_aura",
-                        "stackable": false
-                    }
-                },
-                "changes": []
-            }
-        ]
+        }
     },
     {
         "name": "摄魂心法",
@@ -1295,7 +1298,7 @@
                     "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "<p>直视目标，双眼惑神，与目标进行一次[定力]对抗，若你胜出，目标陷入“自闭”一回合，当“自闭”结束后，再陷入“走火入魔”一个回合。</p><p>·若对方胜出，则你陷入“走火入魔”，持续到战斗脱离。</p><p><strong>升级：</strong>本次[定力]对抗检定结果+2，消耗+4。</p>",
-                    "automationNote": "对抗请求自动，并已包含升级加值。获胜自动施加[自闭]。后续[走火入魔]需在目标下一回合自闭结束时手动施加。失败自动施加自身[走火入魔]。",
+                    "automationNote": "对抗请求自动，并已包含升级加值。获胜自动施加[自闭]（一回合）。后续[走火入魔]需在目标下一回合自闭结束时手动施加。失败自动施加自身[走火入魔]。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1311,7 +1314,7 @@
                         {
                             "label": "定力对抗",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"dingli\",\n    attBonus: bonus,\n    label: \"摄魂心法 - 定力对抗\",\n    outcome: {\n        win: {\n            text: \"摄魂成功！目标陷入[自闭]。请注意在目标[自闭]结束后，手动为其施加[走火入魔]一回合。\",\n            targetEffect: \"zibi\"\n        },\n        lose: {\n            text: \"摄魂失败！心神反噬。\",\n            selfEffect: \"rage\"\n        }\n    }\n});",
+                            "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nconst bonus = (lvl - 1) * 2;\n\nawait Macros.requestContest({\n    attacker: actor,\n    defender: args.target,\n    type: \"dingli\",\n    attBonus: bonus,\n    label: \"摄魂心法 - 定力对抗\",\n    outcome: {\n        win: {\n            text: \"摄魂成功！目标陷入[自闭]。请注意在目标[自闭]结束后，手动为其施加[走火入魔]一回合。\",\n            targetEffect: { id: \"zibi\", duration: { rounds: 1 } }\n        },\n        lose: {\n            text: \"摄魂失败！心神反噬。\",\n            selfEffect: \"rage\"\n        }\n    }\n});",
                             "active": true
                         }
                     ]
@@ -1387,6 +1390,7 @@
                         "mappedStage": 5
                     },
                     "calculation": {
+                        "isFixed": true,
                         "base": 0,
                         "growth": 0,
                         "scalings": []
@@ -1490,36 +1494,36 @@
                     }
                 }
             ],
-            "scripts": []
-        },
-        "effects": [
-            {
-                "name": "四平八稳 (被动)",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                "description": "四平八稳散手被动生效中。你的普通攻击将消耗内力以获得伤害提升和命中优势。",
-                "transfer": true,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "sipingbawen",
-                        "scripts": [
-                            {
-                                "label": "普攻增伤预览",
-                                "trigger": "calc",
-                                "active": true,
-                                "script": "if (args.move.type === 'basic') {\n    const wuxueItem = thisEffect.parent instanceof Item ? thisEffect.parent : actor.items.find(i => i.name === \"四平八稳\" && i.type === \"wuxue\");\n    const lvl = wuxueItem ? Math.max(1, wuxueItem.system.moves[0]?.computedLevel || 1) : 1;\n    const dmgBonus = 10 + (lvl - 1) * 10;\n    args.output.bonusDesc.push(`四平八稳: +${dmgBonus} (若内力充足)`);\n}"
-                            },
-                            {
-                                "label": "普攻内力扣除与加成结算",
-                                "trigger": "attack",
-                                "active": true,
-                                "script": "if (args.move.type === 'basic') {\n    const wuxueItem = thisEffect.parent instanceof Item ? thisEffect.parent : actor.items.find(i => i.name === \"四平八稳\" && i.type === \"wuxue\");\n    const lvl = wuxueItem ? Math.max(1, wuxueItem.system.moves[0]?.computedLevel || 1) : 1;\n    const mpCost = 5 + (lvl - 1) * 5;\n    const dmgBonus = 10 + (lvl - 1) * 10;\n\n    const currentMp = S.resources.mp.value;\n    if (currentMp >= mpCost) {\n        // 1. 扣除内力\n        await actor.changeResources({ \"system.resources.mp.value\": { delta: -mpCost } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n\n        // 2. 增加伤害与优势\n        args.flags.damageResult.damage += dmgBonus;\n        args.flags.damageResult.breakdown += `\\n+ 四平八稳: ${dmgBonus}`;\n        args.flags.level += 1;\n\n        // 3. 视觉反馈与战斗记录 (已增加左侧 padding 防止文字贴边)\n        actor.showFloatyText(`四平八稳! 内力 -${mpCost}`, {fill: \"#4444ff\", fontSize: 28});\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; font-size:0.9em; color:#2c3e50; border-left:3px solid #3498db; background:rgba(52,152,219,0.05);\"><i class=\"fas fa-bolt\" style=\"color:#3498db;\"></i> <b>四平八稳</b> 触发！消耗 <b>${mpCost}</b> 点内力，普攻伤害 <b>+${dmgBonus}</b>，命中获得优势。</div></div>`\n        });\n    } else {\n        // 内力不足时也发送全员可见的战报卡片 (黄色预警风格)\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; font-size:0.9em; color:#856404; border-left:3px solid #f39c12; background:rgba(243,156,18,0.05);\"><i class=\"fas fa-exclamation-triangle\" style=\"color:#f39c12;\"></i> <b>四平八稳</b> 触发失败：需要 <b>${mpCost}</b> 点内力，当前内力不足。</div></div>`\n        });\n    }\n}"
-                            }
-                        ]
-                    }
-                },
-                "changes": []
-            }
-        ]
+            "scripts": [],
+            "effects": [
+                {
+                    "name": "四平八稳 (被动)",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "四平八稳散手被动生效中。你的普通攻击将消耗内力以获得伤害提升和命中优势。",
+                    "transfer": true,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "sipingbawen",
+                            "scripts": [
+                                {
+                                    "label": "普攻增伤预览",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "if (args.move.type === 'basic') {\n    const wuxueItem = thisEffect.parent instanceof Item ? thisEffect.parent : actor.items.find(i => i.name === \"四平八稳\" && i.type === \"wuxue\");\n    const lvl = wuxueItem ? Math.max(1, wuxueItem.system.moves[0]?.computedLevel || 1) : 1;\n    const dmgBonus = 10 + (lvl - 1) * 10;\n    args.output.bonusDesc.push(`四平八稳: +${dmgBonus} (若内力充足)`);\n}"
+                                },
+                                {
+                                    "label": "普攻内力扣除与加成结算",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "if (args.move.type === 'basic') {\n    const wuxueItem = thisEffect.parent instanceof Item ? thisEffect.parent : actor.items.find(i => i.name === \"四平八稳\" && i.type === \"wuxue\");\n    const lvl = wuxueItem ? Math.max(1, wuxueItem.system.moves[0]?.computedLevel || 1) : 1;\n    const mpCost = 5 + (lvl - 1) * 5;\n    const dmgBonus = 10 + (lvl - 1) * 10;\n\n    const currentMp = S.resources.mp.value;\n    if (currentMp >= mpCost) {\n        // 1. 扣除内力\n        await actor.changeResources({ \"system.resources.mp.value\": { delta: -mpCost } }, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n\n        // 2. 增加伤害与优势\n        args.flags.damageResult.damage += dmgBonus;\n        args.flags.damageResult.breakdown += `\\n+ 四平八稳: ${dmgBonus}`;\n        args.flags.level += 1;\n\n        // 3. 视觉反馈与战斗记录 (已增加左侧 padding 防止文字贴边)\n        actor.showFloatyText(`四平八稳! 内力 -${mpCost}`, {fill: \"#4444ff\", fontSize: 28});\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; font-size:0.9em; color:#2c3e50; border-left:3px solid #3498db; background:rgba(52,152,219,0.05);\"><i class=\"fas fa-bolt\" style=\"color:#3498db;\"></i> <b>四平八稳</b> 触发！消耗 <b>${mpCost}</b> 点内力，普攻伤害 <b>+${dmgBonus}</b>，命中获得优势。</div></div>`\n        });\n    } else {\n        // 内力不足时也发送全员可见的战报卡片 (黄色预警风格)\n        ChatMessage.create({\n            speaker: ChatMessage.getSpeaker({actor: actor}),\n            content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px 8px; font-size:0.9em; color:#856404; border-left:3px solid #f39c12; background:rgba(243,156,18,0.05);\"><i class=\"fas fa-exclamation-triangle\" style=\"color:#f39c12;\"></i> <b>四平八稳</b> 触发失败：需要 <b>${mpCost}</b> 点内力，当前内力不足。</div></div>`\n        });\n    }\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
     },
     {
         "name": "不入轮回",
@@ -1558,7 +1562,7 @@
                         {
                             "label": "免死净化",
                             "trigger": "hit",
-                            "script": "if (actor.system.resources.hp.value <= 0) {\n    // 锁血\n    await actor.changeResources({\"system.resources.hp.value\": 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    \n    // 清除临时状态 (transfer=false)\n    const tempEffects = actor.effects.filter(e => !e.transfer).map(e => e.id);\n    if (tempEffects.length > 0) {\n        await actor.deleteEmbeddedDocuments(\"ActiveEffect\", tempEffects);\n    }\n    ui.notifications.info(\"不入轮回触发：保留1气血并清除状态！\");\n} else {\n    ui.notifications.warn(\"当前未处于濒死状态，不入轮回未生效。\");\n}",
+                            "script": "if (actor.system.resources.hp.value <= 0) {\n    // 锁血\n    await actor.changeResources({\"system.resources.hp.value\": 1}, { cause: \"script\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\n    \n    // 清除临时状态 (transfer=false)：走状态 API 保留权限代理与叠层语义\n    const tempEffects = actor.effects.filter(e => !e.transfer);\n    for (const eff of tempEffects) {\n        await game.xjzl.api.effects.removeEffect(actor, eff.id, eff.stacks || 1);\n    }\n    ui.notifications.info(\"不入轮回触发：保留1气血并清除状态！\");\n} else {\n    ui.notifications.warn(\"当前未处于濒死状态，不入轮回未生效。\");\n}",
                             "active": true
                         }
                     ],
@@ -1657,7 +1661,7 @@
                     "targetInfo": "自身",
                     "actionCost": "无",
                     "description": "<p>花费一个小憩的时间，在一把武器中内置火药，该武器获得一层“火灼”词缀，至多三层，持续到被消耗或遇到水。</p><p><strong>火灼：</strong>该武器命中目标后，你可以选择移除一层“火灼”，额外造成 10 点火焰伤害。</p><p><strong>升级：</strong>武器额外获得一层火灼。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "火灼层数自动记录在角色身上（至多3层）。脚本无法校验具体武器：请自觉仅在使用该武器命中时选择消耗。命中后选择消耗将单独结算10点火焰伤害，未命中不触发。附魔哪把武器与遇水解除需手动记录。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1671,7 +1675,7 @@
                         {
                             "label": "获得火灼",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nawait game.xjzl.api.effects.addEffect(actor, \"huozhuo\", stacks);\nui.notifications.info(`获得 ${stacks} 层火灼。`);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\n// huozhuo 是武学自带 AE 而非系统状态，需从本物品取模板后再叠加\nconst eff = thisItem.effects.getName(\"火灼\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff, stacks);\nui.notifications.info(`获得 ${stacks} 层火灼。`);",
                             "active": true
                         }
                     ]
@@ -1690,10 +1694,10 @@
                             "maxStacks": 3,
                             "scripts": [
                                 {
-                                    "label": "消耗爆发",
-                                    "trigger": "attack",
+                                    "label": "命中后消耗爆发",
+                                    "trigger": "hit",
                                     "active": true,
-                                    "script": "const confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"火灼之术\" },\n    content: `<p>是否消耗一层 [火灼] 造成额外 10 点火焰伤害？</p>`,\n    yes: { label: \"引爆\", icon: \"fas fa-fire\" },\n    no: { label: \"保留\", icon: \"fas fa-times\" }\n});\n\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"huozhuo\", 1);\n    args.flags.damageResult.damage += 10;\n    args.flags.damageResult.breakdown += \"\\n+ 火灼: 10\";\n    ui.notifications.info(\"火药引爆！附加火焰伤害。\");\n}"
+                                    "script": "if (!args.isHit) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"火灼之术\" },\n    content: `<p>本次命中是否来自附有[火灼]的武器？</p><p>若是，可消耗一层火灼，额外造成 10 点火焰伤害。</p>`,\n    yes: { label: \"消耗\", icon: \"fas fa-fire\" },\n    no: { label: \"保留\", icon: \"fas fa-times\" }\n});\nif (confirm) {\n    await game.xjzl.api.effects.removeEffect(actor, \"huozhuo\", 1);\n    // 火焰伤害单独结算，不并入原伤害类型\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"fire\",\n        attacker: actor,\n        isHit: true,\n        item: args.item,\n        move: args.move,\n        source: \"extra\"\n    });\n    ui.notifications.info(\"火药引爆！附加 10 点火焰伤害。\");\n}"
                                 }
                             ]
                         }
@@ -2013,7 +2017,7 @@
                         {
                             "label": "选择Buff",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 2 + (lvl - 1) * 2;\n\nnew Dialog({\n    title: \"浩然正气选择\",\n    buttons: {\n        b1: {\n            label: \"威武不能屈 (属性差加成)\",\n            callback: async () => {\n                const eff = thisItem.effects.getName(\"威武不能屈\").toObject();\n                delete eff._id; eff.origin = thisItem.uuid; eff.duration = {rounds: rounds};\n                await game.xjzl.api.effects.addEffect(actor, eff);\n            }\n        },\n        b2: {\n            label: \"富贵不能淫 (回血/去状态)\",\n            callback: async () => {\n                const eff = thisItem.effects.getName(\"富贵不能淫\").toObject();\n                delete eff._id; eff.origin = thisItem.uuid; eff.duration = {rounds: rounds};\n                await game.xjzl.api.effects.addEffect(actor, eff);\n            }\n        },\n        b3: {\n            label: \"贫贱不能移 (免死)\",\n            callback: async () => {\n                const eff = thisItem.effects.getName(\"贫贱不能移\").toObject();\n                delete eff._id; eff.origin = thisItem.uuid; eff.duration = {rounds: rounds};\n                await game.xjzl.api.effects.addEffect(actor, eff);\n            }\n        }\n    }\n}).render(true);",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 2 + (lvl - 1) * 2;\nconst pickEffect = async (name) => {\n    const eff = thisItem.effects.getName(name).toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    eff.duration = { rounds: rounds };\n    await game.xjzl.api.effects.addEffect(actor, eff);\n};\n// 三选一确认使用 DialogV2.wait（取消时返回 null，不施加状态）\nconst choice = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"浩然正气选择\" },\n    content: `<p>选择获得的浩然状态（持续 ${rounds} 回合）：</p>`,\n    buttons: [\n        { action: \"weiwu\", label: \"威武不能屈 (属性差加成)\" },\n        { action: \"fugui\", label: \"富贵不能淫 (回血/去状态)\" },\n        { action: \"pinjian\", label: \"贫贱不能移 (免死)\" }\n    ]\n});\nif (choice === \"weiwu\") await pickEffect(\"威武不能屈\");\nelse if (choice === \"fugui\") await pickEffect(\"富贵不能淫\");\nelse if (choice === \"pinjian\") await pickEffect(\"贫贱不能移\");",
                             "active": true
                         }
                     ],
@@ -2042,11 +2046,16 @@
                     "flags": {
                         "xjzl-system": {
                             "slug": "fugui",
-                            "stackable": false,
-                            "regenHpTurnStart": 10
+                            "stackable": false
                         }
                     },
-                    "changes": []
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.regenHpTurnStart",
+                            "mode": 2,
+                            "value": "10"
+                        }
+                    ]
                 },
                 {
                     "name": "贫贱不能移",
@@ -2169,7 +2178,7 @@
                         {
                             "label": "后续效果",
                             "trigger": "hit",
-                            "script": "// 1. 施加错骨\nawait game.xjzl.api.effects.addEffect(args.target, \"cuogu\");\n\n// 2. 大恶对抗\nconst isDaE = (args.target.system.social.exing >= 500 && args.target.system.social.xiayi < 100);\nif (isDaE) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonusDmg = 50 + (lvl - 1) * 50;\n    \n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"qigan\",\n        label: \"探花飞刀 - 气感牵引\",\n        outcome: {\n            win: { text: `气机牵引，正中咽喉！请手动补算 +${bonusDmg} 伤害。` },\n            lose: { text: \"未能命中要害。\" }\n        }\n    });\n}",
+                            "script": "if (!args.isHit) return;\n// 1. 施加错骨（持续一回合）\nawait game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { rounds: 1 } });\n\n// 2. 大恶对抗\nconst isDaE = (args.target.system.social.exing >= 500 && args.target.system.social.xiayi < 100);\nif (isDaE) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const bonusDmg = 50 + (lvl - 1) * 50;\n    \n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"qigan\",\n        label: \"探花飞刀 - 气感牵引\",\n        outcome: {\n            win: { text: `气机牵引，正中咽喉！请手动补算 +${bonusDmg} 伤害。` },\n            lose: { text: \"未能命中要害。\" }\n        }\n    });\n}",
                             "active": true
                         }
                     ]
@@ -2478,9 +2487,9 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": []
+            ],
+            "effects": []
+        }
     },
     {
         "name": "趁虚而入",
@@ -2522,9 +2531,9 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": []
+            ],
+            "effects": []
+        }
     },
     {
         "name": "精诚团结",
@@ -2567,32 +2576,32 @@
                         }
                     ]
                 }
+            ],
+            "effects": [
+                {
+                    "name": "精诚团结",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
+                    "description": "命中具有优势。技能检定优势及加成请手动应用。",
+                    "duration": {
+                        "rounds": 1
+                    },
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "jingchengtuanjie",
+                            "stackable": false
+                        }
+                    },
+                    "changes": [
+                        {
+                            "key": "flags.xjzl-system.attackLevel",
+                            "mode": 2,
+                            "value": "1"
+                        }
+                    ]
+                }
             ]
-        },
-        "effects": [
-            {
-                "name": "精诚团结",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/江湖4.png",
-                "description": "命中具有优势。技能检定优势及加成请手动应用。",
-                "duration": {
-                    "rounds": 1
-                },
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "jingchengtuanjie",
-                        "stackable": false
-                    }
-                },
-                "changes": [
-                    {
-                        "key": "flags.xjzl-system.attackLevel",
-                        "mode": 2,
-                        "value": "1"
-                    }
-                ]
-            }
-        ]
+        }
     },
     {
         "name": "舍己为人",
@@ -2643,9 +2652,9 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": []
+            ],
+            "effects": []
+        }
     },
     {
         "name": "濒死一击",
@@ -2695,9 +2704,9 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": []
+            ],
+            "effects": []
+        }
     },
     {
         "name": "意在先发",
@@ -2748,8 +2757,8 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": []
+            ],
+            "effects": []
+        }
     }
 ]
