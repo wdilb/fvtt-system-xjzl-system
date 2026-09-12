@@ -33,8 +33,7 @@ export class XJZLCreatureData extends foundry.abstract.TypeDataModel {
                 speed: new fields.NumberField({ initial: 5, integer: true, label: "XJZL.Combat.Speed" }),
                 dodge: new fields.NumberField({ initial: 10, integer: true, label: "XJZL.Combat.Dodge" }),
                 hit: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Combat.HitWaigong" }),
-                protection: new fields.NumberField({ initial: 0, min: 0, integer: true, label: "XJZL.Combat.Protection" }), // 防护阈值
-                damage: new fields.NumberField({ initial: 0, integer: true, label: "XJZL.Equipment.Damage" }) // 基础伤害
+                protection: new fields.NumberField({ initial: 0, min: 0, integer: true, label: "XJZL.Combat.Protection" }) // 防护阈值
             }),
 
             // === 3. 描述信息 ===
