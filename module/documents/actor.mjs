@@ -2056,7 +2056,8 @@ export class XJZLActor extends Actor {
     // 3. 防御前置脚本 (Trigger: PRE_DEFENSE)
     // =====================================================
     // 此时尚未计算暴击倍率，也未计算防御减伤
-    // 目的：修改 config (如：免疫暴击、强制无视防御、获得临时抗性)
+    // 目的：修改 config (如：免疫暴击、强制无视防御、获得临时抗性)，
+    //       或通过 output.damage 在减伤结算前重写本笔伤害的基准值（"受到X类型伤害时+Y"类附加效果）
     const preDefContext = {
       attacker: attacker,
       target: this,
@@ -2066,6 +2067,8 @@ export class XJZLActor extends Actor {
       element: config.element,
       move: move,
       item: item,
+      // 可写容器：脚本改写 output.damage 后，暴击倍率与防御/格挡/抗性均按新值结算
+      output: { damage: amount },
       // 允许修改的配置 (包括 isCrit)
       config: config
     };
@@ -2080,7 +2083,12 @@ export class XJZLActor extends Actor {
     // =====================================================
     // 注意：这里的暴击计算必须在 PRE_DEFENSE 之后
     // 这样脚本里 config.isCrit = false 才能生效
+    // PRE_DEFENSE 改写的基准值优先；脚本未提供有效数值时沿用原始 amount
     let calculatedDamage = amount;
+    const scriptedBase = preDefContext.output?.damage;
+    if (typeof scriptedBase === "number" && Number.isFinite(scriptedBase)) {
+      calculatedDamage = scriptedBase;
+    }
 
     if (config.isCrit && config.applyCritDamage) {
       calculatedDamage = Math.floor(calculatedDamage * 2);

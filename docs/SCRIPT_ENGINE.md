@@ -315,6 +315,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `element` | `string` | 只读 | 当前伤害属性。 |
 | `baseDamage` | `number` | 只读 | 原始面板伤害。 |
 | `move` / `item` | `Object` / `Item` / `null` | 只读 | 招式和物品来源。 |
+| `output.damage` | `number` | **可写** | 暴击与防御/格挡/抗性结算前的伤害基准值，初始等于 `baseDamage`；改写后暴击倍率按新值计算。适用于"受到X类型伤害时+Y"类附加效果。 |
 | `config.ignoreBlock` / `.ignoreDefense` / `.ignoreStance` | `boolean` | **可写** | 穿透配置。 |
 | `config.isCrit` | `boolean` | **可写** | 防御侧最终暴击状态。 |
 | `config.applyCritDamage` | `boolean` | **可写** | 是否应用暴击伤害倍率。 |
