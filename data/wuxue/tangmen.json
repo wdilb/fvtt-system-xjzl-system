@@ -198,7 +198,7 @@
                         {
                             "label": "第二段伤害",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    // 读取面板伤害作为 amount\n    const damageResult = await args.target.applyDamage({\n        amount: args.baseDamage,\n        type: args.damageType,\n        attacker: args.attacker,\n        isHit: true,\n        isCrit: args.isCrit,\n        isBroken: args.isBroken,\n        element: args.element,\n        source: \"move\"\n    });\n    \n    // 构建战报文本\n    const hpLost = damageResult.hpLost || 0;\n    const hutiLost = damageResult.hutiLost || 0;\n    const mpLost = damageResult.mpLost || 0;\n    \n    const info = [];\n    if(hpLost > 0) info.push(`HP -${hpLost}`);\n    if(hutiLost > 0) info.push(`护体 -${hutiLost}`);\n    if(mpLost > 0) info.push(`内力 -${mpLost}`);\n    const resultStr = info.length > 0 ? info.join(\", \") : \"被防御或抗性抵消\";\n\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding: 10px;\">\n        <div style=\"border-left: 4px solid #2e7d32; padding-left: 8px; margin-bottom: 5px;\">\n            <h4 style=\"margin:0; color:#2e7d32;\">第二道绿芒</h4>\n        </div>\n        <div style=\"font-size: 0.9em;\">\n            <p>再次命中 <b>${args.target.name}</b>！</p>\n            <div style=\"background:rgba(0,0,0,0.05); padding:5px; border-radius:4px; font-weight:bold; color:#8b0000;\">\n                ${resultStr}\n            </div>\n        </div>\n    </div>`;\n\n    ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: args.attacker }), content: content });\n}",
+                            "script": "if (args.isHit) {\n    // 读取面板伤害作为 amount\n    const segResult = await args.target.applyDamage({\n        amount: args.baseDamage,\n        type: args.damageType,\n        attacker: args.attacker,\n        isHit: true,\n        isCrit: args.isCrit,\n        isBroken: args.isBroken,\n        element: args.element,\n        item: args.item,\n        move: args.move,\n        source: \"move\"\n    });\n    \n    // 构建战报文本\n    const segHp = segResult.hpLost || 0;\n    const segHuti = segResult.hutiLost || 0;\n    const segMp = segResult.mpLost || 0;\n    \n    const info = [];\n    if(segHp > 0) info.push(`HP -${segHp}`);\n    if(segHuti > 0) info.push(`护体 -${segHuti}`);\n    if(segMp > 0) info.push(`内力 -${segMp}`);\n    const resultStr = info.length > 0 ? info.join(\", \") : \"被防御或抗性抵消\";\n\n    const content = `<div class=\"xjzl-chat-card\" style=\"padding: 10px;\">\n        <div style=\"border-left: 4px solid #2e7d32; padding-left: 8px; margin-bottom: 5px;\">\n            <h4 style=\"margin:0; color:#2e7d32;\">第二道绿芒</h4>\n        </div>\n        <div style=\"font-size: 0.9em;\">\n            <p>再次命中 <b>${args.target.name}</b>！</p>\n            <div style=\"background:rgba(0,0,0,0.05); padding:5px; border-radius:4px; font-weight:bold; color:#8b0000;\">\n                ${resultStr}\n            </div>\n        </div>\n    </div>`;\n\n    ChatMessage.create({ user: game.user.id, speaker: ChatMessage.getSpeaker({ actor: args.attacker }), content: content });\n}",
                             "active": true
                         }
                     ],
@@ -800,28 +800,6 @@
         "name": "离魂镖",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
-        "effects": [
-            {
-                "name": "神魂颠倒",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
-                "description": "施展《离魂镖》套路时，招式额外造成内息+固定数值的毒素伤害。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "shenhundao",
-                        "scripts": [
-                            {
-                                "label": "离魂镖加伤",
-                                "trigger": "hit",
-                                "active": true,
-                                "script": "// 1. 筛选条件：必须是离魂镖套路，且必须命中\nif (!item || !item.name.includes(\"离魂镖\")) return;\nif (!args.isHit) return;\n\n// 2. 读取施法时存入的固定伤害加成 (由绝招等级决定)\nconst flatBonus = thisEffect.getFlag(\"xjzl-system\", \"flatBonus\") || 0;\n\n// 3. 计算伤害: 0.4 内息 + 固定加成\nconst neixi = actor.system.stats.neixi.total;\nconst dmg = Math.floor(neixi * 0.4) + flatBonus;\n\nif (dmg > 0) {\n    // 4. 应用毒素伤害 (无视防御)\n    await args.target.applyDamage({\n        amount: dmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true\n    });\n    \n    // 5. 发送卡片 (带边距样式)\n    const cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #800080; background: rgba(128, 0, 128, 0.1); margin-left: 2px;\">\n                <div style=\"font-weight:bold; color:#800080; font-size:1.1em;\">\n                    <i class=\"fas fa-skull-crossbones\"></i> 神魂颠倒\n                </div>\n                <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                    经脉逆行，毒气攻心！<br>\n                    附加毒伤: <span style=\"font-weight:bold; color:purple;\">${dmg}</span>\n                </div>\n            </div>\n        </div>`;\n    \n    ChatMessage.create({\n        content: cardContent,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
-                            }
-                        ]
-                    }
-                },
-                "changes": []
-            }
-        ],
         "system": {
             "category": "wuxue",
             "sect": "tangmen",
@@ -870,7 +848,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>反手握镖，开启架招。当你每次成功格挡后，获得“游魂”，持续三回合或被击破架招。</p><p><strong>游魂：</strong>速度+3，免疫下盘不稳。</p><p><strong>升级：</strong>格挡值+10，游魂速度+1，内力消耗+2。</p>",
-                    "automationNote": "完全自动化。格挡成功后自动获得Buff。Buff含速度加成。免疫下盘不稳需手动处理。",
+                    "automationNote": "格挡成功后自动获得游魂，速度加成自动生效，架招解除或被击破时随架招自动移除。免疫下盘不稳需手动处理。",
                     "costs": {
                         "mp": [
                             2,
@@ -889,7 +867,7 @@
                             "label": "获得游魂",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "// 1. 校验架招触发条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 2. 获取架招等级 (从 Item 数据中查找当前招式)\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\n\n// 3. 计算速度加成 (基础3 + 升级成长)\n// 升级描述: 游魂速度+1。 Level 1 -> +3, Level 2 -> +4\nconst speedBonus = 3 + (lvl - 1);\n\n// 4. 构建特效数据\nconst effectData = {\n    name: \"游魂\",\n    icon: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n    duration: { rounds: 3 },\n    flags: {\n        \"xjzl-system\": {\n            slug: \"youhun\",\n            stackable: false\n        }\n    },\n    changes: [\n        // 速度加成\n        { key: \"system.combat.speed\", mode: 2, value: speedBonus }\n    ]\n};\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
+                            "script": "// 1. 校验架招触发条件\nif (!Macros.checkStance(actor, args)) return;\n\n// 2. 获取架招等级 (从 Item 数据中查找当前招式)\nconst stanceMove = thisItem.system.moves.find(m => m.id === actor.system.martial.stance);\nconst lvl = Math.max(1, stanceMove?.computedLevel || 1);\n\n// 3. 计算速度加成 (基础3 + 升级成长)\n// 升级描述: 游魂速度+1。 Level 1 -> +3, Level 2 -> +4\nconst speedBonus = 3 + (lvl - 1);\n\n// 4. 构建特效数据\nconst effectData = {\n    name: \"游魂\",\n    icon: \"systems/xjzl-system/assets/icons/wuxue/唐门.png\",\n    duration: { rounds: 3 },\n    flags: {\n        \"xjzl-system\": {\n            slug: \"youhun\",\n            stackable: false,\n            tiedToStance: true\n        }\n    },\n    changes: [\n        // 速度加成\n        { key: \"system.combat.speed\", mode: 2, value: speedBonus }\n    ]\n};\n\nawait game.xjzl.api.effects.addEffect(actor, effectData);"
                         }
                     ]
                 },
@@ -970,6 +948,28 @@
                             "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\n// 计算升级带来的额外固定伤害: (Level - 1) * 20\nconst extraFlatDmg = (lvl - 1) * 20;\n\n// 获取模板\nconst effectData = thisItem.effects.getName(\"神魂颠倒\").toObject();\ndelete effectData._id;\neffectData.origin = thisItem.uuid;\neffectData.duration = { rounds: rounds };\n\n// 将计算好的固定伤害存入 Flag，供特效脚本读取\nfoundry.utils.setProperty(effectData, \"flags.xjzl-system.flatBonus\", extraFlatDmg);\n\n// 应用\nawait game.xjzl.api.effects.addEffect(args.attacker, effectData);\n\n// 标记自动应用，隐藏卡片按钮\nargs.flags.autoApplied = true;"
                         }
                     ]
+                }
+            ],
+            "effects": [
+                {
+                    "name": "神魂颠倒",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "description": "施展《离魂镖》套路时，招式额外造成内息+固定数值的毒素伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "shenhundao",
+                            "scripts": [
+                                {
+                                    "label": "离魂镖加伤",
+                                    "trigger": "hit",
+                                    "active": true,
+                                    "script": "// 1. 筛选条件：必须是离魂镖套路，且必须命中\nif (!item || !item.name.includes(\"离魂镖\")) return;\nif (!args.isHit) return;\n\n// 2. 读取施法时存入的固定伤害加成 (由绝招等级决定)\nconst flatBonus = thisEffect.getFlag(\"xjzl-system\", \"flatBonus\") || 0;\n\n// 3. 计算伤害: 0.4 内息 + 固定加成\nconst neixi = actor.system.stats.neixi.total;\nconst dmg = Math.floor(neixi * 0.4) + flatBonus;\n\nif (dmg > 0) {\n    // 4. 应用毒素伤害 (无视防御)\n    await args.target.applyDamage({\n        amount: dmg,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true,\n        ignoreDefense: true,\n        item: args.item,\n        move: args.move\n    });\n    \n    // 5. 发送卡片 (带边距样式)\n    const cardContent = `\n        <div class=\"xjzl-chat-card\">\n            <div style=\"padding:5px; padding-left: 8px; border-left: 4px solid #800080; background: rgba(128, 0, 128, 0.1); margin-left: 2px;\">\n                <div style=\"font-weight:bold; color:#800080; font-size:1.1em;\">\n                    <i class=\"fas fa-skull-crossbones\"></i> 神魂颠倒\n                </div>\n                <div style=\"font-size:0.9em; margin-top:5px; color:#555;\">\n                    经脉逆行，毒气攻心！<br>\n                    附加毒伤: <span style=\"font-weight:bold; color:purple;\">${dmg}</span>\n                </div>\n            </div>\n        </div>`;\n    \n    ChatMessage.create({\n        content: cardContent,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
                 }
             ]
         }
@@ -1136,7 +1136,7 @@
                             "label": "流血引爆",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    const bleed = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\");\n    if (bleed) {\n        const stacks = bleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const dmg = stacks * 10;\n        await args.target.applyDamage({ amount: dmg, type: \"liushi\", attacker: actor });\n        await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n        ui.notifications.info(`${args.target.name} 流血引爆！流失 ${dmg} 气血并获得失血。`);\n    }\n}"
+                            "script": "if (args.isHit) {\n    const bleed = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"bleed_stack\");\n    if (bleed) {\n        const stacks = bleed.getFlag(\"xjzl-system\", \"stacks\") || 1;\n        const dmg = stacks * 10;\n        await args.target.applyDamage({ amount: dmg, type: \"liushi\", attacker: actor, item: args.item, move: args.move });\n        await game.xjzl.api.effects.addEffect(args.target, \"bloodloss\");\n        ui.notifications.info(`${args.target.name} 流血引爆！流失 ${dmg} 气血并获得失血。`);\n    }\n}"
                         }
                     ]
                 }
@@ -1237,7 +1237,7 @@
                     "actionCost": "主要动作",
                     "range": "15米",
                     "targetInfo": "单体",
-                    "automationNote": "手动：禁反。",
+                    "automationNote": "先攻高于对方时虚招优势自动（逐目标判定）。手动：禁反。",
                     "costs": {
                         "mp": [
                             4,
@@ -1271,8 +1271,8 @@
                     "scripts": [
                         {
                             "label": "先攻判断",
-                            "trigger": "attack",
-                            "script": "const target = game.user.targets.first()?.actor;\nif (target && game.combat) {\n    const myInit = game.combat.combatants.find(c => c.actorId === actor.id)?.initiative || 0;\n    const targetInit = game.combat.combatants.find(c => c.actorId === target.id)?.initiative || 0;\n    if (myInit > targetInit) {\n        args.flags.feintLevel += 1;\n        ui.notifications.info(\"先攻压制：虚招优势\");\n    }\n}"
+                            "trigger": "check",
+                            "script": "// check阶段逐目标执行：args.target 即当前目标，不依赖施放时的选中状态\nif (!args.target || !game.combat) return;\nconst mine = game.combat.combatants.find(c => c.actorId === actor.id);\nconst foe = game.combat.combatants.find(c => c.actorId === args.target.id);\n// 双方必须都已参战且掷过先攻（initiative为null/undefined时不给予优势）\nif (!mine || !foe || typeof mine.initiative !== \"number\" || typeof foe.initiative !== \"number\") return;\nif (mine.initiative > foe.initiative) {\n    args.flags.grantFeintLevel = (args.flags.grantFeintLevel || 0) + 1;\n    ui.notifications.info(\"先攻压制：虚招优势\");\n}"
                         }
                     ]
                 },
@@ -1353,7 +1353,7 @@
                         "scalings": [
                             {
                                 "prop": "shenfa",
-                                "ratio": 1.0
+                                "ratio": 1
                             }
                         ]
                     },
@@ -1398,32 +1398,32 @@
                 }
             ],
             "scripts": [],
-            "automationNote": "伤害加成自动化。抹毒检定难度增加需GM手动处理。"
-        },
-        "effects": [
-            {
-                "name": "暗器秘录",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
-                "transfer": true,
-                "disabled": false,
-                "description": "秘密暗器武学伤害+10。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "anqi-milu",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "秘密暗器加伤",
-                                "trigger": "calc",
-                                "active": true,
-                                "script": "// 1. 过滤逻辑：必须是 暗器(hidden) 且 非普攻(basic)\nif ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack')) return;\nif (args.move.weaponType !== \"hidden\") return;\n\n// 2. 查找源武学 (内存查找，零IO)\n// 假设书名未改动\nconst book = actor.items.find(i => i.name === \"暗器秘录\" && i.type === \"wuxue\");\nif (!book) return;\n\n// 3. 查找招式数据以确认等级\nconst passiveMove = book.system.moves.find(m => m.name === \"暗器秘录\");\n// 尚未入门 (计算等级 < 1) 则不生效\nif (!passiveMove || (passiveMove.computedLevel || 0) < 1) return;\n\n// 4. 应用数值\nargs.output.damage += 10;\nargs.output.bonusDesc.push(\"暗器秘录 +10\");"
-                            }
-                        ]
-                    }
-                },
-                "changes": []
-            }
-        ]
+            "automationNote": "伤害加成自动化。抹毒检定难度增加需GM手动处理。",
+            "effects": [
+                {
+                    "name": "暗器秘录",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/唐门.png",
+                    "transfer": true,
+                    "disabled": false,
+                    "description": "秘密暗器武学伤害+10。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "anqi-milu",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "秘密暗器加伤",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "// 1. 过滤逻辑：必须是 暗器(hidden) 且 非普攻(basic)\nif ((args.move.type === \"basic\" && args.move.id !== 'opportunity-attack')) return;\nif (args.move.weaponType !== \"hidden\") return;\n\n// 2. 查找源武学 (内存查找，零IO)\n// 假设书名未改动\nconst book = actor.items.find(i => i.name === \"暗器秘录\" && i.type === \"wuxue\");\nif (!book) return;\n\n// 3. 查找招式数据以确认等级\nconst passiveMove = book.system.moves.find(m => m.name === \"暗器秘录\");\n// 尚未入门 (计算等级 < 1) 则不生效\nif (!passiveMove || (passiveMove.computedLevel || 0) < 1) return;\n\n// 4. 应用数值\nargs.output.damage += 10;\nargs.output.bonusDesc.push(\"暗器秘录 +10\");"
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
+            ]
+        }
     },
     {
         "name": "唐花",
@@ -1578,40 +1578,40 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": [
-            {
-                "name": "冤魂",
-                "icon": "icons/magic/death/skull-energy-light-purple.webp",
-                "transfer": false,
-                "disabled": false,
-                "description": "命中-10，移动速度-5。",
-                "changes": [
-                    {
-                        "key": "system.combat.hit_waigong",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.hit_neigong",
-                        "mode": 2,
-                        "value": "-10"
-                    },
-                    {
-                        "key": "system.combat.speed",
-                        "mode": 2,
-                        "value": "-5"
-                    }
-                ],
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "yuanhun",
-                        "stackable": false
+            ],
+            "effects": [
+                {
+                    "name": "冤魂",
+                    "icon": "icons/magic/death/skull-energy-light-purple.webp",
+                    "transfer": false,
+                    "disabled": false,
+                    "description": "命中-10，移动速度-5。",
+                    "changes": [
+                        {
+                            "key": "system.combat.hit_waigong",
+                            "mode": 2,
+                            "value": "-10"
+                        },
+                        {
+                            "key": "system.combat.hit_neigong",
+                            "mode": 2,
+                            "value": "-10"
+                        },
+                        {
+                            "key": "system.combat.speed",
+                            "mode": 2,
+                            "value": "-5"
+                        }
+                    ],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "yuanhun",
+                            "stackable": false
+                        }
                     }
                 }
-            }
-        ]
+            ]
+        }
     },
     {
         "name": "七步绝命针",
@@ -1657,24 +1657,24 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": [
-            {
-                "name": "七步绝命",
-                "icon": "icons/magic/movement/trail-streak-impact-blue.webp",
-                "transfer": false,
-                "disabled": false,
-                "description": "累计移动>7米后，每多1米受10毒伤（结束时结算）。需医术/毒术(DC11)检定发现。",
-                "changes": [],
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "qibu-jueming",
-                        "stackable": false
+            ],
+            "effects": [
+                {
+                    "name": "七步绝命",
+                    "icon": "icons/magic/movement/trail-streak-impact-blue.webp",
+                    "transfer": false,
+                    "disabled": false,
+                    "description": "累计移动>7米后，每多1米受10毒伤（结束时结算）。需医术/毒术(DC11)检定发现。",
+                    "changes": [],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "qibu-jueming",
+                            "stackable": false
+                        }
                     }
                 }
-            }
-        ]
+            ]
+        }
     },
     {
         "name": "满天花雨",
@@ -1726,32 +1726,32 @@
                         }
                     ]
                 }
+            ],
+            "effects": [
+                {
+                    "name": "五毒",
+                    "icon": "icons/svg/biohazard.svg",
+                    "transfer": false,
+                    "disabled": false,
+                    "description": "你在每回合末受到 20 点毒素伤害。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wudu",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "毒发",
+                                    "trigger": "turnEnd",
+                                    "script": "await actor.applyDamage({ source: 'dot',amount: 20, type: 'poison', attacker: actor, isHit: true});",
+                                    "active": true
+                                }
+                            ]
+                        }
+                    },
+                    "changes": []
+                }
             ]
-        },
-        "effects": [
-            {
-                "name": "五毒",
-                "icon": "icons/svg/biohazard.svg",
-                "transfer": false,
-                "disabled": false,
-                "description": "你在每回合末受到 20 点毒素伤害。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wudu",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "毒发",
-                                "trigger": "turnEnd",
-                                "script": "await actor.applyDamage({ source: 'dot',amount: 20, type: 'poison', attacker: actor, isHit: true});",
-                                "active": true
-                            }
-                        ]
-                    }
-                },
-                "changes": []
-            }
-        ]
+        }
     },
     {
         "name": "观音泪",
@@ -1803,23 +1803,23 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": [
-            {
-                "name": "观音泪",
-                "icon": "icons/svg/ice-aura.svg",
-                "transfer": false,
-                "disabled": false,
-                "description": "消耗内力时受到毒素伤害。",
-                "changes": [],
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "guanyin-lei",
-                        "stackable": false
+            ],
+            "effects": [
+                {
+                    "name": "观音泪",
+                    "icon": "icons/svg/ice-aura.svg",
+                    "transfer": false,
+                    "disabled": false,
+                    "description": "消耗内力时受到毒素伤害。",
+                    "changes": [],
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "guanyin-lei",
+                            "stackable": false
+                        }
                     }
                 }
-            }
-        ]
+            ]
+        }
     }
 ]

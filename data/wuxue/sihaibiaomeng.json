@@ -289,7 +289,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>排羽待发，开启架招。</p><p>格挡成功后，你的下一次暗器普攻伤害翻倍。</p><p><strong>升级：</strong>格挡值+5，内力消耗+1。</p>",
-                    "automationNote": "完全自动化。格挡后自身获得Buff，下一次符合条件的普攻将在预览/结算时自动翻倍并消耗该Buff。",
+                    "automationNote": "完全自动化。格挡后自身获得Buff。下一次符合条件的暗器普攻在出招时自动翻倍并消耗该Buff（仅打开面板预览不消耗）。",
                     "costs": {
                         "mp": [
                             1,
@@ -356,30 +356,36 @@
                         }
                     ]
                 }
-            ]
-        },
-        "effects": [
-            {
-                "name": "雁行有序",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                "description": "下一次暗器普攻伤害翻倍。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_yanxing_buff",
-                        "stackable": false,
-                        "scripts": [
-                            {
-                                "label": "普攻翻倍并消耗",
-                                "trigger": "calc",
-                                "active": true,
-                                "script": "if (args.move.type === \"basic\" && args.move.weaponType === \"hidden\") {\n    args.output.damage *= 2;\n    args.output.bonusDesc.push(\"雁行有序：伤害翻倍\");\n    await thisEffect.delete();\n}"
-                            }
-                        ]
+            ],
+            "effects": [
+                {
+                    "name": "雁行有序",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "下一次暗器普攻伤害翻倍。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_yanxing_buff",
+                            "stackable": false,
+                            "scripts": [
+                                {
+                                    "label": "普攻翻倍并消耗",
+                                    "trigger": "calc",
+                                    "active": true,
+                                    "script": "if (args.move.type === \"basic\" && args.move.weaponType === \"hidden\") {\n    args.output.damage *= 2;\n    args.output.bonusDesc.push(\"雁行有序：伤害翻倍\");\n}"
+                                },
+                                {
+                                    "label": "出招消耗Buff",
+                                    "trigger": "attack",
+                                    "active": true,
+                                    "script": "// calc会在面板预览时重复执行，消耗副作用必须放在出招阶段的异步脚本中\nif (args.move.type === \"basic\" && args.move.weaponType === \"hidden\") {\n    await game.xjzl.api.effects.removeEffect(actor, \"wuxue_yanxing_buff\");\n}"
+                                }
+                            ]
+                        }
                     }
                 }
-            }
-        ]
+            ]
+        }
     },
     {
         "name": "破阴枪",
@@ -530,7 +536,7 @@
                             "label": "格挡反击",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const target = args.attacker;\n    if (target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\")) {\n        await game.xjzl.api.effects.addEffect(target, \"prone\");\n    } else {\n        const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n        if (unstable) {\n            unstable.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(target, unstable);\n        }\n    }\n}"
+                            "script": "if (args.attacker && Macros.checkStance(actor, args)) {\n    const atk = args.attacker;\n    if (atk.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"unstable\")) {\n        await game.xjzl.api.effects.addEffect(atk, \"prone\");\n    } else {\n        const unstable = foundry.utils.deepClone(CONFIG.statusEffects.find(e => e.id === \"unstable\"));\n        if (unstable) {\n            unstable.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(atk, unstable);\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -869,7 +875,7 @@
                     "targetInfo": "路径敌人",
                     "actionCost": "蓄力动作",
                     "description": "<p>左步缠头，右步劈刀，快步奔行，对周围目标造成 0.5 力量点外功伤害。</p><p>·此招可移动释放，对移动路径上周围 1 米范围内的敌人造成伤害。（不会重复造成伤害）</p><p>·若你处于“衔刀”，本招式伤害提升嘴中之刀的伤害。</p><p><strong>升级：</strong>招式伤害+10，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "完全自动化。",
+                    "automationNote": "衔刀加伤自动。可移动释放的路径伤害需手动处理。",
                     "costs": {
                         "mp": [
                             4,
@@ -902,23 +908,23 @@
                         }
                     ]
                 }
+            ],
+            "effects": [
+                {
+                    "name": "衔刀",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "视作装备嘴中之刀，进行普通攻击时额外增加伤害。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_xiandao_buff",
+                            "stackable": false
+                        }
+                    },
+                    "changes": []
+                }
             ]
-        },
-        "effects": [
-            {
-                "name": "衔刀",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                "description": "视作装备嘴中之刀，进行普通攻击时额外增加伤害。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_xiandao_buff",
-                        "stackable": false
-                    }
-                },
-                "changes": []
-            }
-        ]
+        }
     },
     {
         "name": "地术拳",
@@ -1305,42 +1311,28 @@
                         }
                     ]
                 }
+            ],
+            "effects": [
+                {
+                    "name": "浪潮",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "浪潮层数。",
+                    "transfer": false,
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_langchao_stack",
+                            "stackable": true
+                        }
+                    },
+                    "changes": []
+                }
             ]
-        },
-        "effects": [
-            {
-                "name": "浪潮",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                "description": "浪潮层数。",
-                "transfer": false,
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_langchao_stack",
-                        "stackable": true
-                    }
-                },
-                "changes": []
-            }
-        ]
+        }
     },
     {
         "name": "百鸟朝凤枪",
         "type": "wuxue",
         "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-        "effects": [
-            {
-                "name": "百鸟",
-                "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                "description": "记录点数。可替换他人的D20投掷结果。",
-                "flags": {
-                    "xjzl-system": {
-                        "slug": "wuxue_bainiao_buff",
-                        "stackable": false,
-                        "tiedToStance": true
-                    }
-                }
-            }
-        ],
         "system": {
             "category": "wuxue",
             "sect": "sihaibiaomeng",
@@ -1354,7 +1346,8 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "staff",
-                    "range": "3",
+                    "range": "3米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "牢握枪把，枪扎一线，对目标造成 0.5 力量点外功伤害。<br>若有敌人处于半空中，而自身处于“百鸟”状态，可消耗反应动作释放此招，跃至半空，劈枪砸下，对目标造成伤害，并将其击倒。",
                     "costs": {
@@ -1381,10 +1374,10 @@
                             "label": "击倒",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasBainiao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bainiao_buff\");\nif (hasBainiao) {\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n}"
+                            "script": "if (!args.isHit) return;\nconst hasBainiao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bainiao_buff\");\nif (hasBainiao) {\n    // 书中击倒只属于\"敌人处于半空+反应动作\"的对空反击版本，无法自动判定，改为提示+手动添加\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding:5px; border-left:4px solid #8e44ad; background:rgba(142, 68, 173, 0.1);\"><p style=\"color:#2c3e50; margin:0;\"><i class=\"fas fa-dove\"></i> <b>百鸟加持：</b>若本次为对空反击（敌人处于半空、消耗反应动作施展），请手动为 <b>${args.target.name}</b> 添加[倒地]。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ],
-                    "automationNote": "对空反击需手动触发。击倒效果在普通释放时也会触发（如果手动判断了条件）。脚本逻辑：如果自身有百鸟，命中后击倒。"
+                    "automationNote": "对空反击需手动判断并消耗反应动作。自身有百鸟且命中时发送提示卡片；若为对空反击，击倒请手动添加。"
                 },
                 {
                     "name": "凤凰三点头",
@@ -1392,7 +1385,8 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "staff",
-                    "range": "2",
+                    "range": "2米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "提腕上挑，平刺戳捣，对目标造成 0.4 力量点外功伤害，击破架招时将目标击飞 1 米。<br>·若自身处于“百鸟”状态，还可不消耗动作上步点枪，再对其施展两次普通攻击。",
                     "costs": {
@@ -1419,7 +1413,7 @@
                             "label": "击飞",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isBroken) {\n    ui.notifications.info(`${args.target.name} 被击飞 1 米`);\n}"
+                            "script": "if (args.isBroken) {\n    await ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\" style=\"padding:5px; border-left:4px solid #2980b9; background:rgba(41, 128, 185, 0.1);\"><p style=\"color:#2c3e50; margin:0;\"><i class=\"fas fa-wind\"></i> <b>${args.target.name}</b> 被击飞 1 米！请手动位移。</p></div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
                         }
                     ],
                     "automationNote": "击飞位移需手动处理。百鸟追击需玩家手动操作普通攻击。"
@@ -1430,6 +1424,7 @@
                     "element": "rou",
                     "weaponType": "staff",
                     "range": "自身",
+                    "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "持枪四平，三尖相照，开启架招。格挡成功后进入“百鸟”，持续到脱战或解除架招。<br>百鸟：投掷一个 D20 并将结果记录下来，当场上其他目标进行 D20 投掷（仅命中、虚招对抗、属性技能）时，你可以将对方的投掷结果替换为百鸟的结果，然后移除“百鸟”。<br>·若你已经具有百鸟，你可以投掷新的 D20，并将结果记录下来，替换之前的结果。",
                     "costs": {
@@ -1450,7 +1445,7 @@
                             "label": "获取百鸟",
                             "trigger": "damaged",
                             "active": true,
-                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"百鸟\").toObject();\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
+                            "script": "if (Macros.checkStance(actor, args)) {\n    const effectData = thisItem.effects.getName(\"百鸟\").toObject();\n    delete effectData._id;\n    await game.xjzl.api.effects.addEffect(actor, effectData);\n}"
                         }
                     ],
                     "automationNote": "百鸟记录点数与替换投掷需手动进行。"
@@ -1462,7 +1457,8 @@
                     "element": "rou",
                     "damageType": "waigong",
                     "weaponType": "staff",
-                    "range": "3",
+                    "range": "3米",
+                    "targetInfo": "单体",
                     "actionCost": "主要动作",
                     "description": "变换步法，枪舞连环，对敌人造成 0.8 力量点外功伤害，并与他进行[角力]对抗，若你获胜，则将敌人击飞 1 米并击倒。<br>·若自身处于“百鸟”状态，招式范围+3，且[角力]对抗必定获胜。<br>·若在骑马时施展，可移动释放，对路径上周围敌人造成伤害（不会重复造成伤害），并和他们都进行[角力]对抗，获胜则将敌人击飞 1 米并击倒。",
                     "costs": {
@@ -1493,10 +1489,24 @@
                             "label": "角力对抗",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const hasBainiao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bainiao_buff\");\nif (hasBainiao) {\n    ui.notifications.info(\"百鸟加持：对抗自动获胜，击飞+击倒\");\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n} else {\n    ui.notifications.info(\"请进行[角力]对抗，若获胜则将敌人击飞1米并击倒\");\n}"
+                            "script": "if (!args.isHit) return;\nconst hasBainiao = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"wuxue_bainiao_buff\");\nif (hasBainiao) {\n    // 百鸟：对抗必定获胜，直接击倒；范围+3与击飞位移无法自动判定，交由手动\n    await game.xjzl.api.effects.addEffect(args.target, \"prone\");\n    ui.notifications.info(\"百鸟加持：对抗自动获胜并已击倒。范围+3与击飞1米请手动处理。\");\n} else {\n    await Macros.requestContest({\n        attacker: actor,\n        defender: args.target,\n        type: \"jiaoli\",\n        label: \"鹏程万里 - 角力对抗\",\n        outcome: {\n            win: {\n                text: \"角力获胜！请手动将目标击飞 1 米。\",\n                targetEffect: \"prone\"\n            },\n            lose: {\n                text: \"角力未胜，目标稳住了身形。\"\n            }\n        }\n    });\n}"
                         }
                     ],
-                    "automationNote": "角力对抗需手动进行。移动攻击路径伤害需手动处理。"
+                    "automationNote": "命中后自动进行[角力]对抗，获胜自动击倒，击飞1米位移需手动。有百鸟时对抗自动获胜并击倒，范围+3需手动处理。骑乘时的路径多目标伤害与对抗需手动处理。"
+                }
+            ],
+            "effects": [
+                {
+                    "name": "百鸟",
+                    "icon": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
+                    "description": "记录点数。可替换他人的D20投掷结果。",
+                    "flags": {
+                        "xjzl-system": {
+                            "slug": "wuxue_bainiao_buff",
+                            "stackable": false,
+                            "tiedToStance": true
+                        }
+                    }
                 }
             ]
         }
@@ -1509,7 +1519,7 @@
             "category": "sanshou",
             "sect": "sihaibiaomeng",
             "tier": 1,
-            "description": "镖局弟子往往齐心合力，面对劫道之人，团结一\n致，奋力杀贼。",
+            "description": "<p>镖局弟子往往齐心合力，面对劫道之人，团结一致，奋力杀贼。</p>",
             "requirements": "《走四方》修炼圆满",
             "moves": [
                 {
@@ -1517,7 +1527,7 @@
                     "type": "qi",
                     "actionType": "buff",
                     "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                    "description": "·进入战斗后，场上有其他友方未陷入濒死时，你\n的出招命中+5，暴击骰-1。\n·为他人进行[疗伤]检定时，该次检定结果+2。\n升级：命中+5，暴击骰再-1，疗伤检定结果+2。",
+                    "description": "<p>·进入战斗后，场上有其他友方未陷入濒死时，你的出招命中+5，暴击骰-1。</p><p>·为他人进行[疗伤]检定时，该次检定结果+2。</p><p>升级：命中+5，暴击骰再-1，疗伤检定结果+2。</p>",
                     "automationNote": "命中与暴击加成已实现为常驻被动（忽略进战与友方判定）。疗伤检定加成需玩家手动在检定弹窗中调整。",
                     "xpCostRatio": 1,
                     "scripts": [
@@ -1528,7 +1538,9 @@
                             "script": "const lvl = Math.max(1, args.move.computedLevel || 1);\nS.combat.hit_waigong += 5 * lvl;\nS.combat.hit_neigong += 5 * lvl;\nS.combat.crit_waigong -= 1 * lvl;\nS.combat.crit_neigong -= 1 * lvl;"
                         }
                     ],
-                    "actionCost": "无"
+                    "actionCost": "无",
+                    "range": "自身",
+                    "targetInfo": "自身"
                 }
             ]
         }
@@ -1541,17 +1553,19 @@
             "category": "sanshou",
             "sect": "sihaibiaomeng",
             "tier": 2,
-            "description": "镖师常言：“受人之托，忠人之事”，却也总\n因这份“诚信”和“义气”而卷入江湖纷扰、明争\n暗斗。无论是想赚够钱财归隐田园，亦或是杀出威\n名声震武林，镖师的走镖之路绝非坦途。",
+            "description": "<p>镖师常言：“受人之托，忠人之事”，却也总因这份“诚信”和“义气”而卷入江湖纷扰、明争暗斗。无论是想赚够钱财归隐田园，亦或是杀出威名声震武林，镖师的走镖之路绝非坦途。</p>",
             "moves": [
                 {
                     "name": "镖行天下",
                     "type": "qi",
                     "actionType": "buff",
                     "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                    "description": "镖单\n当他人请求你运送物品或护送人物时，你可以展示\n你四海镖盟的身份，与其签订镖单，有四海镖盟作\n保，对方会对你更加信赖。镖单需写明委托双方、\n起运地点、目的地、接收人，货物数、镖利多少。\n喊趟子\n走镖遇到道上的朋友，若对方愿意交涉，则可进行\n[说服]（难度 10），每次成功后可选择以下一项\n交涉，交涉后具有额外效果，可以叠加：\n1.吃的朋友饭，穿的朋友衣。\n效果：目标在下一次战斗中造成的伤害-10。\n2.朋友听真，你在林里，我在林外，都是一家。\n效果：目标在下一次战斗中的先攻降低 5 点。\n3.咱有四大靠山，不必风摆草动，义如金山银山，\n朋友重如泰山，相会如到梁山。\n效果：目标在下一次战斗中的招式暴击骰+2。\n镖利\n走镖收取的费用叫做镖利，包含基础镖利和路途\n费。将运送货物的总价值的 5%作为基础镖利，路\n途费与你的实力和运送距离有关，参照如下：\n走镖前，委托人会先支付你一半镖利，当你将货物\n按照镖单运送到指定地点，接收货物者会根据镖单\n支付你剩余一半的镖利。\n·若货物损坏、丢失且无法找回，护送人物遭到袭\n击受伤或死亡，你必须向委托人赔偿双倍的镖利。\n升级：镖利中路途费提高 1 成、抽取货物总价值比\n例提高 5%。",
+                    "description": "<p><strong>镖单</strong><br>当他人请求你运送物品或护送人物时，你可以展示你四海镖盟的身份，与其签订镖单，有四海镖盟作保，对方会对你更加信赖。镖单需写明委托双方、起运地点、目的地、接收人，货物数、镖利多少。</p><p><strong>喊趟子</strong><br>走镖遇到道上的朋友，若对方愿意交涉，则可进行[说服]（难度 10），每次成功后可选择以下一项交涉，交涉后具有额外效果，可以叠加：</p><p>1.吃的朋友饭，穿的朋友衣。<br>效果：目标在下一次战斗中造成的伤害-10。</p><p>2.朋友听真，你在林里，我在林外，都是一家。<br>效果：目标在下一次战斗中的先攻降低 5 点。</p><p>3.咱有四大靠山，不必风摆草动，义如金山银山，朋友重如泰山，相会如到梁山。<br>效果：目标在下一次战斗中的招式暴击骰+2。</p><p><strong>镖利</strong><br>走镖收取的费用叫做镖利，包含基础镖利和路途费。将运送货物的总价值的 5%作为基础镖利，路途费与你的实力和运送距离有关，参照如下：</p><p>走镖前，委托人会先支付你一半镖利，当你将货物按照镖单运送到指定地点，接收货物者会根据镖单支付你剩余一半的镖利。</p><p>·若货物损坏、丢失且无法找回，护送人物遭到袭击受伤或死亡，你必须向委托人赔偿双倍的镖利。</p><p>升级：镖利中路途费提高 1 成、抽取货物总价值比例提高 5%。</p>",
                     "automationNote": "纯文本效果，无自动化脚本。请玩家根据交涉结果手动处理后续数值修正。",
                     "xpCostRatio": 1,
-                    "actionCost": "无"
+                    "actionCost": "无",
+                    "range": "自身",
+                    "targetInfo": "自身"
                 }
             ]
         }
@@ -1574,7 +1588,7 @@
                     "damageType": "waigong",
                     "weaponType": "unarmed",
                     "img": "systems/xjzl-system/assets/icons/wuxue/镖盟.png",
-                    "range": "5",
+                    "range": "5米",
                     "targetInfo": "周围敌方",
                     "actionCost": "全回合动作",
                     "description": "<p>全回合动作，双脚插地，双掌拍地，地动山摇，周围敌方进行[角力]检定（难度 @{15 + @up * 2|15}），失败受到 0.6 力量点外功伤害后倒地，并“禁足”一回合。</p><ul><li>每消耗 1 点怒气，招式释放距离提高 5 米。</li></ul><p>升级：招式伤害+10，角力难度+2，内力消耗+8。</p>",
