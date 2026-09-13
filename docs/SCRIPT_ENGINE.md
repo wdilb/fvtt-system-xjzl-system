@@ -79,7 +79,7 @@
 但是：
 
 - 只有对应触发器实际传入的字段才存在。
-- `args` 是阶段上下文：同一触发内的脚本共享同一对象；跨触发阶段不会保留。唯一例外是 `attack` 阶段写入 `args.flags` 的自定义键——它们随攻击卡持久化为 `scriptFlags`，供同卡的 `check`/`hit`/`hit_once` 读取（见 `attack` 触发器说明）。
+- `args` 是阶段上下文：同一触发内的脚本共享同一对象；跨触发阶段不会保留。唯一例外是 `attack` 阶段写入 `args.flags` 的自定义键——它们随攻击卡持久化为 `scriptFlags`，供同卡的 `check`/`preDamage`/`hit`/`hit_once` 读取（见 `attack` 触发器说明）。
 - 脚本运行中新增 `args.myFlag` 不会同步新建顶层 `myFlag`。
 - 业务代码推荐统一从 `args` 读取阶段参数，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
 - 脚本内声明变量不要与注入的顶层变量重名（如 `const move` 会与注入的 `move` 冲突直接抛错），局部变量请另起名。
@@ -253,7 +253,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `flags.damageResult.damage` / `.feint` | `number` | **可写** | 当前面板伤害和虚招值。 |
 | `flags.damageResult.breakdown` / `.feintBreakdown` | `string` | **可写** | 面板详情文本。 |
 
-对上表之外的自定义键写入 `args.flags`（例如 `args.flags.myMark = true`）会随本次攻击卡持久化：卡片后续的 `check`（掷骰时与手动补算新目标时）、`hit` 和 `hit_once` 可通过只读的 `args.scriptFlags` 读取这份快照。需要把出招阶段的决策传递给结算阶段时优先使用该机制，不要写 Actor 持久 flag——多张待结算卡片会互相污染，未结算的卡片还会造成残留。
+对上表之外的自定义键写入 `args.flags`（例如 `args.flags.myMark = true`）会随本次攻击卡持久化：卡片后续的 `check`（掷骰时与手动补算新目标时）、`preDamage`、`hit` 和 `hit_once` 可通过只读的 `args.scriptFlags` 读取这份快照。需要把出招阶段的决策传递给结算阶段时优先使用该机制，不要写 Actor 持久 flag——多张待结算卡片会互相污染，未结算的卡片还会造成残留。
 
 ### `check`（异步）
 
@@ -282,6 +282,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `targetCount` | `number` | 只读 | 本次实际结算的目标数量；仅在真实逐目标结算阶段提供。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
+| `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张攻击卡独立。 |
 | `element` | `string` | 只读 | 招式原始属性。 |
 | `outcome.isHit` / `.isCrit` / `.isBroken` | `boolean` | 只读 | 攻击方已确定的命中、暴击和破架结果。 |
 | `config.amount` | `number` | **可写** | 即将传入伤害 API 的原始数值。 |

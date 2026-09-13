@@ -1483,6 +1483,8 @@ export class ChatCardManager {
                     item: item,
                     move: move,
                     element: moveElement,
+                    // 攻击卡在 attack 阶段保存的自定义决策，供逐目标伤害阶段继续读取。
+                    scriptFlags: flags.scriptFlags || {},
                     // preDamage 才是逐目标的真实结算阶段，供目标数量限定的招式效果使用
                     targetCount: targets.length,
 
