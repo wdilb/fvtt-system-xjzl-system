@@ -377,6 +377,7 @@
                     "actionCost": "次要动作",
                     "description": "<p>次要动作，将内力灌注于棍，奋力插地，入土三分。在周围地面引起阵阵阴气，化为‘热恼地狱’，持续 @{1 + @up|1} 回合。</p><p><strong>热恼地狱：</strong>在其中施展的【大热恼】，不会被“行刑”状态的敌人压制反击。</p><p>·在其中开启【阿鼻降难】成功格挡时，还可使敌方陷入“行刑”，持续一回合。</p><p><strong>升级：</strong>‘热恼地狱’持续回合+1，内力消耗+8。</p>",
                     "automationNote": "仅提示生成地狱，具体区域判定需手动。包含计数。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -489,13 +490,13 @@
                         {
                             "label": "架招检查",
                             "trigger": "check",
-                            "script": "if (args.target.system.martial.stanceActive) {\n    ui.notifications.warn(\"目标开启了架招，望乡还阳无法生效！\");\n    args.flags.abort = true;\n}",
+                            "script": "if (args.target.system.martial.stanceActive) {\n    ui.notifications.warn(\"目标开启了架招，望乡还阳无法生效！\");\n}",
                             "active": true
                         },
                         {
                             "label": "侠义反转与治疗",
                             "trigger": "hit",
-                            "script": "// 1. 读取基础数值 (来自面板)\nlet healAmount = args.baseDamage || 0;\n\n// 2. 读取目标侠义 (NaN防卫)\nconst xiayi = Number(args.target.system.social?.xiayi) || 0;\n\n// 3. 检查行刑状态\nconst isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ healer: actor,  amount: finalValue, type: \"hp\", showScrolling: true });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                             "script": "if (!args.isHit || args.target.system.martial.stanceActive) return;\n\n// 1. 读取基础数值 (来自面板)\nlet healAmount = args.baseDamage || 0;\n\n// 2. 读取目标侠义 (NaN防卫)\nconst xiayi = Number(args.target.system.social?.xiayi) || 0;\n\n// 3. 通过稳定 slug 检查行刑状态，避免依赖可变的显示名称\nconst isXingxing = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xingxing\");\nconst reduction = isXingxing ? (xiayi * 2) : xiayi;\n\n// 4. 计算最终值\nconst finalValue = healAmount - reduction;\n\n// 5. 应用效果\nif (finalValue >= 0) {\n    await args.target.applyHealing({ healer: actor, amount: finalValue, type: \"hp\", showScrolling: true, item: args.item, move: args.move, source: \"move\" });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #27ae60;\"><b>望乡还阳</b> 生效！<br>${args.target.name} 获得 <span style=\"color:green; font-weight:bold;\">${finalValue}</span> 点治疗。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n} else {\n    const damage = Math.abs(finalValue);\n    await args.target.applyDamage({ amount: damage, type: \"liushi\", attacker: actor, item: args.item, move: args.move, source: \"move\" });\n    \n    // 发送卡片\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left:8px; margin-left:2px; border-left:3px solid #c0392b;\"><b>望乡还阳</b> 反转！<br>因侠义值过高，${args.target.name} 流失 <span style=\"color:red; font-weight:bold;\">${damage}</span> 点气血！</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         },
                         {
@@ -515,8 +516,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>自身陷入重伤时（气血不足 50%）方能施展，次要动作，血液流转，鲜血蒸发，短棍引动形成周身血雾，开启架招。你每损失 100 点气血，获得额外 1 点格挡值。格挡成功后，你可以用自身气感与目标的身法进行一次对抗：</p><p>若你对抗成功，鲜血缠绕目标，粘于皮肤之上，使其状如血人，形态可怖，陷入“行刑”状态，持续到战斗脱离。</p><p>若你对抗失败，你的气血逸散，转送阎罗，解除架招，获得 1 点怒气，如果你愿意，你可以消耗反应动作施展一次【阿鼻降难】。</p><p><strong>升级：</strong>格挡值+10，每损失 100 气血获得的额外格挡值+1，内力消耗+4。</p>",
-                    "automationNote": "开启条件自动检查。格挡值动态增加。格挡后自动请求对抗，对抗获胜后自动施加[行刑]。对抗失败解除架招需手动。",
+                    "description": "<p>自身陷入重伤时（气血不足 50%）方能施展，次要动作，血液流转，鲜血蒸发，短棍引动形成周身血雾，开启架招。你每损失 100 点气血，获得额外 1 点格挡值。格挡成功后，你可以用自身气感与目标的身法进行一次对抗：</p><p>若你对抗成功，鲜血缠绕目标，粘于皮肤之上，使其状如血人，形态可怖，陷入“行刑”状态，持续到战斗脱离。</p><p>若你对抗失败，你的气血逸散，转送阎罗，解除架招（需手动），获得 1 点怒气，如果你愿意，你可以消耗反应动作施展一次【阿鼻降难】。</p><p><strong>升级：</strong>格挡值+10，每损失 100 气血获得的额外格挡值+1，内力消耗+4。</p>",
+                    "automationNote": "开启条件与动态格挡值自动；格挡后自动请求对抗并在成功时施加[行刑]。失败后的解除架招、是否消耗反应动作施展[阿鼻降难]需手动，1点怒气自动恢复。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -639,7 +640,7 @@
                         {
                             "label": "残疾提示",
                             "trigger": "hit",
-                            "script": "const isXingxing = args.target.effects.some(e => e.name === \"行刑\");\nif (isXingxing) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const count = 1 + (lvl - 1);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #8b0000;\"><b>楚江剥皮</b> 触发！<br>目标处于行刑状态。<br>请进行 <b>${count}</b> 次残疾检定。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
+                             "script": "if (!args.isHit) return;\nconst isXingxing = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xingxing\");\nif (isXingxing) {\n    const lvl = Math.max(1, move.computedLevel || 1);\n    const count = 1 + (lvl - 1);\n    \n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; padding-left: 8px; margin-left: 2px; border-left:3px solid #8b0000;\"><b>楚江剥皮</b> 触发！<br>目标处于行刑状态。<br>请进行 <b>${count}</b> 次残疾检定。</div></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}",
                             "active": true
                         }
                     ]
@@ -698,8 +699,8 @@
                     "range": "10米",
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
-                    "description": "<p>蓄力动作，人间生死手中定，棍舞阴曹，对周围敌人造成 0.8 内息点内功伤害。</p><p>·你在本场战斗中每施展过一招不同的《阎王棍》招式，此招招式伤害+20（不包括此招，即最多计算十招）。</p><p><strong>升级：</strong>招式伤害+20，每施展过一招增加的招式伤害+10，怒气消耗-1，内力消耗+16。</p><p style=\"color:#888; font-size:0.8em;\">* 提示：若需重置计数，请使用宏清理 flags.xjzl-system.wuxue_yanwang_moves。</p>",
-                    "automationNote": "自动根据历史使用招式数量计算额外伤害。",
+                    "description": "<p>蓄力动作，人间生死手中定，棍舞阴曹，对周围敌人造成 0.8 内息点内功伤害。</p><p>·你在本场战斗中每施展过一招不同的《阎王棍》招式，此招招式伤害+20（不包括此招，即最多计算十招）。</p><p><strong>升级：</strong>招式伤害+20，每施展过一招增加的招式伤害+10，怒气消耗-1，内力消耗+16。</p>",
+                    "automationNote": "战斗开始自动清理历史记录；自动根据本场战斗历史使用招式数量计算额外伤害。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -725,6 +726,12 @@
                         ]
                     },
                     "scripts": [
+                        {
+                            "label": "战斗开始清理招式记录",
+                            "trigger": "combatStart",
+                            "script": "if (actor.getFlag(\"xjzl-system\", \"wuxue_yanwang_moves\")) await actor.unsetFlag(\"xjzl-system\", \"wuxue_yanwang_moves\");",
+                            "active": true
+                        },
                         {
                             "label": "招式计数加伤",
                             "trigger": "calc",
@@ -767,7 +774,7 @@
                                 {
                                     "label": "消耗",
                                     "trigger": "hit",
-                                    "script": "await thisEffect.delete();",
+                                    "script": "await game.xjzl.api.effects.removeEffect(actor, \"abijiannan_broken\");",
                                     "active": true
                                 }
                             ]
@@ -788,7 +795,7 @@
                                 {
                                     "label": "恶行护盾",
                                     "trigger": "preTake",
-                                    "script": "// 1. 读取 Flag 中的护盾强度\nconst shieldValue = thisEffect.getFlag(\"xjzl-system\", \"shieldValue\") || 0;\n\n// 2. 计算减伤\nconst original = args.output.damage;\n// 确保至少扣1点血 (除非完全免疫，但此招描述为抵挡)\nlet reduced = Math.max(1, original - shieldValue);\nconst blocked = original - reduced;\n\n// 3. 应用结果\nargs.output.damage = reduced;\n\n// 4. 发送卡片通知\nlet msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\">\n    <b>卞城枉死</b> 触发！<br>\n    原始伤害: ${original}<br>\n    抵消伤害: ${blocked}<br>\n    <span style=\"font-size:1.2em; font-weight:bold;\">最终伤害: ${reduced}</span>\n`;\n\n// 追击判定：伤害<=1点\nif (reduced <= 1) {\n    msg += `<hr><b style=\"color:red;\">条件满足！</b><br>伤害已压制至1点以下。<br>获得【泰山锥肉】追击机会！`;\n}\n\nmsg += `</div></div>`;\n\nChatMessage.create({\n    content: msg,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 5. 自动销毁此护盾\nawait thisEffect.delete();",
+                                    "script": "if (!args.isCrit) return;\n\n// 1. 读取 Flag 中的护盾强度\nconst shieldValue = thisEffect.getFlag(\"xjzl-system\", \"shieldValue\") || 0;\n\n// 2. 计算减伤\nconst original = args.output.damage;\n// 确保至少扣1点血 (除非完全免疫，但此招描述为抵挡)\nlet reduced = Math.max(1, original - shieldValue);\nconst blocked = original - reduced;\n\n// 3. 应用结果\nargs.output.damage = reduced;\n\n// 4. 发送卡片通知\nlet msg = `<div class=\"xjzl-chat-card\"><div style=\"padding:5px; border-left:3px solid #d35400;\">\n    <b>卞城枉死</b> 触发！<br>\n    原始伤害: ${original}<br>\n    抵消伤害: ${blocked}<br>\n    <span style=\"font-size:1.2em; font-weight:bold;\">最终伤害: ${reduced}</span>\n`;\n\n// 追击判定：伤害<=1点\nif (reduced <= 1) {\n    msg += `<hr><b style=\"color:red;\">条件满足！</b><br>伤害已压制至1点以下。<br>获得【泰山锥肉】追击机会！`;\n}\n\nmsg += `</div></div>`;\n\nChatMessage.create({\n    content: msg,\n    speaker: ChatMessage.getSpeaker({actor: actor})\n});\n\n// 5. 通过效果管理器销毁护盾，确保层数/权限处理一致\nawait game.xjzl.api.effects.removeEffect(actor, \"biancheng\");",
                                     "active": true
                                 }
                             ]
@@ -890,7 +897,7 @@
                                 {
                                     "label": "出招后移除",
                                     "trigger": "attack",
-                                    "script": "await thisEffect.delete();",
+                                    "script": "await game.xjzl.api.effects.removeEffect(actor, \"zhefu\");",
                                     "active": true
                                 }
                             ]
@@ -1343,13 +1350,13 @@
                         {
                             "label": "选择喵字数量",
                             "trigger": "preAttack",
-                            "script": "const content = `<div style=\"display:flex; flex-direction:column; gap:5px;\">\n    <button data-action=\"1\">喵 (额外1怒): 换位</button>\n    <button data-action=\"2\">喵喵 (额外2怒): 乘风x3</button>\n    <button data-action=\"3\">喵喵喵 (额外3怒): 劲力x3</button>\n    <button data-action=\"4\">喵喵喵喵 (额外4怒): 净化</button>\n</div>`;\nconst selection = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"喵喵喵喵\" },\n    content: content,\n    ok: { callback: (e, b) => e.submitter.dataset.action },\n    rejectClose: false\n});\nif (!selection) {\n    args.flags.abort = true;\n    return;\n}\nconst cost = parseInt(selection) || 0;\nargs.costConfig.rage += cost;\nargs.flags.miaoSelection = selection;",
+                            "script": "const content = `<div style=\"display:flex; flex-direction:column; gap:5px;\">\n    <button data-action=\"1\">喵 (额外1怒): 换位</button>\n    <button data-action=\"2\">喵喵 (额外2怒): 乘风x3</button>\n    <button data-action=\"3\">喵喵喵 (额外3怒): 劲力x3</button>\n    <button data-action=\"4\">喵喵喵喵 (额外4怒): 净化</button>\n</div>`;\nconst selection = await foundry.applications.api.DialogV2.prompt({\n    window: { title: \"喵喵喵喵\" },\n    content: content,\n    ok: { callback: (e, b) => e.submitter.dataset.action },\n    rejectClose: false\n});\nif (!selection) {\n    args.abort = true;\n    args.abortReason = \"未选择喵字数量。\";\n    return;\n}\nconst cost = parseInt(selection) || 0;\n// 记录本次选择，后续阶段直接读取该标记；同时把对应的额外怒气加入本次消耗。\nargs.scriptFlags.miaoSelection = selection;\nargs.costConfig.rage += cost;",
                             "active": true
                         },
                         {
                             "label": "结算效果",
                             "trigger": "hit",
-                            "script": "const selection = args.flags.miaoSelection;\nconst target = args.target;\nif (selection === \"1\") {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2980b9; background: rgba(41,128,185,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-exchange-alt\"></i> 喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">请与目标手动互换位置！</div></div></div>` });\n} else if (selection === \"2\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"chengfeng\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-wind\"></i> 喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">目标获得了 3 层乘风！</div></div></div>` });\n} else if (selection === \"3\") {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"jinli\");\n    const data = foundry.utils.deepClone(eff);\n    data.flags[\"xjzl-system\"].stacks = 3;\n    await game.xjzl.api.effects.addEffect(target, data);\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230,126,34,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#e67e22;\"><i class=\"fas fa-fist-raised\"></i> 喵喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">目标获得了 3 层劲力！</div></div></div>` });\n} else if (selection === \"4\") {\n    ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#f39c12;\"><i class=\"fas fa-magic\"></i> 喵喵喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">净化之光！请手动为自己和目标移除任意状态。</div></div></div>` });\n}",
+                            "script": "const selection = args.scriptFlags?.miaoSelection;\nconst recipient = args.target;\nif (!recipient || !selection) return;\n\nif (selection === \"1\") {\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #2980b9; background: rgba(41,128,185,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#2980b9;\"><i class=\"fas fa-exchange-alt\"></i> 喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">请与 ${recipient.name} 手动互换位置！</div></div></div>` });\n} else if (selection === \"2\") {\n    await game.xjzl.api.effects.addEffect(recipient, \"chengfeng\", 3);\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #27ae60; background: rgba(39,174,96,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#27ae60;\"><i class=\"fas fa-wind\"></i> 喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">${recipient.name} 获得了 3 层乘风！</div></div></div>` });\n} else if (selection === \"3\") {\n    await game.xjzl.api.effects.addEffect(recipient, \"jinli\", 3);\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #e67e22; background: rgba(230,126,34,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#e67e22;\"><i class=\"fas fa-fist-raised\"></i> 喵喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">${recipient.name} 获得了 3 层劲力！</div></div></div>` });\n} else if (selection === \"4\") {\n    await ChatMessage.create({ speaker: ChatMessage.getSpeaker({actor: actor}), content: `<div class=\"xjzl-chat-card\" style=\"margin-left: 6px;\"><div style=\"border-left: 3px solid #f1c40f; background: rgba(241,196,15,0.1); padding: 5px 8px;\"><div style=\"font-weight:bold; color:#f39c12;\"><i class=\"fas fa-magic\"></i> 喵喵喵喵</div><div style=\"font-size:0.9em; color:#555; margin-top:3px;\">净化之光！请手动为自己和 ${recipient.name} 移除任意状态。</div></div></div>` });\n}",
                             "active": true
                         }
                     ]
@@ -1469,7 +1476,7 @@
                         {
                             "label": "应用效果",
                             "trigger": "hit",
-                            "script": "const tune = args.flags.tuneSelection;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nif (tune === \"gong\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: rounds } });\n} else if (tune === \"shang\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { rounds: rounds } });\n} else if (tune === \"jue\") {\n    ui.notifications.info(`角·百鸟朝凤：请手动对友方使用 [应用治疗] (基础 ${50 + (lvl - 1) * 20})`);\n} else if (tune === \"zhi\") {\n    const buff = {\n        name: \"花轿\",\n        icon: move.img || \"icons/svg/sound.svg\",\n        duration: { rounds: rounds },\n        changes: [\n            { key: \"system.combat.crit_waigong\", mode: 2, value: \"-3\" },\n            { key: \"system.combat.crit_neigong\", mode: 2, value: \"-3\" }\n        ]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, buff);\n} else if (tune === \"yu\") {\n    ui.notifications.info(\"羽·天乐：请手动移除状态\");\n}",
+                            "script": "const tune = args.scriptFlags?.tuneSelection;\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 1 + (lvl - 1);\nif (tune === \"gong\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"unstable\", duration: { rounds: rounds } });\n} else if (tune === \"shang\") {\n    await game.xjzl.api.effects.addEffect(args.target, { id: \"cuogu\", duration: { rounds: rounds } });\n} else if (tune === \"jue\") {\n    ui.notifications.info(`角·百鸟朝凤：请手动对友方使用 [应用治疗] (基础 ${50 + (lvl - 1) * 20})`);\n} else if (tune === \"zhi\") {\n    const buff = {\n        name: \"花轿\",\n        icon: move.img || \"icons/svg/sound.svg\",\n        duration: { rounds: rounds },\n        flags: { \"xjzl-system\": { slug: \"huajiao\", stackable: false } },\n        changes: [\n            { key: \"system.combat.crit_waigong\", mode: 2, value: \"-3\" },\n            { key: \"system.combat.crit_neigong\", mode: 2, value: \"-3\" }\n        ]\n    };\n    await game.xjzl.api.effects.addEffect(args.target, buff);\n} else if (tune === \"yu\") {\n    ui.notifications.info(\"羽·天乐：请手动移除状态\");\n}",
                             "active": true
                         }
                     ]
@@ -1606,8 +1613,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
-                    "description": "<p>次要动作，步轻如燕，遁形避锋，获得“躲猫猫”，持续三回合。</p><p><strong>躲猫猫：</strong>你的速度+4。当自身是场上移动速度最快（并列第一）的角色时，你无法被招式选中。你对他人造成伤害后，移除躲猫猫。</p><p><strong>升级：</strong>躲猫猫的速度+2，怒气消耗-1，消耗+4。</p>",
-                    "automationNote": "BUFF速度自动。无法选中手动。造成伤害移除自动。",
+                    "description": "<p>次要动作，步轻如燕，遁形避锋，获得“躲猫猫”，持续三回合。</p><p><strong>躲猫猫：</strong>你的速度+@{4 + @up * 2|4}。当自身是场上移动速度最快（并列第一）的角色时，你无法被招式选中。你对他人造成伤害后，移除躲猫猫。</p><p><strong>升级：</strong>躲猫猫的速度+2，怒气消耗-1，消耗+4。</p>",
+                    "automationNote": "纯手动处理。卡片提示效果；速度提高4/6/8点、最快时无法被招式选中，以及对他人造成伤害后移除状态，均需手动处理。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
@@ -1624,14 +1631,7 @@
                             3
                         ]
                     },
-                    "scripts": [
-                        {
-                            "label": "应用BUFF",
-                            "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst spd = 4 + (lvl - 1) * 2;\n\nconst effData = thisItem.effects.getName(\"躲猫猫\").toObject();\ndelete effData._id;\neffData.origin = thisItem.uuid;\neffData.changes[0].value = String(spd);\n\nawait game.xjzl.api.effects.addEffect(actor, effData);",
-                            "active": true
-                        }
-                    ]
+                    "scripts": []
                 }
             ],
             "effects": [
@@ -1644,14 +1644,7 @@
                         "xjzl-system": {
                             "slug": "duomaomao",
                             "stackable": false,
-                            "scripts": [
-                                {
-                                    "label": "造成伤害移除",
-                                    "trigger": "hit",
-                                    "script": "// 攻击者视角：如果造成了伤害/攻击，移除自己身上的躲猫猫\n// 检查动作类型是否为攻击或实招/虚招\nif (args.actionType === 'attack' || args.isAttack) {\n    await thisEffect.delete();\n    ui.notifications.info(\"主动攻击，躲猫猫状态解除\");\n}",
-                                    "active": true
-                                }
-                            ]
+                            "scripts": []
                         }
                     },
                     "changes": [
@@ -1788,8 +1781,8 @@
                     "range": "自身",
                     "targetInfo": "自身",
                     "actionCost": "无",
-                    "description": "<p>你每次受到伤害进行死亡检定时，可以不消耗动作施展此招，凝神止血，逆转轮回，这次死亡检定的结果+10，同时回复 10 点血气内力，清醒过来。然后你获得一层“九命”，至多九层，直到你死亡。</p><p><strong>九命：</strong>叠满九层时，你的死亡检定结果必为 1。</p><p>·九命不会被任何其他内功、物品效果移除，直到死亡才会消散。</p><p><strong>升级：</strong>怒气消耗-1，消耗+8。</p>",
-                    "automationNote": "请在濒死/死亡时手动点击施展。会自动回复状态并添加九命BUFF。九命叠满效果需手动。",
+                    "description": "<p>你每次受到伤害进行死亡检定时，可以不消耗动作施展此招，凝神止血，逆转轮回，这次死亡检定的结果+10（需手动处理死亡检定修正），同时回复 10 点血气内力，清醒过来。然后你获得一层“九命”，至多九层，直到你死亡。</p><p><strong>九命：</strong>叠满九层时，你的死亡检定结果必为 1。</p><p>·九命不会被任何其他内功、物品效果移除，直到死亡才会消散。</p><p><strong>升级：</strong>怒气消耗-1，消耗+8。</p>",
+                    "automationNote": "死亡检定结果+10需手动处理；施展后自动回复气血、内力并解除濒死/死亡状态，再自动添加九命。九命叠满效果需手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 0
