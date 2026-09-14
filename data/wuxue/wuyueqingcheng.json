@@ -74,7 +74,7 @@
                         {
                             "label": "击破回内",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    await actor.applyHealing({ healer: actor,  amount: 5, type: \"mp\" });\n}",
+                            "script": "if (args.isBroken) {\n    await actor.applyHealing({\n        healer: actor,\n        amount: 5,\n        type: \"mp\",\n        item: args.item,\n        move: args.move,\n        source: \"move\"\n    });\n}",
                             "active": true
                         },
                         {
@@ -774,7 +774,7 @@
                     "targetInfo": "单体",
                     "actionCost": "反应动作",
                     "description": "<p>当被对手反击攻击时，可消耗反应动作施展，消耗“莫测”，压制对手反击，寒光陡闪，如梦如幻，刺向目标胸口，造成 1.0 力量点外功伤害。</p><p><strong>升级：</strong>伤害+20，怒气消耗-1，内力消耗+4。</p>",
-                    "automationNote": "反应条件需手动判断。",
+                    "automationNote": "反应条件需手动判断；出招前自动检查并在资源扣除后消耗[莫测]。",
                     "calculation": {
                         "base": 0,
                         "growth": 20,
@@ -799,10 +799,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "莫测强校验",
+                            "label": "莫测前置校验",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "if (!actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\")) {\n    args.abortReason = \"缺少 [莫测] 状态，无法施展！\";\n    args.abort = true;\n}"
+                        },
+                        {
+                            "label": "消耗莫测",
                             "trigger": "attack",
                             "active": true,
-                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (!moce) {\n    args.flags.abortReason = \"缺少 [莫测] 状态，无法施展！\";\n    args.flags.abort = true;\n} else {\n    await game.xjzl.api.effects.removeEffect(actor, \"moce\", 1);\n    actor.showFloatyText(\"消耗莫测\", { fill: \"#00ffff\" });\n}"
+                            "script": "const moce = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"moce\");\nif (moce) {\n    await game.xjzl.api.effects.removeEffect(actor, \"moce\", 1);\n    actor.showFloatyText(\"消耗莫测\", { fill: \"#00ffff\" });\n}"
                         }
                     ]
                 }
@@ -922,7 +928,7 @@
                         {
                             "label": "延长耳鸣",
                             "trigger": "hit",
-                            "script": "if (args.isBroken) {\n    const deaf = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"deaf\");\n    if (deaf) {\n        await deaf.update({ \"duration.rounds\": null, \"duration.turns\": null });\n        ui.notifications.info(`${args.target.name} 的耳鸣变为永久！`);\n    }\n}",
+                            "script": "if (args.isBroken) {\n    const deaf = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"deaf\");\n    if (deaf) {\n        const effectData = deaf.toObject();\n        delete effectData._id;\n        effectData.duration = {};\n        await game.xjzl.api.effects.removeEffect(args.target, deaf.id);\n        await game.xjzl.api.effects.addEffect(args.target, effectData);\n        ui.notifications.info(`${args.target.name} 的耳鸣变为永久！`);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -967,6 +973,7 @@
                     "actionCost": "反应动作",
                     "description": "<p>当你看破虚招时，可消耗反应动作释放，压制目标虚招，剑气如炬，澎湃而出，对周围敌人造成 0.6 内息点内功伤害。并且在范围内建立‘听风’，持续@{2 + @up|两}回合。</p><p><strong>听风：</strong>处于其中的友方单位招式伤害+5。</p><p><strong>升级：</strong>招式伤害+10，持续时间+1 回合，消耗+4。</p>",
                     "automationNote": "听风区域手动(提供AE给玩家手动添加)。",
+                    "x-xjzl-aura": true,
                     "calculation": {
                         "base": 0,
                         "growth": 10,
@@ -1327,7 +1334,7 @@
                         {
                             "label": "额外毒伤",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"poison\",\n        attacker: actor,\n        isHit: true\n    });\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyDamage({\n        amount: 10,\n        type: \"poison\",\n        attacker: actor,\n        item: args.item,\n        move: args.move,\n        source: \"extra\",\n        isHit: true\n    });\n}",
                             "active": true
                         }
                     ]
@@ -1626,7 +1633,7 @@
                         {
                             "label": "流失内力",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyHealing({ healer: actor,  amount: -15, type: \"mp\" });\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    await args.target.applyHealing({\n        healer: actor,\n        amount: -15,\n        type: \"mp\",\n        item: args.item,\n        move: args.move,\n        source: \"extra\"\n    });\n}",
                             "active": true
                         },
                         {
