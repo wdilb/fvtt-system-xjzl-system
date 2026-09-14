@@ -79,12 +79,14 @@
 但是：
 
 - 只有对应触发器实际传入的字段才存在。
-- `args` 是阶段上下文：同一触发内的脚本共享同一对象；跨触发阶段不会保留。唯一例外是 `attack` 阶段写入 `args.flags` 的自定义键——它们随攻击卡持久化为 `scriptFlags`，供同卡的 `check`/`preDamage`/`hit`/`hit_once` 读取（见 `attack` 触发器说明）。
+- `args` 是当前触发阶段的上下文。同一次触发中执行的所有脚本共享同一个 `args` 对象：前一个脚本对公开可写字段的修改，后续脚本可以立即读取。
+- 当前触发结束后，这个 `args` 对象就会被丢弃；进入另一个触发阶段时会创建新的上下文。普通字段不会跨触发阶段保留，不能用 `args.myFlag = ...` 在不同触发器之间传值。
+- 唯一的跨阶段传值通道是出招脚本标记：`preAttack` 可以把自定义键写入 `args.scriptFlags`，`attack` 可以把自定义键写入 `args.flags`。系统会先将前者合并到后者，再把最终结果随攻击卡保存为 `scriptFlags`；同卡后续的 `check`/`preDamage`/`hit`/`hit_once` 只能通过 `args.scriptFlags` 读取这份快照。
 - 脚本运行中新增 `args.myFlag` 不会同步新建顶层 `myFlag`。
 - 业务代码推荐统一从 `args` 读取阶段参数，并对 `args.target`、`args.attacker`、`args.move`、`args.item` 做空值检查。
 - 脚本内声明变量不要与注入的顶层变量重名（如 `const move` 会与注入的 `move` 冲突直接抛错），局部变量请另起名。
 
-对 `args.output`、`args.config`、`args.costConfig`、`args.flags` 等可写容器，应修改后文列出的子字段，不要替换整个对象。`args.baseData`、`args.outcome` 等只读对象当前没有冻结，但修改它们不属于公开契约，也不保证影响结算。
+可写容器以各触发器后文列出的字段为准：应修改 `args.output`、`args.config`、`args.costConfig`、`args.scriptFlags` 或 `args.flags` 的指定子字段，不要替换整个对象。其中 `args.scriptFlags` 只在 `preAttack` 中可写，后续阶段提供的同名对象是只读快照。`args.baseData`、`args.outcome` 等只读对象当前没有冻结，但修改它们不属于公开契约，也不保证影响结算。
 
 后台武学、架招和战斗时机中的招式脚本会临时获得 `args.move` 和顶层 `move`，用来表示脚本所属的招式。它不代表角色正在施展该招式。只有 `preAttack`、`attack`、`check`、`preDamage`、`hit`、`hit_once` 会被系统记作当前主动招式，供后续伤害、治疗和资源变化判断来源。
 
@@ -227,6 +229,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `costConfig.mp` | `number` | **可写** | 本次内力消耗。 |
 | `costConfig.hp` | `number` | **可写** | 本次气血消耗。 |
 | `costConfig.rage` | `number` | **可写** | 本次怒气消耗。 |
+| `scriptFlags` | `Object` | **可写** | 本次出招的自定义选择；系统会在进入 `attack` 时将其合并到 `args.flags`，并随攻击卡传给后续阶段。 |
 | `abort` | `boolean` | **可写** | 设为 `true` 会在扣除资源前中止出招。 |
 | `abortReason` | `string` | **可写** | 中止时向操作者显示的提示。 |
 

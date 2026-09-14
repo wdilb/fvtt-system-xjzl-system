@@ -1865,6 +1865,9 @@ export class XJZLItem extends Item {
         item: this,
         attacker: actor,
         costConfig: finalCost, // 传入引用，脚本内修改 args.costConfig 即可生效
+        // 允许出招前的用户选择随本次攻击卡传递到后续阶段。
+        // 这是每次出招独立的临时容器，不写入 Actor，避免多张待结算卡片互相污染。
+        scriptFlags: {},
         abort: false,
         abortReason: ""
       };
@@ -2022,6 +2025,8 @@ export class XJZLItem extends Item {
         // 核心 Flags (供脚本修改)
         costConsumed: costConsumed,
         flags: {
+          // preAttack 阶段的用户选择在这里并入，随后随攻击卡快照提供给后续脚本阶段。
+          ...preAttackContext.scriptFlags,
           level: postPreAttackStatuses.attackLevel || 0, // 使用数值计数器，不再使用布尔值的flags,初始值继承自 Actor
           feintLevel: postPreAttackStatuses.feintLevel || 0, // 虚招自身等级
           abort: false,       // 脚本设为 true 可阻断攻击
