@@ -225,7 +225,7 @@
                             "label": "调怒",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (!args.target) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"冲和吟\" },\n    content: \"<p>选择对目标的效果：</p>\",\n    yes: { label: \"增加 2 怒气\", icon: \"fas fa-plus\" },\n    no: { label: \"减少 1 怒气\", icon: \"fas fa-minus\" }\n});\n\nconst current = args.target.system.resources.rage.value;\nlet newVal = current;\nif (confirm) {\n    newVal = Math.min(args.target.system.resources.rage.max, current + 2);\n    ui.notifications.info(`${args.target.name} 怒气 +2`);\n} else {\n    newVal = Math.max(0, current - 1);\n    ui.notifications.info(`${args.target.name} 怒气 -1`);\n}\nawait args.target.changeResources({ \"system.resources.rage.value\": newVal }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });"
+                            "script": "if (!args.target) return;\nconst confirm = await foundry.applications.api.DialogV2.confirm({\n    window: { title: \"冲和吟\" },\n    content: \"<p>选择对目标的效果：</p>\",\n    yes: { label: \"增加 2 怒气\", icon: \"fas fa-plus\" },\n    no: { label: \"减少 1 怒气\", icon: \"fas fa-minus\" }\n});\n// 关闭弹窗 (null) 不结算，避免误当作减少\nif (confirm === null) return;\n\n// 资源事务不裁剪负值，增减必须显式处理上下限\nconst rageRes = args.target.system.resources.rage;\nconst newVal = confirm\n    ? Math.min(rageRes.max, rageRes.value + 2)\n    : Math.max(0, rageRes.value - 1);\nawait args.target.changeResources({ \"system.resources.rage.value\": newVal }, { cause: \"script\", source: \"move\", sourceActor: actor, target: args.target, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nui.notifications.info(`${args.target.name} 怒气 ${confirm ? \"+2\" : \"-1\"}`);"
                         }
                     ]
                 }
@@ -555,7 +555,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 11,\n        label: \"抵抗月儿高\",\n        onFail: \"deaf\"\n    });\n}"
+                            "script": "if (args.isHit) {\n    // 耳鸣持续一回合：需带duration的完整状态数据，不能用无期限的状态ID\n    const deafTpl = CONFIG.statusEffects.find(e => e.id === \"deaf\");\n    const deafData = deafTpl ? foundry.utils.deepClone(deafTpl) : null;\n    if (deafData) deafData.duration = { rounds: 1 };\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 11,\n        label: \"抵抗月儿高\",\n        onFail: deafData\n    });\n}"
                         }
                     ]
                 }
@@ -584,7 +584,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，玉笛清音，傲雪凌霜，目标进行难度13的[定力]检定，成功无事，失败则目标流失30点气血，并陷入“错骨”，持续一回合。</p><p><strong>音阶排序：</strong>商、羽</p><p><strong>天籁之音：</strong>难度+3，流失气血提升30点。</p>",
-                    "automationNote": "命中后请求检定自动。失败施加错骨自动。流失气血需手动。",
+                    "automationNote": "命中后请求检定自动。失败施加错骨与流失30点气血自动。天籁之音的难度+3与流失提升需手动。",
                     "tier": 1,
                     "progression": {
                         "mode": "custom",
@@ -613,7 +613,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 13,\n        label: \"抵抗梅花落\",\n        onFail: \"cuogu\"\n    });\n    ChatMessage.create({\n        content: `<div class=\"xjzl-chat-card\"><p>若目标检定失败，请手动流失 30 点气血。</p></div>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n}"
+                            "script": "if (args.isHit) {\n    // 错骨持续一回合：需带duration的完整状态数据\n    const cuoguTpl = CONFIG.statusEffects.find(e => e.id === \"cuogu\");\n    const cuoguData = cuoguTpl ? foundry.utils.deepClone(cuoguTpl) : null;\n    if (cuoguData) cuoguData.duration = { rounds: 1 };\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 13,\n        label: \"抵抗梅花落\",\n        onFail: cuoguData,\n        // hp为资源类型，requestSave 会走负数applyHealing直接流失，无需手动扣除\n        damageOnFail: { value: 30, type: \"hp\" },\n        failureText: \"真气逆行，错骨失血！流失 30 点气血。\",\n        successText: \"心神坚定，未受影响。\"\n    });\n}"
                         }
                     ]
                 }
@@ -1139,7 +1139,7 @@
                             "label": "解除状态",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const slugs = [\"root\", \"unstable\", \"prone\", \"stun\", \"forceSpeedZero\"];\nconst toRemove = args.target.effects.find(e => slugs.includes(e.getFlag(\"xjzl-system\", \"slug\")));\nif (toRemove) {\n    await toRemove.delete();\n    ui.notifications.info(`${args.target.name} 解除了 [${toRemove.name}]`);\n} else {\n    ui.notifications.info(`${args.target.name} 无可解除的移动限制`);\n}"
+                            "script": "const slugs = [\"root\", \"unstable\", \"prone\", \"stun\", \"forceSpeedZero\"];\nconst toRemove = args.target.effects.find(e => slugs.includes(e.getFlag(\"xjzl-system\", \"slug\")));\nif (toRemove) {\n    const slug = toRemove.getFlag(\"xjzl-system\", \"slug\") || toRemove.id;\n    await game.xjzl.api.effects.removeEffect(args.target, slug, 999);\n    ui.notifications.info(`${args.target.name} 解除了 [${toRemove.name}]`);\n} else {\n    ui.notifications.info(`${args.target.name} 无可解除的移动限制`);\n}"
                         }
                     ]
                 }
@@ -1314,7 +1314,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 注意：此招式是 成功 获得BUFF\nconst roll = await args.target.rollAttributeTest(\"dingli\", { level: 0 });\nif (roll.total >= 16) {\n    const eff = thisItem.effects.getName(\"夕阳\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n    ui.notifications.info(\"检定成功，获得 [夕阳]\");\n} else {\n    ui.notifications.info(\"检定失败，无事发生\");\n}"
+                            "script": "// 注意：此招式是 成功 获得BUFF，用 requestSave 的 onSuccess 承载\nconst tpl = thisItem.effects.getName(\"夕阳\");\nconst effData = tpl ? tpl.toObject() : null;\nif (!effData) return;\ndelete effData._id;\neffData.origin = thisItem.uuid;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 16,\n    label: \"聆听夕阳箫鼓\",\n    onSuccess: effData,\n    successText: \"乐音入心，获得 [夕阳]。\",\n    failureText: \"心神坚定，未受乐音侵扰。\"\n});"
                         }
                     ]
                 }
@@ -1405,7 +1405,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "if (args.isHit) {\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 15,\n        label: \"抵抗苍梧引\",\n        onFail: [\n            CONFIG.statusEffects.find(e => e.id === \"prone\"),\n            CONFIG.statusEffects.find(e => e.id === \"deaf\")\n        ]\n    });\n}"
+                            "script": "if (args.isHit) {\n    // 倒地/耳鸣持续三回合：需带duration的完整状态数据\n    const failEffects = [\"prone\", \"deaf\"].map(id => {\n        const tpl = CONFIG.statusEffects.find(e => e.id === id);\n        if (!tpl) return null;\n        const data = foundry.utils.deepClone(tpl);\n        data.duration = { rounds: 3 };\n        return data;\n    }).filter(Boolean);\n    await Macros.requestSave({\n        target: args.target,\n        attacker: actor,\n        type: \"dingli\",\n        dc: 15,\n        label: \"抵抗苍梧引\",\n        onFail: failEffects\n    });\n}"
                         }
                     ]
                 }
@@ -1610,7 +1610,7 @@
                                     "label": "暴击减伤",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "if (args.isCrit) { args.output.damage -= 40; thisEffect.delete(); ui.notifications.info(`${actor.name} 映月触发：减免 40 伤害`); }"
+                                    "script": "if (args.isCrit) { args.output.damage -= 40; await game.xjzl.api.effects.removeEffect(actor, \"yingyue\", 999); ui.notifications.info(`${actor.name} 映月触发：减免 40 伤害`); }"
                                 }
                             ]
                         }
@@ -1873,7 +1873,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const isRooted = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"root\");\nlet failed = false;\n\nif (isRooted) {\n    failed = true;\n    ui.notifications.info(`${args.target.name} 被禁足，检定必定失败`);\n} else {\n    const roll = await args.target.rollAttributeTest(\"dingli\", { level: 0 });\n    if (roll.total < 20) failed = true;\n}\n\nif (failed) {\n    const eff = thisItem.effects.getName(\"哀恨\").toObject();\n    delete eff._id;\n    eff.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}"
+                            "script": "if (!args.isHit) return;\n// 处于禁足时检定必定失败：跳过检定直接施加一层哀恨\nconst isRooted = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"root\");\nconst tpl = thisItem.effects.getName(\"哀恨\");\nconst aiHenData = tpl ? tpl.toObject() : null;\nif (!aiHenData) return;\ndelete aiHenData._id;\naiHenData.origin = thisItem.uuid;\n\nif (isRooted) {\n    await game.xjzl.api.effects.addEffect(args.target, aiHenData);\n    ui.notifications.info(`${args.target.name} 被禁足，检定必定失败，获得 [哀恨]`);\n    return;\n}\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 20,\n    label: \"抵抗胡笳十八拍\",\n    onFail: aiHenData,\n    failureText: \"哀恨缠身，获得一层 [哀恨]。\",\n    successText: \"心神坚定，未沾染哀恨。\"\n});"
                         }
                     ]
                 }
@@ -1924,7 +1924,7 @@
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
                     "description": "<p>全回合动作，纷披灿烂，戈矛纵横，对范围内所有敌方造成0.7内息点内功伤害。若目标手持剑、刀、枪,还会为其添加“迟滞”，持续一回合。</p><p>·并为范围内友方添加“广陵”，持续一回合。</p><p><strong>广陵：</strong>招式伤害提升20点。</p><p>·若自身标签为【侠】，演奏难度降低5。</p><p><strong>音阶排序：</strong>徵、商、徵、羽</p><p><strong>天籁之音：</strong>伤害提升60点。</p>",
-                    "automationNote": "若目标持兵器请手动添加[迟滞]。请手动给友方添加[广陵]。",
+                    "automationNote": "持剑/刀/枪(棍)的命中目标添加迟滞自动。给友方添加[广陵]手动。",
                     "tier": 3,
                     "progression": {
                         "mode": "custom",
@@ -1959,7 +1959,7 @@
                             "label": "广陵提示",
                             "trigger": "hit",
                             "active": true,
-                            "script": "ChatMessage.create({ content: `请手动给友方添加 [广陵] (伤害+20)。若目标持刀剑枪，请手动添加 [迟滞]。`, speaker: ChatMessage.getSpeaker({actor: actor}) });"
+                            "script": "// 持剑/刀/枪(棍)的命中目标自动添加迟滞一回合\nif (args.isHit) {\n    const armedTypes = [\"sword\", \"blade\", \"staff\"]; // 剑、刀、枪/棍\n    const weapon = (args.target.itemTypes.weapon || []).find(w => w.system?.equipped && armedTypes.includes(w.system?.type));\n    if (weapon) {\n        const tpl = CONFIG.statusEffects.find(e => e.id === \"chizhi\");\n        if (tpl) {\n            const data = foundry.utils.deepClone(tpl);\n            data.duration = { rounds: 1 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n            ui.notifications.info(`${args.target.name} 手持兵器，被琴音所滞，陷入 [迟滞]`);\n        }\n    }\n}\n\nChatMessage.create({ content: `<div class=\\\"xjzl-chat-card\\\"><p>请手动给范围内友方添加 [广陵] (招式伤害+20)。</p></div>`, speaker: ChatMessage.getSpeaker({actor: actor}) });"
                         }
                     ]
                 }
@@ -2010,7 +2010,7 @@
                     "targetInfo": "单体",
                     "actionCost": "蓄力动作",
                     "description": "<p>蓄力动作，奏山林石间，风吹有声，对目标造成0.5 内息点内功伤害，同时进行一个[定力]检定（难度 16），失败则失去 2 点怒气。</p><p>·若目标为[恶]，检定必定失败。</p><p><strong>音阶排序：</strong>徵、羽、商</p><p><strong>天籁之音：</strong>伤害提升 20 点，难度+3。</p>",
-                    "automationNote": "恶人判定与扣怒自动。",
+                    "automationNote": "命中后检定自动，失败扣怒自动。恶人判定与扣怒自动。",
                     "tier": 2,
                     "progression": {
                         "mode": "custom",
@@ -2045,7 +2045,7 @@
                             "label": "定力检定",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const isEvil = (args.target.system.social.exing >= 100 && args.target.system.social.xiayi <= 50);\nlet failed = false;\n\nif (isEvil) {\n    failed = true;\n    ui.notifications.info(`${args.target.name} 为恶人，检定必定失败`);\n} else {\n    const roll = await args.target.rollAttributeTest(\"dingli\", { level: 0 });\n    if (roll.total < 16) failed = true;\n}\n\nif (failed) {\n    await args.target.applyHealing({ healer: actor,  amount: -2, type: 'rage', showScrolling: true });\n}"
+                            "script": "if (!args.isHit) return;\n// 阵营判断：邪/恶 (exing >= 100 && xiayi <= 50)\nconst isEvil = (args.target.system.social.exing >= 100 && args.target.system.social.xiayi <= 50);\nif (isEvil) {\n    // 恶人检定必定失败：直接流失2点怒气\n    await args.target.applyHealing({ healer: actor, amount: -2, type: \"rage\", showScrolling: true });\n    ui.notifications.info(`${args.target.name} 为恶人，心境受制，流失 2 点怒气`);\n    return;\n}\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 16,\n    label: \"抵抗遁世操\",\n    // rage为资源类型，requestSave 走负数applyHealing直接流失\n    damageOnFail: { value: 2, type: \"rage\" },\n    failureText: \"心境失守，流失 2 点怒气。\",\n    successText: \"心志坚定，不为所动。\"\n});"
                         }
                     ]
                 }
@@ -2161,7 +2161,7 @@
                             "label": "选择效果版本",
                             "trigger": "hit",
                             "active": true,
-                            "script": "const basicEff = thisItem.effects.getName(\"笑傲\").toObject();\nconst heavenEff = thisItem.effects.getName(\"笑傲 (天籁)\").toObject();\ndelete basicEff._id; basicEff.origin = thisItem.uuid;\ndelete heavenEff._id; heavenEff.origin = thisItem.uuid;\n\nnew Dialog({\n  title: \"演奏效果判定\",\n  content: \"<p>请根据演奏检定结果选择效果：</p>\",\n  buttons: {\n    normal: {\n      label: \"普通 (命中+5, 抵挡30)\",\n      callback: async () => await game.xjzl.api.effects.addEffect(args.target, basicEff)\n    },\n    heaven: {\n      label: \"天籁 (必中, 抵挡200)\",\n      callback: async () => await game.xjzl.api.effects.addEffect(args.target, heavenEff)\n    }\n  },\n  default: \"normal\"\n}).render(true);"
+                            "script": "const basicEff = thisItem.effects.getName(\"笑傲\").toObject();\nconst heavenEff = thisItem.effects.getName(\"笑傲 (天籁)\").toObject();\ndelete basicEff._id; basicEff.origin = thisItem.uuid;\ndelete heavenEff._id; heavenEff.origin = thisItem.uuid;\n\nconst choice = await foundry.applications.api.DialogV2.wait({\n    window: { title: \"演奏效果判定\" },\n    content: \"<p>请根据演奏检定结果选择效果：</p>\",\n    buttons: [\n        { action: \"normal\", label: \"普通 (命中+5, 抵挡30)\", callback: () => \"normal\" },\n        { action: \"heaven\", label: \"天籁 (必中, 抵挡200)\", callback: () => \"heaven\" }\n    ]\n});\n\nif (choice === \"normal\") {\n    await game.xjzl.api.effects.addEffect(args.target, basicEff);\n} else if (choice === \"heaven\") {\n    await game.xjzl.api.effects.addEffect(args.target, heavenEff);\n}"
                         }
                     ]
                 }
@@ -2192,7 +2192,7 @@
                                     "label": "减伤移除",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "if (['waigong','neigong'].includes(args.type)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '笑傲江湖' },\n        content: '<p>消耗 [笑傲] 抵挡 <b>30</b> 点伤害？</p>',\n        yes: { label: '抵挡', icon: 'fas fa-shield-alt' },\n        no: { label: '保留', icon: 'fas fa-times' }\n    });\n    if (confirm) {\n        args.output.damage -= 30;\n        thisEffect.delete();\n    }\n}"
+                                    "script": "if (['waigong','neigong'].includes(args.type)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '笑傲江湖' },\n        content: '<p>消耗 [笑傲] 抵挡 <b>30</b> 点伤害？</p>',\n        yes: { label: '抵挡', icon: 'fas fa-shield-alt' },\n        no: { label: '保留', icon: 'fas fa-times' }\n    });\n    if (confirm) {\n        args.output.damage -= 30;\n        await game.xjzl.api.effects.removeEffect(actor, \"xiaoao\", 999);\n    }\n}"
                                 }
                             ]
                         }
@@ -2218,7 +2218,7 @@
                                     "label": "强力减伤移除",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "if (['waigong','neigong'].includes(args.type)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '笑傲江湖 (天籁)' },\n        content: '<p>消耗 [笑傲] 抵挡 <b>200</b> 点伤害？</p>',\n        yes: { label: '抵挡', icon: 'fas fa-shield-alt' },\n        no: { label: '保留', icon: 'fas fa-times' }\n    });\n    if (confirm) {\n        args.output.damage -= 200;\n        thisEffect.delete();\n    }\n}"
+                                    "script": "if (['waigong','neigong'].includes(args.type)) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: '笑傲江湖 (天籁)' },\n        content: '<p>消耗 [笑傲] 抵挡 <b>200</b> 点伤害？</p>',\n        yes: { label: '抵挡', icon: 'fas fa-shield-alt' },\n        no: { label: '保留', icon: 'fas fa-times' }\n    });\n    if (confirm) {\n        args.output.damage -= 200;\n        await game.xjzl.api.effects.removeEffect(actor, \"xiaoao_heaven\", 999);\n    }\n}"
                                 }
                             ]
                         }
@@ -2310,7 +2310,7 @@
                                     "label": "减伤移除",
                                     "trigger": "preTake",
                                     "active": true,
-                                    "script": "if (['waigong','neigong'].includes(args.type)) { const confirm = await foundry.applications.api.DialogV2.confirm({ window:{title:'笑傲江湖'}, content:'消耗[笑傲]抵挡30点伤害？', yes:{label:'抵挡'}, no:{label:'保留'} }); if(confirm){ args.output.damage -= 30; thisEffect.delete(); } }"
+                                    "script": "if (['waigong','neigong'].includes(args.type)) { const confirm = await foundry.applications.api.DialogV2.confirm({ window:{title:'笑傲江湖'}, content:'消耗[笑傲]抵挡30点伤害？', yes:{label:'抵挡'}, no:{label:'保留'} }); if(confirm){ args.output.damage -= 30; await game.xjzl.api.effects.removeEffect(actor, \"xiaoao\", 999); } }"
                                 }
                             ]
                         }
@@ -2340,7 +2340,7 @@
                     "targetInfo": "范围",
                     "actionCost": "全回合动作",
                     "description": "<p>全回合动作，五音乍起，奏一曲离愁别绪，范围内所有敌方进行一个[定力]检定（难度 13），失败则受到 0.4 内息点内功伤害。</p><p><strong>音阶排序：</strong>商、徵</p><p><strong>天籁之音：</strong>招式伤害+10 点。</p>",
-                    "automationNote": "通过脚本处理伤害，失败自动应用。",
+                    "automationNote": "命中后自动请求定力检定：失败承受面板内功伤害（保留防御与抗性），成功不受伤害。天籁之音伤害+10需手动。",
                     "tier": 1,
                     "progression": {
                         "mode": "custom",
@@ -2372,16 +2372,10 @@
                     },
                     "scripts": [
                         {
-                            "label": "定力检定应用伤害",
-                            "trigger": "attack",
+                            "label": "定力豁免伤害",
+                            "trigger": "preDamage",
                             "active": true,
-                            "script": "args.flags.autoApplied = true; // 阻止自动应用伤害，改由hit脚本判断"
-                        },
-                        {
-                            "label": "检定处理",
-                            "trigger": "hit",
-                            "active": true,
-                            "script": "const roll = await args.target.rollAttributeTest(\"dingli\", { level: 0 });\nif (roll.total < 13) {\n    await args.target.applyDamage(args.damageResult);\n} else{  ui.notifications.info(`${args.target.name} 抵抗了雨霖铃`);\n}"
+                            "script": "// 截获面板伤害并清零主流程伤害，由检定结果决定是否承受\nconst dmg = args.config.amount;\nargs.config.amount = 0;\n\nawait Macros.requestSave({\n    target: args.target,\n    attacker: actor,\n    type: \"dingli\",\n    dc: 13,\n    label: \"抵抗雨霖铃\",\n    // 内功伤害保留防御与抗性，由 requestSave 标准结算\n    damageOnFail: { value: dmg, type: \"neigong\" },\n    failureText: \"定力不足，琴音直入心神！\",\n    successText: \"心神坚定，不受琴音所扰。\"\n});"
                         }
                     ]
                 }
@@ -3310,7 +3304,7 @@
                     "targetInfo": "全体友方",
                     "actionCost": "全回合动作",
                     "description": "<p>全回合动作，琴音绵绵，安神定气，给所有友方角色增添“龙龟气”，持续三回合。<br>龙龟气：你每次受伤后，回复[忍耐]数值的气血。<br>·如果你投掷死亡检定失败，你可以移除“龙龟气”，重掷死亡检定。<br>音阶排序：角、羽、商、羽<br>天籁之音：龙龟气持续回合+2，回复气血+20。</p>",
-                    "automationNote": "内力消耗自动扣除20%最大值。BUFF受击回血自动。重掷死检手动。",
+                    "automationNote": "内力消耗自动改为20%最大值（不足时由系统标准流程中止）。BUFF受击回血自动。重掷死检手动。",
                     "progression": {
                         "mode": "custom",
                         "customThresholds": [
@@ -3328,16 +3322,16 @@
                     },
                     "scripts": [
                         {
-                            "label": "扣除内力与应用",
-                            "trigger": "attack",
-                            "script": "// 扣除 20% 最大内力\nconst maxMp = actor.system.resources.mp.max;\nconst cost = Math.floor(maxMp * 0.2);\nconst currentMp = actor.system.resources.mp.value;\n\nif (currentMp < cost) {\n    args.flags.abort = true;\n    args.flags.abortReason = `内力不足！需要 ${cost} (20%最大值)`;\n    return;\n}\n\n// 手动扣除\nawait actor.changeResources({ \"system.resources.mp.value\": { delta: -cost } }, { cause: \"moveCost\", source: \"move\", sourceActor: actor, item: thisItem instanceof Item ? thisItem : (args.item || null), move: typeof move !== \"undefined\" ? move : (args.move || null) });\nui.notifications.info(`龙龟寿：消耗 ${cost} 点内力`);",
-                            "active": true
-                        },
-                        {
                             "label": "添加龙龟气",
                             "trigger": "hit",
                             "script": "const eff = thisItem.effects.getName(\"龙龟气\").toObject();\neff.origin = thisItem.uuid;\nawait game.xjzl.api.effects.addEffect(args.target, eff);",
                             "active": true
+                        },
+                        {
+                            "label": "动态内力消耗",
+                            "trigger": "preAttack",
+                            "active": true,
+                            "script": "// 在余额检查与资源扣除前把内力消耗改为20%最大值，扣除与中止交给系统标准流程\nargs.costConfig.mp = Math.floor(actor.system.resources.mp.max * 0.2);"
                         }
                     ],
                     "actionType": "buff"
@@ -3410,7 +3404,7 @@
                         {
                             "label": "裂天地效果",
                             "trigger": "hit",
-                            "script": "// 计算目标总属性\nconst stats = args.target.system.stats;\nlet totalStats = 0;\nfor (const k of [\"liliang\", \"shenfa\", \"neixi\", \"tipo\", \"qigan\", \"shencai\", \"wuxing\"]) {\n    totalStats += (stats[k]?.total || 0);\n}\n\nconsole.log(`裂天地检测 ${args.target.name}: 总属性 ${totalStats}`);\n\nif (totalStats < 300) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"root\", true); // 禁足\n    await game.xjzl.api.effects.toggleStatus(args.target, \"blind\", true); // 目盲\n    await game.xjzl.api.effects.toggleStatus(args.target, \"fushen\", true); // 缚身\n    ui.notifications.info(`${args.target.name} (属性<300) 受到严重干扰！`);\n}\nif (totalStats < 200) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}\nif (totalStats < 100) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"stun\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
+                            "script": "// 计算目标总属性\nconst stats = args.target.system.stats;\nlet totalStats = 0;\nfor (const k of [\"liliang\", \"shenfa\", \"neixi\", \"tipo\", \"qigan\", \"shencai\", \"wuxing\"]) {\n    totalStats += (stats[k]?.total || 0);\n}\n\nif (totalStats < 300) {\n    // 禁足/目盲/缚身持续三回合：用带duration的数据施加而非toggleStatus（无期限）\n    for (const id of [\"root\", \"blind\", \"fushen\"]) {\n        const tpl = CONFIG.statusEffects.find(e => e.id === id);\n        if (tpl) {\n            const data = foundry.utils.deepClone(tpl);\n            data.duration = { rounds: 3 };\n            await game.xjzl.api.effects.addEffect(args.target, data);\n        }\n    }\n    ui.notifications.info(`${args.target.name} (属性<300) 受到严重干扰！`);\n}\nif (totalStats < 200) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"fengzhao\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}\nif (totalStats < 100) {\n    const eff = CONFIG.statusEffects.find(e => e.id === \"stun\");\n    if(eff) {\n        const data = foundry.utils.deepClone(eff);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         }
                     ]

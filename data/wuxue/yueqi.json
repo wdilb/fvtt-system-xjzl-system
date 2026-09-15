@@ -42,7 +42,7 @@
                         {
                             "label": "添加效果",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"unstable\", true);\n}",
+                            "script": "if (args.isHit) {\n    // 下盘不稳持续一回合：需带duration的数据施加而非toggleStatus（无期限）\n    const tpl = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (tpl) {\n        const data = foundry.utils.deepClone(tpl);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n}",
                             "active": true
                         },
                         {
@@ -308,7 +308,7 @@
                     "targetInfo": "范围",
                     "actionCost": "蓄力动作",
                     "description": "<p>长音浑厚，对周围敌方造成 0.3 内息点内功伤害。</p><p>·招式范围内每有一个目标存在“惜别”，招式伤害提升 5 点。</p><p><strong>升级：</strong>招式伤害+5，内力消耗+2。</p>",
-                    "automationNote": "惜别增伤自动。",
+                    "automationNote": "惜别增伤自动（按本次选定目标计数）。",
                     "calculation": {
                         "base": 0,
                         "growth": 5,
@@ -330,7 +330,7 @@
                         {
                             "label": "惜别增伤",
                             "trigger": "preDamage",
-                            "script": "if (args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xibie\")) {\n    args.config.amount += 5;\n}",
+                            "script": "// 统计本次选定目标中身负[惜别]的个数，每有一个伤害+5\nconst allTargets = args.targets || [args.target];\nconst count = allTargets.filter(t => t?.effects?.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xibie\")).length;\nif (count > 0) {\n    args.config.amount += 5 * count;\n    ui.notifications.info(`曲无别意：${count} 个目标身负[惜别]，伤害 +${5 * count}`);\n}",
                             "active": true
                         }
                     ]
@@ -376,7 +376,8 @@
                             "script": "const eff = thisItem.effects.getName(\"相思\").toObject();\nawait game.xjzl.api.effects.addEffect(actor, eff);",
                             "active": true
                         }
-                    ]
+                    ],
+                    "x-xjzl-aura": true
                 }
             ],
             "effects": [
@@ -477,7 +478,7 @@
                         {
                             "label": "施加蓄劲",
                             "trigger": "hit",
-                            "script": "const hasCaitou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"caitou\");\nconst stacksToAdd = hasCaitou ? 2 : 1;\n\nconst eff = thisItem.effects.getName(\"蓄劲\").toObject();\nif (hasCaitou) {\n    ui.notifications.info(\"彩头生效：额外添加一层蓄劲！请手动移除彩头。\");\n}\n\n// 循环叠加\nfor(let i=0; i<stacksToAdd; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "const hasCaitou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"caitou\");\nconst stacksToAdd = hasCaitou ? 2 : 1;\n\nconst eff = thisItem.effects.getName(\"蓄劲\").toObject();\nif (hasCaitou) {\n    ui.notifications.info(\"彩头生效：额外添加一层蓄劲！请手动移除彩头。\");\n}\n\n// 层数作为 count 传入，changes 数值才会按层数乘算\nawait game.xjzl.api.effects.addEffect(args.target, eff, stacksToAdd);",
                             "active": true
                         }
                     ],
@@ -515,7 +516,7 @@
                         {
                             "label": "下盘不稳与击倒",
                             "trigger": "hit",
-                            "script": "if (args.isHit) {\n    await game.xjzl.api.effects.toggleStatus(args.target, \"unstable\", true);\n    \n    const hasCaitou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"caitou\");\n    if (hasCaitou) {\n        await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n        ui.notifications.info(\"彩头生效：目标已倒地！请手动移除彩头。\");\n    }\n}",
+                            "script": "if (args.isHit) {\n    // 下盘不稳持续一回合：需带duration的数据施加而非toggleStatus（无期限）\n    const tpl = CONFIG.statusEffects.find(e => e.id === \"unstable\");\n    if (tpl) {\n        const data = foundry.utils.deepClone(tpl);\n        data.duration = { rounds: 1 };\n        await game.xjzl.api.effects.addEffect(args.target, data);\n    }\n    \n    const hasCaitou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"caitou\");\n    if (hasCaitou) {\n        await game.xjzl.api.effects.toggleStatus(args.target, \"prone\", true);\n        ui.notifications.info(\"彩头生效：目标已倒地！请手动移除彩头。\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -552,7 +553,7 @@
                         {
                             "label": "施加养血",
                             "trigger": "hit",
-                            "script": "// 默认给目标施加养血\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"养血\").toObject();\n\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}\n\n// 提示彩头流血\nconst hasCaitou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"caitou\");\nif (hasCaitou) {\n    ui.notifications.info(\"彩头生效：请手动给敌方目标施加 [流血] (消耗彩头)。\");\n}",
+                            "script": "// 默认给目标施加养血\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"养血\").toObject();\n\n// 层数作为 count 传入，changes 数值才会按层数乘算\nawait game.xjzl.api.effects.addEffect(args.target, eff, stacks);\n\n// 提示彩头流血\nconst hasCaitou = actor.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"caitou\");\nif (hasCaitou) {\n    ui.notifications.info(\"彩头生效：请手动给敌方目标施加 [流血] (消耗彩头)。\");\n}",
                             "active": true
                         }
                     ],
@@ -989,7 +990,7 @@
                         {
                             "label": "托起与护身",
                             "trigger": "hit",
-                            "script": "await game.xjzl.api.effects.removeEffect(args.target, \"prone\", 100);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"护身\").toObject();\n\nfor(let i=0; i<stacks; i++) {\n    await game.xjzl.api.effects.addEffect(args.target, eff);\n}",
+                            "script": "await game.xjzl.api.effects.removeEffect(args.target, \"prone\", 100);\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst stacks = 1 + (lvl - 1);\nconst eff = thisItem.effects.getName(\"护身\").toObject();\n\n// 层数作为 count 传入，changes 数值才会按层数乘算\nawait game.xjzl.api.effects.addEffect(args.target, eff, stacks);",
                             "active": true
                         }
                     ],
@@ -1053,7 +1054,7 @@
                         {
                             "label": "施加香醪",
                             "trigger": "hit",
-                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst critReduction = -1 + (lvl - 1) * (-2);\n\nconst eff = thisItem.effects.getName(\"香醪\").toObject();\neff.duration = { rounds: rounds };\neff.changes[0].value = String(critReduction);\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nui.notifications.info(\"请手动消耗背包中的美酒。\");",
+                            "script": "const lvl = Math.max(1, move.computedLevel || 1);\nconst rounds = 3 + (lvl - 1);\nconst critReduction = -1 + (lvl - 1) * (-2);\n\nconst eff = thisItem.effects.getName(\"香醪\").toObject();\neff.duration = { rounds: rounds };\n// 内外功暴击骰同步降低\neff.changes[0].value = String(critReduction);\neff.changes[1].value = String(critReduction);\n\nawait game.xjzl.api.effects.addEffect(args.target, eff);\nui.notifications.info(\"请手动消耗背包中的美酒。\");",
                             "active": true
                         }
                     ],
@@ -1196,7 +1197,8 @@
                             "script": "if (Macros.checkStance(actor, args)) {\n    ui.notifications.info(\"格挡成功：请手动给自己施加 [荻花秋瑟] (使用物品内特效)。\");\n}",
                             "active": true
                         }
-                    ]
+                    ],
+                    "x-xjzl-aura": true
                 },
                 {
                     "name": "珠落玉盘",
@@ -1316,7 +1318,7 @@
                         {
                             "label": "消耗光环必中",
                             "trigger": "attack",
-                            "script": "const aura = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dihua_qiuse\");\nif (aura) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"无声胜有声\" },\n        content: \"<p>是否移除 [荻花秋瑟] 以获得 <b>必中</b> 效果？</p>\",\n        yes: { label: \"移除并必中\", icon: \"fas fa-check\" },\n        no: { label: \"保留光环\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await aura.delete();\n        args.flags.forceHit = true;\n        ui.notifications.info(\"光环已移除，本招式必中！\");\n    }\n}",
+                            "script": "const aura = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"dihua_qiuse\");\nif (aura) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"无声胜有声\" },\n        content: \"<p>是否移除 [荻花秋瑟] 以获得 <b>必中</b> 效果？</p>\",\n        yes: { label: \"移除并必中\", icon: \"fas fa-check\" },\n        no: { label: \"保留光环\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"dihua_qiuse\", 999);\n        args.flags.forceHit = true;\n        ui.notifications.info(\"光环已移除，本招式必中！\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1444,7 +1446,7 @@
                         {
                             "label": "饥饿效果",
                             "trigger": "hit",
-                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const target = args.target;\n    const satiety = target.system.resources.satiety.value;\n    \n    if (satiety > 0) {\n        await target.update({\"system.resources.satiety.value\": 0});\n        ui.notifications.info(`${target.name} 饱食度已归零！请手动移除食物BUFF。`);\n    } else {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const stacks = 1 + (lvl - 1);\n        const eff = CONFIG.statusEffects.find(e => e.id === \"hunger\");\n        if(eff) {\n            for(let i=0; i<stacks; i++) {\n                await game.xjzl.api.effects.addEffect(target, eff);\n            }\n        }\n    }\n}",
+                            "script": "if (args.isHit && !args.target.system.martial.stanceActive) {\n    const tgt = args.target;\n    const satiety = tgt.system.resources.satiety.value;\n    \n    if (satiety > 0) {\n        await tgt.update({\"system.resources.satiety.value\": 0});\n        ui.notifications.info(`${tgt.name} 饱食度已归零！请手动移除食物BUFF。`);\n    } else {\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const stacks = 1 + (lvl - 1);\n        const eff = CONFIG.statusEffects.find(e => e.id === \"hunger\");\n        if(eff) {\n            // 层数作为 count 传入，changes 数值才会按层数乘算\n            await game.xjzl.api.effects.addEffect(tgt, eff, stacks);\n        }\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1555,7 +1557,7 @@
                         {
                             "label": "磐石转化荣归",
                             "trigger": "attack",
-                            "script": "const panshi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"panshi\");\nif (panshi && (panshi.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 3) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"执节荣归\" },\n        content: \"<p>是否移除 3 层 [磐石] 以获得 [荣归]？</p>\",\n        yes: { label: \"转化\", icon: \"fas fa-check\" },\n        no: { label: \"保留磐石\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await panshi.delete();\n        const eff = thisItem.effects.getName(\"荣归\").toObject();\n        // 动态调整回复量\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const regen = 30 + (lvl - 1) * 10;\n        eff.changes[0].value = String(regen);\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}",
+                            "script": "const panshi = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"panshi\");\nif (panshi && (panshi.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 3) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"执节荣归\" },\n        content: \"<p>是否移除 3 层 [磐石] 以获得 [荣归]？</p>\",\n        yes: { label: \"转化\", icon: \"fas fa-check\" },\n        no: { label: \"保留磐石\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"panshi\", 999);\n        const eff = thisItem.effects.getName(\"荣归\").toObject();\n        // 动态调整回复量\n        const lvl = Math.max(1, move.computedLevel || 1);\n        const regen = 30 + (lvl - 1) * 10;\n        eff.changes[0].value = String(regen);\n        await game.xjzl.api.effects.addEffect(actor, eff);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -1659,7 +1661,7 @@
                             "label": "催动花鼓",
                             "trigger": "hit",
                             "active": true,
-                            "script": "// 命中无架招目标时削减[花鼓]层数，层数归零立即炸裂\nif (!args.isHit || !args.target) return;\nif (args.target.system?.martial?.stanceActive) return;\n\nconst target = args.target;\nconst huagu = target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyang_huagu\");\nif (!huagu) return;\n\n// 非战斗中无“本场累计”可依，整体不结算\nif (!game.combat?.started) {\n    await ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>当前不在战斗中，[花开富贵] 不结算${target.name}身上的花鼓层数。</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });\n    return;\n}\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduce = lvl; // 基础减少1层，升级每级+1\nconst current = huagu.getFlag(\"xjzl-system\", \"stacks\") || 1;\nif (current > reduce) {\n    await game.xjzl.api.effects.removeEffect(target, \"fengyang_huagu\", reduce);\n    return;\n}\n\n// ===== 层数归零：花鼓立即炸开 =====\n// 引爆伤害依据“该场战斗所有角色一共添加过的花鼓层数”，累计只增不减\nconst latestEntries = await game.xjzl.socket.executeAsGM(\"updateDocumentAtomic\", game.combat.uuid, { type: \"arrayRead\", path: \"flags.xjzl-system.huaguAdded\" }).catch(error => { console.warn(\"XJZL | 读取共享数组失败，回退本地快照：\", error); return null; });\nconst total = (Array.isArray(latestEntries) ? latestEntries : (game.combat?.getFlag(\"xjzl-system\", \"huaguAdded\") || [])).reduce((sum, e) => sum + (e.count || 0), 0);\nconst dmg = total * 10;\n\n// 炸开后移除场上其他目标身上的花鼓\nconst cleared = [];\nfor (const c of game.combat.combatants) {\n    const other = c.actor;\n    if (!other || other.uuid === target.uuid) continue;\n    if (other.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyang_huagu\")) {\n        await game.xjzl.api.effects.removeEffect(other, \"fengyang_huagu\", 999);\n        cleared.push(other.name);\n    }\n}\n\nawait target.applyDamage({ amount: dmg, type: \"mental\", attacker: actor, item: thisItem, move: args.move, source: \"huagu\", ignoreDefense: true, isHit: true });\nawait game.xjzl.api.effects.removeEffect(target, \"fengyang_huagu\", 999);\n\nlet content = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\">`;\ncontent += `<p><strong>💥 ${target.name} 的花鼓被迫炸开！</strong></p>`;\ncontent += `<p>本场所有角色累计添加花鼓 <strong>${total}</strong> 层，${target.name} 受到 <strong>${dmg}</strong> 点精神伤害。</p>`;\nif (cleared.length) content += `<p>场上其他目标的花鼓已移除：${cleared.join(\"、\")}。</p>`;\ncontent += `</div></div>`;\nawait ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor: target }) });"
+                            "script": "// 命中无架招目标时削减[花鼓]层数，层数归零立即炸裂\nif (!args.isHit || !args.target) return;\nif (args.target.system?.martial?.stanceActive) return;\n\nconst tgt = args.target;\nconst huagu = tgt.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyang_huagu\");\nif (!huagu) return;\n\n// 非战斗中无“本场累计”可依，整体不结算\nif (!game.combat?.started) {\n    await ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>当前不在战斗中，[花开富贵] 不结算${tgt.name}身上的花鼓层数。</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });\n    return;\n}\n\nconst lvl = Math.max(1, move.computedLevel || 1);\nconst reduce = lvl; // 基础减少1层，升级每级+1\nconst current = huagu.getFlag(\"xjzl-system\", \"stacks\") || 1;\nif (current > reduce) {\n    await game.xjzl.api.effects.removeEffect(tgt, \"fengyang_huagu\", reduce);\n    return;\n}\n\n// ===== 层数归零：花鼓立即炸开 =====\n// 引爆伤害依据“该场战斗所有角色一共添加过的花鼓层数”，累计只增不减\nconst latestEntries = await game.xjzl.socket.executeAsGM(\"updateDocumentAtomic\", game.combat.uuid, { type: \"arrayRead\", path: \"flags.xjzl-system.huaguAdded\" }).catch(error => { console.warn(\"XJZL | 读取共享数组失败，回退本地快照：\", error); return null; });\nconst total = (Array.isArray(latestEntries) ? latestEntries : (game.combat?.getFlag(\"xjzl-system\", \"huaguAdded\") || [])).reduce((sum, e) => sum + (e.count || 0), 0);\nconst dmg = total * 10;\n\n// 炸开后移除场上其他目标身上的花鼓\nconst cleared = [];\nfor (const c of game.combat.combatants) {\n    const other = c.actor;\n    if (!other || other.uuid === tgt.uuid) continue;\n    if (other.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"fengyang_huagu\")) {\n        await game.xjzl.api.effects.removeEffect(other, \"fengyang_huagu\", 999);\n        cleared.push(other.name);\n    }\n}\n\nawait tgt.applyDamage({ amount: dmg, type: \"mental\", attacker: actor, item: thisItem, move: args.move, source: \"huagu\", ignoreDefense: true, isHit: true });\nawait game.xjzl.api.effects.removeEffect(tgt, \"fengyang_huagu\", 999);\n\nlet content = `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\">`;\ncontent += `<p><strong>💥 ${tgt.name} 的花鼓被迫炸开！</strong></p>`;\ncontent += `<p>本场所有角色累计添加花鼓 <strong>${total}</strong> 层，${tgt.name} 受到 <strong>${dmg}</strong> 点精神伤害。</p>`;\nif (cleared.length) content += `<p>场上其他目标的花鼓已移除：${cleared.join(\"、\")}。</p>`;\ncontent += `</div></div>`;\nawait ChatMessage.create({ content, speaker: ChatMessage.getSpeaker({ actor: tgt }) });"
                         }
                     ]
                 },
@@ -1786,7 +1788,7 @@
                                     "label": "出招转移询问",
                                     "trigger": "hit_once",
                                     "active": true,
-                                    "script": "// [花鼓]持有者出招（攻击类）时，可将自身全部层数转移给一名目标；转移不计入本场累计\nif (!args.actionType || ![\"attack\", \"basic-attack\"].includes(args.actionType)) return;\nconst stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n// 只使用本次招式应用流程传入的目标，不回查全场战斗目标\nconst targets = (args.targets || []).map(entry => entry?.target).filter(t => t && t.uuid && t.uuid !== actor.uuid);\nconst unique = [...new Map(targets.map(t => [t.uuid, t])).values()]; // 多段/重复目标去重\nif (!unique.length) return;\n\nlet chosen = unique[0];\nif (unique.length > 1) {\n    // 范围招式：由玩家选择转移给其中任意一个目标\n    const options = unique.map(t => `<option value=\"${t.uuid}\">${t.name}</option>`).join(\"\");\n    const picked = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"花鼓转移\" },\n        content: `<p>是否将你身上全部 <strong>${stacks}</strong> 层[花鼓]转移给一名目标？</p><div class=\"form-group\"><label>选择目标</label><select name=\"target\">${options}</select></div>`,\n        ok: { callback: (event, button) => button.form.elements[\"target\"].value },\n        rejectClose: false\n    });\n    if (!picked) return;\n    chosen = unique.find(t => t.uuid === picked);\n} else {\n    const use = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"花鼓转移\" },\n        content: `<p>是否将你身上全部 <strong>${stacks}</strong> 层[花鼓]转移给 ${chosen.name}？</p>`,\n        yes: { label: \"转移\", icon: \"fas fa-check\" },\n        no: { label: \"取消\", icon: \"fas fa-times\" }\n    });\n    if (!use) return;\n}\n\nconst effData = thisEffect.toObject();\ndelete effData._id;\nif (effData.flags?.[\"xjzl-system\"]) delete effData.flags[\"xjzl-system\"].stacks; // 层数交给 addEffect 的 count 处理\nawait game.xjzl.api.effects.removeEffect(actor, \"fengyang_huagu\", stacks);\nawait game.xjzl.api.effects.addEffect(chosen, effData, stacks);\nawait ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>${actor.name} 将 <strong>${stacks}</strong> 层[花鼓]转移给了 ${chosen.name}！</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });"
+                                    "script": "// [花鼓]持有者出招（攻击类）时，可将自身全部层数转移给一名目标；转移不计入本场累计\nif (!args.actionType || ![\"attack\", \"basic-attack\"].includes(args.actionType)) return;\nconst stacks = thisEffect.getFlag(\"xjzl-system\", \"stacks\") || 1;\n// 只使用本次招式应用流程传入的目标，不回查全场战斗目标\nconst hitTargets = (args.targets || []).map(entry => entry?.target).filter(t => t && t.uuid && t.uuid !== actor.uuid);\nconst unique = [...new Map(hitTargets.map(t => [t.uuid, t])).values()]; // 多段/重复目标去重\nif (!unique.length) return;\n\nlet chosen = unique[0];\nif (unique.length > 1) {\n    // 范围招式：由玩家选择转移给其中任意一个目标\n    const options = unique.map(t => `<option value=\"${t.uuid}\">${t.name}</option>`).join(\"\");\n    const picked = await foundry.applications.api.DialogV2.prompt({\n        window: { title: \"花鼓转移\" },\n        content: `<p>是否将你身上全部 <strong>${stacks}</strong> 层[花鼓]转移给一名目标？</p><div class=\"form-group\"><label>选择目标</label><select name=\"target\">${options}</select></div>`,\n        ok: { callback: (event, button) => button.form.elements[\"target\"].value },\n        rejectClose: false\n    });\n    if (!picked) return;\n    chosen = unique.find(t => t.uuid === picked);\n} else {\n    const use = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"花鼓转移\" },\n        content: `<p>是否将你身上全部 <strong>${stacks}</strong> 层[花鼓]转移给 ${chosen.name}？</p>`,\n        yes: { label: \"转移\", icon: \"fas fa-check\" },\n        no: { label: \"取消\", icon: \"fas fa-times\" }\n    });\n    if (!use) return;\n}\n\nconst effData = thisEffect.toObject();\ndelete effData._id;\nif (effData.flags?.[\"xjzl-system\"]) delete effData.flags[\"xjzl-system\"].stacks; // 层数交给 addEffect 的 count 处理\nawait game.xjzl.api.effects.removeEffect(actor, \"fengyang_huagu\", stacks);\nawait game.xjzl.api.effects.addEffect(chosen, effData, stacks);\nawait ChatMessage.create({ content: `<div class=\"xjzl-chat-card\"><div class=\"card-content-wrapper\"><p>${actor.name} 将 <strong>${stacks}</strong> 层[花鼓]转移给了 ${chosen.name}！</p></div></div>`, speaker: ChatMessage.getSpeaker({ actor }) });"
                                 }
                             ]
                         }
@@ -1891,7 +1893,7 @@
                     "targetInfo": "自身",
                     "actionCost": "次要动作",
                     "description": "<p>持弓抚琴，气宇轩昂，开启架招。架招开启期间，你每通读一册乐谱，你的移动速度+1。</p><p>·格挡成功后进行一次[演奏]检定（难度 @{15 - @up|15}），成功则顿弓紧音，将目标朝自己方向拉扯 1 米，然后使其倒地。</p><p><strong>升级：</strong>格挡值+10，[演奏]难度-1，内力消耗+2。</p>",
-                    "automationNote": "乐谱速度加成手动（AE修改）。格挡反击检定自动。拉扯倒地手动。",
+                    "automationNote": "乐谱速度加成手动（AE修改）。格挡反击检定自动，成功自动倒地。拉扯手动。",
                     "calculation": {
                         "base": 0,
                         "growth": 10
@@ -1907,7 +1909,7 @@
                         {
                             "label": "格挡反击",
                             "trigger": "damaged",
-                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst dc = 15 - (lvl - 1);\n\n// 自动投掷检定\nconst roll = await actor.rollAttributeTest(\"yanzou\");\nif (roll.total >= dc) {\n    ChatMessage.create({\n        content: `<div style=\"color:green; font-weight:bold;\">演奏检定成功！</div><p>请手动将 ${args.attacker.name} 拉近 1 米并击倒。</p>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    await game.xjzl.api.effects.toggleStatus(args.attacker, \"prone\", true);\n} else {\n    ui.notifications.warn(\"反击演奏检定失败。\");\n}",
+                            "script": "if (!Macros.checkStance(actor, args)) return;\n\nconst stanceId = actor.system.martial.stance;\nconst moveData = thisItem.system.moves.find(m => m.id === stanceId);\nconst lvl = Math.max(1, moveData?.computedLevel || 1);\nconst dc = 15 - (lvl - 1);\n\n// 自动投掷检定\nconst roll = await actor.rollAttributeTest(\"yanzou\");\nif (roll.total >= dc) {\n    ChatMessage.create({\n        content: `<div style=\"color:green; font-weight:bold;\">演奏检定成功！</div><p>请手动将 ${args.attacker.name} 拉近 1 米。</p>`,\n        speaker: ChatMessage.getSpeaker({actor: actor})\n    });\n    await game.xjzl.api.effects.toggleStatus(args.attacker, \"prone\", true);\n} else {\n    ui.notifications.warn(\"反击演奏检定失败。\");\n}",
                             "active": true
                         }
                     ]
@@ -1956,7 +1958,7 @@
                         {
                             "label": "乘风消耗",
                             "trigger": "attack",
-                            "script": "const chengfeng = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengfeng\");\nif (chengfeng && (chengfeng.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 3) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"万马奔腾\" },\n        content: \"<p>是否消耗 3 层 [乘风] 将范围改为 <b>周围</b>？</p>\",\n        yes: { label: \"消耗并改范围\", icon: \"fas fa-check\" },\n        no: { label: \"保持直线\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await chengfeng.delete();\n        ui.notifications.info(\"已消耗乘风，请手动对周围敌人进行检定/伤害应用。\");\n    }\n}",
+                            "script": "const chengfeng = actor.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"chengfeng\");\nif (chengfeng && (chengfeng.getFlag(\"xjzl-system\", \"stacks\") || 1) >= 3) {\n    const confirm = await foundry.applications.api.DialogV2.confirm({\n        window: { title: \"万马奔腾\" },\n        content: \"<p>是否消耗 3 层 [乘风] 将范围改为 <b>周围</b>？</p>\",\n        yes: { label: \"消耗并改范围\", icon: \"fas fa-check\" },\n        no: { label: \"保持直线\", icon: \"fas fa-times\" }\n    });\n    if (confirm) {\n        await game.xjzl.api.effects.removeEffect(actor, \"chengfeng\", 3);\n        ui.notifications.info(\"已消耗乘风，请手动对周围敌人进行检定/伤害应用。\");\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2008,7 +2010,7 @@
                         {
                             "label": "施加悲情/悲极",
                             "trigger": "hit",
-                            "script": "if (args.target.id === actor.id) return;\n\nconst beiqing = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beiqing\");\n\nif (beiqing) {\n    await beiqing.delete();\n    const beijiData = thisItem.effects.getName(\"悲极\").toObject();\n    beijiData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, beijiData);\n    ui.notifications.info(`${args.target.name} 悲情转化为悲极`);\n} else {\n    const beiji = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beiji\");\n    if (!beiji) {\n        const beiqingData = thisItem.effects.getName(\"悲情\").toObject();\n        beiqingData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, beiqingData);\n    }\n}",
+                            "script": "if (args.target.id === actor.id) return;\n\nconst beiqing = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beiqing\");\n\nif (beiqing) {\n    await game.xjzl.api.effects.removeEffect(args.target, \"beiqing\", 999);\n    const beijiData = thisItem.effects.getName(\"悲极\").toObject();\n    beijiData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, beijiData);\n    ui.notifications.info(`${args.target.name} 悲情转化为悲极`);\n} else {\n    const beiji = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beiji\");\n    if (!beiji) {\n        const beiqingData = thisItem.effects.getName(\"悲情\").toObject();\n        beiqingData.origin = thisItem.uuid;\n        await game.xjzl.api.effects.addEffect(args.target, beiqingData);\n    }\n}",
                             "active": true
                         }
                     ]
@@ -2046,7 +2048,7 @@
                         {
                             "label": "施加喜悦/乐极与抵消",
                             "trigger": "hit",
-                            "script": "if (args.target.id === actor.id) return;\n\n// 1. 处理喜悦/乐极\nconst xiyue = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xiyue\");\nlet hasLeji = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"leji\");\n\nif (xiyue) {\n    await xiyue.delete();\n    const lejiData = thisItem.effects.getName(\"乐极\").toObject();\n    lejiData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, lejiData);\n    hasLeji = true;\n    ui.notifications.info(`${args.target.name} 喜悦转化为乐极`);\n} else if (!hasLeji) {\n    const xiyueData = thisItem.effects.getName(\"喜悦\").toObject();\n    xiyueData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, xiyueData);\n}\n\n// 2. 处理抵消 (延时确保状态已应用)\nsetTimeout(async () => {\n    const t = args.target;\n    const s_beiqing = t.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beiqing\");\n    const s_xiyue = t.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xiyue\");\n    const s_beiji = t.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"beiji\");\n    const s_leji = t.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"leji\");\n\n    if (s_beiqing && s_xiyue) {\n        await s_beiqing.delete();\n        await s_xiyue.delete();\n        ui.notifications.info(`${t.name} 的悲情与喜悦相互抵消`);\n    }\n    if (s_beiji && s_leji) {\n        await s_beiji.delete();\n        await s_leji.delete();\n        ui.notifications.info(`${t.name} 的悲极与乐极相互抵消`);\n    }\n}, 500);",
+                            "script": "if (args.target.id === actor.id) return;\n\n// 1. 处理喜悦/乐极\nconst xiyue = args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === \"xiyue\");\nlet hasLeji = args.target.effects.some(e => e.getFlag(\"xjzl-system\", \"slug\") === \"leji\");\n\nif (xiyue) {\n    await game.xjzl.api.effects.removeEffect(args.target, \"xiyue\", 999);\n    const lejiData = thisItem.effects.getName(\"乐极\").toObject();\n    lejiData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, lejiData);\n    hasLeji = true;\n    ui.notifications.info(`${args.target.name} 喜悦转化为乐极`);\n} else if (!hasLeji) {\n    const xiyueData = thisItem.effects.getName(\"喜悦\").toObject();\n    xiyueData.origin = thisItem.uuid;\n    await game.xjzl.api.effects.addEffect(args.target, xiyueData);\n}\n\n// 2. 处理抵消（上面的添加/删除均已await，效果集合已实时更新）\nconst findEffect = (slug) => args.target.effects.find(e => e.getFlag(\"xjzl-system\", \"slug\") === slug);\nconst s_beiqing = findEffect(\"beiqing\");\nconst s_xiyue = findEffect(\"xiyue\");\nconst s_beiji = findEffect(\"beiji\");\nconst s_leji = findEffect(\"leji\");\n\nif (s_beiqing && s_xiyue) {\n    await game.xjzl.api.effects.removeEffect(args.target, \"beiqing\", 999);\n    await game.xjzl.api.effects.removeEffect(args.target, \"xiyue\", 999);\n    ui.notifications.info(`${args.target.name} 的悲情与喜悦相互抵消`);\n}\nif (s_beiji && s_leji) {\n    await game.xjzl.api.effects.removeEffect(args.target, \"beiji\", 999);\n    await game.xjzl.api.effects.removeEffect(args.target, \"leji\", 999);\n    ui.notifications.info(`${args.target.name} 的悲极与乐极相互抵消`);\n}",
                             "active": true
                         }
                     ]
