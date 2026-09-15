@@ -283,6 +283,7 @@ args.output.bonusDesc.push(`内息加成 +${bonus}`);
 | `args` 字段 | 类型 | 访问 | 含义 |
 |---|---|---|---|
 | `targetCount` | `number` | 只读 | 本次实际结算的目标数量；仅在真实逐目标结算阶段提供。 |
+| `targets` | `Actor[]` | 只读 | 本次实际结算的全部目标（自动与手动结算均提供）；需要跨目标统计（如按持有某状态的个数增伤）时使用。 |
 | `attacker` / `target` | `Actor` | 只读 | 攻击者和当前目标。 |
 | `item` / `move` | `Item` / `Object` | 只读 | 所属武学和当前招式。 |
 | `scriptFlags` | `Object` | 只读 | 出招时 `attack` 阶段脚本写入的自定义 flags 快照；每张攻击卡独立。 |
@@ -695,7 +696,7 @@ await Macros.requestSave({
 | `attacker` / `label` | `Actor` / `string`，可选 | 来源 Actor 和卡片标题。 |
 | `level` / `bonus` | `number`，默认 `0` | 临时优劣势层级和数值修正。 |
 | `onSuccess` / `onFail` | 状态 ID、AE 数据或数组，可选 | 结果状态；不能传函数，函数会被忽略并警告。 |
-| `damageOnSuccess` / `damageOnFail` | `{ value, type }`，可选 | `value` 使用正数；伤害类型走标准 `applyDamage` 并保留防御/抗性，资源类型走负数 `applyHealing` 直接流失。 |
+| `damageOnSuccess` / `damageOnFail` | `{ value, type }`，可选 | `value` 使用正数；伤害类型走标准 `applyDamage` 并保留防御/抗性，资源类型走负数 `applyHealing` 直接流失（以发起者为 healer）。 |
 | `successText` / `failureText` | `string`，可选 | 结果说明。 |
 | `removeStanceOnSuccess` / `removeStanceOnFail` | `boolean`，默认 `false` | 对应结果出现时解除检定者架招。 |
 

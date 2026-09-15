@@ -1487,6 +1487,8 @@ export class ChatCardManager {
                     scriptFlags: flags.scriptFlags || {},
                     // preDamage 才是逐目标的真实结算阶段，供目标数量限定的招式效果使用
                     targetCount: targets.length,
+                    // 本次结算的全部目标（Actor），供跨目标统计类效果（如按持有某状态的个数增伤）使用
+                    targets: targets.map(t => t?.actor || t).filter(Boolean),
 
                     // 状态 (只读)
                     outcome: {
@@ -2018,6 +2020,8 @@ export class ChatCardManager {
                     element: moveElement,
                     // 手动结算同样在逐目标阶段执行 preDamage
                     targetCount: targets.length,
+                    // 与自动结算保持一致：提供本次全部目标（Actor）
+                    targets: targets.map(t => t?.actor || t).filter(Boolean),
                     outcome: {
                         isHit: true,
                         isCrit: config.isCrit,
@@ -2348,16 +2352,17 @@ export class ChatCardManager {
                     // 注意：CONFIG.XJZL.damageTypes 包含了 liushi, none 等
                     const isDamageType = CONFIG.XJZL.damageTypes && (typeKey in CONFIG.XJZL.damageTypes);
 
+                    // 尝试解析发起者：检定卡结算已脱离攻击者脚本栈，来源必须显式恢复，
+                    // 否则伤害/资源变化会把目标自己当成来源，污染统计与 resourceChanged。
+                    let attacker = null;
+                    if (flags.attackerUuid) {
+                        const attDoc = await fromUuid(flags.attackerUuid);
+                        attacker = attDoc?.actor || attDoc;
+                    }
+
                     if (isDamageType) {
                         // === 分支 1: 造成伤害 (走 applyDamage) ===
                         // 这样可以计算抗性、护体抵扣、触发受击特效等
-
-                        // 尝试解析发起者 (用于日志)
-                        let attacker = null;
-                        if (flags.attackerUuid) {
-                            const attDoc = await fromUuid(flags.attackerUuid);
-                            attacker = attDoc?.actor || attDoc;
-                        }
 
                         // 调用伤害逻辑
                         // 判定触发的伤害通常：必中(true),但会受到 抗性 (Resistances) 的减免
@@ -2388,10 +2393,12 @@ export class ChatCardManager {
                         // === 分支 2: 直接资源流失 (走 applyHealing) ===
                         // 用于 hp, mp, rage, tili 等非伤害类型的直接扣除 (Cost)
 
+                        // 流失来源是检定发起者；不传 healer 会被系统当成目标自己，resourceChanged/统计随之失真
                         await actor.applyHealing({
                             amount: -amount,
                             type: typeKey,
-                            showScrolling: true
+                            showScrolling: true,
+                            healer: attacker
                         });
 
                         // 简单的字典映射
