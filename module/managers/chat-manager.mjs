@@ -156,7 +156,7 @@ export class ChatCardManager {
         // 0. 特殊处理2：属性判定请求处理 (前置拦截)
         // 判定是防御者自己的行为，不需要攻击者或源物品参与
         if (action === "rollSave") {
-            await ChatCardManager._rollSave(flags, message, isShiftPressed);
+            await ChatCardManager._rollSave(flags, message, isShiftPressed, isCtrlPressed);
             return;
         }
 
@@ -2262,14 +2262,16 @@ export class ChatCardManager {
     }
 
     /**
-     * 执行属性判定 
+     * 执行属性判定
      * 响应 requestSave 卡片上的判定按钮
-     * 1. 验证权限并读取 Actor 属性进行投掷
+     * 1. 验证权限并读取 Actor 属性进行投掷 (或按 Ctrl 手动录入结果)
      * 2. 比对 DC 确定成功/失败
      * 3. 根据结果执行封装好的 Effect / Damage 逻辑
      * 4. 原地刷新卡片 UI
+     * @param {Boolean} autoFail 按住 Shift 时为 true，跳过弹窗直接判定失败
+     * @param {Boolean} manualInput 按住 Ctrl 时为 true，弹窗手动录入结果 (GM 线下实体骰等场景)
      */
-    static async _rollSave(flags, message, autoFail = false) {
+    static async _rollSave(flags, message, autoFail = false, manualInput = false) {
         // 1. 获取防御者 (Flags 里存的是 targetUuid)
         const targetUuid = flags.targetUuid;
         const doc = await fromUuid(targetUuid);
@@ -2280,26 +2282,45 @@ export class ChatCardManager {
         // 权限检查：只有拥有者或GM可以点
         if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
 
-        // 2. 调用 Actor 的检定方法
-        // 这会弹出一个新的聊天卡片显示骰子结果
-        // 读取 flags.level (发起请求时设定的优劣势)
-        const requestBonus = flags.bonus || 0;
-        const roll = await actor.rollAttributeTest(flags.attribute, {
-            level: flags.level || 0,
-            skipDialog: autoFail,      // 如果按了Shift，直接跳过弹窗
-            bonus: autoFail ? -999 : requestBonus
-        });
-
-        if (!roll) return; // 防呆，万一取消了
-
-        // 3. 比对结果
-        const total = roll.total;
         const dc = flags.dc || 10;
-        const isSuccess = total >= dc;
+        let total;
+        // 手动录入没有真实骰子与属性加值拆分，置空后结果块改用"手动输入"格式显示
+        let attrVal = null;
+        let diceResult = null;
 
-        // 这是我们在 Actor.rollAttributeTest 里传入的
-        const attrVal = roll.data.val || 0;
-        const diceResult = roll.terms[0].total; // 骰子本身的结果
+        if (manualInput) {
+            // Ctrl+点击：直接录入一个结果数值；null=取消，NaN=输入无效
+            // (DialogV2 ok 回调返回 nullish 时 promise 会 resolve 成按钮 action 字符串，无效输入必须用 NaN 哨兵)
+            const labelKey = CONFIG.XJZL.attributes[flags.attribute] ||
+                CONFIG.XJZL.skills[flags.attribute] ||
+                CONFIG.XJZL.arts[flags.attribute] ||
+                CONFIG.XJZL.weaponTypes[flags.attribute] ||
+                flags.attribute;
+            const attrLabel = game.i18n.localize(labelKey);
+            total = await ChatCardManager._promptManualCheckResult(actor, `${attrLabel} · DC ${dc}`);
+            if (total === null || !Number.isFinite(total)) return;
+        } else {
+            // 2. 调用 Actor 的检定方法
+            // 这会弹出一个新的聊天卡片显示骰子结果
+            // 读取 flags.level (发起请求时设定的优劣势)
+            const requestBonus = flags.bonus || 0;
+            const roll = await actor.rollAttributeTest(flags.attribute, {
+                level: flags.level || 0,
+                skipDialog: autoFail,      // 如果按了Shift，直接跳过弹窗
+                bonus: autoFail ? -999 : requestBonus
+            });
+
+            if (!roll) return; // 防呆，万一取消了
+
+            // 3. 比对结果
+            total = roll.total;
+
+            // 这是我们在 Actor.rollAttributeTest 里传入的
+            attrVal = roll.data.val || 0;
+            diceResult = roll.terms[0].total; // 骰子本身的结果
+        }
+
+        const isSuccess = total >= dc;
 
         // ==========================================================
         // 内部辅助函数：统一处理 AE 的施加与 伤害/资源的扣除
@@ -2468,10 +2489,14 @@ export class ChatCardManager {
 
         // 5. 更新卡片 (禁用按钮，显示结果)
         // 构造替换 HTML
+        // 手动录入没有骰式拆分，摘要行显示"手动输入 = 总值"
+        const rollSummary = diceResult === null
+            ? `${game.i18n.localize("XJZL.UI.ManualInput")} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}`
+            : `1d20(${diceResult}) + ${attrVal} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}`;
         const resultBlock = `
             <div style="text-align:center; padding:8px; background:#fff; border:1px solid ${color}; border-radius:4px; margin-top:5px;">
                 <div style="font-size:0.9em; color:#555; margin-bottom:4px;">
-                    1d20(${diceResult}) + ${attrVal} = <span style="font-size:1.5em; font-weight:bold;">${total}</span> vs DC ${dc}
+                    ${rollSummary}
                 </div>
                 ${resultHtml}
             </div>
@@ -2522,7 +2547,10 @@ export class ChatCardManager {
         if (manualInput) {
             // 手动模式只负责产出一个 total；后续写卡、完成检查与自动化结算和正常投掷共用同一条路径，
             // 所以无论哪一方后补的结果，都会正常触发对抗结算
-            const manualTotal = await ChatCardManager._promptManualContestResult(role, actor, attrKey, config);
+            const manualTotal = await ChatCardManager._promptManualCheckResult(
+                actor,
+                (role === "attacker" ? config.attLabel : config.defLabel) || attrKey
+            );
             // null = 用户取消；NaN = 输入为空或非法 (DialogV2 回调返回 nullish 时会 resolve 成按钮 action 字符串，
             // 所以无效输入必须用 NaN 哨兵传递，不能返回 null)
             if (manualTotal === null || !Number.isFinite(manualTotal)) return;
@@ -2612,22 +2640,20 @@ export class ChatCardManager {
     }
 
     /**
-     * 弹窗读取手动输入的对抗检定结果
-     * @param {String} role "attacker" | "defender"
+     * 弹窗读取手动输入的检定结果 (对抗卡与豁免卡共用)
      * @param {Actor} actor 检定者 (仅用于显示名字)
-     * @param {String} attrKey 属性 Key (标签缺失时的兜底显示)
-     * @param {Object} config 对抗卡配置 (含已本地化的 attLabel/defLabel)
+     * @param {String} attrLabel 已本地化的属性/对抗标签 (豁免卡可附带 DC 提示)
      * @returns {Promise<Number|null>} 输入的数值；关闭/ESC 返回 null，空输入或非法输入返回 NaN
      *   (DialogV2 约定 ok 回调返回 nullish 时 promise 会 resolve 成按钮 action 字符串，因此无效输入用 NaN 哨兵)
      */
-    static async _promptManualContestResult(role, actor, attrKey, config) {
-        const attrLabel = (role === "attacker" ? config.attLabel : config.defLabel) || attrKey;
+    static async _promptManualCheckResult(actor, attrLabel) {
         const nameText = foundry.utils.escapeHTML(actor.name);
+        const label = foundry.utils.escapeHTML(String(attrLabel));
         return foundry.applications.api.DialogV2.prompt({
-            window: { title: game.i18n.localize("XJZL.UI.ContestManualTitle"), icon: "fas fa-dice", width: 320 },
+            window: { title: game.i18n.localize("XJZL.UI.ManualResultTitle"), icon: "fas fa-dice", width: 320 },
             content: `
             <div class="xjzl-dialog-content" style="padding:5px;">
-                <p style="margin:0 0 6px; font-weight:bold;">${nameText} · ${attrLabel}</p>
+                <p style="margin:0 0 6px; font-weight:bold;">${nameText} · ${label}</p>
                 <input type="number" name="manualResult" autofocus
                     style="width:100%; text-align:center; font-size:1.2em;" />
             </div>`,
