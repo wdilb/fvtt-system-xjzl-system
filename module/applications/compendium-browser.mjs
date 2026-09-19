@@ -851,18 +851,20 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
     /* -------------------------------------------- */
 
     /**
-     * 从指定范围随机抽取物品
+     * 从指定范围随机抽取物品。
+     * 抽取范围由筛选集合与搜索词共同决定；可用 options.filters / options.query 显式覆盖，
+     * 未传入时回退到指定 Tab 当前的已选筛集与搜索框内容（维持 UI 对话框行为）。
      */
     async randomize(options = {}) {
         const tab = options.tab || this.browserState.activeTab;
-        // 未显式传入 filters 时，回退到指定 Tab 自己的已选筛集（维持 UI 对话框行为）
         const filters = options.filters || this.browserState.tabs[tab]?.filters || {};
+        const query = options.query ?? this.browserState.tabs[tab]?.searchQuery ?? "";
         const amount = options.amount || 1;
         const useWeight = options.weighted ?? true;
         const rawItems = this.cachedData[tab] || [];
 
         // 1. 获取候选池
-        const pool = this._filterItems(rawItems, filters, ""); // 忽略搜索词进行随机
+        const pool = this._filterItems(rawItems, filters, query);
         if (pool.length === 0) {
             ui.notifications.warn(game.i18n.format("XJZL.CompendiumBrowser.State.NoFilteredItems", { tab }));
             return [];
@@ -931,7 +933,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         event.preventDefault();
         const { DialogV2 } = foundry.applications.api;
         const activeTab = this.browserState.activeTab;
-        const currentPool = this._filterItems(this.cachedData[activeTab] || [], undefined, "");
+        // 候选池与 randomize 同条件：当前 Tab 筛选 + 搜索框输入（空参即回退到当前 Tab 状态）
+        const currentPool = this._filterItems(this.cachedData[activeTab] || []);
 
         if (currentPool.length === 0) return ui.notifications.warn(game.i18n.localize("XJZL.CompendiumBrowser.State.EmptyPool"));
 
