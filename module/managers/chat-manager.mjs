@@ -127,8 +127,9 @@ export class ChatCardManager {
         const action = button.dataset.action;
         const flags = message.flags["xjzl-system"] || {};
 
-        // 捕获 Shift 按键状态
+        // 捕获 Shift / Ctrl 按键状态 (Shift=直接判定失败，Ctrl=手动输入对抗结果)
         const isShiftPressed = event.shiftKey;
+        const isCtrlPressed = event.ctrlKey;
 
         // 解锁只允许 GM 直接更新消息，不进入通用角色、物品和目标解析流程。
         if (action === "unlockDetails") {
@@ -161,7 +162,7 @@ export class ChatCardManager {
 
         // 0. 特殊处理3：对抗投掷处理 (前置拦截)
         if (action === "rollContest") {
-            await ChatCardManager._onContestRoll(button.dataset.role, flags, message, isShiftPressed);
+            await ChatCardManager._onContestRoll(button.dataset.role, flags, message, isShiftPressed, isCtrlPressed);
             return;
         }
 
@@ -2493,8 +2494,11 @@ export class ChatCardManager {
     /**
      * 处理对抗中的单方投掷
      * @param {String} role "attacker" | "defender"
+     * @param {Boolean} autoFail 按住 Shift 时为 true，跳过弹窗直接判定失败
+     * @param {Boolean} manualInput 按住 Ctrl 时为 true，弹窗手动录入结果
+     *                              (用于 AOE 对抗发起者只掷一次、或 GM 线下实体骰的场景)
      */
-    static async _onContestRoll(role, flags, message, autoFail = false) {
+    static async _onContestRoll(role, flags, message, autoFail = false, manualInput = false) {
         // 1. 获取当前内存中的状态（仅用于初步检查，防止重复点击）
         const currentState = message.flags["xjzl-system"]?.state || {};
         const updateKey = role === "attacker" ? "attRoll" : "defRoll";
@@ -2510,24 +2514,39 @@ export class ChatCardManager {
         if (!actor) return ui.notifications.warn("角色已不存在。");
         if (!actor.isOwner) return ui.notifications.warn("你没有权限操作此角色。");
 
-        // 3. 执行属性检定
+        // 3. 执行属性检定 (或手动录入结果)
         const config = flags.config || {};
         const attrKey = role === "attacker" ? config.attAttr : config.defAttr;
-        // === 提取对应的临时修正值 ===
-        const specificBonus = role === "attacker" ? (config.attBonus || 0) : (config.defBonus || 0);
-        const roll = await actor.rollAttributeTest(attrKey, {
-            chatMessage: false,
-            skipDialog: autoFail, // 按住 Shift 直接跳过弹窗
-            // 如果没按 Shift，传入特定的 bonus；如果按了，强制 -999
-            bonus: autoFail ? -999 : specificBonus
-        });
 
-        if (!roll) return;
+        let rollData;
+        if (manualInput) {
+            // 手动模式只负责产出一个 total；后续写卡、完成检查与自动化结算和正常投掷共用同一条路径，
+            // 所以无论哪一方后补的结果，都会正常触发对抗结算
+            const manualTotal = await ChatCardManager._promptManualContestResult(role, actor, attrKey, config);
+            // null = 用户取消；NaN = 输入为空或非法 (DialogV2 回调返回 nullish 时会 resolve 成按钮 action 字符串，
+            // 所以无效输入必须用 NaN 哨兵传递，不能返回 null)
+            if (manualTotal === null || !Number.isFinite(manualTotal)) return;
+            rollData = {
+                total: manualTotal,
+                formula: game.i18n.localize("XJZL.UI.ManualInput")
+            };
+        } else {
+            // === 提取对应的临时修正值 ===
+            const specificBonus = role === "attacker" ? (config.attBonus || 0) : (config.defBonus || 0);
+            const roll = await actor.rollAttributeTest(attrKey, {
+                chatMessage: false,
+                skipDialog: autoFail, // 按住 Shift 直接跳过弹窗
+                // 如果没按 Shift，传入特定的 bonus；如果按了，强制 -999
+                bonus: autoFail ? -999 : specificBonus
+            });
 
-        const rollData = {
-            total: roll.total,
-            formula: roll.formula
-        };
+            if (!roll) return;
+
+            rollData = {
+                total: roll.total,
+                formula: roll.formula
+            };
+        }
 
         // =====================================================
         // 4. 原子化更新 (Atomic Update) - 修复并发的关键
@@ -2590,6 +2609,40 @@ export class ChatCardManager {
         });
 
         await ChatCardManager._safeUpdateMessage(finalMessage, { content: content });
+    }
+
+    /**
+     * 弹窗读取手动输入的对抗检定结果
+     * @param {String} role "attacker" | "defender"
+     * @param {Actor} actor 检定者 (仅用于显示名字)
+     * @param {String} attrKey 属性 Key (标签缺失时的兜底显示)
+     * @param {Object} config 对抗卡配置 (含已本地化的 attLabel/defLabel)
+     * @returns {Promise<Number|null>} 输入的数值；关闭/ESC 返回 null，空输入或非法输入返回 NaN
+     *   (DialogV2 约定 ok 回调返回 nullish 时 promise 会 resolve 成按钮 action 字符串，因此无效输入用 NaN 哨兵)
+     */
+    static async _promptManualContestResult(role, actor, attrKey, config) {
+        const attrLabel = (role === "attacker" ? config.attLabel : config.defLabel) || attrKey;
+        const nameText = foundry.utils.escapeHTML(actor.name);
+        return foundry.applications.api.DialogV2.prompt({
+            window: { title: game.i18n.localize("XJZL.UI.ContestManualTitle"), icon: "fas fa-dice", width: 320 },
+            content: `
+            <div class="xjzl-dialog-content" style="padding:5px;">
+                <p style="margin:0 0 6px; font-weight:bold;">${nameText} · ${attrLabel}</p>
+                <input type="number" name="manualResult" autofocus
+                    style="width:100%; text-align:center; font-size:1.2em;" />
+            </div>`,
+            ok: {
+                label: game.i18n.localize("XJZL.UI.Confirm"),
+                icon: "fas fa-check",
+                callback: (event, button) => {
+                    const raw = new FormData(button.form).get("manualResult");
+                    // 空输入不能落到 Number(""): 0，必须是 NaN 哨兵 (见 JSDoc)
+                    if (raw === null || String(raw).trim() === "") return NaN;
+                    return Number(raw);
+                }
+            },
+            rejectClose: false // 点击关闭或 ESC 返回 null
+        });
     }
 
     /**
