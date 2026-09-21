@@ -58,7 +58,7 @@ export class XJZLTraitSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         }));
 
         // 富文本增强
-        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
             this.document.system.description,
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );

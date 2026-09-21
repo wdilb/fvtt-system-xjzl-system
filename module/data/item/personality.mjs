@@ -55,11 +55,11 @@ export class XJZLPersonalityData extends foundry.abstract.TypeDataModel {
 
     return {
       name: `${game.i18n.localize("XJZL.Personality.Label")}: ${item.name}`,
-      icon: item.img || "icons/magic/life/heart-shadow-red.webp",
+      img: item.img || "icons/magic/life/heart-shadow-red.webp",
       changes: this.chosen.map(skillKey => ({
         key: `system.skills.${skillKey}.mod`,
         value: String(this.bonus),
-        mode: CONST.ACTIVE_EFFECT_MODES.ADD
+        type: CONST.ACTIVE_EFFECT_CHANGE_TYPES.ADD
       })),
       transfer: true,
       flags: {

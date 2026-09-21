@@ -3529,7 +3529,7 @@ export class XJZLActor extends Actor {
       }
     };
 
-    ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+    ChatMessage.applyMode(chatData, game.settings.get("core", "messageMode"));
     const message = await ChatMessage.create(chatData);
 
     if (attackRoll && game.dice3d) {

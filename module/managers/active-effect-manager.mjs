@@ -24,7 +24,7 @@ export class ActiveEffectManager {
         // 情况 A: 传入的是字符串 ID (如 "qixu", "stun")
         if (typeof effectDataOrId === "string") {
             // 1. 尝试从系统状态列表查找
-            const statusData = CONFIG.statusEffects.find(e => e.id === effectDataOrId);
+            const statusData = CONFIG.statusEffects[effectDataOrId];
 
             if (!statusData) {
                 console.warn(`XJZL ActiveEffectManager | 未找到系统状态 ID: ${effectDataOrId}`);
@@ -42,7 +42,7 @@ export class ActiveEffectManager {
             // 1. 检查对象里是否有 'id' 且该 'id' 存在于系统配置中
             // 这是一个 "Patch" 操作：以系统配置为底板，传入的对象为修改项
             if (effectDataOrId.id) {
-                const baseStatus = CONFIG.statusEffects.find(e => e.id === effectDataOrId.id);
+                const baseStatus = CONFIG.statusEffects[effectDataOrId.id];
 
                 if (baseStatus) {
                     // 合并对象：Base + Override
@@ -226,7 +226,7 @@ export class ActiveEffectManager {
 
                 // 2. 添加 缴械
                 const jiaoxieData = foundry.utils.deepClone(
-                    CONFIG.statusEffects.find(e => e.id === "jiaoxie")
+                    CONFIG.statusEffects.jiaoxie
                 );
 
                 if (jiaoxieData) {
@@ -274,7 +274,7 @@ export class ActiveEffectManager {
 
                 // 2. 添加 走火入魔 (持续1回合)
                 const rageData = foundry.utils.deepClone(
-                    CONFIG.statusEffects.find(e => e.id === "rage")
+                    CONFIG.statusEffects.rage
                 );
 
                 if (rageData) {
@@ -559,7 +559,7 @@ export class ActiveEffectManager {
      */
     static async toggleStatus(actor, slug, active, options = {}) {
         // 1. 从 CONFIG 中获取基础数据模板
-        const statusData = CONFIG.statusEffects.find(e => e.id === slug);
+        const statusData = CONFIG.statusEffects[slug];
         if (!statusData) {
             console.warn(`XJZL | Status Effect "${slug}" not found in CONFIG.`);
             return;

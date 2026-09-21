@@ -217,7 +217,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
         let currentAmount = "—";
         if (effect.automationType !== "description") {
           try { currentAmount = Math.trunc(evaluateEncounterFormula(effect.amountFormula, combat.round || 1)); }
-          catch (error) { currentAmount = game.i18n.format("XJZL.Encounter.FormulaInvalidShort", { reason: error.message }); }
+          catch (error) { currentAmount = game.i18n.localize("XJZL.Encounter.FormulaInvalidShort", { reason: error.message }); }
         }
         return {
           ...effect,
@@ -267,7 +267,7 @@ export class EncounterRuntimeApp extends HandlebarsApplicationMixin(ApplicationV
         return {
           ...group,
           descriptionText: plainText(group.description),
-          displayName: group.name || group.snapshotName || game.i18n.format("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
+          displayName: group.name || group.snapshotName || game.i18n.localize("XJZL.Encounter.DefaultSupportGroup", { number: groupIndex + 1 }),
           encounterRemainingLabel: this._remainingLabel(group.encounterRemaining),
           roundRemainingLabel: this._remainingLabel(group.roundRemaining),
           availableCount: npcs.filter(npc => npc.available).length,

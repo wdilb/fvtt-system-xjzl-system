@@ -1438,7 +1438,7 @@ export class ChatCardManager {
                 await targetActor.stopStance();
                 // B. 应用 "破防" 状态
                 // 从配置中获取标准数据
-                const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
+                const statusConfig = CONFIG.statusEffects.pofang;
 
 
                 if (statusConfig) {
@@ -1877,10 +1877,10 @@ export class ChatCardManager {
         const safeName = foundry.utils.escapeHTML(String(displayName ?? ""));
         const confirmed = await foundry.applications.api.DialogV2.confirm({
             window: {
-                title: game.i18n.format("XJZL.UI.Chat.HealCard.UndoTitle", { name: displayName }),
+                title: game.i18n.localize("XJZL.UI.Chat.HealCard.UndoTitle", { name: displayName }),
                 icon: "fas fa-undo"
             },
-            content: `<p>${game.i18n.format("XJZL.UI.Chat.HealCard.UndoConfirm", {
+            content: `<p>${game.i18n.localize("XJZL.UI.Chat.HealCard.UndoConfirm", {
                 name: `<strong>${safeName}</strong>`,
                 amount,
                 type: foundry.utils.escapeHTML(resourceLabel)
@@ -1922,7 +1922,7 @@ export class ChatCardManager {
             content: div.innerHTML,
             "flags.xjzl-system.isUndone": true
         });
-        ui.notifications.info(game.i18n.format("XJZL.UI.Chat.HealCard.UndoSuccess", {
+        ui.notifications.info(game.i18n.localize("XJZL.UI.Chat.HealCard.UndoSuccess", {
             name: displayName,
             amount,
             type: resourceLabel
@@ -1993,7 +1993,7 @@ export class ChatCardManager {
                 await targetActor.stopStance();
 
                 // B. 应用 "破防" 状态
-                const statusConfig = CONFIG.statusEffects.find(e => e.id === "pofang");
+                const statusConfig = CONFIG.statusEffects.pofang;
                 if (statusConfig) {
                     const breakEffectData = {
                         ...statusConfig,
@@ -2748,7 +2748,7 @@ export class ChatCardManager {
         // 情况 A: 传入的是字符串 ID (如 "prone", "dianxue")
         if (typeof effectRef === "string") {
             // 1. 从系统配置中查找完整数据
-            const statusConfig = CONFIG.statusEffects.find(e => e.id === effectRef);
+            const statusConfig = CONFIG.statusEffects[effectRef];
 
             if (statusConfig) {
                 // 2. 找到预设：进行合并
@@ -3125,7 +3125,7 @@ export class ChatCardManager {
             await actor.applyHealing({ amount: 1, type: "mp" });
             await actor.toggleStatusEffect("dead", { active: false });//不脱离濒死，只脱离死亡
 
-            const unconscious = CONFIG.statusEffects.find(e => e.id === "unconscious");
+            const unconscious = CONFIG.statusEffects.unconscious;
             if (unconscious) {
                 // 调用系统统一的特效管理器发放“昏迷”状态
                 await game.xjzl.api.effects.addEffect(actor, unconscious);

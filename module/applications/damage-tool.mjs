@@ -238,7 +238,7 @@ export class GenericDamageTool extends HandlebarsApplicationMixin(ApplicationV2)
       isApplying: this._isApplying,
       canApply: resolved.targets.length > 0 && !this._isApplying,
       typeLabel,
-      actionSummary: game.i18n.format(mode === "damage"
+      actionSummary: game.i18n.localize(mode === "damage"
         ? "XJZL.UI.DamageTool.ApplyDamageSummary"
         : "XJZL.UI.DamageTool.ApplyHealingSummary", {
         count: resolved.targets.length,
@@ -442,7 +442,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
 
     try {
       await game.clipboard.copyPlainText(command);
-      ui.notifications.info(game.i18n.format("XJZL.UI.DamageTool.MacroCopied", { count: preset.targets.length }));
+      ui.notifications.info(game.i18n.localize("XJZL.UI.DamageTool.MacroCopied", { count: preset.targets.length }));
       return command;
     } catch (error) {
       console.error("XJZL | 复制伤害工具宏代码失败:", error);
@@ -490,7 +490,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     const typeLabel = mode === "damage"
       ? game.i18n.localize(CONFIG.XJZL.damageTypes[this._state.damageType])
       : game.i18n.localize(HEALING_TYPES[this._state.healingType].label);
-    summaryNode.textContent = game.i18n.format(mode === "damage"
+    summaryNode.textContent = game.i18n.localize(mode === "damage"
       ? "XJZL.UI.DamageTool.ApplyDamageSummary"
       : "XJZL.UI.DamageTool.ApplyHealingSummary", {
       count: this._getResolvedTargets().targets.length,
@@ -585,15 +585,15 @@ await game.xjzl.damageTool.executePreset(preset);`;
     };
 
     if (failures.length === 0) {
-      ui.notifications.info(game.i18n.format("XJZL.UI.DamageTool.BatchSuccess", { count: successCount }));
+      ui.notifications.info(game.i18n.localize("XJZL.UI.DamageTool.BatchSuccess", { count: successCount }));
     } else if (successCount > 0) {
-      ui.notifications.warn(game.i18n.format("XJZL.UI.DamageTool.BatchPartial", {
+      ui.notifications.warn(game.i18n.localize("XJZL.UI.DamageTool.BatchPartial", {
         success: successCount,
         failure: failures.length,
         names: failures.join("、")
       }));
     } else {
-      ui.notifications.error(game.i18n.format("XJZL.UI.DamageTool.BatchFailed", { names: failures.join("、") }));
+      ui.notifications.error(game.i18n.localize("XJZL.UI.DamageTool.BatchFailed", { names: failures.join("、") }));
     }
 
     if (this.rendered) this.render({ force: true });
@@ -770,7 +770,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
   _buildFlavor(reason, typeLabel, sourceActor, mode) {
     const escape = value => foundry.utils.escapeHTML(String(value ?? ""));
     const source = sourceActor
-      ? game.i18n.format(mode === "damage" ? "XJZL.UI.DamageTool.FromDamage" : "XJZL.UI.DamageTool.FromHealing", {
+      ? game.i18n.localize(mode === "damage" ? "XJZL.UI.DamageTool.FromDamage" : "XJZL.UI.DamageTool.FromHealing", {
         name: escape(sourceActor.name)
       })
       : "";

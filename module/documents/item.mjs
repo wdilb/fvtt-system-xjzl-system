@@ -2548,7 +2548,7 @@ export class XJZLItem extends Item {
 
       // 如果配置了骰子声音
       if (attackRoll) {
-        ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+        ChatMessage.applyMode(chatData, game.settings.get("core", "messageMode"));
       }
       const message = await ChatMessage.create(chatData);
 

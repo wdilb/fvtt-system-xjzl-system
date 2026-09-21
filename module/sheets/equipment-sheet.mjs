@@ -82,7 +82,7 @@ export class XJZLEquipmentSheet extends HandlebarsApplicationMixin(ItemSheetV2) 
         }
 
         // 富文本增强 (放在 return 之前)
-        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
             this.document.system.description,
             {
                 secrets: this.document.isOwner,

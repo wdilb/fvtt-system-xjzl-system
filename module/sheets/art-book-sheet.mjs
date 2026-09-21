@@ -40,7 +40,7 @@ export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.tabs = { primary: "details" };
 
         // 顶部总纲描述 (异步解析)
-        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
             this.document.system.description,
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );
@@ -58,7 +58,7 @@ export class XJZLArtBookSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         if (context.system.chapters && context.system.chapters.length > 0) {
             await Promise.all(context.system.chapters.map(async (chapter) => {
                 // 解析每个章节的描述
-                chapter.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+                chapter.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
                     chapter.description || "",
                     { secrets: this.document.isOwner, async: true, relativeTo: this.document }
                 );

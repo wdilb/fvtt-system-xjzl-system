@@ -187,7 +187,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         }
 
         // 富文本字段统一交给 Foundry V13 的 prose-mirror 负责渲染与回写。
-        const enrich = value => foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        const enrich = value => foundry.applications.ux.TextEditor.enrichHTML(
             value || "",
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );
@@ -399,7 +399,7 @@ export class XJZLNeigongSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         if (!effect) return;
         const confirmed = await foundry.applications.api.DialogV2.confirm({
             window: { title: game.i18n.localize("XJZL.UI.Delete") },
-            content: `<p>${game.i18n.format("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
+            content: `<p>${game.i18n.localize("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
             rejectClose: false
         });
         if (confirmed) await effect.delete();

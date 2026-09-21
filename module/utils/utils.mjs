@@ -70,7 +70,7 @@ export async function rollDisabilityTable(actor) {
     rolls: [roll]
   };
 
-  ChatMessage.applyRollMode(chatData, game.settings.get("core", "rollMode"));
+  ChatMessage.applyMode(chatData, game.settings.get("core", "messageMode"));
 
   // 移除 game.dice3d.showForRoll(...)，防止双重播放
   await ChatMessage.create(chatData);

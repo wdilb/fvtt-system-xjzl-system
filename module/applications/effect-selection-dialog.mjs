@@ -155,7 +155,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         // ===========================================
         // 1. 通用状态 (Universal)
         // ===========================================
-        const statusEffects = CONFIG.statusEffects.map(e => {
+        const statusEffects = Object.values(CONFIG.statusEffects).map(e => {
             const name = game.i18n.localize(e.name);
             const descKey = e.description || ""; // 获取配置里的 description key
             const desc = descKey ? game.i18n.localize(descKey) : "无详细描述";
@@ -365,7 +365,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * 读取用户最近使用过的通用状态 id（存在 user flag，按使用时间倒序，过滤已失效的配置）
      */
     async _getRecentStatusIds() {
-        const existingIds = new Set(CONFIG.statusEffects.map(e => e.id));
+        const existingIds = new Set(Object.keys(CONFIG.statusEffects));
         const savedIds = await game.user.getFlag("xjzl-system", "recentStatusPickerIds") || [];
         return savedIds.filter(id => existingIds.has(id)).slice(0, RECENT_STATUS_LIMIT);
     }
@@ -383,7 +383,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
      * 读取用户收藏的「常用」状态 id；从未设置时回退到默认列表 DEFAULT_FAVORITE_STATUS_IDS
      */
     async _getFavoriteStatusIds() {
-        const existingIds = new Set(CONFIG.statusEffects.map(e => e.id));
+        const existingIds = new Set(Object.keys(CONFIG.statusEffects));
         const savedIds = await game.user.getFlag("xjzl-system", "favoriteStatusPickerIds");
         const sourceIds = Array.isArray(savedIds) ? savedIds : DEFAULT_FAVORITE_STATUS_IDS;
         return sourceIds.filter(id => existingIds.has(id)).slice(0, FAVORITE_STATUS_LIMIT);
@@ -484,7 +484,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         const slug = target.dataset.slug;
 
         // 从 CONFIG 中查找数据模板
-        const statusData = CONFIG.statusEffects.find(e => e.id === slug);
+        const statusData = CONFIG.statusEffects[slug];
         if (!statusData) return;
 
         for (const actor of actors) {
@@ -494,7 +494,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
 
         await this._rememberStatus(statusData.id);
-        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.AppliedToTargets", {
             count: actors.length,
             name: game.i18n.localize(statusData.name)
         }));
@@ -527,7 +527,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         }
 
         await this._rememberSceneEffect(uuid);
-        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.AppliedToTargets", {
+        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.AppliedToTargets", {
             count: actors.length,
             name: sourceEffect.name
         }));
@@ -562,7 +562,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
         if (!effect) return;
 
         await effect.delete();
-        ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.RemovedStatus", { name: effect.name }));
+        ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.RemovedStatus", { name: effect.name }));
         this.render();
     }
 
@@ -781,7 +781,7 @@ export class EffectSelectionDialog extends HandlebarsApplicationMixin(Applicatio
                     if (!effect.isStackable) return;
                     const currentStacks = effect.stacks || 1;
                     if (currentStacks > 1) await ActiveEffectManager.removeEffect(actors[0], effect.id, 1);
-                    else ui.notifications.info(game.i18n.format("XJZL.UI.EffectPicker.OneStackLeft", { name: effect.name }));
+                    else ui.notifications.info(game.i18n.localize("XJZL.UI.EffectPicker.OneStackLeft", { name: effect.name }));
                     this.render();
                 }
             });

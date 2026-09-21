@@ -172,8 +172,8 @@ V14 **彻底移除 MeasuredTemplate 文档类型**，逐项归宿：
 | A2 | `foundry.applications.ux.TextEditor.implementation.enrichHTML(...)` → 顶层 `TextEditor.enrichHTML(...)` | 8 处 / 6 文件：compendium-browser、loot-workbench-sheet、equipment-sheet、neigong-sheet、general-item-sheet、art-book-sheet |
 | A3 | `CONST.ACTIVE_EFFECT_MODES`（数字）→ `CONST.ACTIVE_EFFECT_CHANGE_TYPES`（字符串 `type`） | active-effect.mjs、personality.mjs、config.mjs 全部 `mode: 2/5` 定义 |
 | A4 | ActiveEffect 数据 `icon:` → `img:` | personality.mjs（唯一一处） |
-| A5 | `CONFIG.statusEffects` 数组 → 按 id 键对象；`.find(e => e.id === x)` → `CONFIG.statusEffects[x]`；`.map(...)` → `Object.values(...)` | 定义 [config.mjs](../module/config.mjs)；调用约 16 处：active-effect-manager（5）、chat-manager（4）、effect-selection-dialog（4）、xjzl-system.mjs（2）等 |
-| A6 | `game.settings.get("core","rollMode")` → `"messageMode"`；`ChatMessage.applyRollMode` → `ChatMessage.applyMode`；模式串 `publicroll→public`、`gmroll→gm`、`blindroll→blind`、`selfroll→self` | utils.mjs、actor.mjs（约 3532 行）、item.mjs（约 2551 行） |
+| A5 | `CONFIG.statusEffects` 数组 → 按 id 键对象；`.find(e => e.id === x)` → `CONFIG.statusEffects[x]`；`.map(...)` → `Object.values(...)` | 源定义保持数组（条目自带 id），在 [xjzl-system.mjs](../xjzl-system.mjs) 的 CONFIG 赋值处用 `Object.fromEntries` 转换；调用侧 16 处（13 处 `.find` + 3 处 `.map`）：active-effect-manager（5）、chat-manager（4）、effect-selection-dialog（4）、xjzl-system.mjs（3） |
+| A6 | `game.settings.get("core","rollMode")` → `"messageMode"`；`ChatMessage.applyRollMode` → `ChatMessage.applyMode`；模式串 `publicroll→public`、`gmroll→gm`、`blindroll→blind`、`selfroll→self` | utils.mjs、actor.mjs（约 3532 行）、item.mjs（约 2551 行）、container-transaction-manager.mjs（约 873 行，硬编码 `"publicroll"` → `"public"`） |
 | A7 | `system.json` 兼容版本 13 → 14；发布时更新 download 链接 | [system.json](../system.json) |
 
 ---

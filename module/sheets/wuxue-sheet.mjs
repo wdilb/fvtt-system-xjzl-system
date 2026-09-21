@@ -153,7 +153,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         context.tabs = this.tabGroups;
 
         // 1. 侧边栏总纲描述 (异步解析)
-        const enrich = value => foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        const enrich = value => foundry.applications.ux.TextEditor.enrichHTML(
             value || "",
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );
@@ -470,7 +470,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         // 确认弹窗
         const confirm = await foundry.applications.api.DialogV2.confirm({
             window: { title: game.i18n.localize("XJZL.UI.Delete") },
-            content: `<p>${game.i18n.format("XJZL.Wuxue.DeleteMoveConfirm", { name: moves.find(move => move.id === moveId)?.name || "" })}</p>`,
+            content: `<p>${game.i18n.localize("XJZL.Wuxue.DeleteMoveConfirm", { name: moves.find(move => move.id === moveId)?.name || "" })}</p>`,
             rejectClose: false
         });
 
@@ -512,7 +512,7 @@ export class XJZLWuxueSheet extends HandlebarsApplicationMixin(ItemSheetV2) {
         if (!effect) return;
         const confirmed = await foundry.applications.api.DialogV2.confirm({
             window: { title: game.i18n.localize("XJZL.UI.Delete") },
-            content: `<p>${game.i18n.format("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
+            content: `<p>${game.i18n.localize("XJZL.Wuxue.DeleteEffectConfirm", { name: effect.name })}</p>`,
             rejectClose: false
         });
         if (confirmed) await effect.delete();

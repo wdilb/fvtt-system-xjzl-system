@@ -74,7 +74,7 @@ export class XJZLGeneralItemSheet extends HandlebarsApplicationMixin(ItemSheetV2
 
         // 富文本增强
         // 这一步解决了 "<p>...</p>" 直接显示的问题，并激活 UUID 链接
-        context.enrichedDescription = await foundry.applications.ux.TextEditor.implementation.enrichHTML(
+        context.enrichedDescription = await foundry.applications.ux.TextEditor.enrichHTML(
             this.document.system.description,
             { secrets: this.document.isOwner, async: true, relativeTo: this.document }
         );

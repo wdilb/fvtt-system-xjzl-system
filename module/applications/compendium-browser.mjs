@@ -544,7 +544,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
      */
     _updatePagerUI(total, shown) {
         const statsShown = this.element.querySelector(".xjzl-cb-stats-shown");
-        if (statsShown) statsShown.textContent = game.i18n.format("XJZL.CompendiumBrowser.Stats.Shown", { shown });
+        if (statsShown) statsShown.textContent = game.i18n.localize("XJZL.CompendiumBrowser.Stats.Shown", { shown });
 
         const sentinel = this.element.querySelector(".xjzl-cb-sentinel");
         if (!sentinel) return;
@@ -553,8 +553,8 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         const note = document.createElement("div");
         note.className = "xjzl-cb-ended";
         note.textContent = shown >= MAX_RENDER
-            ? game.i18n.format("XJZL.CompendiumBrowser.Stats.LimitReached", { limit: MAX_RENDER })
-            : game.i18n.format("XJZL.CompendiumBrowser.Stats.Ended", { count: total });
+            ? game.i18n.localize("XJZL.CompendiumBrowser.Stats.LimitReached", { limit: MAX_RENDER })
+            : game.i18n.localize("XJZL.CompendiumBrowser.Stats.Ended", { count: total });
         sentinel.replaceWith(note);
         statsShown?.remove();
         this._sentinelObserver?.disconnect();
@@ -610,10 +610,10 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
             totalCount: totalCount,
             hasMore: visibleCount < sortedItems.length && visibleCount < MAX_RENDER,
             reachedMax: visibleCount >= MAX_RENDER && visibleCount < sortedItems.length,
-            statsFound: game.i18n.format("XJZL.CompendiumBrowser.Stats.Found", { count: totalCount }),
-            statsShown: game.i18n.format("XJZL.CompendiumBrowser.Stats.Shown", { shown: displayItems.length }),
-            endedText: game.i18n.format("XJZL.CompendiumBrowser.Stats.Ended", { count: totalCount }),
-            limitText: game.i18n.format("XJZL.CompendiumBrowser.Stats.LimitReached", { limit: MAX_RENDER }),
+            statsFound: game.i18n.localize("XJZL.CompendiumBrowser.Stats.Found", { count: totalCount }),
+            statsShown: game.i18n.localize("XJZL.CompendiumBrowser.Stats.Shown", { shown: displayItems.length }),
+            endedText: game.i18n.localize("XJZL.CompendiumBrowser.Stats.Ended", { count: totalCount }),
+            limitText: game.i18n.localize("XJZL.CompendiumBrowser.Stats.LimitReached", { limit: MAX_RENDER }),
             sortLabel: localize("Sort.Label"),
             sortName: localize("Sort.Name"),
             sortQualityDesc: localize("Sort.QualityDesc"),
@@ -866,7 +866,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
         // 1. 获取候选池
         const pool = this._filterItems(rawItems, filters, query);
         if (pool.length === 0) {
-            ui.notifications.warn(game.i18n.format("XJZL.CompendiumBrowser.State.NoFilteredItems", { tab }));
+            ui.notifications.warn(game.i18n.localize("XJZL.CompendiumBrowser.State.NoFilteredItems", { tab }));
             return [];
         }
 
@@ -967,7 +967,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 senderLabel: localize("Sender"),
                 titleLabel: localize("TitleField"),
                 weightLegend: localize("WeightTitle"),
-                poolLabel: game.i18n.format("XJZL.CompendiumBrowser.Random.Pool", { count: currentPool.length }),
+                poolLabel: game.i18n.localize("XJZL.CompendiumBrowser.Random.Pool", { count: currentPool.length }),
                 isTier: isTier,
                 weights: weightList
             }
@@ -1774,7 +1774,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
      * 播放全屏抽取演出，结束后才将结果发送至聊天栏。
      */
     async _playDrawAnimation(items, { title }) {
-        const TextEditor = foundry.applications.ux.TextEditor.implementation;
+        const TextEditor = foundry.applications.ux.TextEditor;
         const drawItems = items.map((item, index) => {
             const rarity = this._getRarityPresentation(item);
             return {
@@ -1811,7 +1811,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
                 isLarge: drawItems.length > 10,
                 isMassive: drawItems.length > 30,
                 useShowcase,
-                countText: game.i18n.format("XJZL.CompendiumBrowser.Draw.Count", { count: drawItems.length }),
+                countText: game.i18n.localize("XJZL.CompendiumBrowser.Draw.Count", { count: drawItems.length }),
                 totalDisplay: String(drawItems.length).padStart(2, "0"),
                 highestRarity: highest.drawClass,
                 particles

@@ -272,23 +272,23 @@ export class XJZLActiveEffect extends ActiveEffect {
   /**
    * 计算新的 Changes 数组 (用于叠层)
    * 规则：
-   * 1. 仅 Mode = 2 (ADD) 的数值会被乘算
-   * 2. 其他 Mode 保持原样
+   * 1. 仅 add 类型的数值会被乘算
+   * 2. 其他类型保持原样
    * @param {number} newStacks 目标层数
    * @returns {Array} 计算后的 changes 数组
    */
   calculateChangesForStacks(newStacks) {
     const baseChanges = this.getFlag("xjzl-system", "baseChanges");
-    if (!baseChanges) return this.changes; // 容错：如果没有快照，就用当前的
+    if (!baseChanges) return this.system.changes; // 容错：如果没有快照，就用当前的
 
     return baseChanges.map(change => {
       // 深度拷贝，避免修改原引用
       const newChange = { ...change };
 
       // 核心算法：
-      // 只有 Mode 2 (ADD) 且 Value 是纯数字时，才进行乘法
-      // V13 常量: CONST.ACTIVE_EFFECT_MODES.ADD === 2
-      if (Number(newChange.mode) === CONST.ACTIVE_EFFECT_MODES.ADD) {
+      // 只有 add 类型且 Value 是纯数字时，才进行乘法
+      // V14 常量: CONST.ACTIVE_EFFECT_CHANGE_TYPES.ADD === "add"
+      if (newChange.type === CONST.ACTIVE_EFFECT_CHANGE_TYPES.ADD) {
         const baseValue = Number(newChange.value);
         if (!isNaN(baseValue)) {
           newChange.value = String(baseValue * newStacks);

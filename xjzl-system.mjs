@@ -271,7 +271,9 @@ Hooks.once("init", async function () {
   });
 
   // 替换系统核心的状态效果列表
-  CONFIG.statusEffects = CONFIG.XJZL.statusEffects;
+  // V14 的 CONFIG.statusEffects 是按 id 键对象（数组形态已废弃）；
+  // 源定义保持数组（条目自带 id 便于维护），在此处转换为对象形态
+  CONFIG.statusEffects = Object.fromEntries(CONFIG.XJZL.statusEffects.map(e => [e.id, e]));
 
   // 修改世界时间配置
   CONFIG.time.roundTime = 2; // 设置 1 轮 = 2 秒 (我们侠界是这么快的)
@@ -1021,7 +1023,7 @@ Hooks.on("renderTokenHUD", (app, html, data) => {
 
   statusIcons.forEach((icon) => {
     const slug = icon.dataset.statusId;
-    const statusData = CONFIG.statusEffects.find(e => e.id === slug);
+    const statusData = CONFIG.statusEffects[slug];
     if (!statusData) return;
 
     // 克隆节点移除旧事件

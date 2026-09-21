@@ -659,7 +659,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/撕裂.png",
     flags: { "xjzl-system": { slug: "sielie", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.wuxueBleedOnHit", mode: 2, value: "10" }
+      { key: "flags.xjzl-system.wuxueBleedOnHit", type: "add", value: "10" }
     ]
   },
   {
@@ -670,7 +670,7 @@ XJZL.statusEffects = [
     flags: { "xjzl-system": { slug: "pojia", stackable: false } },
     changes: [
       // 外功防御归零 -> 使用 OVERRIDE (5)
-      { key: "flags.xjzl-system.brokenDefense", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.brokenDefense", type: "override", value: "true" }
     ]
   },
   {
@@ -680,7 +680,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/不怒.png",
     flags: { "xjzl-system": { slug: "bunu", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.noRecoverRage", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.noRecoverRage", type: "override", value: "true" }
     ]
   },
   {
@@ -689,7 +689,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.JinxuDesc",
     img: "systems/xjzl-system/assets/icons/ae/禁虚.png",
     flags: { "xjzl-system": { slug: "jinxu", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.blockXuZhao", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.blockXuZhao", type: "override", value: "true" }]
   },
   {
     id: "jinshi",
@@ -697,7 +697,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.JinshiDesc",
     img: "systems/xjzl-system/assets/icons/ae/禁实.png",
     flags: { "xjzl-system": { slug: "jinshi", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.blockShiZhao", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.blockShiZhao", type: "override", value: "true" }]
   },
   {
     id: "jinfan",
@@ -705,7 +705,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.JinfanDesc",
     img: "systems/xjzl-system/assets/icons/ae/禁反.png",
     flags: { "xjzl-system": { slug: "jinfan", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.blockCounter", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.blockCounter", type: "override", value: "true" }]
   },
   {
     id: "jinqi",
@@ -713,7 +713,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.JinqiDesc",
     img: "systems/xjzl-system/assets/icons/ae/禁气.png",
     flags: { "xjzl-system": { slug: "jinqi", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.blockQiZhao", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.blockQiZhao", type: "override", value: "true" }]
   },
   {
     id: "jinjue",
@@ -721,7 +721,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.JinjueDesc",
     img: "systems/xjzl-system/assets/icons/ae/禁绝.png",
     flags: { "xjzl-system": { slug: "jinjue", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.blockUltimate", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.blockUltimate", type: "override", value: "true" }]
   },
   {
     id: "jinliao",
@@ -729,7 +729,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.JinliaoDesc",
     img: "systems/xjzl-system/assets/icons/ae/禁疗.png",
     flags: { "xjzl-system": { slug: "jinliao", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.noRecoverHP", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.noRecoverHP", type: "override", value: "true" }]
   },
   {
     id: "qizhi",
@@ -737,7 +737,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.QizhiDesc",
     img: "systems/xjzl-system/assets/icons/ae/气滞.png",
     flags: { "xjzl-system": { slug: "qizhi", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.noRecoverNeili", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.noRecoverNeili", type: "override", value: "true" }]
   },
   {
     id: "poyi",
@@ -746,7 +746,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/破衣.png",
     flags: { "xjzl-system": { slug: "poyi", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.ignoreArmorEffects", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.ignoreArmorEffects", type: "override", value: "true" }
     ]
   },
   {
@@ -756,8 +756,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/脱力.png",
     flags: { "xjzl-system": { slug: "tuoli", stackable: false } },
     changes: [
-      { key: "system.combat.xuzhao", mode: 2, value: "-3" },
-      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" }
+      { key: "system.combat.xuzhao", type: "add", value: "-3" },
+      { key: "flags.xjzl-system.feintLevel", type: "add", value: "-1" }
     ]
   },
   {
@@ -782,7 +782,7 @@ XJZL.statusEffects = [
     description: "XJZL.Status.JiaoxieDesc",
     img: "systems/xjzl-system/assets/icons/ae/缴械.png",
     flags: { "xjzl-system": { slug: "jiaoxie", stackable: false } },
-    changes: [{ key: "flags.xjzl-system.forceUnarmed", mode: 5, value: "true" }]
+    changes: [{ key: "flags.xjzl-system.forceUnarmed", type: "override", value: "true" }]
   },
 
   // ====================================================
@@ -795,7 +795,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/养血.png",
     flags: { "xjzl-system": { slug: "yangxue", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "flags.xjzl-system.regenHpTurnEnd", mode: 2, value: "10" }
+      { key: "flags.xjzl-system.regenHpTurnEnd", type: "add", value: "10" }
     ]
   },
   {
@@ -805,7 +805,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/聚气.png",
     flags: { "xjzl-system": { slug: "juqi", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "flags.xjzl-system.regenMpTurnEnd", mode: 2, value: "5" }
+      { key: "flags.xjzl-system.regenMpTurnEnd", type: "add", value: "5" }
     ]
   },
   {
@@ -815,7 +815,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/气虚.png",
     flags: { "xjzl-system": { slug: "qixu", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "flags.xjzl-system.regenMpTurnEnd", mode: 2, value: "-5" }
+      { key: "flags.xjzl-system.regenMpTurnEnd", type: "add", value: "-5" }
     ]
   },
   {
@@ -825,7 +825,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/乘风.png",
     flags: { "xjzl-system": { slug: "chengfeng", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.speed", mode: 2, value: "1" }
+      { key: "system.combat.speed", type: "add", value: "1" }
     ]
   },
   {
@@ -835,7 +835,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/刚劲.png",
     flags: { "xjzl-system": { slug: "gangjin", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.damages.gang.mod", mode: 2, value: "5" }
+      { key: "system.combat.damages.gang.mod", type: "add", value: "5" }
     ]
   },
   {
@@ -845,7 +845,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/绵劲.png",
     flags: { "xjzl-system": { slug: "mianjin", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.damages.rou.mod", mode: 2, value: "5" }
+      { key: "system.combat.damages.rou.mod", type: "add", value: "5" }
     ]
   },
   {
@@ -855,7 +855,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/磐石.png",
     flags: { "xjzl-system": { slug: "panshi", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.block", mode: 2, value: "5" }
+      { key: "system.combat.block", type: "add", value: "5" }
     ]
   },
   {
@@ -865,8 +865,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/护身.png",
     flags: { "xjzl-system": { slug: "hushen", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.def_waigong", mode: 2, value: "5" },
-      { key: "system.combat.def_neigong", mode: 2, value: "5" }
+      { key: "system.combat.def_waigong", type: "add", value: "5" },
+      { key: "system.combat.def_neigong", type: "add", value: "5" }
     ]
   },
   {
@@ -876,8 +876,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/蓄劲.png",
     flags: { "xjzl-system": { slug: "xujin", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.crit_waigong", mode: 2, value: "-1" },
-      { key: "system.combat.crit_neigong", mode: 2, value: "-1" }
+      { key: "system.combat.crit_waigong", type: "add", value: "-1" },
+      { key: "system.combat.crit_neigong", type: "add", value: "-1" }
     ]
   },
   {
@@ -887,8 +887,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/犹豫.png",
     flags: { "xjzl-system": { slug: "youyu", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.crit_waigong", mode: 2, value: "1" },
-      { key: "system.combat.crit_neigong", mode: 2, value: "1" }
+      { key: "system.combat.crit_waigong", type: "add", value: "1" },
+      { key: "system.combat.crit_neigong", type: "add", value: "1" }
     ]
   },
   {
@@ -906,8 +906,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/愚钝.png",
     flags: { "xjzl-system": { slug: "yudun", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.xuzhao", mode: 2, value: "-1" },
-      { key: "system.combat.kanpo", mode: 2, value: "-1" }
+      { key: "system.combat.xuzhao", type: "add", value: "-1" },
+      { key: "system.combat.kanpo", type: "add", value: "-1" }
     ]
   },
   {
@@ -917,8 +917,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/失准.png",
     flags: { "xjzl-system": { slug: "shizhun", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.hit_waigong", mode: 2, value: "-5" },
-      { key: "system.combat.hit_neigong", mode: 2, value: "-5" }
+      { key: "system.combat.hit_waigong", type: "add", value: "-5" },
+      { key: "system.combat.hit_neigong", type: "add", value: "-5" }
     ]
   },
   {
@@ -928,8 +928,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/眼力.png",
     flags: { "xjzl-system": { slug: "yanli", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.hit_waigong", mode: 2, value: "5" },
-      { key: "system.combat.hit_neigong", mode: 2, value: "5" }
+      { key: "system.combat.hit_waigong", type: "add", value: "5" },
+      { key: "system.combat.hit_neigong", type: "add", value: "5" }
     ]
   },
   {
@@ -939,7 +939,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/轻灵.png",
     flags: { "xjzl-system": { slug: "qingling", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.dodge", mode: 2, value: "5" }
+      { key: "system.combat.dodge", type: "add", value: "5" }
     ]
   },
   {
@@ -949,7 +949,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/笨拙.png",
     flags: { "xjzl-system": { slug: "benzhuo", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.dodge", mode: 2, value: "-5" }
+      { key: "system.combat.dodge", type: "add", value: "-5" }
     ]
   },
   {
@@ -959,7 +959,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/劲力.png",
     flags: { "xjzl-system": { slug: "jinli", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.damages.skill.mod", mode: 2, value: "5" }
+      { key: "system.combat.damages.skill.mod", type: "add", value: "5" }
     ]
   },
   {
@@ -969,8 +969,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/武器势.png",
     flags: { "xjzl-system": { slug: "wuqishi", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.hit_waigong", mode: 2, value: "10" },
-      { key: "system.combat.hit_neigong", mode: 2, value: "10" }
+      { key: "system.combat.hit_waigong", type: "add", value: "10" },
+      { key: "system.combat.hit_neigong", type: "add", value: "10" }
     ]
   },
   {
@@ -980,7 +980,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/乏力.png",
     flags: { "xjzl-system": { slug: "fali", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.damages.skill.mod", mode: 2, value: "-10" }
+      { key: "system.combat.damages.skill.mod", type: "add", value: "-10" }
     ]
   },
   {
@@ -998,7 +998,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/易伤.png",
     flags: { "xjzl-system": { slug: "yishang", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "flags.xjzl-system.bleedOnHit", mode: 2, value: "10" }
+      { key: "flags.xjzl-system.bleedOnHit", type: "add", value: "10" }
     ]
   },
   {
@@ -1008,7 +1008,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/劲气.png",
     flags: { "xjzl-system": { slug: "jinqi_stack", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.combat.damages.skill.mod", mode: 2, value: "10" }
+      { key: "system.combat.damages.skill.mod", type: "add", value: "10" }
     ]
   },
 
@@ -1022,7 +1022,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/下盘不稳.png",
     flags: { "xjzl-system": { slug: "unstable", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.unstable", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.unstable", type: "override", value: "true" }
     ]
   },
   {
@@ -1032,9 +1032,9 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/目盲.png",
     flags: { "xjzl-system": { slug: "blind", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
-      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" },
-      { key: "flags.xjzl-system.grantAttackLevel", mode: 2, value: "1" }
+      { key: "flags.xjzl-system.attackLevel", type: "add", value: "-1" },
+      { key: "flags.xjzl-system.feintLevel", type: "add", value: "-1" },
+      { key: "flags.xjzl-system.grantAttackLevel", type: "add", value: "1" }
     ]
   },
   {
@@ -1044,7 +1044,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/耳鸣.png",
     flags: { "xjzl-system": { slug: "deaf", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.grantAttackLevel", mode: 2, value: "1" }
+      { key: "flags.xjzl-system.grantAttackLevel", type: "add", value: "1" }
     ]
   },
   {
@@ -1054,8 +1054,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/禁足.png",
     flags: { "xjzl-system": { slug: "root", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.forceSpeedZero", mode: 5, value: "true" },
-      { key: "flags.xjzl-system.forceDodgeZero", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.forceSpeedZero", type: "override", value: "true" },
+      { key: "flags.xjzl-system.forceDodgeZero", type: "override", value: "true" }
     ]
   },
   {
@@ -1065,9 +1065,9 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/错骨.png",
     flags: { "xjzl-system": { slug: "cuogu", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
-      { key: "system.combat.kanpo", mode: 2, value: "-5" },
-      { key: "system.combat.resistances.skill.mod", mode: 2, value: "-10" }
+      { key: "flags.xjzl-system.attackLevel", type: "add", value: "-1" },
+      { key: "system.combat.kanpo", type: "add", value: "-5" },
+      { key: "system.combat.resistances.skill.mod", type: "add", value: "-10" }
     ]
   },
   {
@@ -1101,10 +1101,10 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/定身（无法行动）.png",
     flags: { "xjzl-system": { slug: "stun", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.forceSpeedZero", mode: 5, value: "true" },
-      { key: "flags.xjzl-system.forceDodgeZero", mode: 5, value: "true" },
-      { key: "flags.xjzl-system.stun", mode: 5, value: "true" },
-      { key: "flags.xjzl-system.blockStance", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.forceSpeedZero", type: "override", value: "true" },
+      { key: "flags.xjzl-system.forceDodgeZero", type: "override", value: "true" },
+      { key: "flags.xjzl-system.stun", type: "override", value: "true" },
+      { key: "flags.xjzl-system.blockStance", type: "override", value: "true" }
     ]
   },
   {
@@ -1114,9 +1114,9 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/点穴.png",
     flags: { "xjzl-system": { slug: "dianxue", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.forceSpeedZero", mode: 5, value: "true" },
-      { key: "flags.xjzl-system.forceDodgeZero", mode: 5, value: "true" },
-      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.forceSpeedZero", type: "override", value: "true" },
+      { key: "flags.xjzl-system.forceDodgeZero", type: "override", value: "true" },
+      { key: "flags.xjzl-system.stun", type: "override", value: "true" }
     ]
   },
   {
@@ -1126,7 +1126,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/眩晕.png",
     flags: { "xjzl-system": { slug: "xuanyun", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.stun", type: "override", value: "true" }
     ]
   },
   {
@@ -1152,8 +1152,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/倒地.png",
     flags: { "xjzl-system": { slug: "prone", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.grantAttackLevel", mode: 2, value: "1" },
-      { key: "flags.xjzl-system.defendFeintLevel", mode: 2, value: "1" }
+      { key: "flags.xjzl-system.grantAttackLevel", type: "add", value: "1" },
+      { key: "flags.xjzl-system.defendFeintLevel", type: "add", value: "1" }
     ]
   },
   {
@@ -1163,8 +1163,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/疲劳.png",
     flags: { "xjzl-system": { slug: "fatigue", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
-      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" }
+      { key: "flags.xjzl-system.attackLevel", type: "add", value: "-1" },
+      { key: "flags.xjzl-system.feintLevel", type: "add", value: "-1" }
     ]
   },
   {
@@ -1174,7 +1174,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/饥饿.png",
     flags: { "xjzl-system": { slug: "hunger", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "system.attributes.tipo.mod", mode: 2, value: "-1" }
+      { key: "system.attributes.tipo.mod", type: "add", value: "-1" }
     ]
   },
   {
@@ -1185,7 +1185,7 @@ XJZL.statusEffects = [
     flags: { "xjzl-system": { slug: "bleed_stack", stackable: true, maxStacks: 0 } },
     changes: [
       // 每层回合初造成 10 点流血伤害 (正数，因为我们在代码里是作为伤害量处理)
-      { key: "flags.xjzl-system.takeBleedDamageTurnStart", mode: 2, value: "10" }
+      { key: "flags.xjzl-system.takeBleedDamageTurnStart", type: "add", value: "10" }
     ]
   },
   {
@@ -1204,9 +1204,9 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/剧痛.png",
     flags: { "xjzl-system": { slug: "pain", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.unstable", mode: 5, value: "true" }, // 速度减半(复用下盘不稳Flag)
-      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
-      { key: "flags.xjzl-system.feintLevel", mode: 2, value: "-1" }
+      { key: "flags.xjzl-system.unstable", type: "override", value: "true" }, // 速度减半(复用下盘不稳Flag)
+      { key: "flags.xjzl-system.attackLevel", type: "add", value: "-1" },
+      { key: "flags.xjzl-system.feintLevel", type: "add", value: "-1" }
     ]
   },
   {
@@ -1216,7 +1216,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/失血.png",
     flags: { "xjzl-system": { slug: "bloodloss", stackable: true, maxStacks: 0 } },
     changes: [
-      { key: "flags.xjzl-system.bloodLossLevel", mode: 2, value: "1" }
+      { key: "flags.xjzl-system.bloodLossLevel", type: "add", value: "1" }
     ]
   },
   {
@@ -1226,7 +1226,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/昏迷.png",
     flags: { "xjzl-system": { slug: "unconscious", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.stun", mode: 5, value: "true" },
+      { key: "flags.xjzl-system.stun", type: "override", value: "true" },
     ]
   },
   {
@@ -1237,7 +1237,7 @@ XJZL.statusEffects = [
     flags: { "xjzl-system": { slug: "pofang", stackable: false } },
     duration: { rounds: 1 }, //破防就是持续1回合
     changes: [
-      { key: "flags.xjzl-system.blockStance", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.blockStance", type: "override", value: "true" }
     ]
   },
   {
@@ -1248,8 +1248,8 @@ XJZL.statusEffects = [
     flags: { "xjzl-system": { slug: "zuidao", stackable: false } },
     changes: [
       // 移动速度减半：复用系统中的 unstable 逻辑（或直接修改速度倍率）
-      { key: "flags.xjzl-system.unstable", mode: 5, value: "true" },
-      { key: "flags.xjzl-system.attackLevel", mode: 2, value: "-1" },
+      { key: "flags.xjzl-system.unstable", type: "override", value: "true" },
+      { key: "flags.xjzl-system.attackLevel", type: "add", value: "-1" },
     ]
   },
   {
@@ -1259,8 +1259,8 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/濒死.png",
     flags: { "xjzl-system": { slug: "dying", stackable: false } },
     changes: [
-      // { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
-      { key: "flags.xjzl-system.regenMpTurnStart", mode: 2, value: "-5" }
+      // { key: "flags.xjzl-system.stun", type: "override", value: "true" }
+      { key: "flags.xjzl-system.regenMpTurnStart", type: "add", value: "-5" }
     ]
   },
   {
@@ -1270,7 +1270,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/死亡.png",
     flags: { "xjzl-system": { slug: "dead", stackable: false } },
     // changes: [
-    //   { key: "flags.xjzl-system.stun", mode: 5, value: "true" }
+    //   { key: "flags.xjzl-system.stun", type: "override", value: "true" }
     // ]
   },
   {
@@ -1280,7 +1280,7 @@ XJZL.statusEffects = [
     img: "systems/xjzl-system/assets/icons/ae/无痛.png",
     flags: { "xjzl-system": { slug: "wutong", stackable: false } },
     changes: [
-      { key: "flags.xjzl-system.noRageOnHit", mode: 5, value: "true" }
+      { key: "flags.xjzl-system.noRageOnHit", type: "override", value: "true" }
     ]
   }
 ];

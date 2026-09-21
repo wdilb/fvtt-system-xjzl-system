@@ -159,7 +159,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
         };
 
         await scene.createEmbeddedDocuments("MeasuredTemplate", [templateData]);
-        ui.notifications.info(game.i18n.format("XJZL.UI.AoeCreator.Created", { label }));
+        ui.notifications.info(game.i18n.localize("XJZL.UI.AoeCreator.Created", { label }));
         this.close(); // 创建后自动关闭窗口，方便查看
     }
 

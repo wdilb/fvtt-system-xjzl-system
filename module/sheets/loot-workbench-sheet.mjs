@@ -55,7 +55,7 @@ function containerDialogField(label, control, className = "") {
 async function buildContainerItemTooltip(item, quantity, hidden = false) {
     const rawDescription = String(item.system.description || "").trim();
     const description = rawDescription
-        ? await foundry.applications.ux.TextEditor.implementation.enrichHTML(rawDescription, {
+        ? await foundry.applications.ux.TextEditor.enrichHTML(rawDescription, {
             secrets: item.isOwner,
             async: true,
             relativeTo: item
@@ -97,7 +97,7 @@ Hooks.on("xjzl.containerNeedResult", payload => {
         cancelled: "XJZL.Container.NeedResultCancelled",
         failed: "XJZL.Container.NeedResultFailed"
     }[outcome] || "XJZL.Container.NeedResultFailed";
-    const message = game.i18n.format(messageKey, {
+    const message = game.i18n.localize(messageKey, {
         item: payload.itemName,
         winner: winner?.name || ""
     });
@@ -120,7 +120,7 @@ async function showContainerNeedPrompt(payload) {
     const itemImg = foundry.utils.escapeHTML(String(payload.itemImg || ""));
     const rawDescription = String(payload.itemDescription || "").trim();
     const itemDescription = rawDescription
-        ? await foundry.applications.ux.TextEditor.implementation.enrichHTML(rawDescription, { secrets: false, async: true })
+        ? await foundry.applications.ux.TextEditor.enrichHTML(rawDescription, { secrets: false, async: true })
         : `<p class="need-roll-description-empty">${game.i18n.localize("XJZL.Container.NoDescription")}</p>`;
     const parsedExpiresIn = Number(payload.expiresIn);
     const expiresIn = Number.isFinite(parsedExpiresIn) ? Math.max(0, parsedExpiresIn) : 30000;
@@ -136,7 +136,7 @@ async function showContainerNeedPrompt(payload) {
         const seconds = root.querySelector(".need-roll-timer-seconds");
         if (fill) fill.style.transform = `scaleX(${ratio})`;
         if (label) label.textContent = remaining > 0
-            ? game.i18n.format("XJZL.Container.NeedRollRemaining", { seconds: Math.ceil(remaining / 1000) })
+            ? game.i18n.localize("XJZL.Container.NeedRollRemaining", { seconds: Math.ceil(remaining / 1000) })
             : game.i18n.localize("XJZL.Container.NeedRollExpired");
         if (seconds) seconds.textContent = remaining > 0 ? `${Math.ceil(remaining / 1000)}` : "0";
         root.classList.toggle("is-urgent", remaining > 0 && remaining <= 10000);
@@ -154,7 +154,7 @@ async function showContainerNeedPrompt(payload) {
                         <div class="need-roll-item-copy"><span class="need-roll-item-kicker">${game.i18n.localize("XJZL.Container.NeedRollKicker")}</span><b>${itemName}</b><small>${game.i18n.localize("XJZL.Container.NeedRollInstruction")}</small></div>
                         <div class="need-roll-item-tooltip" role="tooltip"><strong>${game.i18n.localize("XJZL.Container.NeedRollDescription")}</strong>${itemDescription}</div>
                     </div>
-                    <div class="need-roll-timer" aria-live="polite"><div class="need-roll-timer-track"><span class="need-roll-timer-fill"></span></div><div class="need-roll-timer-meta"><span class="need-roll-timer-label">${game.i18n.format("XJZL.Container.NeedRollRemaining", { seconds: Math.ceil(expiresIn / 1000) })}</span><b class="need-roll-timer-seconds">${Math.ceil(expiresIn / 1000)}</b></div></div>
+                    <div class="need-roll-timer" aria-live="polite"><div class="need-roll-timer-track"><span class="need-roll-timer-fill"></span></div><div class="need-roll-timer-meta"><span class="need-roll-timer-label">${game.i18n.localize("XJZL.Container.NeedRollRemaining", { seconds: Math.ceil(expiresIn / 1000) })}</span><b class="need-roll-timer-seconds">${Math.ceil(expiresIn / 1000)}</b></div></div>
                     <div class="need-roll-controls">
                         <div class="need-roll-choice-group" role="radiogroup" aria-label="${game.i18n.localize("XJZL.Container.NeedChoice")}">
                             <label class="need-roll-choice is-selected"><input type="radio" name="choice" value="need" checked><span><i class="fas fa-dice-d20" aria-hidden="true"></i>${game.i18n.localize("XJZL.Container.Need")}</span></label>
@@ -613,7 +613,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         if (!reward) return;
         const confirmed = await confirmContainerDialog({
             title: game.i18n.localize("XJZL.Container.DeleteReward"),
-            content: game.i18n.format("XJZL.Container.DeleteRewardConfirm", { name: foundry.utils.escapeHTML(reward.name) }),
+            content: game.i18n.localize("XJZL.Container.DeleteRewardConfirm", { name: foundry.utils.escapeHTML(reward.name) }),
             label: game.i18n.localize("XJZL.Container.DeleteReward")
         });
         if (!confirmed) return;
@@ -748,7 +748,7 @@ export class XJZLLootWorkbenchSheet extends HandlebarsApplicationMixin(ActorShee
         if (!item) return;
         const confirmed = await confirmContainerDialog({
             title: game.i18n.localize("XJZL.Container.DeleteItem"),
-            content: game.i18n.format("XJZL.Container.DeleteConfirm", { name: foundry.utils.escapeHTML(item.name) }),
+            content: game.i18n.localize("XJZL.Container.DeleteConfirm", { name: foundry.utils.escapeHTML(item.name) }),
             label: game.i18n.localize("XJZL.Container.DeleteItem")
         });
         if (confirmed) {
