@@ -61,7 +61,7 @@ export async function rollDisabilityTable(actor) {
 
   // 4. 发送消息 (V13 标准写法)
   const chatData = {
-    user: game.user.id,
+    author: game.user.id,
     speaker: actor ? ChatMessage.getSpeaker({ actor }) : { alias: "命运" },
     flavor: game.i18n.localize("XJZL.Disability.Flavor"),
     content: content,

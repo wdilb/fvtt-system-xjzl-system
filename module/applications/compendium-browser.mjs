@@ -2072,7 +2072,7 @@ export class XJZLCompendiumBrowser extends HandlebarsApplicationMixin(Applicatio
 
         const content = await renderTemplate("systems/xjzl-system/templates/chat/loot-card.hbs", renderData);
         ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ alias: alias }),
             content: content,
             flags: { "xjzl-system": { type: "loot-card" } }

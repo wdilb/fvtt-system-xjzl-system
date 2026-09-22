@@ -59,7 +59,7 @@ export class XJZLPersonalityData extends foundry.abstract.TypeDataModel {
       changes: this.chosen.map(skillKey => ({
         key: `system.skills.${skillKey}.mod`,
         value: String(this.bonus),
-        type: CONST.ACTIVE_EFFECT_CHANGE_TYPES.ADD
+        type: "add" // V14 变更类型为小写字符串字面量（常量表成员值是优先级数字，不可用作类型）
       })),
       transfer: true,
       flags: {

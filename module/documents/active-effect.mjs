@@ -287,8 +287,9 @@ export class XJZLActiveEffect extends ActiveEffect {
 
       // 核心算法：
       // 只有 add 类型且 Value 是纯数字时，才进行乘法
-      // V14 常量: CONST.ACTIVE_EFFECT_CHANGE_TYPES.ADD === "add"
-      if (newChange.type === CONST.ACTIVE_EFFECT_CHANGE_TYPES.ADD) {
+      // 注意：变更类型是字符串字面量。CONST.ACTIVE_EFFECT_CHANGE_TYPES 的成员值是
+      // 默认优先级数字（如 add: 20）而非类型串，不能用常量做等值比较，直接写字面量。
+      if (newChange.type === "add") {
         const baseValue = Number(newChange.value);
         if (!isNaN(baseValue)) {
           newChange.value = String(baseValue * newStacks);

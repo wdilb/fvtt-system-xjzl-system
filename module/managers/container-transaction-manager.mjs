@@ -864,7 +864,7 @@ export class XJZLContainerTransactionManager {
     static async #postNeedChat(content, rolls = [], variant = "event") {
         try {
             const chatData = {
-                user: game.user.id,
+                author: game.user.id,
                 speaker: { alias: "战利品需求" },
                 content: `<div class="xjzl-loot-roll-chat is-${variant}">${content}</div>`,
                 rolls

@@ -2339,7 +2339,7 @@ export class XJZLActor extends Actor {
 
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: false });
           ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: this }),
             content: content,
             flags: { "xjzl-system": { type: "death-card" } }
@@ -2357,7 +2357,7 @@ export class XJZLActor extends Actor {
           await this.toggleStatusEffect("dead", { overlay: true, active: true });
           const content = await renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: true });
           ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: this }),
             content: content,
             flags: { "xjzl-system": { type: "death-card" } }
@@ -2475,7 +2475,7 @@ export class XJZLActor extends Actor {
 
         // 发送给所有玩家看 (type: OTHER)
         ChatMessage.create({
-          user: game.user.id,
+          author: game.user.id,
           speaker: ChatMessage.getSpeaker({ actor: this }),
           content: cardContent,
           style: CONST.CHAT_MESSAGE_STYLES.OTHER
@@ -2959,7 +2959,7 @@ export class XJZLActor extends Actor {
               renderTemplate("systems/xjzl-system/templates/chat/death-card.hbs", { isDead: true })
                 .then(content => {
                   ChatMessage.create({
-                    user: game.user.id,
+                    author: game.user.id,
                     speaker: ChatMessage.getSpeaker({ actor: this }),
                     content: content,
                     flags: { "xjzl-system": { type: "death-card" } }
@@ -3473,7 +3473,7 @@ export class XJZLActor extends Actor {
     );
 
     const chatData = {
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       flavor: `${isCreatureAttack ? ("发起" + label) : "发起普通攻击"} ${flavorSuffix}`,
       content: content,
@@ -4100,7 +4100,7 @@ export class XJZLActor extends Actor {
     `;
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: content,
       style: CONST.CHAT_MESSAGE_STYLES.OTHER
@@ -4170,7 +4170,7 @@ export class XJZLActor extends Actor {
     `;
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: this }),
       content: content,
       style: CONST.CHAT_MESSAGE_STYLES.OTHER

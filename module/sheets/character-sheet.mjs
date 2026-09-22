@@ -2850,7 +2850,7 @@ export class XJZLCharacterSheet extends HandlebarsApplicationMixin(ActorSheetV2)
         // 防止重复打开
         const existingApp = Object.values(ui.windows).find(w => w instanceof XJZLAuditLog && w.actor.id === this.document.id);
         if (existingApp) {
-            existingApp.bringToTop();
+            existingApp.bringToFront();
             return;
         }
 

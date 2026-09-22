@@ -91,7 +91,7 @@ export class XJZLMacros {
 
         // 4. 发送消息
         return ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: target }), // 建议 Speaker 是目标，方便玩家自己看
             content: content,
             flags: { "xjzl-system": flags }
@@ -197,7 +197,7 @@ export class XJZLMacros {
 
         // 4. 发送消息
         return ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: attacker }), // 默认显示发起者
             content: content,
             flags: { "xjzl-system": flags }

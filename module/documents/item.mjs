@@ -347,7 +347,7 @@ export class XJZLItem extends Item {
       : `${owner.name} 对 ${target.name} 使用了 ${this.name}`;
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: speaker,
       flavor: flavorText,
       content: content,
@@ -412,7 +412,7 @@ export class XJZLItem extends Item {
     });
 
     ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: speaker,
       flavor: `${this.actor.name} 阅读了 ${this.name}`,
       content: content,
@@ -2096,7 +2096,7 @@ export class XJZLItem extends Item {
 
         // 3. 发送卡片
         ChatMessage.create({
-          user: game.user.id,
+          author: game.user.id,
           speaker: speaker,
           flavor: `开启架招: ${move.name}`,
           content: content,
@@ -2471,7 +2471,7 @@ export class XJZLItem extends Item {
 
       // 发送消息
       const chatData = {
-        user: game.user.id,
+        author: game.user.id,
         speaker: speaker,
         flavor: flavorText || `施展了招式: ${move.name}`,
         content: content,

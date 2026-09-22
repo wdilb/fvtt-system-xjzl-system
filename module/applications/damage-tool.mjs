@@ -643,7 +643,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     });
 
     await ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: target.actor }),
       flavor: this._buildFlavor(reason, typeLabel, attackerActor, "damage"),
       content,
@@ -715,7 +715,7 @@ await game.xjzl.damageTool.executePreset(preset);`;
     });
 
     await ChatMessage.create({
-      user: game.user.id,
+      author: game.user.id,
       speaker: ChatMessage.getSpeaker({ actor: target.actor }),
       flavor: this._buildFlavor(reason, typeLabel, healerActor, "healing"),
       content,

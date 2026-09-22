@@ -639,7 +639,7 @@ export class ChatCardManager {
             }
             if (resultListHtml) {
                 ChatMessage.create({
-                    user: game.user.id,
+                    author: game.user.id,
                     speaker: ChatMessage.getSpeaker({ actor: attacker }),
                     flavor: "命中结算详情",
                     content: `
@@ -926,7 +926,7 @@ export class ChatCardManager {
                     );
 
                     ChatMessage.create({
-                        user: game.user.id,
+                        author: game.user.id,
                         speaker: ChatMessage.getSpeaker({ actor: targetActor }),
                         content: content,
                         flags: {
@@ -964,7 +964,7 @@ export class ChatCardManager {
             </div>`;
 
             ChatMessage.create({
-                user: game.user.id,
+                author: game.user.id,
                 speaker: { alias: "战斗提示" },
                 content: summaryHtml
             });
@@ -1268,7 +1268,7 @@ export class ChatCardManager {
             // 保底方案：如果因为模板变更找不到容器，则发送一条新消息
             console.warn("XJZL | 无法定位防御按钮进行原地更新，发送新卡片。");
             ChatMessage.create({
-                user: game.user.id,
+                author: game.user.id,
                 speaker: ChatMessage.getSpeaker({ actor: targetActor }),
                 content: resultHtml
             });
@@ -1571,7 +1571,7 @@ export class ChatCardManager {
 
                 // 发送消息
                 ChatMessage.create({
-                    user: game.user.id,
+                    author: game.user.id,
                     speaker: ChatMessage.getSpeaker({ actor: targetActor }), // Speaker 设为受害者
                     content: content,
                     flags: {
@@ -1668,7 +1668,7 @@ export class ChatCardManager {
 
             // 3. 发送消息
             ChatMessage.create({
-                user: game.user.id,
+                author: game.user.id,
                 speaker: ChatMessage.getSpeaker({ actor: attacker }),
                 content: critContent,
                 style: CONST.CHAT_MESSAGE_STYLES.OTHER
@@ -2100,7 +2100,7 @@ export class ChatCardManager {
                 };
 
                 ChatMessage.create({
-                    user: game.user.id,
+                    author: game.user.id,
                     speaker: ChatMessage.getSpeaker({ actor: targetActor }),
                     content: content,
                     flags: {
@@ -3020,7 +3020,7 @@ export class ChatCardManager {
         const flavorText = (baseAmount > 0) ? "治疗结算" : "BUFF结算";
 
         ChatMessage.create({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: attacker }),
             flavor: flavorText,
             content: `
@@ -3100,7 +3100,7 @@ export class ChatCardManager {
         // 4. 发送结果消息
         // roll.toMessage 会自动处理 rolls 数组和 3D 骰子
         await roll.toMessage({
-            user: game.user.id,
+            author: game.user.id,
             speaker: ChatMessage.getSpeaker({ actor: actor }),
             flavor: flavor,
             content: `
