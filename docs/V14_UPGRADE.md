@@ -1,10 +1,12 @@
 # 侠界之旅 V13 → V14 升级方案
 
-本文档是 `feat/v14-upgrade` 分支的总纲：记录既定决策、两大重点领域（ActiveEffect 融合、距离与光环/Region）的设计分析，以及改动清单与实施顺序。清单以代码检索为依据；标注「待验证」的条目依赖 V14 实机确认，规划时不应视为事实。
+本文档是 `feat/v14-upgrade` 分支的总纲，负责记录升级范围、决策、API 依据、代码定位和验收标准；[`V14_PLAN.md`](V14_PLAN.md) 负责工作项、依赖、进度与验证记录。新会话先读执行计划，再按工作项查阅本文对应章节与实际代码。本文中的设计描述不代表待办状态，已完成范围以执行计划为准。
+
+复杂工作可另建专项计划，由执行计划中的原工作项链接过去；本文只同步影响整体范围、接口或决策的结论，不承载逐步施工记录。标注「待验证」或「倾向」的内容不能当作已经确认的事实。
 
 信息来源以[官方发布说明](https://foundryvtt.com/releases/14.368)、[V14 API](https://foundryvtt.com/api/) 和[弃用移除清单 #13436](https://github.com/foundryvtt/foundryvtt/issues/13436) 为准；DCC 迁移参考与社区记录仅提供实测线索。截至 2026-09-22，发布说明核查至 14.368，API 页面标注 14.365，后续验收须记录实际构建号。
 
-当前代码基线为 `b2f3833`（首批 A 类替换）及其后的修正提交（变更类型字面量、窗口与聊天 API 替换）；勾选状态见执行计划，尚未完成 V14 实机验收。数量只是检索基线，不是迁移验收条件：脚本统计先解析 data/ JSON，再统计 `script`/`command` 字符串中的调用次数，不能与 grep 命中行数混用。其他历史估算在对应条目实施时复核。
+历史锚点：`b2f3833` 为首批 A 类替换。数量只是当时的检索基线，不是迁移验收条件，也不表示剩余工作量：脚本统计先解析 data/ JSON，再统计 `script`/`command` 字符串中的调用次数，不能与 grep 命中行数混用。实施时复核实际调用方，以行为和验证结果验收，不为凑齐旧数量修改代码。
 
 ---
 
@@ -14,18 +16,21 @@
 |---|------|------|
 | D1 | 硬切 V14，不做 V13 兼容 | `system.json` 的 `compatibility.minimum/verified` 已设为 14，发布前须经 M5 完整回归确认；迁移后的代码（如 `i18n.localize(key, data)` 插值写法）在 V13 下不可用，属预期 |
 | D2 | 保留自研 ActiveEffect 门面 | `game.xjzl.api.effects.addEffect/removeEffect` 等公开 API 保持签名不变。兼容层仅归一化**已到达入口的普通数据**，包括内联构造的 V13 风格入参；调用前访问旧文档路径的脚本无法由它修复，须单独迁移，范围见 §2.3 |
-| D3 | 脚本内 `CONFIG.statusEffects.find` 迁移 | 该写法在 V14 对象形态下直接报错；需新增辅助函数（如 `game.xjzl.api.effects.getStatus(id)`），按查询谓词迁移 data/ 的 script/command 字段中 500 个调用，并处理世界副本 |
+| D3 | 脚本内 `CONFIG.statusEffects.find` 迁移 | 先由 S2.9 实现 `game.xjzl.api.effects.getStatus(id)`，再由 S4.2 按查询谓词迁移 data/ 脚本、S4.7 处理世界副本；检索基线为 script/command 字段中 500 个调用 |
 | D4 | 分支策略 | 全部升级工作在 `feat/v14-upgrade` 分支进行 |
 
-### 待定问题（在各里程碑开工前必须拍板）
+**已确认 Q3（保留原问题编号）**：ActiveEffect system 数据模型通过 `CONFIG.ActiveEffect.dataModels` 注册，基础模型为 `foundry.data.ActiveEffectTypeDataModel`，详见 §2.4。是否需要自定义模型、派生字段如何应用变更仍由 S0.1/S0.7 验证，S2.1 落实；注册入口本身不再是待定问题。
 
-| # | 问题 | 倾向 |
-|---|------|------|
-| Q1 | 世界数据迁移框架：`flags.xjzl-system.baseChanges`（V13 格式叠层快照）等系统私有数据如何迁移 | 用独立 world setting 记录已完成的迁移版本；迁移可重复执行，仅全部成功后推进版本，失败时保留可重试状态（见 §6） |
-| Q2 | data/ 源 JSON 的格式转换方式 | 直接把 data/ 全量改为 V14 格式，再 `game.xjzl.seed.all()` 重建合集包（保持事实源唯一）；不采用 seeding 时转换 |
-| Q3 | ~~ActiveEffect system 数据模型的注册机制~~ **已解决**：官方接口为 `CONFIG.ActiveEffect.dataModels`，基础模型 `foundry.data.ActiveEffectTypeDataModel` | 遗留验证：是否需要自定义模型、派生字段如何应用变更 |
-| Q4 | AOE 工具的产品形态：仅还原"圆圈 + 跟随"，还是升级为完整光环系统 | 见 §3.3，建议按自定义 RegionBehavior 方向做完整设计 |
-| Q5 | 过期清理分工：自研 `cleanExpiredEffects` 与 V14 expiry 事件/registry 如何共存 | 保留自研统一入口以维持叠层语义，registry 作为辅助 |
+### 待定问题（在相关实现前定稿，不阻塞无关工作）
+
+| # | 问题 | 倾向 | 落点 |
+|---|------|------|------|
+| Q1 | 世界数据迁移框架：`flags.xjzl-system.baseChanges`（V13 格式叠层快照）等系统私有数据如何迁移 | 用独立 world setting 记录已完成的迁移版本；迁移可重复执行，仅全部成功后推进版本，失败时保留可重试状态（见 §6） | S2.7 定稿并实现框架；S4.7 实施与验收世界迁移 |
+| Q2 | data/ 源 JSON 的格式转换方式 | 直接把 data/ 全量改为 V14 格式，再 `game.xjzl.seed.all()` 重建合集包（保持事实源唯一）；不采用 seeding 时转换 | S2.6/S4.1 涉及转换方式的改动前定稿，两处遵循同一决策；S4.4 重建合集 |
+| Q4 | AOE 工具的产品形态：仅还原"圆圈 + 跟随"，还是升级为完整光环系统 | 见 §3.3，建议按自定义 RegionBehavior 方向做完整设计 | S0.4 提供机制结论；M3 实现前完成 S3.6 中的范围和架构决策 |
+| Q5 | 过期清理分工：自研 `cleanExpiredEffects` 与 V14 expiry 事件/registry 如何共存 | 保留自研统一入口以维持叠层语义，registry 作为辅助 | S0.6 提供机制结论；S2.4 定稿并实现，避免双方重复清理 |
+
+定稿后把结论移至上方已确认区，保留原编号和对应工作项；倾向不等于已经决定。§2.6 的可选能力与 Q4 的扩展方案只有明确纳入范围后才安排实施。
 
 ### 环境注意
 
@@ -41,10 +46,10 @@
 三大工作块，按体量排序：
 
 1. **ActiveEffect 融合**（§2）：V14 把 `changes` 迁入 `system.changes`、数字 `mode` 改字符串 `type`、duration 模型重做。我们的叠层/抑制/飘字/时长规则引擎全部保留，只迁移数据格式并按新机制重接。
-2. **距离与光环 / Region**（§3）：MeasuredTemplate 文档类型整体移除，AOE 工具与跟随光环改用 Region 体系重建；同时计划把"光环"作为新能力嵌入脚本引擎。
+2. **距离与光环 / Region**（§3）：MeasuredTemplate 文档类型整体移除，AOE 工具与跟随光环改用 Region 体系重建；是否新增完整光环及脚本触发器，由 Q4 决定。
 3. **机械替换与数据迁移**（§4–§6）：i18n、TextEditor、statusEffects 形态、聊天可见性、CSS 变量、渲染钩子等确定性替换，加 data/ 源数据与合集包迁移。
 
-已经达标、无需改动的部分：Sheet 层全部为 `ActorSheetV2/ItemSheetV2/ApplicationV2 + HandlebarsApplicationMixin`；数据层全部为 `foundry.abstract.TypeDataModel`（无 `template.json`，V14 已将其废弃）；无 TinyMCE、无 `ChatLog.MESSAGE_PATTERNS`、无 whisper/blind 硬编码、无 `foundry.utils.duplicate`、无自定义 context menu 钩子。
+已有架构基础：Sheet/Application 主框架已使用 V2，Actor/Item 数据模型已使用 `foundry.abstract.TypeDataModel`，无需另做这两项架构迁移；具体字段、AE 配置窗、DOM 和钩子仍按后文适配。检索未发现 `template.json`、TinyMCE、`ChatLog.MESSAGE_PATTERNS`、whisper/blind 硬编码、`foundry.utils.duplicate` 或自定义 context menu 钩子的迁移任务，后续新增命中项再补录。
 
 ---
 
@@ -62,30 +67,31 @@
 - `tokenOverrides`：特效可直接改 Token 的视野/光照/形象/阵营/透明度。
 - ActiveEffect 升级为可直接存入合集包的文档类型。
 - `ActiveEffect#origin` 改为 DocumentUUIDField（合法 UUID 才能通过校验）。
-- `CONFIG.ActiveEffect.legacyTransferral` 的兼容支持彻底移除——V13 下我们已默认运行新模型（false），行为无缝；相关注释清理即可。
+- `CONFIG.ActiveEffect.legacyTransferral` 的兼容支持彻底移除；现有 `isSuppressed` 已按物品特效保留在 Item 上的模型实现，S2.2 清理过时注释并回归转移与抑制行为。
 
 ### 2.2 自研功能 × V14 能力对照
 
 | 自研能力 | 现实现 | V14 对应 | 融合策略 |
 |---|---|---|---|
-| slug 叠层体系（stacks/maxStacks/stackable、baseChanges 快照、`calculateChangesForStacks` 乘算） | `module/documents/active-effect.mjs` + flags | **无原生叠层** | 全部保留；内部读写改走 `system.changes`；`mode` 判断改 `type` 字符串；baseChanges 快照随 Q1 迁移 |
+| slug 叠层体系（stacks/maxStacks/stackable、baseChanges 快照、`calculateChangesForStacks` 乘算） | `module/documents/active-effect.mjs` + flags | **无原生叠层** | 全部保留；`type === "add"` 判断已修正（S1.3），沿用现实现；剩余内部读写由 S2.2/S2.6 迁移至 `system.changes`，baseChanges 快照随 S2.7/S4.7 迁移 |
 | 装备状态抑制（未装备不生效、破衣抑制防具） | `isSuppressed` getter override | `isSuppressed` 判定简化 | 保留 override，按新逻辑重测 |
 | 自定义飘字（绿/红/叠层字幕、socket 广播、状态卡片） | `_displayScrollingStatus` 屏蔽 + `showScrollingText` socket | 核心飘字仍在但能力弱 | 保留自研；验证 override 与 `{scrollingStatusText: false}` 选项仍有效 |
 | 时长规则引擎（叠加/刷新/锚点重置、忍耐减免剧痛、颤手→缴械、心火→走火入魔） | `active-effect-manager.mjs` | duration 新模型仅覆盖"存储与过期"语义 | 规则引擎全部保留；读写对齐新 schema（见 2.3） |
 | 过期清理（战斗流转时 `cleanExpiredEffects`） | `xjzl-system.mjs` updateCombat 流程 | expiry 事件 + registry | 按 Q5 决策；倾向保留统一入口 |
-| 状态选取器（通用状态/场上特效/收藏/最近） | `effect-selection-dialog.mjs` | 无直接对应 | 保留；`CONFIG.statusEffects` 访问改对象形态 |
+| 状态选取器（通用状态/场上特效/收藏/最近） | `effect-selection-dialog.mjs` | 无直接对应 | 对象访问替换已由 S1.5 完成；S2.8 负责与新 AE 数据链路联调 |
 | 特效挂载脚本（`flags.scripts` + `collectScripts`/`runScripts`） | `XJZLActiveEffect.scripts` | 无对应 | 保留 |
 | 权限代理（玩家操作经 socketlib 委托 GM） | manager + `module/socket.mjs` | 无对应 | 保留 |
-| 状态定义（全量替换核心状态表） | `CONFIG.XJZL.statusEffects`（数组） | CONFIG 改为按 id 键对象 | 定义处转对象形态（§4-A5） |
+| 状态定义（全量替换核心状态表） | `module/config.mjs` 的 `XJZL.statusEffects`，经 `CONFIG.XJZL` 暴露 | `CONFIG.statusEffects` 按 id 键访问 | S1.5 已在 `xjzl-system.mjs` 的 init 赋值处用 `Object.fromEntries` 转换；源定义继续保持数组。S2.6 仅迁移条目内 AE 数据字段，不再次改变容器形态（§4-A5） |
 | V13 入参兼容 | 无 | — | 新增：`addEffect/removeEffect` 入口做格式归一化（D2），覆盖 `changes`/`mode`/旧 `duration`/`icon→img`；不能修复到达入口前的文档访问，见 §2.3 |
 
 ### 2.3 数据格式迁移细节
 
-- 读取侧：所有 `effect.changes` → `effect.system.changes`。涉及 [active-effect.mjs](../module/documents/active-effect.mjs)（`_preCreate` 快照、`calculateChangesForStacks`）、[active-effect-manager.mjs](../module/managers/active-effect-manager.mjs)（增删叠层全流程）、[personality.mjs](../module/data/item/personality.mjs)（`buildModifierEffectData`/`syncToEffect`）、[actor.mjs](../module/documents/actor.mjs)（约 845 行扫描 `e.changes` 找 flag 键）、[item.mjs](../module/documents/item.mjs)、[config.mjs](../module/config.mjs)（全部状态定义）。
+- 读取侧：所有文档上的 `effect.changes` → `effect.system.changes`。涉及 [active-effect.mjs](../module/documents/active-effect.mjs)（`_preCreate` 快照、`calculateChangesForStacks`）、[active-effect-manager.mjs](../module/managers/active-effect-manager.mjs)（`addEffect`/`removeEffect`）、[personality.mjs](../module/data/item/personality.mjs)（`buildModifierEffectData`/`syncToEffect`）、[actor.mjs](../module/documents/actor.mjs)（`XJZLActor.prepareBaseData` 扫描 flag 键）、[item.mjs](../module/documents/item.mjs)、[config.mjs](../module/config.mjs)（`XJZL.statusEffects` 条目）。逐点核查剩余访问，不重复改写 S1.3 已完成的类型判断。
 - 写入侧：`update({changes})` → `update({"system.changes": ...})`；`effectData.changes` 构造点同理。
-- duration：现有 `rounds/turns/seconds/startRound/startTurn/startTime` 的读写与叠加逻辑（manager 4.1/4.2 节）按 V14 新 schema 重写；`compareDurations` 评分算法语义不变，仅取值路径调整。`duration.remaining`/`isTemporary` 语义有微调（remaining 返回按存储单位的总剩余），`cleanExpiredEffects` 判断逻辑需重测。
+- duration：`ActiveEffectManager.addEffect` 中 `rounds/turns/seconds/startRound/startTurn/startTime` 的读写、叠加与刷新逻辑按 V14 schema 适配；`compareDurations`/`getDurationScore` 保留现有时长比较规则，新单位或 expiry 事件的处理随 S0.6/Q5 定稿，不能预设只改取值路径即可。`cleanExpiredEffects` 需重测 `duration.remaining`/`isTemporary` 语义及与核心 registry 的清理分工。
 - 兼容层（D2）：`addEffect` 收到的对象若带顶层 `changes`/数字 `mode`/旧 `duration` 结构/`icon` 字段，先归一化为 V14 格式再进入流程。边界取决于数据是否已到达入口，而非对象是否写成内联字面量。脚本若先读取文档再修改（如 `thisItem.effects.getName(x).toObject()` 后 `eff.changes.push(...)`），会在调用前失败，必须迁移；直接绕过门面创建/更新 AE 的脚本也必须适配。当前脚本中 `eff/effect/thisEffect/ae.changes` 共 98 处，只是检索起点，须追踪变量来源并检查其他别名。
-- 脚本直查状态（D3）：500 个 `CONFIG.statusEffects.find(...)` 调用须按谓词分类；按 id 查询可改为辅助函数，其他条件需保留查询语义。解析 JSON 后修改目标脚本字段，再验证脚本语法与未命中项，不能对整个文件做无条件文本替换。
+- 状态查询门面（D3，**S2.9 先于 S4.2/S4.7**）：在 `ActiveEffectManager` 新增静态 `getStatus(id)`，通过现有 `game.xjzl.api.effects` 入口暴露。拟定契约为同步按状态 id 查询，未命中返回 `undefined`，命中返回可安全修改的状态数据副本，不能污染 `CONFIG.statusEffects`；不负责创建或更新文档。返回数据格式与 S2.6 一致，并同步 `SCRIPT_ENGINE.md` 中的公共 API 说明。
+- 脚本直查状态（D3）：检索基线中的 500 个 `CONFIG.statusEffects.find(...)` 调用须按谓词分类；按 id 查询在 S2.9 完成后改用 `getStatus`，其他条件保留查询语义。解析 JSON 后修改目标脚本字段，再验证脚本语法与未命中项，不能对整个文件做无条件文本替换。
 
 ### 2.4 init 配置与模型选择
 
@@ -93,7 +99,7 @@
 - 若需要扩展，继承 [`foundry.data.ActiveEffectTypeDataModel`](https://foundryvtt.com/api/classes/foundry.data.ActiveEffectTypeDataModel.html)；扩展 changes schema 时保留 `type`、`phase`、`priority`，并验证新建和存量效果的类型选择。
 - `CONFIG.ActiveEffect.documentClass` 继续承载自研文档行为，不能代替 system 数据模型注册。内置 `initial`/`final` 不重复配置；附加阶段按需增量注册并显式调用，不覆盖整个 phases 表。
 
-同时清理 [active-effect.mjs](../module/documents/active-effect.mjs) 中 `legacyTransferral` 相关注释（约 116 行）。
+S2.2 同步清理 [active-effect.mjs](../module/documents/active-effect.mjs) 的 `XJZLActiveEffect.isSuppressed` 中 `legacyTransferral` 相关过时注释，并验证物品特效抑制行为。
 
 ### 2.5 需重写的组件
 
@@ -174,7 +180,7 @@ V14 **彻底移除 MeasuredTemplate 文档类型**，逐项归宿：
 | A3 | 数字 `mode` → 字符串 `type` 字面量（如 `2→"add"`、`5→"override"`）；不做两个 CONST 表之间的成员替换 | 首批 active-effect.mjs、personality.mjs、config.mjs 已改；其他代码构造点与数据分别由 S2.6/S4.1 迁移 |
 | A4 | ActiveEffect 数据 `icon:` → `img:` | personality.mjs（唯一一处） |
 | A5 | `CONFIG.statusEffects` 数组 → 按 id 键对象；`.find(e => e.id === x)` → `CONFIG.statusEffects[x]`；`.map(...)` → `Object.values(...)` | 源定义保持数组，在 [xjzl-system.mjs](../xjzl-system.mjs) 的 CONFIG 赋值处用 `Object.fromEntries` 转换；[条目 `id` 仍按官方接口保留](https://foundryvtt.com/api/interfaces/CONFIG._StatusEffectConfig.html#id)，并与对象键保持一致。调用侧涉及 active-effect-manager、chat-manager、effect-selection-dialog、xjzl-system.mjs |
-| A6 | `game.settings.get("core","rollMode")` → `"messageMode"`；`ChatMessage.applyRollMode` → `ChatMessage.applyMode`；模式串 `publicroll→public`、`gmroll→gm`、`blindroll→blind`、`selfroll→self` | utils.mjs、actor.mjs（约 3532 行）、item.mjs（约 2551 行）、container-transaction-manager.mjs（约 873 行，硬编码 `"publicroll"` → `"public"`） |
+| A6 | `game.settings.get("core","rollMode")` → `"messageMode"`；`ChatMessage.applyRollMode` → `ChatMessage.applyMode`；模式串 `publicroll→public`、`gmroll→gm`、`blindroll→blind`、`selfroll→self` | `utils.mjs` 的 `rollDisabilityTable`、`XJZLActor.rollBasicAttack`、`XJZLItem.roll`、`XJZLContainerTransactionManager.#postNeedChat`（固定公开消息） |
 | A7 | `system.json` 兼容版本 13 → 14；发布时更新 download 链接（`verified: 14` 的发布依据须通过 M5 完整回归，M0 机制试验不足以代替） | [system.json](../system.json) |
 | A8 | `ApplicationV2#bringToTop()` → `bringToFront()`（V14 已移除） | character-sheet.mjs 审计日志入口（1 处） |
 | A9 | ChatMessage 数据 `user:` → `author:`（旧字段及其迁移/shim 在 V14 已移除） | 已改模块 27 处、data/ 脚本 88 处（按调用次数口径）；已导入的世界脚本副本仍由 S4.7 处理 |
@@ -192,7 +198,7 @@ V14 **彻底移除 MeasuredTemplate 文档类型**，逐项归宿：
 | B2 | `XJZLActiveEffectConfig` 重写（见 §2.5） | 脱离 jQuery 钩子注入，改 V2 规范 |
 | B3 | MeasuredTemplate → Region（见 §3） | 重点二 |
 | B4 | 渲染钩子**逐钩子实测** V14 派发形态，不做批量改名：ApplicationV2 的通用渲染钩子就是 `render<ClassName>`（参数为 HTMLElement），`renderChatMessageHTML` 是 ChatMessage 专属命名、不可推广到其他窗口。`renderItemDirectory`/`renderActorDirectory`/`renderCompendiumDirectory` 预期原名保留；`renderTokenHUD` 单独核查 V14 中 TokenHUD 的形态、选择器与事件委托（不能只凭 HTMLElement 兼容判断无需修改）；`renderCombatTracker` 双绑实测后清理冗余的一侧 | [官方 ApplicationV2 钩子契约](https://foundryvtt.com/api/functions/hookEvents.renderApplicationV2.html)；现有代码已按 HTMLElement 兼容书写 |
-| B5 | 核查 V1 Sheet 注销逻辑（`foundry.applications.sheets.ActorSheet/ItemSheet` 引用，xjzl-system.mjs 约 325/351 行）：确认 V14 核心默认表的注册形态与继承链后，再删除或改写注销行 | [AppV1 仍存在于弃用命名空间](https://foundryvtt.com/api/classes/foundry.appv1.api.Application.html)，自 V13 弃用；我们为所有类型注册了 `makeDefault` 的 V2 表 |
+| B5 | 核查 `xjzl-system.mjs` 的 `Hooks.once("init")` 内 `Actors.unregisterSheet`/`Items.unregisterSheet` 及其 `foundry.applications.sheets.ActorSheet/ItemSheet` 引用：确认 V14 核心默认表的注册形态与继承链后，再删除或改写注销逻辑 | [AppV1 仍存在于弃用命名空间](https://foundryvtt.com/api/classes/foundry.appv1.api.Application.html)，自 V13 弃用；我们为所有类型注册了 `makeDefault` 的 V2 表 |
 | B6 | `-=`/`==` 更新键在 **V14 弃用，移除期为 V16**。审计写入方与钩子接收形态，迁移到 `foundry.data.operators`；确认删除/替换仍触发 `_changesResourceScriptSources` 重算后，再精简 `"-=ignoreArmorEffects"` 检测 | [官方 #13090](https://github.com/foundryvtt/foundryvtt/issues/13090)；核查 operator 经 socket 传递和更新钩子归一化后的行为，不直接删掉检测 |
 | B7 | CSS 旧变量族替换：`--color-border-light-*`（8）、`--color-text-dark-primary`（4）、`--color-text-light-primary`、`--color-text-light-highlight`、`--color-shadow-highlight`、`--color-border-dark` | 共 17 处，分布在 item-equipment/trait/general.css 等；按 V14 变量表映射，聊天样式注意新 `--chat-*` 变量 |
 
@@ -201,7 +207,7 @@ V14 **彻底移除 MeasuredTemplate 文档类型**，逐项归宿：
 ## 6. 数据与合集包迁移
 
 1. **data/ 源 JSON 中的 AE 数据转 V14 格式**：`changes` → `system.changes`、数字 `mode` → 字符串 `type`、`icon` → `img`、duration 对齐。按 AE 结构遍历，避免修改其他同名字段；涉及 armor/consumables/neigong/wuxue/qizhen/origins/traits 等源文件。
-2. **脚本迁移**（D3）：按谓词迁移 500 个 `CONFIG.statusEffects.find` 调用；构造 V13 风格数据且经门面传入的脚本可由 D2 承接，直接调用核心文档 API 的须迁移；2 处 `measureDistance` 改 `measurePath`，核对取点、返回值和单位。
+2. **脚本迁移**（D3）：S2.9 的查询 API 可用后，按谓词迁移检索基线中的 500 个 `CONFIG.statusEffects.find` 调用；构造 V13 风格数据且经门面传入的脚本可由 D2 承接，直接调用核心文档 API 的须迁移；2 处 `measureDistance` 改 `measurePath`，核对取点、返回值和单位。
 3. **文档访问类脚本迁移**：以 98 处 `eff/effect/thisEffect/ae.changes` 为起点，追踪文档、导出对象与普通构造对象来源，前两者改 `system.changes`；继续检查其他变量别名，不能把这 98 处当成完整覆盖证明。
 4. **合集包重建**：所有 data/、seed-*.mjs 修改及脚本 API 审计完成后，GM 端执行 `game.xjzl.seed.all()`；验证包内数据及导入行为，不能仅以种子函数返回成功验收。
 5. **世界侧副本迁移**（不受 data/ 迁移与合集重建影响）：覆盖世界物品、角色内嵌物品、非关联 Token 的 Actor、Actor/Item 上的 AE 与其脚本、已导入宏。既要处理 baseChanges 等私有数据，也要处理状态查询、changes 访问、聊天 `author`、距离 API 和光环宏。核心对 AE schema 的迁移不能改写这些任意脚本字符串。对用户修改过的脚本仅做可确认的定点转换，无法识别的记录 UUID/字段位置供人工处理，不整项覆盖。
@@ -227,15 +233,17 @@ V14 **彻底移除 MeasuredTemplate 文档类型**，逐项归宿：
 
 ---
 
-## 8. 建议实施顺序
+## 8. 阶段依赖与验收标准
+
+实际进度及验收证据只在执行计划维护；本表定义完成条件。工作项编号用于稳定引用，不代表必须按数字顺序执行。
 
 | 里程碑 | 内容 | 出口标准 |
 |--------|------|----------|
 | M0 验证 spike | 确认是否需要自定义 AE 模型、核心阶段与数据准备的配合、duration、Region API 及 §7 劫持点；官方已明确的注册入口不再作为未知项 | 记录 Foundry 构建号、样例和结论，解决影响实现的待定问题 |
 | M1 机械替换与启动解阻 | A1–A9 + B4/B5/B6/B7 + S1.14 摘除旧模板依赖 + #13436 的入口/module/模板审计；A10 随 M4 | 空白测试世界完成 init/ready，启动路径无未处理异常和本阶段涉及的弃用警告；AE/脚本/AOE 功能分别留待后续里程碑验收 |
-| M2 AE 链路 | §2 必需改动 + D2 兼容层 + Q1 迁移框架（§2.6 新能力另评估） | 用 V14 测试数据验证叠层/抑制/飘字/时长/阶段及旧入参兼容；世界迁移样本由 M4 验收 |
+| M2 AE 链路 | §2 必需改动 + D2 兼容层 + S2.9 状态查询 API + Q1 迁移框架（§2.6 新能力另评估） | 用 V14 测试数据验证叠层/抑制/飘字/时长/阶段、旧入参兼容与查询副本隔离；世界迁移样本由 M4 验收 |
 | M3 Region/光环 | 恢复旧 AOE 功能与距离语义；Q4 决定是否纳入完整光环和新触发器 | 静态/跟随区域、Token 删除清理、1-2-2-2 正常；完整光环若暂缓则记录决策 |
 | M4 数据迁移 | §6 数据与脚本转换、API 审计、packs 重建、世界副本迁移；依赖 M2，光环宏另依赖 M3 | 新世界导入与既有世界升级均通过；重复执行及失败重试正确，未解决项有定位且未被误标完成 |
-| M5 回归与文档 | §7 清单逐项回归 + 文档同步 + 发布声明核验 | 完整战斗流程实测通过，文档更新；据此确认 `verified: 14` 与发布链接 |
+| M5 回归与文档 | §7 清单逐项回归 + 文档同步 + S5.6 发布声明核验 | 完整战斗流程实测通过，各阶段必需项与验收齐全，文档更新；据此确认 `verified: 14` 与发布链接，明确记录未纳入范围的可选能力 |
 
-M0 的机制试验可在独立 V14 最小环境进行，不能以尚未摘除旧模板依赖的完整系统作为启动前提。M1 先解决系统启动，M2/M3 随后可穿插；M4 在相关运行时链路可用后执行。首批机械替换已经完成，不等于这些实机里程碑已验收。
+优先做 M0 的机制试验，可使用独立 V14 最小环境；若验证必须依赖完整系统，先完成 S1.14 等必要启动修复，再补做依赖它的验证，不把暂时无法验证记作通过。M1 启动可用后，M2/M3 可穿插；M3 实现前先定 Q4。M4 先完成源数据、脚本及 API 审计，再执行 S4.4 重建合集与 S4.7 世界迁移验收；状态查询迁移依赖 S2.9。M0 中的机制结论不能替代 M1–M5 的系统集成验收。
