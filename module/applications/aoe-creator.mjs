@@ -4,10 +4,10 @@
  * ==============================================================================
  *  Tech Stack: ApplicationV2 (V13 Standard)
  *
- *  【V14 升级 S1.14 停用，代码仅注释未删除】V14 已移除 MeasuredTemplate 文档类型，
- *  工具栏按钮与创建调用已在 xjzl-system.mjs 中注释，本窗口无法再打开（类本身为
- *  纯 ApplicationV2，加载不受影响）。文件整体保留，供 M3 Region 版 AOE/光环重建
- *  （docs/V14_UPGRADE.md §3）参考复用，重点参考：
+ *  【V14 升级 S1.14 停用，代码仅注释未删除】按升级计划提前下线 AOE 模板功能（V14 的
+ *  MeasuredTemplate 为弃用兼容层，本类为纯 ApplicationV2、加载不受影响），工具栏按钮与
+ *  创建调用已在 xjzl-system.mjs 中注释，本窗口无法再打开。文件整体保留，供 M3 Region 版
+ *  AOE/光环重建（docs/V14_UPGRADE.md §3）参考复用，重点参考：
  *  - 跟随/静态两种模式的目标点选取（Token 中心 / 视野中心对齐网格）
  *  - GM 代玩家创建时把所有权移交给角色 Owner 的处理
  *  - flags.sticky / sourceToken / label 约定（配合 updateToken 同步与 deleteToken 清理）
@@ -90,7 +90,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
      */
     async _onCreate(event, target) {
         // 【V14 升级 S1.14 停用，代码仅注释未删除】创建入口随工具栏按钮一并下线，本函数正常不可达；
-        // V14 已移除 MeasuredTemplate 文档类型。保留 preventDefault 以防窗口被临时恢复时表单提交刷新页面。
+        // MeasuredTemplate 已按计划停用（V14 为弃用兼容层）。保留 preventDefault 以防窗口被临时恢复时表单提交刷新页面。
         event?.preventDefault?.();
         ui.notifications.warn("AOE 区域创建功能在 V14 升级中暂下线，待 M3 Region 版本重建。");
         return;

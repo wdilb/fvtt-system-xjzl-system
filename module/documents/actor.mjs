@@ -950,11 +950,11 @@ export class XJZLActor extends Actor {
     // 例如: @hp, @mp, @rage
     // 【V14 升级 S1.16】V14 的 applyActiveEffects 与 TokenDocument._getReplacementData 会在
     // 数据准备中途（prepareEmbeddedDocuments 阶段，早于 prepareDerivedData）调用 getRollData
-    // 解析变更里的 @ 引用；creature 的 hp/mp 是 prepareDerivedData 才补建的鸭子类型结构，
-    // 此时还不存在，直接读取会中断整个 Actor 的数据准备（启动路径报错）。缺失时按鸭子类型
-    // 的 mock 语义兜底为 0。creature 鸭子类型时序与 AE @ 引用的深层适配由 S0.7/M2 复核。
+    // 解析变更里的 @ 引用；此时 creature 的鸭子类型资源尚未补建，直接读取会中断数据准备。
+    // hp 缺失时映射 creature 的真实体力 tili.value（保持鸭子类型语义，避免初始阶段 @hp 取 0），
+    // mp/rage 缺失按 mock 语义兜底 0。当前无任何脚本使用 @resources.hp.value，不做二级支持。
     if (sys.resources) {
-      data.hp = sys.resources.hp?.value ?? 0;
+      data.hp = sys.resources.hp?.value ?? sys.resources.tili?.value ?? 0;
       data.mp = sys.resources.mp?.value ?? 0;
       data.rage = sys.resources.rage?.value ?? 0;
     }

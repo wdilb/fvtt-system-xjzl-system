@@ -56,10 +56,11 @@ import { EffectSelectionDialog } from "./module/applications/effect-selection-di
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 import { setupSocket } from "./module/socket.mjs";
-// 【V14 升级 S1.14 停用，代码仅注释未删除】V14 已移除 MeasuredTemplate 文档类型，
-// 原 AOE 模板功能整体下线，待 M3 用 Region 体系重建（光环设计见 docs/V14_UPGRADE.md §3.3）。
-// 以下代码与 module/measured-template.mjs、module/applications/aoe-creator.mjs 保留原逻辑，
-// 供 M3 重建光环/区域功能时参考复用。
+// 【V14 升级 S1.14 停用，代码仅注释未删除】按升级计划提前下线 AOE 模板功能：
+// 14.368 实测仍提供 MeasuredTemplate 弃用兼容层（类、CONFIG 注册点、scene.templates 可用），
+// 停用不是启动所必需，而是不基于弃用层继续开发；待 M3 用 Region 体系重建
+// （光环设计见 docs/V14_UPGRADE.md §3.3）。以下代码与 module/measured-template.mjs、
+// module/applications/aoe-creator.mjs 保留原逻辑，供 M3 重建光环/区域功能时参考复用。
 // import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
 // import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
@@ -106,8 +107,8 @@ Hooks.once("init", async function () {
   const useCustomRule = game.settings.get("xjzl-system", "customDistanceRule");
   if (useCustomRule) {
 
-    // 【V14 升级 S1.14 停用，代码仅注释未删除】CONFIG.MeasuredTemplate 在 V14 已不存在，
-    // 访问其 objectClass 会直接抛错；保留供 M3 Region 重建参考。
+    // 【V14 升级 S1.14 停用，代码仅注释未删除】14.368 仍提供 CONFIG.MeasuredTemplate 弃用兼容层，
+    // 此处代码在兼容层下可运行，但基于弃用 API 不再继续使用；保留供 M3 Region 重建参考。
     // 替换系统的测量模板
     // CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
 
@@ -267,9 +268,13 @@ Hooks.once("init", async function () {
     console.log("XJZL | 已成功应用自定义距离移动计算。");
   }
 
-  // 【V14 升级 S1.9】V14 的 unregisterSheet 第三参要求 Sheet 类本身（内部取 .name 拼 id），
-  // 传字符串会静默无效；且核心 ActiveEffectConfig 在 V14 已无公开导出、被核心注册为非默认备选，
-  // 故不再注销，仅将我们的表注册为默认（实际解析永远命中我们的表）。S2.5 重写配置表时再定最终形态。
+  // 【V14 升级 S1.9】注销核心 AE 配置表，保持 V13 起的独占语义。注意两点：
+  // ① V14 的 unregisterSheet 第三参必须传 Sheet 类（内部取 .name 拼 id），传字符串会静默无效；
+  //    核心类导出位置为 foundry.applications.sheets.ActiveEffectConfig（apps 命名空间下没有）。
+  // ② 即使旧世界已保存默认表设置指向 core.ActiveEffectConfig，注销后 updateDefaultSheets
+  //    找不到该 id 会跳过应用，解析回落到下方 makeDefault 的系统表单，行为与 V13 一致。
+  foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", foundry.applications.sheets.ActiveEffectConfig);
+
   // 注册我们的表单
   foundry.applications.apps.DocumentSheetConfig.registerSheet(ActiveEffect, "xjzl-system", XJZLActiveEffectConfig, {
     makeDefault: true,
@@ -957,7 +962,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
     }
   }
 
-  // 【V14 升级 S1.14 停用，代码仅注释未删除】V14 已移除 templates 控制层与 MeasuredTemplate，
+  // 【V14 升级 S1.14 停用，代码仅注释未删除】V14 的 templates 控制层已弃用（14.368 兼容层仍提供），
   // AOE Creator 工具栏按钮一并下线；以下注入逻辑保留，供 M3 按钮迁移（S3.4）与 Region 重建参考。
   // // 4·注入 AOE Creator 按钮
   // // 1. 查找 templates 层级 (测量工具在代码里叫 templates)
@@ -1458,7 +1463,7 @@ async function _routeActorTurnScript(actor, trigger, regenTiming) {
 /**
  * 统一处理 Token 更新：名称/阵营变化刷新战局目标。
  * 【V14 升级 S1.14 停用，代码仅注释未删除】位置变化同步“粘性”模板的逻辑已注释：
- * V14 移除了 MeasuredTemplate 与 scene.templates，跟随效果将在 M3 改用 Region
+ * V14 的 MeasuredTemplate/scene.templates 属弃用兼容层，跟随效果将在 M3 改用 Region
  * attachment.token 原生实现（总纲 §3.2）；原同步算法（含中心点计算、1px 去抖、
  * 权限不足走 socket 委托）保留在下方注释中，供重建时参考。
  */
@@ -1570,7 +1575,7 @@ Hooks.on("deleteCombat", async (combat, options, userId) => {
 /**
  * 处理 Token 删除
  * 【V14 升级 S1.14 停用，代码仅注释未删除】本钩子仅负责清理 Token 关联的自动删除模板，
- * MeasuredTemplate 在 V14 已移除，整体下线；M3 重建时需先验证 Region 原生附着
+ * MeasuredTemplate 已按计划下线（V14 为弃用兼容层）；M3 重建时需先验证 Region 原生附着
  * （attachment.token）是否随 Token 删除自动清理，若不自动清理再参考此逻辑补 Region 删除。
  */
 // Hooks.on("deleteToken", (tokenDoc, options, userId) => {

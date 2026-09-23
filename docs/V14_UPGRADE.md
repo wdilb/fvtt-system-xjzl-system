@@ -46,7 +46,7 @@
 三大工作块，按体量排序：
 
 1. **ActiveEffect 融合**（§2）：V14 把 `changes` 迁入 `system.changes`、数字 `mode` 改字符串 `type`、duration 模型重做。我们的叠层/抑制/飘字/时长规则引擎全部保留，只迁移数据格式并按新机制重接。
-2. **距离与光环 / Region**（§3）：MeasuredTemplate 文档类型整体移除，AOE 工具与跟随光环改用 Region 体系重建；是否新增完整光环及脚本触发器，由 Q4 决定。
+2. **距离与光环 / Region**（§3）：MeasuredTemplate 文档类型已弃用（14.368 保留兼容层），AOE 工具与跟随光环改用 Region 体系重建；是否新增完整光环及脚本触发器，由 Q4 决定。
 3. **机械替换与数据迁移**（§4–§6）：i18n、TextEditor、statusEffects 形态、聊天可见性、CSS 变量、渲染钩子等确定性替换，加 data/ 源数据与合集包迁移。
 
 已有架构基础：Sheet/Application 主框架已使用 V2，Actor/Item 数据模型已使用 `foundry.abstract.TypeDataModel`，无需另做这两项架构迁移；具体字段、AE 配置窗、DOM 和钩子仍按后文适配。检索未发现 `template.json`、TinyMCE、`ChatLog.MESSAGE_PATTERNS`、whisper/blind 硬编码、`foundry.utils.duplicate` 或自定义 context menu 钩子的迁移任务，后续新增命中项再补录。
@@ -59,7 +59,7 @@
 
 - `ActiveEffect#changes` → `ActiveEffect#system#changes`（结构化数据模型承载变更）。
 - `EffectChangeData#mode`（数字）→ `#type`（字符串字面量：`custom/multiply/add/subtract/downgrade/upgrade/override`）。[`CONST.ACTIVE_EFFECT_CHANGE_TYPES`](https://foundryvtt.com/api/variables/CONST.ACTIVE_EFFECT_CHANGE_TYPES.html) 的键是类型名，值是默认优先级（如 `add: 20`），不能将成员值当作 `type`，也不存在 `.ADD` 成员。
-- `EffectChangeData#value` 会做 JSON 反序列化：`"true"` 将存为布尔 `true`。我们的 flag 类 override 变更（`value: "true"`）读写要注意类型。
+- `EffectChangeData#value` 官方文档描述会做 JSON 反序列化；**14.368 实测（计划 S0.7）：`"true"` 在模型清洗、DB 写入与 flags 应用全链路保持字符串**，未出现布尔化。flag 类 override 变更（`value: "true"`）按字符串语义读写。
 - duration 重做：支持任意时间单位与 **expiry 事件**（如"直到战斗结束"），`ActiveEffect.registry` 追踪临时特效时长。
 - 变更支持**应用阶段**（application phases）：[`initial`/`final` 为核心内置阶段](https://foundryvtt.com/api/variables/CONST.ACTIVE_EFFECT_CHANGE_PHASES.html)，`CONFIG.ActiveEffect.phases` 只注册附加阶段，且注册方须在相应时机调用 `Actor#applyActiveEffects(phase)`。M0 验证它们与本系统数据准备顺序的配合，不重复注册内置阶段。
 - 变更值可引用 actor 数据（`@` 插值），新增 `subtract` 类型。
@@ -133,7 +133,7 @@ S2.2 同步清理 [active-effect.mjs](../module/documents/active-effect.mjs) 的
 
 ### 3.2 现有 MeasuredTemplate 功能归宿
 
-V14 **彻底移除 MeasuredTemplate 文档类型**，逐项归宿：
+V14 **弃用 MeasuredTemplate 文档类型**（14.368 实测保留兼容层：类、`CONFIG.MeasuredTemplate`、`scene.templates` 仍可用，未来版本移除），逐项归宿：
 
 | 现功能 | 现实现 | V14 归宿 |
 |---|---|---|
@@ -147,7 +147,7 @@ V14 **彻底移除 MeasuredTemplate 文档类型**，逐项归宿：
 | 跟随光环宏 | [data/macros/utility.json](../data/macros/utility.json) | 改写为 Region 版，或并入光环系统（§3.3） |
 | `CONFIG.MeasuredTemplate.objectClass` 注册 + [measured-template.mjs](../module/measured-template.mjs) | 整文件 | 删除 |
 
-> 摘除动作（静态 import、CONFIG 注册、`scene.templates` 相关钩子与 AOE 创建调用）在 **M1 先行完成**，否则模块求值期就会因继承已删除的类而抛错、系统无法加载；本节的 Region 重建设计属于 M3。
+> 摘除动作（静态 import、CONFIG 注册、`scene.templates` 相关钩子与 AOE 创建调用）已在 M1 完成：14.368 兼容层下旧代码仍可运行，摘除并非启动所必需，而是**不基于弃用 API 继续开发**（兼容层将在未来版本移除，届时再摘即为启动阻断）；本节的 Region 重建设计属于 M3。
 
 ### 3.3 光环设计方向（Q4，待重点讨论）
 

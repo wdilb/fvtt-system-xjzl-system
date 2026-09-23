@@ -1,10 +1,10 @@
 /**
  * 侠界之旅 - 自定义测量模板
  *
- * 【V14 升级 S1.14 停用，代码仅注释未删除】V14 已移除 MeasuredTemplate 文档类型
- * （foundry.canvas.placeables.MeasuredTemplate 不复存在），本文件一旦被 import，
- * 模块求值期就会因 extends undefined 抛错阻断系统加载，入口已在 xjzl-system.mjs 中注释。
- * 文件整体保留，供 M3 Region/光环重建（docs/V14_UPGRADE.md §3）参考：
+ * 【V14 升级 S1.14 停用，代码仅注释未删除】按升级计划提前下线：14.368 实测仍提供
+ * MeasuredTemplate 弃用兼容层（foundry.canvas.placeables.MeasuredTemplate / CONFIG.MeasuredTemplate /
+ * scene.templates 可用），本文件在兼容层下可运行，但不再基于弃用 API 继续开发，入口已在
+ * xjzl-system.mjs 中注释停用。文件整体保留，供 M3 Region/光环重建（docs/V14_UPGRADE.md §3）参考：
  * - _getGridHighlightPositions：圆形 1-2-2-2 按格覆盖算法（包围盒遍历 + 欧几里得剪枝 + measurePath 精确判定）
  * - get tokens：AoE 范围查询预留接口（同款距离判定）
  * - _draw/_updateLabel：模板标签绘制与点击穿透处理
