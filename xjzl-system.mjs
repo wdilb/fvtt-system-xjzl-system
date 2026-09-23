@@ -667,26 +667,34 @@ Hooks.once("ready", async function () {
   // V14 的 #registerSheet 逻辑：设置里存有任何已保存项（即使指向已注销的表）时，makeDefault 即被
   // 忽略（isDefault = existingDefault === id）。旧世界若保存过 core.ActiveEffectConfig，我们的表会
   // 注册成 default:false，无任何表带默认标记时解析回退到"第一个可配置表"，可能被其他模块抢走。
-  // 此处把指向已注销/不存在表单的陈旧项改写为系统表单并持久化（GM 执行，一次生效），并同步
-  // 纠正当次会话的内存 default 标记；指向其他**有效**已注册表单的项尊重用户选择，不覆盖。
+  // 修正规则：逐子类型检查，仅改写指向已注销/不存在表单的陈旧项，指向有效表单的项尊重用户选择；
+  // 内存 default 标记先行修正（不依赖写入成功），持久化失败仅记录错误——绝不中断 ready 初始化。
   {
     const ours = "xjzl-system.XJZLActiveEffectConfig";
     const saved = game.settings.get("core", "sheetClasses");
     const ae = saved?.ActiveEffect;
     if (foundry.utils.isPlainObject(ae)) {
-      let stale = false;
+      const correctedTypes = [];
       for (const [type, id] of Object.entries(ae)) {
         const registered = CONFIG.ActiveEffect.sheetClasses?.[type];
         if (id === "core.ActiveEffectConfig" || (registered && !registered[id])) {
           ae[type] = ours;
-          stale = true;
+          correctedTypes.push(type);
         }
       }
-      if (stale) {
-        if (game.user.isGM) await game.settings.set("core", "sheetClasses", saved);
-        const base = CONFIG.ActiveEffect.sheetClasses?.base;
-        if (base?.[ours]) Object.values(base).forEach(s => s.default = s.id === ours);
-        console.log("XJZL | 已修正旧世界遗留的 AE 默认表设置。");
+      if (correctedTypes.length > 0) {
+        for (const type of correctedTypes) {
+          const group = CONFIG.ActiveEffect.sheetClasses?.[type];
+          if (group?.[ours]) Object.values(group).forEach(s => s.default = s.id === ours);
+        }
+        if (game.user.isGM) {
+          try {
+            await game.settings.set("core", "sheetClasses", saved);
+          } catch (err) {
+            console.error("XJZL | AE 默认表设置持久化失败，本次会话内存已修正，下次会话将重试：", err);
+          }
+        }
+        console.log(`XJZL | 已修正旧世界遗留的 AE 默认表设置（${correctedTypes.join(", ")}）。`);
       }
     }
   }
