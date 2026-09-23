@@ -928,7 +928,7 @@ export class XJZLActor extends Actor {
 
   /**
    * 准备用于骰子检定的数据 (Roll Data)
-   * 这决定了你在公式里可以用 @ 什么属性
+   * 这决定了骰点公式中可通过 @ 引用的属性
    */
   getRollData() {
     // --- 容器直接返回基础数据，不进行属性映射 ---
@@ -948,14 +948,19 @@ export class XJZLActor extends Actor {
 
     // 2. 将资源添加到顶层
     // 例如: @hp, @mp, @rage
+    // 【V14 升级 S1.16】V14 的 applyActiveEffects 与 TokenDocument._getReplacementData 会在
+    // 数据准备中途（prepareEmbeddedDocuments 阶段，早于 prepareDerivedData）调用 getRollData
+    // 解析变更里的 @ 引用；creature 的 hp/mp 是 prepareDerivedData 才补建的鸭子类型结构，
+    // 此时还不存在，直接读取会中断整个 Actor 的数据准备（启动路径报错）。缺失时按鸭子类型
+    // 的 mock 语义兜底为 0。creature 鸭子类型时序与 AE @ 引用的深层适配由 S0.7/M2 复核。
     if (sys.resources) {
-      data.hp = sys.resources.hp.value;
-      data.mp = sys.resources.mp.value;
-      data.rage = sys.resources.rage.value;
+      data.hp = sys.resources.hp?.value ?? 0;
+      data.mp = sys.resources.mp?.value ?? 0;
+      data.rage = sys.resources.rage?.value ?? 0;
     }
 
     // 3. 创建战斗属性的快捷方式 (Combat Shortcuts)
-    // 你的计算代码把结果存为了 xxxTotal，我们可以做一些简化映射
+    // 派生结果以 xxxTotal 形式存储，此处映射为顶层快捷键供公式引用
     if (sys.combat) {
       // 先攻 (Initiative)
       // 映射后，公式里可以用 @init 或 @combat.initiativeTotal

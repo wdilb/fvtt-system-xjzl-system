@@ -3,6 +3,14 @@
  *  自定义 AOE 区域创建工具 (AOE Creator)
  * ==============================================================================
  *  Tech Stack: ApplicationV2 (V13 Standard)
+ *
+ *  【V14 升级 S1.14 停用，代码仅注释未删除】V14 已移除 MeasuredTemplate 文档类型，
+ *  工具栏按钮与创建调用已在 xjzl-system.mjs 中注释，本窗口无法再打开（类本身为
+ *  纯 ApplicationV2，加载不受影响）。文件整体保留，供 M3 Region 版 AOE/光环重建
+ *  （docs/V14_UPGRADE.md §3）参考复用，重点参考：
+ *  - 跟随/静态两种模式的目标点选取（Token 中心 / 视野中心对齐网格）
+ *  - GM 代玩家创建时把所有权移交给角色 Owner 的处理
+ *  - flags.sticky / sourceToken / label 约定（配合 updateToken 同步与 deleteToken 清理）
  */
 
 const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api;
@@ -81,86 +89,92 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
      * 点击 "生成" 按钮触发
      */
     async _onCreate(event, target) {
-        // 阻止表单默认提交刷新页面
-        event.preventDefault();
-        const formData = new FormData(this.element);
-        const scene = canvas.scene;
-        if (!scene) return;
+        // 【V14 升级 S1.14 停用，代码仅注释未删除】创建入口随工具栏按钮一并下线，本函数正常不可达；
+        // V14 已移除 MeasuredTemplate 文档类型。保留 preventDefault 以防窗口被临时恢复时表单提交刷新页面。
+        event?.preventDefault?.();
+        ui.notifications.warn("AOE 区域创建功能在 V14 升级中暂下线，待 M3 Region 版本重建。");
+        return;
 
-        // 获取基础数据
-        const label = formData.get("label") || game.i18n.localize("XJZL.UI.AoeCreator.Unlabeled");
-        const rawDistance = parseFloat(formData.get("distance")) || 1;
-        const finalDistance = rawDistance * (canvas.dimensions.distance || 1);
-        const color = formData.get("color");
-        const mode = formData.get("mode");
-        const selectedTokenId = formData.get("tokenId"); // 获取下拉框选中的 ID
-
-        let x = 0;
-        let y = 0;
-        let sourceTokenId = null;
-        let isSticky = false;
-
-        // 默认模板作者为当前点击按钮的用户
-        let templateOwnerId = game.user.id;
-
-        if (mode === "follow") {
-            // --- 模式 A: 跟随 ---
-            // 从场景中查找 ID 对应的 Token
-            const targetToken = scene.tokens.get(selectedTokenId)?.object;
-
-            if (!targetToken) {
-                return ui.notifications.warn(game.i18n.localize("XJZL.UI.AoeCreator.InvalidToken"));
-            }
-
-            const { center } = targetToken;
-            x = center.x;
-            y = center.y;
-            sourceTokenId = targetToken.id;
-            isSticky = true;
-
-            // 如果 GM 给玩家的角色创建跟随 AOE，把模板的所有权移交给该玩家
-            if (targetToken.actor) {
-                // 查找对该角色具有所有权 (OWNER) 的第一个非 GM 玩家
-                const playerOwner = game.users.find(u => !u.isGM && targetToken.actor.testUserPermission(u, "OWNER"));
-                if (playerOwner) {
-                    templateOwnerId = playerOwner.id;
-                }
-            }
-
-        } else {
-            // --- 模式 B: 静态 (视野中心) ---
-            // 不再使用鼠标位置，改用当前视野中心 (Pivot)
-            // canvas.stage.pivot 存储的是当前屏幕中心点在 Canvas 坐标系下的位置
-            const { x: cx, y: cy } = canvas.stage.pivot;
-
-            // 为了美观，对齐到最近的网格交点/中心
-            const offset = canvas.grid.getOffset({ x: cx, y: cy });
-            const center = canvas.grid.getCenterPoint(offset);
-
-            x = center.x;
-            y = center.y;
-        }
-
-        const templateData = {
-            t: "circle",
-            user: templateOwnerId, // 使用智能分配的用户ID
-            distance: finalDistance,
-            direction: 0,
-            x: x,
-            y: y,
-            fillColor: color,
-            flags: {
-                "xjzl-system": {
-                    label: label,
-                    sourceToken: sourceTokenId,
-                    sticky: isSticky
-                }
-            }
-        };
-
-        await scene.createEmbeddedDocuments("MeasuredTemplate", [templateData]);
-        ui.notifications.info(game.i18n.localize("XJZL.UI.AoeCreator.Created", { label }));
-        this.close(); // 创建后自动关闭窗口，方便查看
+        // // 阻止表单默认提交刷新页面
+        // event.preventDefault();
+        // const formData = new FormData(this.element);
+        // const scene = canvas.scene;
+        // if (!scene) return;
+        //
+        // // 获取基础数据
+        // const label = formData.get("label") || game.i18n.localize("XJZL.UI.AoeCreator.Unlabeled");
+        // const rawDistance = parseFloat(formData.get("distance")) || 1;
+        // const finalDistance = rawDistance * (canvas.dimensions.distance || 1);
+        // const color = formData.get("color");
+        // const mode = formData.get("mode");
+        // const selectedTokenId = formData.get("tokenId"); // 获取下拉框选中的 ID
+        //
+        // let x = 0;
+        // let y = 0;
+        // let sourceTokenId = null;
+        // let isSticky = false;
+        //
+        // // 默认模板作者为当前点击按钮的用户
+        // let templateOwnerId = game.user.id;
+        //
+        // if (mode === "follow") {
+        //     // --- 模式 A: 跟随 ---
+        //     // 从场景中查找 ID 对应的 Token
+        //     const targetToken = scene.tokens.get(selectedTokenId)?.object;
+        //
+        //     if (!targetToken) {
+        //         return ui.notifications.warn(game.i18n.localize("XJZL.UI.AoeCreator.InvalidToken"));
+        //     }
+        //
+        //     const { center } = targetToken;
+        //     x = center.x;
+        //     y = center.y;
+        //     sourceTokenId = targetToken.id;
+        //     isSticky = true;
+        //
+        //     // 如果 GM 给玩家的角色创建跟随 AOE，把模板的所有权移交给该玩家
+        //     if (targetToken.actor) {
+        //         // 查找对该角色具有所有权 (OWNER) 的第一个非 GM 玩家
+        //         const playerOwner = game.users.find(u => !u.isGM && targetToken.actor.testUserPermission(u, "OWNER"));
+        //         if (playerOwner) {
+        //             templateOwnerId = playerOwner.id;
+        //         }
+        //     }
+        //
+        // } else {
+        //     // --- 模式 B: 静态 (视野中心) ---
+        //     // 不再使用鼠标位置，改用当前视野中心 (Pivot)
+        //     // canvas.stage.pivot 存储的是当前屏幕中心点在 Canvas 坐标系下的位置
+        //     const { x: cx, y: cy } = canvas.stage.pivot;
+        //
+        //     // 为了美观，对齐到最近的网格交点/中心
+        //     const offset = canvas.grid.getOffset({ x: cx, y: cy });
+        //     const center = canvas.grid.getCenterPoint(offset);
+        //
+        //     x = center.x;
+        //     y = center.y;
+        // }
+        //
+        // const templateData = {
+        //     t: "circle",
+        //     user: templateOwnerId, // 使用智能分配的用户ID
+        //     distance: finalDistance,
+        //     direction: 0,
+        //     x: x,
+        //     y: y,
+        //     fillColor: color,
+        //     flags: {
+        //         "xjzl-system": {
+        //             label: label,
+        //             sourceToken: sourceTokenId,
+        //             sticky: isSticky
+        //         }
+        //     }
+        // };
+        //
+        // await scene.createEmbeddedDocuments("MeasuredTemplate", [templateData]);
+        // ui.notifications.info(game.i18n.localize("XJZL.UI.AoeCreator.Created", { label }));
+        // this.close(); // 创建后自动关闭窗口，方便查看
     }
 
     /**
@@ -171,7 +185,7 @@ export class AOECreator extends HandlebarsApplicationMixin(ApplicationV2) {
 
         // 获取 DOM 元素
         const modeSelect = this.element.querySelector('select[name="mode"]');
-        const tokenGroup = this.element.querySelector('#token-select-group'); // 需要你在 hbs 里给那个 div 加 id
+        const tokenGroup = this.element.querySelector('#token-select-group'); // 对应模板 aoe-creator.hbs 中的 #token-select-group
 
         if (!modeSelect || !tokenGroup) return;
 

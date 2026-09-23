@@ -2,7 +2,7 @@
 
 本文件是 V14 升级的进度事实源，记录工作项、依赖和验证结果；范围、设计、API 依据及验收标准见 [`V14_UPGRADE.md`](V14_UPGRADE.md)。复杂工作另建专项计划，并在对应工作项后附链接，本清单不展开实现细节。
 
-**当前下一步：M0，从 S0.1 开始。** 先确认可用的 V14 验证环境并记录构建号；若机制验证依赖完整系统启动，先处理 S1.14 等必要启动修复，再返回验证。首批 A 类改动已完成，阶段实机验收均尚未完成。
+**当前下一步：M0，从 S0.1 开始。** V14 验证环境已就绪（构建号 14.368）；S1.14 已按“注释停用、保留代码”方式完成，S1.16 修复了 creature 的启动数据准备报错。待用户刷新复验启动路径无报错后，正式推进 M0 机制验证。首批 A 类改动与 S1.14/S1.16 已完成，阶段实机验收均尚未完成。
 
 ## 使用方式与状态约定
 
@@ -44,8 +44,17 @@
 - [ ] S1.11 B7：CSS 旧变量族替换（17 处 / 6 个变量族）
 - [x] S1.12 A8：`bringToTop()` → `bringToFront()`（character-sheet.mjs，V14 已移除）
 - [x] S1.13 A9：ChatMessage 数据 `user:` → `author:`（模块 27 处 + data/ 脚本 88 处；世界内脚本副本由 S4.7 迁移）
-- [ ] S1.14 摘除 MeasuredTemplate 启动依赖并删除旧类文件：xjzl-system.mjs 静态 import、`CONFIG.MeasuredTemplate` 注册、updateToken/deleteToken 中 `scene.templates` 逻辑、AOE Creator 创建调用与工具栏按钮（模块求值期即阻断加载，功能暂下线待 M3 Region 重建）
+- [x] S1.14 摘除 MeasuredTemplate 启动依赖（应用户要求以注释方式停用、保留代码供 M3 光环/Region 重建参考，未删除文件；模块求值期即阻断加载，功能暂下线待 M3 Region 重建）；`node --check` 通过，V14 构建 14.368 实机进入系统确认 AOE 按钮已消失，启动解阻生效
+  - 注释位置明细（M3 重建完成后，全局搜索 `【V14 升级 S1.14 停用，代码仅注释未删除】` 标记即可定位全部注释块并删除）：
+    1. `xjzl-system.mjs` 顶部：`XJZLMeasuredTemplate`、`AOECreator` 两条 import
+    2. `xjzl-system.mjs` init 内：`CONFIG.MeasuredTemplate.objectClass` 注册
+    3. `xjzl-system.mjs` getSceneControlButtons 钩子：“4·注入 AOE Creator 按钮”整段（V14 已移除 templates 控制层）
+    4. `xjzl-system.mjs` updateToken 钩子：粘性模板同步算法（保留名称/阵营→战局刷新；注释内含中心点计算、1px 去抖、无权限走 socket 委托的完整原逻辑）
+    5. `xjzl-system.mjs` deleteToken 钩子：整体（该钩子仅负责 autoDelete 模板清理）
+    6. `module/measured-template.mjs`：代码本身未注释（不再被 import 即不求值，可安全保留），文件头标注 M3 参考要点——1-2-2-2 圆形网格高亮算法、`tokens` 范围查询接口、标签绘制与点击穿透
+    7. `module/applications/aoe-creator.mjs`：类整体保留可正常加载，仅 `_onCreate` 创建逻辑注释并加守卫返回；文件头标注 M3 参考要点——跟随/静态取点、GM 代创时所有权移交、`flags.sticky/sourceToken/label` 约定
 - [ ] S1.15 对照[官方 #13436](https://github.com/foundryvtt/foundryvtt/issues/13436)审计入口、module 与模板代码，补录遗漏项
+- [x] S1.16 V14 启动路径修复：`XJZLActor.getRollData` 对缺失资源兜底。V14 的 `applyActiveEffects` 与 `TokenDocument._getReplacementData` 在 prepareEmbeddedDocuments 阶段即调用 getRollData 解析变更中的 @ 引用，早于 creature 在 prepareDerivedData 补建鸭子类型 `hp/mp`，直接读取使该 Actor 数据准备中断（构建 14.368 实机报错）；改为 `?.` + `?? 0` 兜底（character 的 schema 自带 hp/mp/rage 不受影响），`node --check` 通过；修复效果待用户刷新复验，creature 时序与 AE @ 引用的深层适配归 S0.7/M2 复核
 
 ## M2 ActiveEffect 链路（依赖 S0.1/S0.2/S0.6/S0.7）
 
@@ -107,7 +116,7 @@
 | 阶段 | 验收状态 | 验证记录 / 专项计划 |
 |---|---|---|
 | M0 | 待验 | 尚无 V14 实机验证记录 |
-| M1 | 待验 | 首批 A 类代码项已勾选，启动、钩子与界面行为待验 |
+| M1 | 待验 | 首批 A 类代码项与 S1.14 已勾选；2026-09-23 构建 14.368 首次实机进入系统：AOE 按钮确认下线，但发现 creature Actor 数据准备报错（S1.16 已修复待复验），启动验收仍未通过 |
 | M2 | 待验 | — |
 | M3 | 待验 | — |
 | M4 | 待验 | — |

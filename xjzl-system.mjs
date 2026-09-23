@@ -56,8 +56,12 @@ import { EffectSelectionDialog } from "./module/applications/effect-selection-di
 import { SeedingManager } from "./module/utils/seeding/index.mjs";  //合集包数据转换类
 import { XJZLCompendiumBrowser } from "./module/applications/compendium-browser.mjs";
 import { setupSocket } from "./module/socket.mjs";
-import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
-import { AOECreator } from "./module/applications/aoe-creator.mjs";
+// 【V14 升级 S1.14 停用，代码仅注释未删除】V14 已移除 MeasuredTemplate 文档类型，
+// 原 AOE 模板功能整体下线，待 M3 用 Region 体系重建（光环设计见 docs/V14_UPGRADE.md §3.3）。
+// 以下代码与 module/measured-template.mjs、module/applications/aoe-creator.mjs 保留原逻辑，
+// 供 M3 重建光环/区域功能时参考复用。
+// import { XJZLMeasuredTemplate } from "./module/measured-template.mjs";
+// import { AOECreator } from "./module/applications/aoe-creator.mjs";
 import { XJZLMacros } from "./module/utils/macros.mjs";
 import { XJZLTurnMarkerManager } from "./module/combat-turn-marker.mjs";
 import { ActionTracker } from "./module/applications/action-tracker.mjs";
@@ -102,8 +106,10 @@ Hooks.once("init", async function () {
   const useCustomRule = game.settings.get("xjzl-system", "customDistanceRule");
   if (useCustomRule) {
 
+    // 【V14 升级 S1.14 停用，代码仅注释未删除】CONFIG.MeasuredTemplate 在 V14 已不存在，
+    // 访问其 objectClass 会直接抛错；保留供 M3 Region 重建参考。
     // 替换系统的测量模板
-    CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
+    // CONFIG.MeasuredTemplate.objectClass = XJZLMeasuredTemplate;
 
     // 替换FVTT自带的一定距离计算方式
     const SquareGrid = foundry.grid.SquareGrid;
@@ -114,7 +120,7 @@ Hooks.once("init", async function () {
     }
 
     // ==========================================
-    //  第一部分：Token 拖拽计算 (你完美的原始代码，原封不动)
+    // 第一部分：Token 拖拽计算
     // ==========================================
     // 2. 保存原始方法 (说不定后面要用到)
     const originalMeasurePath = SquareGrid.prototype.measurePath;
@@ -276,11 +282,11 @@ Hooks.once("init", async function () {
   CONFIG.statusEffects = Object.fromEntries(CONFIG.XJZL.statusEffects.map(e => [e.id, e]));
 
   // 修改世界时间配置
-  CONFIG.time.roundTime = 2; // 设置 1 轮 = 2 秒 (我们侠界是这么快的)
+  CONFIG.time.roundTime = 2; // 1 轮 = 2 秒（侠界时长规则）
 
   // 1. 配置 Combat 先攻设置
   CONFIG.Combat.initiative = {
-    // 这里填你的先攻公式字符串
+    // 先攻公式（经 actor.getRollData() 解析 @ 引用）
     // @attributes.shenfa.value 必须能通过 actor.getRollData() 访问到
     formula: "1d20 + @init",
     decimals: 2 // 出现平局时保留2位小数
@@ -828,12 +834,12 @@ Hooks.on('getSceneControlButtons', (controls) => {
     }
   };
 
-  // --- 步骤 1: 查找 Token 控制层级 (严格参考你的 QTE 代码逻辑) ---
+  // --- 步骤 1: 查找 Token 控制层级 ---
   let tokenLayer = null;
 
   // V13 模式: controls 是对象，直接通过属性访问
   if (controls.token) {
-    tokenLayer = controls.token; // 注意：V13 有时是 controls.token 而不是 controls.tokens，但你的参考代码用了 tokens，如果是 tokens 请看下一行
+    tokenLayer = controls.token; // 层级键名在不同构建中可能为 token 或 tokens，下一行做兼容
   }
   else if (controls.tokens) {
     tokenLayer = controls.tokens; // 兼容 controls.tokens 的写法
@@ -864,7 +870,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       }
     }
     // 情况 B: 数组结构 (V12 或 V13 早期)
-    // 既然你的 QTE 代码里保留了这个分支且能运行，我们为了稳妥也保留它
+    // 数组形态兜底：兼容旧构建的 tools 结构
     else if (Array.isArray(tools)) {
       if (!tools.some(t => t.name === 'damage-tool')) {
         tools.push(damageToolBtn);
@@ -900,7 +906,7 @@ Hooks.on('getSceneControlButtons', (controls) => {
       }
     };
 
-    // 注入逻辑 (复用你现有的稳健代码)
+    // 注入逻辑（与上方按钮相同的层级查找方式）
     let tokenLayer = null;
     if (controls.token) tokenLayer = controls.token;
     else if (controls.tokens) tokenLayer = controls.tokens;
@@ -951,64 +957,66 @@ Hooks.on('getSceneControlButtons', (controls) => {
     }
   }
 
-  // 4·注入 AOE Creator 按钮 
-  // 1. 查找 templates 层级 (测量工具在代码里叫 templates)
-  let templateLayer = null;
-
-  // 仿照你处理 tokenLayer 的方式
-  if (controls.templates) {
-    templateLayer = controls.templates;
-  }
-  else if (controls instanceof Map && controls.has('templates')) {
-    templateLayer = controls.get('templates');
-  }
-  else if (Array.isArray(controls)) {
-    templateLayer = controls.find(c => c.name === "templates");
-  }
-
-  // 2. 注入按钮
-  if (templateLayer) {
-    const aoeBtn = {
-      name: "xjzl-aoe",
-      title: game.i18n.localize("XJZL.UI.Toolbar.AoeCreator"),
-      icon: "fas fa-bullseye",
-      visible: true,
-      button: true, // 关键：这是点击型按钮
-      onChange: () => {
-        const existingApp = Object.values(ui.windows).find(
-          (app) => app.options.id === "xjzl-aoe-creator"
-        );
-        if (existingApp) {
-          existingApp.render(true, { focus: true });
-        } else {
-          new AOECreator().render(true);
-        }
-      }
-    };
-
-    const tools = templateLayer.tools;
-
-    // 3. 处理 tools 集合 (严格仿照你原本的 tools 处理逻辑)
-
-    // 情况 A: Map 结构
-    if (tools instanceof Map) {
-      if (!tools.has('xjzl-aoe')) {
-        tools.set('xjzl-aoe', aoeBtn);
-      }
-    }
-    // 情况 B: 数组结构
-    else if (Array.isArray(tools)) {
-      if (!tools.some(t => t.name === 'xjzl-aoe')) {
-        tools.push(aoeBtn);
-      }
-    }
-    // 情况 C: 普通对象结构 (Object)
-    else if (tools) {
-      if (!tools['xjzl-aoe']) {
-        templateLayer.tools['xjzl-aoe'] = aoeBtn;
-      }
-    }
-  }
+  // 【V14 升级 S1.14 停用，代码仅注释未删除】V14 已移除 templates 控制层与 MeasuredTemplate，
+  // AOE Creator 工具栏按钮一并下线；以下注入逻辑保留，供 M3 按钮迁移（S3.4）与 Region 重建参考。
+  // // 4·注入 AOE Creator 按钮
+  // // 1. 查找 templates 层级 (测量工具在代码里叫 templates)
+  // let templateLayer = null;
+  //
+  // // 层级查找方式与上方 tokenLayer 一致
+  // if (controls.templates) {
+  //   templateLayer = controls.templates;
+  // }
+  // else if (controls instanceof Map && controls.has('templates')) {
+  //   templateLayer = controls.get('templates');
+  // }
+  // else if (Array.isArray(controls)) {
+  //   templateLayer = controls.find(c => c.name === "templates");
+  // }
+  //
+  // // 2. 注入按钮
+  // if (templateLayer) {
+  //   const aoeBtn = {
+  //     name: "xjzl-aoe",
+  //     title: game.i18n.localize("XJZL.UI.Toolbar.AoeCreator"),
+  //     icon: "fas fa-bullseye",
+  //     visible: true,
+  //     button: true, // 关键：这是点击型按钮
+  //     onChange: () => {
+  //       const existingApp = Object.values(ui.windows).find(
+  //         (app) => app.options.id === "xjzl-aoe-creator"
+  //       );
+  //       if (existingApp) {
+  //         existingApp.render(true, { focus: true });
+  //       } else {
+  //         new AOECreator().render(true);
+  //       }
+  //     }
+  //   };
+  //
+  //   const tools = templateLayer.tools;
+  //
+  //   // 3. 处理 tools 集合 (兼容 Map/数组/对象三种形态)
+  //
+  //   // 情况 A: Map 结构
+  //   if (tools instanceof Map) {
+  //     if (!tools.has('xjzl-aoe')) {
+  //       tools.set('xjzl-aoe', aoeBtn);
+  //     }
+  //   }
+  //   // 情况 B: 数组结构
+  //   else if (Array.isArray(tools)) {
+  //     if (!tools.some(t => t.name === 'xjzl-aoe')) {
+  //       tools.push(aoeBtn);
+  //     }
+  //   }
+  //   // 情况 C: 普通对象结构 (Object)
+  //   else if (tools) {
+  //     if (!tools['xjzl-aoe']) {
+  //       templateLayer.tools['xjzl-aoe'] = aoeBtn;
+  //     }
+  //   }
+  // }
 });
 
 /* -------------------------------------------- */
@@ -1065,14 +1073,14 @@ Hooks.on("renderItemDirectory", (app, html, data) => {
   const button = document.createElement("button");
   button.type = "button"; // 防止意外提交表单
   button.className = "xjzl-browser-btn";
-  // 直接写内联样式，或者你在 css 文件里写类名
+  // 使用内联样式，避免为单个入口按钮扩展全局样式表
   button.style.cssText = "min-width: 96%; margin: 0 2% 5px 2%; display: flex; align-items: center; justify-content: center; gap: 5px;";
   button.innerHTML = `<i class="fas fa-book-open"></i> ${game.i18n.localize("XJZL.UI.Toolbar.Compendium")}`;
 
   // 4. 绑定点击事件
   button.addEventListener("click", (ev) => {
     ev.preventDefault();
-    // 调用我们在 ready 中挂载的单例
+    // 调用 ready 阶段挂载的单例
     if (game.xjzl?.compendiumBrowser) {
       game.xjzl.compendiumBrowser.render(true);
     } else {
@@ -1447,7 +1455,11 @@ async function _routeActorTurnScript(actor, trigger, regenTiming) {
 // });
 
 /**
- * 统一处理 Token 更新：名称/阵营变化刷新战局目标，位置变化同步“粘性”模板。
+ * 统一处理 Token 更新：名称/阵营变化刷新战局目标。
+ * 【V14 升级 S1.14 停用，代码仅注释未删除】位置变化同步“粘性”模板的逻辑已注释：
+ * V14 移除了 MeasuredTemplate 与 scene.templates，跟随效果将在 M3 改用 Region
+ * attachment.token 原生实现（总纲 §3.2）；原同步算法（含中心点计算、1px 去抖、
+ * 权限不足走 socket 委托）保留在下方注释中，供重建时参考。
  */
 Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
   if (("name" in change) || ("disposition" in change)) {
@@ -1458,61 +1470,61 @@ Hooks.on("updateToken", (tokenDoc, change, options, userId) => {
     }
   }
 
-  // 1. 没有位移、非当前用户、场景未准备好，直接退出
-  if (!canvas.ready) return;
-  if (!change.x && !change.y) return;
-  if (game.user.id !== userId) return;
-
-  const scene = tokenDoc.parent;
-  if (!scene) return;
-
-  // 2. 场景里根本没有模板，直接退出 (避免无意义遍历)
-  // V13 Collection 使用 .size
-  if (scene.templates.size === 0) return;
-
-  // 3. 预计算 Token 新中心点
-  const gridSize = canvas.grid.size;
-  // 使用 ?? 运算符处理 0 的情况
-  const newX = change.x ?? tokenDoc.x;
-  const newY = change.y ?? tokenDoc.y;
-
-  const targetCenterX = newX + (tokenDoc.width * gridSize) / 2;
-  const targetCenterY = newY + (tokenDoc.height * gridSize) / 2;
-
-  // 4. 单次遍历查找并构建更新数据
-  const directUpdates = [];
-
-  // V13 推荐直接遍历 Collection
-  for (const t of scene.templates) {
-    // 快速检查 Flag
-    const flags = t.flags["xjzl-system"]; // 直接访问属性比 getFlag 稍微快一点点
-    if (!flags || flags.sourceToken !== tokenDoc.id || flags.sticky !== true) continue;
-
-    // 检查是否真的需要更新
-    // 如果位置差异小于 1 像素，视为未移动，跳过数据库更新
-    if (Math.abs(t.x - targetCenterX) < 1 && Math.abs(t.y - targetCenterY) < 1) continue;
-
-    const updateData = { _id: t.id, x: targetCenterX, y: targetCenterY };
-
-    // ==========================================
-    // 🌟 如果玩家权限不足，则交给Socket 委托
-    // ==========================================
-    // t.canUserModify 是 Foundry 底层 API，判断当前玩家能否直接改它
-    if (t.canUserModify(game.user, "update")) {
-      // 自己建的，或者 GM 操作：直接改，零延迟！
-      directUpdates.push(updateData);
-    } else {
-      // 没权限（比如 GM 给玩家建的）：委托 Socket 让 GM 帮忙改，不报错！
-      if (xjzlSocket) {
-        xjzlSocket.executeAsGM("updateDocument", t.uuid, updateData);
-      }
-    }
-  }
-
-  // 5. 批量提交
-  if (directUpdates.length > 0) {
-    scene.updateEmbeddedDocuments("MeasuredTemplate", directUpdates);
-  }
+  // // 1. 没有位移、非当前用户、场景未准备好，直接退出
+  // if (!canvas.ready) return;
+  // if (!change.x && !change.y) return;
+  // if (game.user.id !== userId) return;
+  //
+  // const scene = tokenDoc.parent;
+  // if (!scene) return;
+  //
+  // // 2. 场景里根本没有模板，直接退出 (避免无意义遍历)
+  // // V13 Collection 使用 .size
+  // if (scene.templates.size === 0) return;
+  //
+  // // 3. 预计算 Token 新中心点
+  // const gridSize = canvas.grid.size;
+  // // 使用 ?? 运算符处理 0 的情况
+  // const newX = change.x ?? tokenDoc.x;
+  // const newY = change.y ?? tokenDoc.y;
+  //
+  // const targetCenterX = newX + (tokenDoc.width * gridSize) / 2;
+  // const targetCenterY = newY + (tokenDoc.height * gridSize) / 2;
+  //
+  // // 4. 单次遍历查找并构建更新数据
+  // const directUpdates = [];
+  //
+  // // V13 推荐直接遍历 Collection
+  // for (const t of scene.templates) {
+  //   // 快速检查 Flag
+  //   const flags = t.flags["xjzl-system"]; // 直接访问属性比 getFlag 稍微快一点点
+  //   if (!flags || flags.sourceToken !== tokenDoc.id || flags.sticky !== true) continue;
+  //
+  //   // 检查是否真的需要更新
+  //   // 如果位置差异小于 1 像素，视为未移动，跳过数据库更新
+  //   if (Math.abs(t.x - targetCenterX) < 1 && Math.abs(t.y - targetCenterY) < 1) continue;
+  //
+  //   const updateData = { _id: t.id, x: targetCenterX, y: targetCenterY };
+  //
+  //   // ==========================================
+  //   // 🌟 如果玩家权限不足，则交给Socket 委托
+  //   // ==========================================
+  //   // t.canUserModify 是 Foundry 底层 API，判断当前玩家能否直接改它
+  //   if (t.canUserModify(game.user, "update")) {
+  //     // 自己建的，或者 GM 操作：直接改，零延迟！
+  //     directUpdates.push(updateData);
+  //   } else {
+  //     // 没权限（比如 GM 给玩家建的）：委托 Socket 让 GM 帮忙改，不报错！
+  //     if (xjzlSocket) {
+  //       xjzlSocket.executeAsGM("updateDocument", t.uuid, updateData);
+  //     }
+  //   }
+  // }
+  //
+  // // 5. 批量提交
+  // if (directUpdates.length > 0) {
+  //   scene.updateEmbeddedDocuments("MeasuredTemplate", directUpdates);
+  // }
 });
 
 /**
@@ -1556,33 +1568,36 @@ Hooks.on("deleteCombat", async (combat, options, userId) => {
 
 /**
  * 处理 Token 删除
+ * 【V14 升级 S1.14 停用，代码仅注释未删除】本钩子仅负责清理 Token 关联的自动删除模板，
+ * MeasuredTemplate 在 V14 已移除，整体下线；M3 重建时需先验证 Region 原生附着
+ * （attachment.token）是否随 Token 删除自动清理，若不自动清理再参考此逻辑补 Region 删除。
  */
-Hooks.on("deleteToken", (tokenDoc, options, userId) => {
-  if (game.user.id !== userId) return;
-
-  const scene = tokenDoc.parent;
-  if (!scene || scene.templates.size === 0) return;
-
-  const idsToDelete = [];
-
-  for (const t of scene.templates) {
-    const flags = t.flags["xjzl-system"];
-    if (flags && flags.sourceToken === tokenDoc.id && flags.autoDelete === true) {
-      idsToDelete.push(t.id);
-    }
-  }
-
-  if (idsToDelete.length > 0) {
-    scene.deleteEmbeddedDocuments("MeasuredTemplate", idsToDelete);
-  }
-});
+// Hooks.on("deleteToken", (tokenDoc, options, userId) => {
+//   if (game.user.id !== userId) return;
+//
+//   const scene = tokenDoc.parent;
+//   if (!scene || scene.templates.size === 0) return;
+//
+//   const idsToDelete = [];
+//
+//   for (const t of scene.templates) {
+//     const flags = t.flags["xjzl-system"];
+//     if (flags && flags.sourceToken === tokenDoc.id && flags.autoDelete === true) {
+//       idsToDelete.push(t.id);
+//     }
+//   }
+//
+//   if (idsToDelete.length > 0) {
+//     scene.deleteEmbeddedDocuments("MeasuredTemplate", idsToDelete);
+//   }
+// });
 
 /**
  * 监听宏栏放置事件 (Hotbar Drop Hook)
  */
 /**
  * 1. 同步钩子：负责拦截
- * 只要是 Item，立刻告诉 Foundry "你不许动，放着我来"，然后调用异步处理函数。
+ * 只要是 Item，立即拦截 Foundry 的默认宏生成流程，转交给下方异步处理函数。
  */
 Hooks.on("hotbarDrop", (bar, data, slot) => {
 
