@@ -381,9 +381,10 @@ export class XJZLItem extends Item {
     }
     if (!targetItem) return ui.notifications.error("目标物品不存在。");
 
-    // 优先检查 sourceId，如果没有 sourceId，则检查 name
+    // 优先检查 compendiumSource（V14 官方来源字段，替代已移除的 flags.core.sourceId），
+    // 没有来源记录时退回 name+type 比对（覆盖旧世界数据）
     const alreadyLearned = this.actor.items.find(i =>
-      (i.flags.core?.sourceId === targetUuid) ||
+      (i._stats?.compendiumSource === targetUuid) ||
       (i.name === targetItem.name && i.type === targetItem.type)
     );
     if (alreadyLearned) {
@@ -395,8 +396,8 @@ export class XJZLItem extends Item {
     delete itemData._id;
     delete itemData.folder;
     delete itemData.ownership;
-    // 记录来源，以便下次查重
-    foundry.utils.setProperty(itemData, "flags.core.sourceId", targetUuid);
+    // 记录官方来源字段，以便下次查重（V14：flags.core.sourceId 已移除）
+    foundry.utils.setProperty(itemData, "_stats.compendiumSource", targetUuid);
 
     await this.actor.createEmbeddedDocuments("Item", [itemData]);
 

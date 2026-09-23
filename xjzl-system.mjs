@@ -267,9 +267,9 @@ Hooks.once("init", async function () {
     console.log("XJZL | 已成功应用自定义距离移动计算。");
   }
 
-  // 注销默认表单
-  foundry.applications.apps.DocumentSheetConfig.unregisterSheet(ActiveEffect, "core", "ActiveEffectConfig");
-
+  // 【V14 升级 S1.9】V14 的 unregisterSheet 第三参要求 Sheet 类本身（内部取 .name 拼 id），
+  // 传字符串会静默无效；且核心 ActiveEffectConfig 在 V14 已无公开导出、被核心注册为非默认备选，
+  // 故不再注销，仅将我们的表注册为默认（实际解析永远命中我们的表）。S2.5 重写配置表时再定最终形态。
   // 注册我们的表单
   foundry.applications.apps.DocumentSheetConfig.registerSheet(ActiveEffect, "xjzl-system", XJZLActiveEffectConfig, {
     makeDefault: true,
@@ -1328,8 +1328,9 @@ function renderEncounterTrackerControls(app, html) {
   else root.prepend(controls);
 }
 
+// 【V14 升级 S1.8 实测】renderCombatTrackerHTML 在 V14 不派发（实测仅 renderCombatTracker 以
+// (CombatTracker, HTMLElement, context, options) 触发），删除冗余绑定。
 Hooks.on("renderCombatTracker", renderEncounterTrackerControls);
-Hooks.on("renderCombatTrackerHTML", renderEncounterTrackerControls);
 // 删除战局 Item 时只清理“未关联”的失效按钮；已关联战斗持有独立快照副本，不受源 Item 删除影响。
 // 保留 linked 按钮是为了让已关联战斗的战局副本继续可访问、可运行。
 Hooks.on("deleteItem", item => {

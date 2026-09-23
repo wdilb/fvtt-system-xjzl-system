@@ -2,7 +2,7 @@
 
 本文件是 V14 升级的进度事实源，记录工作项、依赖和验证结果；范围、设计、API 依据及验收标准见 [`V14_UPGRADE.md`](V14_UPGRADE.md)。复杂工作另建专项计划，并在对应工作项后附链接，本清单不展开实现细节。
 
-**当前下一步：M0 已全部验证通过（S0.1–S0.7），进入 M1 剩余项（S1.8 渲染钩子实测 / S1.9 注销逻辑 / S1.10 更新键弃用 / S1.11 CSS 变量 / S1.15 #13436 审计），完成 M1 验收后进入 M2（AE 链路迁移，机制结论已齐备）；冗余代码清理集中在 S5.7 收尾执行。**
+**当前下一步：M1 代码项已全部完成（S1.1–S1.16），待用户刷新确认控制台无本阶段涉及的弃用警告后 M1 验收收尾；随后进入 M2（AE 链路迁移，从 S2.2 开始，机制结论见 M0 记录）。**
 
 ## 使用方式与状态约定
 
@@ -38,10 +38,10 @@
 - [x] S1.5 A5：`CONFIG.statusEffects` 数组 → 按 id 键对象（定义在 CONFIG 赋值处转换，调用侧约 16 处改对象访问）
 - [x] S1.6 A6：`rollMode` 设置 → `messageMode`；`ChatMessage.applyRollMode` → `ChatMessage.applyMode`（3 处设置读取 + 1 处固定 public，共 4 个调用点）
 - [x] S1.7 A7：`system.json` 兼容版本 13 → 14（声明已改；`verified` 的发布依据仍需 M5 完整回归）
-- [ ] S1.8 B4：逐钩子实测 V14 渲染钩子派发形态（ApplicationV2 通用钩子为 `render<ClassName>` + HTMLElement，**不批量改 `*HTML`**）；renderTokenHUD 单独核查选择器/按钮/事件委托；renderCombatTracker 双绑实测后清理冗余
-- [ ] S1.9 B5：核查 V14 核心默认表注册形态与继承链后，再处理 V1 Sheet 注销逻辑（AppV1 仍在弃用命名空间）
-- [ ] S1.10 B6：`-=`/`==` 更新键在 V14 弃用，移除期为 V16；审计写入方与钩子接收形态，迁移到 `foundry.data.operators`，验证删除/替换仍触发资源脚本重算后再精简旧键检测
-- [ ] S1.11 B7：CSS 旧变量族替换（17 处 / 6 个变量族）
+- [x] S1.8 B4：逐钩子实测 V14 渲染钩子派发形态 → **已验证（14.368 实测，探针捕获参数）**：目录三钩子 `renderActorDirectory/renderItemDirectory/renderCompendiumDirectory` 正常派发，参数 `(App实例, HTMLElement, context, options)`，现有 HTMLElement 兼容写法有效，万卷阁按钮注入位置正确（`header.directory-header`）；`renderChatMessageHTML` 以 `(ChatMessage, HTMLElement, context)` 正常派发；`renderTokenHUD` 已由 S0.3 验证（图标渲染+点击链路正常）；**`renderCombatTrackerHTML` 在 V14 不派发，已删除冗余双绑**，仅留 `renderCombatTracker`；战局控制条空置源于无进行中战斗（函数 `!combat` 早退），锚点 `header.combat-tracker-header` 在 V14 存在；`renderXJZLActiveEffectConfig`（自有 AppV1 钩子）归 S2.5 重写处理。**注意：目录在启动时渲染一次，切标签不触发重渲染钩子**，验证需 force render
+- [x] S1.9 B5：核查 V14 核心默认表注册形态与继承链后，再处理 V1 Sheet 注销逻辑 → **已验证（14.368 实测）**：V14 移除了 `CONFIG.Actors.sheetClasses`，注册表改挂文档类（`CONFIG.Actor.sheetClasses`）；`Actors/Items.registerSheet/unregisterSheet` 是兼容 shim，自动转发 `DocumentSheetConfig.registerSheet(文档类, ...)`——我方全部注册生效（character/npc→XJZLCharacterSheet、creature→XJZLCreatureSheet、container→XJZLLootWorkbenchSheet 均为默认，实际解析 `actor.sheet` 命中确认），Actor/Item 的 core 注销调用（传类）有效；**唯一问题：AE 注销调用第三参传字符串 id，V14 要求传 Sheet 类（内部取 .name），静默无效**——已删除该调用并注明原因（核心 ActiveEffectConfig 在 V14 无公开导出，被核心注册为非默认备选，S2.5 重写配置表时定最终形态）
+- [x] S1.10 B6：`-=`/`==` 更新键审计与迁移评估 → **审计完成（14.368 实测），代码保持现状**：全库（module/入口/data 脚本）确认**无 `-=`/`==` 写入方**，无需迁移 operators；`_changesResourceScriptSources` 的 `-=ignoreArmorEffects` 检测分支保留——实测 V14 仍在钩子前归一化掉 `-=` 键（updateActor 收到的 changes 无 `-=`），但 `update()` 覆写与内部快路径收到的是**调用方原始数据**，外部调用者仍可用 `-=` 删除 flag（V14 实测有效），检测分支在该路径承重；V14 operators API 为 `foundry.data.operators.{ForcedDeletion, ForcedReplacement, ...}`；**V16 移除 `-=` 时需复查本项**
+- [x] S1.11 B7：CSS 旧变量族替换（实测 16 处，原记 17）→ **已完成**：旧变量在 V14 从 `:root` 缩小作用域到 `body.game .app` 兼容层（V13 表过渡保留）；映射（固定色底元素选**稳定色阶**而非主题感知变量，避免用户切主题后对比度反转）：`--color-border-light-2`→`--color-dark-6`（8）、`--color-text-dark-primary`→`--color-dark-1`（4）、`--color-text-light-highlight`→`--color-light-1`（1）、`--color-text-light-primary`→`--color-light-5`（1）、`--color-shadow-highlight`→`--color-warm-1`（1，V14 官方 highlight 即 warm-1）、`--color-border-dark`→`--color-dark-1`（1）；涉及 _encounter/_roll-config/item-trait/item-equipment/item-art-book/item-general 共 6 文件，残留检查为 0
 - [x] S1.12 A8：`bringToTop()` → `bringToFront()`（character-sheet.mjs，V14 已移除）
 - [x] S1.13 A9：ChatMessage 数据 `user:` → `author:`（模块 27 处 + data/ 脚本 88 处；世界内脚本副本由 S4.7 迁移）
 - [x] S1.14 摘除 MeasuredTemplate 启动依赖（应用户要求以注释方式停用、保留代码供 M3 光环/Region 重建参考，未删除文件；模块求值期即阻断加载，功能暂下线待 M3 Region 重建）；`node --check` 通过，V14 构建 14.368 实机进入系统确认 AOE 按钮已消失，启动解阻生效
@@ -53,7 +53,7 @@
     5. `xjzl-system.mjs` deleteToken 钩子：整体（该钩子仅负责 autoDelete 模板清理）
     6. `module/measured-template.mjs`：代码本身未注释（不再被 import 即不求值，可安全保留），文件头标注 M3 参考要点——1-2-2-2 圆形网格高亮算法、`tokens` 范围查询接口、标签绘制与点击穿透
     7. `module/applications/aoe-creator.mjs`：类整体保留可正常加载，仅 `_onCreate` 创建逻辑注释并加守卫返回；文件头标注 M3 参考要点——跟随/静态取点、GM 代创时所有权移交、`flags.sticky/sourceToken/label` 约定
-- [ ] S1.15 对照[官方 #13436](https://github.com/foundryvtt/foundryvtt/issues/13436)审计入口、module 与模板代码，补录遗漏项
+- [x] S1.15 对照[官方 #13436](https://github.com/foundryvtt/foundryvtt/issues/13436)审计入口、module 与模板代码 → **审计完成，1 处命中已修复**：`item.mjs` 秘籍查重读/写 `flags.core.sourceId`（V14 已移除）→ 改为官方字段 `_stats.compendiumSource`（旧世界数据由 name+type 兜底比对，无需迁移）。其余类别全部干净：Handlebars `colorPicker`/`select` helper、`CONST.CHAT_MESSAGE_TYPES`、`Math.clamped/roundDecimals`、`_on*Documents` 旧集合钩子、Token 旧 API（getCenter/updateSource/toggle*）、Scene 雾与全局光旧字段、GridLayer 旧属性（`canvas.grid.size` 仅存于 S1.14 注释块）、裸全局引用（SquareGrid 等均走 foundry.* 命名空间）、`advanceTime`/`temporary` 选项、`PerceptionManager#refresh` 等；`updateSource` 两处命中为 `_preCreate` 中改 `_source` 的官方现行 API，非被移除的 Token#updateSource。data/ 脚本字符串的对照审计归 S4.8（M4）
 - [x] S1.16 V14 启动路径修复：`XJZLActor.getRollData` 对缺失资源兜底。V14 的 `applyActiveEffects` 与 `TokenDocument._getReplacementData` 在 prepareEmbeddedDocuments 阶段即调用 getRollData 解析变更中的 @ 引用，早于 creature 在 prepareDerivedData 补建鸭子类型 `hp/mp`，直接读取使该 Actor 数据准备中断（构建 14.368 实机报错）；改为 `?.` + `?? 0` 兜底（character 的 schema 自带 hp/mp/rage 不受影响），`node --check` 通过；修复效果待用户刷新复验，creature 时序与 AE @ 引用的深层适配归 S0.7/M2 复核
 
 ## M2 ActiveEffect 链路（依赖 S0.1/S0.2/S0.6/S0.7）
@@ -121,7 +121,7 @@
 | 阶段 | 验收状态 | 验证记录 / 专项计划 |
 |---|---|---|
 | M0 | **通过** | 2026-09-23 构建 14.368 实机验证（浏览器自动化，GM 身份）：S0.1–S0.7 全部通过并记录结论。关键结论：无需自定义 AE 数据模型；initial/final 阶段契约确认（initial 先于派生计算，变更必须指向原始字段）；1-2-2-2 劫持存活且计费正确（`_animateTurnMarker` 已被 V14 移除，装饰损失）；duration 全新 `{units,value,expiry,expired}` 结构；Region 行为完整进出周期通过（事件仅由官方移动驱动派发；非链接 token 落合成 Actor）；AE 变更全类型应用与“true”字符串语义安全；TokenHUD/选取器/工具栏注入全链路正常。写入型验证用临时数据已全部清理。影响实现的待定问题：无阻塞项（Q4/Q5 依据已收集，分别在 S3.6/S2.4 定稿） |
-| M1 | 待验 | 首批 A 类代码项与 S1.14 已勾选；2026-09-23 构建 14.368 首次实机进入系统：AOE 按钮确认下线；creature Actor 数据准备报错由 S1.16 修复，用户刷新复验启动路径无报错，S1.14/S1.16 的启动解阻目标达成，其余 M1 项（钩子/表单/样式）仍待验 |
+| M1 | 待验（收尾） | 2026-09-23 构建 14.368 实机验证：启动解阻已达成（S1.14/S1.16，用户复验无报错）；S1.8–S1.11、S1.15 全部完成并记录结论（探针实测钩子派发、Sheet 注册表形态、`-=` 行为、CSS 变量映射、#13436 全量对照）。M1 代码项已全部勾选，阶段出口仅剩：用户刷新后确认控制台无本阶段涉及的弃用警告；AE/脚本/AOE 等功能行为分别留待 M2/M3/M5 验收 |
 | M2 | 待验 | — |
 | M3 | 待验 | — |
 | M4 | 待验 | — |
